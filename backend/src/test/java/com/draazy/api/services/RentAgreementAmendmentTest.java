@@ -31,10 +31,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.ResultActions;
 
-// Re-priced terms reach the draft only once the requester accepted them and paid any difference.
 @DisplayName("Rent agreement amendments — the desk proposes, the requester accepts and pays the difference")
 class RentAgreementAmendmentTest extends ServiceFixtures {
-
     private static final String TERMS = "{\"type\":\"rent-agreement\",\"details\":{\"rent\":20000,"
             + "\"deposit\":60000,\"months\":11,\"_state\":{\"prop\":{\"gramPanchayat\":false},\"terms\":{\"rent\":\"20000\",\"deposit\":\"60000\","
             + "\"months\":\"11\"}}}}";

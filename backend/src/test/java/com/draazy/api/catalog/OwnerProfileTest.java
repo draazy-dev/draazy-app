@@ -21,9 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** Public seller card at {@code GET /owners/{id}} plus the owner facet on {@code /properties}. */
 class OwnerProfileTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -31,10 +29,8 @@ class OwnerProfileTest extends AbstractApiTest {
     @Autowired
     EntityManager em;
 
-    /** A slug no seed uses, so each test owns its slice of the catalogue outright. */
     private static final String SLUG = "owner-profile-fixture";
 
-    /** Same reason as the TrustStatsTest fixture: {@code locality_slug} is a foreign key. */
     @BeforeEach
     void createFixtureLocality() {
         jdbc.update("insert into localities (slug, name, city) values (?, ?, 'Pune')"
@@ -58,9 +54,6 @@ class OwnerProfileTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    // ---------------- the card ----------------
-
-    /** Asserted as a whole to catch an <em>extra</em> field a single-key check would miss. */
     @Test
     void theSellerCardIsPublicAndCappedToSixFields() throws Exception {
         User u = owner("9811000001");
@@ -74,7 +67,6 @@ class OwnerProfileTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.*", org.hamcrest.Matchers.hasSize(6)));
     }
 
-    /** Fields named individually so a swap fails; {@code lastActive} would expose a private person's presence. */
     @Test
     void theCardCarriesNothingOperationalAboutTheAccount() throws Exception {
         User u = owner("9811000002");
@@ -93,7 +85,6 @@ class OwnerProfileTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
     }
 
-    /** Both directions in one test: the masked form is present <em>and</em> the raw number is absent. */
     @Test
     void theMobileIsMaskedWithNoWayToRevealIt() throws Exception {
         User u = owner("9811000003");
@@ -103,11 +94,10 @@ class OwnerProfileTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.mobile").value(org.hamcrest.Matchers.not("9811000003")));
     }
 
-    /** Read in IST to match the confirmation email; JDBC-written as {@code joined_at} isn't updatable. */
     @Test
     void memberSinceIsTheYearReadInIndianTime() throws Exception {
         User u = owner("9811000004");
-        Instant justAfterMidnightIst = Instant.parse("2023-12-31T19:00:00Z"); // 00:30 IST, 1 Jan 2024
+        Instant justAfterMidnightIst = Instant.parse("2023-12-31T19:00:00Z");
         jdbc.update("update users set joined_at = ? where id = ?",
                 java.sql.Timestamp.from(justAfterMidnightIst), u.getId());
         em.clear();
@@ -119,7 +109,6 @@ class OwnerProfileTest extends AbstractApiTest {
                         .value(org.hamcrest.Matchers.not(justAfterMidnightIst.atZone(ZoneId.of("UTC")).getYear())));
     }
 
-    /** The stored {@code listings_count} disagrees with what a visitor can open once anything is taken down. */
     @Test
     void theListingCountCountsOnlyWhatAVisitorCanOpen() throws Exception {
         User u = owner("9811000005");
@@ -137,7 +126,6 @@ class OwnerProfileTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.listingCount").value(1));
     }
 
-    /** An owner with nothing live is a real owner with a real answer, not a 404. */
     @Test
     void anOwnerWithNoLiveListingsAnswersZero() throws Exception {
         User u = owner("9811000006");
@@ -146,9 +134,6 @@ class OwnerProfileTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.listingCount").value(0));
     }
 
-    // ---------------- what is not reachable ----------------
-
-    /** All collapse to 404: 400 would be an enumeration oracle, and an archived owner must not stay reachable. */
     @Test
     void unknownMalformedAndArchivedOwnersAreAllTheSameNotFound() throws Exception {
         mvc.perform(get("/owners/" + UUID.randomUUID())).andExpect(status().isNotFound());
@@ -160,15 +145,11 @@ class OwnerProfileTest extends AbstractApiTest {
         mvc.perform(get("/owners/" + u.getId())).andExpect(status().isNotFound());
     }
 
-    /** {@code GET /owners} would be a scraper-grade landlord directory; no handler, no deep public path. */
     @Test
     void thereIsNoPublicListOfOwners() throws Exception {
         mvc.perform(get("/owners")).andExpect(status().is4xxClientError());
     }
 
-    // ---------------- the owner facet on search ----------------
-
-    /** Both directions: only asserting the positive would pass against a facet silently ignored. */
     @Test
     void theOwnerFacetNarrowsToOnePerson() throws Exception {
         User mine = owner("9811000008");
@@ -184,7 +165,6 @@ class OwnerProfileTest extends AbstractApiTest {
                         org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("Theirs and live"))));
     }
 
-    /** Asked for by title, since "count is 1" would also pass against the wrong single row. */
     @Test
     void askingForOneOwnersStockStillHidesWhatIsNotPublic() throws Exception {
         User u = owner("9811000010");
@@ -200,7 +180,6 @@ class OwnerProfileTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].title").value("Owner facet live"));
     }
 
-    /** Driver-side UUID comparison answers empty rather than 500 when the parameter is malformed. */
     @Test
     void aMalformedOwnerFacetMatchesNothingRatherThanFailing() throws Exception {
         mvc.perform(get("/properties").param("owner", "u1"))

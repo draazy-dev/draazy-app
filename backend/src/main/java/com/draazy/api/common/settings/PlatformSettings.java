@@ -12,26 +12,19 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class PlatformSettings {
-
     private static final Logger log = LoggerFactory.getLogger(PlatformSettings.class);
 
-    /** The seeded key holding the fee block (see {@code R__DML_seed_reference_data.sql}). */
     public static final String FEES_KEY = "fees";
 
-    /** The seeded key holding the feature-toggle block, the same one {@code GET /bootstrap} publishes. */
     static final String FLAGS_KEY = "flags";
 
-    /** Owner contacts a caller with no subscription may open, before any referral bonus. */
     private static final long DEFAULT_FREE_CONTACT_LIMIT = 15L;
 
-    // Ceiling on the contact numbers.
-    // Past a thousand means "no limit"; that belongs in `plans.unlimited_contacts`.
     private static final long MAX_CONTACT_GRANT = 1_000L;
 
     public record Bound(long fallback, long min, long max) {
     }
 
-    // Every referral and Featured number an admin may set; an out-of-range stored value reads as the fallback.
     public static final Map<String, Bound> FEE_BOUNDS = Map.ofEntries(
             Map.entry("featuredDays", new Bound(7, 1, 90)),
             Map.entry("referralContactBonus", new Bound(15, 0, MAX_CONTACT_GRANT)),
@@ -58,8 +51,6 @@ public class PlatformSettings {
     public record GrievanceOfficer(String name, String email) {
     }
 
-    // The product prices, in whole rupees.
-    // Defaults match a healthy install so broken rows fail instead of changing prices.
     private static final long DEFAULT_LISTING_PASS = 999L;
 
     private static final long DEFAULT_CONTACT_PACK = 199L;
@@ -68,7 +59,6 @@ public class PlatformSettings {
 
     public static final int MAX_PRICE = 100_000;
 
-    // An out-of-range price falls back to its default here, so the admin write must refuse one.
     public static final List<String> PRICE_FIELDS = List.of("listingPass", "contactPack",
             "rentAgreementPlatform");
 
@@ -242,7 +232,6 @@ public class PlatformSettings {
         return flag(FLAGS_KEY, "maintenanceMode", false);
     }
 
-    // Read past the cache: these are kill switches, and one must bite on the next request.
     private boolean flag(String key, String field, boolean whenUndecided) {
         Optional<Setting> row = settings.findById(key);
         if (row.isEmpty()) {

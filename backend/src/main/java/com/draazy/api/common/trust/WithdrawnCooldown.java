@@ -8,9 +8,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
-/** How long a requester must wait before asking again on a listing they withdrew from. */
 public final class WithdrawnCooldown {
-
     private static final Duration LENGTH = Duration.ofDays(7);
     private static final DateTimeFormatter DAY =
             DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH).withZone(ZoneId.of("Asia/Kolkata"));

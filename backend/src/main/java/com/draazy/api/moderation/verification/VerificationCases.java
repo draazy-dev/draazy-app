@@ -18,17 +18,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-// Catalog reaches this through ListingCaseNotes because it may not import moderation.
 @Service
 public class VerificationCases implements ListingCaseNotes {
-
-    // Rental has a lighter checklist because tenancy risk is lighter than sale risk.
     static final List<String> CHECKLIST = List.of(
             "Photos are real and match the listing",
             "Not a duplicate of another listing",
             "Details and location look right");
 
-    // Present only on a listing that quotes a RERA ID; driven by the RERA check, never ticked by hand.
     static final String RERA_ITEM = "RERA ID checked on MahaRERA";
 
     private final PropertyReviewRepository reviews;
@@ -41,7 +37,6 @@ public class VerificationCases implements ListingCaseNotes {
         this.properties = properties;
     }
 
-    // MANDATORY keeps case creation in the write that justified it and holds the lock.
     @Transactional(propagation = Propagation.MANDATORY)
     public PropertyReview ensure(UUID propertyId, String deal) {
         Optional<PropertyReview> existing = reviews.findByPropertyId(propertyId);
@@ -55,8 +50,6 @@ public class VerificationCases implements ListingCaseNotes {
             PropertyReview created = new PropertyReview(propertyId);
             expectedChecklist(properties.findById(propertyId)).forEach(created::addChecklistItem);
 
-            // saveAndFlush, not save: the checklist items are transient until insert, so plain save is
-            // correct only until a checklist entry gains a generated id.
             return reviews.saveAndFlush(created);
         });
     }
@@ -73,7 +66,6 @@ public class VerificationCases implements ListingCaseNotes {
             review.reopen();
             reconcilePendingChecklist(review);
 
-            // After commit only: a refused decision rolls the reopen back, and its audit row must not outlive it.
             String propertyId = event.propertyId().toString();
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -93,14 +85,12 @@ public class VerificationCases implements ListingCaseNotes {
         reviews.saveAndFlush(review);
     }
 
-    // Opens the case if absent because a note with nowhere to land warns nobody.
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void post(UUID propertyId, String deal, String body) {
         write(propertyId, deal, body, false);
     }
 
-    // Staff-only because duplicate notes would otherwise reveal pending rows to owners.
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void postInternalOnce(UUID propertyId, String deal, String body) {
@@ -118,8 +108,6 @@ public class VerificationCases implements ListingCaseNotes {
             review.addMessage(null, body);
         }
 
-        // saveAndFlush: a new message is a transient child of a managed collection, so deferring the
-        // persist to commit leaves its id and timestamp null for readers in the same transaction.
         reviews.saveAndFlush(review);
     }
 

@@ -12,8 +12,6 @@ import lombok.Getter;
 @Table(name = "otp_codes")
 @Getter
 public class OtpCode extends BaseEntity {
-
-    /** Sign-in. Lookups filter on purpose, so other flows share the table without colliding. */
     public static final String PURPOSE_LOGIN = "login";
 
     public static final String PURPOSE_OWNER_CONSENT = "owner-consent";
@@ -38,13 +36,10 @@ public class OtpCode extends BaseEntity {
     @Column(name = "expires_at", nullable = false, updatable = false)
     private Instant expiresAt;
 
-    /** The account that asked; null for login and signup. Read only by the per-caller send
-     * budget — every other limit keys on the recipient, the wrong end of this flow. */
     @Column(name = "requested_by", updatable = false)
     private UUID requestedBy;
 
     protected OtpCode() {
-
     }
 
     public OtpCode(String mobile, String codeHash, String purpose, Instant expiresAt,
@@ -64,7 +59,6 @@ public class OtpCode extends BaseEntity {
         this.consumed = true;
     }
 
-    /** Not a property: there is no {@code expired} field, so Lombok generates no colliding getter. */
     public boolean isExpired() {
         return Instant.now().isAfter(expiresAt);
     }

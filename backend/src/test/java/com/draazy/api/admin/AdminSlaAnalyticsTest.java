@@ -23,12 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/** {@code GET /admin/analytics/sla}. Semantics and the reasoning behind each predicate live in
- *  {@code docs/flows/admin/analytics.md} §5.7a; the fixtures below pin them one at a time. */
 @DisplayName("/admin/analytics/sla — moderation turnaround, measured not modelled")
 class AdminSlaAnalyticsTest extends AbstractApiTest {
-
-    /** Must match {@code AdminSlaService.TARGET_HOURS}; asserted, not assumed. */
     private static final int TARGET_HOURS = 24;
 
     @Autowired UserRepository users;
@@ -38,8 +34,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
         User u = new User(mobile, role);
         u.setName(name);
         u.setMobileVerified(true);
-        // A staff account is keyed in the permission map by its desk, and one with no desk is refused
-        // outright. Which desk is immaterial here — the seeded document grants all six the same set.
         if (Roles.Wire.STAFF.equals(role)) u.setTeam(Teams.RENTAL);
         return bearer(users.saveAndFlush(u));
     }
@@ -48,7 +42,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
         return bearerFor("9877750001", Roles.Wire.ADMIN, "SLA admin");
     }
 
-    /** A plain authenticated consumer — signed in, and entitled to none of this. */
     private String consumer() {
         return bearerFor("9877750002", Roles.Wire.BUYER, "SLA buyer");
     }
@@ -63,15 +56,11 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
         return ((Number) JsonPath.read(json, path)).longValue();
     }
 
-    /** Audit writes run {@code REQUIRES_NEW} and survive a neighbour's rollback, so an average over
-     *  the suite's leftovers could not tell a correct implementation from a broken one. */
     private void clearRecordedDecisions() {
         jdbc.update("delete from audit_log where action in ('property.status', 'property.verification.decision')"
                 + " and entity = 'property'");
     }
 
-    /** {@code created_at} is stamped by the database on insert, so a listing's age is moved
-     *  afterwards rather than set on the entity — the application does not get to choose it. */
     private UUID listing(String suffix, String status, int ageHours) {
         User owner = new User("987775" + suffix, Roles.Wire.OWNER);
         owner.setName("SLA Landlord " + suffix);
@@ -91,8 +80,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
         return p.getId();
     }
 
-    /** Written straight to {@code audit_log}: the moderation endpoint stamps {@code now()}, so every
-     *  fixture would have a turnaround of zero and could not tell a query from a constant. */
     private void recordDecision(UUID propertyId, int hoursAfterCreation) {
         jdbc.update("""
                 insert into audit_log (actor, actor_role, action, entity, entity_id, metadata, at)
@@ -102,8 +89,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                 """, propertyId.toString(), propertyId, hoursAfterCreation);
     }
 
-    /** The same decision against the listing's <em>slug</em>: {@code audit_log.entity_id} is free
-     *  text, which is why the join carries an {@code or} branch. */
     private void recordDecisionBySlug(UUID propertyId, int hoursAfterCreation) {
         jdbc.update("""
                 insert into audit_log (actor, actor_role, action, entity, entity_id, metadata, at)
@@ -114,8 +99,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                 """, propertyId, propertyId, hoursAfterCreation);
     }
 
-    /** Carries the {@code to} status, which only the concierge track reads. Kept apart from
-     *  {@link #recordDecision} so a non-approval can be shown not to count as going live. */
     private void recordStatusDecision(UUID propertyId, int hoursAfterCreation, String toStatus) {
         jdbc.update("""
                 insert into audit_log (actor, actor_role, action, entity, entity_id, metadata, at)
@@ -136,8 +119,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                 """, propertyId.toString(), toStatus, propertyId, hoursAfterCreation);
     }
 
-    /** Written with jdbc because the ticket's age is the thing under measurement, and a fixture that
-     *  could not set it would only ever produce turnarounds of zero. */
     private UUID ticket(String subject, String status, int ageHours) {
         UUID id = UUID.randomUUID();
         jdbc.update("""
@@ -148,13 +129,10 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
         return id;
     }
 
-    /** Hands a ticket to somebody, so it stops counting as unowned work. */
     private void assignTicket(UUID ticketId, UUID assigneeId) {
         jdbc.update("update tickets set assignee_id = ? where id = ?", assigneeId, ticketId);
     }
 
-    /** Both metadata keys are written on every row because {@code TicketService.update} does; a
-     *  fixture omitting one would describe a shape the application never produces. */
     private void recordTicketUpdate(UUID ticketId, int hoursAfterCreation,
             String toStatus, String assigneeId) {
         jdbc.update("""
@@ -167,7 +145,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                 """, ticketId.toString(), toStatus, assigneeId, ticketId, hoursAfterCreation);
     }
 
-    /** See {@link #clearRecordedDecisions}; the ticket track needs the same clean slate. */
     private void clearRecordedTicketUpdates() {
         jdbc.update("delete from audit_log where action = 'ticket.update' and entity = 'ticket'");
         jdbc.update("delete from tickets");
@@ -176,22 +153,18 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the guard")
     class Guard {
-
-        /** The report names how slow the platform is to look at what it publishes. Not public. */
         @Test
         void aPlainConsumerCannotReadIt() throws Exception {
             mvc.perform(get(Routes.Admin.ANALYTICS_SLA).header(HttpHeaders.AUTHORIZATION, consumer()))
                     .andExpect(status().isForbidden());
         }
 
-        /** The acceptance half, so the test above cannot pass because the route is simply broken. */
         @Test
         void anAdministratorReachesIt() throws Exception {
             mvc.perform(get(Routes.Admin.ANALYTICS_SLA).header(HttpHeaders.AUTHORIZATION, admin()))
                     .andExpect(status().isOk());
         }
 
-        /** Staff too: a backlog only an administrator can see is a backlog nobody clears. */
         @Test
         void opsStaffReachesIt() throws Exception {
             String staff = bearerFor("9877750003", Roles.Wire.STAFF, "SLA staff");
@@ -203,8 +176,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the shape")
     class Shape {
-
-        /** The target is served, so the browser stops carrying its own copy of the number. */
         @Test
         void theResponseCarriesTheTargetAndEveryCount() throws Exception {
             String json = body(Routes.Admin.ANALYTICS_SLA, admin());
@@ -219,11 +190,8 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                     .isNotNull();
         }
 
-        /** {@code ?days=} is validated rather than silently clamped or ignored. */
         @Test
         void anImpossibleWindowIsRejected() throws Exception {
-            // One caller, reused: admin() inserts a user, and the mobile is unique, so asking for a
-            // second token in the same test would fail on the fixture rather than on the endpoint.
             String admin = admin();
 
             mvc.perform(get(Routes.Admin.ANALYTICS_SLA + "?days=0")
@@ -238,9 +206,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
     @Nested
     @DisplayName("turnaround")
     class Turnaround {
-
-        /** Turnarounds chosen so every plausible mistake gives a different number: 5 = earliest
-         *  (correct), 200 = latest, 102.5 = the mean of both. */
         @Test
         void turnaroundIsTheFirstDecision_notTheLatestAndNotTheirAverage() throws Exception {
             clearRecordedDecisions();
@@ -260,14 +225,10 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                     .isEqualTo(5.0);
         }
 
-        /** The only test that records a decision against the slug: drop the join's {@code or} branch
-         *  and every other test here stays green while older decisions stop counting. */
         @Test
         void aDecisionRecordedAgainstTheSlugStillCounts() throws Exception {
             clearRecordedDecisions();
             UUID id = listing("0031", PropertyStatus.APPROVED, 400);
-            // The column is nullable and no fixture sets it, so without this the audit row would
-            // carry a null and match nothing — which looks exactly like the branch working.
             jdbc.update("update properties set slug = ? where id = ?", "sla-slug-fixture", id);
             recordDecisionBySlug(id, 6);
 
@@ -291,7 +252,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
             assertThat(((Number) JsonPath.read(json, "$.avgHoursToReview")).doubleValue()).isEqualTo(7.0);
         }
 
-        /** Breach counting, and the rate that follows from it. */
         @Test
         void aTurnaroundPastTheTargetIsABreachAndMovesTheRate() throws Exception {
             clearRecordedDecisions();
@@ -314,7 +274,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                     .isEqualTo(8.0);
         }
 
-        /** A listing nobody has decided on is not a fast review; it is not a review. */
         @Test
         void aPendingListingIsNotCountedAsReviewed() throws Exception {
             clearRecordedDecisions();
@@ -324,8 +283,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
             assertThat(num(json, "$.reviewedCount")).isZero();
         }
 
-        /** Reviewed is a past event; a listing that has since sold, paused or gone back to review
-         *  was still reviewed, and dropping it would time only the listings that never moved on. */
         @Test
         void aListingThatMovedOnAfterItsDecisionStillCountsAsReviewed() throws Exception {
             clearRecordedDecisions();
@@ -336,12 +293,9 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
             assertThat(num(json, "$.reviewedCount")).isEqualTo(2);
         }
 
-        /** {@code ?days=} filters on when the decision was taken, not when the listing was posted. */
         @Test
         void theWindowFiltersOnTheDecisionInstant() throws Exception {
             clearRecordedDecisions();
-            // Both posted 100 days ago; one decided six hours later, one decided yesterday. A query
-            // filtering on created_at would keep both or drop both, and never just the one.
             recordDecision(listing("0015", PropertyStatus.APPROVED, 2400), 6);
             recordDecision(listing("0016", PropertyStatus.APPROVED, 2400), 2376);
 
@@ -358,9 +312,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
     @Nested
     @DisplayName("an empty record")
     class EmptyRecord {
-
-        /** Null is the answer: there is no average of nothing, and a team with no decisions has not
-         *  met the SLA. {@code breachedCount} stays 0 because it is a count, not a derived figure. */
         @Test
         void withNothingReviewedTheAverageAndTheRateAreNull_notZeroAndNotAHundred()
                 throws Exception {
@@ -385,9 +336,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the backlog")
     class Backlog {
-
-        /** Asserted as a delta: the seeded catalogue carries pending listings of its own, so an
-         *  absolute count would fail the day somebody seeds an unrelated one. */
         @Test
         void aPendingListingOlderThanTheTargetIsBreachingNow() throws Exception {
             String token = admin();
@@ -407,7 +355,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                     .isEqualTo(1);
         }
 
-        /** The backlog is a present-tense fact, so narrowing the window must not shrink it. */
         @Test
         void theWindowDoesNotHideOldBacklog() throws Exception {
             String token = admin();
@@ -422,8 +369,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                     .isEqualTo(1);
         }
 
-        /** An edited listing re-enters the queue on resubmission; the review queue and the team
-         *  report both age it from there, so this report must too. */
         @Test
         void aResubmittedListingWaitsFromItsResubmission_notItsCreation() throws Exception {
             String token = admin();
@@ -441,7 +386,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
             assertThat(waits).allSatisfy(w -> assertThat(w.doubleValue()).isLessThan(24.0));
         }
 
-        /** Longest-waiting first — a queue ordered any other way is not a queue. */
         @Test
         void theOffenderListIsLongestWaitingFirstAndCapped() throws Exception {
             listing("0023", PropertyStatus.PENDING, 5000);
@@ -459,13 +403,9 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
         }
     }
 
-    /** Each test below goes after one predicate a plausible reimplementation gets wrong; each is a
-     *  one-word change to the query. See {@code docs/flows/admin/analytics.md} §5.7a. */
     @Nested
     @DisplayName("ticket and concierge turnaround")
     class Tracks {
-
-        /** Must match the three constants in {@code AdminSlaService}; asserted, not assumed. */
         @Test
         void everyTrackServesItsOwnTarget() throws Exception {
             String json = body(Routes.Admin.ANALYTICS_SLA, admin());
@@ -475,8 +415,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
             assertThat((int) num(json, "$.conciergeToLive.targetHours")).isEqualTo(168);
         }
 
-        /** Assigned at +2h, re-queued at +26h with {@code assignee_id} left null: reading the column
-         *  reports nothing picked up, reading the latest row reports 26. */
         @Test
         void pickupIsTheFirstRealAssignment_notTheColumnAndNotTheUnassignment() throws Exception {
             clearRecordedTicketUpdates();
@@ -494,8 +432,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                     .isEqualTo(2.0);
         }
 
-        /** The assigned ticket is the control: without it a query counting every open ticket would
-         *  pass, and that is the query reporting a desk clearing nothing as a desk with no backlog. */
         @Test
         void anUnownedTicketIsOutstandingAndPastTheTargetIsBreaching() throws Exception {
             clearRecordedTicketUpdates();
@@ -514,8 +450,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                     .isEqualTo(1);
         }
 
-        /** Recognising only {@code resolved} would leave every closed ticket outstanding for ever —
-         *  a backlog that grows every time somebody tidies up. */
         @Test
         void deliveryCountsAClosedTicketAsFinished() throws Exception {
             clearRecordedTicketUpdates();
@@ -536,8 +470,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                     .isEqualTo(50.0);
         }
 
-        /** Bounced back at +4h, approved at +200h: reusing the review track's "earliest decision"
-         *  reports 4, which would have this desk publishing everything inside half a day. */
         @Test
         void conciergeMeasuresTheApproval_notTheFirstDecision() throws Exception {
             clearRecordedDecisions();
@@ -570,8 +502,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
             assertThat(((Number) JsonPath.read(json, "$.conciergeToLive.avgHours")).doubleValue()).isEqualTo(30.0);
         }
 
-        /** Without the {@code posted_by_admin} filter this reports the whole catalogue's approval
-         *  time under a heading about staff-posted listings — plausible, and a different team. */
         @Test
         void anOwnerPostedListingIsNotConciergeWork() throws Exception {
             clearRecordedDecisions();
@@ -586,8 +516,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                     .isEqualTo(1);
         }
 
-        /** "Anything not approved" is the obvious spelling of the outstanding predicate and it is
-         *  wrong: it grows the backlog every time the pipeline correctly turns something down. */
         @Test
         void aRejectedConciergeListingIsNotStillPending() throws Exception {
             String token = admin();
@@ -605,8 +533,6 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                     .isEqualTo(1);
         }
 
-        /** Null on all three tracks: zero hours and 100% would have a fresh deployment reporting
-         *  instantaneous service and perfect compliance. */
         @Test
         void withNothingCompletedEveryTrackSaysSoRatherThanClaimingAPerfectRecord()
                 throws Exception {
@@ -628,12 +554,9 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
             }
         }
 
-        /** The window filters on completion, like the review track's does on the decision. */
         @Test
         void theWindowFiltersOnWhenTheWorkWasFinished() throws Exception {
             clearRecordedTicketUpdates();
-            // Both raised 100 days ago; one delivered the next day, one delivered yesterday. A query
-            // that filtered on created_at would keep both or drop both, and never just the one.
             recordTicketUpdate(ticket("Old and long done", "resolved", 2400), 24, "resolved", null);
             recordTicketUpdate(ticket("Old and just done", "resolved", 2400), 2376, "resolved", null);
 

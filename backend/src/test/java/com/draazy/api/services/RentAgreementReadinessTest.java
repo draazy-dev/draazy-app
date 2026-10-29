@@ -275,8 +275,8 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         }
 
         @Test
-            @DisplayName("missing identity rows are named after the papers are complete")
-            void identitiesAreCheckedAfterPapers() throws Exception {
+        @DisplayName("missing identity rows are named after the papers are complete")
+        void identitiesAreCheckedAfterPapers() throws Exception {
             User owner = customer("9820000706");
             String id = create(owner, state("owner", "", "9820000706", "9820000707"), 201);
 

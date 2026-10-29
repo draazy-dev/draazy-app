@@ -23,11 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Boundary cases prove this owner convenience cannot become a lookup
-// for somebody else's registered meter or address.
 @DisplayName("Listings — have I already listed this property?")
 class OwnListingDuplicateCheckTest extends AbstractApiTest {
-
     private static final String PATH = "/me/listings/duplicate-check";
 
     private static final String ADDRESS = "Flat 402, B Wing, Rohan Nilay";
@@ -80,7 +77,6 @@ class OwnListingDuplicateCheckTest extends AbstractApiTest {
                 meter == null ? "" : ", \"electricityMeterNo\": \"" + meter + "\"");
     }
 
-    /** The house way to pull one field out of a response body without a parser. */
     private String field(String json, String name) {
         return json.replaceAll("^.*?\"" + name + "\":\"([^\"]+)\".*$", "$1");
     }
@@ -111,7 +107,6 @@ class OwnListingDuplicateCheckTest extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString();
         String existingId = field(verdict, "existingId");
 
-        // The "edit the one you already have" link the wizard offers goes here.
         mvc.perform(get("/me/listings/" + existingId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(o)))
                 .andExpect(status().isOk());
@@ -139,7 +134,6 @@ class OwnListingDuplicateCheckTest extends AbstractApiTest {
         createListing(stranger, ADDRESS, METER);
         User o = owner("9876511005");
 
-        // A guessed meter must not reveal whether another owner registered it.
         mvc.perform(post(PATH)
                         .header(HttpHeaders.AUTHORIZATION, bearer(o))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -213,8 +207,6 @@ class OwnListingDuplicateCheckTest extends AbstractApiTest {
         User o = owner("9876511009");
         createListing(o, null, null);
 
-        // `= ''` is a match in SQL where `= null` is not. Without the blank-to-null guard this
-        // caller would collide with every listing they have that carries no meter.
         mvc.perform(post(PATH)
                         .header(HttpHeaders.AUTHORIZATION, bearer(o))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -228,11 +220,8 @@ class OwnListingDuplicateCheckTest extends AbstractApiTest {
     void meterMatchesAcrossGroupings() throws Exception {
         User o = owner("9876511012");
 
-        // Stored the way a bill prints it. The owner is shown this string back and checks it against
-        // that bill, so the raw column keeps the grouping; only the comparison key drops it.
         UUID existing = createListing(o, null, "1700 4455 6677");
 
-        // Typed the way somebody types a number from memory.
         for (String spelling : new String[] {"170044556677", "1700-4455-6677", " 1700  4455 6677 "}) {
             mvc.perform(post(PATH)
                             .header(HttpHeaders.AUTHORIZATION, bearer(o))
@@ -243,8 +232,6 @@ class OwnListingDuplicateCheckTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.existingId").value(existing.toString()));
         }
 
-        // Counter-anchor: one digit different is a different meter,
-        // so a constant key cannot satisfy every assertion above.
         mvc.perform(post(PATH)
                         .header(HttpHeaders.AUTHORIZATION, bearer(o))
                         .contentType(MediaType.APPLICATION_JSON)

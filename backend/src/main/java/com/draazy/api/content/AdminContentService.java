@@ -13,8 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdminContentService {
-
-    // Bare arrays because FAQs are editor-curated reference data (api-standards.md §5.1).
     static final int MAX_ITEMS = 500;
 
     private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "createdAt");
@@ -27,7 +25,6 @@ public class AdminContentService {
         this.audit = audit;
     }
 
-    /** {@code archived} null lists both; {@code translations} opts the authoring map in. */
     @Transactional(readOnly = true)
     public List<ContentItem> list(String type, Boolean archived, boolean translations) {
         requireFaqs(type);
@@ -65,8 +62,6 @@ public class AdminContentService {
         requireFaqs(type);
         FaqEntity faq = load(id);
 
-        // Idempotent on purpose: two ops clicking Archive on the same row is not a conflict, and a
-        // 409 here would only teach them to reload and click again.
         if (!faq.isArchived()) {
             faq.archive("Archived by " + caller.role());
             audit.record(caller, "content.archive", ContentTypes.FAQS, faq.getId().toString());

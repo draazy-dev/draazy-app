@@ -17,10 +17,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 
-// Service request docs are not vault docs; ownership is request-scoped, not listing-scoped.
 @DisplayName("Slice 11 — service-request documents")
 class ServiceRequestDocsTest extends ServiceFixtures {
-
     @Test
     @DisplayName("a request with no property files its documents against the request alone")
     void noPropertyDocumentsFileAgainstTheRequest() throws Exception {

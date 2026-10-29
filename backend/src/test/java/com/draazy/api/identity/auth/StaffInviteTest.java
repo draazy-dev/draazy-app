@@ -21,15 +21,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Audit rows run REQUIRES_NEW and survive class-level rollback, so successful writes clean up after themselves.
 @DisplayName("D206 — back-office accounts are activated by their holder, not by their creator")
 class StaffInviteTest extends AbstractApiTest {
-
     private static final String MAKERS_CHOICE = "Maker-chose-this!";
 
     private static final String HOLDERS_CHOICE = "Holder-chose-this!";
 
-    /** The secret half this test plants on an invite row; see {@link #plantToken}. */
     private static final String SECRET = "chosen-by-the-test";
 
     @Autowired
@@ -51,12 +48,8 @@ class StaffInviteTest extends AbstractApiTest {
         return users.saveAndFlush(user);
     }
 
-    // Sends a password anyway; the request record does not declare the field so Jackson drops it
-    // silently — pinned against a stale admin console still calling with it.
     private String createStaffAs(User actor, String mobile, String email, String role)
             throws Exception {
-        // A staff account must name a team; an admin resolves to the literal `admin` bundle and must
-        // not carry one. Neither is what this class is testing, so the helper keeps the body valid.
         String team = Roles.Wire.STAFF.equals(role) ? ",\"team\":\"" + Teams.RENTAL + "\"" : "";
         String body = mvc.perform(post(Routes.Users.STAFF)
                         .header(HttpHeaders.AUTHORIZATION, bearer(actor))
@@ -70,15 +63,12 @@ class StaffInviteTest extends AbstractApiTest {
         return body.replaceAll("(?s).*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
-    // Replace the account's invite hash with the digest of SECRET and return the token the holder uses.
     private String plantToken(String userId) {
         em.flush();
         String inviteId = jdbc.queryForObject(
                 "SELECT id::text FROM staff_invites WHERE user_id = ?::uuid", String.class, userId);
         jdbc.update("UPDATE staff_invites SET token_hash = ? WHERE id = ?::uuid",
                 sha256Hex(SECRET), inviteId);
-        // Detach, or the rewrite above is invisible to the code under test: Hibernate would resolve
-        // the row to the instance it already holds and read the stale in-memory hash.
         em.clear();
         return inviteId + "." + SECRET;
     }
@@ -97,8 +87,6 @@ class StaffInviteTest extends AbstractApiTest {
                 .andReturn().getResponse().getStatus();
     }
 
-    // Drive a real OTP sign-in and return verify status; the dispatched code is only logged so the
-    // stored hash is replaced with one this test chooses. One call per mobile — OtpService throttles.
     private int otpLogin(String mobile) throws Exception {
         mvc.perform(post(Routes.Auth.LOGIN)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,8 +98,6 @@ class StaffInviteTest extends AbstractApiTest {
                 WHERE id = (SELECT id FROM otp_codes WHERE mobile = ?
                             ORDER BY created_at DESC LIMIT 1)""",
                 sha256Hex("424242"), mobile);
-        // Detach, or the rewrite above is invisible: Hibernate would resolve the row to the OtpCode
-        // instance it already holds and read the stale in-memory hash.
         em.clear();
         return mvc.perform(post(Routes.Auth.LOGIN)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -140,8 +126,6 @@ class StaffInviteTest extends AbstractApiTest {
 
         String hireId = createStaffAs(maker, "9866041003", "hire@example.com", Roles.Wire.STAFF);
 
-        // 401 rather than 403: no password hash means the credential path refuses before any gate
-        // is consulted, indistinguishable from a mistyped password to the maker.
         assertThat(staffLogin("hire@example.com", MAKERS_CHOICE)).isEqualTo(401);
         em.flush();
         assertThat(jdbc.queryForObject("SELECT password_hash FROM users WHERE id = ?::uuid",
@@ -149,16 +133,12 @@ class StaffInviteTest extends AbstractApiTest {
                 .as("a back-office account must be created with no usable credential")
                 .isNull();
 
-        // The holder redeems, chooses their own password, and only then does the account come alive.
         String token = plantToken(hireId);
         assertThat(redeem(token, HOLDERS_CHOICE)).isEqualTo(204);
         assertThat(staffLogin("hire@example.com", HOLDERS_CHOICE)).isEqualTo(200);
-        // And the maker's guess is still just a wrong password, not a way in.
         assertThat(staffLogin("hire@example.com", MAKERS_CHOICE)).isEqualTo(401);
     }
 
-    // An account with no password is not unreachable: POST /auth/login needs no password, so a
-    // creator who typed their own mobile would hold the account outright without the invite gate.
     @Test
     @DisplayName("an un-activated account cannot sign in by OTP either")
     void anUnactivatedAccountCannotSignInByOtp() throws Exception {
@@ -169,8 +149,6 @@ class StaffInviteTest extends AbstractApiTest {
         assertThat(otpLogin(mobile)).isEqualTo(403);
     }
 
-    // A token that silently reset the password on every presentation would be a permanent
-    // credential in somebody's message history — anyone who ever saw the link could take the account back.
     @Test
     @DisplayName("an invite is single-use — a second redemption is refused and changes nothing")
     void anInviteIsSingleUse() throws Exception {
@@ -185,8 +163,6 @@ class StaffInviteTest extends AbstractApiTest {
         assertThat(staffLogin("once@example.com", "Attackers-choice!")).isEqualTo(401);
     }
 
-    // The row carries its own death date so a policy change cannot retroactively extend an
-    // invite already in flight.
     @Test
     @DisplayName("an expired invite is refused")
     void anExpiredInviteIsRefused() throws Exception {
@@ -194,8 +170,6 @@ class StaffInviteTest extends AbstractApiTest {
         String hireId = createStaffAs(maker, "9866041042", "stale@example.com", Roles.Wire.STAFF);
 
         String token = plantToken(hireId);
-        // The CHECK forbids expiring before issue, so backdating expires_at alone would be
-        // refused by the schema rather than by the code under test.
         jdbc.update("UPDATE staff_invites SET created_at = now() - interval '30 days',"
                 + " expires_at = now() - interval '1 second' WHERE user_id = ?::uuid", hireId);
 
@@ -204,8 +178,6 @@ class StaffInviteTest extends AbstractApiTest {
                 String.class, hireId)).isNull();
     }
 
-    // Every failure must give the same answer or the route becomes an oracle: a distinct
-    // "wrong secret" would confirm the guessed selector named a real invite.
     @Test
     @DisplayName("unknown, wrong and malformed tokens are refused identically")
     void everyRefusalLooksTheSame() throws Exception {
@@ -224,8 +196,6 @@ class StaffInviteTest extends AbstractApiTest {
         assertThat(wrongSecret).contains("401");
     }
 
-    // Status, error code and message as one comparable string; traceId is excluded because it
-    // is a per-request id that would make every comparison fail for the wrong reason.
     private String body(String token) throws Exception {
         var response = mvc.perform(post(Routes.Auth.STAFF_INVITE_REDEEM)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -242,8 +212,6 @@ class StaffInviteTest extends AbstractApiTest {
         return json.replaceAll("(?s).*\"" + name + "\"\\s*:\\s*\"([^\"]*)\".*", "$1");
     }
 
-    // Only a digest is stored (43 base64 chars vs 64 lower-case hex); a dump of this table must not
-    // be replayable, on the same reasoning as refresh_tokens.token_hash and otp_codes.code_hash.
     @Test
     @DisplayName("only a digest of the invite secret is persisted")
     void onlyADigestIsPersisted() throws Exception {
@@ -257,8 +225,6 @@ class StaffInviteTest extends AbstractApiTest {
                 .matches("^[0-9a-f]{64}$");
     }
 
-    // A password nobody can remember gets written down; the floor is on the request so the
-    // answer is a 422 naming the field.
     @Test
     @DisplayName("a too-short password is refused with a validation error")
     void aTooShortPasswordIsRefused() throws Exception {
@@ -281,7 +247,6 @@ class StaffInviteTest extends AbstractApiTest {
                 String.class, hireId)).isNull();
     }
 
-    // If the invite were skipped, an admin could mint a colleague against their own mobile and sign in by OTP.
     @Test
     @DisplayName("staff creation issues an invite")
     void staffCreationIssuesAnInvite() throws Exception {
@@ -292,16 +257,12 @@ class StaffInviteTest extends AbstractApiTest {
         String hireId = createStaffAs(solo, mobile, "bootstrap@example.com", Roles.Wire.STAFF);
 
         em.flush();
-        // OTP path deliberately: it needs no credential, so it is the only one still open if the
-        // invite were skipped here. A password login would 401 for want of a hash and prove nothing.
         assertThat(otpLogin(mobile)).isEqualTo(403);
 
         assertThat(redeem(plantToken(hireId), HOLDERS_CHOICE)).isEqualTo(204);
         assertThat(staffLogin("bootstrap@example.com", HOLDERS_CHOICE)).isEqualTo(200);
     }
 
-    // Read the CHECK from pg_constraint rather than provoking it: a failed statement aborts the
-    // Postgres transaction and every later statement (including cleanup) would then fail.
     @Test
     @DisplayName("the database refuses an invite that expires before it was issued")
     void theDatabaseRefusesAnImpossibleExpiry() {

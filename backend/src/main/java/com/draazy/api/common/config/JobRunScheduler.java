@@ -16,10 +16,7 @@ import org.springframework.scheduling.support.ScheduledMethodRunnable;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 
-/** Wraps each {@code @Scheduled} run: a {@code job-<Class.method>-<hex>} trace id and, for cron and one-off runs
- * with a lock, one runner across instances. */
 final class JobRunScheduler implements TaskScheduler {
-
     static final String TRACE_PREFIX = "job-";
 
     private static final Pattern QUALIFIED_METHOD = Pattern.compile("[\\w$]+(?:\\.[\\w$]+)+");
@@ -49,8 +46,6 @@ final class JobRunScheduler implements TaskScheduler {
         return delegate.schedule(wrap(task, true), startTime);
     }
 
-    // Fixed-rate and fixed-delay tasks tick on each instance's own clock and do per-instance housekeeping (such
-    // as an in-memory purge every 25 s), so they get a trace id but no cluster lock or connection.
     @Override
     public ScheduledFuture<?> scheduleAtFixedRate(Runnable task, Instant startTime, Duration period) {
         return delegate.scheduleAtFixedRate(wrap(task, false), startTime, period);
@@ -77,8 +72,6 @@ final class JobRunScheduler implements TaskScheduler {
         return job == null ? task : () -> run(job, task, runLock);
     }
 
-    // Spring hands the scheduler a tracking wrapper whose toString() is the scheduled method's
-    // "<class>.<method>"; it is accepted only when that names a real no-arg method, so other tasks pass through.
     static String jobName(Runnable task) {
         if (task instanceof ScheduledMethodRunnable method) {
             return simpleName(ClassUtils.getUserClass(method.getTarget()), method.getMethod().getName());
@@ -122,7 +115,6 @@ final class JobRunScheduler implements TaskScheduler {
         }
     }
 
-    // Logged here, not left to Spring's error handler, so the failure still carries the job trace id.
     private static void runLogged(String job, Runnable task) {
         try {
             task.run();

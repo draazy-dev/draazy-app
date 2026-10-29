@@ -8,12 +8,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-/** The invoice for one successful payment; immutable once issued. */
 @Entity
 @Table(name = "invoices")
 @Getter
 public class Invoice extends BaseEntity {
-
     @Column(name = "number", nullable = false, updatable = false)
     private String number;
 
@@ -39,7 +37,6 @@ public class Invoice extends BaseEntity {
     private Instant issuedAt;
 
     protected Invoice() {
-        // JPA
     }
 
     Invoice(String number, UUID userId, String sourceType, UUID sourceId, String orderRef, long amount,

@@ -18,10 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// /admin/notes — what the team knows about a case. Three operations over one table serving four entity families.
 @RestController
 public class InternalNoteController {
-
     private static final String STAFF_OR_ADMIN =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
     private static final String NOTES_READ =
@@ -42,7 +40,6 @@ public class InternalNoteController {
         return service.list(principal, entityType, entityId);
     }
 
-    // Author comes from the principal, not the request body.
     @PostMapping(Routes.Moderation.NOTES_FOR_ENTITY)
     @PreAuthorize(NOTES_WRITE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -52,7 +49,6 @@ public class InternalNoteController {
         return service.add(principal, entityType, entityId, body.action(), body.text());
     }
 
-    // text is @NotBlank so action-only notes cannot render as empty bullets.
     public record NoteCreateRequest(
             @NotBlank @Size(max = 4000) String text,
             @Size(max = 60) String action) {

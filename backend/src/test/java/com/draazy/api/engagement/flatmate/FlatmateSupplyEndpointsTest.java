@@ -41,11 +41,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
-// A cap a client enforces is a suggestion, so Guardrails proves the anti-broker cap and the address
-// dedupe hold in the process that inserts, and Tiers that a tier is derived.
 @DisplayName("Flatmates — rooms, groups, the feed and the guardrails behind them")
 class FlatmateSupplyEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -293,8 +290,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    // A room or group is born pending and invisible; none of the tests below is about moderation,
-    // so they seed published supply. The default is pinned in FlatmateModerationGateTest.
     private String publish(String table, String id) {
         jdbc.update("update " + table + " set mod_status = 'approved' where id = ?::uuid", id);
         entityManager.clear();
@@ -381,8 +376,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                 "select seats_open from flatmate_groups where id = ?::uuid", Integer.class, groupId);
     }
 
-    // The address is the consent's scope, so it must be the one the post will fingerprint at
-    // — a group names its flat by title, a room by society — or the post is filed without the flag.
     private String recordOwnerConsent(User host, String title, String society, String locality)
             throws Exception {
         String ownerMobile = "983" + host.getMobile().substring(3);
@@ -435,14 +428,11 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the anti-broker guardrails (now server-side)")
     class Guardrails {
-
         @Test
         @DisplayName("a fourth live post from one identity is refused")
         void capIsEnforcedAcrossRoomsAndGroups() throws Exception {
             User host = user("9820000001", "Broker");
 
-            // The cap counts rooms AND groups together — it is a cap on one identity's supply,
-            // not on one table.
             createRoom(host, "Baner", "Sai Radha A");
             createRoom(host, "Baner", "Sai Radha B");
             createGroup(host, "Three of us in Baner", "Baner");
@@ -504,7 +494,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("verification tiers")
     class Tiers {
-
         private String ownerRoom(User host, String society, String propertyId) throws Exception {
             return mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
@@ -567,8 +556,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             assertThat(queued).isOne();
         }
 
-        // Every other fixture sends the full evidence set, so without this nothing would notice the
-        // rule loosening back to the bare flag — which is free, and mints tenant tier for anyone.
         @Test
         @DisplayName("a rent agreement claimed without its paperwork is refused, naming what is missing")
         void anUnevidencedClaimIsRefused() throws Exception {
@@ -601,15 +588,11 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             User host = user("9820000012", "Landlord", Roles.Wire.OWNER);
             Property flat = badgedListing(host, PropertyStatus.APPROVED);
 
-            // Without a propertyId on the room create path this host could only reach identity,
-            // which is pending — a queue their own approved listing had already cleared.
             String json = ownerRoom(host, "Landlord Heights", flat.getId().toString());
 
             assertThat(json).contains("\"verificationTier\":\"owner\"");
             assertThat(json).contains("\"verified\":true");
 
-            // Owner tier skips the queue: reviewing the parent listing's documents twice costs Ops
-            // real time for nothing.
             assertThat(json).contains("\"modStatus\":\"live\"");
 
             String id = idOf(json);
@@ -617,8 +600,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     "select count(*) from flatmate_reviews where room_id = ?::uuid",
                     Integer.class, id)).isZero();
 
-            // Read for the tier and the fingerprint, never stored: a seat-based room cannot also
-            // be a split of a flat (ck_flatmate_rooms_split_has_no_seats).
             assertThat(jdbc.queryForObject(
                     "select property_id from flatmate_rooms where id = ?::uuid", String.class, id))
                     .isNull();
@@ -672,7 +653,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.verified").value(true));
         }
 
-        // The room never stores the id, so without this an edit form re-saves an owner room as identity.
         @Test
         @DisplayName("the host's own room names the flat it claimed, so an edit can send it back")
         void hostViewReturnsTheClaimedFlat() throws Exception {
@@ -748,7 +728,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("seats and occupants")
     class Capacity {
-
         @Test
         @DisplayName("closing a seat keeps the verification tier — a re-list needs no re-verification")
         void seatChangePreservesTier() throws Exception {
@@ -845,7 +824,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("groups")
     class Groups {
-
         @Test
         @DisplayName("joining an open-policy group files a pending request; the seat goes only when the host accepts")
         void openPolicyJoinWaitsForTheHost() throws Exception {
@@ -886,8 +864,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.action").value("request"));
         }
 
-        // users.name is nullable (an OTP sign-in gives a mobile and nothing else), and a fabricated
-        // name would be shown to other people as theirs — so initials must stay null too.
         @Test
         @DisplayName("a joiner who has never given a name joins with no name, not with \"Member\"")
         void namelessJoinerStoresNoName() throws Exception {
@@ -935,8 +911,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[0].perHead").value(40000 / 3));
         }
 
-        // The client can only tell group_full from already_interested by the trailing marker, and
-        // the marker only reaches it if nothing follows — so the position is what is asserted.
         @Test
         @DisplayName("open seats never overlap members, and changing them resizes the group and its share")
         void openSeatsNeverOverlapMembers() throws Exception {
@@ -1008,8 +982,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message", Matchers.endsWith("(group_full)")))
 
-                    // Both refusals travel as `error: "conflict"`, so the sub-code is the only
-                    // thing separating a red refusal from a benign notice.
                     .andExpect(jsonPath("$.message",
                             Matchers.not(Matchers.containsString("already_interested"))));
 
@@ -1090,12 +1062,9 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         }
     }
 
-    // Deliberately sequential; the racing version lives in FlatmateDuplicateInterestRaceTest, which
-    // needs real commits. Answering 201 here while that one answers 409 would be two contracts.
     @Nested
     @DisplayName("asking twice")
     class Duplicates {
-
         @Test
         @DisplayName("a second room enquiry is refused with 409 and leaves one row")
         void secondRoomInterestIsRefused() throws Exception {
@@ -1115,8 +1084,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                             .content("{\"share\":\"solo\",\"message\":\"Second ask.\"}"))
                     .andExpect(status().isConflict())
 
-                    // Ends with, not contains — see FlatmateConflicts for why the position is the
-                    // contract and not just the presence.
                     .andExpect(jsonPath("$.message", Matchers.endsWith("(already_interested)")));
 
             Integer rows = jdbc.queryForObject(
@@ -1185,7 +1152,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the mixed feed")
     class Feed {
-
         @Test
         @DisplayName("move-in shows rooms; team-up shows people")
         void tabsSplitByIntentNotByTable() throws Exception {
@@ -1248,7 +1214,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the Ops queue")
     class OpsQueue {
-
         private String tenantClaimRoom(User host, String society) throws Exception {
             return tenantClaimRoom(host, society, null);
         }
@@ -1290,7 +1255,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     String.class, roomId);
         }
 
-
         @Test
         @DisplayName("approving grants the badge and tells the host")
         void approvingGrantsTheBadge() throws Exception {
@@ -1316,8 +1280,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
 
             assertThat(roomTier(roomId)).isEqualTo("tenant");
 
-            // And the card agrees: the badge is derived from tier plus verdict, so an approved
-            // claim cannot pass the Verified-only filter while its own card comes back unbadged.
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "Baner")
                             .param("verifiedOnly", "true").param("size", "100"))
                     .andExpect(status().isOk())
@@ -1325,8 +1287,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[?(@.id == '" + roomId + "')].verified",
                             Matchers.hasItem(true)));
 
-            // And so does the host's own write response: one built without the verdict would tell
-            // a host who merely reopened a seat that the claim Ops just accepted had lapsed.
             mvc.perform(patch(Routes.Flatmates.ROOM_SEATS, roomId)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -1387,8 +1347,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                             .content(FlatmateApprovals.approve()))
                     .andExpect(status().isOk());
 
-            // This host submitted no paperwork: they are queued because a *different* host claimed
-            // the same address, which must not mint a badge out of somebody else's mistake.
             assertThat(roomTier(roomId)).isEqualTo("identity");
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "Undri")
                             .param("verifiedOnly", "true").param("size", "100"))
@@ -1429,8 +1387,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                             .content("{\"decision\":\"rejected\",\"note\":\"Illegible scan\"}"))
                     .andExpect(status().isOk());
 
-            // Ops answering a question about a rent agreement cannot revoke a tier that came from
-            // a title deed, on evidence the host has since stopped offering.
             assertThat(roomTier(roomId)).isEqualTo("owner");
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "Baner")
                             .param("verifiedOnly", "true").param("size", "100"))
@@ -1483,8 +1439,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.verificationTier").value("identity"));
 
-            // Dropping to identity needs no review, so the edit does not re-open the row either:
-            // it still says `tenant`, and still says Agreement Flat.
             assertThat(jdbc.queryForObject(
                     "select status from flatmate_reviews where id = ?::uuid",
                     String.class, reviewId)).isEqualTo("pending");
@@ -1547,8 +1501,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             flat.archive("Owner withdrew the listing");
             properties.saveAndFlush(flat);
 
-            // Owner tier is the one rung the queue cannot reach, so the sweep is the only lever:
-            // deriveTier runs only on a host-initiated write, and owner-tier posts never queue.
             assertThat(reconciler.reconcileOwnerTier()).isEqualTo(1);
             assertThat(roomTier(roomId)).isEqualTo("identity");
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "Kothrud")
@@ -1567,7 +1519,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             User ops = user("9820000053", "Ops2", Roles.Wire.STAFF);
             String roomId = tenantClaimRoom(host, "Doubtful Heights");
 
-            // A host told "no" with no reason cannot fix anything.
             mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, roomReview(roomId))
                             .header(HttpHeaders.AUTHORIZATION, bearer(ops))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -1626,12 +1577,9 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         }
     }
 
-    // reviewStatus travels on the feed and detail DTOs so the badge and the "verified only" filter
-    // are answerable server-side; read from localStorage instead, both silently stop working.
     @Nested
     @DisplayName("the Ops verdict, server-side")
     class ReviewStatusOnTheWire {
-
         private String tenantClaimGroup(User host, String title, String locality) throws Exception {
             String ownerConsentMobile = recordOwnerConsent(host, title, null, locality);
             String json = mvc.perform(post(Routes.Flatmates.GROUPS)
@@ -1776,7 +1724,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             User host = user("9820000077", "No claim");
             createRoom(host, "VerdictTownE", "Plain Heights");
 
-            // Not "pending": there is nothing queued, and saying pending would invent a promise.
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "VerdictTownE"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)))
@@ -1784,12 +1731,9 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         }
     }
 
-    // Each test isolates its data behind a unique locality and asserts an exact page size, because
-    // "the filter narrowed something" is weaker than "the filter returned exactly these".
     @Nested
     @DisplayName("server-side facets (D116)")
     class Facets {
-
         private String facetRoomBody(User host, String locality, String society, String lookingFor,
                 String foodPref, long rentShare, String bhk) {
             return withSocietyIds("""
@@ -1840,7 +1784,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in")
                             .param("locality", "GenderFacetTown").param("gender", "female"))
                     .andExpect(status().isOk())
-            // A request of 'any' states no preference: it must not exclude a thing.
                     .andExpect(jsonPath("$.content", Matchers.hasSize(2)));
         }
 
@@ -1859,7 +1802,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)));
         }
 
-            // A women request returns the women group and the open group — never the men-only one.
         @Test
         @DisplayName("rent range filters groups server-side")
         void groupRentRange() throws Exception {

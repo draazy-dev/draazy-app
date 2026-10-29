@@ -27,53 +27,13 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * The way out of {@code awaiting-payment}, and the floor under the cap that guards it — D152 and
- * D153.
- *
- * <p><strong>One suite for two items because they are one situation.</strong> A priced service
- * request is committed unpaid and only the Cashfree webhook moves it on, so closing the modal
- * without paying left the row in a state with no exit: ops cannot see it, {@code PATCH /status} is
- * staff-only, and the one-open-unpaid cap then refused the customer's next attempt while pointing
- * at a request they could do nothing with (D152). The cap that did the refusing was itself
- * check-then-act, so it held against the double click it was written for and not against a loop
- * (D153). Fixing either alone leaves the customer stuck: a cap you cannot get out from under, or an
- * exit from a cap that does not hold.
- *
- * <p><strong>Why there are no threads here</strong> — the same reason {@code OpsQueueConcurrencyTest}
- * has none. A race reproduced with threads is a race reproduced <em>sometimes</em>, and a flaky test
- * guarding concurrency is worse than none. What the D153 fix adds is a uniqueness constraint, and a
- * constraint's whole point is that it does not depend on timing: a second row that would violate it
- * is refused whether it arrives a millisecond later or a day later. So the tests below insert the
- * second row directly, past the service's count, and assert the database's own answer.
- *
- * <p>The sweep is driven by calling {@code expireAbandonedCheckouts(cutoff)} with a fabricated
- * instant rather than by waiting on {@code AbandonedCheckoutSweep}'s schedule — the split between
- * the trigger and the work exists precisely so no test has to wait on a wall clock.
- */
 @DisplayName("Slice 11 — the exit from an unpaid service request, and the cap's floor")
 class ServiceRequestUnpaidExitTest extends ServiceFixtures {
-
-    /**
-     * Composed the same way the controller composes it, and deliberately not copied as a literal:
-     * if the path moves, this fails to compile rather than silently testing a 404.
-     */
     private static final String CANCEL = Routes.ServiceRequests.BY_ID + "/cancel";
 
     @Nested
     @DisplayName("the customer cancels their own abandoned checkout (D152)")
     class SelfCancel {
-
-        /**
-         * Self-cancel writes an audit row, and audit runs {@code REQUIRES_NEW} — so it commits even
-         * though the test transaction rolls back (see {@code AbstractApiTest}). Clear it, or the row
-         * outlives the suite.
-         *
-         * <p>Declared on this nested class rather than the outer one on purpose: {@code CapFloor}
-         * deliberately provokes a constraint violation, which leaves the database transaction
-         * aborted, and an inherited {@code @AfterEach} issuing SQL would then fail there instead of
-         * where the assertion is.
-         */
         @AfterEach
         void clearAudit() {
             jdbc.update("delete from audit_log where action = 'service-request.cancelled-unpaid'");
@@ -88,8 +48,6 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
             cancel(buyer, id, 200);
 
             expectStatus(buyer, id, ServiceRequestStatus.CANCELLED.wire());
-            // payment.abandoned, not payment.failed: no money was ever attempted, and support needs
-            // to be able to tell "my card was declined" from "I closed the tab".
             mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                     .andExpect(status().isOk())
@@ -104,12 +62,10 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
             Property p = listing(buyer);
             String first = raiseUnpaid(buyer, p);
 
-            // Before: the cap refuses, because the abandoned request still holds the slot.
             create(buyer, p, 409);
 
             cancel(buyer, first, 200);
 
-            // After: the desk is open again. Nothing was charged for either.
             create(buyer, p, 201);
         }
 
@@ -160,7 +116,6 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
     @Nested
     @DisplayName("the sweep closes checkouts nobody came back to (D152)")
     class ExpirySweep {
-
         @Test
         @DisplayName("an unpaid request past the TTL is cancelled, and the desk reopens")
         void staleCheckoutsAreCancelled() throws Exception {
@@ -171,7 +126,6 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
             assertThat(serviceRequests.expireAbandonedCheckouts(future())).isEqualTo(1);
 
             expectStatus(buyer, id, ServiceRequestStatus.CANCELLED.wire());
-            // The point of the sweep: the customer who never came back is not locked out either.
             create(buyer, p, 201);
         }
 
@@ -244,12 +198,10 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
                     + "and status = 'awaiting-payment'", UUID.class, requester.getId());
         }
 
-        /** Every request in this suite is younger than this, so the whole set is "past its TTL". */
         private Instant future() {
             return Instant.now().plus(Duration.ofMinutes(5));
         }
 
-        /** Older than anything this suite creates, so nothing is stale. */
         private Instant past() {
             return Instant.now().minus(Duration.ofHours(1));
         }
@@ -258,19 +210,12 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
     @Nested
     @DisplayName("the unpaid-order cap has a floor in the database (D153)")
     class CapFloor {
-
-        /**
-         * Bypasses {@code create} entirely — a raw INSERT is what a lost race amounts to: a second
-         * row arriving after the count read zero. If the partial unique index were missing this
-         * would succeed, which is exactly the unbounded-orders outcome D153 records.
-         */
         @Test
         @DisplayName("a second open unpaid row for the same requester and desk is refused")
         void theDatabaseRefusesTheSecondRow() throws Exception {
             User buyer = customer("9820000920");
             raiseUnpaid(buyer, listing(buyer));
 
-            // Nothing may follow: a constraint violation leaves the transaction rollback-only.
             assertThatThrownBy(() -> insertOpenUnpaid(buyer, "rent-agreement"))
                     .isInstanceOf(DataIntegrityViolationException.class);
         }
@@ -282,9 +227,7 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
             User other = customer("9820000922");
             raiseUnpaid(buyer, listing(buyer));
 
-            // A different person's unpaid request on the same desk is not in conflict...
             insertOpenUnpaid(other, "rent-agreement");
-            // ...nor is the same person's on a different desk.
             insertOpenUnpaid(buyer, "legal");
 
             assertThat(openUnpaidCount(buyer)).isEqualTo(2);
@@ -299,13 +242,10 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
             String first = raiseUnpaid(buyer, p);
             deliverSigned(paymentRef(first), true);
 
-            // Paid, so out of the predicate: a second unpaid row for the same desk is now legal at
-            // the database as well as at the service. The cap is on outstanding orders, not volume.
             create(buyer, p, 201);
             insertOpenUnpaid(buyer, "legal");
         }
 
-        /** The count-based fast path still answers first, with the same 409 the index would give. */
         @Test
         @DisplayName("the ordinary double click is still refused by the count, not by the index")
         void theFastPathStillAnswersFirst() throws Exception {
@@ -314,16 +254,10 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
             raiseUnpaid(buyer, p);
 
             create(buyer, p, 409);
-            // Still one row: the count refused before anything was inserted, so no constraint was
-            // reached and the transaction is still usable.
             assertThat(openUnpaidCount(buyer)).isEqualTo(1);
         }
 
         private void insertOpenUnpaid(User requester, String type) {
-            // `team` is written explicitly rather than left out: V72 made it NOT NULL and paired it
-            // to `type` by CHECK, so a raw insert has to state the desk the service would have
-            // derived. Resolved through the same map the production path uses, so this fixture
-            // cannot drift away from it.
             jdbc.update("insert into service_requests (requester_id, type, team, status) "
                     + "values (?, ?, ?, 'awaiting-payment')",
                     requester.getId(), type, ServiceRequestTypes.teamFor(type));
@@ -341,7 +275,6 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
     @Nested
     @DisplayName("the cap's 409 describes something the customer can actually do (D152)")
     class CapMessage {
-
         @Test
         @DisplayName("it offers cancellation and expiry, not the two dead ends it used to")
         void theMessageNamesRealActions() throws Exception {
@@ -356,13 +289,10 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message", containsString("Cancel it")))
                     .andExpect(jsonPath("$.message", containsString("expired")))
-                    // The old wording told them to do one of two things they could not do.
                     .andExpect(jsonPath("$.message",
                             not(containsString("Pay for it or cancel it"))));
         }
     }
-
-    // ---------------------------------------------------------------- helpers
 
     private void cancel(User caller, String id, int expected) throws Exception {
         mvc.perform(post(CANCEL, id)
@@ -370,7 +300,6 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
                 .andExpect(status().is(expected));
     }
 
-    /** Raise a rent agreement and assert only the status code — the body varies by outcome. */
     private void create(User caller, Property property, int expected) throws Exception {
         mvc.perform(post(Routes.ServiceRequests.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(caller))

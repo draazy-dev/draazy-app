@@ -31,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class EnquiryBoardService {
-
     private static final int LOCALITY_ROWS = 10;
 
     private final ContactRequestRepository contactRequests;
@@ -76,7 +75,6 @@ public class EnquiryBoardService {
                 (Instant) r[10], (Instant) r[11]));
     }
 
-    /** Totals, per-status counts and the funnel in one read; {@code days} and {@code deal} narrow the funnel only. */
     @Transactional(readOnly = true)
     public AdminEnquirySummary summary(Integer days, String deal) {
         Map<String, Long> enquiryCounts = withTotal(queries.countsByStatus("ContactRequest"));
@@ -146,7 +144,6 @@ public class EnquiryBoardService {
                 since(days));
     }
 
-    /** {@code GET /admin/enquiries/{id}} — one contact request; audited, as opening a row is. */
     @Transactional
     public AdminEnquiryDto enquiry(AuthPrincipal actor, String id) {
         ContactRequest row = Ids.parseUuid(id)
@@ -172,7 +169,6 @@ public class EnquiryBoardService {
                 row.getCreatedAt());
     }
 
-    /** {@code GET /admin/visits/{id}} — one site visit; audited. */
     @Transactional
     public AdminVisitDto visit(AuthPrincipal actor, String id) {
         Visit row = Ids.parseUuid(id)
@@ -200,7 +196,6 @@ public class EnquiryBoardService {
                 row.getCreatedAt());
     }
 
-    // Same preferred typed number as the list; the audit names its source.
     @Transactional
     public AdminDealDto deal(AuthPrincipal actor, String id) {
         Deal row = Ids.parseUuid(id)

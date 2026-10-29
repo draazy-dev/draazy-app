@@ -11,17 +11,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Reads over {@code offers}, shaped to hit the V5 and V47 indexes. */
 public interface OfferRepository extends JpaRepository<Offer, UUID> {
-
-    /** The caller's own offers, newest first; {@code idx_offers_from_created} carries the sort. */
     Page<Offer> findByFromUserIdOrderByCreatedAtDesc(UUID fromUserId, Pageable pageable);
 
-    /** Offers against the caller's listings, newest first; hits {@code idx_offers_property_created}. */
     Page<Offer> findByPropertyIdInOrderByCreatedAtDesc(Collection<UUID> propertyIds,
                                                        Pageable pageable);
 
-    /** Clean-error pre-check; {@code uq_offers_live_per_user_property} is the real guarantee. */
     @Query("select o from Offer o where o.fromUserId = :userId and o.propertyId = :propertyId " +
             "and o.status in ('pending', 'countered')")
     Optional<Offer> findLiveByUserAndProperty(@Param("userId") UUID userId,
@@ -32,13 +27,11 @@ public interface OfferRepository extends JpaRepository<Offer, UUID> {
 
     boolean existsByFromUserIdAndPropertyIdAndStatus(UUID fromUserId, UUID propertyId, String status);
 
-    /** Live offers the buyer made, plus any that moved since {@code since}. */
     @Query("""
             select o from Offer o where o.fromUserId = :buyerId
             and (o.status in ('pending', 'countered') or o.updatedAt >= :since)""")
     List<Offer> findSentSince(@Param("buyerId") UUID buyerId, @Param("since") Instant since);
 
-    /** Live offers on these listings, plus any that moved since {@code since}. */
     @Query("""
             select o from Offer o where o.propertyId in :propertyIds
             and (o.status in ('pending', 'countered') or o.updatedAt >= :since)""")

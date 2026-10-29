@@ -34,7 +34,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class IdentityVerificationService {
-
     static final int MAX_ATTEMPTS_PER_WINDOW = 3;
     static final Duration ATTEMPT_WINDOW = Duration.ofHours(24);
     static final String CONSENT_NOTICE_VERSION = "2026-09";
@@ -100,14 +99,11 @@ public class IdentityVerificationService {
                 .orElse(false);
     }
 
-    /** Approved, not merely submitted. Seeded and staff-granted accounts carry the user flag without a case row. */
     @Transactional(readOnly = true)
     public boolean isApproved(UUID userId) {
         return users.findById(userId).map(User::isVerified).orElse(false) || isVerified(userId);
     }
 
-    /** KYC verified or in review is enough to file a verification request; approval waits for verified.
-     * Seeded accounts carry the user flag without a case row. */
     @Transactional(readOnly = true)
     public boolean isSubmitted(UUID userId) {
         boolean flagged = users.findById(userId).map(User::isVerified).orElse(false);
@@ -435,5 +431,4 @@ public class IdentityVerificationService {
         }
         ownerBadge.markOwnerUnverified(userId);
     }
-
 }

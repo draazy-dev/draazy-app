@@ -15,7 +15,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 class TeamPerformanceRepository {
-
     private static final String STAFF = """
             select u.id::text, coalesce(nullif(u.name, ''), u.mobile, u.id::text)
             from users u
@@ -124,7 +123,6 @@ class TeamPerformanceRepository {
             ) property_queue
             """;
 
-    // One branch per function a staffer holds, so /my-work never scans a desk it cannot work.
     private static final List<Map.Entry<String, String>> MY_QUEUES = List.of(
             Map.entry("kyc", """
                     select 'kyc', count(*) filter (where status = 'pending'),
@@ -248,7 +246,6 @@ class TeamPerformanceRepository {
                 branches.add(queue.getValue());
             }
         }
-        // Team names come from DESK_TEAMS, never from the caller, so formatting them in is safe.
         String teams = DESK_TEAMS.stream()
                 .filter(team -> functions.contains("desk:" + team))
                 .map(team -> "('" + team + "')")

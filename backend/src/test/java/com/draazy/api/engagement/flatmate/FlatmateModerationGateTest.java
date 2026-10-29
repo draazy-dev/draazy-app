@@ -23,11 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Broker contact can hide in unbounded title, note or locality text.
-// All three gates must hold; any one alone either hides or leaks the post.
 @DisplayName("Flatmate board — a flat is moderated before public, a flatless post after (D72)")
 class FlatmateModerationGateTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -121,8 +118,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
     @Nested
     @DisplayName("a post with a flat is not public")
     class NotPublic {
-
-            // No Authorization header: this is the surface the whole item is about.
         @Test
         @DisplayName("a room is absent from the anonymous feed until it is decided")
         void roomStartsInvisible() throws Exception {
@@ -149,7 +144,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
             String id = createRoom(seeker("9811000004", "Direct"), "GateTownD", "Direct House");
             User other = seeker("9811000005", "Curious");
 
-            // The interest path uses `findVisible`; otherwise free text leaks by another route.
             mvc.perform(post(Routes.Flatmates.ROOM_INTEREST, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(other))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -161,7 +155,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
     @Nested
     @DisplayName("a post with no flat is public at once, but cannot carry a number")
     class FlatlessGoesLive {
-
         @Test
         @DisplayName("a seeker post is on the anonymous feed as soon as it is written")
         void seekerPostIsPublic() throws Exception {
@@ -200,7 +193,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
     @Nested
     @DisplayName("and its author is not left guessing")
     class TheAuthorCanStillSeeIt {
-
         @Test
         @DisplayName("the create response says live, so the page can say so")
         void createEchoesTheModerationState() throws Exception {
@@ -236,8 +228,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                                     """.formatted(FlatmateRoomFixture.photos(host.getId()),
                                     FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS)))
                     .andExpect(status().isCreated())
-                    // Without this the client has no way to distinguish "saved" from "published",
-                    // and would show a success screen for a post nobody can see.
                     .andExpect(jsonPath("$.modStatus").value("pending"));
         }
     }
@@ -245,7 +235,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
     @Nested
     @DisplayName("and there is a queue to let it out")
     class TheQueue {
-
         private User admin(String mobile) {
             return user(mobile, "Mod", Roles.Wire.ADMIN);
         }
@@ -303,8 +292,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
 
-            // A decided post must leave the queue, or the backlog never shrinks and the moderator
-            // re-reads the same rejection every morning.
             mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_QUEUE)
                             .param("kind", "room")
                             .header(HttpHeaders.AUTHORIZATION, bearer(mod)))

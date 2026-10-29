@@ -5,24 +5,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** The twelve questions, each answered 0..2 on an ordered scale: 0 strictest or quietest, 2 most relaxed. */
 public final class LivingStyleCatalogue {
-
     private LivingStyleCatalogue() {
     }
 
     public static final List<String> KEYS = List.of("tidy", "food", "sleep", "wfh", "guests", "visitors",
             "smoking", "drinks", "pets", "bills", "family", "quiet");
 
-    /** The subset the feed and alerts can filter on. */
     public static final List<String> FILTER_KEYS = List.of("food", "smoking", "pets", "drinks", "visitors", "sleep");
 
     public static final int MAX = 2;
 
-    /** Below this many shared answers a percentage says more about the sample than the people. */
     public static final int MIN_COMMON = 3;
 
-    /** {@code match} is null when too few answers overlap to say anything. */
     public record Score(Integer match, int common) {
     }
 
@@ -43,7 +38,6 @@ public final class LivingStyleCatalogue {
         return new Score((int) Math.round(100.0 * points / (MAX * common)), common);
     }
 
-    /** Strict on purpose: a decimal or a string is a client bug, not an answer to round. */
     public static Map<String, Integer> validated(Map<String, Object> raw) {
         if (raw == null) {
             throw new BadRequestException("answers is required.");
@@ -69,7 +63,6 @@ public final class LivingStyleCatalogue {
         throw new BadRequestException("Answer for '" + key + "' must be a whole number from 0 to " + MAX + ".");
     }
 
-    /** The jsonb column does not keep insertion order; the questionnaire reads in this one. */
     public static Map<String, Integer> ordered(Map<String, Integer> answers) {
         Map<String, Integer> out = new LinkedHashMap<>();
         for (String key : KEYS) {

@@ -14,7 +14,6 @@ import org.springframework.core.env.MapPropertySource;
 @SpringBootApplication
 @ConfigurationPropertiesScan
 public class DraazyApiApplication {
-
     static final String MIGRATE_ONLY = "--migrate-only";
 
     public static void main(String[] args) {
@@ -24,8 +23,8 @@ public class DraazyApiApplication {
         SpringApplication.run(DraazyApiApplication.class, args);
     }
 
-    // Deployed profiles set spring.flyway.enabled=false, so the serving app never holds the schema-owner
-    // credential; the migration job boots Flyway alone and re-enables it above every other source.
+    // Deployed profiles disable Flyway so the serving app never holds the schema-owner credential.
+    // The migration job boots Flyway alone and re-enables it above every other property source.
     static ConfigurableApplicationContext migrate(String... args) {
         return new SpringApplicationBuilder(FlywayAutoConfiguration.class)
                 .web(WebApplicationType.NONE)

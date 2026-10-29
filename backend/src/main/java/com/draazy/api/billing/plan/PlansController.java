@@ -13,17 +13,14 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The caller's subscription. The plan catalogue is the {@code plans} section of {@code GET /bootstrap}. */
 @RestController
 public class PlansController {
-
     private final SubscriptionService service;
 
     public PlansController(SubscriptionService service) {
         this.service = service;
     }
 
-    /** {@code GET /me/subscription} (contract {@code getSubscription}). */
     @GetMapping(Routes.Plans.SUBSCRIPTION)
     public SubscriptionState getSubscription(@CurrentUser AuthPrincipal principal) {
         return SubscriptionState.of(service.getSubscription(principal));
@@ -43,7 +40,6 @@ public class PlansController {
         service.cancelPending(principal);
     }
 
-    /** {@code GET /me/subscription/orders/{orderId}}: {@code paid | pending | failed | closed}. */
     @GetMapping(Routes.Plans.ORDER_STATUS)
     public OrderStatus orderStatus(@CurrentUser AuthPrincipal principal, @PathVariable String orderId) {
         return new OrderStatus(service.orderStatus(principal, orderId));

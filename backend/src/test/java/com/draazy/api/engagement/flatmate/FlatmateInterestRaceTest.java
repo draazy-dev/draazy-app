@@ -20,18 +20,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-// Deliberately not on AbstractApiTest: that base rolls back, so a commit-time race cannot be
-// observed from it (see Races) — hence everything here commits and cleanUp() deletes by hand.
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("Flatmate interests under concurrency — the cap D73 was raised against")
 class FlatmateInterestRaceTest {
-
-    /** {@code FlatmateSeekerService.MAX_INTERESTS}, which is private and stays that way. */
     private static final int CAP = 10;
 
-    // Two, not three: the winner holds two of the four test connections (its own plus the
-    // REQUIRES_NEW audit write), so a third racer would exhaust the pool and fail as a timeout.
+    // Two racers, not three: the winner holds two of the four test connections (own + audit write).
+    // A third would exhaust the pool and time out.
     private static final int RACERS = 2;
 
     @Autowired FlatmateSeekerService seekers;
@@ -52,8 +48,6 @@ class FlatmateInterestRaceTest {
             hosts.add(host);
             postIds.add(livePostFor(host));
         }
-        // One slot short of the ceiling, so the correct answer to two simultaneous callers is
-        // "one of you". Targets are arbitrary ids: the counter is keyed on the requester alone.
         for (int i = 0; i < CAP - 1; i++) {
             requests.saveAndFlush(new FlatmateRequest("flatmate", UUID.randomUUID(),
                     hosts.get(0).getId(), requester.getId(), "solo", "earlier"));
@@ -72,14 +66,10 @@ class FlatmateInterestRaceTest {
             jdbc.update("delete from flatmate_requests where host_id = ?", hostId);
         }
         for (UUID postId : postIds) {
-            // The interest audit row commits in its own REQUIRES_NEW transaction, so it outlives
-            // everything else here and has to be removed by hand.
             jdbc.update("delete from audit_log where entity_id = ?", postId.toString());
             jdbc.update("delete from flatmate_seeker_posts where id = ?", postId);
         }
         for (UUID userId : everyone) {
-            // Sending an interest notifies BOTH sides, so this has to sweep everyone and not just
-            // the hosts, or the FK to users holds the requester's row down.
             jdbc.update("delete from notifications where user_id = ?", userId);
             jdbc.update("delete from users where id = ?", userId);
         }
@@ -97,7 +87,6 @@ class FlatmateInterestRaceTest {
 
     private UUID livePostFor(User host) {
         FlatmateSeekerPost post = new FlatmateSeekerPost(host.getId(), host.getName(), 15_000L);
-        // findVisible only returns publicly-visible posts, and a new one starts pending.
         post.setModStatus(FlatmateVocabulary.MOD_LIVE);
         return posts.saveAndFlush(post).getId();
     }
@@ -108,8 +97,6 @@ class FlatmateInterestRaceTest {
         return n == null ? 0 : n;
     }
 
-    // Two *different* posts: the per-(post, requester) unique index would absorb two attempts at
-    // the same post by itself and prove nothing about the counter.
     @Test
     @DisplayName("two simultaneous interests fill the last slot once")
     void concurrentInterestsCannotOverfillTheHourlyCap() {

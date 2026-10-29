@@ -22,15 +22,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
-/** Demand signals: the anonymous half of the supply-gap report. The write must work without a token, or it misses
- * the population it measures; the read stays non-public. */
 @DisplayName("demand signals feed the supply-gap report")
 class DemandSignalTest extends AbstractApiTest {
-
-    /** A slug no seed row uses, so counts in this class cannot drift with the fixtures. */
     private static final String LOCALITY = "d10-demand-locality";
 
-    /** Deliberately never inserted into `localities` — see theUnknownLocalityIsTheInterestingRow. */
     private static final String UNKNOWN = "d10-nowhere-at-all";
 
     @Autowired
@@ -56,7 +51,6 @@ class DemandSignalTest extends AbstractApiTest {
         return n == null ? 0 : n;
     }
 
-    /** The JPA save is unflushed and {@code jdbc} reads don't flush, so flush before counting. */
     private void send(String body) throws Exception {
         mvc.perform(post("/demand-signals").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isAccepted());
@@ -166,8 +160,6 @@ class DemandSignalTest extends AbstractApiTest {
         send("{\"kind\":\"search\",\"localitySlug\":\"" + LOCALITY + "\"}");
         send("{\"kind\":\"alert\",\"localitySlug\":\"" + LOCALITY + "\"}");
 
-        // 1 search (x2) + 1 alert (x5) = 7; views are not counted as they grow with supply.
-        // Hamcrest `contains`, as a filtered JSONPath yields an array even for one row.
         mvc.perform(get("/admin/supply-gap").header("Authorization", bearer(admin())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.localitySlug=='" + LOCALITY + "')].searches")
@@ -209,15 +201,12 @@ class DemandSignalTest extends AbstractApiTest {
     void theUnknownLocalityIsTheInterestingRow() throws Exception {
         send("{\"kind\":\"alert\",\"localitySlug\":\"" + UNKNOWN + "\"}");
 
-        // No `localities` row means no foreign key: someone asking for uncovered ground, which a FK would reject.
         mvc.perform(get("/admin/supply-gap").header("Authorization", bearer(admin())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.localitySlug=='" + UNKNOWN + "')].alerts")
                         .value(Matchers.contains(1)))
                 .andExpect(jsonPath("$[?(@.localitySlug=='" + UNKNOWN + "')].supply")
                         .value(Matchers.contains(0)))
-                // NON_NULL omits localityName entirely, so the filtered selection is empty rather
-                // than a list holding null -- the response does not advertise a field it withheld.
                 .andExpect(jsonPath("$[?(@.localitySlug=='" + UNKNOWN + "')].localityName")
                         .value(Matchers.empty()));
     }
@@ -244,7 +233,6 @@ class DemandSignalTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isAccepted());
         }
-        // Four anonymous searches add to `searches` only: nothing distinguishes four strangers from one seeker.
         for (int i = 0; i < 4; i++) {
             send(body);
         }

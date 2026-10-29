@@ -9,10 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** {@code GET /admin/analytics/funnel}, guarded like the other analytics reads. */
 @RestController
 public class AdminFunnelController {
-
     private static final String ANALYTICS_READ =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')"
                     + " and " + Capabilities.REQUIRE_VIEW_DASHBOARD

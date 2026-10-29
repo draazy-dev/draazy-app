@@ -13,13 +13,9 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-// Finder shapes mirror the contact-request indexes, so inbox and reveal checks stay cheap.
 public interface ContactRequestRepository extends JpaRepository<ContactRequest, UUID> {
-
     Optional<ContactRequest> findByRequesterIdAndPropertyId(UUID requesterId, UUID propertyId);
 
-    // Counts while it has revealed the number or may still: approved, or pending inside the reply window. A projection,
-    // since first_requested_at is database-written and a just-saved entity holds null. Read under CONTACT_REQUEST lock.
     @Query("""
             select cr.propertyId as propertyId, cr.firstRequestedAt as firstRequestedAt, cr.status as status
             from ContactRequest cr where cr.requesterId = :requesterId
@@ -46,7 +42,6 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
             where cr.status = 'pending' and cr.createdAt < :replyCutoff order by cr.createdAt""")
     List<ContactRequest> findOverduePending(@Param("replyCutoff") Instant replyCutoff, Limit limit);
 
-    // The mapper asks this on every detail render, so an existence check is enough.
     boolean existsByRequesterIdAndPropertyIdAndStatus(UUID requesterId, UUID propertyId, String status);
 
     @Query("""
@@ -83,7 +78,6 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
             @Param("status") String status,
             @Param("liveSince") Instant liveSince);
 
-    // Takes property ids because contact requests do not store owner ids.
     Page<ContactRequest> findByPropertyIdInOrderByCreatedAtDesc(Collection<UUID> propertyIds,
             Pageable pageable);
 
@@ -109,7 +103,6 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
     Page<ContactRequest> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    // This table owns the question, so the finance slice should not query it.
     @Query("""
             update ContactRequest cr
                set cr.status = :toStatus
@@ -122,7 +115,6 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
 
     List<ContactRequest> findByPropertyIdAndStatus(UUID propertyId, String status);
 
-    // Native: first_requested_at is database-written, so the entity maps it read-only.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             update contact_requests

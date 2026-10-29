@@ -20,10 +20,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Reads are caller-independent; whether the caller follows a society is {@code /me/societies/following}. */
 @RestController
 public class SocietyController {
-
     private static final int TOP_RAIL = 8;
 
     private final SocietyService societyService;
@@ -37,8 +35,6 @@ public class SocietyController {
         this.resolveService = resolveService;
     }
 
-    /** {@code sort} is clamped to {@link SocietySort}'s whitelist; {@code hasListings=true} keeps societies with a live
-     *  listing, {@code mapped=true} only Google-picked ones (the listing wizard's Maps-down fallback). */
     @GetMapping(Routes.Societies.BASE)
     public PageResponse<SocietyResponse> browse(
             @RequestParam(required = false) String q,
@@ -51,7 +47,6 @@ public class SocietyController {
                 Function.identity());
     }
 
-    /** {@code GET /societies/top}: caller-independent, so it is cached like the other public reference reads. */
     @GetMapping(Routes.Societies.TOP)
     public List<SocietyCard> top() {
         return societyService.browse(null, null, true, null,
@@ -65,13 +60,11 @@ public class SocietyController {
         return societyService.get(slug);
     }
 
-    /** {@code GET /societies/{slug}/brief}: name, specs and rating for a listing page or a search chip. */
     @GetMapping(Routes.Societies.BRIEF)
     public SocietyBrief brief(@PathVariable String slug) {
         return societyService.brief(slug);
     }
 
-    /** The place's society, or similar ones within 250 m; anonymous-readable like the directory. */
     @GetMapping(Routes.Societies.RESOLVE)
     public SocietyResolveResponse resolve(
             @RequestParam String placeId,
@@ -81,7 +74,6 @@ public class SocietyController {
         return resolveService.resolve(placeId, name, lat, lng);
     }
 
-    /** 201 for a new row, 200 when the place already has one, so the screen can tell them apart. */
     @PostMapping(Routes.Societies.BASE)
     public ResponseEntity<SocietyResponse> mint(@CurrentUser AuthPrincipal principal,
             @Valid @RequestBody SocietyMintRequest request) {

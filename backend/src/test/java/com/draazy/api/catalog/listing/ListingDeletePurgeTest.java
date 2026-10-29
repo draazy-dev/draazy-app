@@ -44,7 +44,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @DisplayName("Owner delete — blocked by open work, then the content and photos go after the undo window")
 class ListingDeletePurgeTest extends AbstractApiTest {
-
     private static final String PREFIX = "/api/dev/storage/public/";
 
     @Autowired UserRepository users;
@@ -59,7 +58,6 @@ class ListingDeletePurgeTest extends AbstractApiTest {
         doReturn(PREFIX).when(storage).publicUrlPrefix();
     }
 
-    // Audit rows commit through REQUIRES_NEW, so the test's rollback does not take them with it.
     @AfterTransaction
     void removeAuditRowsThatEscapedRollback() {
         jdbc.update("delete from audit_log where entity = 'property' and entity_id = any (?)",

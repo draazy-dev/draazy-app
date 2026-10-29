@@ -11,11 +11,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-// Local-only shortcut so the consumer flow can run without a staff session.
 @RestController
 @LocalOnly
 public class DevIdentityVerificationController {
-
     private final IdentityVerificationService service;
     private final IdentityReviewService reviews;
     private final IdentityVerificationRepository verifications;
@@ -27,8 +25,6 @@ public class DevIdentityVerificationController {
         this.verifications = verifications;
     }
 
-    // POST /me/verification/identity/simulate?outcome=approve|reject — decide the caller's pending
-    // case. The synthetic number is derived from the user id so two dev users never collide.
     @PostMapping(Routes.Verification.IDENTITY_SIMULATE)
     public IdentityVerificationResponse simulate(@CurrentUser AuthPrincipal principal,
             @RequestParam(defaultValue = "approve") String outcome) {

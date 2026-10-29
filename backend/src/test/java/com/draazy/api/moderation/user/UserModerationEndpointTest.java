@@ -31,24 +31,20 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-// Suspend, verified badge and review-flag actions. Load-bearing: aSuspendedAccountCannotSignIn —
-// writing status='suspended' without AuthService reading it would only produce a badge.
 @DisplayName("V77 — suspend, badge and flag")
 class UserModerationEndpointTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
     @PersistenceContext
     EntityManager em;
 
-    /** The service and this test share one transaction, but raw SQL cannot see unflushed entities. */
     private void flushSoRawSqlCanSeeIt() {
         em.flush();
     }
 
-    // Audit rows are REQUIRES_NEW so they outlive class rollback; leaving them would poison the
-    // entity-id filter test below, which counts.
+    // Audit rows are REQUIRES_NEW and outlive the class rollback; leaving them would poison
+    // the entity-id filter test below, which counts.
     @AfterEach
     void clearCommittedAuditRows() {
         jdbc.update("DELETE FROM audit_log WHERE action LIKE 'user.%'");
@@ -85,8 +81,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .content("{\"reason\":\"listings look fake\"}"))
                 .andExpect(status().isOk());
 
-        // Flush before clear: the route ran inside this test's transaction, so detaching without
-        // flushing throws the status write away and reports "active".
         flushSoRawSqlCanSeeIt();
         em.clear();
         User reloaded = users.findById(target.getId()).orElseThrow();
@@ -184,8 +178,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.message").value("You cannot suspend your own account"));
     }
 
-    // Reactivate refuses an archived account (rather than silently promoting) because the
-    // archived-to-active path has a live-email collision guard this route does not.
     @Test
     @DisplayName("reactivate refuses an archived account and points at restore")
     void reactivateIsNotRestore() throws Exception {
@@ -392,8 +384,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
         assertThat(users.findById(target.getId()).orElseThrow().isFlagged()).isFalse();
     }
 
-    // The flag is a note between moderators about the holder, so the /me route must not carry it;
-    // boxed on the record so an omitted value does not render as false.
     @Test
     @DisplayName("the review flag never appears on the account holder's own profile")
     void ownProfileDoesNotCarryTheFlag() throws Exception {
@@ -487,8 +477,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    // Without this filter the audit log is browsable only by time, useless for a case — and it is
-    // what lets the badge and flag routes store no provenance of their own.
     @Test
     @DisplayName("admin edit cannot change a verified user's name")
     void adminNameChangeIsLockedForVerifiedUsers() throws Exception {
@@ -560,8 +548,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].entityId").value(target.getId().toString()));
     }
 
-    // The account line is the one entry every user has, so a brand-new account must still come
-    // back with exactly one event rather than an empty list.
     @Test
     @DisplayName("a new account's timeline is its creation and nothing else")
     void timelineAlwaysHasTheAccountLine() throws Exception {
@@ -577,8 +563,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[0].entityId").value(target.getId().toString()));
     }
 
-    // Cross at least one module boundary; a moderation action is the cheapest second source and
-    // pins the audit join — the one arm of the union keyed on text rather than uuid.
     @Test
     @DisplayName("the timeline unions moderation actions with the account line")
     void timelineIncludesModerationActions() throws Exception {
@@ -601,8 +585,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[1].kind").value("account"));
     }
 
-    // An empty timeline is a normal answer for a new account, so a mistyped id must not render as
-    // "this person has done nothing" — see UserModerationService#timeline.
     @Test
     @DisplayName("an unknown id is 404, not an empty timeline")
     void timelineRefusesAnUnknownId() throws Exception {
@@ -612,8 +594,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-    // Admin-only despite users:read, because one arm of the union is the audit log (admin-only) —
-    // staff reaching this would get moderation history through an unlocked door.
     @Test
     @DisplayName("staff cannot read a timeline either")
     void timelineIsAdminOnly() throws Exception {
@@ -625,7 +605,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
-    // guards
     @Test
     @DisplayName("staff cannot reach any of the four")
     void staffAreRefused() throws Exception {
@@ -647,7 +626,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
     }
 
     private MockHttpServletResponse otpLoginResponse(String mobile) throws Exception {
-
         flushSoRawSqlCanSeeIt();
         jdbc.update("DELETE FROM otp_codes WHERE mobile = ?", mobile);
         em.clear();

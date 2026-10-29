@@ -14,15 +14,12 @@ import org.springframework.data.repository.query.Param;
 
 public interface FlatmateGroupApplicationRepository
         extends JpaRepository<FlatmateGroupApplication, UUID> {
-
-    /** Uses the unfiltered created-at index so the admin board does not sort the full table. */
     Page<FlatmateGroupApplication> findByOrderByCreatedAtDesc(Pageable pageable);
 
     Page<FlatmateGroupApplication> findByModStatusIn(Collection<String> modStatuses, Pageable pageable);
 
     long countByModStatusIn(Collection<String> modStatuses);
 
-    /** A query rather than the entity, so a staff take-down committed while waiting on the listing lock is seen. */
     boolean existsByIdAndModStatusIn(UUID id, Collection<String> modStatuses);
 
     @Query("select a.listingId from FlatmateGroupApplication a where a.id = :id")
@@ -30,13 +27,11 @@ public interface FlatmateGroupApplicationRepository
 
     List<FlatmateGroupApplication> findByListingIdOrderByCreatedAtDesc(UUID listingId);
 
-    /** {@code modStatus} hides removed spam while leaving owner-facing status pending. */
     Page<FlatmateGroupApplication> findByListingIdInAndModStatusInOrderByCreatedAtDesc(
             Collection<UUID> listingIds, Collection<String> modStatuses, Pageable pageable);
 
     Optional<FlatmateGroupApplication> findByListingIdAndGroupId(UUID listingId, UUID groupId);
 
-    /** Callers pass the public moderation states: a removed application does not hold the flat. */
     boolean existsByListingIdAndStatusAndModStatusIn(UUID listingId, String status,
             Collection<String> modStatuses);
 
@@ -78,7 +73,6 @@ public interface FlatmateGroupApplicationRepository
                                 @Param("status") String status,
                                 @Param("decidedAt") java.time.Instant decidedAt);
 
-    // created_at restarts so the reminder clock counts from the new application.
     @Modifying(flushAutomatically = true)
     @Query(value = "update flatmate_group_applications set created_at = now() where id = :id", nativeQuery = true)
     void restartClock(@Param("id") UUID id);

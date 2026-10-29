@@ -9,11 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-// This allowlist is the only guard before JSONB, and the 422 cannot name a bad field.
-// The allowlist is mirrored in `frontend/src/lib/listingFormDetails.js`; drift there drops keys silently.
 @DisplayName("Listing form details — the allowlist that decides what survives the wire")
 class ListingFormDetailsTest {
-
     private final ListingFormDetails.Validator validator = new ListingFormDetails.Validator();
 
     private boolean accepts(Map<String, Object> details) {

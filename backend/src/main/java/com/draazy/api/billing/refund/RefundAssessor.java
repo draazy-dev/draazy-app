@@ -14,18 +14,14 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** Reads the facts behind a paid order and applies {@link RefundPolicy} to them. */
 @Component
 public class RefundAssessor {
-
     private static final UUID NO_REQUEST = new UUID(0, 0);
 
-    // Never equal to a stored digest, so a missing signal matches nothing instead of everything.
     private static final String NO_SIGNAL = "-";
 
     private static final int MONTHS_IN_YEAR = 12;
 
-    // A listing paused to be brought back by the pass it was bought with is not a pause during the window.
     private static final Duration PAUSE_GRACE = Duration.ofMinutes(10);
 
     private final PlatformSettings settings;
@@ -55,7 +51,6 @@ public class RefundAssessor {
         return isPack(plan) ? RefundStatuses.KIND_CONTACT_PACK : RefundStatuses.KIND_LISTING_PASS;
     }
 
-    /** What the customer may do with this order right now. */
     public RefundVerdict forCustomer(Subscription order, Plan plan, boolean alreadyRequested, String deviceHash,
             Instant now) {
         boolean entitling = SubscriptionStatuses.isEntitling(order.getStatus());
@@ -66,8 +61,6 @@ public class RefundAssessor {
         return evaluate(order, plan, requested, entitling, disputed, deviceHash, now, now, NO_REQUEST, true);
     }
 
-    /** The window is judged as of the request, so a slow review cannot turn a valid request into a late one;
-     * enquiries are counted up to now, so one that arrived while it waited still counts. */
     RefundVerdict forDecision(Subscription order, Plan plan, RefundRequest request) {
         return evaluate(order, plan, false, true, false, request.getDeviceIdHash(), request.getCreatedAt(),
                 Instant.now(), request.getId(), false);
@@ -78,13 +71,11 @@ public class RefundAssessor {
                 ? entitlements.contactsSpentFromPack(order.getUserId(), term(order, plan), asOf) : 0;
     }
 
-    /** Every enquiry from the pass start up to {@code asOf}, so waiting out the window does not hide any. */
     public long enquiries(Subscription order, Instant asOf) {
         return order.getPropertyId() == null ? 0
                 : enquiries.enquiriesBetween(order.getPropertyId(), order.getStartedAt(), asOf.plusMillis(1));
     }
 
-    /** True when the listing left the live state at any point in the guarantee window. */
     public boolean pausedDuringWindow(Subscription order) {
         if (order.getPropertyId() == null) {
             return false;

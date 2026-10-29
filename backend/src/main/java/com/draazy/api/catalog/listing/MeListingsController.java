@@ -28,10 +28,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** JWT owner-scoping is the gate; the client never supplies the owner id. */
 @RestController
 public class MeListingsController {
-
     private final ListingService listingService;
     private final ListingArchiveService archiveService;
     private final PropertyMapper propertyMapper;
@@ -72,7 +70,6 @@ public class MeListingsController {
                 BackOfficeVisibility.HIDDEN, OutreachCounts.NONE, PrivateFieldVisibility.VISIBLE);
     }
 
-    /** The one row a client re-reads after an action that moved it, instead of the whole list. */
     @GetMapping(Routes.MeListings.CARD)
     public OwnerListingCard getMineCard(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         return card(listingService.getMine(principal.userId(), id));
@@ -90,7 +87,6 @@ public class MeListingsController {
         return propertyMapper.toWriteResult(listingService.update(principal, id, body));
     }
 
-    /** No body: the only date that matters is the server's receipt of the owner action. */
     @PostMapping(Routes.MeListings.CONFIRM_AVAILABLE)
     public OwnerListingCard confirmAvailable(@CurrentUser AuthPrincipal principal,
             @PathVariable String id) {
@@ -107,7 +103,6 @@ public class MeListingsController {
         return card(listingService.resume(principal, id));
     }
 
-    /** Archive frees the one-listing free-tier slot without hard-deleting the row. */
     @DeleteMapping(Routes.MeListings.BY_ID)
     public ListingWriteResult archive(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         return propertyMapper.toTakenDown(archiveService.deleteByOwner(principal.userId(), id));

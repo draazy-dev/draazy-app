@@ -15,10 +15,8 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The tenant's side of an owner's rent tracker, joined on the tenant's own mobile so a later sign-up links itself. */
 @Service
 public class TrackedRentService {
-
     static final String TRACKING = "rent.tracking";
     static final String DUE = "rent.due";
     static final String OVERDUE = "rent.overdue";
@@ -26,7 +24,6 @@ public class TrackedRentService {
     static final int HEADS_UP_DAYS = 3;
     static final int OVERDUE_DAYS = 5;
 
-    // Must match currentDueStatus() in frontend/src/lib/data/rentReminders.js.
     private static final int DEFAULT_DUE_DAY = 5;
     private static final int TENANT_RECEIPTS = 12;
     private static final String TENANT_LINK = "/dashboard#rental";
@@ -91,7 +88,6 @@ public class TrackedRentService {
                 TENANT_LINK));
     }
 
-    /** Runs once a day: heads-up to the tenant, due-day nudge to the owner, overdue to both; paid months stay quiet. */
     @Transactional
     public int remindDue(LocalDate today) {
         int reminded = 0;
@@ -125,7 +121,6 @@ public class TrackedRentService {
         return reminded;
     }
 
-    // A due date before the tenant was named belongs to whoever held the flat then, so it is never theirs to chase.
     private boolean unpaidDueOn(ManagedProperty m, LocalDate day) {
         return day.getDayOfMonth() == dueDay(m) && !day.isBefore(namedOn(m)) && !paid(m, YearMonth.from(day));
     }

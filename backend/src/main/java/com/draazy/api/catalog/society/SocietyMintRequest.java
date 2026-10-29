@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/** Only from a Google Place pick; {@code localityLabel} is folded into the slug to avoid collisions and is not stored. */
 public record SocietyMintRequest(
         @NotBlank @Size(max = 255) @Pattern(regexp = "^[A-Za-z0-9_-]+$") String placeId,
         @Size(max = 160) @NoContactDetails String name,

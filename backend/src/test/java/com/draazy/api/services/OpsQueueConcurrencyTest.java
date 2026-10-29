@@ -22,29 +22,8 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * Optimistic locking on the ops queues (tech debt D48).
- *
- * <p>The situation being defended against is mundane and used to be invisible: two staff members
- * open the same ticket, both change something, both press save. Before {@code @Version} the second
- * save overwrote the first, both callers saw {@code 200}, and the audit log recorded two successful
- * updates — so there was no artefact anywhere from which the lost edit could be recovered, or even
- * noticed.
- *
- * <p><strong>Why there are no threads here.</strong> A race reproduced with threads is a race
- * reproduced <em>sometimes</em>, and a flaky test guarding concurrency is worse than none. What
- * makes a lost update possible is not simultaneity but <strong>staleness</strong>: one writer
- * holding a copy of the row the database has since moved past. Staleness is deterministic.
- *
- * <p><strong>Why the {@code EntityManager} appears at all.</strong> Every test in this suite runs
- * inside one rolled-back transaction, so two HTTP requests share a persistence context and Hibernate
- * hands both of them the <em>same instance</em> — there is no second copy to go stale. Detaching one
- * copy is what restores the two-editors situation the production code actually meets, where the two
- * requests arrive on different connections. {@code flush()} stands in for the winner's commit.
- */
 @DisplayName("Slice 11 — concurrent edits on the ops queues")
 class OpsQueueConcurrencyTest extends ServiceFixtures {
-
     @Autowired
     TicketRepository tickets;
 
@@ -58,11 +37,9 @@ class OpsQueueConcurrencyTest extends ServiceFixtures {
         User legal = staff("9820000802", Teams.LEGAL);
         String id = create(buyer, "{\"subject\":\"Rent agreement\",\"team\":\"legal\"}", 201);
 
-        // Staff A opens the ticket. Detached, so it is a genuine private copy from here on.
         Ticket stale = tickets.findById(UUID.fromString(id)).orElseThrow();
         em.detach(stale);
 
-        // Staff B edits and saves first.
         mvc.perform(patch(Routes.Tickets.BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(legal))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -72,9 +49,6 @@ class OpsQueueConcurrencyTest extends ServiceFixtures {
         em.flush();
         assertThat(version(id)).isEqualTo(1L);
 
-        // Staff A now saves their copy. Without @Version this succeeds and B's change is gone.
-        // Nothing may follow this assertion: a failed lock leaves the transaction rollback-only,
-        // so the "B's edit survived" half of the claim is checked above, before the collision.
         stale.setStatus("closed");
         assertThatThrownBy(() -> tickets.saveAndFlush(stale))
                 .isInstanceOf(OptimisticLockingFailureException.class);
@@ -97,11 +71,6 @@ class OpsQueueConcurrencyTest extends ServiceFixtures {
         assertThat(version(id)).isEqualTo(2L);
     }
 
-    /**
-     * Sequential edits by different people must still both land. Optimistic locking only rejects a
-     * writer holding a stale copy, and every controller here reloads per request — so this is the
-     * case that must <em>not</em> have regressed into a 409.
-     */
     @Test
     @DisplayName("back-to-back edits by two people both succeed")
     void sequentialEditsBothLand() throws Exception {
@@ -129,11 +98,6 @@ class OpsQueueConcurrencyTest extends ServiceFixtures {
         em.flush();
     }
 
-    /**
-     * Read straight out of the table rather than through JPA: the claim is that the column exists in
-     * the schema and that Hibernate maintains it, and asking Hibernate would only prove that
-     * Hibernate agrees with itself.
-     */
     private long version(String id) {
         return jdbc.queryForObject("select version from tickets where id = ?::uuid",
                 Long.class, id);

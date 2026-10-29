@@ -16,12 +16,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Every per-number limit is walked past by rotating the number; this one is keyed on the sender. */
 @SpringBootTest(properties = "draazy.otp.max-sends-per-ip-per-window=" + OtpSendIpCapTest.CAP)
 @AutoConfigureMockMvc
 @Transactional
 class OtpSendIpCapTest {
-
     static final int CAP = 2;
 
     @Autowired

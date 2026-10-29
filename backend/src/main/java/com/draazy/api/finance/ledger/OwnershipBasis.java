@@ -12,18 +12,14 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/** Does not extend {@code BaseEntity}: V6 makes {@code property_id} the primary key, as the basis is 1:1 with the listing.
- * Every money field is nullable whole rupees, as a zero would assert a figure the owner never gave. */
 @Entity
 @Table(name = "ownership_basis")
 @Getter
 public class OwnershipBasis {
-
     @Id
     @Column(name = "property_id", nullable = false, updatable = false)
     private UUID propertyId;
 
-    /** Whoever recorded the basis; if the flat changes hands, the new owner's figures are their own. */
     @Column(name = "owner_id", nullable = false, updatable = false)
     private UUID ownerId;
 
@@ -39,7 +35,6 @@ public class OwnershipBasis {
     @Setter
     private Long loanOutstanding;
 
-    /** Loan rate and tenure are deliberately not stored; see {@link FinanceService}. */
     @Column(name = "emi")
     @Setter
     private Long emi;
@@ -57,12 +52,10 @@ public class OwnershipBasis {
     private Instant updatedAt;
 
     protected OwnershipBasis() {
-        // JPA
     }
 
     public OwnershipBasis(UUID propertyId, UUID ownerId) {
         this.propertyId = propertyId;
         this.ownerId = ownerId;
     }
-
 }

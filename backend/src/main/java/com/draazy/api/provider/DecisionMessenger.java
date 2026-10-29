@@ -6,29 +6,23 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/** Best-effort and never throws, unlike {@link OtpSender}: the in-app inbox row
- * duplicates a decision notice. */
 public interface DecisionMessenger {
-
     String IDENTITY_DECISION = "identity-decision";
     String WAITING_DIGEST = "waiting-digest";
     String OWNER_NOTICE = "owner-notice";
 
     void sendIdentityDecision(String mobile, String line);
 
-    /** Returns whether the vendor accepted it, so the caller can retry later rather than count it as sent. */
     boolean sendWaitingDigest(String mobile, String waiting);
 
-    /** {@code link} carries a one-time credential: implementations must never log it. */
+    // link carries a one-time credential: implementations must never log it.
     boolean sendOwnerNotice(String mobile, String tenantName, String place, String link);
 }
 
-/** Not profile-bound: a bean that threw here would roll back the very decision it announces. */
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.whatsapp", name = "enabled",
         havingValue = "false", matchIfMissing = true)
 class LoggingDecisionMessenger implements DecisionMessenger {
-
     private static final Logger log = LoggerFactory.getLogger(LoggingDecisionMessenger.class);
 
     private final ProviderCalls calls;

@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ServiceRequestIdentityService {
-
     private static final Logger log = LoggerFactory.getLogger(ServiceRequestIdentityService.class);
 
     private static final Set<String> ALL_ROLES = Set.of("owner", "tenant", "witness");
@@ -52,7 +51,6 @@ public class ServiceRequestIdentityService {
         this.ownerSide = ownerSide;
     }
 
-    // Replace rows first so corrected parties do not leave old numbers behind.
     @Transactional
     public void replace(AuthPrincipal caller, String id, ServiceRequestIdentitiesRequest body) {
         ServiceRequest request = Ids.parseUuid(id).flatMap(requests::findByIdForUpdate).orElseThrow(() -> NotFoundException.of("Service request"));
@@ -76,7 +74,7 @@ public class ServiceRequestIdentityService {
         if (afterPurge && caller.userId().equals(request.getRequesterId())) {
             events.save(new ServiceRequestEvent(request.getId(), RERECORDED, null));
         }
-        // Audit counts only; storing numbers in audit_log would create a second secret store.
+        // Audit counts only; identity numbers in audit_log would create a second secret store.
         audit.record(caller, "service-request.identities-recorded", "service_request",
                 request.getId().toString(), "parties", body.parties().size());
     }
@@ -85,7 +83,6 @@ public class ServiceRequestIdentityService {
         return events.findFirstByRequestIdAndEventInOrderByAtDesc(requestId, IDENTITY_EVENTS).map(e -> PURGED.equals(e.getEvent())).orElse(false);
     }
 
-    // Only the assigned worker may read numbers; admins must assign themselves first.
     @Transactional(readOnly = true)
     public List<ServiceRequestIdentityDto> forAssignee(AuthPrincipal caller, String id) {
         ServiceRequest request = ServiceDeskAuthority.onCallersDesk(caller,
@@ -94,8 +91,6 @@ public class ServiceRequestIdentityService {
                 accountPermissions.desksFor(caller));
         UUID assignee = request.getAssigneeId();
         if (assignee == null || !assignee.equals(caller.userId())) {
-
-            // Audit before refusal; REQUIRES_NEW preserves the attempted cross-matter read.
             audit.record(caller, "service-request.identities-refused", "service_request",
                     request.getId().toString(),
                     "assignee", assignee == null ? null : assignee.toString());
@@ -133,8 +128,6 @@ public class ServiceRequestIdentityService {
         return purged;
     }
 
-    // Requesters write all roles; accepted co-fill parties write only their side.
-    // Staff cannot invent identity numbers; strangers get 404.
     private Set<String> writableRoles(AuthPrincipal caller, ServiceRequest request) {
         if (caller.userId().equals(request.getRequesterId())) {
             return ALL_ROLES;

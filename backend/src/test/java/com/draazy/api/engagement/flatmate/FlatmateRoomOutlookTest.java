@@ -31,7 +31,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
 class FlatmateRoomOutlookTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
         @Autowired PropertyRepository properties;
     @Autowired EntityManager em;
@@ -183,8 +182,6 @@ class FlatmateRoomOutlookTest extends AbstractApiTest {
     }
 
     private void assertStoredAndReadable(String id, String facing, String overlooking) throws Exception {
-
-        // Evict the shared test persistence context so a cached entity cannot stand in for a write.
         em.flush();
         em.clear();
         var stored = jdbc.queryForMap("select facing, overlooking from flatmate_rooms where id = ?",

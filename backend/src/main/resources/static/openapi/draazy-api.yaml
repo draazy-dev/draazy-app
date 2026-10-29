@@ -2140,7 +2140,6 @@ paths:
   /visits:
     get:
       tags: [Listings]
-      # Caller-scoped to prevent disclosure of other visitors' names, mobiles, addresses, and times.
       summary: Visits the caller booked
       operationId: listVisits
       description: >
@@ -2420,7 +2419,6 @@ paths:
       tags: [Moderation]
       summary: Archive listing (soft-delete)
       operationId: archiveProperty
-      # No x-roles: dual audience (owner deletes own, staff takes down); guard is owner-or-staff server-side.
       requestBody:
         content:
           application/json:
@@ -2434,7 +2432,6 @@ paths:
       tags: [Moderation]
       summary: Restore archived listing
       operationId: restoreProperty
-      # No x-roles: dual audience, see archiveProperty.
       responses:
         '200': { description: Restored (status reset to pending) }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -2492,7 +2489,6 @@ paths:
         `PATCH /properties/{id}`; disambiguated here from the public getter to
         avoid method/verb collision (documented assumption).
       operationId: adminUpdateProperty
-      # Correcting another user's listing: the verification or moderation desk.
       x-roles: [staff, admin]
       requestBody:
         required: true
@@ -2505,8 +2501,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Property' }
-        # The one path that edits a listing the caller does not own: without a documented
-        # failure, "id does not exist" is undefined behaviour.
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/ValidationError' }
   /properties/{id}/photos/takedown:
@@ -2578,11 +2572,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/BoardDays'
         - { name: role, in: query, schema: { $ref: '#/components/schemas/Role' } }
-        # Owners and buyers only; back-office accounts are listed under Team & Access.
         - { name: customers, in: query, schema: { type: boolean, default: false } }
         - { name: q, in: query, schema: { type: string } }
-        # Separate columns: an account can be suspended *and* archived, and a moderator works the
-        # suspended ones still live. Unknown status is 422 so a typo'd dropdown fails loudly.
         - { name: status, in: query, schema: { type: string, enum: [active, suspended, archived] } }
         - { name: flagged, in: query, schema: { type: boolean } }
         - { name: archived, in: query, schema: { type: boolean, default: false } }
@@ -2616,7 +2607,6 @@ paths:
       tags: [Moderation]
       summary: Update user
       operationId: adminUpdateUser
-      # Manager/admin only: editing another person's profile is not a routine ops action.
       x-roles: [manager, admin]
       requestBody:
         required: true
@@ -3011,7 +3001,6 @@ paths:
       tags: [Moderation]
       summary: Get own identity-verification status
       operationId: getIdentityVerification
-      # No x-roles: the caller's own verification; /me/** self-scoping is the guard.
       description: >
         The caller's **opt-in** identity verification (L2 "Verified" badge). Always 200:
         someone who never submitted reads `status: none`. Absence of the badge never blocks
@@ -3026,7 +3015,6 @@ paths:
       tags: [Moderation]
       summary: Submit a government ID + live selfie for manual review
       operationId: submitIdentityVerification
-      # No x-roles: the caller's own submission; /me/** self-scoping is the guard.
       description: >
         Live-captured photos of one government ID (Aadhaar front+back, PAN front, driving
         licence front, passport front, or voter ID front+back) plus a selfie, taken in the app camera and compressed client-side to
@@ -3500,7 +3488,6 @@ paths:
       tags: [Moderation]
       summary: Get property review thread
       operationId: getPropertyVerification
-      # No x-roles: owner<->ops clarification thread, owner is a participant; guard is participant-or-staff.
       responses:
         '200':
           description: Review thread
@@ -3511,7 +3498,6 @@ paths:
       tags: [Moderation]
       summary: Initiate property review
       operationId: initPropertyVerification
-      # No x-roles: the owner submits their own listing; guard is participant-or-staff.
       parameters:
         - name: markRead
           in: query
@@ -3527,7 +3513,6 @@ paths:
       tags: [Moderation]
       summary: Add message to review
       operationId: addVerificationMessage
-      # No x-roles: both sides of the thread post here; guard is participant-or-staff.
       requestBody:
         required: true
         content:
@@ -3546,7 +3531,6 @@ paths:
       tags: [Moderation]
       summary: Mark review messages read
       operationId: markVerificationRead
-      # No x-roles: either participant marks their own side read; guard is participant-or-staff.
       responses:
         '204': { description: Marked }
   /properties/{id}/verification/decision:
@@ -4550,8 +4534,6 @@ paths:
         exception is `service_request`: staff read those only on the request's own desk (D44),
         so another desk gets 403 and an unknown request 404.
       x-roles: [staff, admin]
-      # A bare array, not a PageEnvelope. Per api-standards.md 5.1 the envelope is for collections
-      # that grow with the platform; this one grows with a single case's history.
       responses:
         '200':
           description: Notes, newest first
@@ -4643,7 +4625,6 @@ paths:
       summary: Report a listing
       description: An account may file 10 reports per hour; the 11th is a 429 with `Retry-After`.
       operationId: createReport
-      # No x-roles: any signed-in user must be able to report abuse.
       requestBody:
         required: true
         content:
@@ -4715,8 +4696,6 @@ paths:
       tags: [Admin]
       summary: Erasure request queue (admin)
       operationId: listErasureRequests
-      # Admin, not staff - one rung above every other moderation power here. Listing takedowns and
-      # user suspensions are reversible; an executed erasure is not, by anybody.
       x-roles: [admin]
       parameters:
         - $ref: '#/components/parameters/BoardDays'
@@ -5248,8 +5227,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: verification_required, message: This owner only accepts verified contacts, status: 403 }
-        # 422, not 403 (a 403 invites a login, and signing in again conjures no contacts) and not
-        # 429 (that promises the request works if you wait; this quota is a lifetime total).
         '422':
           description: No owner contacts left (`contact_quota_exhausted`), or `contactPendingMax` requests still wait for a reply (`contact_pending_limit`).
           content:
@@ -5536,8 +5513,6 @@ paths:
               schema: { $ref: '#/components/schemas/LeadNote' }
         '204': { description: Note cleared }
         '422': { $ref: '#/components/responses/ValidationError' }
-  # No `GET /enquiries`: nothing writes an `enquiries` row — the contact-request surface replaced
-  # it — so the operation could only return an empty page, a worse admin surface than none.
   /messages:
     get:
       tags: [Leads & Contact]
@@ -5583,8 +5558,6 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/ConversationCreate' }
       responses:
-        # 200 as well as 201: starting a conversation that already exists returns the existing one
-        # rather than forking the thread, and the status says which happened.
         '200':
           description: The conversation already existed
           content:
@@ -5668,8 +5641,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ConversationMessage' }
-        # A conversation the caller is not a participant in is a 404, not a
-        # 403 -- confirming that a thread exists is itself the disclosure.
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
@@ -5715,7 +5686,7 @@ paths:
       operationId: readConversation
       responses:
         '204': { description: Marked read }
-        '404': { $ref: '#/components/responses/NotFound' }  # Slice-12 spec fix S48
+        '404': { $ref: '#/components/responses/NotFound' }
   /messages/{id}/typing:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -5927,8 +5898,6 @@ paths:
       tags: [Rentals & Payments]
       summary: Transactions list (owner)
       operationId: listTransactions
-      # Paged: a ledger accrues on a schedule and is never culled, so its size tracks how long the
-      # property was held, not anything the caller did. No `Sort` — the order is fixed server-side.
       parameters:
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
@@ -5968,8 +5937,6 @@ paths:
       tags: [Rentals & Payments]
       summary: Update transaction
       operationId: updateTransaction
-      # TransactionUpdate has no required fields, so an absent key means "leave it alone" — fixing a
-      # typo in `note` must not oblige the client to resend type, amount and date.
       requestBody:
         required: true
         content:
@@ -6007,8 +5974,6 @@ paths:
       tags: [Rentals & Payments]
       summary: Income / expense / net summary
       operationId: financeSummary
-      # The period is the client's question and the aggregate is the server's answer, so the window
-      # belongs in the request — without it the endpoint can only ever answer "all time".
       parameters:
         - name: period
           in: query
@@ -6037,8 +6002,6 @@ paths:
       tags: [Rentals & Payments]
       summary: My self-declared rentals (as tenant)
       operationId: myRentals
-      # Unpaged, deliberately: a person rents one home at a time, so the count is bounded by how
-      # often they move rather than by anything they can do to the platform (api-standards.md §5.1).
       responses:
         '200':
           description: Rentals, most recent lease first
@@ -6262,8 +6225,6 @@ paths:
     post:
       tags: [Rentals & Payments]
       summary: Reject or withdraw a claimed stay (listing owner)
-      # POST, not DELETE: "claimed, agreed, withdrawn" is the trail an abuse investigation needs,
-      # and the surviving row holds the unique slot so the claimant cannot simply declare again.
       description: >
         The owner disagrees with a claim, or takes back a confirmation they already gave. The
         declaration is retained in `revoked` state rather than deleted. 404 for any caller who does
@@ -6735,7 +6696,6 @@ paths:
                       content:
                         type: array
                         items: { $ref: '#/components/schemas/TicketRow' }
-    # No x-roles: a customer raising a request is the point of the queue; only working it is staff-only.
     post:
       tags: [Services & Support]
       summary: Create service request
@@ -6822,8 +6782,6 @@ paths:
   /support/tickets:
     get:
       tags: [Services & Support]
-      # The caller's own tickets only: an admin view of every support conversation is either an
-      # unbounded dump of names and mobiles, or a shape that changes with the caller's role.
       summary: My support tickets
       operationId: listSupportTickets
       responses:
@@ -6875,8 +6833,6 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/MessageCreate' }
       responses:
-        # Returns the message: a bare `'201': Replied` leaves a client with no way to render the
-        # message it had just sent without re-fetching the whole ticket.
         '201':
           description: Sent
           content:
@@ -6891,7 +6847,7 @@ paths:
       operationId: markSupportTicketRead
       responses:
         '204': { description: Marked }
-        '404': { $ref: '#/components/responses/NotFound' }  # Slice-12 spec fix S48
+        '404': { $ref: '#/components/responses/NotFound' }
   /support/tickets/{id}/close:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -7023,8 +6979,6 @@ paths:
         '422': { $ref: '#/components/responses/ValidationError' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
   /service-requests:
-    # Staff cannot find the requests the operations below act on without a list, and "every service
-    # request on the platform" is an unbounded queue. Scope is role-derived.
     get:
       tags: [Services & Support]
       summary: Service requests - own for a customer, the whole queue for staff/admin
@@ -7484,8 +7438,6 @@ paths:
           description: No such request
   /service-requests/{id}/draft:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
-    # Multipart, matching /final-doc, because a draft agreement is a file — without a body,
-    # "share draft for review" asks the customer to approve a document never transmitted.
     post:
       tags: [Services & Support]
       summary: Share draft for review (staff)
@@ -8283,8 +8235,6 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/SubscribeRequest' }
       responses:
-        # Returns the resource not-yet-paid carrying the gateway order id and lets the webhook
-        # settle it: a bare 402 tells a client to pay and gives it nothing to pay with.
         '201':
           description: >
             Subscribed. `status` is `active` for a free plan and `pending` for a priced one,
@@ -8333,8 +8283,6 @@ paths:
       tags: [Billing & Growth]
       summary: What I am entitled to (owner contacts, listing slots)
       operationId: getEntitlements
-      # Contact and listing allowance in one response because they derive from the same subscription
-      # and referrals. Separate from /me/subscription, whose pending purchase confers nothing.
       responses:
         '200': { description: Entitlements, content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } } }
   /me/payments:
@@ -8532,12 +8480,10 @@ paths:
       tags: [Billing & Growth]
       summary: Referral review queue (admin/ops fraud desk)
       operationId: listReferrals
-      # Admin/ops only, and enforced: the queue carries both parties' mobile numbers plus the fraud
-      # signals saying which of them we suspect. The decision endpoints below are guarded alike.
       x-roles: [staff, admin]
       parameters:
         - $ref: '#/components/parameters/BoardDays'
-        - { name: status, in: query, schema: { type: string }, description: 'One status or a comma-separated set of pending, qualified, held, rewarded, rejected, clawed-back.' }  # Slice-13 spec fix S52
+        - { name: status, in: query, schema: { type: string }, description: 'One status or a comma-separated set of pending, qualified, held, rewarded, rejected, clawed-back.' }
         - { name: risk, in: query, schema: { type: string, enum: [low, medium, high] } }
         - { name: q, in: query, schema: { type: string }, description: 'Matches the referrer or referred name, either mobile, or the referral id.' }
         - name: counts
@@ -8569,7 +8515,7 @@ paths:
         that approving a rejected referral is an appeal and needs a non-blank `reason` (422 `VALIDATION_FAILED`
         without one); the reason is kept on the row and in the audit trail.
       operationId: approveReferral
-      x-roles: [staff, admin]  # Slice-13 spec fix S53
+      x-roles: [staff, admin]
       requestBody:
         required: false
         content:
@@ -8591,7 +8537,7 @@ paths:
       tags: [Billing & Growth]
       summary: Reject a referral (checker)
       operationId: rejectReferral
-      x-roles: [staff, admin]  # Slice-13 spec fix S53
+      x-roles: [staff, admin]
       requestBody:
         content:
           application/json:
@@ -8608,7 +8554,7 @@ paths:
       tags: [Billing & Growth]
       summary: Claw back a released referral reward - debits the ledger
       operationId: clawbackReferral
-      x-roles: [staff, admin]  # Slice-13 spec fix S53
+      x-roles: [staff, admin]
       requestBody:
         content:
           application/json:
@@ -10627,7 +10573,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Every locality the console lists, with its live listing count
       operationId: adminListLocalities
-      # Server also requires the localities:read permission.
       x-roles: [staff, admin]
       description: >
         The staff table's row: pin, retired flag and live count, without the public page's market stats.
@@ -10646,7 +10591,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Close an area to new listings
       operationId: adminRetireLocality
-      # Server also requires the localities:write permission.
       x-roles: [staff, admin]
       description: >
         Retiring only stops the area being picked for new listings, by place or by name. Existing
@@ -10666,7 +10610,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Reopen a retired area for new listings
       operationId: adminRestoreLocality
-      # Server also requires the localities:write permission.
       x-roles: [staff, admin]
       description: >
         Clears the retirement and marks the row active. Idempotent. Audited as `locality.restore`.
@@ -10682,7 +10625,6 @@ paths:
       tags: [Admin & Analytics]
       summary: The staff society directory, one page
       operationId: adminListSocieties
-      # Server also requires the societies:read permission.
       x-roles: [staff, admin]
       description: >
         Live societies by name with only what the directory table draws. Edits open `/admin/societies/{slug}`.
@@ -10708,7 +10650,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Count behind the societies console's candidates tab
       operationId: adminSocietiesSummary
-      # Server also requires the societies:read permission.
       x-roles: [staff, admin]
       description: >
         The whole-set count of member-added societies, never the length of a page.
@@ -10726,7 +10667,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Live member-added societies, newest first
       operationId: adminListSocietyCandidates
-      # Server also requires the societies:read permission.
       x-roles: [staff, admin]
       description: >
         Every live society `mintSociety` created that has not been merged away, newest first. There
@@ -10755,7 +10695,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Societies this candidate may already be a copy of
       operationId: adminListSocietyCandidateDuplicates
-      # Server also requires the societies:read permission.
       x-roles: [staff, admin]
       description: >
         Ranked hints, strongest first, scored on shared distinctive name tokens plus a boost for
@@ -10797,7 +10736,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Every society merge currently in force
       operationId: adminListSocietyMerges
-      # Server also requires the societies:read permission.
       x-roles: [staff, admin]
       description: >
         Newest first, and deliberately the other way round from the four work queues beside it.
@@ -10830,7 +10768,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Record that one society is a duplicate of another
       operationId: adminMergeSocieties
-      # Server also requires the societies:write permission.
       x-roles: [staff, admin]
       description: >
         Auto-minting a society from four surfaces guarantees duplicates: "Kumar Pinnacle", "Kumar
@@ -10880,7 +10817,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Undo a society merge
       operationId: adminUndoSocietyMerge
-      # Server also requires the societies:write permission.
       x-roles: [staff, admin]
       description: >
         Addressed by the slug of the society that was **merged away**, not the survivor's: a
@@ -10906,7 +10842,6 @@ paths:
       tags: [Admin & Analytics]
       summary: One society as the back-office editor needs it
       operationId: adminGetSociety
-      # Server also requires the societies:read permission.
       x-roles: [staff, admin]
       description: >
         The four public facts plus `adminNote`.
@@ -10934,7 +10869,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Correct a society's own facts
       operationId: adminEditSociety
-      # Server also requires the societies:write permission.
       x-roles: [staff, admin]
       description: >
         Registration, conveyance and the maintenance rate, plus an internal note
@@ -11050,7 +10984,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Draazy's fees per month, split by source
       operationId: adminFinanceSeries
-      # Finance guard, not the staff one: exposes the revenue mix.
       description: >
         Monthly fees for the finance console's chart, oldest month first, ending with the current
         (partial) month. Every month in the window is returned, including empty ones, because an
@@ -11076,7 +11009,6 @@ paths:
       tags: [Admin & Analytics]
       summary: The invoice and credit-note ledger, paged
       operationId: adminFinanceTransactions
-      # Finance guard: lists every movement of money with the counterparty's name.
       description: Every invoice and credit note, newest first. Credit notes carry negative amounts.
       x-roles: [admin]
       parameters:
@@ -11327,8 +11259,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Which cities people have asked Draazy to launch in
       operationId: adminCityWaitlist
-      # Guarded like /admin/supply-gap, since it renders on that tab: an operator who sees the gap
-      # but not the waitlist gets a half-loaded screen they cannot tell from nobody having asked.
       x-roles: [staff, admin]
       description: >
         The `city_waitlist` table aggregated by city, most-wanted first. This is the evidence for
@@ -11494,13 +11424,10 @@ paths:
       tags: [Admin & Analytics]
       summary: Audit log (maker-checker trail)
       operationId: adminAuditLog
-      # Admin-only: staff must not read the record of admin actions.
       x-roles: [admin]
       parameters:
         - { name: actor, in: query, schema: { type: string } }
         - { name: entity, in: query, schema: { type: string } }
-        # Narrows the trail to one record; without it the log is browsable only by time, which
-        # serves the daily review and is useless for a case. `entity` is optional — ids are UUIDs.
         - { name: entityId, in: query, schema: { type: string } }
         - { name: from, in: query, schema: { type: string, format: date-time } }
         - { name: to, in: query, schema: { type: string, format: date-time } }
@@ -11524,14 +11451,11 @@ paths:
       tags: [Admin & Analytics]
       summary: Captured errors, newest first
       operationId: adminErrorLog
-      # Admin-only, like the audit log: stacks and request paths are operational detail.
       x-roles: [admin]
       parameters:
         - $ref: '#/components/parameters/BoardDays'
         - { name: source, in: query, schema: { type: string, enum: [api, job, web] } }
         - { name: status, in: query, schema: { type: string, enum: [open, resolved, all], default: open } }
-        # Matches message, error type, path, last trace id and fingerprint anywhere, and the client crash
-        # reference from its start; `%` and `_` are escaped.
         - { name: q, in: query, schema: { type: string } }
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
@@ -11571,7 +11495,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Mark a captured error resolved
       operationId: adminErrorLogResolve
-      # A server error happening again reopens the row; a browser report does not.
       x-roles: [admin]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -11584,7 +11507,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Back-office activity feed (who did what)
       operationId: adminStaffActivity
-      # Managers see staff rows only; administrators see the full back-office feed.
       x-roles: [manager, admin]
       parameters:
         - { name: actor, in: query, schema: { type: string } }
@@ -11592,8 +11514,6 @@ paths:
         - { name: action, in: query, schema: { type: string } }
         - { name: from, in: query, schema: { type: string, format: date-time } }
         - { name: to, in: query, schema: { type: string, format: date-time } }
-        # Free text over actor name, action, entity and entity id. `%` and `_` are escaped server
-        # side; a search for "100%" narrows rather than matching everything.
         - { name: q, in: query, schema: { type: string } }
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
@@ -11615,8 +11535,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Back-office activity totals, facets and leaderboard
       operationId: adminStaffActivitySummary
-      # Takes the same filter set as the feed so a narrowed console gets a headline about what it
-      # is showing. Aggregated in the database: a leaderboard folded from one page ranks the page.
       x-roles: [manager, admin]
       parameters:
         - { name: actor, in: query, schema: { type: string } }
@@ -11684,7 +11602,6 @@ paths:
       tags: [Admin & Analytics]
       summary: List CMS content of a type
       operationId: adminListContent
-      # CMS is an ops job. Bare array (api-standards.md §5.1: fixed reference data).
       x-roles: [staff, admin]
       parameters:
         - { name: archived, in: query, schema: { type: boolean }, description: 'true: archived rows only; false: live rows only; absent: both' }
@@ -11710,8 +11627,6 @@ paths:
       responses:
         '201':
           description: Created
-          # Not a bodiless 201: the ops screen renders the saved row straight from the
-          # response; without a body it has to guess the server-assigned id and timestamps.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ContentItem' }
@@ -11743,7 +11658,6 @@ paths:
       tags: [Admin & Analytics]
       summary: Archive content item (soft delete)
       operationId: adminArchiveContent
-      # Returns the item so the caller can see `archived: true` without a re-read.
       x-roles: [staff, admin]
       responses:
         '200':
@@ -12195,8 +12109,6 @@ components:
             Whether this party carries the ID verified badge. Server-computed, and optional
             like every other property here: populated today on `Offer.from` and on the two
             `FinalizationRequest` parties, absent from the payloads that have no badge to show.
-    # Distinct from Party: an under-offer party is off-platform, so it has no account, no `role`
-    # and no contact gating, and carries `note`/`at`, meaningless on Offer.from or Visit.visitor.
     DealParty:
       type: object
       description: An off-platform interested party recorded by the owner on a reserved deal.
@@ -12409,8 +12321,6 @@ components:
       properties:
         id: { type: string }
         requestId: { type: string }
-        # Echoed so /me/service-request-invites can say what the invitation is *for* without the
-        # invitee having to fetch a request they cannot yet read.
         requestType: { type: string, example: rent-agreement }
         role: { type: string, enum: [owner, tenant] }
         partyIndex: { type: integer, minimum: 0, default: 0 }
@@ -12421,8 +12331,6 @@ components:
             Display name of the invited account. `null` while the invitation is still `pending` --
             there is no account to take a name from -- and also `null` if a once-claimed account has
             since been removed.
-        # An invitation may be addressed to a number that never registered, leaving the requester
-        # with no name to show for the side they just named. Exists only while that is true.
         mobile:
           type: [string, 'null']
           example: 98XXXXX999
@@ -12522,8 +12430,6 @@ components:
         authorRole: { $ref: '#/components/schemas/Role' }
         body: { type: string }
         createdAt: { type: string, format: date-time }
-        # When the other side read it, or null while unread. Per side rather than per reader — on a
-        # co-filled request this means "somebody on the other side has seen it", not "everyone has".
         readAt: { type: [string, 'null'], format: date-time }
     Conversation:
       type: object
@@ -12537,8 +12443,6 @@ components:
         counterpartyId: { type: [string, 'null'], description: User id of the other participant; null on a group thread }
         counterpartyName: { type: [string, 'null'] }
         counterpartyRole: { $ref: '#/components/schemas/Role' }
-        # Masking is listing-bound: approval reveals the owner to the buyer (unless hidden) and the requester
-        # to the owner; an unrelated conversation reveals nothing. Detail only, the inbox list omits it.
         counterpartyMobile: { $ref: '#/components/schemas/Mobile' }
         youAre: { type: string, enum: [owner, buyer, member] }
         propertyId: { type: [string, 'null'] }
@@ -13277,8 +13181,6 @@ components:
             ownership: { type: string, description: Owner-declared ownership type. }
             loanAvailable: { type: boolean, description: Whether the owner says a home loan is available. }
             agreementDuration: { type: string, description: Owner-declared rental agreement duration. }
-            # Promoted out of `formDetails`, which is owner/staff only — without it a public viewer
-            # is shown a client-side default ("None", "1 month") in place of the listing's own terms.
             lockIn: { type: string, description: 'Lock-in period in months, as the owner stated it.' }
             noticePeriod: { type: string, description: 'Notice period in months, as the owner stated it.' }
             foodPref: { type: string, description: 'Food rule the owner stated for a rental (e.g. veg, jain, any); absent when unstated.' }
@@ -13293,11 +13195,7 @@ components:
             floor: { type: integer }
             totalFloors: { type: integer }
             facing: { type: string }
-            # Split out of `facing` in V19. A home has a compass direction and a view at the same
-            # time; offering both through one control could only ever record one of the two.
             overlooking: { type: string }
-            # Absent must stay absent: substituting `bhk - 1` for bathrooms prints a guess as fact.
-            # Counts, not enums — `0` is a real answer, and not the same as omitted.
             bathrooms: { type: integer, minimum: 0 }
             parking: { type: integer, minimum: 0 }
             balconies: { type: integer, minimum: 0 }
@@ -14457,8 +14355,6 @@ components:
           pattern: '^$|^[A-Za-z0-9_-]{11}$'
           description: Optional normalised YouTube video id. Send an empty string on PATCH to withdraw it.
         description: { type: string }
-        # The duplicate-detection inputs. None is required — a bulk meter has no number, a plot no
-        # floor, a standalone building no society — so the rule reads what is present, else silent.
         address: { type: string, description: Street address; normalised server-side into a duplicate key }
         floor: { type: integer, minimum: 0, description: Which floor the unit is on (0 is Ground) }
         societyId:
@@ -14474,8 +14370,6 @@ components:
             The unit's electricity meter number. Write-mostly: the duplicate probe reads it
             server-side, and it is returned only to the listing's owner and to staff, never on the
             public listing response.
-        # The detail answers the posting wizard collects. facing and totalFloors exist on the read
-        # side (`Property`) and must exist here too, or they read back empty forever.
         bathrooms: { type: integer, minimum: 0, description: Bathroom count. Omit rather than guess }
         parking: { type: integer, minimum: 0, description: Dedicated slots conveyed with the unit }
         balconies: { type: integer, minimum: 0, description: Balcony count }
@@ -15489,7 +15383,6 @@ components:
       properties:
         note: { type: [string, 'null'], maxLength: 2000 }
         followUpAt: { type: [string, 'null'], format: date-time }
-    # No `Enquiry` schema: its only operation is gone. See /enquiries above.
     FinalizationRequest:
       type: object
       properties:
@@ -15502,8 +15395,6 @@ components:
         createdAt: { type: string, format: date-time }
     FinalizationCreate:
       type: object
-      # `propertyId` duplicates the {propId} path parameter and two sources invite disagreement:
-      # the path wins, and a body value contradicting it is rejected with 422, not ignored.
       required: [counterpartyMobile, agreedPrice]
       properties:
         propertyId:
@@ -15524,8 +15415,6 @@ components:
         date: { type: string, format: date }
         note: { type: string }
         recurring: { type: string, enum: [none, monthly, quarterly, yearly], default: none }
-    # A due carries its own due date: the server owns the recurrence, so a client recomputing it
-    # re-implements the rules, which is how two answers to one question start to diverge.
     Due:
       type: object
       description: >
@@ -15547,8 +15436,6 @@ components:
         date: { type: string, format: date }
         note: { type: string }
         recurring: { type: string, enum: [none, monthly, quarterly, yearly], default: none }
-    # The partial-update shape for the PATCH. Every field optional -
-    # an absent key means "leave it alone", which is what PATCH means and what the UI sends.
     TransactionUpdate:
       type: object
       description: >
@@ -15561,8 +15448,6 @@ components:
         date: { type: string, format: date }
         note: { type: string }
         recurring: { type: string, enum: [none, monthly, quarterly, yearly] }
-    # The tenant's own record of a home they rent. Distinct from Tenancy, which is an agreement
-    # this platform brokered; this is one it had nothing to do with, which is almost all of them.
     TenantRental:
       type: object
       description: >
@@ -15640,8 +15525,6 @@ components:
         income: { $ref: '#/components/schemas/Money' }
         expense: { $ref: '#/components/schemas/Money' }
         net: { $ref: '#/components/schemas/Money' }
-        # Nullable: tenanted-days over days-in-window has no value for a listing never let, and 0.0
-        # would assert "vacant throughout" — a failing property rather than an inapplicable question.
         occupancyRate:
           type: [number, 'null']
           format: float
@@ -15723,8 +15606,6 @@ components:
       properties:
         livedFrom: { type: [string, 'null'], format: date }
         livedTo: { type: [string, 'null'], format: date }
-    # Mirrors what the UI collects, because four of the six trust-score inputs must have columns or
-    # the score caps at half. `occupants` is an enum: "3" cannot express "Bachelor (Male)".
     TenantProfile:
       type: object
       description: >
@@ -15744,8 +15625,6 @@ components:
         about: { type: string, description: Tenant's own introduction. }
         score: { type: integer, minimum: 0, maximum: 100, readOnly: true, description: Computed trust score. }
         verified: { type: boolean, readOnly: true }
-    # `score`, `verified` and `mobile` are absent rather than ignored: a tenant who could set them
-    # would award themselves the badge owners screen on, or file against somebody else's number.
     TenantProfileUpdate:
       type: object
       properties:
@@ -15967,13 +15846,9 @@ components:
             Number of uploaded files this request's category scope unlocks. Zero means the owner
             approved categories for which no file has been uploaded yet; it does not mean the
             request was declined.
-        # A grant is time-boxed, so the token carries its deadline: without it the client cannot
-        # tell a live grant from one about to lapse, and 'expired' appears out of nowhere.
         expiresAt: { type: [string, 'null'], format: date-time }
         acknowledgedDisclaimer: { type: boolean, description: Buyer accepted the sensitive-docs disclaimer }
         createdAt: { type: string, format: date-time }
-    # The create schema must carry `acknowledgedDisclaimer`: a consent flag the client cannot send
-    # could only ever read false, and that is not consent.
     DocumentRequestCreate:
       type: object
       required: [propertyId]
@@ -16154,13 +16029,9 @@ components:
             type: object
             required: [id, name, done, canUpload]
             properties:
-              # Also the upload `category` that satisfies this item -- one vocabulary, read and
-              # written, rather than two kept in step by hand.
               id: { type: string, example: owner-id }
               name: { type: string, example: Owner Aadhaar + PAN }
               done: { type: boolean }
-              # The newest document filed under this item. An id, never a URL: this endpoint mints
-              # no download credential, so the bytes stay behind getServiceRequestDocumentUrl.
               documentId: { type: [string, 'null'] }
               review: { type: [string, 'null'], enum: [pending, verified, rejected, null], description: The desk's verdict on documentId; null when nothing is filed }
               reason: { type: [string, 'null'], description: "Why the desk rejected it; null on another co-fill side's PAN, Aadhaar or photo" }
@@ -16196,10 +16067,7 @@ components:
           type: array
           items: { $ref: '#/components/schemas/ServiceRequestParty' }
         createdAt: { type: string, format: date-time }
-        # Whole-rupee desk charge: null for free requests, otherwise the accepted published/repriced fee.
         amount: { type: [integer, 'null'], format: int64 }
-        # The single-use Cashfree checkout session for a priced request. Present only on the checkout
-        # response (the SDK consumes it once); always null on create/read. Never persisted.
         paymentSessionId: { type: [string, 'null'] }
         registration:
           oneOf: [ { type: 'null' }, { $ref: '#/components/schemas/ServiceRequestRegistration' } ]
@@ -16476,7 +16344,6 @@ components:
         short of a number it had no way to know it should have asked for.
       properties:
         partyRole: { type: string, enum: [owner, tenant, witness] }
-        # The primary licensor is owner 0 and co-owners follow; tenants by position; witnesses are 0 and 1 only.
         partyIndex: { type: integer, minimum: 0, default: 0 }
         partyName: { type: string, maxLength: 120 }
         pan: { type: string, pattern: '^$|^[A-Za-z]{5}[0-9]{4}[A-Za-z]$', example: ABCDE1234F }
@@ -16496,8 +16363,6 @@ components:
         partyName: { type: [string, 'null'] }
         pan: { type: [string, 'null'] }
         aadhaar: { type: [string, 'null'] }
-        # Null means two things the reader must separate: with a null purgedAt the customer left the
-        # field empty; with a timestamp the matter is closed and the numbers were discarded.
         purgedAt: { type: [string, 'null'], format: date-time }
     RentAgreementRecord:
       type: object
@@ -16577,11 +16442,7 @@ components:
         planId: { type: [string, 'null'] }
         propertyId: { type: [string, 'null'], description: The listing a listing pass covers; null otherwise. }
         status: { type: [string, 'null'], enum: [pending, active, past-due, cancelled, expired] }
-        # The gateway order id. Null
-        # once nothing is owed; the durable handle the payment webhook correlates against.
         paymentRef: { type: [string, 'null'] }
-        # The single-use hosted-checkout session. Present only in the immediate `subscribe` response
-        # for a priced plan; never stored, so always null from `getSubscription`.
         paymentSessionId: { type: [string, 'null'] }
     SubscribeRequest:
       type: object
@@ -16599,8 +16460,6 @@ components:
         agreements: { $ref: '#/components/schemas/AgreementEntitlement' }
     ContactEntitlement:
       type: object
-      # Null, not a huge sentinel, when the plan lifts the ceiling: "999,983 contacts left" is the
-      # truth in a form nobody can read. `remaining` is derivable but sent, so only one sum exists.
       properties:
         unlimited: { type: boolean }
         used: { type: integer, description: Contact requests opened, for all time }
@@ -16731,7 +16590,6 @@ components:
         channel: { type: string, enum: [whatsapp, sms, email, push], default: whatsapp }
         mobile: { $ref: '#/components/schemas/Mobile' }
     SavedSearchUpdate:
-      # Absent means unchanged. `filters` (listings only) needs `query` alongside it.
       type: object
       properties:
         name: { type: string }
@@ -16760,8 +16618,6 @@ components:
             else — absolute, protocol-relative, backslash-smuggled, off-site or over-long — is a 422.
           example: /listings?deal=rent&loc=baner
     Review:
-      # `context`, `categories` and `recommend` are rendered by the property page, so the contract
-      # must carry them — a contract that cannot express what the product ships is the defect.
       type: object
       properties:
         id: { type: string }
@@ -16839,8 +16695,6 @@ components:
             `pending` is in the enum because the column can hold it, not because this platform
             writes it: reviews are post-moderated, so `ReviewService` publishes on write.
     ReviewCreate:
-      # Note what is NOT here: `context`. It is derived server-side (see Review.context), because a
-      # client-settable badge would defeat the anti-fake-review rule it exists to enforce.
       type: object
       required: [rating]
       properties:
@@ -16853,8 +16707,6 @@ components:
           description: >-
             Omit for "did not say". `false` is a different answer, and the UI shows it as one.
     ReviewCategories:
-      # Extracted so `Review` and `ReviewCreate` cannot drift apart on what an aspect map may hold.
-      # See Review.categories for why the union is declared and the server narrows it.
       type: object
       properties:
         locality:     { type: integer, minimum: 1, maximum: 5 }
@@ -16934,8 +16786,6 @@ components:
             Amenities:    { type: number }
             Connectivity: { type: number }
           additionalProperties: false
-    # Two feeds, split by the one question a seeker can always answer: is there a flat yet?
-    # Behavioural spec: docs/flows/consumer/flatmates.md
     FlatmateTab:
       type: string
       description: >
@@ -18920,13 +18770,9 @@ components:
         newUsers7d: { type: integer }
         dealsClosed30d: { type: integer }
         revenue30d:
-          # 3.1 spelling of a nullable $ref: `nullable: true` beside an `allOf` was the 3.0 idiom
-          # and says nothing in 3.1, and a type array cannot express it — the null has to be a branch.
           anyOf:
             - { $ref: '#/components/schemas/Money' }
             - { type: 'null' }
-          # Null for staff, populated for admin: this endpoint is [staff, admin] but /admin/finance
-          # is [admin] only, so serving staff a revenue figure here contradicts the next operation.
           description: Draazy's net fees over the last 30 days (invoices less credit notes, pass-through excluded). **Null for staff** - admin only.
     AdminAnalyticsTraffic:
       type: object
@@ -19689,7 +19535,6 @@ components:
         question: { type: [string, 'null'] }
         answer: { type: [string, 'null'] }
         category: { type: [string, 'null'] }
-        # list rows omit it unless `?translations=true`
         translations: { $ref: '#/components/schemas/ContentTranslations' }
     ContentItemWrite:
       type: object
@@ -19768,8 +19613,6 @@ components:
             resolvedBy: { type: [string, 'null'], format: uuid }
     StaffActivityEntry:
       type: object
-      # AuditEntry with the actor resolved to a person. `metadata` is filled for admins only, the same
-      # boundary as /admin/audit-log; for managers the key is absent.
       required: [id, actorRole, action, entity, at]
       properties:
         id: { type: string, description: The audit row's id, so the feed can be reconciled against the audit log. }
@@ -19788,8 +19631,6 @@ components:
         count: { type: integer, format: int64 }
     StaffLeaderboardEntry:
       type: object
-      # Volume, not performance. An audit row records that something was done, not that it was worth
-      # doing — filing the same number under "performance" is not something the data can support.
       required: [actor, name, role, total]
       properties:
         actor: { type: string }

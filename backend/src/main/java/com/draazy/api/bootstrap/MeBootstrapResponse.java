@@ -7,7 +7,6 @@ import com.draazy.api.identity.user.SelfResponse;
 import com.draazy.api.leads.conversation.ConversationService;
 import java.util.List;
 
-/** Only what every signed-in page draws: navbar, bottom nav and card hearts; a section is null if read failed. */
 public record MeBootstrapResponse(
         SelfResponse me,
         SubscriptionState subscription,

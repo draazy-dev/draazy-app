@@ -9,13 +9,8 @@ import java.util.Objects;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
-/** Classify-only twin of {@code catalog.listing.ListingEditRules}: it must run before
- * {@code mapper.applyTo}, or the stored values it compares against are gone. */
 @Component
 class FlatmateEditRules {
-
-    /* Silent: ownerConsentMobile is not stored, occupants/maxOccupants are outside the mapper allowlist,
-       society derives from societyId, and localitySlug folds into the compared canonical locality. */
     static final Map<Class<?>, Set<String>> SILENT = Map.of(
             FlatmateRoomCreateRequest.class,
             Set.of("attachedBath", "lookingFor", "foodPref", "hostRole", "propertyId",
@@ -28,8 +23,6 @@ class FlatmateEditRules {
             Set.of("gender", "age", "flatPref", "roomPref", "verifiedContactOnly", "furnishing", "gatedOnly",
                     "attachedBath", "parking"));
 
-    /** {@code locality} is foundation here but only a re-check on a seeker post: a room's locality
-     * asserts where a physical flat is and feeds the duplicate fingerprint. */
     FlatmateEditImpact classify(FlatmateRoom room, FlatmateRoomCreateRequest in) {
         boolean remoderationRequired = false;
         List<String> rechecked = new ArrayList<>();
@@ -38,14 +31,10 @@ class FlatmateEditRules {
             remoderationRequired = true;
         }
 
-        // A single room that became a whole flat, or a 2BHK that became a 4BHK, answers filters it
-        // was never checked for — and both are how a broker relabels a room into a better slot.
         if (!same(room.getRoomType(), in.roomType()) || !same(room.getBhk(), in.bhk())) {
             remoderationRequired = true;
         }
 
-        /** The address is what the guardrail fingerprints. The society *reference* counts too:
-         * `societyReference.require` proves the id names *a* society, not this host's. */
         if (!same(room.getFlatNumber(), in.flatNumber())
                 || in.societyId() != null
                 && !Objects.equals(room.getSocietyId(), Ids.parseUuid(in.societyId().trim()).orElse(null))) {
@@ -62,8 +51,6 @@ class FlatmateEditRules {
             rechecked.add("furnishing");
         }
 
-        /** Not foundation, because nothing filters on it — but it is the card's headline claim about
-         * what the building is, so a flat relabelled a villa is the BHK relabel minus the filter. */
         if (!same(room.getHomeTypeLabel(), in.homeTypeLabel())) {
             rechecked.add("home type");
         }
@@ -71,8 +58,6 @@ class FlatmateEditRules {
             rechecked.add("availability");
         }
 
-        // Photos and prose are the evidence the moderator approved against, so swapping them
-        // re-sells that approval — the exact bait-and-switch this class exists to stop.
         if (!sameList(room.getPhotos(), in.photos())) {
             rechecked.add("photos");
         }
@@ -83,15 +68,11 @@ class FlatmateEditRules {
             rechecked.add("title");
         }
 
-        /** These read like facets because the wizard offers chips, but the *endpoint* takes `@Size`
-         * strings checked against no vocabulary and renders them on the anonymous feed. */
         if (!same(room.getFacing(), in.facing())
                 || !same(room.getOverlooking(), in.overlooking())) {
             rechecked.add("details");
         }
 
-        // Deposit and terms are the other half of the ask: watching `rentShare` alone would leave a
-        // host free to move the money, or to add a lock-in, without tripping anything.
         if (!Objects.equals(room.getDeposit(), in.deposit())
                 || !Objects.equals(room.getNoticePeriodDays(), in.noticePeriodDays())
                 || !Objects.equals(room.getLockInMonths(), in.lockInMonths())
@@ -100,7 +81,6 @@ class FlatmateEditRules {
             rechecked.add("deposit");
         }
 
-        // Everything else is silent, and named in SILENT so the test can hold the two together.
         return impact(remoderationRequired, rechecked);
     }
 
@@ -136,8 +116,6 @@ class FlatmateEditRules {
             rechecked.add("note");
         }
 
-        /** Seats, because the card advertises `rent / seatsTotal`: halving them halves the per-head
-         * price a reader sees without touching `rent`. */
         if (group.getSeatsTotal() != seats) {
             rechecked.add("seats");
         }
@@ -150,13 +128,10 @@ class FlatmateEditRules {
         return impact(remoderationRequired, rechecked);
     }
 
-    /** Nothing here is foundation: there is no address, tier or document, so a seeker post cannot
-     * stop being the thing that was approved. */
     FlatmateEditImpact classify(FlatmateSeekerPost post, FlatmateSeekerPostCreateRequest in,
             String profileName) {
         List<String> rechecked = new ArrayList<>();
 
-        // Staff-set profile names skip the self-service name pattern, so a rename still gets a look.
         if (!same(post.getName(), profileName)) {
             rechecked.add("name");
         }
@@ -174,8 +149,6 @@ class FlatmateEditRules {
             rechecked.add("budget");
         }
 
-        /** Cleaned on the incoming side for the same reason `same` trims: `FlatmateSeekerService.clean`
-         * runs on the way to the column, so one stray duplicate would look like an edit. */
         if (!sameList(post.getLocalities(), FlatmateSeekerService.clean(in.localities()))) {
             rechecked.add("localities");
         }
@@ -192,20 +165,15 @@ class FlatmateEditRules {
             return FlatmateEditImpact.SILENT;
         }
 
-        // A full re-moderation supersedes a re-check, so the two flags are never both true.
         return new FlatmateEditImpact(remoderationRequired,
                 !remoderationRequired, List.copyOf(rechecked));
     }
 
-    /** Compared the way it will be stored: the edit paths strip what they write, and a field cleared
-     * to {@code ""} means the same as one never filled. */
     private static boolean same(String stored, String incoming) {
         return Objects.equals(FlatmateVocabulary.blankToNull(stored),
                 FlatmateVocabulary.blankToNull(incoming));
     }
 
-    /** Order matters: the first photo is the cover, so a re-order puts a picture in front of people
-     * that was approved as the fourth one down. */
     private static boolean sameList(List<String> stored, List<String> incoming) {
         return Objects.equals(stored == null ? List.of() : stored,
                 incoming == null ? List.of() : incoming);

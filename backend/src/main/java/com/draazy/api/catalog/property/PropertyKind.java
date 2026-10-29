@@ -2,8 +2,6 @@ package com.draazy.api.catalog.property;
 
 import java.util.Locale;
 
-/** The kind a free-text {@code property_type} label belongs to, tokens in the order of the generated
- * {@code property_type_key} column's {@code CASE}, so a row classified here is classified the same in SQL. */
 public enum PropertyKind {
     COMMERCIAL, HOUSE, FLAT, VILLA, FARMLAND, PLOT;
 
@@ -39,7 +37,6 @@ public enum PropertyKind {
         return this == FARMLAND || this == PLOT;
     }
 
-    /** An unrecognised label is not provably a building, so it keeps the BHK it was given. */
     public static boolean carriesBhk(String label) {
         PropertyKind kind = of(label);
         return kind == null || kind.isResidential();

@@ -8,10 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Expires the referral correlation digests after the configured retention window. */
 @Service
 public class ReferralSignalRetention {
-
     private static final Logger log = LoggerFactory.getLogger(ReferralSignalRetention.class);
 
     private final ReferralRepository referrals;
@@ -25,7 +23,6 @@ public class ReferralSignalRetention {
         this.settings = settings;
     }
 
-    // One transaction over both tables so no comparison is left half-erased.
     @Transactional
     public int expireSignalsOlderThan(Instant cutoff) {
         int cleared = referrals.clearSignalsOlderThan(cutoff) + codes.clearSignalsOlderThan(cutoff);

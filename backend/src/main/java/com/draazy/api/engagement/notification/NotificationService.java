@@ -12,11 +12,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** All queries are strictly caller-scoped — user A can never read or mark user B's notifications.
- * Passing another user's notification ids to the mark-read operation has no effect (invariant 2). */
 @Service
 public class NotificationService {
-
     public static final Duration READ_VISIBILITY = Duration.ofDays(30);
 
     private final NotificationRepository repo;
@@ -27,7 +24,6 @@ public class NotificationService {
         this.mapper = mapper;
     }
 
-    /** Deferred quiet-hours rows stay hidden only until their delivery instant. */
     @Transactional(readOnly = true)
     public Page<NotificationResponse> list(UUID userId, Boolean read, Pageable pageable) {
         Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
@@ -42,7 +38,6 @@ public class NotificationService {
         return repo.countUnreadDeliverable(userId, Instant.now());
     }
 
-    /** Empty ids means all visible caller rows; deferred rows must not be consumed unseen. */
     @Transactional
     public void markRead(UUID userId, Collection<UUID> ids) {
         Instant now = Instant.now();
@@ -53,7 +48,6 @@ public class NotificationService {
         }
     }
 
-    /** Foreign ids return 404, and dismiss hard-deletes because only the inbox reads the row. */
     @Transactional
     public void dismiss(UUID userId, UUID id) {
         Notification entity = repo.findByIdAndUserId(id, userId)
@@ -61,7 +55,6 @@ public class NotificationService {
         repo.delete(entity);
     }
 
-    /** Another user's ids are skipped, as on mark-read, so a batch cannot probe the id space. */
     @Transactional
     public void dismiss(UUID userId, Collection<UUID> ids) {
         repo.deleteMine(userId, ids);

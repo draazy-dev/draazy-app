@@ -2,8 +2,6 @@ package com.draazy.api.engagement.flatmate;
 
 import java.util.List;
 
-/** The listing wizard's starting answers for an owner's flat, in the wizard's own vocabulary. Null means the source
- * did not say, which the wizard must ask. */
 public record OwnerHomePrefillDto(
         String managedId,
         String homeTypeLabel,

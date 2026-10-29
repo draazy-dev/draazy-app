@@ -15,22 +15,14 @@ import java.util.TreeMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Reads only the daily rollup, never {@code page_views}: raw views are kept 30 days but the picker offers 180,
- * so a raw read would silently return half a window. Windows are cut on the Indian calendar like the rollup. */
 @Service
 public class AdminPageViewAnalyticsService {
-
-    /** Caps the typed {@code ?days=}: without it {@code ?days=100000} is a grouped scan of every aggregate row
-     * available to any staff account. */
     static final int MAX_DAYS = 400;
 
-    /** What the caller gets when they do not say. Matches the console's default selection. */
     static final int DEFAULT_DAYS = 90;
 
-    /** Row cap for top-pages and drop-off: a site with thousands of distinct routes must not return them all. */
     static final int TOP_PAGES = 10;
 
-    /** Closed channel vocabulary in chart order; raw referring hosts would make a doughnut slice per site. */
     private static final String DIRECT = "Direct";
     private static final String ORGANIC = "Organic search";
     private static final String SOCIAL = "Social";
@@ -40,8 +32,6 @@ public class AdminPageViewAnalyticsService {
     private static final List<String> CHANNEL_ORDER =
             List.of(ORGANIC, DIRECT, WHATSAPP, SOCIAL, REFERRAL);
 
-    /** Matched by substring, not equality, as each engine has many country domains; the cost is that a site
-     * with "google" in its name counts as organic search. */
     private static final List<String> SEARCH_HOSTS =
             List.of("google.", "bing.", "duckduckgo.", "yahoo.", "ecosia.", "yandex.", "baidu.");
 
@@ -57,7 +47,6 @@ public class AdminPageViewAnalyticsService {
         this.repository = repository;
     }
 
-    /** {@code GET /admin/analytics/traffic}. */
     @Transactional(readOnly = true)
     public AdminAnalyticsTraffic traffic(Integer daysRequested) {
         int days = window(daysRequested);
@@ -81,7 +70,6 @@ public class AdminPageViewAnalyticsService {
             tablet += num(row[8]);
             desktop += num(row[9]);
         }
-        // Zero-fill: see AdminAnalyticsTraffic.Day for why a gap is worse than a zero here.
         for (LocalDate day = from; day.isBefore(to); day = day.plusDays(1)) {
             series.add(new AdminAnalyticsTraffic.Day(
                     day,
@@ -100,7 +88,6 @@ public class AdminPageViewAnalyticsService {
                 identityWeeks(rows, from, to));
     }
 
-    /** Dashboard tile: today's sessions and signups plus the window's sessions, no {@link #traffic} breakdowns. */
     @Transactional(readOnly = true)
     public AdminDashboard.Traffic glance(int days) {
         LocalDate today = today();
@@ -118,15 +105,12 @@ public class AdminPageViewAnalyticsService {
         return new AdminDashboard.Traffic(signupsToday, sessionsToday, sessions);
     }
 
-    /** {@code GET /admin/analytics/engagement}. */
     @Transactional(readOnly = true)
     public AdminAnalyticsEngagement engagement(Integer daysRequested) {
         int days = window(daysRequested);
         LocalDate to = today().plusDays(1);
         LocalDate from = to.minusDays(days);
 
-        // Accumulate per week: a bounce rate is a ratio, so weekly is bounces over sessions, not the mean of
-        // seven daily rates, which would weight a four-session Tuesday like a four-thousand-session Saturday.
         Map<LocalDate, long[]> weekly = emptyWeeks(from, to, 3);
         for (Object[] row : repository.dailyTraffic(from, to)) {
             long[] acc = weekly.get(weekOf(day(row[0])));
@@ -154,7 +138,6 @@ public class AdminPageViewAnalyticsService {
         return new AdminAnalyticsEngagement(days, from, to, weeks, topPages);
     }
 
-    /** {@code GET /admin/analytics/surfers}. */
     @Transactional(readOnly = true)
     public AdminAnalyticsSurfers surfers(Integer daysRequested) {
         int days = window(daysRequested);
@@ -185,8 +168,6 @@ public class AdminPageViewAnalyticsService {
         List<AdminAnalyticsSurfers.Exit> dropOff = new ArrayList<>();
         for (Object[] row : exitRows) {
             long exits = num(row[1]);
-            // Share of the exits shown, not of all exits in the window,
-            // so the chart's slices add up to what it displays.
             dropOff.add(new AdminAnalyticsSurfers.Exit(
                     (String) row[0], exits, totalExits == 0 ? 0 : percent(exits, totalExits)));
         }
@@ -205,9 +186,6 @@ public class AdminPageViewAnalyticsService {
                 dropOff);
     }
 
-
-    /** Today on the Indian calendar (see class Javadoc). The window ends at tomorrow, exclusive, so today is
-     * included though still accumulating: the rollup runs hourly. */
     private static LocalDate today() {
         return LocalDate.now(PlatformTime.IST);
     }
@@ -223,8 +201,6 @@ public class AdminPageViewAnalyticsService {
         return requested;
     }
 
-    /** Folds referring hosts into channels; shares are of total sessions and sum to 100 because every session
-     * has exactly one entry host, the empty one meaning direct. */
     private List<AdminAnalyticsTraffic.Source> sources(LocalDate from, LocalDate to) {
         Map<String, Long> byChannel = new LinkedHashMap<>();
         CHANNEL_ORDER.forEach(channel -> byChannel.put(channel, 0L));
@@ -243,7 +219,6 @@ public class AdminPageViewAnalyticsService {
         return sources;
     }
 
-    /** Package-private so tests assert the channel vocabulary directly rather than through a chart. */
     static String channelOf(String host) {
         if (host == null || host.isBlank()) {
             return DIRECT;
@@ -261,8 +236,6 @@ public class AdminPageViewAnalyticsService {
         return REFERRAL;
     }
 
-    /** Real ISO weeks anchored to Monday, not the window divided into eight: equal chunks leave a short last
-     * bucket that draws a false downward slope at the right edge. */
     private static List<AdminAnalyticsTraffic.IdentityWeek> identityWeeks(
             List<Object[]> rows, LocalDate from, LocalDate to) {
         Map<LocalDate, long[]> weekly = emptyWeeks(from, to, 2);
@@ -277,8 +250,6 @@ public class AdminPageViewAnalyticsService {
         return weeks;
     }
 
-    /** Pre-creates every week in the window so an unvisited week shows as a gap, not a line the chart draws
-     * across; sorted because a {@code HashMap} would reorder the series between requests. */
     private static Map<LocalDate, long[]> emptyWeeks(LocalDate from, LocalDate to, int slots) {
         Map<LocalDate, long[]> weeks = new TreeMap<>();
         for (LocalDate week = weekOf(from); week.isBefore(to); week = week.plusWeeks(1)) {
@@ -297,8 +268,6 @@ public class AdminPageViewAnalyticsService {
         return byDay;
     }
 
-    /** Native queries return {@code Object[]}: a {@code date} is {@link LocalDate} or {@code java.sql.Date}
-     * depending on the driver, and assuming one would throw {@link ClassCastException} on every report. */
     private static LocalDate day(Object value) {
         if (value instanceof LocalDate date) {
             return date;
@@ -314,7 +283,6 @@ public class AdminPageViewAnalyticsService {
         return value == null ? 0L : ((Number) value).longValue();
     }
 
-    /** A percentage 0–100 to one decimal place. Callers guarantee a non-zero denominator. */
     private static double percent(long part, long whole) {
         return round1(part * 100.0 / whole);
     }

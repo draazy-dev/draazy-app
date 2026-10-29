@@ -11,10 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** What a listing may say about itself given its type and deal. Create, owner edit and staff edit all
- * come through here, so the three cannot disagree on what is storable. */
 final class ListingShape {
-
     static final long MAX_SALE_PRICE = 10_000_000_000L;
     static final long MAX_MONTHLY_RENT = 10_000_000L;
     private static final BigDecimal MAX_AREA_SQFT = BigDecimal.valueOf(10_000).multiply(AreaUnit.sqftPer(AreaUnit.ACRE));
@@ -64,7 +61,6 @@ final class ListingShape {
         return List.of();
     }
 
-    /** A listing that was never asked a question must not hold an answer to it. */
     static void clearUnaskedAnswers(Property p) {
         if (!PropertyKind.carriesBhk(p.getPropertyType())) {
             p.setBhk(null);

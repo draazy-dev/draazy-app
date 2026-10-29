@@ -18,7 +18,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class CoFillServiceRequests {
-
     private final ServiceRequestRepository requests;
     private final ServiceRequestPartyRepository partyRows;
     private final CoFillParties parties;
@@ -61,14 +60,12 @@ public class CoFillServiceRequests {
         UUID requestId = serviceRequests.fileDeferred(caller, body);
         parties.invite(caller, requestId.toString(), role, 0, mobile);
 
-        // Re-read after invite so the DTO sees the just-written party row.
         ServiceRequest request = requests.findById(requestId).orElseThrow(() -> new IllegalStateException("Service request " + requestId
                         + " disappeared before its co-fill invitation was recorded"));
         serviceRequests.recordBy(request, "party.invited", caller.userId());
         return mapper.toDto(request, caller);
     }
 
-    // Merge only this side; blank fields must not erase the other party's work.
     @Transactional
     public ServiceRequestDto submitPartyDetails(AuthPrincipal caller, String id,
             Map<String, Object> details) {
@@ -182,7 +179,6 @@ public class CoFillServiceRequests {
         });
     }
 
-    // A fully waived request has no gateway order to wait for, so it is settled as a paid one would be.
     private ServiceRequest spendReferralCredit(AuthPrincipal caller, String id) {
         ServiceRequest request = checkoutable(caller, id);
         if (referralCredit.spend(request)) {

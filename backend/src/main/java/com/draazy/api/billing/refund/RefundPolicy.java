@@ -6,10 +6,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
 
-/** The refund rules as a pure function of the order, the clock and the settings. */
 final class RefundPolicy {
-
-    /** How long after the guarantee window closes the owner may still claim it. */
     static final Duration CLAIM_PERIOD = Duration.ofDays(7);
 
     private RefundPolicy() {

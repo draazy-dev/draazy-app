@@ -13,11 +13,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-// Guard plaintext details: ops reads this JSON on every queue page.
-// Identity numbers belong in the identity endpoint, not bulk-readable jsonb.
 final class ServiceRequestDetailsGuard {
-
-    // Mirrors buildDetails in useRentAgreement.js; a key added there must be added here.
     static final Set<String> RENT_AGREEMENT_KEYS = Set.of("property", "ownerName", "tenants", "rent",
             "deposit", "nrDeposit", "months", "startDate", "regArea", "_state");
 
@@ -30,7 +26,6 @@ final class ServiceRequestDetailsGuard {
     private static final Pattern KEY_WORD_BOUNDARY = Pattern.compile(
             "[^A-Za-z0-9]+|(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|(?<=[A-Za-z])(?=\\d)|(?<=\\d)(?=[A-Za-z])");
 
-    // A UUID's last group can be twelve digits, so UUIDs are cut out before a run is sought.
     private static final Pattern UUID_SHAPE = Pattern.compile(
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
@@ -63,8 +58,8 @@ final class ServiceRequestDetailsGuard {
         rejectIdentityNumbers(null, details);
     }
 
-    // A 12-digit IMPS/UPI UTR passes the Aadhaar checksum one time in ten, so a well-formed
-    // deposit-payment reference is checked for a PAN only.
+    // A 12-digit UTR passes the Aadhaar checksum one time in ten, so payment references
+    // are checked for a PAN only.
     private static Map<String, Object> withoutPaymentReferences(Map<String, Object> details) {
         if (!(details.get("_state") instanceof Map<?, ?> state) || !(state.get("terms") instanceof Map<?, ?> terms)
                 || !(terms.get("depositPayments") instanceof List<?> rows)) {

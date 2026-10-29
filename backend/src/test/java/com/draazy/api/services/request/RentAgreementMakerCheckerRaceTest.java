@@ -34,7 +34,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("Rent agreement maker-checker races: one decision wins, the other is a clean 409")
 class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
-
     @Autowired ServiceRequestRepository requests;
     @MockitoSpyBean ServiceRequestDraftApprovals approvals;
     @MockitoSpyBean OtpSender sender;
@@ -166,7 +165,6 @@ class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
         return id;
     }
 
-    // Runs the share on its own thread and gives it a moment; a correct lock keeps it waiting until we commit.
     private Thread reshareMeanwhile(User holder, UUID id) throws InterruptedException {
         Thread share = new Thread(() -> share(holder, id));
         share.start();
@@ -197,7 +195,6 @@ class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
                 """, staff.getId().toString(), "[\"support\",\"desk:" + Teams.RENTAL + "\"]");
         return users.findById(staff.getId()).orElseThrow();
     }
-
 
     private UUID filed(User owner, User holder, ServiceRequestStatus status, long rent) {
         return filed(owner, holder, status, rent, Map.of());

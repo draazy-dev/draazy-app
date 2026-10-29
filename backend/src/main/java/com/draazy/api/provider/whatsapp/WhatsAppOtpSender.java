@@ -8,11 +8,9 @@ import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-// Delivers login codes as a WhatsApp `AUTHENTICATION` template through the Meta Cloud API (ADR-020).
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.whatsapp", name = "enabled", havingValue = "true")
 class WhatsAppOtpSender implements OtpSender {
-
     private static final String COUNTRY_CODE = "91";
 
     private final WhatsAppClient client;
@@ -25,8 +23,6 @@ class WhatsAppOtpSender implements OtpSender {
         this.calls = calls;
     }
 
-    // Checked at startup because the alternative is worse than it looks.
-    // These two live here rather than in `WhatsAppClient` because they are this sender's concern.
     @PostConstruct
     void requireTemplate() {
         if (isBlank(props.otpTemplateName()) || isBlank(props.otpTemplateLang())) {
@@ -40,8 +36,6 @@ class WhatsAppOtpSender implements OtpSender {
         }
     }
 
-    // Send `code` to `mobile` as an authentication template.
-    // The code appears twice in the payload, and both are required.
     @Override
     public void send(String mobile, String code) {
         List<Map<String, Object>> components = List.of(

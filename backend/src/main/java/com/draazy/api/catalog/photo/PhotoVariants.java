@@ -19,10 +19,7 @@ import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
 
-// Card-sized JPEG copies, made server-side so a card shows exactly the picture the gallery and moderators see.
 final class PhotoVariants {
-
-    // Must match cardSrcSet in frontend/src/lib/imgSrcSet.js. Widest first: each is scaled from the last.
     static final int[] WIDTHS = {960, 480};
 
     private static final float QUALITY = 0.8f;
@@ -35,7 +32,6 @@ final class PhotoVariants {
         return originalKey + ".w" + width + ".jpg";
     }
 
-    /** Never wider than the original; empty when the bytes cannot be decoded. */
     static Map<Integer, byte[]> of(byte[] photo) throws IOException {
         BufferedImage image = decode(photo, WIDTHS[0]);
         Map<Integer, byte[]> variants = new LinkedHashMap<>();
@@ -49,8 +45,6 @@ final class PhotoVariants {
         return variants;
     }
 
-    // Subsampled at decode so a 24 MP upload never becomes a huge bitmap; kept at least twice the widest
-    // variant across when the budget allows, so the averaging in `scale` still has real pixels.
     private static BufferedImage decode(byte[] photo, int widest) throws IOException {
         try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(photo))) {
             Iterator<ImageReader> readers = in == null ? null : ImageIO.getImageReaders(in);
@@ -73,7 +67,6 @@ final class PhotoVariants {
         }
     }
 
-    // Halving first: a single bilinear step over a large ratio skips pixels and shimmers.
     private static BufferedImage scale(BufferedImage source, int width) {
         BufferedImage current = source;
         while (current.getWidth() / 2 > width) {
@@ -82,7 +75,6 @@ final class PhotoVariants {
         return resize(current, width);
     }
 
-    // Opaque RGB on white, as the browser's upload encoder does, since JPEG has no alpha.
     private static BufferedImage resize(BufferedImage source, int width) {
         int height = Math.max(1, Math.round((float) source.getHeight() * width / source.getWidth()));
         BufferedImage out = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);

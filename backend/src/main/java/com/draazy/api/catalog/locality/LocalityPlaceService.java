@@ -17,11 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Typed text never creates a locality: a dormant curated row of the same name is revived before one is minted.
- * A retired row is never reopened by a pick. */
 @Service
 public class LocalityPlaceService {
-
     static final String PICK_MESSAGE = "Pick the locality from the suggestions.";
 
     static final String CLOSED_MESSAGE = "That area isn't open for new listings.";
@@ -53,7 +50,6 @@ public class LocalityPlaceService {
         this.tx = tx;
     }
 
-    /** Deliberately not one transaction: the Google call must not hold a database connection. */
     public LocalitySummary resolve(LocalityResolveRequest request) {
         String placeId = request.placeId().trim();
         LocalitySummary known = tx.execute(status -> known(placeId));

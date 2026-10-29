@@ -21,10 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 
-/** A third vault: keyed on a {@code managed_properties} row, its {@code managed} segment outranks
- * {@code {propId}}, a stranger's id is 404 never 403, and deleting the record deletes its papers. */
 class ManagedPropertyDocumentTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -39,7 +36,6 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    /** A managed record made the way the client makes one, so the id under test is a real one. */
     private String record(User owner, String locality) throws Exception {
         String json = mvc.perform(post(Routes.MeManagedProperties.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -66,22 +62,16 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
         return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
     }
 
-    // ---------------- routing ----------------
-
     @Test
     void managedRoute_outranksThePropIdTemplate_soItReachesTheManagedHandler() throws Exception {
         User owner = user("9841004001");
         String managedId = record(owner, "Baner");
 
-        // If `managed` were read as a {propId} this would 404 in the listing vault; as a literal segment it wins
-        // over the template and the record's own (empty) list comes back.
         mvc.perform(get(Routes.MeDocuments.FOR_MANAGED, managedId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
-
-    // ---------------- upload ----------------
 
     @Test
     void upload_returnsAMintedUrlThatIsNotStoredOnTheRow() throws Exception {
@@ -90,8 +80,6 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
 
         String docId = upload(owner, managedId, "Sale Deed", pdf("deed.pdf"));
 
-        // The wire carries a signed, expiring URL; the row holds only an opaque key under its own prefix,
-        // so nothing in the bucket can be mistaken for a listing's paperwork by path.
         assertThat(managedDocuments.findById(UUID.fromString(docId)))
                 .get()
                 .satisfies(d -> {
@@ -122,8 +110,6 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
         User stranger = user("9841004006");
         String managedId = record(owner, "Baner");
 
-        // 404 rather than 403: a 403 would confirm the record exists, which is exactly what an id
-        // this caller should not be able to learn about would be probing for.
         mvc.perform(multipart(Routes.MeDocuments.FOR_MANAGED, managedId)
                         .file(pdf("deed.pdf"))
                         .param("category", "Sale Deed")
@@ -134,8 +120,6 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
                 UUID.fromString(managedId))).isEmpty();
     }
 
-    // ---------------- list ----------------
-
     @Test
     void list_showsOnlyThatRecordsPapers_newestFirst() throws Exception {
         User owner = user("9841004007");
@@ -145,8 +129,6 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
         upload(owner, baner, "Index II", pdf("index2.pdf"));
         upload(owner, kothrud, "Society NOC", pdf("noc.pdf"));
 
-        // Two records owned by the same person are two vaults, not one. The owner scoping is on the
-        // record; the bucket scoping is on the id.
         mvc.perform(get(Routes.MeDocuments.FOR_MANAGED, baner)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
@@ -171,14 +153,10 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
     void list_onAnUnknownRecordIs404_notAnEmptyVault() throws Exception {
         User owner = user("9841004010");
 
-        // An empty array here would tell a caller that any id they invent is a record they own with
-        // nothing in it, which is both false and a probe that always succeeds.
         mvc.perform(get(Routes.MeDocuments.FOR_MANAGED, UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isNotFound());
     }
-
-    // ---------------- delete ----------------
 
     @Test
     void delete_removesOnePaperAndLeavesTheRest() throws Exception {
@@ -204,8 +182,6 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
         String kothrud = record(owner, "Kothrud");
         String deed = upload(owner, baner, "Sale Deed", pdf("deed.pdf"));
 
-        // Owning both records is not enough — the document must belong to the vault named in the
-        // path, or the id in the path is decoration and the route is really "delete any of my docs".
         mvc.perform(delete(Routes.MeDocuments.MANAGED_BY_ID, kothrud, deed)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isNotFound());
@@ -229,8 +205,6 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
                 UUID.fromString(managedId))).hasSize(1);
     }
 
-    // ---------------- lifecycle ----------------
-
     @Test
     void deletingTheRecord_takesItsPapersWithIt() throws Exception {
         User owner = user("9841004015");
@@ -241,13 +215,9 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isNoContent());
 
-        // The flush is the test: the cascade is a database rule, unfired until the DELETE reaches the database,
-        // and Hibernate will not auto-flush it for a child query; findById would pass on cache, proving nothing.
         em.flush();
         em.clear();
 
-        // V93 cascades, unlike `documents` and `personal_documents` whose parents are archived, because
-        // this parent is really deleted; otherwise rows nobody can reach would leak storage (V20).
         assertThat(managedDocuments.findByManagedPropertyIdOrderByUploadedAtDescIdDesc(
                 UUID.fromString(managedId))).isEmpty();
     }

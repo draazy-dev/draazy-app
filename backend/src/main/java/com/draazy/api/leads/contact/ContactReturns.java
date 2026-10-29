@@ -9,10 +9,8 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Giving a seeker their contact back when an owner declines or never answers; no money moves. */
 @Component
 public class ContactReturns {
-
     private static final int BATCH = 500;
 
     private final ContactRequestRepository requests;
@@ -34,7 +32,6 @@ public class ContactReturns {
                 listing + " " + what + " \u2014 your contact is back.", "/property/" + row.getPropertyId());
     }
 
-    /** Expires what is still pending on a listing that closed or came down; each seeker gets their contact back. */
     @Transactional
     public void expirePendingForClosedListing(UUID propertyId, String what) {
         for (ContactRequest row : requests.findByPropertyIdAndStatus(propertyId, ContactRequestStatuses.PENDING)) {
@@ -45,7 +42,6 @@ public class ContactReturns {
         }
     }
 
-    /** Stores the expiry of every pending request whose reply window has run out; returns how many. */
     @Transactional
     public int expireOverdue(Instant now) {
         int expired = 0;

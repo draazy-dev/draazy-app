@@ -10,12 +10,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Derives what is left from history: each past contact is spent on the earliest-expiring valid bucket. */
 final class ContactAllocator {
-
     static final Duration FREE_WINDOW = Duration.ofDays(30);
 
-    /** The free-window end is null before the first contact; the pack end is null with no pack contacts left. */
     record Standing(int remaining, Instant freeWindowEndsAt, Instant packExpiresAt) {
     }
 
@@ -46,7 +43,6 @@ final class ContactAllocator {
     private ContactAllocator() {
     }
 
-    /** @param contacts when each contact was opened, oldest first */
     static Standing allocate(List<Instant> contacts, int freeCapacity, List<ContactPackTerm> packs,
             int referralCapacity, Instant now) {
         Instant freeEnds = contacts.isEmpty() ? null : contacts.get(0).plus(FREE_WINDOW);
@@ -61,7 +57,6 @@ final class ContactAllocator {
         return new Standing(remaining, freeEnds, packExpires);
     }
 
-    /** Contacts the replay drew from each pack, by subscription id; a pack with none is absent from the map. */
     static Map<UUID, Integer> spentFromPacks(List<Instant> contacts, int freeCapacity,
             List<ContactPackTerm> packs, int referralCapacity) {
         Instant freeEnds = contacts.isEmpty() ? null : contacts.get(0).plus(FREE_WINDOW);
@@ -76,7 +71,6 @@ final class ContactAllocator {
         return spent;
     }
 
-    // Bucket order: free, then each pack in the order given, then referral.
     private static List<Bucket> replay(List<Instant> contacts, Instant freeEnds, int freeCapacity,
             List<ContactPackTerm> packs, int referralCapacity) {
         List<Bucket> buckets = new ArrayList<>();

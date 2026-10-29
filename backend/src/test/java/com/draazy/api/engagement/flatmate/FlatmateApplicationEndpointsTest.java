@@ -27,11 +27,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// These routes prove owner status and moderation status stay separate: ops removing a row
-// must never be recorded as the owner saying no.
 @DisplayName("Flatmate group applications — the group applies, the owner answers")
 class FlatmateApplicationEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -71,8 +68,6 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    // Applying deliberately requires a visible group, so skipping approval would assert
-    // against a 400 rather than the intended branch.
     private String group(User host, String title) throws Exception {
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
@@ -85,8 +80,6 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString();
         String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", id);
-        // The transaction still holds the pending entity; clearing forces the next read
-        // through the database, matching the running application.
         em.clear();
         return id;
     }
@@ -104,7 +97,6 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("applying")
     class Applying {
-
         @Test
         @DisplayName("the host applies and the owner's inbox carries the per-head split")
         void happyPath() throws Exception {
@@ -123,8 +115,6 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.applicantName").value("Host One"))
                     .andExpect(jsonPath("$.applicantMobile").value(org.hamcrest.Matchers.nullValue()))
                     .andExpect(jsonPath("$.status").value("pending"))
-                    // The owner reads the per-head figure, which comes from intended seats
-                    // rather than current members.
                     .andExpect(jsonPath("$.perHead").value(15000))
                     .andExpect(jsonPath("$.seatsTotal").value(3));
 
@@ -207,7 +197,6 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the owner's inbox")
     class Inbox {
-
         @Test
         @DisplayName("shows applications on my flats and nobody else's")
         void scopedToMe() throws Exception {
@@ -254,8 +243,6 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content.length()").value(0));
 
-            // Still pending. Taking a row down is a moderation act; declining is the owner's, and
-            // one must never be recorded as the other.
             String status = jdbc.queryForObject(
                     "select status from flatmate_group_applications where id = ?::uuid",
                     String.class, appId);
@@ -266,7 +253,6 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("deciding")
     class Deciding {
-
         @Test
         @DisplayName("the owner accepts, and the row carries the decision back")
         void accept() throws Exception {
@@ -319,8 +305,6 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
             Property flat = listing(owner, "Private flat", "rent", 45000L);
             String appId = apply(host, group(host, "Group F"), flat);
 
-            // 404 rather than 403 deliberately: a 403 would confirm the id exists, which is an
-            // existence oracle over other owners' inboxes.
             mvc.perform(patch(Routes.Flatmates.MY_GROUP_APPLICATION_BY_ID.replace("{id}", appId))
                             .header(HttpHeaders.AUTHORIZATION, bearer(other))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -436,7 +420,6 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("my own groups")
     class MyGroups {
-
         @Test
         @DisplayName("includes a group still waiting on moderation — the host is not a stranger")
         void includesPending() throws Exception {

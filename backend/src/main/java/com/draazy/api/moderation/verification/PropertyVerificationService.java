@@ -25,10 +25,9 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Strangers get 404, not 403, so verification cases do not become an oracle.
+// Strangers get 404, not 403, so verification cases are not an existence oracle.
 @Service
 public class PropertyVerificationService {
-
     private final PropertyReviewRepository reviews;
     private final PropertyRepository properties;
     private final VerificationCases cases;
@@ -62,7 +61,6 @@ public class PropertyVerificationService {
         return toResponse(review, property, checker);
     }
 
-    // Owners cannot see a case containing only staff-only notes; that closes the probe oracle.
     private PropertyReview ownerVisibleCase(Property property, boolean checker) {
         PropertyReview review = requireCase(property);
         if (!checker && review.getReviewer() == null && review.getDecidedAt() == null
@@ -73,7 +71,6 @@ public class PropertyVerificationService {
         return review;
     }
 
-    // Idempotent because property_reviews.property_id is UNIQUE.
     @Transactional
     public PropertyReviewResponse initiate(AuthPrincipal actor, String propertyId, boolean markRead) {
         Property property = participantPropertyForWrite(actor, propertyId);
@@ -85,7 +82,6 @@ public class PropertyVerificationService {
             property, mayReadNotes(actor) && !actor.userId().equals(property.getOwner().getId()));
     }
 
-    // Opens the case instead of requiring one, closing the oracle on message routes.
     @Transactional
     public PropertyReviewResponse addMessage(AuthPrincipal actor, String propertyId, String body,
             boolean clarificationRequested) {
@@ -110,7 +106,6 @@ public class PropertyVerificationService {
         return toResponse(review, property, checker);
     }
 
-    // Marks only the other side's messages the caller could have seen.
     @Transactional
     public void markRead(AuthPrincipal actor, String propertyId) {
         Property property = participantPropertyForWrite(actor, propertyId);
@@ -126,7 +121,6 @@ public class PropertyVerificationService {
                 .forEach(ReviewMessage::markRead);
     }
 
-    // Approval also publishes in this transaction; a catalogue-missing verdict is no verdict.
     @Transactional
     public PropertyReviewResponse decide(AuthPrincipal actor, String propertyId, String decision,
             String note, String reasonCode, String expectedStatus) {
@@ -158,8 +152,6 @@ public class PropertyVerificationService {
         if (approve) {
             ApprovalGate.require(review, property);
 
-                // Checked before the verdict is written, not left to `publish` below: the rollback would
-                // take the verdict with it and cost the reviewer the whole checklist.
             lifecycle.requireFiled(property);
         }
 
@@ -203,7 +195,6 @@ public class PropertyVerificationService {
         }
     }
 
-    // Addressed by text and refuses the listing owner; see the flow doc.
     @Transactional
     public PropertyReviewResponse setChecklistItem(AuthPrincipal actor, String propertyId, String item,
             boolean pass) {
@@ -243,7 +234,6 @@ public class PropertyVerificationService {
         return Roles.isBackOffice(actor.role());
     }
 
-    // Grant, not role, controls staff-only material.
     private boolean mayReadNotes(AuthPrincipal actor) {
         return isStaff(actor) && permissions.granted(actor, BackOfficePermissions.PROPERTIES_READ);
     }
@@ -288,7 +278,6 @@ public class PropertyVerificationService {
         return toResponse(review, property, mayReadNotes(actor));
     }
 
-    // Owners get no checklist until a document exists; staff keep it because emptiness matters.
     private PropertyReviewResponse toResponse(PropertyReview review, Property property,
             boolean staff) {
         UUID ownerId = property.getOwner().getId();
@@ -308,8 +297,6 @@ public class PropertyVerificationService {
                         : List.of(),
                 review.getMessages().stream()
 
-                        // The one line keeping the duplicate finding away from the person it is
-                        // about — a filter on the way out, so there is one place to get wrong.
                         .filter(message -> staff || !message.isInternal())
                         .map(message -> new PropertyReviewResponse.MessageEntry(
                                 message.getId().toString(),
@@ -326,7 +313,6 @@ public class PropertyVerificationService {
                 review.getDecidedAt(), ListingProgress.of(property, staff), staff ? property.getReraCheck() : null);
     }
 
-    // Before the lifecycle guards, so the loser of a race is told the listing moved, not how to restore it.
     private void requireNotStale(Property property, String expected) {
         if (expected != null && !expected.isBlank()) {
             String wire = reviews.findByPropertyId(property.getId())

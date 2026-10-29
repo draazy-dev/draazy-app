@@ -15,10 +15,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The role guard keeps staff from hosting; ownership of the listing is checked in the service. */
 @RestController
 public class FlatSplitController {
-
     private final FlatSplitService service;
 
     public FlatSplitController(FlatSplitService service) {

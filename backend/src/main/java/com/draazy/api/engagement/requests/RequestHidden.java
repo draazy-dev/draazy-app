@@ -12,7 +12,6 @@ import lombok.Getter;
 @Table(name = "request_hidden")
 @Getter
 public class RequestHidden {
-
     @EmbeddedId
     private RequestHiddenKey id;
 
@@ -20,7 +19,6 @@ public class RequestHidden {
     private Instant hiddenAt;
 
     protected RequestHidden() {
-        // JPA
     }
 
     RequestHidden(UUID userId, String kind, UUID refId) {

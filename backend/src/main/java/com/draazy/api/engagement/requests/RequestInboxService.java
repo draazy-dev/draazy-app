@@ -23,11 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RequestInboxService {
-
     static final String RECEIVED = "received";
     static final String SENT = "sent";
     private static final Duration SENT_HISTORY = Duration.ofDays(30);
-    // Longer than Sent: the owner's private lead notes are only reachable from these rows.
     private static final Duration RECEIVED_HISTORY = Duration.ofDays(90);
 
     private static final Comparator<RequestItem> NEWEST_FIRST = Comparator.comparing(RequestItem::createdAt).reversed();
@@ -105,7 +103,6 @@ public class RequestInboxService {
                 .collect(Collectors.toMap(h -> key(h.getId().kind(), h.getId().refId()), RequestHidden::getHiddenAt));
     }
 
-    // A clear covers only the outcome the user saw; a re-ask or a later decision brings the request back.
     private static boolean clearedBefore(RequestView view, Instant hiddenAt) {
         if (hiddenAt == null || view.pending()) {
             return false;
@@ -115,7 +112,6 @@ public class RequestInboxService {
         return !lastMoved.isAfter(hiddenAt);
     }
 
-    // A withdrawal is the requester taking the ask back, so the owner never sees it.
     private List<RequestView> receivedViews(UUID userId) {
         Instant since = Instant.now().minus(RECEIVED_HISTORY);
         Map<String, Instant> cleared = clearedAt(userId);

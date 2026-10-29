@@ -8,13 +8,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-/** Keyed on the owner's mobile like {@link FlatmateOwnerConsent}: the landlord rarely has an account.
- * Only the hash of the link token is stored. */
 @Entity
 @Table(name = "flatmate_owner_notices")
 @Getter
 public class FlatmateOwnerNotice extends BaseEntity {
-
     static final String SENT = "sent";
     static final String AGREED = "agreed";
     static final String DECLINED = "declined";

@@ -5,7 +5,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-// Images are short-lived signed URLs; warnings carry dedup signals for approval.
 public record IdentityReviewResponse(
         UUID id,
         UUID userId,
@@ -43,8 +42,6 @@ public record IdentityReviewResponse(
         IdentityAppealInfo appeal,
         boolean appealCanDecide,
         boolean appealCanReopen) {
-
-    /** The OCR claim as stored: {@code number} is the last 4 only, the full number never lands. */
     public record Claims(String number, String name, LocalDate dob) {
     }
 

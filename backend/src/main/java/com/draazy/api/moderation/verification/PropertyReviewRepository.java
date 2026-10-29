@@ -11,11 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface PropertyReviewRepository extends JpaRepository<PropertyReview, UUID> {
-
-    /** {@code property_id} is UNIQUE, so a listing has at most one open case file. */
     Optional<PropertyReview> findByPropertyId(UUID propertyId);
 
-    // Transaction-level lock prevents two inserts for the same case file.
     @Query(value = """
             select 1 from (
               select pg_advisory_xact_lock(hashtextextended(cast(:propertyId as text), 0))

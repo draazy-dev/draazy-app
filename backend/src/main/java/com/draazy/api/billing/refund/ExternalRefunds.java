@@ -14,10 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** A pack or pass refunded on the gateway dashboard rather than through the refunds desk. */
 @Service
 public class ExternalRefunds {
-
     private static final Logger log = LoggerFactory.getLogger(ExternalRefunds.class);
 
     private final SubscriptionRepository subscriptions;
@@ -40,7 +38,6 @@ public class ExternalRefunds {
         this.notifier = notifier;
     }
 
-    /** False when the order is not a pack or pass of ours. A redelivered webhook changes nothing. */
     @Transactional
     public boolean apply(String orderRef, String gatewayRefund, long amount) {
         Optional<Subscription> found = orderRef == null ? Optional.empty() : subscriptions.findByPaymentRef(orderRef);
@@ -82,7 +79,6 @@ public class ExternalRefunds {
         return true;
     }
 
-    // The money is already back, so approving the request later would refund it twice.
     private void closePendingRequest(Subscription order, Instant now) {
         requests.findBySubscriptionId(order.getId()).filter(RefundRequest::isPending)
                 .ifPresent(request -> request.approve(null, now));

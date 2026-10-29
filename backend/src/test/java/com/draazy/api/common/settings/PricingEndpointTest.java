@@ -15,12 +15,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** Round trips are admin write then anonymous read; other fee-block keys (fraud threshold) are never published. */
 class PricingEndpointTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
 
-    /** Mobile block 98691000xx — used by no other test class. */
     private String adminToken() {
         User u = new User("9869100001", Roles.Wire.ADMIN);
         u.setName("Pricing Admin");
@@ -28,7 +25,6 @@ class PricingEndpointTest extends AbstractApiTest {
         return "Bearer " + jwtService.issueAccessToken(users.saveAndFlush(u));
     }
 
-    /** Anonymous: a route missed in {@code SecurityConfig} would 401 and plans would use bundled constants. */
     @Test
     void anonymousCallersGetThePriceList() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))
@@ -36,7 +32,6 @@ class PricingEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.pricing.listingPass").value(999));
     }
 
-    /** Checked per key with {@code exists()}: defaults equal the seed row, so a value check proves no read. */
     @Test
     void everyPriceTheClientNeedsIsPublished() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))
@@ -47,7 +42,6 @@ class PricingEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.pricing.ownerProYearly").doesNotExist());
     }
 
-    /** Only test that tells a real row read from literals; the untouched sibling proves the write deep-merges. */
     @Test
     void aPriceAnAdminChangesIsThePriceAnAnonymousVisitorIsQuoted() throws Exception {
         mvc.perform(put(Routes.Admin.SETTINGS)
@@ -63,7 +57,6 @@ class PricingEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.pricing.rentAgreementPlatform").value(499));
     }
 
-    /** The fraud threshold and contact allowances share the prices block but must never be published. */
     @Test
     void theRestOfTheFeesBlockIsNotPublished() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))

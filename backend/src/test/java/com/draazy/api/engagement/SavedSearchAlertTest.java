@@ -24,15 +24,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
-// The cadence, not just the send, is under test: "Daily" fired every sweep would break the user's choice.
-// Alerts are counted via jdbc so the assertion is about what reached the table.
 @DisplayName("D94 - saved-search alerts are actually sent")
 class SavedSearchAlertTest extends AbstractApiTest {
-
-    /** The BHK no seeded or inline listing outside this test uses, so counts cannot drift. */
     private static final String ODD_BHK = "97";
 
-    /** Matches the locality this test inserts, and nothing else. */
     private static final String LOCALITY = "d94-alert-locality";
 
     @Autowired
@@ -65,7 +60,6 @@ class SavedSearchAlertTest extends AbstractApiTest {
                 """, LOCALITY, "D94 Alert Locality", "Pune");
     }
 
-    // Baseline pinned so only listings created after this call can match.
     private SavedSearch alertFor(User user, String frequency) {
         SavedSearch search = new SavedSearch(user.getId(), "rent " + LOCALITY);
         search.setFilters("{\"deal\":\"rent\",\"localities\":[\"" + LOCALITY
@@ -123,15 +117,12 @@ class SavedSearchAlertTest extends AbstractApiTest {
 
         savedSearches.recomputeNewCounts(Instant.now());
 
-        // The count is still maintained -- the badge on the card is not an alert, and a user who
-        // turned alerts off has not asked to stop seeing what is there when they visit.
         SavedSearch after = searches.findById(search.getId()).orElseThrow();
         assertThat(after.getNewCount()).isEqualTo(1);
         assertThat(after.getLastAlertedAt()).isNull();
         assertThat(alertsFor(user)).isZero();
     }
 
-    // The sweep runs hourly; a daily alert must survive 24 of them without sending twice.
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
             "twenty minutes later it does not fire twice in a day | 20 | 1",
@@ -149,7 +140,6 @@ class SavedSearchAlertTest extends AbstractApiTest {
         savedSearches.recomputeNewCounts(Instant.now());
         assertThat(alertsFor(user)).isEqualTo(1);
 
-        // A second wave, and a second sweep.
         jdbc.update("update saved_searches set updated_at = ? where id = ?",
                 Timestamp.from(Instant.now().minusSeconds(60)), search.getId());
         listing(user, "D94 second match");
@@ -163,7 +153,6 @@ class SavedSearchAlertTest extends AbstractApiTest {
                 .isEqualTo(expectedAlerts);
     }
 
-    // The count drops to zero the tick after an alert because the baseline moves with updated_at; not news.
     @Test
     @DisplayName("a falling count never notifies")
     void aFallingCountIsSilent() {
@@ -177,7 +166,6 @@ class SavedSearchAlertTest extends AbstractApiTest {
         savedSearches.recomputeNewCounts(Instant.now());
         assertThat(alertsFor(user)).isEqualTo(1);
 
-        // No new inventory. The baseline has advanced, so the count falls back to zero.
         savedSearches.recomputeNewCounts(Instant.now().plus(1, ChronoUnit.HOURS));
 
         assertThat(alertsFor(user))

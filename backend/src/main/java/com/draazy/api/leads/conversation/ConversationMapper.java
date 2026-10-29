@@ -25,7 +25,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ConversationMapper {
-
     private final ConversationMessageRepository messages;
     private final UserRepository users;
     private final PropertyRepository properties;
@@ -76,8 +75,6 @@ public class ConversationMapper {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toCollection(HashSet::new));
 
-        // The thread's authors as well as the counterparties: a message needs a display name, and
-        // on the detail read that includes the reader themselves.
         threads.values().forEach(thread ->
                 thread.forEach(m -> counterparties.add(m.getAuthorId())));
         counterparties.add(readerId);
@@ -111,7 +108,6 @@ public class ConversationMapper {
                     boolean available = listing != null && listing.isDirectlyReachable();
                     UUID latestAuthor = latestAuthors.get(c.getId());
                     ContactVisibility visibility = visibilityFor(readerId, other, listing, approved);
-                    // Number and presence serve the open thread's header, not a hundred inbox rows.
                     boolean detail = threads.containsKey(c.getId());
                     return new ConversationDto(
                             c.getId().toString(),

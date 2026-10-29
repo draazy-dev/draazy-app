@@ -11,10 +11,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 
-/** Deletes uploads that nothing shows once the wizard's saved draft has had a week to use them. */
 @Service
 public class PhotoUploadSweep {
-
     static final Duration GRACE = Duration.ofDays(7);
 
     private static final Logger log = LoggerFactory.getLogger(PhotoUploadSweep.class);
@@ -33,8 +31,6 @@ public class PhotoUploadSweep {
         this.storage = storage;
     }
 
-    /** Settles one page of uploads past the grace period; returns how many. A failed delete keeps its row for the
-     * next run, since storage deletes are idempotent and only fail transiently. */
     public int sweep(Instant now) {
         List<PhotoUpload> due = uploads.findByCreatedAtBeforeOrderByCreatedAt(now.minus(GRACE), Limit.of(BATCH));
         String prefix = storage.publicUrlPrefix();

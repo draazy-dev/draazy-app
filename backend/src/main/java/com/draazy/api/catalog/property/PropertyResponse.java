@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Full listing detail; the entity↔wire boundary for the detail path. The owner's mobile is always
- * emitted masked by {@code PropertyMapper.toOwner}, never by the client. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record PropertyResponse(
         String id,
@@ -26,8 +24,6 @@ public record PropertyResponse(
         String locality,
         String localitySlug,
 
-        /** The society this home is in, keyed by slug because that is its public key; null when the
-         * owner named none, and the client then renders no Society section rather than an empty one. */
         String societySlug,
         String societyName,
         String city,
@@ -39,21 +35,15 @@ public record PropertyResponse(
 
         ListingProgress progress,
 
-        // Deal outcome (active|reserved|closed). Carries the one state `status` cannot: `reserved`,
-        // an under-offer listing whose moderation status is still `approved`.
         String dealStatus,
         Instant createdAt,
 
-        // When the owner last confirmed the listing is still available. Public, because the
-        // freshness badge is a buyer-facing signal; null makes the client fall back to `createdAt`.
         Instant lastConfirmedAt,
         Instant resubmittedAt,
 
         Instant ownershipRequestedAt,
         String ownershipDeclinedReason,
 
-        // Server-side freshness tier and generated completeness score: both order or gate
-        // search, which a browser cannot page. `qualityScore` is absent on a row not yet read back.
         Integer qualityScore,
         String freshness,
 
@@ -74,8 +64,6 @@ public record PropertyResponse(
         Boolean loanAvailable,
         String agreementDuration,
 
-        /** Lock-in and notice, in months. Promoted out of {@code formDetails} because that map is
-         * owner/staff only, so a public viewer saw a client-side default in their place. */
         String lockIn,
         String noticePeriod,
         String foodPref,
@@ -91,8 +79,6 @@ public record PropertyResponse(
         String facing,
         String overlooking,
 
-        // Owner-declared counts. Absent means unstated, so the page shows nothing rather than
-        // deriving a confident wrong number from `bhk`.
         Integer bathrooms,
         Integer parking,
         Integer balconies,
@@ -102,74 +88,50 @@ public record PropertyResponse(
         String floorPlan,
         String video,
 
-        /** Street address including the unit — owner and staff only, and dangerous to publish.
-         * Rationale: docs/system/cross-cutting.md#private-listing-fields-on-the-detail-response. */
         String address,
         String pincode,
         String societyId,
 
-        /** Supplemental edit answers including unit-level address; owner/staff only. */
         Map<String, Object> formDetails,
 
-        /** The unit's electricity meter number — owner and staff only; it names a live utility
-         * account. Rationale: docs/system/cross-cutting.md#private-listing-fields-on-the-detail-response. */
         String electricityMeterNo,
         int views,
         int enquiries,
         Boolean featured,
 
-        /** Why a moderator took this listing down — back office only, withheld from the owner too.
-         * Rationale: docs/system/cross-cutting.md#private-listing-fields-on-the-detail-response. */
         String flagReason,
 
-        /** Is a stays-live moderation re-check queued? Without it the stays-live and
-         * revert-to-pending outcomes are indistinguishable on the wire. */
         Boolean recheckPending,
 
         String recheckReason,
 
-        /** Back-office only: what the owner's edit changed, as {@code [{field, before, after}]}; null when none. */
         List<Map<String, String>> recheckChanges,
 
         Instant recheckRequestedAt,
 
-        /** The soft-delete flag — a separate axis from {@code status}, not a sixth status value, so
-         * a status-complete list can tell a live pending listing from an archived one. */
         Boolean archived,
         boolean ownerVerified,
         boolean ownershipVerified,
         int docsCount,
         Owner owner,
 
-        /** Everything a commercial listing answers that a home does not. Null rather than an all-empty
-         * record so {@code NON_NULL} removes the key and a home's response never carries the concept. */
         Commercial commercial,
 
-        /** Everything a plot or farm answers that a building does not. Null rather than an all-empty
-         * record so {@code NON_NULL} removes the key and a flat's response never carries the concept. */
         Land land,
 
-        /** The post-on-behalf onboarding funnel, or null for every audience but the back office —
-         * null rather than {@code {}} so {@code NON_NULL} removes the key and conceals the concept. */
         AdminPipeline adminPipeline) {
-
     public record AdminPipeline(
             boolean postedByAdmin,
             String postedByStaff,
             int reminderCount) {
     }
 
-    /** Owner summary embedded in the detail. {@code mobile} is the masked form; the raw number is
-     * never placed here on this slice. */
     public record Owner(String id, String name, String mobile, boolean verified) {
-
         public Owner {
             Objects.requireNonNull(id, "owner id");
         }
     }
 
-    /** The commercial answer set, lifted verbatim out of {@code formDetails}. Values stay Strings because
-     * that is how {@code ListingFormDetails} validates them; parsing here would invent a second vocabulary. */
     public record Commercial(
             String commercialType,
             String shellType,

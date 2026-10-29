@@ -36,7 +36,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @DisplayName("Back-office sign-in — password, then an authenticator code")
 class StaffTwoFactorTest extends AbstractApiTest {
-
     private static final String PASSWORD = "Str0ng-passphrase!";
     private final ObjectMapper json = new ObjectMapper();
 
@@ -63,7 +62,6 @@ class StaffTwoFactorTest extends AbstractApiTest {
         return json.readTree(response.getContentAsString());
     }
 
-    /** Enrols the account and returns its secret, leaving the confirm step's code as consumed. */
     private byte[] enrolled(String email) throws Exception {
         String challenge = StaffSignIn.password(mvc, email, PASSWORD).get("challenge").asText();
         byte[] secret = StaffSignIn.enrol(mvc, challenge);

@@ -16,23 +16,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** No {@code @PreAuthorize}: the contract carries no {@code x-roles}; caller-scoping is the guard. */
 @RestController
 public class SavedSearchController {
-
     private final SavedSearchService service;
 
     public SavedSearchController(SavedSearchService service) {
         this.service = service;
     }
 
-    /** {@code GET /me/saved-searches} (contract {@code listSavedSearches}) — bare array. */
     @GetMapping(Routes.Engagement.SAVED_SEARCHES)
     public List<SavedSearchResponse> list(@CurrentUser AuthPrincipal principal) {
         return service.list(principal.userId());
     }
 
-    /** {@code POST /me/saved-searches} (contract {@code createSavedSearch}) — 201. */
     @PostMapping(Routes.Engagement.SAVED_SEARCHES)
     @ResponseStatus(HttpStatus.CREATED)
     public SavedSearchResponse create(@CurrentUser AuthPrincipal principal,
@@ -40,14 +36,12 @@ public class SavedSearchController {
         return service.create(principal.userId(), request);
     }
 
-    /** {@code PATCH /me/saved-searches/{id}} (contract {@code updateSavedSearch}). */
     @PatchMapping(Routes.Engagement.SAVED_SEARCH_BY_ID)
     public SavedSearchResponse update(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @Valid @RequestBody SavedSearchUpdateRequest request) {
         return service.update(principal.userId(), id, request);
     }
 
-    /** {@code DELETE /me/saved-searches/{id}} (contract {@code deleteSavedSearch}) — 204. */
     @DeleteMapping(Routes.Engagement.SAVED_SEARCH_BY_ID)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@CurrentUser AuthPrincipal principal, @PathVariable UUID id) {

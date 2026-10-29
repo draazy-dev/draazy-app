@@ -52,7 +52,6 @@ public class ServiceRequestAmendmentsController {
         return amendments.withdraw(principal, id, amendmentId);
     }
 
-    // Customer endpoint has no role guard; service still refuses non-requesters.
     @PostMapping(Routes.ServiceRequests.AMENDMENT_ACCEPT)
     public ServiceRequestDto acceptServiceRequestAmendment(@CurrentUser AuthPrincipal principal,
             @PathVariable String id, @PathVariable String amendmentId) {

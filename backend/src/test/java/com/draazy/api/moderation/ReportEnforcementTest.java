@@ -29,10 +29,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** An {@code actioned} report with enforcement must change the target in one transaction, naming the moderator. */
 @DisplayName("Report triage — the decision reaches the thing that was reported")
 class ReportEnforcementTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -40,7 +38,6 @@ class ReportEnforcementTest extends AbstractApiTest {
     @Autowired
     ReportRepository reports;
 
-    /** Audit writes commit past rollback ({@code REQUIRES_NEW}); wipe them per actor to stay order-independent. */
     private final List<String> createdActors = new ArrayList<>();
 
     @AfterEach
@@ -85,9 +82,6 @@ class ReportEnforcementTest extends AbstractApiTest {
                 {"status":"%s","note":"upheld","enforcement":"%s"}""".formatted(status, enforcement);
     }
 
-    // ------------------------------------------------------------------ authorisation
-
-    /** Reading the queue is ops-only, acting more so: a buyer would learn every complaint and decide them. */
     @Test
     @DisplayName("a non-ops caller can neither read the queue nor decide a report")
     void buyerIsRefused() throws Exception {
@@ -105,12 +99,9 @@ class ReportEnforcementTest extends AbstractApiTest {
                         .content(triage("actioned", "hide_content")))
                 .andExpect(status().isForbidden());
 
-        // The refusal has to be a refusal, not a 403 on the way out of a method that already ran.
         assertThat(properties.findById(listing.getId()).orElseThrow().getStatus())
                 .isEqualTo(PropertyStatus.APPROVED);
     }
-
-    // ------------------------------------------------------------------ the decision lands
 
     @Test
     @DisplayName("actioned + hide_content takes the listing off the public site, attributed to the moderator")
@@ -130,12 +121,8 @@ class ReportEnforcementTest extends AbstractApiTest {
 
         Property after = properties.findById(listing.getId()).orElseThrow();
         assertThat(after.getStatus()).isEqualTo(PropertyStatus.FLAGGED);
-        // The reason is the half the owner and the next moderator actually read; a status change
-        // with no reason is a listing that went dark for no recorded cause.
         assertThat(after.getFlagReason()).contains("Reported: fake");
 
-        // Two audit rows, deliberately: one against the queue, one against the listing — an auditor
-        // must see why a listing went dark without knowing a report existed.
         assertThat(jdbc.queryForObject(
                 "select count(*) from audit_log where action = 'report.triage' and entity_id = ?",
                 Integer.class, filed.getId().toString())).isEqualTo(1);
@@ -162,9 +149,6 @@ class ReportEnforcementTest extends AbstractApiTest {
         assertThat(users.findById(offender.getId()).orElseThrow().isArchived()).isTrue();
     }
 
-    // ------------------------------------------------------------------ the refusals
-
-    /** "Dismissed, and also taken down" is a contradiction that would leave a self-contradicting audit trail. */
     @Test
     @DisplayName("an enforcement is refused unless the report is being upheld")
     void enforcementRequiresActioned() throws Exception {
@@ -185,7 +169,6 @@ class ReportEnforcementTest extends AbstractApiTest {
         assertThat(reports.findById(filed.getId()).orElseThrow().getStatus()).isEqualTo("open");
     }
 
-    /** The refusal must name the alternative, or the moderator will believe fake reviews can't be removed. */
     @Test
     @DisplayName("an unsupported target refuses by naming the endpoint that can do the job")
     void unsupportedTargetNamesTheAlternative() throws Exception {
@@ -202,7 +185,6 @@ class ReportEnforcementTest extends AbstractApiTest {
                         org.hamcrest.Matchers.containsString("/reviews/{id}/status")));
     }
 
-    /** A request with no enforcement is the pre-existing caller; it must still decide and touch nothing. */
     @Test
     @DisplayName("triage without an enforcement field still decides and still changes nothing")
     void absentEnforcementIsNone() throws Exception {
@@ -223,9 +205,6 @@ class ReportEnforcementTest extends AbstractApiTest {
                 .isEqualTo(PropertyStatus.APPROVED);
     }
 
-    // ------------------------------------------------------------------ filters
-
-    /** A client-side filter over one page silently stops being true once the queue outgrows the page. */
     @Test
     @DisplayName("the queue filters by reason and by target type, server-side")
     void queueFiltersServerSide() throws Exception {
@@ -250,8 +229,6 @@ class ReportEnforcementTest extends AbstractApiTest {
                         .value(org.hamcrest.Matchers.everyItem(
                                 org.hamcrest.Matchers.equalTo("fake"))));
 
-        // A mistyped filter must not read as "queue clear" — same appearance as a genuinely empty
-        // queue.
         mvc.perform(get("/reports").param("reason", "notareason")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isBadRequest());
@@ -333,9 +310,6 @@ class ReportEnforcementTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
-    // ------------------------------------------------------------------ the dashboard tile
-
-    /** The count comes from the queue's definition of outstanding, not a second copy of it. */
     @Test
     @DisplayName("the ops scorecard carries the reports backlog, counting claimed-but-undecided")
     void scorecardCarriesTheBacklog() throws Exception {

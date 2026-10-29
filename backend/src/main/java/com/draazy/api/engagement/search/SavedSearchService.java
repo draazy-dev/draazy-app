@@ -20,11 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
-/** Saved searches. {@code newCount} is stored by the hourly job (matches since the last alert, or since saving);
- * {@code matchCount} is counted live on read, an N+1 accepted at {@link #MAX_SAVED_SEARCHES} rows. */
 @Service
 public class SavedSearchService {
-
     private static final Logger LOG = LoggerFactory.getLogger(SavedSearchService.class);
     private static final int SWEEP_BATCH_SIZE = 200;
 
@@ -33,7 +30,6 @@ public class SavedSearchService {
     private final SavedSearchMatchCounter counter;
     private final ObjectMapper objectMapper;
 
-    // The port rather than NotificationPublisher, so the master switch and quiet hours stay in one place.
     private final Notifier notifier;
 
     public SavedSearchService(SavedSearchRepository repo, SavedSearchMapper mapper,
@@ -45,7 +41,6 @@ public class SavedSearchService {
         this.notifier = notifier;
     }
 
-    // Counted here, not in the mapper: the mapper maps one row, and a match count is a count of other rows.
     @Transactional(readOnly = true)
     public List<SavedSearchResponse> list(UUID userId) {
         return repo.findByUserIdOrderByCreatedAtDesc(userId).stream()
@@ -53,13 +48,10 @@ public class SavedSearchService {
                 .toList();
     }
 
-    // filters is a free-form jsonb with nothing for @Size to bind to; 8 KB is far past any real facet set.
     private static final int MAX_FILTERS_CHARS = 8192;
 
-    // Bounds the standing alert workload per user; a 409, resolved by deleting one.
     private static final int MAX_SAVED_SEARCHES = 10;
 
-    /** Create a new saved search. Returns 201 with the created resource. */
     @Transactional
     public SavedSearchResponse create(UUID userId, SavedSearchCreateRequest request) {
         String kind = request.kind() == null || request.kind().isBlank()
@@ -101,12 +93,10 @@ public class SavedSearchService {
         return mapper.toResponse(saved).withMatchCount(countMatchingNow(saved));
     }
 
-    /** The card's summary line. The user-given name wins; otherwise there is nothing to invent. */
     private static String label(SavedSearchCreateRequest request) {
         return request.name() == null || request.name().isBlank() ? null : request.name().strip();
     }
 
-    // Null leaves a field unchanged, so turning alerts off is alertFrequency "off". 404 if not the caller's.
     @Transactional
     public SavedSearchResponse update(UUID userId, UUID searchId, SavedSearchUpdateRequest request) {
         SavedSearch entity = repo.findByIdAndUserId(searchId, userId)
@@ -124,7 +114,6 @@ public class SavedSearchService {
         return mapper.toResponse(saved).withMatchCount(countMatchingNow(saved));
     }
 
-    // lastAlertedAt is the new-count baseline, so moving it to now counts only matches after the edit.
     private void replaceFilters(UUID userId, SavedSearch entity, SavedSearchUpdateRequest request) {
         if (!"listings".equals(entity.getKind())) {
             throw new BadRequestException("Only a listings alert can change its filters.");
@@ -148,7 +137,6 @@ public class SavedSearchService {
         entity.setLastAlertedAt(Instant.now());
     }
 
-    // User-scoped: another user's id is a 404, never a 403.
     @Transactional
     public void delete(UUID userId, UUID searchId) {
         SavedSearch entity = repo.findByIdAndUserId(searchId, userId)
@@ -161,7 +149,6 @@ public class SavedSearchService {
         try {
             json = objectMapper.writeValueAsString(filters);
         } catch (RuntimeException unserializable) {
-            // Jackson 3 throws unchecked; an unserializable body degrades to an empty filter set.
             return "{}";
         }
         if (json.length() > MAX_FILTERS_CHARS) {
@@ -207,8 +194,6 @@ public class SavedSearchService {
         }
     }
 
-    // Counts matches since the last alert (or since saving, if never alerted), and alerts while any are waiting
-    // and the cadence allows. Not updated_at: trg_set_updated_at moves it on every write, this sweep's included.
     @Transactional
     public long recomputeNewCounts(Instant now) {
         long updated = 0L;
@@ -238,8 +223,6 @@ public class SavedSearchService {
         }
     }
 
-    // Measured from lastAlertedAt so a restart cannot re-send. "instant" means the next hourly run;
-    // an unknown frequency fails toward the quieter daily.
     private boolean isAlertDue(SavedSearch search, Instant now) {
         String frequency = search.getAlertFrequency() == null
                 ? "daily" : search.getAlertFrequency().strip().toLowerCase(Locale.ROOT);
@@ -258,7 +241,6 @@ public class SavedSearchService {
         return !last.plus(floor).isAfter(now);
     }
 
-    // The count is the only fact the job knows; describing the matches would cost a query per alert.
     private Instant alert(SavedSearch search, int count, Instant now) {
         String noun = "flatmates".equals(search.getKind()) ? "match" : "home";
         String what = count == 1 ? "1 new " + noun : count + " new " + noun + "s";

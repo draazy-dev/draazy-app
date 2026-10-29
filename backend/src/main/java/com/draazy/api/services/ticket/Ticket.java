@@ -8,16 +8,13 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 
-// Service requests need customer sign-off; tickets are ops-owned work items.
 @Entity
 @Table(name = "tickets")
 @Getter
 public class Ticket extends VersionedEntity {
-
     @Column(name = "subject", nullable = false)
     private String subject;
 
-    // One of com.draazy.api.security.Teams; the CHECK rejects anything else.
     @Column(name = "team")
     @Setter
     private String team;
@@ -52,7 +49,6 @@ public class Ticket extends VersionedEntity {
     @Column(name = "value")
     private Long value;
 
-    // Keep pre-ops quote separate from desk value; disagreement is the signal.
     @Column(name = "quoted_value", updatable = false)
     private Long quotedValue;
 
@@ -60,7 +56,6 @@ public class Ticket extends VersionedEntity {
     private String detail;
 
     protected Ticket() {
-
     }
 
     public Ticket(String subject, String team, String priority, UUID propertyId, UUID requesterId,
@@ -77,5 +72,4 @@ public class Ticket extends VersionedEntity {
         this.detail = detail;
         this.quotedValue = quotedValue;
     }
-
 }

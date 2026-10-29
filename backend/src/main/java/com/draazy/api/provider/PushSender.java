@@ -6,16 +6,12 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
 public interface PushSender {
-
-    /** Returns false only when the push service says the subscription is gone (or unusable), so it can be deleted. */
     boolean send(String endpoint, String p256dh, String auth, PushPayloads.Payload payload);
 }
 
-/** Wired while no VAPID private key is configured. */
 @Component
 @ConditionalOnExpression("'${draazy.providers.push.vapid-private-key:}'.isBlank()")
 class LoggingPushSender implements PushSender {
-
     private static final Logger LOG = LoggerFactory.getLogger(LoggingPushSender.class);
 
     @Override

@@ -16,11 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** Every capability asserted in both directions on the same route and principal, with only the stored document
- * differing; a guard that always says yes looks like no guard. */
 @DisplayName("D67 — the stored permission map actually governs, and only downwards")
 class PermissionMapGuardTest extends AbstractApiTest {
-
     private static final String ANY_ID = "11111111-1111-1111-1111-111111111111";
 
     @Autowired
@@ -44,7 +41,6 @@ class PermissionMapGuardTest extends AbstractApiTest {
         return "Bearer " + jwtService.issueAccessToken(saved);
     }
 
-    /** Replace the whole permission document. Raw SQL because the point is the stored bytes. */
     private void storePermissions(String json) {
         jdbc.update("UPDATE settings SET value = ?::jsonb WHERE key = 'permissions'", json);
     }
@@ -68,7 +64,6 @@ class PermissionMapGuardTest extends AbstractApiTest {
                 .andReturn().getResponse().getStatus();
     }
 
-    /** The seed is the current policy; without this half, a guard refusing everyone would pass every refusal. */
     @Test
     @DisplayName("a desk that holds the capability is admitted")
     void heldCapabilityAdmits() throws Exception {
@@ -76,12 +71,9 @@ class PermissionMapGuardTest extends AbstractApiTest {
 
         assertThat(dashboardStatus(rental)).isEqualTo(200);
         assertThat(queueStatus(rental)).isEqualTo(200);
-        // A fictional id — the ticket route fails on the merits. What matters is it got past the guard.
         assertThat(ticketUpdateStatus(rental)).isNotEqualTo(403);
     }
 
-    /** A team missing from the document is refused, so completeness is asserted: a team added to {@link Teams}
-     * without a bundle is locked out. */
     @Test
     @DisplayName("the seeded document names every team the platform recognises, plus admin")
     void theSeededDocumentIsComplete() {
@@ -94,7 +86,6 @@ class PermissionMapGuardTest extends AbstractApiTest {
                 Teams.INTERIOR, Teams.PACKERS, Teams.VALUATION, Roles.Wire.ADMIN);
     }
 
-    /** An administrator narrowing one desk's bundle takes effect on that desk, and nowhere else. */
     @Test
     @DisplayName("removing a capability from a desk's bundle refuses that desk, and only it")
     void revokedCapabilityRefuses() throws Exception {
@@ -113,7 +104,6 @@ class PermissionMapGuardTest extends AbstractApiTest {
         assertThat(dashboardStatus(legal)).as("legal was not touched").isEqualTo(200);
     }
 
-    /** Capability checks are {@code and}-ed with the role guard so an admin's map can't arm a buyer. */
     @Test
     @DisplayName("the map cannot widen: granting a capability to a buyer changes nothing")
     void theMapCannotWidenTheRoleBaseline() throws Exception {
@@ -129,7 +119,6 @@ class PermissionMapGuardTest extends AbstractApiTest {
         assertThat(ticketUpdateStatus(buyer)).isEqualTo(403);
     }
 
-    /** The wildcard bundle is honoured, which is how administrators stay unrestricted. */
     @Test
     @DisplayName("the admin bundle's wildcard grants every capability")
     void wildcardGrantsEverything() throws Exception {
@@ -141,7 +130,6 @@ class PermissionMapGuardTest extends AbstractApiTest {
         assertThat(ticketUpdateStatus(admin)).isNotEqualTo(403);
     }
 
-    /** Deny-on-omission: an absent key meaning "allow" would leave an administrator no way to remove access. */
     @Test
     @DisplayName("a desk the document does not mention is refused")
     void omittedDeskIsRefused() throws Exception {
@@ -152,7 +140,6 @@ class PermissionMapGuardTest extends AbstractApiTest {
         assertThat(queueStatus(packers)).isEqualTo(403);
     }
 
-    /** No document means the platform is at its role baseline; denying would let a missing row take the back office offline. */
     @Test
     @DisplayName("no permission document falls back to the role baseline, not to a lockout")
     void absentDocumentFallsBackToTheRoleBaseline() throws Exception {
@@ -163,7 +150,6 @@ class PermissionMapGuardTest extends AbstractApiTest {
         assertThat(queueStatus(packers)).isEqualTo(200);
     }
 
-    /** {@code permissions} allows additional properties, so a string can land there; that document is broken. */
     @Test
     @DisplayName("a permission document that is not an object falls back to the role baseline")
     void malformedDocumentFallsBackToTheRoleBaseline() throws Exception {
@@ -173,7 +159,6 @@ class PermissionMapGuardTest extends AbstractApiTest {
         assertThat(dashboardStatus(packers)).isEqualTo(200);
     }
 
-    /** Team-less staff get no baseline, which no admin could undo; {@code UserAdminService.addStaff} stops it. */
     @Test
     @DisplayName("staff with no team are refused: a governed document has no way to name them")
     void teamlessStaffAreRefusedByAGovernedDocument() throws Exception {
@@ -192,7 +177,6 @@ class PermissionMapGuardTest extends AbstractApiTest {
                 .isEqualTo(200);
     }
 
-    /** An absent document is no policy, so deleting the row must not lock out the back office. */
     @Test
     @DisplayName("with no document at all, team-less staff fall back to the baseline like anyone else")
     void teamlessStaffStillSurviveAnAbsentDocument() throws Exception {
@@ -202,7 +186,6 @@ class PermissionMapGuardTest extends AbstractApiTest {
         assertThat(dashboardStatus(unassigned)).isEqualTo(200);
     }
 
-    /** Only the ops branch of {@code GET /service-requests} is guarded; a customer's own list must always work. */
     @Test
     @DisplayName("a customer's own service-request list is untouched by the permission map")
     void customersAreUnaffectedByTheOpsCapability() throws Exception {

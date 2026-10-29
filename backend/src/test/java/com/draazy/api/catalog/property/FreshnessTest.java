@@ -7,23 +7,7 @@ import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins {@link Freshness#unconfirmedBefore} to {@link Freshness#of}.
- *
- * <p>These two express the same idea in two places that cannot see each other: {@code of} classifies
- * a listing the browser is about to render, and {@code unconfirmedBefore} produces the instant the
- * moderation search compares against in SQL. Nothing in the type system stops the pair drifting, and
- * the drift would be invisible — the desk's "unconfirmed" queue would simply contain a day's worth
- * of listings that are still {@code AGING}, or omit a day's worth that are already {@code STALE},
- * and every row in it would look plausible. So the boundary is asserted from both sides.
- *
- * <p>The off-by-one is real and not hypothetical: {@code of} floors the elapsed duration before
- * comparing, so {@code STALE} does not begin at {@code AGING_DAYS} but a full day later. A
- * hand-written {@code now() - interval '14 days'} in the specification would have been wrong from
- * the moment it was typed.
- */
 class FreshnessTest {
-
     private static final Instant NOW = Instant.parse("2026-03-01T12:00:00Z");
 
     @Test
@@ -42,8 +26,6 @@ class FreshnessTest {
     @Test
     @DisplayName("the cutoff sits a day past AGING_DAYS, because of() floors the duration")
     void cutoffIsADayPastTheNominalThreshold() {
-        // Stated as a literal so that moving AGING_DAYS without re-reading unconfirmedBefore's
-        // reasoning fails here rather than in a queue nobody is measuring.
         assertThat(Duration.between(Freshness.unconfirmedBefore(NOW), NOW))
                 .isEqualTo(Duration.ofDays(Freshness.AGING_DAYS + 1L));
 

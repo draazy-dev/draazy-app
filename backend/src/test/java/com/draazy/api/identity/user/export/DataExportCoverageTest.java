@@ -22,15 +22,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-// Returns the subject's data and nobody else's. Absence assertions search the raw response body
-// so a leak arriving through an unexpected column or nested document cannot slip past.
 @DisplayName("Data export (/me/data-export)")
 class DataExportCoverageTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
-    // Values chosen so a substring match cannot occur by chance — a match is a leak, not a coincidence.
     private static final String OTHER_MOBILE = "9700000042";
     private static final String OTHER_NAME = "Zebulon Quartzfeather";
     private static final String OTHER_EMAIL = "zebulon.quartzfeather@example.invalid";
@@ -40,10 +36,6 @@ class DataExportCoverageTest extends AbstractApiTest {
     private static final String SUBJECT_MOBILE = "9800000041";
     private static final String SUBJECT_NAME = "Priyamvada Ranganathan";
 
-    // Structural
-
-    // Every counterparty leak of contact details or verification state would arrive through their
-    // users row or a denormalised copy of it; users may be named exactly once — by the subject's own row.
     @Test
     @DisplayName("no dataset joins another person's users row")
     void noDatasetReadsAnotherPersonsUserRow() {
@@ -75,8 +67,6 @@ class DataExportCoverageTest extends AbstractApiTest {
                         """, bullets(offenders))
                 .isEmpty();
 
-        // Converse: the one permitted use must be keyed on the subject, or the rule above is
-        // satisfied by a dataset called `users` returning everybody.
         DataExportScope.Dataset own = DataExportScope.all().stream()
                 .filter(d -> d.name().equals("users"))
                 .findFirst()
@@ -94,8 +84,6 @@ class DataExportCoverageTest extends AbstractApiTest {
                 .contains("id = :subjectId");
     }
 
-    // Data the erasure sweep cannot reach is still data the subject is entitled to see. Derived
-    // rather than transcribed so the gap list and this test cannot silently drift apart.
     @Test
     @DisplayName("every table erasure lists as a known gap is exported or explicitly excluded")
     void everyErasureGapIsExportedOrExplicitlyExcluded() {
@@ -159,8 +147,6 @@ class DataExportCoverageTest extends AbstractApiTest {
                 .isEmpty();
     }
 
-    // Queries are strings, so a schema drift is a runtime failure on the one endpoint whose whole
-    // purpose is completeness. Running against a subject with no data still executes every query.
     @Test
     @DisplayName("every dataset query is valid against the migrated schema")
     void everyDatasetQueryRunsAgainstTheRealSchema() throws Exception {
@@ -180,7 +166,6 @@ class DataExportCoverageTest extends AbstractApiTest {
                 .hasSize(DataExportScope.all().size());
     }
 
-    // A seeker row's property is the third-party listing the friend contacted, which the referrer must not learn.
     @Test
     @DisplayName("a seeker referral withholds the contacted listing; an owner referral exports its own")
     void aSeekerReferralDoesNotRevealTheContactedListing() throws Exception {
@@ -200,10 +185,6 @@ class DataExportCoverageTest extends AbstractApiTest {
         assertThat(body).contains(own.toString()).doesNotContain(contacted.toString());
     }
 
-    // Behavioural — presence
-
-    // Asserted across several domains because a misplaced predicate (owner_id where requester_id
-    // was meant) returns an empty dataset that looks like an honest "you have none of these".
     @Test
     @DisplayName("the subject's own data comes back, across every domain they have data in")
     void theSubjectsOwnDataComesBack() throws Exception {
@@ -226,15 +207,10 @@ class DataExportCoverageTest extends AbstractApiTest {
                         miss here is a predicate that does not match the way the application actually
                         writes the row — not a formatting problem.
                         """)
-                // identity — their own KYC, which they are entitled to see in full
                 .contains("ABCDE****F")
-                // listings — their own property
                 .contains("Subject's own flat in Kothrud")
-                // enquiries — a contact request they sent on somebody else's listing
                 .contains("Is this still available?")
-                // messaging — a message they wrote
                 .contains("Sending my documents over now.")
-                // community — a review they wrote about the counterparty
                 .contains("Responsive and straightforward to deal with.");
 
         assertThat(nonEmptyDatasets(body))
@@ -245,10 +221,6 @@ class DataExportCoverageTest extends AbstractApiTest {
                 .hasSizeGreaterThanOrEqualTo(5);
     }
 
-    // Behavioural — absence (the half that matters)
-
-    // Raw id is asserted absent alongside contact details: a uuid column reads as plumbing but is a
-    // stable global handle on a person — two exports carrying it could be joined.
     @Test
     @DisplayName("the counterparty's mobile, email, name, KYC and raw id are absent")
     void theCounterpartyNeverAppears() throws Exception {
@@ -258,8 +230,6 @@ class DataExportCoverageTest extends AbstractApiTest {
 
         String body = export(subject);
 
-        // Sanity: without this, every absence assertion below would pass trivially on an empty
-        // document — the classic way a leak test proves nothing.
         assertThat(body)
                 .withFailMessage("""
                         The shared records did not come back, so the absence assertions below would
@@ -315,8 +285,6 @@ class DataExportCoverageTest extends AbstractApiTest {
                 .doesNotContain(other.getId().toString());
     }
 
-    // One stable reference per person per document lets the subject tell their own messages from
-    // the counterparty's and lets shared records be tied together, without leaking anything outside it.
     @Test
     @DisplayName("partyRef is `self` for the subject and stable for one counterparty")
     void partyRefIsSelfForTheSubjectAndStableForACounterparty() throws Exception {
@@ -365,8 +333,6 @@ class DataExportCoverageTest extends AbstractApiTest {
                 .isNotEqualTo(other.getId().toString().substring(0, 16).replace("-", ""));
     }
 
-    // Fixture
-
     private User user(String mobile, String name) {
         User u = new User(mobile, "owner");
         u.setName(name);
@@ -378,7 +344,6 @@ class DataExportCoverageTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    /** The other party, given values that cannot occur anywhere else by accident. */
     private User counterparty() {
         User u = new User(OTHER_MOBILE, "owner");
         u.setName(OTHER_NAME);
@@ -389,8 +354,6 @@ class DataExportCoverageTest extends AbstractApiTest {
         u.setVerified(true);
         User saved = users.saveAndFlush(u);
 
-        // Identity papers and verification state: the subject has no business seeing these however
-        // many flats they rented from this person.
         jdbc.update("""
                 insert into owner_kyc (user_id, pan_masked, aadhaar_masked, status)
                 values (?, ?, ?, 'verified')
@@ -405,8 +368,6 @@ class DataExportCoverageTest extends AbstractApiTest {
         return saved;
     }
 
-    // Both directions are seeded: the "received" side of every paired dataset selects the
-    // counterparty's id, so it is the side where a leak lives.
     private void seed(User subject, User other) {
         UUID mine = property(subject.getId(), "Subject's own flat in Kothrud");
         UUID theirs = property(other.getId(), "A flat in Baner belonging to somebody else");
@@ -423,7 +384,6 @@ class DataExportCoverageTest extends AbstractApiTest {
                 insert into saved_properties (user_id, property_id) values (?, ?)
                 """, subject.getId(), theirs);
 
-        // Enquiries in both directions.
         jdbc.update("""
                 insert into contact_requests (property_id, requester_id, status, message)
                 values (?, ?, 'pending', 'Is this still available?')
@@ -441,8 +401,6 @@ class DataExportCoverageTest extends AbstractApiTest {
                 values (?, ?, 2600000, 'pending', 'Offering slightly under asking.')
                 """, theirs, subject.getId());
 
-        // Order the pair in Postgres, not Java: `uuid <` is unsigned and UUID.compareTo is signed,
-        // so they disagree on half of all ids — and sorting here exercises both sides of the CASE.
         UUID conversation = UUID.randomUUID();
         jdbc.update("""
                 insert into conversations (id, user_a_id, user_b_id, property_id, last_message)
@@ -458,8 +416,6 @@ class DataExportCoverageTest extends AbstractApiTest {
                 values (?, ?, 'owner', 'Received, thank you.')
                 """, conversation, other.getId());
 
-        // Reviews use `owner` for "review is about a person"; reports spells the same idea `user`.
-        // Both are seeded because the two datasets redact on different literals to do the same job.
         jdbc.update("""
                 insert into reviews (target_type, target_id, author_id, rating, title, body)
                 values ('owner', ?, ?, 5, 'Good landlord',
@@ -492,10 +448,6 @@ class DataExportCoverageTest extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString();
     }
 
-    // Helpers
-
-    // Tables a query reads, from its `from` and `join` clauses. Crude on purpose — a real SQL
-    // parser would be a dependency and its own source of bugs, and the queries are in one house style.
     private static Set<String> tablesIn(String sql) {
         Set<String> tables = new LinkedHashSet<>();
         Matcher m = Pattern
@@ -534,7 +486,6 @@ class DataExportCoverageTest extends AbstractApiTest {
         return names;
     }
 
-    /** Dataset names whose {@code rowCount} is greater than zero. */
     private static Set<String> nonEmptyDatasets(String body) {
         Set<String> names = new LinkedHashSet<>();
         Matcher m = Pattern

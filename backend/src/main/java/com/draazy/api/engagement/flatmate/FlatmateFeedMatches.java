@@ -10,11 +10,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/** Living-style match per feed row, keyed {@code room:<id>}, {@code group:<id>} or {@code post:<id>}.
- * Only rows whose author has enough answers in common appear, and never the viewer's own. */
 @Component
 class FlatmateFeedMatches {
-
     private final LivingStyleService styles;
 
     FlatmateFeedMatches(LivingStyleService styles) {

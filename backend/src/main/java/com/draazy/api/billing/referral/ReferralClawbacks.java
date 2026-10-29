@@ -14,10 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Rejects a held referral or claws back a granting one inside the window; {@link #recheck} is the sweep backstop. */
 @Service
 public class ReferralClawbacks {
-
     static final String REFEREE_SUSPENDED = "referee_suspended";
     static final String LISTING_TAKEN_DOWN = "listing_taken_down";
     static final String VERIFICATION_REVOKED = "verification_revoked";
@@ -51,8 +49,6 @@ public class ReferralClawbacks {
         referrals.findLiveForReferee(userId).ifPresent(r -> take(r, REFEREE_SUSPENDED));
     }
 
-    // A seeker row's property is a third party's listing the friend contacted: only moderation calling it
-    // fake (rejected or flagged) counts against the row, never an archive or a withdrawn verification.
     @Transactional(propagation = Propagation.REQUIRED)
     public void onListingTakenDown(UUID propertyId) {
         boolean fake = properties.findById(propertyId).map(ReferralClawbacks::isFake).orElse(false);
@@ -68,7 +64,6 @@ public class ReferralClawbacks {
                 .forEach(r -> take(r, VERIFICATION_REVOKED));
     }
 
-    // A staff override is a later decision than any problem the sweep can see, so it is left alone.
     @Transactional
     public void recheck(UUID referralId) {
         referrals.findForDecision(referralId)
@@ -86,7 +81,6 @@ public class ReferralClawbacks {
                 .plus(Duration.ofDays(settings.referralClawbackDays())).isAfter(now);
     }
 
-    /** The reason this referral must stop earning, or null; {@code needLive} adds the owner-track archive check. */
     String problem(Referral referral, boolean needLive) {
         var referee = users.findByMobile(referral.getReferredMobile());
         if (referee.isPresent() && UserStatuses.SUSPENDED.equals(referee.get().getStatus())) {

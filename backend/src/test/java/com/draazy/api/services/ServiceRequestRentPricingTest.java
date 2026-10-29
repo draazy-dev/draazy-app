@@ -13,16 +13,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// The statutory half of the bill is computed from the customer's own terms, never read as a flat published figure.
 @DisplayName("Rent agreement pricing — the statutory charges are computed, not published")
 class ServiceRequestRentPricingTest extends ServiceFixtures {
-
     private static final int PLATFORM_HALF = 499;
 
     @Test
     @DisplayName("the published rent schedule states no flat stamp duty or registration")
     void statutoryLinesAreNotPublished() throws Exception {
-
         mvc.perform(get("/fees"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].deal").value("rent"))
@@ -31,8 +28,6 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                 .andExpect(jsonPath("$[0].registration").doesNotExist());
     }
 
-    // The non-refundable deposit lives only in the wizard's `_state` snapshot, so a pricer reading the top level
-    // alone would undercharge.
     @Test
     @DisplayName("a request that states its terms is charged the real Art. 36A duty")
     void pricesFromTheStatedTerms() throws Exception {
@@ -48,8 +43,6 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1000 + 1000 + 300));
     }
 
-    // It is not: a statutory figure derived from a rent nobody stated is a wrong number wearing the clothes of a
-    // right one, and ops cannot draw the agreement from this request either.
     @Test
     @DisplayName("a customer who says Rural in a municipal locality is still charged ₹1,000")
     void customerCannotChooseTheCheaperFee() throws Exception {
@@ -66,7 +59,6 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.details._state.regArea").value("urban"));
     }
 
-    /** A blank term is eleven months — the wizard's own default, so the two cannot diverge. */
     @Test
     @DisplayName("a property the customer says is under a gram panchayat is charged ₹500, whatever regArea says")
     void gramPanchayatAnswerIsRural() throws Exception {
@@ -114,7 +106,6 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    // Silently clamping it to the ceiling would bill a number the customer never asked for.
     @Test
     @DisplayName("a rural area smuggled into the terms snapshot is ignored")
     void termsSnapshotCannotChooseTheFee() throws Exception {

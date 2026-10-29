@@ -24,10 +24,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** {@code GET /admin/reviews}: reviews publish on write, so moderators could only act on ids they already had. */
 @DisplayName("Moderation — the review queue is reachable")
 class ReviewModerationQueueTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -35,7 +33,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
     @Autowired
     PropertyRepository properties;
 
-    /** Audit rows commit through REQUIRES_NEW, so the rollback does not take them with it. */
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
         jdbc.update("delete from audit_log where entity = 'review'");
@@ -90,7 +87,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
 
-    /** "What have we taken down": otherwise nothing on the platform can confirm a rejection happened. */
     @Test
     @DisplayName("the status filter narrows to one moderation state")
     void statusFilterNarrowsTheQueue() throws Exception {
@@ -106,7 +102,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].id").value(taken.getId().toString()));
     }
 
-    /** The queue is every review on the platform, so an ordinary account must not reach it. */
     @Test
     @DisplayName("an ordinary user cannot read the queue")
     void seekersAreForbidden() throws Exception {
@@ -116,7 +111,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** The find-then-take-down loop end to end; each endpoint alone is not a moderation system. */
     @Test
     @DisplayName("a review found in the queue can be taken down and the change is visible there")
     void queueAndDecisionCloseTheLoop() throws Exception {
@@ -164,8 +158,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.counts").doesNotExist());
     }
 
-    /** Rows carry their status: without it an unfiltered queue mixes live and rejected reviews indistinguishably.
-     * Uses {@code Matchers.contains} since a JSONPath filter yields an array even for one element. */
     @Test
     @DisplayName("every queue row carries its moderation status, so the unfiltered queue is usable")
     void queueRowsCarryTheirStatus() throws Exception {
@@ -182,8 +174,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                         .value(Matchers.contains(ReviewStatuses.REJECTED)));
     }
 
-    /** No public read carries {@code status}: it is constant there, and a constant field invites client branches
-     * that never run. Absent (NON_NULL), not null, so the response shape doesn't advertise a withheld field. */
     @Test
     @DisplayName("the public property read does not carry status — it would be a constant there")
     void publicReadsOmitStatus() throws Exception {

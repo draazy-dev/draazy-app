@@ -8,18 +8,14 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Slim reads of the verification queue for the bell and the dashboard, which render four fields and
-// two counts; the full admin row is ten times the size.
 @Service
 public class PendingQueue {
-
     public record Row(String id, String title, String locality, Long price, String owner, String ownerMobile) {
     }
 
     public record Counts(long pending, long flagged, long followUp) {
     }
 
-    // id desc is the admin search's own tiebreak, so these rows line up with that list.
     private static final String ROWS = """
             select p.id, p.title, p.locality, p.price, o.name, o.mobile
               from Property p join p.owner o
@@ -27,7 +23,6 @@ public class PendingQueue {
              order by p.createdAt %s, p.id desc
             """;
 
-    // followUp is the admin Follow-up tab's set, so the tile and the tab it opens agree.
     private static final String COUNTS = """
             select sum(case when p.status = :pending then 1 else 0 end),
                    sum(case when p.status = :flagged then 1 else 0 end),

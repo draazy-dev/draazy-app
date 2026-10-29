@@ -25,10 +25,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/** The database is shared and the book may grow, so each test inserts its own rows and asserts deltas. */
 @DisplayName("/admin/finance — the console's three reads")
 class AdminFinanceConsoleTest extends AbstractApiTest {
-
     private static final long OWNER_PRO_PRICE = 2499L;
 
     private static final long OWNER_PRO_MONTHLY = 208L;
@@ -64,7 +62,6 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
                 """, UUID.class, userId, status, "pay_" + mobile, planName);
     }
 
-    /** Stands in for the payment webhook, which issues the invoice; returns its number. */
     private String invoice(UUID userId, String sourceType, long amount, long fee, Instant issuedAt) {
         String number = "TST-INV-" + UUID.randomUUID();
         jdbc.update("""
@@ -100,7 +97,6 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
     @Nested
     @DisplayName("the subscription book")
     class Book {
-
         @Test
         void aYearlyPlanContributesATwelfthOfItsPriceToMrr() throws Exception {
             String token = admin();
@@ -171,7 +167,6 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
     @Nested
     @DisplayName("this month's money")
     class Money {
-
         @Test
         void aSubscriptionInvoiceIsCollectedAndAllFee() throws Exception {
             String token = admin();
@@ -257,7 +252,6 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
     @Nested
     @DisplayName("the monthly series")
     class Series {
-
         @Test
         void everyMonthInTheWindowIsReturnedIncludingEmptyOnes() throws Exception {
             String json = body(Routes.Admin.FINANCE_SERIES + "?months=6", admin());
@@ -304,7 +298,6 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
     @Nested
     @DisplayName("the ledger")
     class Ledger {
-
         @Test
         void anInvoiceIsARowFindableByPartyOrNumber() throws Exception {
             String token = admin();
@@ -399,7 +392,6 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
     @Nested
     @DisplayName("the guard")
     class Guard {
-
         @Test
         void staffCannotReadAnyOfTheThree() throws Exception {
             String staff = bearerFor("9877730050", Roles.Wire.STAFF, "Ops staff");

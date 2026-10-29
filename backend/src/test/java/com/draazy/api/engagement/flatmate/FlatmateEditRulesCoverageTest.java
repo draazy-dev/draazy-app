@@ -19,13 +19,11 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 @DisplayName("FlatmateEditRules — every request field is classified or declared silent")
 class FlatmateEditRulesCoverageTest {
-
     private final FlatmateEditRules rules = new FlatmateEditRules();
 
     @Nested
     @DisplayName("room")
     class Rooms {
-
         @Test
         @DisplayName("re-saving the stored values changes nothing")
         void unchangedIsSilent() {
@@ -42,8 +40,6 @@ class FlatmateEditRulesCoverageTest {
                     mutated -> rules.classify(stored, (FlatmateRoomCreateRequest) mutated));
         }
 
-        // `overlooking` is free text at the endpoint rendered on the anonymous feed, and the deposit
-        // is the other half of the ask: neither may slip past as a bounded facet.
         @ParameterizedTest(name = "{0} is re-checked as {1}, not re-moderated")
         @CsvSource({"overlooking,details", "deposit,deposit"})
         @DisplayName("an edited field is re-checked under its own reason")
@@ -62,7 +58,6 @@ class FlatmateEditRulesCoverageTest {
     @Nested
     @DisplayName("group")
     class Groups {
-
         @Test
         @DisplayName("re-saving the stored values changes nothing")
         void unchangedIsSilent() {
@@ -125,7 +120,6 @@ class FlatmateEditRulesCoverageTest {
     @Nested
     @DisplayName("seeker post")
     class SeekerPosts {
-
         @Test
         @DisplayName("re-saving the stored values changes nothing")
         void unchangedIsSilent() {
@@ -198,8 +192,6 @@ class FlatmateEditRulesCoverageTest {
         }
     }
 
-    // Must differ *as stored*: societyId is parsed to a UUID and a mobile is normalised to ten
-    // digits, so two values that collapse to the same stored value would hide a live classifier.
     private static Object other(RecordComponent component, Object current) {
         String name = component.getName();
         String lower = name.toLowerCase(Locale.ROOT);

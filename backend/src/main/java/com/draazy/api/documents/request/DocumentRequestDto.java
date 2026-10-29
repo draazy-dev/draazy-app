@@ -13,8 +13,6 @@ public record DocumentRequestDto(
         Instant expiresAt,
         boolean acknowledgedDisclaimer,
         Instant createdAt) {
-
-    /** Contract schema {@code Party}, projected for this surface. */
     public record Party(String id, String name, String mobile, String role) {
     }
 }

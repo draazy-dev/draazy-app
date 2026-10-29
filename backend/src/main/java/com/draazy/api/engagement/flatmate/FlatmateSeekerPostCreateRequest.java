@@ -11,8 +11,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
-/** Contract schema {@code FlatmateSeekerPostCreate}; also serves the PATCH. Enum-valued fields are
- * checked in the service against {@link FlatmateVocabulary} so the message can list what was expected. */
 public record FlatmateSeekerPostCreateRequest(
         String gender,
         @Min(18) @Max(120) Integer age,

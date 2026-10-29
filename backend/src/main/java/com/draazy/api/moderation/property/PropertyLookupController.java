@@ -16,10 +16,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The command palette's property search: six fields per hit, where the queue row carries about forty. */
 @RestController
 public class PropertyLookupController {
-
     private static final String PROPERTIES_READ = "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "') and "
             + BackOfficePermissions.REQUIRE_PROPERTIES_READ;
 

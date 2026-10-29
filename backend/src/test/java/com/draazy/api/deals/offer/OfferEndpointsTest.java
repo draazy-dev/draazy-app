@@ -26,7 +26,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 class OfferEndpointsTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired JwtService jwtService;
     @Autowired UserRepository users;
@@ -34,8 +33,6 @@ class OfferEndpointsTest extends AbstractApiTest {
     @Autowired OfferRepository offerRepo;
     @Autowired OfferHistoryRepository historyRepo;
     @Autowired JdbcTemplate jdbc;
-
-    // ---- helpers ----
 
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
@@ -77,8 +74,6 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    // ---- §11 test 1: Submit → 201, correct shape, history row with by='buyer' ----
-
     @Test
     void submitOffer_creates201WithHistoryRow() throws Exception {
         User owner = user("9820100001", "owner");
@@ -111,8 +106,6 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.moveIn").value("2026-03-15"));
     }
 
-    // ---- §11 test 2: Owner counters → 'countered', history row with by='owner' ----
-
     @Test
     void ownerCounters_statusCountered_historyByOwner() throws Exception {
         User owner = user("9820100003", "owner");
@@ -132,8 +125,6 @@ class OfferEndpointsTest extends AbstractApiTest {
         assertThat(trail.get(1).getAmount()).isEqualTo(5500000L);
     }
 
-    // ---- §11 test 3: Author counters back → history row with by='buyer' ----
-
     @Test
     void authorCountersBack_historyByBuyer() throws Exception {
         User owner = user("9820100005", "owner");
@@ -151,8 +142,6 @@ class OfferEndpointsTest extends AbstractApiTest {
         assertThat(trail.get(2).getAmount()).isEqualTo(5200000L);
     }
 
-    // ---- §11 test 4: Owner accepts → 'accepted', NO new history row ----
-
     @Test
     void ownerAccepts_statusAccepted_noNewHistoryRow() throws Exception {
         User owner = user("9820100007", "owner");
@@ -166,10 +155,8 @@ class OfferEndpointsTest extends AbstractApiTest {
         assertThat(offer.getStatus()).isEqualTo(OfferStatuses.ACCEPTED);
 
         List<OfferHistory> trail = historyRepo.findByOfferIdOrderByAtAsc(offer.getId());
-        assertThat(trail).hasSize(1); // only the submit event
+        assertThat(trail).hasSize(1);
     }
-
-    // ---- §11 test 5: Illegal transition → 409, not 500, not 422 ----
 
     @Test
     void illegalTransition_respondToAcceptedOffer_returns409() throws Exception {
@@ -187,8 +174,6 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.error").value("conflict"));
     }
 
-    // ---- §11 test 6: Third party responding → 404, not 403 ----
-
     @Test
     void thirdPartyResponding_returns404() throws Exception {
         User owner = user("9820100011", "owner");
@@ -203,8 +188,6 @@ class OfferEndpointsTest extends AbstractApiTest {
                         .content("{\"action\":\"accept\"}"))
                 .andExpect(status().isNotFound());
     }
-
-    // ---- §11 test 7: /offers/mine returns only the caller's own offers ----
 
     @Test
     void myOffers_returnsOnlyCallerOwn() throws Exception {
@@ -222,8 +205,6 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].amount").value(5000000));
     }
-
-    // ---- §11 test 8: /me/offers returns only offers on the caller's listings ----
 
     @Test
     void offersOnMine_returnsOnlyCallersListings() throws Exception {
@@ -243,8 +224,6 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].propertyId").value(p1.getId().toString()));
     }
 
-    // ---- §11 test 9: Buyer's mobile masked on pending, stays masked to the owner once accepted ----
-
     @Test
     void buyerMobile_staysMaskedToOwner_evenAfterAccepted() throws Exception {
         User owner = user("9820100020", "owner");
@@ -252,23 +231,18 @@ class OfferEndpointsTest extends AbstractApiTest {
         Property p = listing(owner, "Mask test");
         String offerId = submitOffer(buyer, p, 5000000);
 
-        // Owner views offers on their listings — buyer mobile should be masked.
         mvc.perform(get(Routes.Offers.ME)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].from.mobile").value("98XXXXX543"));
 
-        // Accept the offer.
         respond(owner, offerId, "accept", null, null);
 
-        // After acceptance, buyer mobile should be revealed.
         mvc.perform(get(Routes.Offers.ME)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].from.mobile").value("98XXXXX543"));
     }
-
-    // ---- §11 test 10: Duplicate live offer → 409 (DB constraint) ----
 
     @Test
     void duplicateLiveOffer_returns409() throws Exception {
@@ -284,7 +258,6 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
     }
 
-    /** §11 test 10 part 2: assert the DB constraint fires even if the service check is bypassed. */
     @Test
     void duplicateLiveOffer_dbConstraintFiresDirectly() {
         User owner = user("9820100023", "owner");
@@ -300,15 +273,12 @@ class OfferEndpointsTest extends AbstractApiTest {
                 () -> offerRepo.saveAndFlush(second));
     }
 
-    // ---- §11 test 11: Offer on property with closed deal → 409 ----
-
     @Test
     void offerOnClosedDeal_returns409() throws Exception {
         User owner = user("9820100025", "owner");
         User buyer = user("9820100026", "buyer");
         Property p = listing(owner, "Closed deal");
 
-        // Insert a closed deal directly via JDBC (DealRef is read-only, no public constructor).
         jdbc.update("INSERT INTO deals (id, property_id, deal, status) VALUES (?, ?, 'buy', 'closed')",
                 UUID.randomUUID(), p.getId());
 
@@ -319,17 +289,12 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
     }
 
-
-    /** Asserts {@code totalElements}, not {@code content.length()}: a count derived from the page is right
-     * for every owner until the first one gets popular. */
     @Test
     void offersOnMine_isPaged_andTotalCountsTheWholeBookNotThePage() throws Exception {
         User owner = user("9820100040", "owner");
         Property p1 = listing(owner, "Paging A");
         Property p2 = listing(owner, "Paging B");
         Property p3 = listing(owner, "Paging C");
-        // One offer per property: `uq_offers_live_per_user_property` forbids a buyer stacking two
-        // live offers on one listing, so three rows need three listings, not three amounts.
         submitOffer(user("9820100041", "buyer"), p1, 5000000);
         submitOffer(user("9820100042", "buyer"), p2, 5100000);
         submitOffer(user("9820100043", "buyer"), p3, 5200000);
@@ -351,8 +316,6 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(3));
     }
 
-    /** A client sort must be ignored: an unknown {@code ?sort=} property otherwise reaches the JPA query
-     * and becomes a 500 any signed-in caller can trigger by guessing. */
     @Test
     void offersOnMine_ignoresAClientSuppliedSort_ratherThanFailingOnAnUnknownField() throws Exception {
         User owner = user("9820100044", "owner");
@@ -365,9 +328,6 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.sort").doesNotExist());
     }
-
-    // Accept/decline are the owner's decision alone: a participant-only check lets the buyer accept their own
-    // offer, agreeing a price with no owner and flipping the status that drives the mobile reveal.
 
     @Test
     void buyerCannotAcceptTheirOwnOffer() throws Exception {
@@ -416,7 +376,6 @@ class OfferEndpointsTest extends AbstractApiTest {
                         OfferStatuses.BY_BUYER);
     }
 
-
     private List<Map<String, Object>> notificationsFor(User u) {
         return jdbc.queryForList(
                 "select type, title, body, link from notifications where user_id = ?", u.getId());
@@ -435,11 +394,9 @@ class OfferEndpointsTest extends AbstractApiTest {
             assertThat(row.get("link")).isEqualTo("/dashboard?tab=leads&box=received");
             assertThat((String) row.get("title")).contains("Offer notify test");
             assertThat((String) row.get("body")).contains("\u20b941,00,000");
-            // D5/Q2: the amount and the buyer's display name are fair game, the mobile is not.
             assertThat((String) row.get("body")).doesNotContain(buyer.getMobile());
         });
 
-        // Submitting is the buyer's own action.
         assertThat(notificationsFor(buyer)).isEmpty();
     }
 

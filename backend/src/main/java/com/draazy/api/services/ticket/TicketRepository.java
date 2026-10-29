@@ -10,9 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Ticket board reads; the team is resolved by the service, never taken from the caller's raw {@code ?team=}. */
 public interface TicketRepository extends JpaRepository<Ticket, UUID> {
-
     @Query("""
             select t from Ticket t
             where (:allTeams = true or t.team in :teams or (:unassigned = true and t.team is null))
@@ -25,7 +23,6 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
             @Param("status") String status,
             Pageable pageable);
 
-    // `q` is a lower-cased, escaped `%term%`; the id is cast so a pasted reference matches too.
     @Query("""
             select t from Ticket t
             where (:allTeams = true or t.team in :teams or (:unassigned = true and t.team is null))
@@ -75,11 +72,8 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
             @Param("unassigned") boolean unassigned,
             @Param("status") String status);
 
-    /** Counts every ticket for the number, not just waitlist ones, so alternating services can't dodge the cap. */
     long countByMobileAndCreatedAtAfter(String mobile, Instant since);
 
-    /** Idempotency check for {@code POST /service-waitlist}; the subject is fixed by {@link ServiceWaitlists} so a
-     * client typo can't duplicate a row, and only open statuses count so a closed lead can be raised again. */
     boolean existsByMobileAndSubjectAndStatusIn(String mobile, String subject,
             Collection<String> statuses);
 }

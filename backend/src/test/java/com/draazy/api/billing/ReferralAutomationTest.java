@@ -29,9 +29,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** The referral decision made without a desk: risk bands, hold, caps, clawback, the flag and redeem hardening. */
 class ReferralAutomationTest extends AbstractApiTest {
-
     private static final String UA = "DraazyTest/1.0 (referral automation)";
     private static final String IP = "203.0.113.9";
     private static final String REFERRER_IP = "198.51.100.9";
@@ -95,7 +93,6 @@ class ReferralAutomationTest extends AbstractApiTest {
         return mvc.perform(request).andReturn().getResponse().getStatus();
     }
 
-    /** A pending referral from {@code referrer} to a fresh referee who came from a different network and browser. */
     private Referral pending(User referrer, String refereeMobile) throws Exception {
         User referee = user(refereeMobile, "owner");
         assertThat(redeem(referee, mint(referrer, REFERRER_IP, REFERRER_UA, null), IP, UA, "device-" + refereeMobile))
@@ -136,14 +133,11 @@ class ReferralAutomationTest extends AbstractApiTest {
         entityManager.clear();
     }
 
-    /** Verifies a real listing of the referee's, so the referral reaches the decision and can later be re-checked. */
     private Referral qualifyByListing(Referral referral) {
         User referee = users.findByMobile(referral.getReferredMobile()).orElseThrow();
         qualification.announceOwnershipVerified(referee.getId(), verifiedListing(referee).getId(), Instant.now());
         return reload(referral);
     }
-
-    // ---- tracks: the first event decides ----
 
     @Test
     void aFirstAcceptedContactQualifiesTheSeekerTrackAndTheListingThenAddsNothing() throws Exception {
@@ -170,8 +164,6 @@ class ReferralAutomationTest extends AbstractApiTest {
 
         assertThat(reload(referral).getTrack()).isEqualTo(ReferralStatuses.TRACK_OWNER);
     }
-
-    // ---- seeker-track integrity ----
 
     private User otherOwner(Referral referral) {
         return user("97" + referral.getReferredMobile().substring(2), "owner");
@@ -276,7 +268,6 @@ class ReferralAutomationTest extends AbstractApiTest {
         assertThat(after.getAutoReason()).isEqualTo("high_risk");
     }
 
-    /** A held seeker row whose hold has elapsed; the contacted listing is another owner's. */
     private Referral dueHeldSeeker(User referrer, String refereeMobile) throws Exception {
         User referee = user(refereeMobile, "owner");
         assertThat(redeem(referee, mint(referrer, REFERRER_IP, REFERRER_UA, null), IP, UA, null)).isEqualTo(200);
@@ -338,8 +329,6 @@ class ReferralAutomationTest extends AbstractApiTest {
         assertThat(after.getAutoReason()).isEqualTo("self_dealing");
     }
 
-    // ---- a third party's listing is not the referee's ----
-
     @Test
     void archivingOrRevokingTheContactedListingLeavesAQualifiedSeekerRowAlone() throws Exception {
         Referral referral = pending(agedReferrer("9866620340"), "9866620341");
@@ -372,8 +361,6 @@ class ReferralAutomationTest extends AbstractApiTest {
         assertThat(after.getAutoReason()).isEqualTo("listing_taken_down");
     }
 
-    // ---- staff overrides survive the sweep ----
-
     @Test
     void aStaffApprovedAppealIsNotUndoneByTheHourlyRecheck() throws Exception {
         Referral held = dueHeldSeeker(agedReferrer("9866620360"), "9866620361");
@@ -390,8 +377,6 @@ class ReferralAutomationTest extends AbstractApiTest {
         assertThat(after.getHandledBy()).isNotEqualTo(ReferralStatuses.SYSTEM);
     }
 
-    // ---- the referrer is serialised ----
-
     @Test
     void qualifyingTakesTheReferrersAdvisoryLockUntilCommit() throws Exception {
         Referral referral = pending(agedReferrer("9866620370"), "9866620371");
@@ -403,8 +388,6 @@ class ReferralAutomationTest extends AbstractApiTest {
                 where locktype = 'advisory' and classid = 10 and pid = pg_backend_pid()
                 """, Long.class)).isEqualTo(1L);
     }
-
-    // ---- risk bands ----
 
     @Test
     void oneSignalHoldsTheReferralForTheConfiguredDays() throws Exception {
@@ -443,8 +426,6 @@ class ReferralAutomationTest extends AbstractApiTest {
         assertThat(after.getStatus()).isEqualTo(ReferralStatuses.QUALIFIED);
         assertThat(auditRows(after, "referral.auto.qualified")).isEqualTo(1);
     }
-
-    // ---- hold release ----
 
     private Referral heldAndDue(String referrerMobile, String refereeMobile) throws Exception {
         Referral held = qualifyByListing(pending(user(referrerMobile, "owner"), refereeMobile));
@@ -499,8 +480,6 @@ class ReferralAutomationTest extends AbstractApiTest {
         assertThat(body).contains("\"status\":\"held\"").contains("\"holdUntil\":\"").contains("\"track\":\"owner\"");
     }
 
-    // ---- caps ----
-
     @Test
     void thePastTheYearlyCapReferralIsRejectedWithNoDeferral() throws Exception {
         setFee("referralQualifyPerYear", 1);
@@ -514,8 +493,6 @@ class ReferralAutomationTest extends AbstractApiTest {
         assertThat(after.getStatus()).isEqualTo(ReferralStatuses.REJECTED);
         assertThat(after.getAutoReason()).isEqualTo("cap_reached");
     }
-
-    // ---- clawback ----
 
     private Referral grantedWithListing(String referrerMobile, String refereeMobile, Property[] listing)
             throws Exception {
@@ -588,8 +565,6 @@ class ReferralAutomationTest extends AbstractApiTest {
 
         assertThat(reload(granted).getAutoReason()).isEqualTo("verification_revoked");
     }
-
-    // ---- redeem hardening ----
 
     @Test
     void aReferralCannotBeRedeemedOutsideTheSignupWindow() throws Exception {
@@ -673,8 +648,6 @@ class ReferralAutomationTest extends AbstractApiTest {
                 String.class, referrer.getId());
     }
 
-    // ---- the flag ----
-
     private void flag(boolean on) {
         jdbc.update("update settings set value = jsonb_set(value, '{referralRewards}', ?::jsonb) where key = 'flags'",
                 String.valueOf(on));
@@ -695,8 +668,6 @@ class ReferralAutomationTest extends AbstractApiTest {
         flag(true);
         assertThat(qualifyByListing(redeemedBefore).getStatus()).isEqualTo(ReferralStatuses.QUALIFIED);
     }
-
-    // ---- the summary ----
 
     @Test
     void theReferrersSummaryCountsHeldAndEarnedByTrack() throws Exception {

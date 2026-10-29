@@ -18,11 +18,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
-// The society FK is nullable because rooms may be offered in uncatalogued buildings.
-// The FK cannot catch this: `null` is a legal value for the column.
 @DisplayName("Flatmates — a room's society id has to name a society")
 class FlatmateRoomSocietyTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -33,7 +30,6 @@ class FlatmateRoomSocietyTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    // This helper sends `societyId`; the shared supply helper deliberately never does.
     private static String roomBody(User host, String societyId) {
         return """
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
@@ -78,7 +74,6 @@ class FlatmateRoomSocietyTest extends AbstractApiTest {
     @Test
     @DisplayName("omitting the society id is still allowed — the room just names no building")
     void absentSocietyIdStillWorks() throws Exception {
-        // The guard must not turn an optional field into a required one.
         offerRoom(host("9811100003"), null)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.societyId").doesNotExist());

@@ -40,7 +40,6 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
-// Kept as a base class rather than a utility because every helper needs the autowired `MockMvc` and the repositories.
 abstract class ServiceFixtures extends AbstractApiTest {
 
     @Autowired
@@ -116,8 +115,6 @@ abstract class ServiceFixtures extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString();
         String id = field(json, "id");
 
-        // These fixtures exercise the maker-checker that runs after payment, so open its checkout and settle it here
-        // exactly as the live webhook would.
         requestRepo.findById(UUID.fromString(id))
                 .filter(r -> r.getStatus() == ServiceRequestStatus.AWAITING_PAYMENT)
                 .ifPresent(r -> serviceRequests.applyWebhookOutcome(paymentRef(id), true, null, null));
@@ -137,7 +134,6 @@ abstract class ServiceFixtures extends AbstractApiTest {
         return id;
     }
 
-    /** The Cashfree order id a request is gated on, opening its checkout if nobody has yet. */
     String paymentRef(String id) {
         return CheckoutFixture.open(serviceRequests, requestRepo, UUID.fromString(id));
     }
@@ -164,7 +160,6 @@ abstract class ServiceFixtures extends AbstractApiTest {
                 + merchantRefundId + "\",\"order_id\":\"order_x\",\"refund_status\":\"" + refundStatus + "\"}}}");
     }
 
-    /** A refund someone made on the Cashfree dashboard: Cashfree picks the refund id, not us. */
     void deliverDashboardRefund(String orderId, String cfRefundId, long amount, String refundStatus) throws Exception {
         deliverBody("{\"type\":\"REFUND_STATUS_WEBHOOK\",\"data\":{\"refund\":{\"refund_id\":\"refund_" + cfRefundId
                 + "\",\"cf_refund_id\":\"" + cfRefundId + "\",\"order_id\":\"" + orderId + "\",\"refund_amount\":"
@@ -174,7 +169,6 @@ abstract class ServiceFixtures extends AbstractApiTest {
     private void deliverBody(String body) throws Exception {
         String ts = String.valueOf(System.currentTimeMillis());
         String signature = webhookSignature.sign(ts, body);
-        // The endpoint answers 200 to every refusal, so isOk() alone cannot tell a settled delivery from a dropped one.
         assertThat(webhookSignature.verify(signature, ts, body.getBytes(StandardCharsets.UTF_8)))
                 .isEqualTo(WebhookSignature.Verification.VERIFIED);
         mvc.perform(post(Routes.Webhooks.CASHFREE_PAYMENT)
@@ -264,7 +258,6 @@ abstract class ServiceFixtures extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString();
     }
 
-    /** Assert the request's current status without caring about the rest of the document. */
     void expectStatus(User caller, String id, String status) throws Exception {
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(caller)))

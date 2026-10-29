@@ -9,11 +9,8 @@ import java.util.UUID;
 import java.util.function.ToLongFunction;
 import org.springframework.stereotype.Component;
 
-/** A paid plan's price is the admin fee schedule's figure, not {@code plans.price}.
- * Keyed by seeded id because the seed may rename a plan but never re-ids one. */
 @Component
 public class PlanMapper {
-
     private static final Map<UUID, ToLongFunction<PlatformSettings>> ADMIN_PRICED = Map.of(
             UUID.fromString("b1000000-0000-4000-8000-000000000005"), PlatformSettings::listingPass,
             UUID.fromString("b1000000-0000-4000-8000-000000000006"), PlatformSettings::contactPack);
@@ -48,8 +45,6 @@ public class PlanMapper {
     }
 
     public SubscriptionDto toDto(Subscription subscription) {
-        // paymentSessionId is single-use and never stored, so it is null from the entity; the
-        // subscribe flow attaches a fresh one via withPaymentSessionId for a priced plan.
         return new SubscriptionDto(
                 subscription.getId().toString(),
                 subscription.getPlanId().toString(),

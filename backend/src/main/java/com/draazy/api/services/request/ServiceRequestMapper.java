@@ -24,7 +24,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ServiceRequestMapper {
-
     private static final String MIGRATED_FROM_TYPE = "_migratedFromType";
 
     private static final String MIGRATED_DETAILS = "_migratedDetails";
@@ -131,7 +130,6 @@ public class ServiceRequestMapper {
                         && viewer.userId().equals(p.getUserId()));
     }
 
-
     private static PoliceIntimationDto policeIntimation(ServiceRequestPoliceIntimation p,
             Map<UUID, String> names) {
         return p == null ? PoliceIntimationDto.pending()
@@ -172,7 +170,6 @@ public class ServiceRequestMapper {
         return side == null || readableSides(request, parties, viewer).contains(side);
     }
 
-    // The same visibility and identity-scan rules as the list, applied to one file when it is opened.
     Optional<String> documentUrl(ServiceRequest request, UUID documentId, AuthPrincipal viewer) {
         List<UUID> ids = List.of(request.getId());
         List<ServiceRequestParty> sides = parties.findByRequestIdIn(ids);
@@ -203,7 +200,6 @@ public class ServiceRequestMapper {
         return readable;
     }
 
-    // Hide migration audit fields from clients; the raw payload stays server-side.
     private static Map<String, Object> visibleDetails(Map<String, Object> details) {
         if (details == null
                 || !(details.containsKey(MIGRATED_FROM_TYPE) || details.containsKey(MIGRATED_DETAILS))) {
@@ -232,7 +228,6 @@ public class ServiceRequestMapper {
                 m.getReadAt());
     }
 
-    // Use HashMap because callers read names.get(null); Map.of() rejects null keys.
     private Map<UUID, String> names(List<ServiceRequest> requests,
             Iterable<List<ServiceRequestMessage>> threads,
             Iterable<List<ServiceRequestParty>> sides,

@@ -29,11 +29,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Rooms and groups — the supply side (contract tag {@code Engagement}). Lists are public, writes
- * authenticated; creates are consumer-role-gated because a host is somebody who lives there. */
 @RestController
 public class FlatmateSupplyController {
-
     private final FlatmateSupplyService service;
     private final FlatmateOwnerConsentService consentService;
     private final PhotoLimit photoLimit;
@@ -57,8 +54,6 @@ public class FlatmateSupplyController {
         return service.createRoom(principal, body);
     }
 
-    /** Same role guard as the create: an account that may not write a flatmate ad may not rewrite
-     * one. */
     @PatchMapping(Routes.Flatmates.ROOM_BY_ID)
     @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public FlatmateRoomDto updateRoom(@CurrentUser AuthPrincipal principal,
@@ -104,8 +99,6 @@ public class FlatmateSupplyController {
         service.deleteGroup(principal, id);
     }
 
-    /** Contract {@code updateFlatmateGroup}. {@link #setGroupSeats} stays: one-tap "a seat just
-     * went" should not resend title, rent, policy. */
     @PatchMapping(Routes.Flatmates.GROUP_BY_ID)
     @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public FlatmateGroupDto updateGroup(@CurrentUser AuthPrincipal principal,
@@ -130,8 +123,6 @@ public class FlatmateSupplyController {
                 body == null ? null : body.gender());
     }
 
-    /** 200 for both calls; the body says which happened. Role-guarded like the creates it serves:
-     * the consent flow spends a send budget against a third party's number. */
     @PostMapping(Routes.Flatmates.OWNER_CONSENT)
     @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public ConsentResult ownerConsent(@CurrentUser AuthPrincipal principal,
@@ -141,14 +132,10 @@ public class FlatmateSupplyController {
         return recorded ? ConsentResult.recorded() : ConsentResult.sent(resendAfterSeconds());
     }
 
-    /** Reported rather than guessed: a timer the client picks is wrong in every environment whose
-     * cooldown differs. */
     private int resendAfterSeconds() {
         return consentService.resendCooldownSeconds();
     }
 
-    /** {@code otp} absent means "send one". The address fields are deliberately not {@code @NotBlank}:
-     * the rule is about the composed address, enforced in {@code FlatmateGuardrails.fingerprint}. */
     public record OwnerConsentRequest(
             @NotBlank
             @IndianMobile
@@ -161,8 +148,6 @@ public class FlatmateSupplyController {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record ConsentResult(boolean consentRecorded, Integer resendAfterSeconds) {
-
-        /** A code is on its way; the client counts {@code resendAfterSeconds} down before offering another. */
         static ConsentResult sent(int resendAfterSeconds) {
             return new ConsentResult(false, resendAfterSeconds);
         }

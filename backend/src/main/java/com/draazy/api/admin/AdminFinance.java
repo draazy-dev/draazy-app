@@ -7,12 +7,10 @@ public record AdminFinance(
         List<PlanLine> plans,
         Money month,
         Attention attention) {
-
     public record PlanLine(String name, String audience, String billingCycle, long price,
             long active, long monthlyValue, Integer termDays) {
     }
 
-    /** {@code collected - refunded - passThrough == net}; pass-through is statutory money Draazy only forwards. */
     public record Money(long collected, long refunded, long passThrough, long net, long payments) {
     }
 

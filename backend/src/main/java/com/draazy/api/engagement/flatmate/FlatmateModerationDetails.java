@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 class FlatmateModerationDetails {
-
     private final FlatmateSeekerPostRepository posts;
     private final FlatmateRoomRepository rooms;
     private final FlatmateGroupRepository groups;
@@ -72,7 +71,6 @@ class FlatmateModerationDetails {
                 null, reviewOf(review, host, group.getOwnerConsentMobile()), styleOf(group.getHostId()));
     }
 
-    /** Staff see every answer: the stranger rule protects members from each other, not from review. */
     private Map<String, Integer> styleOf(UUID authorId) {
         return authorId == null ? Map.of() : LivingStyleCatalogue.ordered(livingStyle.answersOf(authorId));
     }

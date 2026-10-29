@@ -29,18 +29,14 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 
-/** Serves public reference reads from memory and lets browsers and the edge cache them (cross-cutting.md §9). */
 @Component
-// After Spring Security, so a hit still passes the origin gate, CORS and the security headers.
 @Order(Ordered.LOWEST_PRECEDENCE)
 public class PublicReadCacheFilter extends OncePerRequestFilter {
-
-    // Each must answer every caller identically: one that varied by caller would leak across users.
+    // Cached routes must answer every caller identically; one varying by caller leaks across users.
     static final Set<String> PATHS = Set.of(
             Routes.Bootstrap.BASE, Routes.Fees.BASE, Routes.Localities.BASE, Routes.Content.FAQS,
             Routes.Properties.FEATURED, Routes.Properties.SEARCH_INDEX, Routes.Societies.TOP);
 
-    // Caller-aware for a signed-in viewer (the owner, a checker), identical for every anonymous one.
     static final List<PathPattern> ANONYMOUS = Stream.of(
                     Routes.Properties.BASE, Routes.Properties.ANY_SINGLE, Routes.Reviews.FOR_PROPERTY,
                     Routes.Reviews.FOR_ENTITY, Routes.Owners.ANY_SINGLE, Routes.Localities.ANY_SINGLE,
@@ -58,7 +54,6 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
 
     private static final Set<String> READ_METHODS = Set.of("GET", "HEAD", "OPTIONS");
 
-    /** Bounds memory against arbitrary query strings, e.g. {@code /properties/featured?x=<random>}. */
     static final int MAX_ENTRIES = 256;
 
     private final long ttlMillis;
@@ -76,7 +71,6 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
         this.ttlMillis = ttl.toMillis();
     }
 
-    /** Whether this request is served through the cache; false for everything when the TTL is zero. */
     public boolean caches(HttpServletRequest request) {
         if (ttlMillis <= 0 || !"GET".equals(request.getMethod())) {
             return false;
@@ -94,8 +88,6 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
         return ANONYMOUS.stream().anyMatch(p -> p.matches(container));
     }
 
-    // Back-office and listing moderation/lifecycle writes can change a cached answer, so a successful one
-    // drops them all. Only on this instance: the others serve out their TTL.
     private boolean evicts(HttpServletRequest request) {
         if (ttlMillis <= 0 || READ_METHODS.contains(request.getMethod())) {
             return false;
@@ -135,7 +127,6 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
                 return;
             }
             byte[] body = buffer.getContentAsByteArray();
-            // Weak: Tomcat will not gzip a response that carries a strong ETag.
             entry = new Entry(body, buffer.getContentType(),
                     "W/\"" + DigestUtils.md5DigestAsHex(body) + '"', now + ttlMillis);
             entries.put(key, entry);
@@ -143,13 +134,11 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
         serve(entry, now, request, response);
     }
 
-    // max-age counts down to the entry's expiry, so memory plus browser never exceeds one TTL.
     private static void serve(Entry entry, long now, HttpServletRequest request,
             HttpServletResponse response) throws IOException {
         long maxAge = Math.max(1, TimeUnit.MILLISECONDS.toSeconds(entry.expiresAt() - now + 999));
         response.setHeader(HttpHeaders.CACHE_CONTROL,
                 CacheControl.maxAge(maxAge, TimeUnit.SECONDS).cachePublic().getHeaderValue());
-        // Else a browser could replay an anonymous answer to the same visitor just after sign-in.
         response.addHeader(HttpHeaders.VARY, HttpHeaders.AUTHORIZATION);
         if (new ServletWebRequest(request, response).checkNotModified(entry.etag())) {
             return;
@@ -159,7 +148,6 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
         response.getOutputStream().write(entry.body());
     }
 
-    /** Sent on every staff and admin read (http.js), so an editor always sees their own edits. */
     private static boolean wantsFresh(HttpServletRequest request) {
         String header = request.getHeader(HttpHeaders.CACHE_CONTROL);
         if (header == null) {

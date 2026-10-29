@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class OriginGateFilter extends OncePerRequestFilter {
-
     private static final Logger log = LoggerFactory.getLogger(OriginGateFilter.class);
 
     static final String HEADER = "X-Proxy-Auth";
@@ -73,8 +72,6 @@ public class OriginGateFilter extends OncePerRequestFilter {
                 ErrorCodes.Messages.ACCESS_DENIED);
     }
 
-    // The edge proxy writes the visitor's address as the first X-Forwarded-For hop;
-    // the origin front end may append more.
     private static HttpServletRequest edgeAddressed(HttpServletRequest request) {
         String forwarded = request.getHeader(WriteRateLimitFilter.FORWARDED_FOR);
         String client = forwarded == null ? "" : forwarded.split(",", 2)[0].trim();

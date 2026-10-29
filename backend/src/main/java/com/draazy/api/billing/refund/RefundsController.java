@@ -18,10 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The refunds desk (contracts {@code listRefunds}, {@code approveRefund}, {@code rejectRefund}). */
 @RestController
 public class RefundsController {
-
     private static final String STAFF_OR_ADMIN = "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "') and ";
     private static final String READ = STAFF_OR_ADMIN + BackOfficePermissions.REQUIRE_REFUNDS_READ;
     private static final String WRITE = STAFF_OR_ADMIN + BackOfficePermissions.REQUIRE_REFUNDS_WRITE;

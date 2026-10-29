@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AdminDashboardService {
-
     private static final int ROWS = 5;
     private static final int TRAFFIC_DAYS = 30;
 
@@ -91,7 +90,6 @@ public class AdminDashboardService {
                 counts.countVisits("scheduled"), counts.countDealsNotClosed());
     }
 
-    // A staffer on no desk has no board; the section is left out rather than zeroed.
     private AdminDashboard.Tickets tickets(AuthPrincipal caller) {
         try {
             var latest = tickets.rows(caller, null, null, null, null, PageRequest.of(0, ROWS)).getContent();

@@ -11,11 +11,8 @@ import java.util.UUID;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-// Same transaction as the archive or deal close, so a withdrawn listing never keeps booked visits.
-// Past visits are left for the owner to mark completed.
 @Component
 class ArchivedListingVisits {
-
     private final VisitRepository visits;
     private final PropertyRepository properties;
     private final Notifier notifier;
@@ -42,7 +39,6 @@ class ArchivedListingVisits {
     }
 
     private void cancelUpcoming(UUID propertyId, String reason, String message) {
-        // Same row lock VisitService.schedule takes, so a booking in flight is committed before the select below.
         properties.findForVerificationDecision(propertyId);
         for (Visit visit : visits.findUpcomingByProperty(propertyId, Instant.now())) {
             String before = visit.getStatus();

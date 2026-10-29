@@ -26,11 +26,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
-// ? a saved search reports how many listings match it, counted by the server.
-// The absurd BHK fixture makes assertions exact, not "greater than existing fixtures".
 @DisplayName("Saved searches — how many listings match this alert, counted server-side")
 class SavedSearchMatchCountTest extends AbstractApiTest {
-
     private static final String SLUG = "d227-match-count";
     private static final String NAME = "D227 Match Count";
 
@@ -104,8 +101,6 @@ class SavedSearchMatchCountTest extends AbstractApiTest {
         Property ancient = listing(user, "Old 99BHK", "rent", "99", "approved");
         listing(user, "New 99BHK", "rent", "99", "approved");
 
-        // Push one of them well before any plausible sweep baseline. newCount would exclude it;
-        // matchCount is the answer to a different question and must not.
         jdbc.update("update properties set created_at = ? where id = ?",
                 Timestamp.from(Instant.now().minusSeconds(86_400 * 30)), ancient.getId());
         em.flush();
@@ -466,8 +461,6 @@ class SavedSearchMatchCountTest extends AbstractApiTest {
         seedLocality();
         alert(searcher, "{\"deal\":\"rent\",\"localities\":[\"" + SLUG + "\"],\"bhk\":[99]}");
 
-        // The catalogue is public: a searcher's count is over every live listing, not only their own.
-        // That is the opposite of the own-listing duplicate check and deliberately so.
         listing(poster, "Somebody else's 99BHK", "rent", "99", "approved");
         em.flush();
         em.clear();
@@ -599,8 +592,6 @@ class SavedSearchMatchCountTest extends AbstractApiTest {
                         Map.of("deal", "rent", "localities", List.of(SLUG), "bhk", List.of(99)),
                         null, null, null));
 
-        // The alert card renders the count the moment it is saved. Serving 0 here and the real
-        // number on the next list read would look like the alert found nothing.
         assertThat(created.matchCount()).isEqualTo(1);
         assertThat(created.newCount()).isZero();
     }

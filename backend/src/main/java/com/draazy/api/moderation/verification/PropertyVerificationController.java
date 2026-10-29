@@ -22,14 +22,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// Participant-or-staff guard lives in service; annotations cannot express "owns this row".
 @RestController
 public class PropertyVerificationController {
-
     private static final String STAFF_OR_ADMIN =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
 
-    // Verification decisions use the verification atom.
     private static final String PROPERTIES_VERIFY =
             STAFF_OR_ADMIN + " and " + BackOfficePermissions.REQUIRE_PROPERTIES_VERIFY;
 
@@ -44,20 +41,17 @@ public class PropertyVerificationController {
         this.reraChecks = reraChecks;
     }
 
-    /** {@code GET /properties/{id}/verification} (contract {@code getPropertyVerification}). */
     @GetMapping(Routes.Moderation.PROPERTY_VERIFICATION)
     public PropertyReviewResponse get(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         return service.get(principal, id);
     }
 
-    // Owner dashboard gets its own case files in one page.
     @GetMapping(Routes.Moderation.ME_PROPERTY_REVIEWS)
     public PageResponse<ReviewBadge> listMyCases(
             @CurrentUser AuthPrincipal principal, Pageable pageable) {
         return PageResponse.of(queue.listMyCases(principal, Pageables.unsorted(pageable)), badge -> badge);
     }
 
-    /** {@code POST /properties/{id}/verification} (contract {@code initPropertyVerification}) — 201. */
     @PostMapping(Routes.Moderation.PROPERTY_VERIFICATION)
     @ResponseStatus(HttpStatus.CREATED)
     public PropertyReviewResponse initiate(@CurrentUser AuthPrincipal principal,
@@ -78,7 +72,6 @@ public class PropertyVerificationController {
         return service.start(principal, id);
     }
 
-    /** {@code POST /properties/{id}/verification/read} (contract {@code markVerificationRead}) — 204. */
     @PostMapping(Routes.Moderation.VERIFICATION_READ)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void markRead(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
@@ -93,7 +86,6 @@ public class PropertyVerificationController {
                 body.reasonCode(), body.expectedStatus());
     }
 
-    // One line per PATCH so reviewers cannot overwrite each other's checklist changes.
     @PatchMapping(Routes.Moderation.VERIFICATION_CHECKLIST)
     @PreAuthorize(PROPERTIES_VERIFY)
     public PropertyReviewResponse setChecklistItem(@CurrentUser AuthPrincipal principal,
@@ -116,7 +108,6 @@ public class PropertyVerificationController {
             String reasonCode, String expectedStatus) {
     }
 
-    // Boxed pass lets omission bind distinctly; controller collapses null to false.
     public record ChecklistUpdate(@NotBlank String item, Boolean pass) {
     }
 

@@ -6,11 +6,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** Decides visibility — may a stranger see this post — which is deliberately not the question
- * the review queue answers (verification). A tenant-tier post is live and unbadged. */
 @Component
 class FlatmatePublication {
-
     static final String UNREVIEWED = "new post";
 
     private final FlatmateGuardrails guardrails;
@@ -21,8 +18,6 @@ class FlatmatePublication {
         this.reviews = reviews;
     }
 
-    /** One row per target, updated in place: {@code uq_flatmate_reviews_room} and its group twin are
-     * unique on it, so filing a second row on edit would 409 every edit of an agreement-backed post. */
     void enqueueReviewIfNeeded(AuthPrincipal caller, String kind, UUID roomId, UUID groupId,
             String tier, boolean flagged, String address, AgreementClaim claim) {
         if (FlatmateVocabulary.TIER_OWNER.equals(tier)) {
@@ -44,8 +39,6 @@ class FlatmatePublication {
             claim.tenancyPropertyId(), claim.evidenceType()));
     }
 
-    /** {@code ownerConsent} is a derived fact, never a request field: callers must obtain it from
-     * {@code FlatmateOwnerConsentService}, or ten arbitrary digits would certify a sub-let. */
     record AgreementClaim(Map<String, Object> doc, AgreementRegistration registration,
             boolean ownerConsent, UUID tenancyPropertyId, String evidenceType) {
     }
@@ -63,8 +56,6 @@ class FlatmatePublication {
         }
     }
 
-    /** The eligibility result is read for its flag, never its verdict — {@code blocked()} is always true
-     * for a post that already exists. The ladder is consulted only for its power to lower. */
     void reapplyAfterEdit(AuthPrincipal caller, String tier, FlatmateEditImpact impact,
             FlatmateSupplyPost post, FlatmateGuardrails.Address address) {
         var eligibility = guardrails.evaluate(caller.userId(), tier, address);

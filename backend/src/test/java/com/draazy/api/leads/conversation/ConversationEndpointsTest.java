@@ -40,7 +40,6 @@ import org.springframework.http.MediaType;
 
 @DisplayName("Slice 12 — conversations: who may talk to whom")
 class ConversationEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -57,7 +56,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the relationship guard")
     class Guard {
-
         @Test
         @DisplayName("an approved contact request opens the door — in either direction")
         void approvedContactMayMessage() throws Exception {
@@ -68,8 +66,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
 
             start(buyer, owner, p, 201);
 
-            // Owner -> buyer, about the same listing: the guard looks both ways, so the owner does
-            // not have to raise a contact request against their own flat to answer.
             start(owner, buyer, p, 200);
         }
 
@@ -121,8 +117,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
             Property elsewhere = listing(thirdParty);
             approve(buyer, theirs);
 
-            // The pair are related, but the listing they claim to be discussing belongs to neither
-            // of them — otherwise propertyId is an arbitrary id that drives the title and the gate.
             start(buyer, owner, elsewhere, 403);
         }
 
@@ -209,7 +203,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("opening from a visit or offer request")
     class LeadRequest {
-
         private org.springframework.test.web.servlet.ResultActions open(User caller, String kind, Object id)
                 throws Exception {
             return mvc.perform(post(Routes.Conversations.LEAD_REQUEST, kind, id.toString())
@@ -264,11 +257,9 @@ class ConversationEndpointsTest extends AbstractApiTest {
         }
     }
 
-    // These cover the derivation added for that — and, more importantly, that it did not become a way around the guard.
     @Nested
     @DisplayName("addressing by listing")
     class ByListing {
-
         @Test
         @DisplayName("an approved buyer opens the thread with propertyId and no mobile")
         void derivesTheOwnerFromTheListing() throws Exception {
@@ -277,7 +268,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
             Property p = listing(owner);
             approve(buyer, p);
 
-            // The buyer cannot have typed the number: this is exactly what they hold — a listing id.
             mvc.perform(post(Routes.Conversations.BASE)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -305,8 +295,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
 
-            // 200 not 201, same id, one row: the derivation resolves to the same user, so it cannot
-            // give one relationship two inboxes depending on how the client happened to address it.
             assertThat(id(derived)).isEqualTo(id(byMobile));
             assertThat(conversations.inboxOf(buyer.getId(), Pageable.unpaged())).hasSize(1);
         }
@@ -318,8 +306,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
             User stranger = user("9830000166", Roles.Wire.BUYER, "Stranger Sixty-six");
             Property p = listing(owner);
 
-            // Byte-identical to the request in `derivesTheOwnerFromTheListing`; the only difference is the missing
-            // approval.
             mvc.perform(post(Routes.Conversations.BASE)
                             .header(HttpHeaders.AUTHORIZATION, bearer(stranger))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -328,8 +314,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
 
             approve(stranger, p);
 
-            // The derived branch has to match it, or the same person becomes addressable by listing after they have
-            // gone.
             mvc.perform(post(Routes.Conversations.BASE)
                             .header(HttpHeaders.AUTHORIZATION, bearer(stranger))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -347,8 +331,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
             owner.archive("Erased on the account holder's request");
             users.saveAndFlush(owner);
 
-            // Answering it with the enumeration-safe 403 would hide a client bug behind a refusal the client is told
-            // to expect, and would leave `counterpartyMobile` looking optional in every case.
             mvc.perform(post(Routes.Conversations.BASE)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -372,7 +354,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the refusal must not be an oracle")
     class Oracle {
-
         @Test
         @DisplayName("an unregistered number and an unrelated user get the identical answer")
         void refusalIsIndistinguishable() throws Exception {
@@ -393,8 +374,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isForbidden())
                     .andReturn().getResponse().getContentAsString();
 
-            // Same status, same body. If these ever diverge, POST /messages becomes a way to test a
-            // list of phone numbers against the user base without an account of the target's.
             assertThat(strip(toUnregistered)).isEqualTo(strip(toUnrelated));
         }
 
@@ -403,7 +382,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
         void malformedMobileIsRejectedAtTheEdge() throws Exception {
             User caller = user("9830000123", Roles.Wire.BUYER, "Edge caller");
 
-            // Both are 422 at the edge, before any lookup.
             for (String notAMobile : new String[] {"not-a-number", "2012345678"}) {
                 mvc.perform(post(Routes.Conversations.BASE)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(caller))
@@ -412,7 +390,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
                         .andExpect(status().isUnprocessableEntity());
             }
 
-            // A 422 only ever says "not mobile-shaped".
             for (String wellFormed : new String[] {"9899999998", "919899999998"}) {
                 mvc.perform(post(Routes.Conversations.BASE)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(caller))
@@ -426,7 +403,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("a thread cannot fork")
     class FindOrCreate {
-
         @Test
         @DisplayName("starting twice returns the same thread, 201 then 200")
         void idempotent() throws Exception {
@@ -498,7 +474,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the thread itself")
     class Thread {
-
         @Test
         @DisplayName("a suspended owner's listing shows as unavailable in the inbox")
         void suspendedOwnerListingIsUnavailable() throws Exception {
@@ -545,8 +520,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[0].presence").doesNotExist())
                     .andExpect(jsonPath("$.content[0].messages").doesNotExist());
 
-            // Both people are called "Same Name", so `author` cannot separate them and `mine`
-            // is the only field that can. That is the whole reason this test uses a duplicate name.
             mvc.perform(get(Routes.Conversations.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                     .andExpect(status().isOk())
@@ -646,7 +619,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
             String id = id(start(buyer, owner, p, 201));
             reply(owner, id, "sure, come by", 201);
 
-            // The sender never accrues unread against their own words.
             expectUnread(buyer, 1);
             expectUnread(owner, 1);
 
@@ -712,8 +684,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"archived\":true}"))
                     .andExpect(status().isNoContent());
-            // ADR-019: approval reveals the *owner's* number to the buyer who asked, never the
-            // buyer's number to the owner. Being in one thread is not a mutual reveal.
             mvc.perform(get(Routes.Conversations.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                     .andExpect(jsonPath("$.archived").value(true))
@@ -945,7 +915,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("masking is not relaxed by being in a thread")
     class Masking {
-
         @Test
         @DisplayName("the approved buyer sees the owner's number, and the owner sees the buyer")
         void asymmetry() throws Exception {

@@ -12,8 +12,6 @@ import jakarta.validation.constraints.Size;
 import java.util.Map;
 
 @FlatDescribedUnlessHunting
-/** Contract schema {@code FlatmateGroupCreate}. {@code role} and {@code propertyId} are accepted but
- * never believed — the tier is derived server-side and the listing must genuinely be the caller's. */
 public record FlatmateGroupCreateRequest(
         @NotBlank @Size(min = 3, max = 120) @NoContactDetails(message = NO_CONTACT) String title,
         @Size(max = 80) @NoContactDetails(message = NO_CONTACT) String locality,
@@ -34,7 +32,6 @@ public record FlatmateGroupCreateRequest(
         @IndianMobile String consentMobile,
         @Size(max = 600) @NoContactDetails(message = NO_CONTACT) String note,
         @Valid FlatmateGroupPreferences preferences) {
-
     boolean hunting() {
         return preferences != null;
     }

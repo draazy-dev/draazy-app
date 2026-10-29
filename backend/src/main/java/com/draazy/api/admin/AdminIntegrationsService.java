@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AdminIntegrationsService {
-
     private static final List<String> PROVIDERS =
             List.of(ProviderCalls.ZEPTOMAIL, ProviderCalls.WHATSAPP, ProviderCalls.CASHFREE);
     private static final List<String> OUTCOMES = Arrays.stream(ProviderCalls.Outcome.values())
@@ -107,7 +106,6 @@ public class AdminIntegrationsService {
             args.add(Timestamp.from(since));
         }
         if (q != null && !q.isBlank()) {
-            // A recipient is only ever found by its full address; the stored form is masked.
             String hash = ProviderCalls.hashRecipient(q);
             where.append(" AND (reference = ?").append(hash == null ? ")" : " OR recipient_hash = ?)");
             args.add(q.strip());

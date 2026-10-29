@@ -18,12 +18,9 @@ import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Whole-exchange deadline rather than a read timeout, for the reason given on {@code WhatsAppClient}:
- * the send runs on a request thread. */
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.zeptomail", name = "enabled", havingValue = "true")
 class ZeptoMailEmailSender implements EmailSender {
-
     private static final Logger log = LoggerFactory.getLogger(ZeptoMailEmailSender.class);
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
@@ -45,7 +42,6 @@ class ZeptoMailEmailSender implements EmailSender {
         this.calls = calls;
         this.from = Map.of("address", props.fromAddress(),
                 "name", isBlank(props.fromName()) ? "Draazy" : props.fromName());
-        // The Zoho console shows the token with its scheme prefix; accept it pasted either way.
         String key = props.apiKey().strip();
         String authorization = key.startsWith(AUTH_SCHEME) ? key : AUTH_SCHEME + key;
 
@@ -86,7 +82,6 @@ class ZeptoMailEmailSender implements EmailSender {
                 to, subject, failure, (int) ((System.nanoTime() - started) / 1_000_000L));
     }
 
-    /** Error codes only: Zoho's free-text messages can echo the recipient address. */
     private String describe(String responseBody) {
         try {
             JsonNode error = json.readTree(responseBody).path("error");

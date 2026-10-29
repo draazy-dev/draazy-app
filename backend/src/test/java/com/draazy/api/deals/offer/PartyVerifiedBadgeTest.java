@@ -20,24 +20,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-/**
- * The Verified Tenant badge on a party payload (tech-debt D114).
- *
- * <p><strong>What was wrong.</strong> The badge was decided in the browser by matching the party's
- * mobile against a list of verified numbers. D5 masks a buyer's mobile on the way out
- * ({@code 98XXXXX210}), and a mask is not reversible, so the match could never succeed against the
- * real API — the badge rendered in mock mode, where the numbers are real, and was permanently
- * absent in live. A mock more permissive than the server it stands in for passes tests the real
- * thing would fail (D97(d)), which is why this test asserts against the server rather than the seam.
- *
- * <p><strong>What is asserted.</strong> That {@code verified} is a real answer and not a constant:
- * the same endpoint, the same shape of buyer, differing only in whether a verified tenant profile
- * exists — and that the flag is right in both directions. The masked mobile is asserted alongside
- * it deliberately: the two facts travelling together on one payload is the whole fix, and a future
- * change that "simplifies" the flag away by going back to the number would fail here.
- */
 class PartyVerifiedBadgeTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
@@ -59,7 +42,6 @@ class PartyVerifiedBadgeTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** A tenant profile carrying (or not carrying) the badge — the only fact under test. */
     private void tenantProfile(User u, boolean verified) {
         TenantProfile profile = new TenantProfile(u.getId());
         profile.setVerified(verified);
@@ -83,9 +65,6 @@ class PartyVerifiedBadgeTest extends AbstractApiTest {
 
         submitOffer(buyer, p, 24000L);
 
-        // The owner is the viewer, so the buyer's number is masked — and the badge still arrives.
-        // That pairing is the point: under the old client-side derivation these two assertions
-        // could not both hold, because the masked value was the input to the badge.
         mvc.perform(get(Routes.Offers.ME).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].from.mobile").value("98XXXXX002"))
@@ -96,8 +75,6 @@ class PartyVerifiedBadgeTest extends AbstractApiTest {
     void offersOnMine_unverifiedBuyer_carriesNoBadge() throws Exception {
         User owner = user("9861100003", "owner");
         User buyer = user("9861100004", "buyer");
-        // A saved profile that was never verified — distinct from having no profile at all, and the
-        // case a flag hardcoded to `true` would sail through.
         tenantProfile(buyer, false);
         Property p = listing(owner, "Unverified buyer");
 
@@ -135,14 +112,11 @@ class PartyVerifiedBadgeTest extends AbstractApiTest {
                                 + "\",\"agreedPrice\":5000000}"))
                 .andExpect(status().isOk());
 
-        // The counterparty's mobile stays masked at every finalization status, so this payload is
-        // the one where a number could never have answered the question.
         mvc.perform(get("/finalization/" + p.getId() + "/status")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.initiator.mobile").value("98XXXXX008"))
                 .andExpect(jsonPath("$.initiator.verified").value(true))
-                // The owner has no tenant profile: the flag is per-party, not per-request.
                 .andExpect(jsonPath("$.counterparty.verified").value(false));
     }
 

@@ -20,7 +20,6 @@ import org.springframework.mock.env.MockEnvironment;
 
 @DisplayName("The prod profile — a contract nothing else in the suite loads")
 class ProdProfileContractTest {
-
     private static final Set<String> REQUIRED_DEPLOY_VARIABLES = Set.of(
             "DB_URL",
             "DB_USER",
@@ -39,11 +38,8 @@ class ProdProfileContractTest {
 
             "STAFF_TOTP_KEY",
 
-            // A second connection string, and it must be the session pooler, not DB_URL's
-            // transaction pooler — defaulting it to DB_URL would default to a hang.
             "FLYWAY_DB_URL",
 
-            // The schema owner, used only by the --migrate-only job. DB_USER is the DML-only runtime role.
             "FLYWAY_DB_USER",
             "FLYWAY_DB_PASSWORD",
 
@@ -59,8 +55,6 @@ class ProdProfileContractTest {
         return PropertiesLoaderUtils.loadProperties(new ClassPathResource(resource));
     }
 
-    // Read from the source tree, because {@code src/test/resources/application.properties} shadows
-    // the main one for the whole suite and a {@code ClassPathResource} would return that instead.
     private static Properties mainResource(String name) throws IOException {
         Path file = MODULE.resolve("src/main/resources").resolve(name);
         assertThat(file)
@@ -70,8 +64,6 @@ class ProdProfileContractTest {
     }
 
     private static Properties prod() throws IOException {
-
-        // From the classpath deliberately: this doubles as proof the file is packaged at all.
         return load("application-prod.properties");
     }
 
@@ -91,9 +83,6 @@ class ProdProfileContractTest {
     @Test
     @DisplayName("the file exists and is loadable at all")
     void theProdProfileIsOnTheClasspath() throws IOException {
-
-        // Spring does not complain about a profile with no properties file, so a misnamed or
-        // unpackaged file makes `--spring.profiles.active=prod` a silent no-op.
         assertThat(prod()).isNotEmpty();
     }
 
@@ -115,8 +104,6 @@ class ProdProfileContractTest {
                         "spring.datasource.username",
                         "spring.datasource.password",
 
-                        // Misspell this and Flyway silently falls back to the app's datasource,
-                        // which is the transaction pooler it cannot run against.
                         "spring.flyway.url",
                         "spring.flyway.user",
                         "spring.flyway.password",
@@ -127,8 +114,6 @@ class ProdProfileContractTest {
                         "draazy.security.origin-secret");
     }
 
-    // A literal, so the placeholder tests above cannot see it, and losing it aborts no boot and
-    // breaks no request — a thirty-day credential simply becomes willing to travel in clear.
     @Test
     @DisplayName("none of them carries a fallback default")
     void noSecretHasADefaultToSilentlyFallBackTo() throws IOException {
@@ -163,7 +148,6 @@ class ProdProfileContractTest {
     @Test
     @DisplayName("prod requires the API's own public origin")
     void theApiPublicOriginIsRequiredInProd() throws IOException {
-
         assertThat(prod().getProperty("draazy.web.public-origin"))
                 .as("the delivery check has nothing to compare against without it")
                 .isEqualTo("${API_PUBLIC_ORIGIN}");
@@ -206,8 +190,6 @@ class ProdProfileContractTest {
         }
     }
 
-    // `R__` re-runs on every checksum change, so production would re-seed indefinitely. Profiles are
-    // not exclusive, so `local,prod` needs this override.
     @Test
     @DisplayName("Flyway runs the schema only, never the demo seed")
     void productionNeverRunsTheLocalSeed() throws IOException {
@@ -215,7 +197,6 @@ class ProdProfileContractTest {
                 .as("a `local,prod` deploy must still resolve to migration-only")
                 .isEqualTo("classpath:db/migration");
 
-        // The override is only load-bearing while some other profile really does add the seed.
         assertThat(mainResource("application-local.properties").getProperty("spring.flyway.locations"))
                 .as("this is what the prod override above exists to beat")
                 .contains("db/seed");
@@ -228,8 +209,6 @@ class ProdProfileContractTest {
                 .isEqualTo("true");
     }
 
-    // Inheriting local's loosened window would make the OTP endpoint a free SMS-bombing service.
-    // The window, not the cooldown: local matches prod's 60s on purpose so the countdown is exercised.
     @Test
     @DisplayName("the OTP throttle is re-pinned to its secure values")
     void theOtpBudgetIsNotInheritedFromTheLoosenedLocalProfile() throws IOException {

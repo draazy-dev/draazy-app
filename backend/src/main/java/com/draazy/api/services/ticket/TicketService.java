@@ -32,11 +32,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Team scoping: staff see only their desk's tickets plus team-less ones no desk owns yet; admins see all.
 @Service
 public class TicketService {
-
-    // Three matches SocietyLeadService: real households rarely hit it; scripts do fast.
     private static final int MAX_WAITLIST_SIGNUPS = 3;
 
     private static final Duration WAITLIST_WINDOW = Duration.ofHours(1);
@@ -84,8 +81,6 @@ public class TicketService {
         return rows(caller, team, status, priority, q, null, pageable);
     }
 
-    // The board's rows: the same scope as `list`, narrowed by priority, a contains-search and the last N IST days;
-    // no notes are read.
     @Transactional(readOnly = true)
     public Page<TicketRow> rows(AuthPrincipal caller, String team, String status, String priority, String q,
             Integer days, Pageable pageable) {
@@ -129,7 +124,6 @@ public class TicketService {
         return "%" + LikePatterns.escape(term.toLowerCase(Locale.ROOT)) + "%";
     }
 
-    /** What {@code list(team, "open")} would total, without reading a page. */
     @Transactional(readOnly = true)
     public long countOpen(AuthPrincipal caller, String team) {
         BoardScope scope = boardScope(caller, team);
@@ -158,7 +152,6 @@ public class TicketService {
         return new BoardScope(false, requested == null ? new ArrayList<>(desks) : List.of(requested), requested == null);
     }
 
-    // quotedValue is caller-owned at creation; ops fills platform facts later.
     @Transactional
     public CustomerTicketDto create(AuthPrincipal caller, TicketCreate body) {
         String team = blankToNull(body.team());
@@ -173,7 +166,6 @@ public class TicketService {
                 ? null
                 : Ids.parseUuid(body.propertyId()).orElseThrow(() -> new BadRequestException("propertyId must be a valid id"));
 
-        // Check FK upfront so bad property ids return caller-facing 404, not constraint 500.
         if (propertyId != null && !properties.existsById(propertyId)) {
             throw NotFoundException.of("Property");
         }
@@ -184,7 +176,7 @@ public class TicketService {
                 requester.getMobile(), body.body(), body.quotedValue())));
     }
 
-    // Waitlist mobiles are unverified; do not resolve requesterId from typed numbers.
+    // Waitlist mobiles are unverified; never resolve requesterId from a typed number.
     @Transactional
     public void joinWaitlist(ServiceWaitlistRequest body) {
         String slug = blankToNull(body.service());
@@ -193,13 +185,11 @@ public class TicketService {
         }
         String subject = ServiceWaitlists.subjectFor(slug);
 
-        // Canonicalise once so lock, budget query, and row share the same ten digits.
         String mobile = MobileMask.normalise(body.mobile());
 
         locks.holdUntilCommit(RateLimitLock.Limit.SERVICE_WAITLIST, mobile);
         if (tickets.existsByMobileAndSubjectAndStatusIn(
                 mobile, subject, TicketStatuses.UNRESOLVED)) {
-
             return;
         }
         if (tickets.countByMobileAndCreatedAtAfter(mobile, Instant.now().minus(WAITLIST_WINDOW))
@@ -214,8 +204,6 @@ public class TicketService {
                 name == null ? ANONYMOUS_CUSTOMER : name.strip(), mobile, null, null));
     }
 
-    // Omitted assignee leaves current value; UNASSIGN returns ticket to pool.
-    // Any other bad id stays 404, not quiet unassignment.
     @Transactional
     public TicketDto update(AuthPrincipal caller, String id, TicketUpdate body) {
         Ticket ticket = accessible(caller, id);
@@ -248,8 +236,6 @@ public class TicketService {
         }
         String assigneeId = blankToNull(body.assigneeId());
         if (body.unassigns()) {
-
-            // Null needs an explicit intent word; see TicketUpdate.UNASSIGN.
             ticket.setAssigneeId(null);
         } else if (assigneeId != null) {
             User assignee = Ids.parseUuid(assigneeId).flatMap(users::findById)
@@ -265,7 +251,6 @@ public class TicketService {
         return mapper.toDto(ticket);
     }
 
-    // Note author comes from principal; display name is not client input.
     @Transactional
     public TicketDto.Note addNote(AuthPrincipal caller, String id, String text) {
         Ticket ticket = accessible(caller, id);

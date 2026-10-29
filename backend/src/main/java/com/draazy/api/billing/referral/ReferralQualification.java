@@ -15,10 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Settles a pending referral on the referee's first verified listing or accepted contact request. */
 @Service
 public class ReferralQualification implements VerificationAnnouncer {
-
     private static final long SAME_OWNER_WINDOW_DAYS = 30;
 
     private final ReferralRepository referrals;
@@ -59,7 +57,6 @@ public class ReferralQualification implements VerificationAnnouncer {
             return;
         }
         Referral referral = pending.get();
-        // After the row lock, so every path takes referral row then referrer; counts below see a rival's commit.
         locks.holdUntilCommit(RateLimitLock.Limit.REFERRER_QUALIFY, referral.getReferrerId().toString());
         boolean owner = ReferralStatuses.TRACK_OWNER.equals(track);
         long amount = owner ? settings.referralOwnerRewardAgreements() : settings.referralContactBonus();
@@ -85,13 +82,11 @@ public class ReferralQualification implements VerificationAnnouncer {
         }
     }
 
-    // One owner vouching for several of the same referrer's referees is a ring, not independent demand.
     private boolean sameOwnerQualifiedOthers(Referral referral, UUID ownerId, Instant at) {
         return referrals.countSeekerQualifiedByOwner(referral.getReferrerId(), ownerId, referral.getId(),
                 at.minus(Duration.ofDays(SAME_OWNER_WINDOW_DAYS))) > 0;
     }
 
-    // Calendar month and year in IST, so a referrer cannot bank a window by waiting for a rolling edge.
     private boolean overCap(Referral referral, Instant at) {
         ZonedDateTime local = at.atZone(PlatformTime.IST);
         ZonedDateTime month = local.toLocalDate().withDayOfMonth(1).atStartOfDay(PlatformTime.IST);

@@ -4,9 +4,7 @@ import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import java.util.regex.Pattern;
 
-/** Backs {@link Aadhaar}. The same check as the wizard's {@code isAadhaar} in {@code helpers.js}. */
 public final class AadhaarValidator implements ConstraintValidator<Aadhaar, String> {
-
     private static final Pattern SHAPE = Pattern.compile("^[2-9][0-9]{11}$");
 
     private static final int[][] MULTIPLY = {

@@ -11,12 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
-// A real container, since MockMvc ignores server.servlet.context-path and would pass with the property removed.
-// The JDK HttpClient is used because TestRestTemplate is not a declared dependency in Boot 4.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DisplayName("The /api prefix — served by the container, not invented by the dev proxy")
 class ApiContextPathTest {
-
     @LocalServerPort
     int port;
 
@@ -36,7 +33,6 @@ class ApiContextPathTest {
         assertThat(statusOf("/api/properties")).isEqualTo(200);
     }
 
-    // The negative half matters: mapping the controllers at both prefixes would reintroduce the drift.
     @Test
     @DisplayName("the same route is not also served without the prefix")
     void unprefixedRouteIsNotServed() throws Exception {
@@ -45,7 +41,6 @@ class ApiContextPathTest {
                 .isEqualTo(404);
     }
 
-    // Probes must target the prefixed path: the container prefixes infrastructure routes too.
     @Test
     @DisplayName("the health probe moves under the prefix with everything else")
     void healthProbeIsAlsoPrefixed() throws Exception {

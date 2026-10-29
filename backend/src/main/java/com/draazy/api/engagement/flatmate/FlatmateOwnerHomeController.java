@@ -8,11 +8,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Authenticated but not role-gated: every read is keyed by the caller's own account, so falling through to
- * {@code anyRequest().authenticated()} in {@code SecurityConfig} is intentional. */
 @RestController
 public class FlatmateOwnerHomeController {
-
     private final FlatmateOwnerHomeService service;
 
     public FlatmateOwnerHomeController(FlatmateOwnerHomeService service) {

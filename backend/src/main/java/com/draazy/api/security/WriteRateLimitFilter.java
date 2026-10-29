@@ -21,14 +21,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.UriUtils;
 
-/** Caps mutating requests per caller per window; details: docs/system/cross-cutting.md §8.5. */
 public class WriteRateLimitFilter extends OncePerRequestFilter {
-
-    /** Shared with {@link MaintenanceModeFilter}: one answer to "can this request change state". */
     static final Set<String> MUTATING = Set.of("POST", "PUT", "PATCH", "DELETE");
 
-    /** Reads limited anyway; the export path is a literal, so a rename fails open ({@code
-     * WriteRateLimitTest.dataExportIsLimited}). */
     private static final Set<String> LIMITED_READS = Set.of(
             Routes.Documents.SHARED,
             Routes.Documents.SHARED_URL,
@@ -37,17 +32,13 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
             Routes.Webhooks.WHATSAPP,
             "/me/data-export");
 
-    /** Callbacks get their own budget: they can't share a user bucket and are {@code permitAll}, so not exempt. */
     private static final Set<String> PROVIDER_CALLBACKS =
             Set.of(Routes.Webhooks.CASHFREE_PAYMENT, Routes.Webhooks.WHATSAPP);
 
-    /** Extra window for provider callbacks replaying a backlog after an outage from one address. */
     private static final int CALLBACK_BUDGET_MULTIPLIER = 50;
 
-    /** Ceiling on a callback body, as nothing else bounds JSON here; {@code 64L} avoids int overflow. */
     private static final long MAX_CALLBACK_BODY_BYTES = 64L * 1024;
 
-    /** Another person's answers sit behind a public listing id, so reading them listing by listing is metered. */
     private static final Duration LIVING_STYLE_WINDOW = Duration.ofMinutes(10);
 
     private static final Logger log = LoggerFactory.getLogger(WriteRateLimitFilter.class);
@@ -63,7 +54,6 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
     private final boolean proxyAware;
     private volatile boolean misconfigurationLogged;
 
-    /** The two counter families need separate namespaces; they must never share a counter on a shared backend. */
     public WriteRateLimitFilter(int budget, Duration window, boolean proxyAware,
             WriteRateLimitStore.Factory stores, int localityResolveBudget, int propertyReadBudget,
             int livingStyleBudget) {
@@ -71,8 +61,6 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
         this.localityResolveLimiter = stores.create("loc", localityResolveBudget, window);
         this.propertyReadLimiter = stores.create("pr", propertyReadBudget, window);
         this.livingStyleLimiter = stores.create("ls", livingStyleBudget, LIVING_STYLE_WINDOW);
-        // Computed as a long and clamped: at int width this wraps above 42,949,672 and would hand
-        // the callbacks a *smaller* budget than everyone else.
         long callbackBudget = (long) budget * CALLBACK_BUDGET_MULTIPLIER;
         this.callbackLimiter = stores.create(
                 "cb", (int) Math.min(Integer.MAX_VALUE, callbackBudget), window);
@@ -88,8 +76,7 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
         if (isProviderCallback(request, path)) {
             long declared = request.getContentLengthLong();
             if (declared < 0 || declared > MAX_CALLBACK_BODY_BYTES) {
-                // A negative length means unknown (chunked) and passes any `> cap` test, so the
-                // ceiling would be bypassable by one request header.
+                // A negative length means unknown (chunked) and passes any `> cap` test, so check it explicitly.
                 SecurityErrors.write(response, 413, ErrorCodes.RATE_LIMITED,
                         "Callback body must declare a length of at most "
                                 + MAX_CALLBACK_BODY_BYTES + " bytes.");
@@ -119,15 +106,12 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    /** Counts the request and, if over budget, writes the refusal. True means the caller proceeds. */
     private boolean allow(WriteRateLimitStore against, HttpServletRequest request,
             HttpServletResponse response) throws IOException {
         int retryAfter = against.tryAcquire(callerKey(request), Instant.now());
         if (retryAfter == 0) {
             return true;
         }
-        // Header for proxies, message for the toast a person reads. ASCII only: SecurityErrors
-        // writes the body without pinning a charset, so a flourish would arrive as mojibake.
         response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfter));
         SecurityErrors.write(response, 429, ErrorCodes.RATE_LIMITED,
                 "Too many requests. Please slow down and try again in " + retryAfter + "s.");
@@ -142,7 +126,6 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
         return "POST".equals(request.getMethod()) && Routes.Localities.RESOLVE.equals(path);
     }
 
-    /** Listing scraping is anonymous by nature; signed-in callers are already identifiable and are not metered here. */
     private static boolean isAnonymousPropertyRead(HttpServletRequest request, String path) {
         boolean read = "GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod());
         boolean listings = path.equals(Routes.Properties.BASE) || path.startsWith(Routes.Properties.BASE + "/");
@@ -150,7 +133,6 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
         return read && listings && !(auth != null && auth.getPrincipal() instanceof AuthPrincipal);
     }
 
-    /** {@code /flatmates/{kind}/{id}/living-style}: the id varies, so the exact-path set cannot hold it. */
     private static boolean isLivingStyleRead(HttpServletRequest request, String path) {
         boolean read = "GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod());
         String[] parts = path.split("/", -1);
@@ -161,30 +143,23 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
         if (MUTATING.contains(request.getMethod())) {
             return true;
         }
-        // Not "GET": Spring MVC dispatches HEAD to @GetMapping handlers, so allowing HEAD through
-        // unlimited would make the enumeration defence bypassable by a one-character change.
+        // Not just GET: MVC routes HEAD to @GetMapping handlers, so skipping HEAD bypasses the limit.
         return LIMITED_READS.contains(path);
     }
 
-    /** Each step closes a bypass (cross-cutting.md section 8.5): context path removed,
-     * path parameters dropped, escapes decoded. */
     private static String path(HttpServletRequest request) {
         return normalisedPath(request.getContextPath(), request.getRequestURI());
     }
 
-    /** Visible for tests, which assert the bypasses this closes without a live container. */
     static String normalisedPath(String context, String uri) {
         if (context != null && !context.isEmpty() && uri.startsWith(context)) {
             uri = uri.substring(context.length());
         }
-        // Decode first, then cut, as UrlPathHelper does: cutting first leaves `%3b` intact, so
-        // `/documents/shared%3Bx=1` would match nothing here yet still reach the handler.
         String decoded = UriUtils.decode(uri, StandardCharsets.UTF_8);
         int params = decoded.indexOf(';');
         return params < 0 ? decoded : decoded.substring(0, params);
     }
 
-    /** Prefixed by kind so a user id can never collide with an address. */
     private String callerKey(HttpServletRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof AuthPrincipal principal) {
@@ -194,7 +169,6 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
         return "ip:" + anonymousKey(request.getRemoteAddr());
     }
 
-    /** The smallest unit one party controls: the IPv4 address, or the /64 for IPv6 (assigned to a host whole). */
     public static String anonymousKey(String address) {
         if (address == null || address.indexOf(':') < 0 || !isNumericIpv6(address)) {
             return address == null ? "unknown" : address;
@@ -213,13 +187,10 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
             }
             return prefix.append("::/64").toString();
         } catch (UnknownHostException e) {
-            // Not resolvable as an address, so there is nothing to normalise; the raw string is no
-            // worse a key than the address it came from.
             return address;
         }
     }
 
-    /** {@link InetAddress#getByName} resolves non-literals, so a non-numeric input would block on DNS. */
     private static boolean isNumericIpv6(String address) {
         for (int i = 0; i < address.length(); i++) {
             char c = address.charAt(i);
@@ -232,7 +203,6 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
         return true;
     }
 
-    /** Logged once: a line per request would be an unauthenticated log-amplification tap. */
     private void warnIfProxied(HttpServletRequest request) {
         if (proxyAware || misconfigurationLogged || request.getHeader(FORWARDED_FOR) == null) {
             return;
@@ -243,7 +213,6 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
                 + "that property to the proxy's address range.", FORWARDED_FOR);
     }
 
-    /** Visible for tests and for the startup log line, which states the policy it is enforcing. */
     Duration window() {
         return window;
     }

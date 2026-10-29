@@ -25,21 +25,14 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-// Co-fill requests need a party row; otherwise tenant-side work stays browser-only.
 @Component
 class CoFillParties {
-
-    // The sides of an agreement.
-    // Mirrors the role CHECK, which is the enforcement.
     static final Set<String> ROLES = Set.of("owner", "tenant");
 
-    // Named, because the read scope keys on this exact value in three places.
     static final String INVITED = "invited";
     static final String ACCEPTED = "accepted";
     static final String DECLINED = "declined";
 
-    // Pending invites expire when TRAI may recycle the mobile number.
-    // After that, a stranger could inherit the invite.
     static final Duration PENDING_INVITE_TTL = Duration.ofDays(90);
 
     private final ServiceRequestPartyRepository parties;
@@ -66,8 +59,6 @@ class CoFillParties {
         this.auditLog = auditLog;
     }
 
-    // Only the requester may invite; naming the other side grants read access.
-    // Staff/customer proxies would turn support or a typo into consent.
     @Transactional
     ServiceRequestPartyDto invite(AuthPrincipal caller, String requestId, String role, int partyIndex,
             String mobile) {
@@ -117,7 +108,6 @@ class CoFillParties {
         return toDto(saved, request.getType(), invitee.getName(), displayName(caller.userId()));
     }
 
-    // Pending-number invites have no inbox until #claimPendingFor binds them to a user.
     private void notifyInvitee(ServiceRequest request, ServiceRequestParty saved, UUID inviteeId,
             String side) {
         notifier.notify(inviteeId, "service.party-invited",
@@ -128,7 +118,6 @@ class CoFillParties {
                         + "&request=" + request.getId());
     }
 
-    // No self-invite check here: requester numbers resolve to their account above.
     private ServiceRequestPartyDto inviteByMobile(AuthPrincipal caller, ServiceRequest request,
             String side, int partyIndex, String normalised) {
         if (parties.existsByRequestIdAndMobile(request.getId(), normalised)) {
@@ -151,7 +140,6 @@ class CoFillParties {
         documents.deleteAll(stale);
     }
 
-    // Pending invites are indexed; the common no-invite path costs one empty probe.
     @Transactional
     void claimPendingFor(AuthPrincipal caller) {
         User self = users.findById(caller.userId()).orElse(null);
@@ -168,8 +156,6 @@ class CoFillParties {
                 continue;
             }
 
-            // Drop invitations that would put one user on both sides of the agreement.
-            // Claiming them would also trip uq_service_request_parties_user.
             boolean wouldDuplicate = parties.existsByRequestIdAndUserId(party.getRequestId(),
                     caller.userId())
                     || requests.findById(party.getRequestId()).map(r -> caller.userId().equals(r.getRequesterId())).orElse(true);
@@ -185,8 +171,6 @@ class CoFillParties {
         parties.flush();
     }
 
-    // Mistyped pending mobiles must be withdrawable.
-    // Otherwise the role slot stays occupied and checkout is blocked.
     @Transactional
     void withdraw(AuthPrincipal caller, String requestId, String partyId) {
         ServiceRequest request = Ids.parseUuid(requestId).flatMap(requests::findById).orElseThrow(() -> NotFoundException.of("Service request"));
@@ -209,7 +193,6 @@ class CoFillParties {
                 "party", String.valueOf(party.getUserId()));
     }
 
-    // Invites are the discoverable unit; pending parties cannot read the agreement yet.
     @Transactional(readOnly = true)
     List<ServiceRequestPartyDto> myInvites(AuthPrincipal caller) {
         List<ServiceRequestParty> pending =
@@ -224,8 +207,8 @@ class CoFillParties {
                         names.get(p.getUserId()), names.get(p.getInvitedBy()))).toList();
     }
 
-    // Acceptance grants agreement access, so only the invitee can perform it.
-    // Staff/requester acceptance would break maker-checker separation.
+    // Only the invitee may accept: acceptance grants agreement access, and staff or requester
+    // acceptance would break maker-checker separation.
     @Transactional
     ServiceRequestPartyDto decide(AuthPrincipal caller, String partyId, String decision) {
         ServiceRequestParty party = Ids.parseUuid(partyId).flatMap(parties::findById).orElseThrow(() -> NotFoundException.of("Invitation"));
@@ -249,7 +232,6 @@ class CoFillParties {
         return toDto(party, type, names.get(party.getUserId()), names.get(party.getInvitedBy()));
     }
 
-    // Single DTO builder keeps embedded parties and invitation-list parties aligned.
     static ServiceRequestPartyDto toDto(ServiceRequestParty party, String requestType,
             String partyName, String invitedByName) {
         return new ServiceRequestPartyDto(

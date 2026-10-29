@@ -19,10 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** The PUT merges because every field is optional: under replace semantics a flags-only save would delete the
- * fee table and the platform would silently charge compiled-in defaults. */
 class AdminSettingsEndpointsTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @PersistenceContext EntityManager em;
 
@@ -60,7 +57,6 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.fees").exists());
     }
 
-    /** The same invariant one level down, which is where a shallow merge would still lose data. */
     @Test
     void changingOneFeeKeepsTheRest() throws Exception {
         String token = bearer("9877710003", Roles.Wire.ADMIN);
@@ -74,8 +70,6 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.fees.listingPass").value(299));
     }
 
-    /** An array replaces rather than merges inside a merged object, the only place that is observable;
-     * merging {@code geo.blacklist} positionally would re-admit a locality nobody re-admitted. */
     @Test
     void arraysAreReplacedWholesale() throws Exception {
         String token = bearer("9877710004", Roles.Wire.ADMIN);
@@ -86,8 +80,6 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.geo.blacklist.length()").value(1))
                 .andExpect(jsonPath("$.geo.blacklist[0]").value("c"))
-                // the sibling scalar survives, so this is a merge that replaced an array rather
-                // than a replace that happened to look right.
                 .andExpect(jsonPath("$.geo.city").value("Pune"));
     }
 
@@ -184,8 +176,6 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.flags").doesNotExist());
     }
 
-
-    /** Two admins save the same block: without a conditional write the second silently discards the first. */
     @Test
     void aSecondAdminEditingTheSameBlockIsRefusedRatherThanWinningSilently() throws Exception {
         String first = bearer("9877710010", Roles.Wire.ADMIN);
@@ -202,7 +192,6 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isPreconditionFailed())
                 .andExpect(jsonPath("$.error").value("precondition_failed"));
 
-        // Nothing was written: the loser's number must not be anywhere in the stored document.
         mvc.perform(get(Routes.Admin.SETTINGS).header(HttpHeaders.AUTHORIZATION, first))
                 .andExpect(jsonPath("$.fees.rentAgreementPlatform").value(999));
     }
@@ -225,7 +214,6 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
         assertThat(etag(token)).isEqualTo(after);
     }
 
-    /** The tag describes content, not write count: a no-op save must not invalidate a colleague's open editor. */
     @Test
     void aWriteThatChangesNothingLeavesTheTagAlone() throws Exception {
         String token = bearer("9877710013", Roles.Wire.ADMIN);
@@ -237,7 +225,6 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
         assertThat(etag(token)).isEqualTo(tag);
     }
 
-    /** An omitted header means an unconditional write, so existing clients keep working without a flag. */
     @Test
     void withoutIfMatchTheWriteIsUnconditional() throws Exception {
         String token = bearer("9877710014", Roles.Wire.ADMIN);
@@ -248,7 +235,6 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.fees.rentAgreementPlatform").value(222));
     }
 
-    /** {@code *} means "any current representation", and the settings document always exists. */
     @Test
     void ifMatchStarAlwaysPasses() throws Exception {
         String token = bearer("9877710015", Roles.Wire.ADMIN);
@@ -261,7 +247,6 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    /** A stale tag among several current ones still passes — {@code If-Match} is a list. */
     @Test
     void anyEntryInTheListMatching_isEnough() throws Exception {
         String token = bearer("9877710016", Roles.Wire.ADMIN);
@@ -275,7 +260,6 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    /** A refused precondition must not leave an audit row claiming a change nobody made. */
     @Test
     void aRefusedWriteIsNotAudited() throws Exception {
         String token = bearer("9877710017", Roles.Wire.ADMIN);
@@ -291,7 +275,6 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
         assertThat(auditRows()).isEqualTo(before);
     }
 
-    /** jsonb re-renders what was written, so the tag a save returns must still match on the page's next save. */
     @Test
     void theTagASaveReturnsStillMatchesAfterAFreshRead() throws Exception {
         String token = bearer("9877710030", Roles.Wire.ADMIN);

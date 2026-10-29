@@ -29,7 +29,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("/admin/integrations — provider health and call log")
 class AdminIntegrationsTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @Autowired ProviderCalls calls;
     @Autowired EmailSender email;
@@ -44,7 +43,7 @@ class AdminIntegrationsTest extends AbstractApiTest {
         return own;
     }
 
-    // Rows are written by a background thread outside the test transaction, so its rollback does not remove them.
+    // Rows come from a background thread outside the test transaction; rollback does not remove them.
     @AfterEach
     void removeRows() {
         ownTransaction().executeWithoutResult(

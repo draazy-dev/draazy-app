@@ -6,16 +6,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** One kind of request the requests inbox lists, as a port so engagement can merge kinds owned by other contexts. */
 public interface RequestSource {
-
     String PENDING = "pending";
     String ACCEPTED = "accepted";
     String DECLINED = "declined";
     String EXPIRED = "expired";
     String WITHDRAWN = "withdrawn";
 
-    /** The other side of the request: the requester in a received box, the recipient in a sent one. */
     record Party(UUID id, String name, boolean verified) {
     }
 
@@ -25,8 +22,6 @@ public interface RequestSource {
     record RequestView(UUID id, String kind, String state, String status, Party party, Target target,
             String message, Instant slot, Instant createdAt, Instant decidedAt, Instant expiresAt,
             UUID recipientId, String share) {
-
-        /** Every kind but a flatmate interest has no share intent. */
         public RequestView(UUID id, String kind, String state, String status, Party party, Target target,
                 String message, Instant slot, Instant createdAt, Instant decidedAt, Instant expiresAt,
                 UUID recipientId) {
@@ -41,15 +36,12 @@ public interface RequestSource {
 
     String kind();
 
-    /** Everything the requester still has open, plus what was decided or created since {@code since}. */
     List<RequestView> sent(UUID requesterId, Instant since);
 
-    /** Everything still open for the recipient, plus what was decided since {@code since}. */
     List<RequestView> received(UUID recipientId, Instant since);
 
     Optional<RequestView> findSent(UUID requesterId, UUID id);
 
-    /** Withdraws a pending request the caller sent; throws {@link #alreadyAnswered()} if it was decided first. */
     void withdraw(UUID requesterId, UUID id);
 
     static ConflictException alreadyAnswered() {

@@ -8,12 +8,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-/** The credit note for one confirmed refund; immutable once issued. */
 @Entity
 @Table(name = "credit_notes")
 @Getter
 public class CreditNote extends BaseEntity {
-
     @Column(name = "number", nullable = false, updatable = false)
     private String number;
 
@@ -42,7 +40,6 @@ public class CreditNote extends BaseEntity {
     private Instant issuedAt;
 
     protected CreditNote() {
-        // JPA
     }
 
     CreditNote(String number, UUID userId, String sourceType, UUID sourceId, String orderRef, long amount,

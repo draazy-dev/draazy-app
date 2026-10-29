@@ -10,10 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** Deletes the stored files a listing stopped showing, unless something else still shows them. */
 @Component
 public class ListingPhotoFiles {
-
     private static final Logger log = LoggerFactory.getLogger(ListingPhotoFiles.class);
 
     private final PhotoService photos;
@@ -24,7 +22,6 @@ public class ListingPhotoFiles {
         this.properties = properties;
     }
 
-    /** A failed delete is logged and leaves the file behind. */
     public void deleteUnusedAfterCommit(UUID propertyId, Collection<String> urls) {
         if (urls.isEmpty()) {
             return;
@@ -34,7 +31,7 @@ public class ListingPhotoFiles {
         if (unused.isEmpty()) {
             return;
         }
-        // After commit, so a rollback never leaves a listing pointing at a deleted file.
+        // Delete after commit so a rollback never leaves a listing pointing at a deleted file.
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

@@ -21,13 +21,10 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** People teaming up ({@code flatmate_groups}). The address is nullable because "we have a flat" is
- * a state a group passes through, not a kind — column reasoning: docs/system/data-model.md. */
 @Entity
 @Table(name = "flatmate_groups")
 @Getter
 public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
-
     @Column(name = "host_id", nullable = false, updatable = false)
     private UUID hostId;
 
@@ -39,12 +36,10 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
     @Setter
     private String locality;
 
-    /** Who the group admits by gender; {@code any} is mixed. */
     @Column(name = "policy", nullable = false)
     @Setter
     private String policy = FlatmateVocabulary.POLICY_OPEN;
 
-    /** Whole-flat rent. Per-head is {@link #perHead}, generated from this so it cannot drift. */
     @Column(name = "rent", nullable = false)
     @Setter
     private Long rent;
@@ -53,7 +48,6 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
     @Setter
     private Long deposit;
 
-    /** Null means the host did not state it, which is not the same as a term of zero. */
     @Column(name = "notice_period_days")
     @Setter
     private Integer noticePeriodDays;
@@ -76,8 +70,6 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
     @Setter
     private int seatsTotal = 2;
 
-    /** {@code round(rent / seatsTotal)}, maintained by the database and read-only here — a second
-     * writer would be a second answer to the only price a member sees. */
     @Column(name = "per_head", insertable = false, updatable = false)
     private Long perHead;
 
@@ -101,8 +93,6 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
     @Setter
     private boolean agreementDeclared = false;
 
-    /** True only once the flat's owner confirmed by OTP. Never client-asserted: the entire value of
-     * the record is that the owner themselves acted. */
     @Column(name = "owner_consent", nullable = false)
     @Setter
     private boolean ownerConsent = false;
@@ -129,8 +119,6 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
     @Embedded
     private FlatmateExpiry expiry = new FlatmateExpiry();
 
-    /** Null means unknown, never {@code 0} — (0,0) is open ocean; radius search excludes
-     * null instead. */
     @Column(name = "lat")
     @Setter
     private Double lat;
@@ -187,8 +175,6 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
     @Column(name = "archive_reason")
     private String archiveReason;
 
-    /** Cascaded and orphan-removing because a member has no meaning outside its group — a genuine
-     * composition, not an association. */
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true,
             fetch = FetchType.LAZY)
     @OrderBy("createdAt asc")
@@ -284,7 +270,6 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
         return !archived && FlatmateVocabulary.isPublic(modStatus);
     }
 
-    /** Never null — see {@code FlatmateRoom#getRecheck} for why the field alone is not enough. */
     public ModerationRecheck getRecheck() {
         if (recheck == null) {
             recheck = new ModerationRecheck();
@@ -301,7 +286,6 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
         return seatsOpen == null ? max : Math.max(0, Math.min(max, seatsOpen));
     }
 
-    /** {@link #openSeats()} {@code > 0} as native SQL over alias {@code g}; the two must agree. */
     public static final String HAS_OPEN_SEAT_SQL = " and (g.seats_open is null or g.seats_open > 0)"
             + " and g.seats_total > (select count(*) from flatmate_group_members gm where gm.group_id = g.id)";
 }

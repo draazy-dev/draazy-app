@@ -21,11 +21,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** No operation may leave the platform with no live administrator. Archiving revokes the archived
- * account's token (V115), so the floor's remaining job is two administrators archiving each other at once. */
 @DisplayName("D200 — the last-administrator floor")
 class AdministratorGuardTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -35,7 +32,6 @@ class AdministratorGuardTest extends AbstractApiTest {
     @Autowired
     AdministratorGuard guard;
 
-    // Each test counts administrators, so none may depend on the database; demoting keeps foreign keys intact.
     @BeforeEach
     void leaveNoOtherAdministrators() {
         jdbc.update("UPDATE users SET role = 'buyer' WHERE role = 'admin'");
@@ -99,7 +95,6 @@ class AdministratorGuardTest extends AbstractApiTest {
         assertThat(narrow(second, first, "[\"kyc\"]")).isEqualTo(422);
         assertThat(grants.findById(first.getId())).isEmpty();
     }
-    /** Nothing about a buyer or a moderator touches this guard. */
     @Test
     @DisplayName("the floor is silent about accounts that were never administrators")
     void theFloorIgnoresNonAdministrators() {

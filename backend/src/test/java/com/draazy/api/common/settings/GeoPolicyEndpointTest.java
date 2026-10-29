@@ -16,13 +16,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Round trips (admin write, anonymous read) prove the read matches the write; the route must expose only geo, never the blacklist note. */
 class GeoPolicyEndpointTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
 
-    /** Audit rows written under {@code REQUIRES_NEW} commit past the class rollback; cleared by actor, not action,
-     * because other tests legitimately write {@code settings.update}. */
+    // REQUIRES_NEW audit rows survive rollback; clear by actor, not action,
+    // because other tests legitimately write settings.update.
     private static final String ADMIN_MOBILE = "9877730001";
 
     private String adminId;
@@ -34,7 +32,6 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
         }
     }
 
-    /** Created per test: {@code save()} runs twice in the merge test and admins can't share a mobile. */
     private String adminToken;
 
     private String adminToken() {
@@ -57,8 +54,6 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    /** Reachable without Authorization: a 401 would silently fall back to built-in defaults. {@code geo} is
-     * deliberately not seeded, as defaults live in the client. */
     @Test
     void anonymousCallersGetAnEmptyPolicyOnAnUnconfiguredInstall() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))
@@ -67,12 +62,9 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.geo.cities").isEmpty())
                 .andExpect(jsonPath("$.geo.blacklist").isArray())
                 .andExpect(jsonPath("$.geo.blacklist").isEmpty())
-                // Absent, not false. The client's default is on, and a `false` here would read as a
-                // deliberate decision to unfence locality search on an install nobody has touched.
                 .andExpect(jsonPath("$.geo.enforceCityLimit").doesNotExist());
     }
 
-    /** Where a city centres and how far its Places fence extends are admin-owned, and must reach an anonymous browser from the server. */
     @Test
     void cityMapOverridesAreVisibleToAnAnonymousClient() throws Exception {
         save("""
@@ -85,7 +77,6 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.geo.cities.Mumbai.live").doesNotExist());
     }
 
-    /** The blacklist is public (matching runs in the browser) but the operator's reason is staff-to-staff text about a named building and must not be published. */
     @Test
     void theBlacklistIsPublishedWithoutTheOperatorsReason() throws Exception {
         save("""
@@ -98,12 +89,9 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.geo.blacklist[0].placeId").value("ChIJxyz"))
                 .andExpect(jsonPath("$.geo.blacklist[0].term").value("Sunrise Towers"))
                 .andExpect(jsonPath("$.geo.blacklist[0].note").doesNotExist())
-                // Asserted as a whole-response absence too, so a future field named `note` nested
-                // anywhere under the list fails this test rather than shipping.
                 .andExpect(jsonPath("$.geo..note").isEmpty());
     }
 
-    /** An incomplete bounding box is dropped whole: forwarding three edges would give the client a fence with a gap, whereas the built-in box is closed. */
     @Test
     void anIncompleteBoundingBoxIsDroppedRatherThanForwarded() throws Exception {
         save("""
@@ -114,7 +102,6 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.geo.cities.Pune.bounds").doesNotExist());
     }
 
-    /** An inverted bounding box is dropped: it encloses nothing, so the client's suggestion box would be silently empty, whereas the built-in bounds enclose the city. */
     @Test
     void anInvertedBoundingBoxEnclosesNothingAndIsDropped() throws Exception {
         save("""
@@ -126,8 +113,6 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.geo.cities.Pune.bounds").doesNotExist());
     }
 
-    /** Clamping lat 200 to 90 would invent a deliberate-looking North Pole centre; dropping the
-     * whole point falls back to the city's built-in centre. */
     @Test
     void aCoordinateOffTheGlobeIsDroppedRatherThanClamped() throws Exception {
         save("""
@@ -138,8 +123,6 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.geo.cities.Pune.center").doesNotExist());
     }
 
-    /** An empty {@code {"Nashik": {}}} would read as a configured override; absent matches every
-     * unconfigured city. */
     @Test
     void aCityWhoseEveryOverrideWasRefusedIsOmitted() throws Exception {
         save("""
@@ -150,7 +133,6 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.geo.cities.Nashik").doesNotExist());
     }
 
-    /** An entry that can match nothing is dropped; two characters is the shortest the client acts on, so the server must publish exactly those, as drift is silent. */
     @Test
     void blacklistEntriesThatCouldMatchNothingAreOmitted() throws Exception {
         save("""
@@ -165,7 +147,6 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.geo.blacklist[1].term").value("DY"));
     }
 
-    /** Asserted from the public response, as a merge regression would blank other cities for visitors without failing a write-side assertion. */
     @Test
     void editingOneCityLeavesTheOthersStanding() throws Exception {
         save("""

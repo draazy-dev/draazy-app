@@ -15,10 +15,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Byte-level cases keep the vault policy independent of multipart metadata. */
 @DisplayName("Document upload policy")
 class DocumentUploadsTest {
-
     private static byte[] bytes(int... unsigned) {
         byte[] out = new byte[unsigned.length];
         for (int i = 0; i < unsigned.length; i++) {
@@ -58,8 +56,6 @@ class DocumentUploadsTest {
     @Test
     @DisplayName("a real iPhone photo is HEIC whichever HEIF brand it carries")
     void acceptsEveryHeifBrandIosEmits() {
-        // mif1 in particular: an iPhone HEIC is routinely branded as the generic image brand, so a
-        // check for the literal "heic" would reject the single most likely camera upload.
         for (String brand : new String[] {"heic", "heix", "mif1", "msf1", "hevc"}) {
             assertThat(DocumentUploads.sniff(isoBmff(brand)))
                     .as("brand %s", brand)
@@ -97,7 +93,6 @@ class DocumentUploadsTest {
     @Test
     @DisplayName("size is judged before content, so an oversized file is not mislabelled")
     void checksSizeBeforeSignature() {
-        // An oversized unknown signature must report size, not ask for a different format.
         byte[] big = new byte[32];
         assertThatThrownBy(() ->
                 DocumentUploads.validate("application/pdf", DocumentUploads.MAX_BYTES + 1, big))
@@ -108,8 +103,6 @@ class DocumentUploadsTest {
     @DisplayName("the declared type is still rejected first, before any byte is read")
     void keepsTheAllowlistAsTheFirstGate() {
         byte[] pdf = "%PDF-1.4".getBytes(StandardCharsets.US_ASCII);
-        // Genuine PDF bytes, but the client asked for it to be stored as HTML. The sniff would pass
-        // it; the allowlist must not.
         assertThatThrownBy(() -> DocumentUploads.validate("text/html", pdf.length, pdf))
                 .isInstanceOf(UnsupportedMediaTypeException.class);
     }

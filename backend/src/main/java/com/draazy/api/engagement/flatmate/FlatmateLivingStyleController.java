@@ -8,10 +8,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Not under the public detail routes: answers are shown to signed-in people only. */
 @RestController
 public class FlatmateLivingStyleController {
-
     private final FlatmateLivingStyleService service;
 
     public FlatmateLivingStyleController(FlatmateLivingStyleService service) {

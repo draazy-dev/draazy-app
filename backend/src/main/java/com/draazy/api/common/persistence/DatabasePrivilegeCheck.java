@@ -11,11 +11,9 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-/** Refuses to boot a deployment whose runtime database role could run DDL (docs/DEPLOY.md §2.1). */
 @Component
 @Profile(LocalProfileGuard.PROD_PROFILE + " | " + LocalProfileGuard.SANDBOX_PROFILE)
 public class DatabasePrivilegeCheck {
-
     private static final Logger log = LoggerFactory.getLogger(DatabasePrivilegeCheck.class);
 
     private static final String GRANTS_SQL = """
@@ -67,7 +65,6 @@ public class DatabasePrivilegeCheck {
         }
         String message = "Runtime database role " + problems + "; point DB_USER at the DML-only role "
                 + "(docs/DEPLOY.md §2.1)";
-        // The single-user dev database cannot split the roles, so refusing there would block every deploy.
         if (runtimeUser.equals(flywayUser)) {
             log.warn(message);
             return;

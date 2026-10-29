@@ -15,8 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
 
-/** Runs whole job groups the way the scheduler does, on committed fixtures, and fails on any job error JobRunner
- * would otherwise swallow. Crons are disabled so only the test triggers a run. */
 @TestPropertySource(properties = {
         "draazy.jobs.enabled=true",
         "draazy.jobs.frequent.cron=-",
@@ -25,7 +23,6 @@ import org.springframework.test.context.TestPropertySource;
         "draazy.jobs.daytime.cron=-",
 })
 abstract class AbstractJobQaTest extends AbstractCommittedApiTest {
-
     @Autowired
     private JobRunner runner;
 
@@ -47,7 +44,6 @@ abstract class AbstractJobQaTest extends AbstractCommittedApiTest {
         runnerLog.setLevel(previousLevel);
     }
 
-    /** Runs the group once and asserts no job in it failed. */
     protected void runGroup(Group group) {
         events.list.clear();
         runner.run(group);
@@ -59,7 +55,6 @@ abstract class AbstractJobQaTest extends AbstractCommittedApiTest {
         assertThat(failures).as("jobs that failed in %s", group).isEmpty();
     }
 
-    /** Rows the named job reported touching in the last {@link #runGroup} call; 0 when it logged nothing. */
     protected long touched(String jobName) {
         return events.list.stream()
                 .filter(e -> e.getLevel() == Level.INFO && e.getArgumentArray() != null

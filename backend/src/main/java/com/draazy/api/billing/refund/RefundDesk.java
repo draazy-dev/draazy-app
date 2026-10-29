@@ -32,16 +32,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The staff desk's read side: customer requests, the system's own refunds, and orders under dispute. */
 @Service
 public class RefundDesk {
-
-    /** Only the review queue carries signals: they replay a customer's history, which a decided row does not need. */
     public record Signals(long refunds12m, long linkedAccounts, long contactsUsed, long enquiries,
             boolean pausedDuringWindow) {
     }
 
-    /** The payment behind a row; the refund fields stay null until money is due back. */
     public record Transaction(long paid, Instant paidAt, String orderStatus, String invoiceNo, String refundReason,
             Long refundAmount, Instant refundDueAt, String refundState, Instant refundSettledAt, String gatewayRefund,
             int refundAttempts, Instant refundTriedAt) {
@@ -53,10 +49,8 @@ public class RefundDesk {
             Signals signals, Transaction transaction) {
     }
 
-    // What one page of rows needs, loaded once for the whole page.
     private record Lookup(Map<UUID, Subscription> orders, Map<UUID, Plan> plans, Map<UUID, User> people,
             Map<UUID, String> notes, Map<UUID, Invoice> invoices) {
-
         String name(UUID userId) {
             User u = userId == null ? null : people.get(userId);
             return u == null ? null : u.getName();
@@ -172,7 +166,6 @@ public class RefundDesk {
             return null;
         }
         Invoice invoice = lookup.invoices().get(order.getId());
-        // An order that died before paying is never invoiced; its payment landed when the refund fell due.
         Instant paidAt = invoice != null ? invoice.getIssuedAt()
                 : SubscriptionStatuses.CANCELLED.equals(order.getStatus()) ? order.getRefundDueAt() : null;
         boolean due = order.getRefundDueAt() != null;

@@ -23,58 +23,45 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 
 public interface PaymentGateway {
-
     String CREATE_ORDER = "create-order";
     String TERMINATE = "terminate-order";
     String REFUND = "refund";
     String WEBHOOK = "webhook";
 
-    // Prefer `#createOrder(long, String, Customer)` so Cashfree can prefill and notify the real payer.
     default PaymentOrder createOrder(long amountInr, String reference) {
         return createOrder(amountInr, reference, null);
     }
 
     PaymentOrder createOrder(long amountInr, String reference, Customer customer);
 
-    // returnPath is where a payer bounced out of the modal lands; the provider fills in {order_id}.
     default PaymentOrder createOrder(long amountInr, String reference, Customer customer, String returnPath) {
         return createOrder(amountInr, reference, customer);
     }
 
-    /** Best effort: stops a payer still holding the checkout from paying an order we have abandoned. */
     default void terminate(String orderId) {
     }
 
     Optional<String> resumeSession(String orderId);
 
-    /** True once the provider holds the money, so an unresumable order is not mistaken for an unpaid one. */
     boolean paid(String orderId);
 
-    /** Whether the order's newest attempt was declined or abandoned; the order itself stays payable until expiry. */
     boolean lastAttemptFailed(String orderId);
 
     String refund(String orderId, long amountInr, String refundId, String note);
 
-    /** The provider's id for a refund we already sent under {@code refundId}; empty when it never arrived. */
     Optional<String> findRefund(String orderId, String refundId);
 
-    /** A created payment order. {@code paymentSessionId} is single-use and must not be stored. */
     record PaymentOrder(String orderId, String paymentSessionId) {
     }
 
-    /** {@code phone} may be null — the payer authenticates with their own instrument regardless. */
     record Customer(String id, String phone) {
     }
 }
 
-/** Deterministic fake order, no external call, so the pay flow demos without a merchant account. */
-// The real Cashfree rail.
-// The order id is ours because it is echoed on the webhook and is the only link back to the row.
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.cashfree", name = "enabled",
         havingValue = "false", matchIfMissing = true)
 class MockPaymentGateway implements PaymentGateway {
-
     private final ProviderCalls calls;
 
     MockPaymentGateway(ProviderCalls calls) {
@@ -116,13 +103,9 @@ class MockPaymentGateway implements PaymentGateway {
     }
 }
 
-// The real Cashfree rail.
-// Vendor orders use our id so webhooks link back and expire with our sweep TTL.
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.cashfree", name = "enabled", havingValue = "true")
 class CashfreePaymentGateway implements PaymentGateway {
-
-    /** The Payment Gateway product is versioned separately from Secure ID (KYC). */
     private static final String API_VERSION = "2025-01-01";
 
     private static final String PLACEHOLDER_PHONE = "9999999999";
@@ -148,13 +131,11 @@ class CashfreePaymentGateway implements PaymentGateway {
         this.calls = calls;
     }
 
-    // Cashfree refuses a non-https return_url, and a localhost one would strand a phone anyway.
     private static String httpsOrBlank(String base) {
         String trimmed = base == null ? "" : base.trim();
         return trimmed.regionMatches(true, 0, "https://", 0, 8) ? trimmed.replaceAll("/+$", "") : "";
     }
 
-    // Cashfree POSTs the phone, amount and HMAC here, so a typo'd `http://` would put all of it in cleartext.
     private static String requireHttpsOrBlank(String configured) {
         if (configured == null || configured.isBlank()) {
             return "";
@@ -167,8 +148,6 @@ class CashfreePaymentGateway implements PaymentGateway {
             throw new IllegalStateException(NOTIFY_URL_REQUIREMENT + " Got: " + trimmed, malformed);
         }
 
-        // equalsIgnoreCase because RFC 3986 makes the scheme case-insensitive and URI does not fold
-        // it: a guard meant to catch a typo must not itself invent one.
         if (!"https".equalsIgnoreCase(parsed.getScheme()) || parsed.getHost() == null) {
             throw new IllegalStateException(NOTIFY_URL_REQUIREMENT + " Got: " + trimmed);
         }
@@ -202,9 +181,6 @@ class CashfreePaymentGateway implements PaymentGateway {
                             OrderResponse.class);
                     if (response == null || response.payment_session_id() == null
                             || response.payment_session_id().isBlank()) {
-
-                        // A 2xx with no session id is a broken vendor contract, not a caller mistake, so it
-                        // surfaces as a 500. Transport failures never reach here — CashfreeClient.post throws.
                         throw new IllegalStateException(
                                 "Cashfree returned no payment_session_id for order " + orderId);
                     }
@@ -237,7 +213,6 @@ class CashfreePaymentGateway implements PaymentGateway {
         return newestFailed(cashfree.get("/pg/orders/" + orderId + "/payments", API_VERSION, Payment[].class));
     }
 
-    // A success anywhere wins: the webhook settling it may simply not have landed yet.
     static boolean newestFailed(Payment[] payments) {
         if (payments == null || payments.length == 0
                 || Arrays.stream(payments).anyMatch(p -> "SUCCESS".equals(p.payment_status()))) {
@@ -317,13 +292,11 @@ class CashfreePaymentGateway implements PaymentGateway {
         return body;
     }
 
-    /** UTC and second-precision because a vendor parser may reject an offset or nanoseconds. */
     private static String expiryFormat(Instant expiresAt) {
         return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
                 expiresAt.truncatedTo(ChronoUnit.SECONDS).atOffset(ZoneOffset.UTC));
     }
 
-    /** Reduce a {@code reference} to Cashfree's {@code customer_id} charset, stable per buyer. */
     private static String sanitise(String reference) {
         String cleaned = reference == null ? "" : reference.replaceAll("[^A-Za-z0-9_-]", "_");
         return cleaned.isBlank() ? "guest_" + UUID.randomUUID() : cleaned;

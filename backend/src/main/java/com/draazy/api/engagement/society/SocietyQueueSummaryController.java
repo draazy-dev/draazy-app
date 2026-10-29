@@ -9,14 +9,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class SocietyQueueSummaryController {
-
     private final SocietyQueueSummaryService summaries;
 
     public SocietyQueueSummaryController(SocietyQueueSummaryService summaries) {
         this.summaries = summaries;
     }
 
-    /** The tab counts of the societies console, so it can load only the tab on screen. */
     @GetMapping(Routes.AdminSocieties.SUMMARY)
     @PreAuthorize("hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "') and "
             + BackOfficePermissions.REQUIRE_SOCIETIES_READ)

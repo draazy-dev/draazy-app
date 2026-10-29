@@ -7,10 +7,8 @@ import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.BackOfficePermissions;
 import org.springframework.stereotype.Component;
 
-/** Tells whoever holds the {@code refunds} back-office function, and the administrator, that money needs a look. */
 @Component
 public class RefundStaffAlerts {
-
     private static final String DESK_LINK = "/admin/refunds";
 
     private final UserRepository users;

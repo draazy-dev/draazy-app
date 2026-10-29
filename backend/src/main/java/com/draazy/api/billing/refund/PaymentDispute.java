@@ -8,12 +8,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-/** A chargeback the gateway reported against one order. */
 @Entity
 @Table(name = "payment_disputes")
 @Getter
 public class PaymentDispute extends VersionedEntity {
-
     public static final String OPEN = "open";
     public static final String WON = "won";
     public static final String LOST = "lost";
@@ -56,7 +54,6 @@ public class PaymentDispute extends VersionedEntity {
     private Instant closedAt;
 
     protected PaymentDispute() {
-        // JPA
     }
 
     PaymentDispute(String disputeRef, String orderRef, UUID userId, UUID subscriptionId, Long amount, String reason,

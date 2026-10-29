@@ -32,10 +32,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** The listing-pass rules: what a pass may be bought for, and what activating one does to its listing. */
 @Component
 class ListingPasses {
-
     private static final Logger log = LoggerFactory.getLogger(ListingPasses.class);
 
     private static final int MAX_REFUNDS_PER_RUN = 50;
@@ -95,14 +93,11 @@ class ListingPasses {
         return id;
     }
 
-    /** Locks the listing row, then re-reads the pass under lock, so a terminal transition that ended it is seen
-     * and a webhook cannot act on a stale copy. */
     void lock(Subscription pass) {
         properties.findForVerificationDecision(pass.getPropertyId());
         entityManager.refresh(pass, LockModeType.PESSIMISTIC_WRITE);
     }
 
-    /** A paused listing is the one the owner bought the pass to bring back. */
     void resumeIfPaused(Subscription pass) {
         properties.findForVerificationDecision(pass.getPropertyId())
                 .filter(p -> !p.isArchived() && PropertyStatus.PAUSED.equals(p.getStatus()))
@@ -113,7 +108,6 @@ class ListingPasses {
                 });
     }
 
-    /** Money arrived for an order that cannot buy anything: it was cancelled, or its listing is off the market. */
     boolean isDead(Subscription pass) {
         if (SubscriptionStatuses.CANCELLED.equals(pass.getStatus())) {
             return true;
@@ -125,8 +119,6 @@ class ListingPasses {
                         .orElse(true);
     }
 
-    /** Records the refund as due and tells the owner. The gateway call is {@link #sendDueRefunds}'s, so no
-     * HTTP happens inside the webhook's transaction. */
     void refund(Subscription pass, Instant now) {
         boolean listingGone = pass.getPropertyId() != null
                 && !SubscriptionStatuses.CANCELLED.equals(pass.getStatus());
@@ -146,7 +138,6 @@ class ListingPasses {
         }
     }
 
-    /** A signed paid callback whose sum or currency is not the order's grants nothing; the sum paid goes back. */
     boolean refundIfMismatched(Subscription order, Instant now, BigDecimal paid, String currency) {
         boolean wrongCurrency = currency != null && !currency.isBlank()
                 && !EXPECTED_CURRENCY.equalsIgnoreCase(currency);
@@ -176,7 +167,6 @@ class ListingPasses {
                 Notifier.rupees(amount) + " is going back on order " + order.getPaymentRef() + ": " + why + ".");
     }
 
-    /** One gateway call and one short transaction per row, so a refused refund leaves the others untouched. */
     int sendDueRefunds() {
         int sent = 0;
         for (Subscription due : subscriptions.findRefundsDue(Limit.of(MAX_REFUNDS_PER_RUN))) {
@@ -187,7 +177,6 @@ class ListingPasses {
         return sent;
     }
 
-    // The refund id derives from the subscription id, so a resend after a failed record is the same refund.
     private boolean settle(Subscription due) {
         String refundId = due.gatewayRefundId();
         String ref = send(due, refundId);
@@ -206,7 +195,6 @@ class ListingPasses {
         }
     }
 
-    // A refusal may mean the refund already exists (an earlier run sent it but could not record it).
     private String send(Subscription due, String refundId) {
         try {
             return gateway.refund(due.getPaymentRef(), due.refundable(), refundId, "Order not activated");
@@ -240,7 +228,6 @@ class ListingPasses {
                 "{\"amount\":" + pass.refundable() + ",\"gatewayRefund\":\"" + ref + "\"}");
     }
 
-    /** The gateway's refund status for one of our {@code lp_} refunds; false when the id is not one of ours. */
     boolean applyRefundWebhook(String refundId, String status, String gatewayRef) {
         Matcher m = refundId == null ? null : REFUND_ID.matcher(refundId);
         if (m == null || !m.matches()) {

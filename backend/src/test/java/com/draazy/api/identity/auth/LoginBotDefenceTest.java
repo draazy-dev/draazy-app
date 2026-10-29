@@ -15,10 +15,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
-// A Turnstile token is single-use, so challenging the verify step would refuse every sign-in once enforced.
 @DisplayName("POST /auth/login bot defence")
 class LoginBotDefenceTest {
-
     private static final String GOOD = "a-token-the-provider-accepts";
 
     private final AuthService auth = mock(AuthService.class);

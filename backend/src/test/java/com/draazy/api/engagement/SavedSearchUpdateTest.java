@@ -17,7 +17,6 @@ import org.springframework.http.MediaType;
 
 @DisplayName("Saved searches — alert preferences are editable")
 class SavedSearchUpdateTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -54,7 +53,6 @@ class SavedSearchUpdateTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.channel").value("push"));
     }
 
-    /** {@code off} is a vocabulary value, not a null, so this record needs no absent-vs-null distinction. */
     @Test
     @DisplayName("turning alerts off is a value, not an absence")
     void alertsCanBeTurnedOff() throws Exception {
@@ -157,7 +155,6 @@ class SavedSearchUpdateTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest());
     }
 
-    /** 404, not 403: "exists but not yours" would confirm the id is real. */
     @Test
     @DisplayName("another user's saved search is 404, never 403")
     void crossUserUpdateIsNotFound() throws Exception {
@@ -171,7 +168,6 @@ class SavedSearchUpdateTest extends AbstractApiTest {
                         .content("{\"alertFrequency\":\"off\"}"))
                 .andExpect(status().isNotFound());
 
-        // And the owner's row is untouched by the attempt.
         mvc.perform(get("/me/saved-searches").header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].alertFrequency").value("daily"));

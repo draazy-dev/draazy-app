@@ -17,10 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockMultipartFile;
 
-/** Owned by the person, not a property: the {@code personal} route outranks {@code {propId}},
- * and a stored row never carries a persisted URL while the sniffed type wins over the declared one. */
 class PersonalDocumentFlowTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -47,15 +44,12 @@ class PersonalDocumentFlowTest extends AbstractApiTest {
         return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
     }
 
-    // ---------------- upload ----------------
-
     @Test
     void uploadPersonal_returnsAMintedUrlThatIsNotStoredOnTheRow() throws Exception {
         User owner = user("9821002002");
 
         String id = upload(owner, "Aadhaar Card", pdf("aadhaar.pdf"));
 
-        // The wire carries a signed URL; the row carries only an opaque, owner-scoped storage key.
         assertThat(personalDocuments.findById(java.util.UUID.fromString(id)))
                 .get()
                 .satisfies(d -> {
@@ -79,8 +73,6 @@ class PersonalDocumentFlowTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.url").doesNotExist());
     }
 
-    // ---------------- list ----------------
-
     @Test
     void listPersonal_showsOnlyTheCallersOwnPapers_newestFirst() throws Exception {
         User owner = user("9821002005");
@@ -97,8 +89,6 @@ class PersonalDocumentFlowTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[0].propertyId").doesNotExist())
                 .andExpect(jsonPath("$[0].url").doesNotExist());
     }
-
-    // ---------------- delete ----------------
 
     @Test
     void deletePersonal_removesItFromTheCallersVault() throws Exception {
@@ -123,12 +113,10 @@ class PersonalDocumentFlowTest extends AbstractApiTest {
         User stranger = user("9821002009");
         String id = upload(owner, "Aadhaar Card", pdf("aadhaar.pdf"));
 
-        // 403 would confirm that this document exists; owner-scoping by lookup answers 404.
         mvc.perform(delete(Routes.MeDocuments.PERSONAL_BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
                 .andExpect(status().isNotFound());
 
-        // ...and it is still there for its real owner.
         mvc.perform(get(Routes.MeDocuments.PERSONAL)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.length()").value(1));

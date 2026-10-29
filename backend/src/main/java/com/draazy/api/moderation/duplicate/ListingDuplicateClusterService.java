@@ -34,16 +34,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Derived on demand, never stored, because the signals change with live listing edits.
 @Service
 public class ListingDuplicateClusterService {
-
     private static final List<String> OCCUPYING = PropertyStatus.OCCUPYING_DUPLICATE_STATUSES;
 
-    // Generous because the real failure is splitting a duplicate pair across the boundary.
     static final int SCAN_CAP = 2000;
 
-    // Mirrors ListingDuplicateProbe.PHOTO_CANDIDATE_CAP so probe and desk agree.
     private static final int BAND_BUCKET_CAP = 200;
 
     private final PropertyRepository properties;
@@ -72,8 +68,6 @@ public class ListingDuplicateClusterService {
 
     @Transactional(readOnly = true)
     public DuplicateClusterReport clusters() {
-
-        // One row past the ceiling distinguishes an exact page from a truncated scan.
         List<Property> scan = properties.findSignalCarrying(OCCUPYING, PageRequest.of(0, SCAN_CAP + 1));
         boolean truncated = scan.size() > SCAN_CAP;
         List<Property> candidates = truncated ? List.copyOf(scan.subList(0, SCAN_CAP)) : scan;
@@ -87,7 +81,6 @@ public class ListingDuplicateClusterService {
             components.union(link.a(), link.b());
         }
 
-        // Attribute after union so reasons key on the settled root, not a later child.
         Map<UUID, Set<String>> reasons = new HashMap<>();
         for (Link link : links) {
             reasons.computeIfAbsent(components.find(link.a()), k -> new TreeSet<>()).add(link.reason());
@@ -126,7 +119,6 @@ public class ListingDuplicateClusterService {
         return new DuplicateClusterReport(clusters, candidates.size(), truncated);
     }
 
-    // Archive through ListingArchiveService so a merge is reversible like other takedowns.
     @Transactional
     public void resolve(AuthPrincipal actor, String keepId, List<String> dropIds) {
         if (keepId == null || keepId.isBlank()) {
@@ -139,7 +131,6 @@ public class ListingDuplicateClusterService {
         if (drops.isEmpty()) {
             throw new BadRequestException("Name at least one listing to archive");
         }
-        // Sorted lock order keeps two crossing merges from deadlocking; the loser then sees the winner's archive.
         Map<UUID, Property> locked = new HashMap<>();
         Stream.concat(Stream.of(keep), drops.stream()).sorted().forEach(id ->
                 properties.findForVerificationDecision(id).ifPresent(p -> locked.put(id, p)));
@@ -165,7 +156,6 @@ public class ListingDuplicateClusterService {
                 "count", drops.size());
     }
 
-    // Signature is derived from submitted ids, never accepted from the caller.
     @Transactional
     public void dismiss(AuthPrincipal actor, List<String> memberIds) {
         List<UUID> ids = parseIds(memberIds);
@@ -175,8 +165,6 @@ public class ListingDuplicateClusterService {
         String signature = DuplicateClusterSignature.of(ids);
         requireNoMaker(actor, properties.findAllById(ids));
 
-        // Idempotent: a double-clicked button and two operators reaching the same verdict are the
-        // same fact, and the unique index would otherwise turn the second into a 500.
         if (dismissals.findByClusterSignature(signature).isPresent()) {
             return;
         }
@@ -191,7 +179,6 @@ public class ListingDuplicateClusterService {
     private DuplicateCluster render(Candidate c) {
         List<DuplicateCluster.Listing> listings = c.members().stream()
 
-                // Revealed so owner contact stays in the audited platform workflow.
                 .map(p -> new DuplicateCluster.Listing(p.getId().toString(), p.getSlug(), p.getTitle(),
                         p.getPrice(), p.getStatus(), propertyMapper.coverImage(p), p.getLocality(),
                         p.getPincode(), p.isVerified(), p.getCreatedAt(),
@@ -233,7 +220,6 @@ public class ListingDuplicateClusterService {
         return max.subtract(min).multiply(BigDecimal.TEN).compareTo(max) <= 0;
     }
 
-    // Bucketed rather than pairwise so the desk can scan the full candidate set.
     private void linkByDoorway(List<Property> candidates, List<Link> links) {
         Map<String, List<Property>> byMeter = new HashMap<>();
         Map<DoorwayKey, List<Property>> byAddress = new HashMap<>();
@@ -263,7 +249,6 @@ public class ListingDuplicateClusterService {
         }
     }
 
-    // Same two-step as the probe, applied symmetrically across all candidates.
     private void linkByPhotos(List<Property> candidates, List<Link> links) {
         List<UUID> ids = candidates.stream().map(Property::getId).toList();
         if (ids.isEmpty()) {
@@ -290,7 +275,6 @@ public class ListingDuplicateClusterService {
                         continue;
                     }
 
-                    // Same pair can share several bands; verify once to avoid duplicate edges.
                     if (!seen.add(pairKey(a, b))) {
                         continue;
                     }
@@ -333,24 +317,19 @@ public class ListingDuplicateClusterService {
         return List.copyOf(ids);
     }
 
-    /** A pair of listings and why they were linked. */
     private record Link(UUID a, UUID b, String reason) {
     }
 
-    /** A typed bucket key — see {@link #linkByDoorway} for why this is not a joined string. */
     private record DoorwayKey(String addressKey, String localitySlug) {
     }
 
     private record BandKey(int index, int value) {
     }
 
-    /** A cluster before rendering, so the dismissal filter can run on signatures alone. */
     private record Candidate(String signature, String reason, List<Property> members) {
     }
 
-    // Union-find with path compression. Union by nothing in particular — no rank, no size.
     private static final class DisjointSet {
-
         private final Map<UUID, UUID> parent = new HashMap<>();
 
         UUID find(UUID x) {

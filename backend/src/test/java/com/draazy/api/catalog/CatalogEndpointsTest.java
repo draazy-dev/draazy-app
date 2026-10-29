@@ -23,10 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** Nothing here is owner-scoped, so the exposures are enumeration and unbounded anonymous reads.
- *  Count-bearing assertions read live counts rather than hard-coding a regenerable seed size. */
 class CatalogEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -34,8 +31,6 @@ class CatalogEndpointsTest extends AbstractApiTest {
     @PersistenceContext
     EntityManager em;
 
-    /** Forces a real SELECT: the test shares a transaction with the handler, and
-     *  {@code Property.societySlug} is a {@code @Formula} only ever populated by a query. */
     private void detach() {
         em.flush();
         em.clear();
@@ -48,7 +43,6 @@ class CatalogEndpointsTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    /** A listing in a known locality/society, at a chosen moderation status. */
     private Property listing(User owner, String title, String localitySlug, UUID societyId,
             String status) {
         Property p = new Property(owner, title, "rent", "apartment", 25000L, "Kothrud", "Pune");
@@ -65,7 +59,6 @@ class CatalogEndpointsTest extends AbstractApiTest {
         return jdbc.queryForObject("select id from societies where slug = ?", UUID.class, slug);
     }
 
-    /** An array, because the table is keyed by deal and one object cannot say which. */
     @Test
     void feesReturnsTheRentRowOnly() throws Exception {
         mvc.perform(get("/fees"))
@@ -147,7 +140,6 @@ class CatalogEndpointsTest extends AbstractApiTest {
 
     @Test
     void societiesBrowseIsPagedAndAlphabeticalByDefault() throws Exception {
-
         int totalSocieties = jdbc.queryForObject(
                 "select count(*) from societies", Integer.class);
         String firstByName = jdbc.queryForObject(
@@ -202,8 +194,6 @@ class CatalogEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.sort").value("occupancy,desc"));
     }
 
-    /** Spring's own ceiling is 2000, which on a tokenless endpoint is free amplification; the
-     *  contract publishes 100. */
     @Test
     void societiesBrowseClampsAHostilePageSize() throws Exception {
         mvc.perform(get("/societies?size=5000"))
@@ -227,7 +217,6 @@ class CatalogEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.homes[0].status").doesNotExist());
     }
 
-    /** The hub's tab counts and averages are server aggregates, so it never needs the whole home list. */
     @Test
     void societyDetailAggregatesItsLiveHomesAndCarriesNoProvenance() throws Exception {
         User o = owner("9850000004");
@@ -277,8 +266,6 @@ class CatalogEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.error").value("not_found"));
     }
 
-    /** The slug, not {@code society_id}: every society route takes a slug. The card leaves it out:
-     *  the society filter runs server-side and the hero search counts from the search index. */
     @Test
     void aBoundListingCarriesItsSocietySlugOnDetailOnly() throws Exception {
         User o = owner("9850000021");
@@ -307,7 +294,6 @@ class CatalogEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.societySlug").doesNotExist());
     }
 
-    // The query is deliberately out of slug order and shares no word with the title.
     @Test
     void publicSearchMatchesASocietyNameWordByWordAndAndsTheWords() throws Exception {
         User o = owner("9850000031");
@@ -347,7 +333,6 @@ class CatalogEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    /** Following is served by {@code /me/societies/following}; public reads stay caller-independent. */
     @Test
     void societyReadsCarryNoFollowerState() throws Exception {
         User follower = owner("9850000002");

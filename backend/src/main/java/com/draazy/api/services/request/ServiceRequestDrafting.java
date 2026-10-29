@@ -16,7 +16,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ServiceRequestDrafting {
-
     private static final String DRAFT = "draft";
     private static final String FINAL_DOCUMENT = "final-document";
 
@@ -43,7 +42,6 @@ public class ServiceRequestDrafting {
         this.amendments = amendments;
     }
 
-    // Notify requester in the transaction; only they can decide, so silence stalls both sides.
     @Transactional
     public ServiceRequestDto shareDraft(AuthPrincipal caller, String id, String note,
             List<String> checks, MultipartFile file) {
@@ -69,7 +67,6 @@ public class ServiceRequestDrafting {
         return mapper.toDto(request, caller);
     }
 
-    // Rent agreements draft tenancy rows; a second operator verifies before trust badges.
     @Transactional
     public DocumentDto uploadFinalDoc(AuthPrincipal caller, String id, MultipartFile file,
             RegistrationParticulars particulars) {

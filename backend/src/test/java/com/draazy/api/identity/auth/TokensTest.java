@@ -5,13 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 
 class TokensTest {
-
     @Test
     void randomTokensAreUniqueAndUrlSafe() {
         String a = Tokens.randomToken();
         String b = Tokens.randomToken();
         assertThat(a).isNotEqualTo(b);
-        assertThat(a).matches("[A-Za-z0-9_-]+"); // base64url, no padding
+        assertThat(a).matches("[A-Za-z0-9_-]+");
     }
 
     @Test
@@ -27,6 +26,6 @@ class TokensTest {
         String h = Tokens.sha256Hex("code");
         assertThat(Tokens.hashesEqual(h, Tokens.sha256Hex("code"))).isTrue();
         assertThat(Tokens.hashesEqual(h, Tokens.sha256Hex("nope"))).isFalse();
-        assertThat(Tokens.hashesEqual(h, "short")).isFalse(); // differing lengths must not throw
+        assertThat(Tokens.hashesEqual(h, "short")).isFalse();
     }
 }

@@ -10,12 +10,11 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 
-// The document number never lands; UNIQUE identityHash is written only at approval.
+// The raw document number is never stored; the UNIQUE identityHash is written only at approval.
 @Entity
 @Table(name = "identity_verifications")
 @Getter
 public class IdentityVerification extends AuditedEntity {
-
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
@@ -39,12 +38,10 @@ public class IdentityVerification extends AuditedEntity {
     @Setter
     private LocalDate claimedDob;
 
-    /** HMAC of the client's OCR claim. Non-unique: a fake claim must not block a real holder. */
     @Column(name = "claimed_hash")
     @Setter
     private String claimedHash;
 
-    /** HMAC of the reviewer-confirmed number; UNIQUE, so the DB is the last word on dedup. */
     @Column(name = "identity_hash", unique = true)
     @Setter
     private String identityHash;
@@ -158,7 +155,6 @@ public class IdentityVerification extends AuditedEntity {
     private boolean numberOverridden = false;
 
     protected IdentityVerification() {
-
     }
 
     public IdentityVerification(UUID userId, String docType, Instant now) {
@@ -171,7 +167,6 @@ public class IdentityVerification extends AuditedEntity {
         this.attemptWindowStart = now;
     }
 
-    /** Clears every decision and claim field so a resubmission starts from a clean pending case. */
     public void resetForResubmission(String docType, Instant now) {
         this.docType = docType;
         this.status = VerificationStatuses.PENDING;

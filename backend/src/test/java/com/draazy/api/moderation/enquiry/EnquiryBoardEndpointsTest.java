@@ -36,13 +36,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/** Rows are seeded via repositories to skip the contact gate. */
 @DisplayName("D25 — the demand board")
 class EnquiryBoardEndpointsTest extends AbstractApiTest {
-
     private static final String RAW = "9855100011";
 
-    /** What the audit row stores in place of {@link #RAW}. */
     private static final String MASKED = "98XXXXX011";
 
     @Autowired
@@ -59,7 +56,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("enquiries — contact requests")
     class Enquiries {
-
         @Test
         @DisplayName("an admin sees the row with the requester's full number")
         void adminReadsFullMobile() throws Exception {
@@ -97,7 +93,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("visits")
     class Visits {
-
         @Test
         @DisplayName("the visitor's full number, and the slot survives the projection")
         void visitorMobileInFull() throws Exception {
@@ -120,7 +115,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("deals — two sources for one number")
     class Deals {
-
         @Test
         @DisplayName("a registered counterparty's own mobile")
         void registeredCounterparty() throws Exception {
@@ -164,7 +158,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("server paging, search and summary")
     class Narrowing {
-
         @Test
         @DisplayName("q matches the person's name, case-insensitively, and a mobile only as the whole number")
         void searchByNameAndMobile() throws Exception {
@@ -280,14 +273,10 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isUnauthorized());
         }
     }
-    // --- who may open the board ---------------------------------------------------------------
 
     @Nested
     @DisplayName("who may open the board")
     class Authorisation {
-
-        /** enquiries:read is an ops atom staff hold from the baseline with no permissions document; asserted so
-         * the route cannot silently become admin-only. */
         @Test
         @DisplayName("a staffer reads it too — this is a floor tool, not an admin-only one")
         void staffMayRead() throws Exception {
@@ -321,13 +310,9 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
         }
     }
 
-
-    /** The number and the audit row are asserted in one request, so a refactor cannot keep one
-     * and drop the other. */
     @Nested
     @DisplayName("opening one row is audited")
     class Detail {
-
         @Test
         @DisplayName("an admin opening an enquiry gets the number, and the log says they did")
         void enquiryDetailIsAudited() throws Exception {
@@ -367,7 +352,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
             assertThat(auditRows(actor, "visit.contact.reveal", v.getId().toString())).isEqualTo(1);
         }
 
-        /** A typed number may belong to someone with no account, so the log names the source. */
         @Test
         @DisplayName("an off-platform deal's log names the number's source")
         void dealDetailNamesItsSource() throws Exception {
@@ -421,7 +405,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
             assertThat(auditRows(actor, "enquiry.contact.reveal", ghost)).isZero();
         }
 
-        /** A path that is not a UUID is the same answer as one that is but names nothing. */
         @Test
         @DisplayName("a non-UUID id is a 404, not a 500")
         void malformedIdIsNotFound() throws Exception {
@@ -430,8 +413,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isNotFound());
         }
     }
-
-    // --- fixtures -----------------------------------------------------------------------------
 
     private User admin(String mobile) {
         return user(mobile, Roles.Wire.ADMIN, "Board Reader");
@@ -461,9 +442,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
         return contactRequests.saveAndFlush(cr);
     }
 
-    // --- audit helpers ------------------------------------------------------------------------
-
-    /** Audit writes use {@code REQUIRES_NEW} and outlive the class rollback in a shared DB; cleaned by actor. */
     private final List<String> revealActors = new ArrayList<>();
 
     @AfterEach
@@ -472,7 +450,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
         revealActors.clear();
     }
 
-    /** Scoped by actor <em>and</em> entity id — other suites write to this table too. */
     private int auditRows(User actor, String action, String entityId) {
         return jdbc.queryForObject("""
                 select count(*) from audit_log

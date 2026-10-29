@@ -32,9 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.ObjectMapper;
 
-/** Exercise MVC validation before any listing write, without opening a database. */
 class ListingGalleryPolicyTest {
-
     private static final UUID OWNER = UUID.randomUUID();
     private final ListingService listings = mock(ListingService.class);
     private final ObjectMapper json = new ObjectMapper();
@@ -95,7 +93,6 @@ class ListingGalleryPolicyTest {
                 argThat(body -> body.images() == null));
     }
 
-    // Without the element-level `@NotNull` that is a 500 on a fixable body.
     @ParameterizedTest
     @ValueSource(strings = {"images", "amenities", "tenants"})
     void aNullListElementIsRefusedRatherThanThrownOn(String field) throws Exception {

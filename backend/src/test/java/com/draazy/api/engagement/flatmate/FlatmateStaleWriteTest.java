@@ -35,7 +35,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("Flatmates — a write that waited on a lock never puts back what it read before the lock")
 class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
-
     @Autowired
     TransactionTemplate tx;
 
@@ -64,7 +63,6 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
         return idIn(mvc.perform(request).andReturn().getResponse().getContentAsString());
     }
 
-    /** The rival holds the lock, lets {@code call} start and block behind it, then commits its own write. */
     private int race(Runnable lock, Runnable rivalWrite, RequestBuilder call) throws Exception {
         CountDownLatch held = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(2);

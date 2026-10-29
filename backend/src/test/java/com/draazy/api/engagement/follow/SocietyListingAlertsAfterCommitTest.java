@@ -20,11 +20,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Not transactional: the alert runs only once the publishing transaction has really committed. */
 @SpringBootTest
 @DisplayName("Society listing alerts — after the approval commits")
 class SocietyListingAlertsAfterCommitTest {
-
     private static final String PREFIX = "98681000";
     private static final String TYPE = "match.society-listing";
 

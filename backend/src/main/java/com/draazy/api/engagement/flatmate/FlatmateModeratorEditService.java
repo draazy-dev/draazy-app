@@ -16,11 +16,8 @@ import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Not the owner's update path, which re-derives tier, consent and agreement from the caller (here the moderator);
- * the edit is audited and does not send the post back for review. */
 @Service
 public class FlatmateModeratorEditService {
-
     private final FlatmateSeekerPostRepository posts;
     private final FlatmateRoomRepository rooms;
     private final FlatmateGroupRepository groups;
@@ -177,8 +174,6 @@ public class FlatmateModeratorEditService {
         groups.saveAndFlush(group);
     }
 
-    /** The duplicate/contested-address check matches on the stored fingerprint, so a corrected
-     * address must move it. A flat-bound fingerprint is kept: the flat, not the text, is the address. */
     private String refingerprint(String current, FlatmateGuardrails.Address address) {
         return current != null && current.startsWith(FlatmateGuardrails.PROPERTY_PREFIX)
                 ? current : guardrails.fingerprint(address);

@@ -13,11 +13,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-// Replace roles in the body; wizard resubmits owned parties after typo fixes.
-// Co-filled tenant rows survive requester resubmits.
 public record ServiceRequestIdentitiesRequest(
 
-        // Cap matches wizard parties; this endpoint writes rows and has no other throttle.
         @NotEmpty(message = "record at least one party")
         @Size(max = 12, message = "at most 12 parties")
         List<@Valid Party> parties) {
@@ -77,7 +74,6 @@ public record ServiceRequestIdentitiesRequest(
         return parties.stream().map(Party::partyRole).collect(Collectors.toSet());
     }
 
-    // A party with neither number says nothing, so reject instead of dropping it.
     public record Party(
             @NotNull
             @Pattern(regexp = "^(owner|tenant|witness)$", message = "must be owner, tenant or witness")
@@ -94,8 +90,6 @@ public record ServiceRequestIdentitiesRequest(
 
             @Aadhaar
             String aadhaar) {
-
-        // Keep this as validation so incomplete and malformed identity rows share 422 fields[].
         @AssertTrue(message = "record a PAN or an Aadhaar number for each party")
         public boolean hasANumber() {
             return isPresent(pan) || isPresent(aadhaar);

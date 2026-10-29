@@ -13,9 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-// Server copy of wizard term rules; protects checkout when clients skip steps.
 final class RentAgreementDetailsRules {
-
     static final int START_DATE_PAST_DAYS = 30;
     static final int START_DATE_FUTURE_DAYS = 180;
 

@@ -13,11 +13,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** An author's living-style answers, under the visibility rule of {@code FlatmateDetailService}.
- * A stranger sees only the keys they answered too. */
 @Service
 public class FlatmateLivingStyleService {
-
     public record Response(Map<String, Integer> answers, Integer match, int common) {
     }
 

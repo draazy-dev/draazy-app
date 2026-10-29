@@ -10,17 +10,10 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Resolves {@code settings.permissions} — the administrator-editable allow-list — into a yes or no
- * for one {@linkplain Capabilities capability}. Rationale: docs/system/cross-cutting.md#permission-map.
- */
 @Component(Capabilities.BEAN)
 public class PermissionMap {
-
     private static final Logger log = LoggerFactory.getLogger(PermissionMap.class);
 
-    /** The settings block this class reads. Seeded by {@code R__DML_seed_permission_map.sql}; written by
-     * {@code /admin/settings}. */
     static final String PERMISSIONS_KEY = "permissions";
 
     private final SettingRepository settings;
@@ -34,10 +27,6 @@ public class PermissionMap {
         this.accountPermissions = accountPermissions;
     }
 
-    /**
-     * The {@code @PreAuthorize} entry point — {@code @permissions.granted(authentication, '…')}.
-     * Anything that is not one of our own authenticated principals is refused, not waved through.
-     */
     @Transactional(readOnly = true)
     public boolean granted(Authentication authentication, String capability) {
         if (authentication == null
@@ -47,7 +36,6 @@ public class PermissionMap {
         return granted(caller, capability);
     }
 
-    /** As above, for callers that already hold the resolved principal. */
     @Transactional(readOnly = true)
     public boolean granted(AuthPrincipal caller, String capability) {
         if (caller == null) {
@@ -88,10 +76,6 @@ public class PermissionMap {
         return false;
     }
 
-    /**
-     * Which bundle in the document governs this caller, or {@code null} when the document has no way
-     * to name them — a denial. Read off the signature-verified principal and nothing else.
-     */
     private String keyFor(AuthPrincipal caller) {
         if (Roles.Wire.ADMIN.equals(caller.role()) || Roles.Wire.MANAGER.equals(caller.role())) {
             return Roles.Wire.ADMIN;
@@ -99,10 +83,6 @@ public class PermissionMap {
         return null;
     }
 
-    /**
-     * The stored allow-list, or {@code null} for every way it can fail to be one. Read per call, not
-     * cached: a TTL here would keep a revoked desk working during the incident it was revoked in.
-     */
     private JsonNode storedAllowList() {
         try {
             JsonNode document = settings.findById(PERMISSIONS_KEY)

@@ -6,11 +6,8 @@ import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-// Its own bean, not ListingQuota: ListingQuota needs billing's allowance, so billing needing it back
-// would be a constructor cycle.
 @Component
 class ListingSlotCounter implements ListingSlotLookup {
-
     private final PropertyRepository properties;
 
     ListingSlotCounter(PropertyRepository properties) {

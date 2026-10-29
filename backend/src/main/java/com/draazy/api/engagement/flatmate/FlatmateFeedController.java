@@ -13,11 +13,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Public feed; its own controller because it reads all three collections.
- * Facets: docs/flows/consumer/flatmates.md §5. */
 @RestController
 public class FlatmateFeedController {
-
     private final FlatmateFeedService service;
 
     public FlatmateFeedController(FlatmateFeedService service) {
@@ -52,7 +49,6 @@ public class FlatmateFeedController {
             @RequestParam(required = false) Long meBudget,
             @RequestParam(required = false) String meGender,
             @PageableDefault(size = 20) Pageable pageable) {
-
         FlatmateSearchQuery facets = new FlatmateSearchQuery(
                 FlatmateVocabulary.resolveTab(tab, view), q, locality,
                 nearLat, nearLng, nearRadiusKm,

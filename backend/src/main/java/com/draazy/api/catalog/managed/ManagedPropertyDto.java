@@ -4,8 +4,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
 
-/** Wire source data, not a rendered card: the client derives price strings and the location line, and relabels
- * {@code buy} as {@code sale}. */
 public record ManagedPropertyDto(
         String id,
         String title,

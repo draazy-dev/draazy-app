@@ -6,10 +6,8 @@ import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import org.springframework.stereotype.Repository;
 
-// The moderation summary's one query. Native SQL, and a single statement rather than seven count(*) calls.
 @Repository
 class PropertyModerationSummaryRepository {
-
     private static final String SUMMARY = """
             select
               count(*) filter (where not archived)                                     as total,
@@ -44,7 +42,6 @@ class PropertyModerationSummaryRepository {
                 at(row, 7), at(row, 8));
     }
 
-    // Read through Number so the mapping ignores Long vs BigInteger driver paths.
     private static long at(Object[] row, int index) {
         Object value = row[index];
         return value instanceof Number n ? n.longValue() : 0L;

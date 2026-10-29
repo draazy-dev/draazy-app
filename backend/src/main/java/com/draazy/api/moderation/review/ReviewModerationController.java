@@ -30,12 +30,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Setting {@code rejected} on {@code reviews.status} removes a review from the page and from the rating aggregate
- * in one write; a separate archived column would leave it dragging the score down. */
 @RestController
 public class ReviewModerationController {
-
-    /** A moderator may publish or reject. {@code pending} is the intake state, not a decision. */
     private static final Set<String> SETTABLE = Set.of(ReviewStatuses.PUBLISHED, ReviewStatuses.REJECTED);
 
     private final ReviewRepository reviews;
@@ -49,8 +45,6 @@ public class ReviewModerationController {
         this.audit = audit;
     }
 
-    /** Delegates to {@link ReviewService} so author names are resolved in one batched query per page,
-     * not one per row. */
     @GetMapping(Routes.Moderation.ADMIN_REVIEWS)
     @PreAuthorize("hasAnyRole('" + Roles.STAFF + "', '" + Roles.MANAGER + "', '" + Roles.ADMIN + "') and "
             + BackOfficePermissions.REQUIRE_REVIEWS_READ)
@@ -87,7 +81,6 @@ public class ReviewModerationController {
                 .orElseThrow(() -> NotFoundException.of("Review"));
     }
 
-    /** Body of {@code setReviewStatus} (schema {@code ReviewStatusUpdate}). */
     public record StatusRequest(@NotBlank String status, String reason) {
     }
 }

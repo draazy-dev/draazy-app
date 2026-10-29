@@ -9,16 +9,12 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Not an enforcement point: api-standards.md §4.4. */
 @Component
 public class AppFlagsController {
-
     private static final Logger log = LoggerFactory.getLogger(AppFlagsController.class);
 
-    /** The seeded key holding the flag block. Shared so the two readers cannot drift apart. */
     private static final String FLAGS_KEY = PlatformSettings.FLAGS_KEY;
 
-    /** The flags the consumer app reads. The rest (e.g. staffLoginEnabled) stay in the admin-only document. */
     static final Set<String> PUBLIC = Set.of("mapSearch", "scheduleVisit", "reviewsEnabled", "inAppMessaging",
             "assistant", "kycBadgeEnabled", "subscriptionPlans", "referralRewards",
             "signupsEnabled", "maintenanceMode");
@@ -31,8 +27,6 @@ public class AppFlagsController {
         this.objectMapper = objectMapper;
     }
 
-    /** Absent means on, non-booleans and non-public keys are dropped, and an unreadable row
-     * serves {@code {}}: api-standards.md §4.4. */
     public Map<String, Boolean> flags() {
         Map<String, Boolean> out = new LinkedHashMap<>();
         settings.value(FLAGS_KEY).ifPresent(row -> {

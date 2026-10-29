@@ -4,9 +4,7 @@ import com.draazy.api.common.error.ValidationException;
 import java.util.ArrayList;
 import java.util.List;
 
-/** What a new room must answer. Edits are exempt so rooms posted before this rule stay correctable. */
 final class NewRoomRequirements {
-
     static final int MIN_PHOTOS = 3;
 
     private NewRoomRequirements() {

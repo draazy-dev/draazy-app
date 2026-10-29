@@ -17,10 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// This proves the round trip that makes the repoint safe.
-// Three properties, in the order they matter: A translation written through the admin surface reaches the public one.
 class ContentTranslationsTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
 
     private static final String MR_QUESTION = "\u0939\u0947 \u092e\u094b\u092b\u0924 \u0906\u0939\u0947 \u0915\u093e?";
@@ -54,8 +51,6 @@ class ContentTranslationsTest extends AbstractApiTest {
                 "{\"question\":\"Is it free?\",\"answer\":\"Yes.\",\"translations\":"
                         + "{\"mr\":{\"question\":\"" + MR_QUESTION + "\",\"answer\":\"" + MR_ANSWER + "\"}}}");
 
-        // The client falls back per field, and it can only do that if the server tells it which fields are actually
-        // missing.
         mvc.perform(get("/faqs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.id == '" + id + "')].question").value("Is it free?"))
@@ -79,7 +74,6 @@ class ContentTranslationsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[?(@.id == '" + id + "')].translations.mr.answer")
                         .doesNotExist());
 
-        // Replace rather than merge, and this is the case that decides it.
         mvc.perform(patch(Routes.Admin.CONTENT_ITEM, ContentTypes.FAQS, id)
                         .header(HttpHeaders.AUTHORIZATION, token)
                         .contentType(MediaType.APPLICATION_JSON)

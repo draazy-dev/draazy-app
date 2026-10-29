@@ -26,10 +26,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 @DisplayName("Tracked rent — the tenant's side of an owner's rent tracker")
 class TrackedRentTest extends AbstractApiTest {
-
     private static final String THIS_MONTH = YearMonth.now(ZoneId.of("Asia/Kolkata")).toString();
     private static final String LAST_MONTH = YearMonth.now(ZoneId.of("Asia/Kolkata")).minusMonths(1).toString();
-    // In the past so a receipt for it is allowed, and with day-of-month room on either side.
     private static final LocalDate TODAY = LocalDate.of(2025, 3, 10);
 
     @Autowired

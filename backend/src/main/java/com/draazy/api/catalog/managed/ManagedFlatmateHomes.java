@@ -20,12 +20,8 @@ import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The private home an owner gets when they confirm a tenant's flatmate room in it. Facts arrive as plain values so
- * this context never learns what a room is. */
 @Service
 public class ManagedFlatmateHomes {
-
-    /** What the room says about the flat; every field may be blank except the fingerprint and locality. */
     public record Facts(UUID roomId, String fingerprint, String homeTypeLabel, String bhk, String locality,
             String society, String furnishing) {
     }
@@ -53,8 +49,8 @@ public class ManagedFlatmateHomes {
         this.jdbc = new JdbcTemplate(dataSource);
     }
 
-    /** Joins the caller's transaction to see its uncommitted rows; a database error rolls back to a savepoint, and goes
-     * through JDBC because a failed Hibernate statement would mark that transaction rollback-only. */
+    // Uses JDBC with a savepoint: a failed Hibernate statement would mark the caller's
+    // transaction rollback-only.
     @Transactional(noRollbackFor = DataAccessException.class)
     public boolean register(UUID ownerId, Facts facts) {
         String society = blankToNull(facts.society());
@@ -96,7 +92,6 @@ public class ManagedFlatmateHomes {
                 .filter(m -> m.getOwnerId().equals(ownerId) && m.getAddressFingerprint() != null);
     }
 
-    // The wizard's HOME_TYPE_PILLS: Row House shares "independent" with Independent House.
     static String propertyTypeOf(String homeTypeLabel) {
         String label = homeTypeLabel == null ? "" : homeTypeLabel.strip().toLowerCase(Locale.ROOT);
         return switch (label) {
@@ -106,7 +101,6 @@ public class ManagedFlatmateHomes {
         };
     }
 
-    // A flatmate post says "semi"; the catalogue says "semi-furnished".
     static String furnishingOf(String roomFurnishing) {
         if (roomFurnishing == null) {
             return null;

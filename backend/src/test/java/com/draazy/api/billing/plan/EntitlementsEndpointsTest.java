@@ -22,14 +22,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** The owner-contact quota is server-enforced; allowances derive from the live plan and referrals each call. */
 @DisplayName("Entitlements — the contact quota the browser used to keep")
 class EntitlementsEndpointsTest extends AbstractApiTest {
-
-    /** Owner Plus: priced, and carries {@code unlimited_contacts}. */
     private static final String UNLIMITED_PLAN = "b1000000-0000-4000-8000-000000000002";
 
-    /** {@code fees.freeContactLimit} and {@code fees.referralContactBonus} in the seeded row. */
     private static final int FREE_LIMIT = 15;
     private static final int REFERRAL_BONUS = 15;
     private static final int FRIEND_BONUS = 5;
@@ -63,7 +59,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** Put {@code buyer} in front of one owner, and say what the server made of it. */
     private int ask(User buyer, Property p) throws Exception {
         return mvc.perform(post(Routes.Contacts.REQUEST)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
@@ -86,12 +81,10 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 Instant.now().plus(30, ChronoUnit.DAYS), null, null));
     }
 
-    /** Read, not written out: a literal price here would drift the first time the plan is repriced. */
     private long priceOf(String planId) {
         return plans.findById(UUID.fromString(planId)).orElseThrow().getPrice();
     }
 
-    /** Earns the referral through real endpoints; setting the status directly would pass even if it broke. */
     private String referralApprovedFor(User referrer, String refereeMobile, User staff)
             throws Exception {
         User referee = identityVerified(refereeMobile, "buyer");
@@ -130,8 +123,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT))
                 .andExpect(jsonPath("$.contacts.referralBonus").value(0))
                 .andExpect(jsonPath("$.contacts.friendBonus").value(0))
-                // Owner Free's listing_limit. Reported even to a buyer, because the number is a
-                // property of the account rather than of the role it is browsing under.
                 .andExpect(jsonPath("$.listings.allowance").value(1))
                 .andExpect(jsonPath("$.listings.referralBonus").doesNotExist())
                 .andExpect(jsonPath("$.listings.used").value(0));
@@ -223,7 +214,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.error").value("contact_quota_exhausted"));
     }
 
-    /** Running out blocks only new owners; opened conversations must stay open for double-tap idempotency. */
     @Test
     @DisplayName("an exhausted caller can still re-read the requests they already opened")
     void exhaustionNeverClosesADoorAlreadyOpened() throws Exception {
@@ -328,8 +318,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT))
                 .andExpect(jsonPath("$.contacts.referralBonus").value(0))
-                // The free agreement goes back with it, for the same reason: nothing was stored, so
-                // there is no counter anybody has to remember to un-increment.
                 .andExpect(jsonPath("$.agreements.free").value(0));
     }
 
@@ -345,12 +333,10 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.contacts.unlimited").value(true))
                 .andExpect(jsonPath("$.contacts.allowance").doesNotExist())
                 .andExpect(jsonPath("$.contacts.remaining").doesNotExist())
-                // Usage is still reported. The plan makes it moot, not uninteresting.
                 .andExpect(jsonPath("$.contacts.used").value(1))
                 .andExpect(jsonPath("$.listings.allowance").value(2));
     }
 
-    /** Pending rows exist so unpaid orders can resume; reading entitlement off them would grant the plan. */
     @Test
     @DisplayName("an unpaid order confers nothing — capability is not the same question as standing")
     void aPendingSubscriptionEntitlesNothing() throws Exception {

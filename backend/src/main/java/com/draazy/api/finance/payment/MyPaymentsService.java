@@ -34,10 +34,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The caller's paid orders across passes, packs and rent agreements, each with where its refund stands. */
 @Service
 public class MyPaymentsService {
-
     private static final Set<String> PAID_STATES = Set.of(SubscriptionStatuses.ACTIVE, SubscriptionStatuses.PAST_DUE,
             SubscriptionStatuses.EXPIRED, SubscriptionStatuses.REFUND_REVIEW, SubscriptionStatuses.REFUNDED,
             SubscriptionStatuses.DISPUTED);

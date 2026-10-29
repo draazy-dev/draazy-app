@@ -9,36 +9,16 @@ import java.util.UUID;
 import lombok.Getter;
 import org.hibernate.annotations.CreationTimestamp;
 
-/**
- * One file in a property's document vault — a sale deed, an index-II, a society NOC. Maps
- * {@code documents} (V6, tightened by V20).
- *
- * <p><strong>The bytes are not here.</strong> The row stores a {@code storageKey}, an opaque handle
- * into the object store; the {@code url} the client sees is minted per read and expires. That is
- * why there is no {@code url} column: a URL persisted in a row is a permanent, un-revocable
- * credential to a title deed, and the first thing anyone would do is email it.
- *
- * <p><strong>Ids, not associations</strong> — {@code propertyId} is a plain UUID for the same
- * reason as {@code leads.contact.ContactRequest}: the target lives in {@code catalog} and an object
- * reference would hard-wire a cross-context join.
- *
- * <p>{@code uploadedAt} is a distinct column from the inherited {@code createdAt} because V6 made
- * it so; they are set together and only {@code uploadedAt} is on the wire.
- */
 @Entity
 @Table(name = "documents")
 @Getter
 public class Document extends AuditedEntity {
-
-    /** Null only for a service-request file on a flat that was never listed (V40). */
     @Column(name = "property_id", updatable = false)
     private UUID propertyId;
 
-    /** Free text by contract ("Sale Deed", "Index II") — the vocabulary is the UI's, not the DB's. */
     @Column(name = "category")
     private String category;
 
-    /** The uploader's filename, sanitised. Shown to the owner; never used as the storage key. */
     @Column(name = "file_name")
     private String fileName;
 
@@ -51,15 +31,6 @@ public class Document extends AuditedEntity {
     @Column(name = "mime_type")
     private String mimeType;
 
-    /**
-     * Set when this file belongs to a service request (the old V7) — a draft agreement, the registered
-     * copy, a document ops asked the customer for.
-     *
-     * <p>When the request names a listing the file carries its {@link #propertyId} too. A rent
-     * agreement is often drafted for a flat that was never listed, so one of the two is enough
-     * ({@code documents_subject_check}, V40). Property-scoped vault reads exclude these rows either
-     * way — see {@code DocumentRepository}.
-     */
     @Column(name = "service_request_id")
     private UUID serviceRequestId;
 
@@ -68,7 +39,6 @@ public class Document extends AuditedEntity {
     private Instant uploadedAt;
 
     protected Document() {
-        // JPA
     }
 
     public Document(UUID propertyId, String category, String fileName, String storageKey,
@@ -81,11 +51,9 @@ public class Document extends AuditedEntity {
         this.mimeType = mimeType;
     }
 
-    /** The service-request variant: the same file, additionally attached to a request. */
     public Document(UUID propertyId, UUID serviceRequestId, String category, String fileName,
             String storageKey, long sizeBytes, String mimeType) {
         this(propertyId, category, fileName, storageKey, sizeBytes, mimeType);
         this.serviceRequestId = serviceRequestId;
     }
-
 }

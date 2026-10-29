@@ -9,17 +9,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-// These expected amounts are independent of the implementation so arithmetic regressions
-// cannot agree with themselves on statutory charges customers pay and the platform remits.
 @DisplayName("Leave & License statutory charges — Maharashtra Art. 36A")
 class LeaveAndLicenceChargesTest {
-
     @Nested
     @DisplayName("the consideration")
     class Consideration {
-
-        // 0.25% of that is 917.5, which rounds up to 918.
-        // Common tenancy that lands exactly on a half, so it pins rounding direction.
         @Test
         @DisplayName("rent for the term plus 10% of the refundable deposit per year")
         void canonicalElevenMonthTenancy() {
@@ -33,7 +27,6 @@ class LeaveAndLicenceChargesTest {
             assertThat(charges.total()).isEqualTo(2_300L);
         }
 
-        // A non-refundable deposit is never returned, so it enters whole and once.
         @Test
         @DisplayName("a non-refundable deposit enters whole, once, not weighted and not per year")
         void nonRefundableDepositEntersWhole() {
@@ -43,7 +36,6 @@ class LeaveAndLicenceChargesTest {
             assertThat(charges.exactDuty()).isEqualTo(1_043L);
         }
 
-        // The refundable deposit is weighted per year of term, so a two-year tenancy counts it twice.
         @Test
         @DisplayName("the refundable deposit is counted once per year of term")
         void depositIsWeightedPerYear() {
@@ -53,7 +45,6 @@ class LeaveAndLicenceChargesTest {
             assertThat(charges.exactDuty()).isEqualTo(1_250L);
         }
 
-        // A part year is a whole year: thirteen months holds the deposit into a second year.
         @Test
         @DisplayName("a part year counts as a whole year")
         void termRoundsUpToWholeYears() {
@@ -71,8 +62,6 @@ class LeaveAndLicenceChargesTest {
             assertThat(charges.exactDuty()).isEqualTo(688L);
         }
 
-        // The paise the deposit weighting produces must survive.
-        // The consideration is ?3,67,000.50 and 0.25% of it is ?917.50125, which rounds to 918.
         @Test
         @DisplayName("a deposit that weights to half a rupee does not lose it")
         void fractionalDepositWeightIsExact() {
@@ -86,7 +75,6 @@ class LeaveAndLicenceChargesTest {
     @Nested
     @DisplayName("rent escalation")
     class Escalation {
-
         @Test
         @DisplayName("an increase every eleven months taxes the escalated rent for the months it runs")
         void elevenMonthEscalation() {
@@ -179,7 +167,6 @@ class LeaveAndLicenceChargesTest {
     @Nested
     @DisplayName("the duty GRAS collects (D-a)")
     class IgrRounding {
-
         @Test
         @DisplayName("a duty already in whole hundreds is billed as it is")
         void wholeHundredStays() {
@@ -220,7 +207,6 @@ class LeaveAndLicenceChargesTest {
     @Nested
     @DisplayName("the registration fee")
     class Registration {
-
         @Test
         @DisplayName("₹1,000 for a municipal body — Pune city is one")
         void urbanIsAThousand() {
@@ -242,9 +228,6 @@ class LeaveAndLicenceChargesTest {
     @Nested
     @DisplayName("terms it refuses to price")
     class Refusals {
-
-        // Zero rent would produce a confident ₹0 duty for a chargeable document.
-        // Nothing downstream can distinguish that from a real answer.
         @Test
         @DisplayName("a rent of zero or less is not a tenancy")
         void rejectsNonPositiveRent() {
@@ -277,7 +260,6 @@ class LeaveAndLicenceChargesTest {
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
-        // The largest allowed inputs must produce a number, not an overflow.
         @Test
         @DisplayName("the largest priceable tenancy still computes rather than overflowing")
         void extremeButPriceableTermsDoNotOverflow() {

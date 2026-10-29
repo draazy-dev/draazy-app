@@ -18,7 +18,6 @@ import org.springframework.http.MediaType;
 
 @DisplayName("staff account functions")
 class StaffTeamRequiredTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -97,7 +96,6 @@ class StaffTeamRequiredTest extends AbstractApiTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    /** Administrators are bootstrapped, not created by another back-office account. */
     @Test
     @DisplayName("an administrator cannot be created here")
     void anAdministratorNeedsNoTeam() throws Exception {

@@ -17,10 +17,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 
-/** Builds desk queue rows in three small reads, none of which touches a file, thread or party. */
 @Component
 class ServiceRequestQueueRows {
-
     private static final String APPROVED_EVENT = "draft.approved";
 
     private static final List<String> SCALAR_DETAILS = List.of("property", "location", "ownerName", "tenants",
@@ -96,7 +94,6 @@ class ServiceRequestQueueRows {
         return u == null ? null : u.getMobile();
     }
 
-
     private Map<UUID, Instant> approvedAt(Collection<UUID> ids) {
         Map<UUID, Instant> out = new HashMap<>();
         for (ServiceRequestEvent e : events.findByRequestIdInOrderByAtAsc(ids)) {
@@ -107,7 +104,6 @@ class ServiceRequestQueueRows {
         return out;
     }
 
-    // Free-form `_state` carries mobiles and identity fields, so only what the case summary draws is copied.
     private static Map<String, Object> projected(Map<String, Object> details) {
         if (details == null) {
             return null;

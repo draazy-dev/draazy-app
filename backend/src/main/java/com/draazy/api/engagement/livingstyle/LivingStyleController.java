@@ -8,10 +8,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/** {@code /me/living-style} — optional answers about how the caller lives, shown to flatmate matches. */
 @RestController
 public class LivingStyleController {
-
     private final LivingStyleService service;
 
     public LivingStyleController(LivingStyleService service) {

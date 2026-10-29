@@ -12,11 +12,8 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.Named;
 import org.mapstruct.ReportingPolicy;
 
-/** Entity→wire mapper for the flatmates market (api-standards §8.1). Hand-written contact, derived
- * capacity and seats stay outside the generator; see docs/flows/consumer/flatmates.md. */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface FlatmateMapper {
-
     @Mapping(target = "type", constant = "flatmate")
     @Mapping(target = "flatCommitted", expression = "java(view.flatCommitted())")
     @Mapping(target = "owner", expression = "java(view.ownerName())")
@@ -43,7 +40,6 @@ public interface FlatmateMapper {
     @Mapping(target = "lng", source = "lng", qualifiedByName = "coarse")
     FlatmateRoomFeedDto toFeedDto(FlatmateRoom room, @Context RoomView view);
 
-    /** ~110 m: enough for a map pin, not enough to find the door. */
     @Named("coarse")
     default Double coarse(Double degrees) {
         return degrees == null ? null : Math.round(degrees * 1000) / 1000.0;
@@ -54,8 +50,6 @@ public interface FlatmateMapper {
         return photos == null || photos.isEmpty() ? null : photos.get(0);
     }
 
-    /** Must agree with {@code FlatmateRoomRepository.feed}'s {@code verifiedOnly} clause and
-     * {@code FlatmateSearchQueries.roomVerified()}, or a trust-first list sorts an unbadgeable card first. */
     default boolean hostVerified(FlatmateRoom room, String reviewStatus) {
         String tier = room.getVerificationTier();
         return FlatmateVocabulary.TIER_OWNER.equals(tier)
@@ -65,9 +59,6 @@ public interface FlatmateMapper {
 
     default String occupancyOf(FlatmateRoom room, int flatCommitted) {
         if (room.isSeatBased()) {
-
-            // A seat-model room's seats say nothing about the flat around it, so the ledger answers
-            // the question the seeker asked.
             int open = room.getSeatsOpen() == null ? 0 : room.getSeatsOpen();
             if (open <= 0) {
                 return "occupied";
@@ -80,13 +71,10 @@ public interface FlatmateMapper {
         return flatCommitted >= room.getMaxOccupants() ? "occupied" : "filling";
     }
 
-    /** The flat's ceiling, which only a split room has — a standalone room is not part of a flat. */
     default Integer flatMax(FlatmateRoom room) {
         return room.isSplitRoom() ? room.getMaxOccupants() : null;
     }
 
-    /** The most people who could still take this room. Always 1 for per-person prices — a per-head
-     * quote cannot express sharing. */
     default int shareMax(FlatmateRoom room, int flatCommitted) {
         if ("person".equals(room.getPriceBasis())) {
             return 1;
@@ -115,13 +103,11 @@ public interface FlatmateMapper {
     FlatmateGroupFeedDto toFeedDto(FlatmateGroup group, @Context PartyView view);
 
     @Mapping(target = "host", expression = "java(member.getUserId() != null && member.getUserId().equals(member.getGroup().getHostId()))")
-    /** Members map name-for-name; no contact on a member, so nothing to gate. */
     FlatmateGroupDto.Member toMember(FlatmateGroupMember member);
 
     @Mapping(target = "host", expression = "java(member.getUserId() != null && member.getUserId().equals(member.getGroup().getHostId()))")
     FlatmateGroupFeedDto.Member toFeedMember(FlatmateGroupMember member);
 
-    /** Whole-flat rent divided by the seats, computed on read so it can never drift from the rent. */
     default Long perHead(FlatmateGroup group) {
         return group.getSeatsTotal() > 0 ? group.getRent() / group.getSeatsTotal() : group.getRent();
     }
@@ -159,7 +145,6 @@ public interface FlatmateMapper {
     @Mapping(target = "gatedCommunity", expression = "java(Boolean.TRUE.equals(body.gatedCommunity()))")
     @Mapping(target = "details", source = "details")
 
-    /** {@code ignoreByDefault = true} is an allowlist: trust fields absent here cannot be client-set. */
     @Mapping(target = "ownerConsentMobile", source = "ownerConsentMobile",
             qualifiedByName = "mobileNormaliseOrNull")
 
@@ -175,8 +160,6 @@ public interface FlatmateMapper {
     @Mapping(target = "electricityBilling", source = "electricityBilling", qualifiedByName = "billingOrNull")
     @Mapping(target = "seatsTotal", source = "seats", qualifiedByName = "seatsOrTwo")
 
-    /** Same allowlist treatment for a group. {@code propertyId} arrives in the request but is only
-     * honoured after {@code deriveTier} confirms owner tier, so the service writes it, not this. */
     @Mapping(target = "seatsOpen", source = "seatsOpen")
     @Mapping(target = "note", source = "note", qualifiedByName = "trimmedOrNull")
     @Mapping(target = "ownerConsentMobile", source = "consentMobile", qualifiedByName = "mobileNormaliseOrNull")
@@ -231,8 +214,6 @@ public interface FlatmateMapper {
         return FlatmateVocabulary.blankToNull(value);
     }
 
-    /** Canonicalises the owner-consent number to ten digits so {@code +91}-prefixed values pass the
-     * column CHECK. Null-safe. */
     @Named("mobileNormaliseOrNull")
     default String mobileNormaliseOrNull(String value) {
         return MobileMask.normalise(value);
@@ -243,7 +224,6 @@ public interface FlatmateMapper {
         return Ids.parseUuid(value).orElse(null);
     }
 
-    /** A jsonb list column is {@code NOT NULL}, so an omitted array is empty rather than absent. */
     @Named("stringsOrEmpty")
     default List<String> stringsOrEmpty(List<String> values) {
         return values == null ? List.of() : values;
@@ -265,7 +245,6 @@ public interface FlatmateMapper {
 
     record RoomView(int flatCommitted, String ownerName, String ownerMobile, String reviewStatus,
             FlatmateRoomDto.Host host) {
-
         RoomView(int flatCommitted, String ownerName, String ownerMobile, String reviewStatus) {
             this(flatCommitted, ownerName, ownerMobile, reviewStatus, null);
         }
@@ -279,9 +258,7 @@ public interface FlatmateMapper {
         }
     }
 
-    /** The host's name and, only where the caller says so, their number. */
     record PartyView(String ownerName, String ownerMobile, String reviewStatus) {
-
         PartyView(String ownerName, String ownerMobile) {
             this(ownerName, ownerMobile, null);
         }
@@ -291,7 +268,6 @@ public interface FlatmateMapper {
         }
     }
 
-    /** A seeker post carries only its author's own number, and only back to that author. */
     record SeekerView(String mobile) {
     }
 }

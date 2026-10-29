@@ -32,15 +32,10 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-/** DPDP right-to-erasure, filing and execution. Erased vs retained: {@link ErasureRetention} and
- * docs/system/legal-entity-and-compliance.md (section 11). */
 @Service
 public class ErasureService {
-
-    /** Serializer for the two {@code jsonb} documents; must not corrupt or forge fields from a quoted note. */
     private static final ObjectMapper DOCUMENT_JSON = JsonMapper.builder().build();
 
-    // Ten digits starting 0-5: never a real Indian mobile (6-9), and wide enough that clashes stay rare.
     private static final long MOBILE_BLOCK_SIZE = 6_000_000_000L;
 
     private final ErasureRequestRepository requests;
@@ -67,7 +62,6 @@ public class ErasureService {
         this.pepper = pepper == null ? "" : pepper;
     }
 
-    /** Double-tap returns 409 rather than the unique-index violation. */
     @Transactional
     public ErasureRequestResponse request(AuthPrincipal subject, String reason) {
         requests.findBySubjectIdAndStatus(subject.userId(), ErasureStatuses.PENDING)
@@ -78,7 +72,6 @@ public class ErasureService {
         ErasureRequest saved = requests.saveAndFlush(
                 new ErasureRequest(subject.userId(), digest(subject.userId()), reason));
 
-        // Audit the subject-initiated ask onto a table other than the one about to be emptied.
         audit.record(subject, "erasure.request", "erasure_request", saved.getId().toString(),
                 "reason", reason);
         return ErasureRequestResponse.of(saved);
@@ -151,8 +144,6 @@ public class ErasureService {
                 .setParameter("id", subjectId)
                 .executeUpdate());
 
-        // 1b. Outbound messages. Deleted whole: `body` holds rendered text naming the subject, so
-        //     there is no column subset to null. Not retained — chasers are coordination, not obligation.
         erased.put("outbound_message", entityManager
                 .createNativeQuery("delete from outbound_message where recipient_id = :id")
                 .setParameter("id", subjectId)
@@ -184,8 +175,6 @@ public class ErasureService {
                 .setParameter("id", subjectId)
                 .executeUpdate());
 
-        // 3. Profile free text. Column set follows the V13 schema; `score` and `verified`
-        //    stay — platform-derived signals, not identifiers.
         erased.put("tenant_profiles", entityManager
                 .createNativeQuery("""
                         update tenant_profiles
@@ -214,8 +203,8 @@ public class ErasureService {
                 .setParameter("id", subjectId)
                 .executeUpdate());
 
-        // 5. Unclaimed co-fill invitations. Row deleted because the CHECK forces mobile XOR
-        //    user_id; must run before step 10 replaces the mobile. Claimed rows untouched by design.
+        // Must run before the mobile is replaced: the CHECK forces mobile XOR user_id, so the row
+        // is deleted. Claimed rows are untouched by design.
         erased.put("service_request_parties", entityManager
                 .createNativeQuery("delete from service_request_parties where mobile = :mobile")
                 .setParameter("mobile", oldMobile)
@@ -242,7 +231,6 @@ public class ErasureService {
 
         erased.put("personal_documents", erasePersonalDocuments(subjectId));
 
-        // Both sides of a rent tracker: the subject as someone's tenant, and the tenants on the subject's own records.
         erased.put("managed_properties", entityManager
                 .createNativeQuery("""
                         update managed_properties
@@ -265,8 +253,6 @@ public class ErasureService {
                 .setParameter("mobileHash", Tokens.sha256Hex(MobileMask.normalise(oldMobile)))
                 .executeUpdate());
 
-        // 10. Identity root, last: earlier steps key off mobile or row-existing, so replacing the
-        //    number first would orphan the OTP and pending-invite deletes.
         subject.erasePersonalData(freePseudonym(subjectId));
         erased.put("users", 1);
 
@@ -276,15 +262,11 @@ public class ErasureService {
                 "notYetSwept", ErasureRetention.knownGaps()));
         request.complete(admin.userId(), note, erasedJson, retainedJson);
 
-        // Audit against the request, not the user: a row naming the erased account would put the
-        // identifier straight back into a permanent table.
         audit.record(admin, "erasure.execute", "erasure_request", request.getId().toString(),
                 "erased", erased, "note", note);
         return request;
     }
 
-    // A key also filed onto a service request or property (fileFromPersonalVault) belongs to that
-    // retained document too, so only unshared objects leave storage.
     @SuppressWarnings("unchecked")
     private int erasePersonalDocuments(UUID subjectId) {
         List<String> keys = entityManager
@@ -302,7 +284,6 @@ public class ErasureService {
                 .executeUpdate();
     }
 
-    // users.mobile is UNIQUE, so a clash with an earlier erasure probes the next salt instead of failing for ever.
     private String freePseudonym(UUID subjectId) {
         for (int salt = 0; ; salt++) {
             String candidate = pseudonymMobile(subjectId, salt);
@@ -322,8 +303,6 @@ public class ErasureService {
         return String.format("%010d", tail);
     }
 
-    /** Surviving reference to an erased subject — {@code SHA-256(pepper || uuid)}, lowercase hex.
-     * A verifier, not an index: confirms a UUID you already hold, cannot be run backwards. */
     String digest(UUID subjectId) {
         byte[] bytes = sha256(pepper + subjectId);
         StringBuilder hex = new StringBuilder(bytes.length * 2);
@@ -339,13 +318,11 @@ public class ErasureService {
             return MessageDigest.getInstance("SHA-256")
                     .digest(value.getBytes(StandardCharsets.UTF_8));
         } catch (NoSuchAlgorithmException impossible) {
-
             throw new IllegalStateException("SHA-256 unavailable", impossible);
         }
     }
 
     public static final class ErasureDecisions {
-
         private ErasureDecisions() {
         }
 

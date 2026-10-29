@@ -16,11 +16,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Files evidence for the Verified property badge on a room or group already posted. Moderation status and every
- * other field stay put, so the badge request never re-publishes or re-moderates the ad. */
 @Service
 public class FlatmateBadgeRequestService {
-
     private final FlatmateRoomRepository rooms;
     private final FlatmateGroupRepository groups;
     private final FlatmateReviewRepository reviews;
@@ -149,7 +146,6 @@ public class FlatmateBadgeRequestService {
     }
 
     private record Evidence(UUID id, String type, AgreementPeriod period) {
-
         Map<String, Object> doc() {
             Map<String, Object> doc = new LinkedHashMap<>();
             doc.put("id", id.toString());

@@ -24,12 +24,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-/** Selected when a VAPID private key is configured; otherwise {@code LoggingPushSender} is wired
- * and nothing leaves the process. */
 @Component
 @ConditionalOnExpression("!'${draazy.providers.push.vapid-private-key:}'.isBlank()")
 class WebPushSender implements PushSender {
-
     private static final Logger log = LoggerFactory.getLogger(WebPushSender.class);
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
@@ -129,7 +126,6 @@ class WebPushSender implements PushSender {
         return "vapid t=" + WebPushCrypto.vapidJwt(privateKey, audience, subject, expires) + ", k=" + publicKey;
     }
 
-    // The endpoint is client-supplied and this server POSTs to it.
     static boolean isPublicHttps(URI uri) {
         if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null
                 || (uri.getPort() != -1 && uri.getPort() != 443)) {
@@ -148,8 +144,6 @@ class WebPushSender implements PushSender {
         return true;
     }
 
-    // Ranges the JDK predicates miss: 0.0.0.0/8, carrier-grade NAT (cloud metadata lives there on some
-    // providers), benchmarking, IPv6 unique-local and the NAT64 prefix.
     private static boolean isReserved(InetAddress address) {
         byte[] b = address.getAddress();
         if (b.length == 4) {

@@ -13,17 +13,13 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** The signups gate sits at provisionBuyer's one caller, so a second caller disarms it: docs/flows/consumer/auth.md. */
 @DisplayName("The signups gate — nothing may create a consumer account behind its back")
 class AccountProvisioningGuardTest {
-
     private static final Path MAIN = Path.of("src", "main", "java");
 
-    /** A path rather than a class name so the failure message points at something openable. */
     private static final String GATED_CALLER =
             "com/draazy/api/identity/auth/AuthService.java".replace('/', java.io.File.separatorChar);
 
-    /** {@code provisionBuyer(} anywhere that is not the declaration itself. */
     private static final Pattern CALL = Pattern.compile("\\.provisionBuyer\\s*\\(");
 
     @Test
@@ -48,7 +44,6 @@ class AccountProvisioningGuardTest {
                 .containsExactly(GATED_CALLER);
     }
 
-    /** Counterweight: the guard above also passes if {@code provisionBuyer} has been deleted. */
     @Test
     @DisplayName("the method being guarded still exists under that name")
     void theGuardIsNotPinningAGhost() {

@@ -26,11 +26,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Public reads callable in a loop, so every aggregate is page-scoped, never per-row. */
 @Service
 public class SocietyService {
-
-    /** The hub draws six home tiles; its counts and averages come from {@link SocietyHomeStats}. */
     private static final int HUB_HOMES = 6;
 
     private final SocietyRepository societies;
@@ -48,8 +45,6 @@ public class SocietyService {
         this.ratings = ratings;
     }
 
-    /** A handful of queries for any page size, never one per row;
-     * {@code hasListings} is {@code TRUE} only from the home rail; {@code mapped} keeps Google-picked rows only. */
     @Transactional(readOnly = true)
     public Page<SocietyResponse> browse(String q, String localitySlug, Boolean hasListings, Boolean mapped,
             Pageable pageable) {
@@ -64,14 +59,12 @@ public class SocietyService {
         return new PageImpl<>(rows, safe, page.getTotalElements());
     }
 
-    /** The database ranks the filtered set and returns only the page's ids, so page 2 continues page 1. */
     private Page<SocietyResponse> ranked(Specification<Society> spec, String q, String localitySlug,
             Boolean hasListings, Boolean mapped, String mode, Pageable pageable) {
         List<Object[]> rows = societies.rankedIds(SocietySpecs.likePattern(q), SocietySpecs.trimmed(localitySlug),
                 Boolean.TRUE.equals(hasListings), Boolean.TRUE.equals(mapped), mode,
                 pageable.getPageSize(), pageable.getOffset(), Freshness.dormantCutoff(Instant.now()));
         List<UUID> ids = rows.stream().map(r -> (UUID) r[0]).toList();
-        // A page past the end carries no window total, so only that case pays for a count.
         long total = rows.isEmpty()
                 ? (pageable.getPageNumber() == 0 ? 0 : societies.count(spec))
                 : ((Number) rows.get(0)[1]).longValue();
@@ -83,14 +76,10 @@ public class SocietyService {
         return new PageImpl<>(summarise(ordered), echoed, total);
     }
 
-    /** Shared with the follow list so the two cannot drift;
-     * every aggregate covers the whole merge family (societies.md 9.1). */
     @Transactional(readOnly = true)
     public List<SocietyResponse> summarise(List<Society> page) {
         Tallies tallies = tallies(page.stream().map(Society::getId).toList());
         return page.stream().map(society -> {
-            // Absent, not zero: `forSocieties` omits unrated societies precisely so this stays a
-            // null average rather than a 0.0 the card would render as a one-star society.
             RatingLookup.Rating rating = tallies.rating(society.getId());
             return societyMapper.toResponse(
                     society,
@@ -100,10 +89,8 @@ public class SocietyService {
         }).toList();
     }
 
-    /** The per-society aggregates a card needs, over each one's merge family. */
     private record Tallies(Map<UUID, List<UUID>> families, Map<UUID, Long> listings,
             Map<UUID, RatingLookup.Rating> rated) {
-
         long homes(UUID id) {
             return sum(listings, families.get(id));
         }
@@ -119,7 +106,6 @@ public class SocietyService {
         return new Tallies(families, listingCounts.bySocietyIds(reach), ratings.forSocieties(reach));
     }
 
-    /** Live homes per society over its merge family — {@link #summarise} without the rating read. */
     @Transactional(readOnly = true)
     public Map<UUID, Long> homeCounts(List<UUID> ids) {
         Map<UUID, List<UUID>> families = families(ids);
@@ -129,7 +115,6 @@ public class SocietyService {
                 .collect(Collectors.toMap(id -> id, id -> sum(listings, families.get(id))));
     }
 
-    /** A merged-away slug resolves to its survivor rather than 404ing. */
     @Transactional(readOnly = true)
     public SocietyDetailResponse get(String slug) {
         Society society = live(slug);
@@ -166,7 +151,6 @@ public class SocietyService {
         return society;
     }
 
-    /** One query keyed by survivor, survivor-first; per-row would be an N+1 on an unauthenticated endpoint. */
     private Map<UUID, List<UUID>> families(List<UUID> survivorIds) {
         Map<UUID, List<UUID>> families = new LinkedHashMap<>();
         for (UUID id : survivorIds) {
@@ -181,12 +165,10 @@ public class SocietyService {
         return families;
     }
 
-    /** A per-society aggregate totalled over the family. Absent keys count as zero. */
     private static long sum(Map<UUID, Long> counts, List<UUID> family) {
         return family.stream().mapToLong(id -> counts.getOrDefault(id, 0L)).sum();
     }
 
-    /** Weighted by review count so a one-review duplicate can't drag the average; null if none published. */
     private static RatingLookup.Rating combinedRating(
             Map<UUID, RatingLookup.Rating> rated, List<UUID> family) {
         if (family.size() == 1) {

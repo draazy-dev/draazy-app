@@ -26,9 +26,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-/** RFC 8291 (aes128gcm message encryption) and RFC 8292 (VAPID) on the JDK alone. */
 final class WebPushCrypto {
-
     private static final int RECORD_SIZE = 4096;
     private static final int POINT_LENGTH = 65;
     private static final byte[] KEY_INFO_PREFIX = "WebPush: info\0".getBytes(StandardCharsets.US_ASCII);

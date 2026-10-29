@@ -28,20 +28,17 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 
-/** A merge is a shared, reversible fact on the server; semantics: docs/flows/consumer/societies.md §9.1. */
 @DisplayName("Societies — merging duplicates")
 class SocietyMergeTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
 
-    /** Audit rows commit {@code REQUIRES_NEW} past the rollback; static and run before too for killed builds. */
+    // REQUIRES_NEW audit rows survive rollback; sweep in a static hook, also before the run.
     @BeforeAll
     static void removeAuditRowsLeftByAnEarlierRun(@Autowired JdbcTemplate jdbc) {
         sweepOwnAuditRows(jdbc);
     }
 
-    /** @see #removeAuditRowsLeftByAnEarlierRun */
     @AfterAll
     static void removeAuditRowsThatEscapedRollback(@Autowired JdbcTemplate jdbc) {
         sweepOwnAuditRows(jdbc);
@@ -51,7 +48,6 @@ class SocietyMergeTest extends AbstractApiTest {
         jdbc.update("delete from audit_log where entity = 'society' and entity_id like '%-d243'");
     }
 
-    /** Mobile block 98680000xx — used by no other test class. */
     private User user(String mobile, String name) {
         User u = new User(mobile, Roles.Wire.BUYER);
         u.setName(name);
@@ -66,7 +62,6 @@ class SocietyMergeTest extends AbstractApiTest {
         return bearer(users.saveAndFlush(u));
     }
 
-    /** Minted through the public route so it carries {@code source = 'community'}, like a member's. */
     private String society(User author, String name) throws Exception {
         ResultActions minted = mvc.perform(post("/societies")
                         .header(HttpHeaders.AUTHORIZATION, bearer(author))
@@ -99,7 +94,6 @@ class SocietyMergeTest extends AbstractApiTest {
                 "select id, merged_into, merged_at, merged_by from societies where slug = ?", slug);
     }
 
-    /** A live listing filed against one society, as a member's would be. */
     private Property listing(User owner, String title, UUID societyId) {
         Property p = new Property(owner, title, "rent", "apartment", 25000L, "Kothrud", "Pune");
         p.setBhk(new BigDecimal("2"));
@@ -115,8 +109,6 @@ class SocietyMergeTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
     }
-
-    // ------------------------------------------------------------- the shared fact
 
     @Test
     @DisplayName("a merge one operator makes is a fact every other operator and searcher sees")
@@ -135,8 +127,6 @@ class SocietyMergeTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.mergedAt").exists())
                 .andExpect(jsonPath("$.mergedBy").doesNotExist());
 
-        // A browser-local merge leaves this queue empty for everyone else, so the pair waits to be
-        // merged a second time, possibly the other way round.
         String queue = mvc.perform(get("/admin/society-merges")
                         .header(HttpHeaders.AUTHORIZATION, second).param("size", "100"))
                 .andExpect(status().isOk())
@@ -144,7 +134,6 @@ class SocietyMergeTest extends AbstractApiTest {
         assertThat(queue).contains("\"slug\":\"" + duplicate + "\"")
                 .contains("\"intoSlug\":\"" + keep + "\"");
 
-        // And the searcher, who never saw the merge and is the reason it was made.
         String listed = directory("D243");
         assertThat(listed).contains(keep).doesNotContain("\"slug\":\"" + duplicate + "\"");
     }
@@ -159,8 +148,6 @@ class SocietyMergeTest extends AbstractApiTest {
         String duplicate = society(author, "Trelis Court D243");
         merge(ops, duplicate, keep).andExpect(status().isCreated());
 
-        // 404 would break every indexed URL, shared link and saved alert the moment an operator
-        // tidied the catalogue, with no way to know in advance.
         mvc.perform(get("/societies/" + duplicate))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value(keep))
@@ -185,14 +172,11 @@ class SocietyMergeTest extends AbstractApiTest {
 
         merge(ops, duplicate, keep).andExpect(status().isCreated());
 
-        // A merge that only hid the duplicate would take that second flat off both pages, leaving a
-        // listing that exists and is findable nowhere.
         mvc.perform(get("/societies/" + keep))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.listingCount").value(2))
                 .andExpect(jsonPath("$.homes.length()").value(2));
 
-        // The person who followed the duplicate followed this building, and still does.
         mvc.perform(get("/me/societies/following")
                         .header(HttpHeaders.AUTHORIZATION, bearer(follower)))
                 .andExpect(jsonPath("$.totalElements").value(1));
@@ -207,13 +191,9 @@ class SocietyMergeTest extends AbstractApiTest {
         String keep = society(author, "Juniper Rise D243");
         String duplicate = society(author, "Junipar Rise D243");
 
-        // Only on the loser, which is the shape a merge produces in the wild: the duplicate exists
-        // because somebody listed against it.
         listing(author, "2 BHK in Juniper Rise D243", id(duplicate));
         merge(ops, duplicate, keep).andExpect(status().isCreated());
 
-        // A correlated EXISTS on the survivor's own id would say "has a home" on the card and "has
-        // none" to the rail — an omission, so nothing errors and the rail comes up short.
         mvc.perform(get("/societies").param("q", "Juniper Rise D243").param("size", "100"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].slug").value(keep))
@@ -225,8 +205,6 @@ class SocietyMergeTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].slug").value(keep));
 
-        // And the other direction: a society nobody has listed against is not on the rail, which is
-        // the whole point of the filter. Same query without it still finds it.
         String quiet = society(author, "Juniper Rise D243 Annexe");
         mvc.perform(get("/societies")
                         .param("q", "Juniper Rise D243 Annexe").param("size", "100"))
@@ -250,8 +228,6 @@ class SocietyMergeTest extends AbstractApiTest {
 
         merge(ops, duplicate, keep).andExpect(status().isCreated());
 
-        // Rewriting `properties.society_id` would consolidate the same way but be a one-way door:
-        // nothing would say which listings came from where, so no merge could be taken back.
         assertThat(jdbc.queryForObject("select society_id from properties where id = ?",
                 UUID.class, filed.getId())).isEqualTo(duplicateId);
 
@@ -261,8 +237,6 @@ class SocietyMergeTest extends AbstractApiTest {
         assertThat(stored.get("merged_by")).isNotNull();
     }
 
-    // ------------------------------------------------------------- what is refused
-
     @Test
     @DisplayName("a society cannot be merged into itself")
     void selfMergeIsRefused() throws Exception {
@@ -270,8 +244,6 @@ class SocietyMergeTest extends AbstractApiTest {
         String ops = staff("9868000012");
         String slug = society(author, "Cypress Row D243");
 
-        // The schema refuses this too, but a CHECK violation reaches the operator as a 500 with no
-        // idea which of the two fields they got wrong.
         merge(ops, slug, slug).andExpect(status().isUnprocessableEntity());
         assertThat(row(slug).get("merged_into")).isNull();
     }
@@ -287,14 +259,10 @@ class SocietyMergeTest extends AbstractApiTest {
         String c = society(author, "Lanturn Bay D243");
         merge(ops, b, a).andExpect(status().isCreated());
 
-        // Forward: `a` has something pointing at it, so merging it onward would leave `b` two hops
-        // away. The refusal names `b`, since two rows sharing a name is the normal case here.
         merge(ops, a, c)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value(containsString(b)));
 
-        // Backward: merging into `b`, which is itself merged away, would put the same two-hop
-        // pointer in place from the other end.
         merge(ops, c, b).andExpect(status().isConflict());
 
         assertThat(row(a).get("merged_into")).isNull();
@@ -314,8 +282,6 @@ class SocietyMergeTest extends AbstractApiTest {
 
         merge(first, duplicate, keep).andExpect(status().isCreated());
 
-        // Two operators clearing the same queue at the same time. Letting the second write win would
-        // silently overwrite the first one's decision and the record of who made it.
         merge(second, duplicate, other).andExpect(status().isConflict());
         assertThat(row(duplicate).get("merged_into")).isEqualTo(id(keep));
     }
@@ -336,8 +302,6 @@ class SocietyMergeTest extends AbstractApiTest {
         mvc.perform(get("/admin/society-merges")).andExpect(status().isUnauthorized());
     }
 
-    // ------------------------------------------------------------- taking it back
-
     @Test
     @DisplayName("an undo puts the society back exactly as it was, and both decisions are in the audit log")
     void undoRestoresTheDuplicate() throws Exception {
@@ -351,8 +315,6 @@ class SocietyMergeTest extends AbstractApiTest {
 
         undo(ops, duplicate).andExpect(status().isNoContent());
 
-        // An undo takes all three merge columns back to null, so without the audit rows the fact
-        // that a merge was ever made would be gone from the database entirely.
         assertThat(auditCount("society.unmerge", duplicate)).isOne();
 
         Map<String, Object> stored = row(duplicate);
@@ -360,8 +322,6 @@ class SocietyMergeTest extends AbstractApiTest {
         assertThat(stored.get("merged_at")).isNull();
         assertThat(stored.get("merged_by")).isNull();
 
-        // Back in the directory and answering for itself — merging is a judgement an operator must
-        // be able to take back when a resident says the two buildings really are different.
         assertThat(directory("D243")).contains("\"slug\":\"" + duplicate + "\"");
         mvc.perform(get("/societies/" + duplicate))
                 .andExpect(status().isOk())
@@ -375,12 +335,9 @@ class SocietyMergeTest extends AbstractApiTest {
         String ops = staff("9868000022");
         String slug = society(author, "Beacon Rise D243");
 
-        // A 204 here would tell an operator who mistyped a slug that they had just undone something.
         undo(ops, slug).andExpect(status().isNotFound());
         undo(ops, "no-such-society-d243").andExpect(status().isNotFound());
     }
-
-    // ------------------------------------------------------------- agreeing with the rest
 
     @Test
     @DisplayName("a merged-away society leaves the candidates queue")
@@ -412,8 +369,6 @@ class SocietyMergeTest extends AbstractApiTest {
         String duplicate = society(author, "Astar Vale D243");
         merge(ops, duplicate, keep).andExpect(status().isCreated());
 
-        // Nothing was deleted, so both mint-guard lookups still find the duplicate. Handing it back
-        // would put the pair in front of the operator again and file this flat against a retired row.
         mvc.perform(post("/societies")
                         .header(HttpHeaders.AUTHORIZATION, bearer(member))
                         .contentType(MediaType.APPLICATION_JSON)

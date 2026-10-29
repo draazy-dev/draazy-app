@@ -29,13 +29,10 @@ import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** The catalogue aggregate mapping the {@code properties} table; wire shapes derive from it at the
- * boundary. Column-type and invariant rationale: docs/system/data-model.md#catalogue-entity-notes. */
 @Entity
 @Table(name = "properties")
 @Getter
 public class Property extends SoftDeleteEntity {
-
     public static final String OWNERSHIP_REVIEW_ITEM = "Ownership documents";
 
     public static final String OWNER_DELETE_REASON = "Taken down by the owner";
@@ -44,8 +41,6 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String slug;
 
-    /** The listing owner, fetched via an entity graph on the detail finders so the owner summary
-     * costs no N+1; search summaries never touch it. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
@@ -62,18 +57,12 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String propertyType;
 
-    /** Canonical filter key behind {@link #propertyType}'s free text, generated and read-only:
-     * chip filtering needs a fixed key an index can answer, not a substring scan. */
     @Column(name = "property_type_key", insertable = false, updatable = false)
     private String propertyTypeKey;
 
-    /** Canonical commercial subtype, generated and read-only: {@link #propertyTypeKey}
-     * collapses every commercial label, leaving the Office/Shop/Warehouse sub-filter nothing to use. */
     @Column(name = "commercial_use_key", insertable = false, updatable = false)
     private String commercialUseKey;
 
-    /** Share flag derived from {@link #room} (generated, read-only). Without it a share posted as
-     * "Flat" keys as {@code flat}, so a whole-unit Flat search returns shared rooms. */
     @Column(name = "share_type", insertable = false, updatable = false)
     private String shareType;
 
@@ -137,25 +126,18 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String facing;
 
-    /** Stored separately from facing so a home can state both compass direction and view. */
     @Column(name = "overlooking")
     @Setter
     private String overlooking;
 
-    /** Bathroom count, full and half together. {@code null} means unstated, {@code 0} means
-     * none — a shop or plot legitimately has none, and a synthesised number would be confidently wrong. */
     @Column(name = "bathrooms")
     @Setter
     private Integer bathrooms;
 
-    /** Dedicated parking slots conveyed with the unit — a count, not the "4-Wheeler Parking"
-     * amenity token. {@code null} = unstated, {@code 0} = none. */
     @Column(name = "parking")
     @Setter
     private Integer parking;
 
-    /** Balcony count, stated rather than derived from the bedroom count.
-     * {@code null} = unstated, {@code 0} = none. */
     @Column(name = "balconies")
     @Setter
     private Integer balconies;
@@ -164,32 +146,23 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String possession;
 
-    /** Permitted zoning for an open plot or farm land; null once there is a building on it. A
-     * search facet, not a detail: the wrong zoning is a dead purchase, not a disappointment. */
     @Column(name = "land_use")
     @Setter
     private String landUse;
 
-    /** Age of the construction in years. {@code null} is absent, never zero — reading unstated
-     * as brand-new would float every lazy listing above the honest ones in filters and scoring. */
     @Column(name = "age_years")
     @Setter
     private Integer ageYears;
 
-    /** Flatmate room shape: {@code single} for a private room, {@code shared} for a bed in a
-     * shared room. Null for every listing that is not a flatmate share. */
     @Column(name = "room")
     @Setter
     private String room;
 
-    /** Who the owner will rent to. A list because "family or company, no bachelors" is the
-     * ordinary Pune position; empty means no preference and must match every tenant filter. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "tenants", nullable = false)
     @Setter
     private List<String> tenants = new ArrayList<>();
 
-    /** The exact move-in date; null when unstated. The legacy now/15/30 bucket is derived from it. */
     @Column(name = "available_on")
     @Setter
     private LocalDate availableOn;
@@ -198,14 +171,10 @@ public class Property extends SoftDeleteEntity {
         return AvailableOn.bucketOf(availableOn, AvailableOn.today());
     }
 
-    /** Pets allowed; null when the owner did not answer. "No" and "unstated" are different facts, and
-     * the pet-friendly filter matches true only, so null is never advertised either way. */
     @Column(name = "pets")
     @Setter
     private Boolean pets;
 
-    /** Listing completeness, 0–100, generated and read-only: it orders search results, and an
-     * ordering the database cannot see cannot be paged. Weights and reasoning live in V94. */
     @Column(name = "quality_score", insertable = false, updatable = false)
     private Short qualityScore;
 
@@ -213,8 +182,6 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String locality;
 
-    /** FK slug into {@code localities}, resolved server-side; null when nothing resolved confidently.
-     * The public locality facet filters on this, while responses emit both name and slug. */
     @Column(name = "locality_slug")
     @Setter
     private String localitySlug;
@@ -223,13 +190,10 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private UUID societyId;
 
-    /** The bound society's public key, which clients route on; a formula so no second copy can drift.
-     * Setter stamps a just-written row for its own response — docs/system/data-model.md#society-slug. */
     @Formula("(select s.slug from societies s where s.id = society_id)")
     @Setter
     private String societySlug;
 
-    /** Server-derived, so a listing bound to an archived society still names it in the owner's edit form. */
     @Formula("(select s.name from societies s where s.id = society_id)")
     @Setter
     private String societyName;
@@ -250,14 +214,11 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String address;
 
-    /** The unit's electricity meter number — optional, since bulk-metered societies have none.
-     * Never emitted in a response: with a surname it is enough to impersonate a utility consumer. */
+    // Never emit in a response: with a surname it is enough to impersonate a utility consumer.
     @Column(name = "electricity_meter_no")
     @Setter
     private String electricityMeterNo;
 
-    /** {@link #electricityMeterNo} normalised for the duplicate probe — see {@link MeterKey}.
-     * Server-derived, never client-supplied: {@code "1700 1234 5678"} is not a different meter. */
     @Column(name = "electricity_meter_key")
     @Setter
     private String electricityMeterKey;
@@ -270,7 +231,6 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String pincode;
 
-    /** Private, validated edit answers; never included in public projections. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "form_details")
     @Setter
@@ -356,7 +316,6 @@ public class Property extends SoftDeleteEntity {
         setStatus(PropertyStatus.APPROVED);
     }
 
-    /** The only archive that schedules a purge: every other one is a takedown kept intact as evidence. */
     public void deleteByOwner(Instant purgeAfter) {
         archive(OWNER_DELETE_REASON);
         this.purgeAfter = purgeAfter;
@@ -382,14 +341,12 @@ public class Property extends SoftDeleteEntity {
         return isArchived() && OWNER_DELETE_REASON.equals(getArchiveReason());
     }
 
-    // Video is included because PhotoService ignores anything that is not its own upload.
     public Set<String> storedFiles() {
         Set<String> files = new LinkedHashSet<>(images);
         Stream.of(coverImage, floorPlan, video).filter(Objects::nonNull).forEach(files::add);
         return files;
     }
 
-    /** Keeps only what deals, invoices and chats still name; returns the files to delete from storage. */
     public Set<String> purgeContent(Instant at) {
         Set<String> files = storedFiles();
         images = new ArrayList<>();
@@ -420,7 +377,6 @@ public class Property extends SoftDeleteEntity {
         infoRequestedAt = Instant.now();
     }
 
-    // A result is about one ID, so changing the ID voids it.
     public void setReraId(String reraId) {
         if (!Objects.equals(this.reraId, reraId)) {
             recordReraCheck(null, null);
@@ -470,14 +426,10 @@ public class Property extends SoftDeleteEntity {
         return postedByAdmin && ownerConfirmedAt == null;
     }
 
-    // Read-side mirror of deals.status, kept in sync by DealService in the same transaction, so the
-    // catalogue can surface "under offer" without importing deals and closing a package cycle.
     @Column(name = "deal_status", nullable = false)
     @Setter
     private String dealStatus = "active";
 
-    // Featured is a reward for verifying ownership, not something a listing can be bought into; the
-    // window is the per-listing referral bonus, else the platform setting, else seven days.
     public static final String FEATURED_SQL = """
             coalesce(ownership_verified = true and ownership_verified_at > now() - interval '1 day' \
             * coalesce(featured_days, \
@@ -494,8 +446,6 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String flagReason;
 
-    /** Stays-live moderation work item: a nullable timestamp whose age is the queue SLA.
-     * Not a status value — every status but {@code approved} is off search, the cost this avoids. */
     @Column(name = "recheck_requested_at")
     private Instant recheckRequestedAt;
 
@@ -512,8 +462,6 @@ public class Property extends SoftDeleteEntity {
     @Column(name = "posted_by_admin", nullable = false)
     private boolean postedByAdmin = false;
 
-    /** Hand-back detail that is not the stage — currently only {@code postedByStaff}. Stores the
-     * staff id, so a colleague changing their display name does not rewrite history. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "admin_pipeline", nullable = false)
     private Map<String, Object> adminPipeline = new LinkedHashMap<>();
@@ -524,13 +472,11 @@ public class Property extends SoftDeleteEntity {
         this.adminPipeline.put("postedByStaff", staffId);
     }
 
-    /** The staff member who created this listing on the owner's behalf, or null. */
     public String getPostedByStaff() {
         Object value = adminPipeline.get("postedByStaff");
         return value == null ? null : value.toString();
     }
 
-    /** Owner or on-behalf poster: the maker, who may never be its checker. */
     public boolean isMadeBy(UUID userId) {
         return userId.equals(owner.getId()) || userId.toString().equals(getPostedByStaff());
     }
@@ -543,16 +489,12 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private boolean ownerVerified = false;
 
-    /** The ops verdict on ownership evidence — not the badge; read {@link #isOwnershipVerified()}.
-     * No setter: the three columns move together or the badge lies. */
     @Column(name = "ownership_verified", nullable = false)
     private boolean ownershipVerified = false;
 
     @Column(name = "ownership_verified_at")
     private Instant ownershipVerifiedAt;
 
-    /** Earliest expiry among the documents the verdict rested on, or {@code null} when every one of
-     * them was a never-expiring registry or identity document. */
     @Column(name = "ownership_verified_until")
     private Instant ownershipVerifiedUntil;
 
@@ -565,23 +507,17 @@ public class Property extends SoftDeleteEntity {
     @Column(name = "ownership_declined_reason")
     private String ownershipDeclinedReason;
 
-    /** When the owner last confirmed the listing is still available — the one freshness input
-     * that records a human act. Null = never confirmed; readers fall back to {@code createdAt}. */
     @Column(name = "last_confirmed_at")
     private Instant lastConfirmedAt;
 
-    /** Record the owner's confirmation at {@code at}. Unconditional and idempotent: an owner cannot
-     * know which of their listings the badge currently calls stale, so "confirm all" must not error. */
     public void confirmAvailable(Instant at) {
         this.lastConfirmedAt = at;
-        // JPA
     }
 
     @Column(name = "docs_count", nullable = false)
     @Setter
     private int docsCount = 0;
 
-    // Not updatable: only countView writes it, and a full-row entity save would roll its increments back.
     @Column(name = "views", nullable = false, updatable = false)
     private int views = 0;
 
@@ -592,8 +528,6 @@ public class Property extends SoftDeleteEntity {
     protected Property() {
     }
 
-    /** Create a listing with the minimum a new post requires; callers layer optional fields on via
-     * setters. The status/owner defaults are applied by the service so this stays a dumb constructor. */
     public Property(User owner, String title, String deal, String propertyType, Long price,
             String locality, String city) {
         this.owner = owner;
@@ -605,24 +539,18 @@ public class Property extends SoftDeleteEntity {
         this.city = city;
     }
 
-    /** Public visibility floor: only approved, non-archived rows of an unsuspended owner are shown. */
     public boolean isPubliclyVisible() {
         return !isArchived() && PropertyStatus.APPROVED.equals(status) && !isOwnerSuspended();
     }
 
-    // Reads the owner: list paths load it through findAllById's entity graph, and search filters it in PropertySpecs.
     public boolean isOwnerSuspended() {
         return owner != null && UserStatuses.SUSPENDED.equals(owner.getStatus());
     }
 
-    /** Direct-link reachability: approved or terminal (sold/rented) rows open, so a held link shows
-     * the badge rather than a 404. Pending/rejected/flagged/archived and suspended owners stay unreachable. */
     public boolean isDirectlyReachable() {
         return !isArchived() && PropertyStatus.DIRECTLY_REACHABLE.contains(status) && !isOwnerSuspended();
     }
 
-    /** Send an identity-changing edit (or a restore) back to review. Any pending re-check is dropped:
-     * a full re-moderation covers the whole listing, so keeping one would double the queue entry. */
     public void revertToPending() {
         setStatus(PropertyStatus.PENDING);
         clearRecheck();
@@ -632,8 +560,6 @@ public class Property extends SoftDeleteEntity {
         this.resubmittedAt = Instant.now();
     }
 
-    /** Queue a stays-live re-check on a publicly visible listing only. The timestamp is kept at
-     * the first unreviewed edit, so daily price edits cannot reset an owner's place in the queue. */
     public void requestRecheck(List<String> fields) {
         if (fields == null || fields.isEmpty() || isArchived()
                 || !(PropertyStatus.APPROVED.equals(status) || PropertyStatus.PAUSED.equals(status)
@@ -653,7 +579,6 @@ public class Property extends SoftDeleteEntity {
         recordResubmission();
     }
 
-    /** Keeps the first "before" and the latest "after" per field until a moderator clears the re-check. */
     public void recordRecheckChanges(List<Map<String, String>> changes) {
         if (changes == null || changes.isEmpty() || isArchived()
                 || !(PropertyStatus.APPROVED.equals(status) || PropertyStatus.PAUSED.equals(status)
@@ -689,7 +614,6 @@ public class Property extends SoftDeleteEntity {
         return ownershipRequestedAt != null;
     }
 
-    /** A moderator has looked: drop the work item. Idempotent. */
     public void clearRecheck() {
         if (ownershipRequestedAt != null && !isArchived()
                 && (PropertyStatus.APPROVED.equals(status) || PropertyStatus.PAUSED.equals(status))) {
@@ -707,21 +631,15 @@ public class Property extends SoftDeleteEntity {
         return recheckRequestedAt != null;
     }
 
-    /** The Ownership Verified badge — an ops verdict that has not yet lapsed.
-     * Derived, never swept: docs/system/data-model.md#the-ownership-badge-is-derived-not-swept. */
     public boolean isOwnershipVerified() {
         return isOwnershipVerifiedAt(Instant.now());
     }
 
-    /** The badge as at a given moment. One clock reading per request, so the badge, the gate and the
-     * evidence list cannot straddle an expiry and contradict each other in one response. */
     public boolean isOwnershipVerifiedAt(Instant at) {
         return ownershipVerified
                 && (ownershipVerifiedUntil == null || ownershipVerifiedUntil.isAfter(at));
     }
 
-    /** Record an ops verdict that the ownership evidence is complete: {@code at} is announced to
-     * billing, {@code until} is the earliest expiry relied on, or {@code null} when none expires. */
     public void verifyOwnership(Instant at, Instant until) {
         this.ownershipVerified = true;
         this.ownershipVerifiedAt = at;
@@ -746,12 +664,9 @@ public class Property extends SoftDeleteEntity {
         }
     }
 
-    /** Withdraw the verdict — the evidence was forged, or belonged to another flat. Not a lapse,
-     * which needs no write: this erases the claim itself. Idempotent. */
     public void revokeOwnershipVerification() {
         this.ownershipVerified = false;
         this.ownershipVerifiedAt = null;
         this.ownershipVerifiedUntil = null;
     }
-
 }

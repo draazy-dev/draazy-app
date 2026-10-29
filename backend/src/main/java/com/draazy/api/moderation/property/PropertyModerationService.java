@@ -25,10 +25,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Every method writes an audit row because one user is changing another's listing.
 @Service
 public class PropertyModerationService {
-
     private static final Set<String> SETTABLE = Set.of(
             PropertyStatus.PENDING, PropertyStatus.APPROVED, PropertyStatus.REJECTED);
 
@@ -65,8 +63,6 @@ public class PropertyModerationService {
         boolean clearingApprovedRecheck = PropertyStatus.APPROVED.equals(status)
                 && PropertyStatus.APPROVED.equals(from) && property.isRecheckPending();
         if (PropertyStatus.APPROVED.equals(status)) {
-
-            // Before anything is written, so a refusal costs the moderator nothing to retry.
             lifecycle.requireFiled(property);
         } else if (PropertyStatus.REJECTED.equals(status)) {
             ReviewReasonCodes.require("reject", reasonCode, reason);
@@ -79,14 +75,10 @@ public class PropertyModerationService {
         }
 
         if (PropertyStatus.APPROVED.equals(status)) {
-
-            /* Re-listing a home whose deal fell through is an approval, so return the row to the queue first
-               and let the verification below be real. An archived listing has its own restore verb. */
             if (!property.isArchived() && (PropertyStatus.SOLD.equals(from) || PropertyStatus.RENTED.equals(from))) {
                 lifecycle.reenterPending(actor, property);
             }
 
-            // Not reenterPending: that resets the checklist, and an approval must stand on the ticks already made.
             if (PropertyStatus.REJECTED.equals(from)) {
                 property.revertToPending();
             }
@@ -119,8 +111,6 @@ public class PropertyModerationService {
                 "checklist", checklistSnapshot(property.getId()),
                 "owner", String.valueOf(property.getOwner().getId()));
 
-        // Only the two terminal verdicts are announced; a bounce back to `pending` is a queue move.
-        // A rejected listing is not publicly viewable, so its link points at the dashboard.
         UUID ownerId = property.getOwner().getId();
         if (PropertyStatus.APPROVED.equals(status) && !clearingApprovedRecheck) {
             lifecycle.announceApproval(property);
@@ -134,7 +124,6 @@ public class PropertyModerationService {
         return property;
     }
 
-    // Sets both status and flag_reason: the status delists, the reason is for humans.
     @Transactional
     public Property flag(AuthPrincipal actor, String id, String reason) {
         Property property = load(id);
@@ -179,8 +168,8 @@ public class PropertyModerationService {
                 PropertyLifecycle.reviewLink(property));
     }
 
-    // A caller that does not name the status it saw may only decide a pending listing; otherwise the loser of
-    // two concurrent verdicts would land on top of the winner's (approve then reject both succeeding).
+    // Without an expected status only a pending listing may be decided, so the loser of two concurrent
+    // verdicts cannot overwrite the winner's.
     private static void requireExpected(String current, String expected, boolean clearingRecheck) {
         if (expected == null || expected.isBlank()) {
             if (!PropertyStatus.PENDING.equals(current) && !clearingRecheck) {
@@ -205,7 +194,6 @@ public class PropertyModerationService {
                 .orElseGet(Map::of);
     }
 
-    /** The desk's read of one listing by id or slug, archived rows included; no lock, no write. */
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public Property find(String idOrSlug) {
         return Ids.parseUuid(idOrSlug).flatMap(properties::findById)

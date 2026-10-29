@@ -15,19 +15,14 @@ import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
-/** The flatmate board as one searchable list — a {@code UNION ALL} narrowed, ordered, counted and
- * paged by PostgreSQL. Why the database, and the binding rules: docs/flows/consumer/flatmates.md §5. */
 @Component
 public class FlatmateSearchQueries {
-
     private static final int ROOM_SHARE_MAX = 3;
 
     private static final double EARTH_RADIUS_KM = 6371.0;
 
     private static final double KM_PER_DEGREE = 111.045;
 
-    /** A text block strips common indentation, so an appended {@code " and (...)"} contributes
-     * no leading space and fuses with the token before it ({@code nulland}). */
     private static final String SEP = "\n ";
 
     private final EntityManager em;
@@ -46,8 +41,6 @@ public class FlatmateSearchQueries {
         Map<String, Object> params = new HashMap<>();
         String matches = matchesCte(facets, params);
 
-        /** Snapshot before ordering: `orderBy` binds parameters of its own that appear nowhere in
-         * the CTE, and setting a parameter a statement does not mention is an error. */
         Map<String, Object> cteParams = new HashMap<>(params);
 
         String sql = matches + """
@@ -67,9 +60,6 @@ public class FlatmateSearchQueries {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = query.getResultList();
         if (rows.isEmpty()) {
-
-            /** Both totals ride on window columns of the RETURNED rows, so an offset past the end
-             * carries none. Zeros would unmount the pager on a search with hundreds of results. */
             return countOnly(matches, cteParams);
         }
         List<Ref> refs = rows.stream()
@@ -84,8 +74,6 @@ public class FlatmateSearchQueries {
         return countOnly(matchesCte(facets, params), params).total();
     }
 
-    /** The newest team on the Teams tab, priced by its whole-flat budget — the board's own rows, so the panel
-     * cannot show a split the feed would hide. */
     public FlatmatePulse.Split newestSplit() {
         Map<String, Object> params = new HashMap<>();
         Query query = em.createNativeQuery("""
@@ -121,11 +109,7 @@ public class FlatmateSearchQueries {
                 ((Number) totals[1]).longValue());
     }
 
-    /** Every branch ends in {@code id desc}: without a total order the boundary row of a page is
-     * shown twice or skipped. Only literals chosen here are concatenated. */
     private static String orderBy(FlatmateSearchQuery f, Map<String, Object> params) {
-
-        // A null price sorts last in both directions: "we do not know" is neither free nor dearest.
         return switch (f.sort()) {
             case FlatmateSearchQuery.SORT_NEWEST -> "order by created_at desc, id desc\n";
             case FlatmateSearchQuery.SORT_BUDGET_LOW ->
@@ -176,8 +160,6 @@ public class FlatmateSearchQueries {
         return "order by (" + score + ") desc, created_at desc, id desc\n";
     }
 
-    /** Worth up to 4 for a perfect match, 0 when the author has not answered enough to compare. Only
-     * catalogue keys reach the SQL text; the viewer's values are bound. */
     private static void appendStyleTerm(StringBuilder score, LivingStyleViewer viewer,
             Map<String, Object> params) {
         StringBuilder points = new StringBuilder();
@@ -218,8 +200,6 @@ public class FlatmateSearchQueries {
         return "with matches as (\n" + body + "\n)\n";
     }
 
-    /** Computed over every unarchived room BEFORE any facet applies — otherwise a budget filter
-     * would move the very price it compares against. */
     private static String roomLedgerCte() {
         return """
                 with room_ledger as (
@@ -232,8 +212,6 @@ public class FlatmateSearchQueries {
                 )""";
     }
 
-    /** Closes the surrounding parenthesis. IST, not the session's timezone: {@code move_in_at} is
-     * written in IST and would filter a day out. */
     private static String moveInHorizon() {
         return "(cast((now() at time zone 'Asia/Kolkata') as date)"
                 + " + cast(:moveInDays as integer)))";
@@ -247,7 +225,6 @@ public class FlatmateSearchQueries {
                       end)""".formatted(ROOM_SHARE_MAX);
     }
 
-    // Whitelisted on active so a suspended or erased author's posts are hidden, and any new status fails closed.
     private static String publicRows(String alias, String authorColumn, Map<String, Object> params) {
         params.put("modPublic", FlatmateVocabulary.MOD_PUBLIC);
         params.put("active", UserStatuses.ACTIVE);
@@ -256,8 +233,6 @@ public class FlatmateSearchQueries {
                 .formatted(alias, authorColumn);
     }
 
-    /** The projected column and the {@code verifiedOnly} filter both ask, and must agree. Same rule
-     * as {@link FlatmateRoomRepository#feed} and {@code FlatmateMapper.hostVerified}. */
     private static String roomVerified() {
         return """
                 (r.verification_tier = 'owner'
@@ -322,9 +297,6 @@ public class FlatmateSearchQueries {
             sql.append(" and r.gated_community");
         }
         if (f.moveInDays() != null) {
-
-            /** An undated row PASSES: null means "the host has not said", and `available_from` is
-             * null on most rows, so requiring it empties the board on first touch. */
             sql.append(" and (r.available_from is null or r.available_from <= ")
                     .append(moveInHorizon());
             params.put("moveInDays", f.moveInDays());
@@ -348,8 +320,6 @@ public class FlatmateSearchQueries {
                                      where gm.group_id = g.id and gm.verified = false)))""";
     }
 
-    /** Only hunting teams list. A legacy group that has its flat stays readable by link but off the board:
-     * a place to move into is a room post, with the photos and flat details a group never carries. */
     private static String groupSelect(FlatmateSearchQuery f, Map<String, Object> params) {
         StringBuilder sql = new StringBuilder("""
                 select 'group' as kind, g.id as id, g.created_at as created_at,
@@ -373,23 +343,17 @@ public class FlatmateSearchQueries {
             params.put("locality", f.locality());
         }
         if (f.q() != null) {
-
-            /** Not the members' names, for the reason on the seeker branch: a name on a card is not
-             * the same permission as a name being queryable. */
             sql.append(SEP).append("""
                     and (lower(g.title) like :q or lower(coalesce(g.note, '')) like :q""")
                     .append(" or ").append(jsonbTextLike("g.localities")).append(')');
             params.put("q", like(f.q()));
         }
 
-        // `per_head` is generated so it cannot drift from the card. Comparing against `rent`
-        // would filter on the whole flat's price while the screen shows one member's share.
         if (f.minBudget() != null) {
             sql.append(" and g.per_head >= :minBudget");
             params.put("minBudget", f.minBudget());
         }
         if (f.maxBudget() != null) {
-
             sql.append(" and coalesce(round(cast(g.rent_min as numeric) / g.seats_total), g.per_head)"
                     + " <= :maxBudget");
             params.put("maxBudget", f.maxBudget());
@@ -405,15 +369,12 @@ public class FlatmateSearchQueries {
             params.put("sharing", f.sharing());
         }
         if (f.moveInDays() != null) {
-
             sql.append(" and (g.move_in_by is null or g.move_in_by <= ").append(moveInHorizon());
             params.put("moveInDays", f.moveInDays());
         }
         appendVibe(sql, "g.host_id", f, params);
         appendRadius(sql, "g", f, params);
         if (f.verifiedOnly()) {
-
-            // The same expression the row projects, so the filter and the badge cannot disagree.
             sql.append(SEP).append(" and ").append(groupVerified());
         }
         return sql.toString();
@@ -431,16 +392,11 @@ public class FlatmateSearchQueries {
                 """);
         sql.append(publicRows("p", "user_id", params)).append('\n');
 
-        // A seeker names a shortlist rather than one locality, so this is containment against the
-        // jsonb array and its GIN index.
         if (f.locality() != null) {
             sql.append(" and p.localities @> to_jsonb(cast(:locality as text))");
             params.put("locality", f.locality());
         }
         if (f.q() != null) {
-
-            // Deliberately not `p.name`: matching it would turn a no-login endpoint into a
-            // searchable directory of people looking for a room.
             sql.append(SEP).append("""
                     and (lower(coalesce(p.occupation, '')) like :q
                          or lower(coalesce(p.note, '')) like :q""")
@@ -465,7 +421,6 @@ public class FlatmateSearchQueries {
             params.put("roomPref", f.roomType());
         }
         if (f.moveInDays() != null) {
-
             sql.append(" and (p.move_in_at is null or p.move_in_at <= ")
                     .append(moveInHorizon());
             params.put("moveInDays", f.moveInDays());
@@ -483,8 +438,6 @@ public class FlatmateSearchQueries {
         sql.append(VibeFilter.sql(authorColumn, f.vibe(), f.meStyle().answers(), params));
     }
 
-    /** "Within N km of this point" without PostGIS — bounding box, then the exact great-circle test,
-     * with a locality-centroid fallback: docs/flows/consumer/flatmates.md §5. */
     private static void appendRadius(StringBuilder sql, String alias, FlatmateSearchQuery f,
             Map<String, Object> params) {
         if (!f.hasNearPoint()) {
@@ -498,8 +451,6 @@ public class FlatmateSearchQueries {
 
         double latDelta = radiusKm / KM_PER_DEGREE;
 
-        // Floored so a search near a pole degenerates into the whole longitude range, not a
-        // division by zero.
         double lngDelta = radiusKm / (KM_PER_DEGREE * Math.max(Math.abs(cosLat), 1e-6));
 
         sql.append(SEP).append(" and ((").append(alias).append(".lat is not null and ")
@@ -524,7 +475,6 @@ public class FlatmateSearchQueries {
                 + " + :sinLat * sin(radians(%1$s.lat))) >= :cosRadius").formatted(alias);
     }
 
-    /** A seeker names a shortlist, so any entry landing in the circle answers yes. */
     private static String nearByLocality(String alias) {
         boolean shortlist = "p".equals(alias) || "g".equals(alias);
         String source = shortlist
@@ -537,8 +487,6 @@ public class FlatmateSearchQueries {
                 .formatted(source, match, within("loc"));
     }
 
-    /** Against the ELEMENTS of a jsonb text array, not its serialization — otherwise JSON
-     * punctuation becomes matchable and a pattern can span an element boundary. */
     private static String jsonbTextLike(String column) {
         return ("exists (select 1 from jsonb_array_elements_text(coalesce(%s, '[]'::jsonb)) as e(v)"
                 + " where lower(e.v) like :q)").formatted(column);

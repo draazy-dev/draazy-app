@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FlatmateMembershipService {
-
     private final FlatmateGroupRepository groups;
     private final FlatmateRequestRepository requests;
     private final PlatformSettings settings;
@@ -62,8 +61,6 @@ public class FlatmateMembershipService {
         release(group, me, users.findById(caller.userId()).map(User::getName).orElse(null));
     }
 
-    /** Account erasure: every seat the person holds in someone else's group opens again, with the
-     * same notice to the host that leaving by hand sends. */
     public void leaveAll(UUID userId) {
         for (UUID groupId : groups.findJoinedIds(userId)) {
             FlatmateGroup group = groups.findById(groupId).orElse(null);
@@ -122,8 +119,6 @@ public class FlatmateMembershipService {
         }
     }
 
-    /** A deleted group has no page to open, so the asks pointing at it go too — they would otherwise
-     * sit in every asker's list as a card whose View is a 404. */
     void disband(FlatmateGroup group) {
         List<FlatmateRequest> asks = requests.findByKindAndTargetId("group", group.getId());
         asks.stream().filter(r -> "accepted".equals(r.getStatus())).forEach(r ->

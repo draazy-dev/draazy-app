@@ -9,12 +9,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class AdminMetricsRepository {
-
-    // Spelled as a string because it is interpolated into SQL.
     private static final String IST = PlatformTime.IST.getId();
 
-    // Invoices are issued only when the gateway confirms a payment and credit notes only when it confirms a refund,
-    // so together they are the money ledger. `fee` is Draazy's own part; the rest is statutory pass-through.
     private static final String MONEY = """
             select i.id, i.number, i.user_id, cast((i.issued_at at time zone '%1$s') as date) as day,
                    case when i.source_type = 'subscription' then 'subscription' else 'service' end as source,
@@ -41,7 +37,6 @@ public class AdminMetricsRepository {
               from (%s) money
             """.formatted(MONEY) + WINDOW;
 
-    // Buckets with no money in a given source simply do not appear; the service fills the gaps.
     private static final String FEE_SERIES = """
             select cast(date_trunc('month', cast(day as timestamp)) as date) as bucket, source,
                    coalesce(sum(fee) filter (where not refund), 0),
@@ -73,7 +68,6 @@ public class AdminMetricsRepository {
                and s.amount > 0
             """;
 
-    // Group by charged amount so repriced plans show old and new cohorts separately.
     private static final String PLAN_LINES = """
             select p.name, p.audience, coalesce(p.billing_cycle, 'monthly'), s.amount,
                    count(*) as active,
@@ -102,8 +96,6 @@ public class AdminMetricsRepository {
               left join users u on u.id = m.user_id
             """.formatted(MONEY);
 
-    // The filter applied to `#LEDGER_ROWS`, written once and used by both the page and its count.
-    // Every bound parameter is cast to its type before the null test.
     private static final String LEDGER_FILTER = """
              where (cast(:kind as text) is null or kind = cast(:kind as text))
                and (cast(:q    as text) is null or party ilike cast(:q as text) escape '\\'
@@ -120,7 +112,6 @@ public class AdminMetricsRepository {
         this.em = em;
     }
 
-    /** Listings that are not soft-deleted, optionally narrowed to one moderation status. */
     public long countListings(String status) {
         String sql = "select count(*) from properties where archived = false"
                 + (status == null ? "" : " and status = :status");
@@ -131,7 +122,6 @@ public class AdminMetricsRepository {
         return ((Number) query.getSingleResult()).longValue();
     }
 
-    /** Users that are not soft-deleted, optionally only those who joined within {@code days}. */
     public long countUsers(Integer withinDays) {
         String sql = "select count(*) from users where archived = false"
                 + (withinDays == null ? ""
@@ -185,7 +175,6 @@ public class AdminMetricsRepository {
                 longAt(row, 4));
     }
 
-    /** Rows of month bucket, source, fees invoiced, fees credited back. */
     @SuppressWarnings("unchecked")
     public List<Object[]> feeSeries(LocalDate from, LocalDate to) {
         return em.createNativeQuery(FEE_SERIES)
@@ -204,7 +193,6 @@ public class AdminMetricsRepository {
         return ((Number) row[index]).longValue();
     }
 
-    /** Monthly run rate of the active subscription book, in whole rupees. See {@link #MRR}. */
     public long mrr() {
         return ((Number) em.createNativeQuery(MRR).getSingleResult()).longValue();
     }

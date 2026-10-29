@@ -12,17 +12,10 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 
-/**
- * An append-only audit trail row (schema: AuditEntry). Written server-side on every maker-checker /
- * money / privileged mutation. {@code actor}/{@code checker} are resolved server-side, never
- * client-supplied. Immutable — no {@code updated_at}; its {@code at} column is the creation stamp,
- * so this entity intentionally does not extend {@code BaseEntity}. Maps {@code audit_log} (V1).
- */
 @Entity
 @Table(name = "audit_log")
 @Getter
 public class AuditLog {
-
     @Id
     @UuidGenerator
     @Column(name = "id", nullable = false, updatable = false)
@@ -46,7 +39,6 @@ public class AuditLog {
     @Column(name = "checker", updatable = false)
     private String checker;
 
-    /** Free-form JSON context (e.g. before/after diff). Stored as jsonb. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", nullable = false, updatable = false)
     private String metadata = "{}";
@@ -56,7 +48,6 @@ public class AuditLog {
     private Instant at;
 
     protected AuditLog() {
-        // JPA
     }
 
     public AuditLog(String actor, String actorRole, String action, String entity, String entityId,
@@ -69,5 +60,4 @@ public class AuditLog {
         this.checker = checker;
         this.metadata = metadata == null ? "{}" : metadata;
     }
-
 }

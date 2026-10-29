@@ -17,17 +17,13 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-// Driven directly rather than through MockMvc, because the two things worth proving are which requests reach the
-// chain and what the refusal looks like.
 @DisplayName("Bot defence filter (D130)")
 class BotDefenceFilterTest {
-
     private static final String GOOD = "a-token-the-provider-accepts";
 
     private final MockHttpServletResponse response = new MockHttpServletResponse();
     private final MockFilterChain chain = new MockFilterChain();
 
-    /** Enforcing, and accepting only {@link #GOOD}. */
     private static BotDefence enforcing() {
         return new BotDefence() {
             @Override
@@ -42,7 +38,6 @@ class BotDefenceFilterTest {
         };
     }
 
-    /** Enforcing, with a provider that never answers — the outage case. */
     private static BotDefence unreachable() {
         return new BotDefence() {
             @Override
@@ -52,9 +47,6 @@ class BotDefenceFilterTest {
 
             @Override
             public boolean verify(String token, String remoteIp) {
-
-                // What TurnstileBotDefence returns when the HTTP call throws: a refusal, never an
-                // exception. See TurnstileBotDefenceTest for the real thing doing this.
                 return false;
             }
         };
@@ -72,7 +64,6 @@ class BotDefenceFilterTest {
         new BotDefenceFilter(defence).doFilter(request, response, chain);
     }
 
-    /** The chain only advances when the filter let the request through. */
     private boolean reachedApplication() {
         return chain.getRequest() != null;
     }
@@ -80,7 +71,6 @@ class BotDefenceFilterTest {
     @Nested
     @DisplayName("when no challenge is configured")
     class Disabled {
-
         @Test
         @DisplayName("passes a challenged write straight through, with no token at all")
         void passesThrough() throws Exception {
@@ -119,7 +109,6 @@ class BotDefenceFilterTest {
     @Nested
     @DisplayName("when a challenge is configured")
     class Enabled {
-
         @Test
         @DisplayName("accepts a write carrying a token the provider confirms")
         void acceptsValidToken() throws Exception {
@@ -226,7 +215,6 @@ class BotDefenceFilterTest {
         @Test
         @DisplayName("still challenges a percent-encoded spelling of a protected path")
         void normalisesBeforeMatching() throws Exception {
-
             MockHttpServletRequest request = post("/service-waitlist");
             request.setRequestURI("/service-waitlis%74");
 

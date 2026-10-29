@@ -19,7 +19,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class NeedsInfoSweepService {
-
     private static final Logger log = LoggerFactory.getLogger(NeedsInfoSweepService.class);
     private static final Duration FIRST_REMINDER = Duration.ofDays(3);
     private static final Duration DAY_7 = Duration.ofDays(7);
@@ -48,8 +47,6 @@ public class NeedsInfoSweepService {
         this.clock = clock;
     }
 
-    // One transaction per row: a row that fails rolls back alone. The conditional mark* updates keep a
-    // row that another instance already handled from being handled twice.
     public SweepResult sweep() {
         Instant now = Instant.now(clock);
         List<NeedsInfoReviewRepository.NeedsInfoCase> due = tx.execute(status -> reviews.findDue(
@@ -116,7 +113,8 @@ public class NeedsInfoSweepService {
                 "We archived it because we did not receive the requested info within 14 days. "
                         + "You can restore and resubmit when ready.",
                 "/dashboard");
-        // audit.record commits on its own, so it goes last: a failure above must not log a rolled-back archive.
+        // audit.record commits on its own, so it goes last: a failure above must not
+        // log a rolled-back archive.
         audit.record("system", Roles.Wire.ADMIN, "property.needs_info.timeout_archive",
                 "property", row.propertyId().toString(), null,
                 "{\"reason\":\"" + ARCHIVE_REASON + "\",\"reviewId\":\"" + row.reviewId() + "\"}");

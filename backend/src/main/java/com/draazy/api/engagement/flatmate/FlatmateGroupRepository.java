@@ -15,7 +15,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UUID> {
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select g from FlatmateGroup g where g.id = :id and g.archived = false")
     Optional<FlatmateGroup> lockLive(@Param("id") UUID id);
@@ -81,8 +80,6 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
 
     long countByRecheckRequestedAtNotNullAndArchivedFalse();
 
-    /** {@code cast(:locality as string)} is required: with a bare parameter Hibernate binds a null as
-     * {@code bytea} and PostgreSQL has no {@code lower(bytea)}, 500ing the unfiltered feed. */
     @Query(value = """
             select distinct g from FlatmateGroup g
             left join fetch g.members

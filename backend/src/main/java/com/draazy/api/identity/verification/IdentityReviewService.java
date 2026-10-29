@@ -34,7 +34,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @Service
 public class IdentityReviewService {
-
     private static final Logger log = LoggerFactory.getLogger(IdentityReviewService.class);
 
     private static final String IDENTITY_HASH_CONSTRAINT = "identity_verifications_identity_hash_key";
@@ -114,7 +113,6 @@ public class IdentityReviewService {
         }
         Instant now = Instant.now(clock);
         String legalName = normaliseName(body.name());
-        // Joiners are legitimate in Indic legal names but are not letters to the self-service rule.
         personNames.require(legalName.replace("\u200C", "").replace("\u200D", ""));
         v.setIdentityHash(hash);
         v.setDocLast4(IdentityNumbers.last4(canonical));
@@ -398,5 +396,4 @@ public class IdentityReviewService {
             throw new ConflictException("This case has already been decided");
         }
     }
-
 }

@@ -6,8 +6,6 @@ import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
-/** Contract schema {@code FlatmateReview}. Back-office only, so the host's and owner's mobiles are in full. The
- * consent OTP proves only possession of the number, so the desk also sees whose Draazy account holds it. */
 public record FlatmateReviewDto(
         UUID id,
         String kind,
@@ -33,7 +31,6 @@ public record FlatmateReviewDto(
         String reason,
         Instant createdAt,
         Instant updatedAt) {
-
     static FlatmateReviewDto of(FlatmateReview review, User host, String ownerMobile, User ownerAccount) {
         return new FlatmateReviewDto(
                 review.getId(),

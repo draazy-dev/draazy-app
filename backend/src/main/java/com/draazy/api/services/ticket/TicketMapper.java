@@ -12,11 +12,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/** Batch-loaded as in {@code ServiceRequestMapper}: notes are inline and the board is paged,
- * so per-row loads would be an N+1 on the busiest ops screen. */
 @Component
 public class TicketMapper {
-
     private final TicketNoteRepository notes;
     private final UserRepository users;
 
@@ -29,8 +26,6 @@ public class TicketMapper {
         return toDtos(List.of(ticket)).getFirst();
     }
 
-    /** Single-row, so one assignee lookup replaces the batch; omits internal notes,
-     * which {@link CustomerTicketDto} has no component for. */
     public CustomerTicketDto toCustomer(Ticket ticket) {
         String assignee = ticket.getAssigneeId() == null
                 ? null
@@ -83,7 +78,6 @@ public class TicketMapper {
                 .toList();
     }
 
-    /** Board rows: no notes read, and the assignee names resolved in one lookup. */
     public List<TicketRow> toRows(List<Ticket> tickets) {
         if (tickets.isEmpty()) {
             return List.of();

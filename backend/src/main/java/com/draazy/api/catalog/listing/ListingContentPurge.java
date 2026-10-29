@@ -13,10 +13,8 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Once an owner-deleted listing's undo window ends, clears what it showed and deletes its photos from storage. */
 @Service
 public class ListingContentPurge {
-
     public static final Duration UNDO_WINDOW = Duration.ofDays(30);
 
     private static final int BATCH = 200;
@@ -31,7 +29,6 @@ public class ListingContentPurge {
         this.audit = audit;
     }
 
-    /** Purges one page of due listings; returns how many. */
     @Transactional
     public int purgeDue(Instant now) {
         List<Property> due = properties.findContentPurgeDue(now, Limit.of(BATCH));

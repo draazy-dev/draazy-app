@@ -8,14 +8,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class IdentityAppeals {
-
     private final IdentityAppealRepository appeals;
 
     public IdentityAppeals(IdentityAppealRepository appeals) {
         this.appeals = appeals;
     }
 
-    /** The appeal that still describes this case: open, or its outcome while the case sits in that state. */
     public Optional<IdentityAppealInfo> current(IdentityVerification v) {
         return appeals.findFirstByVerificationIdOrderByCreatedAtDesc(v.getId())
                 .filter(a -> switch (a.getStatus()) {
@@ -31,7 +29,6 @@ public class IdentityAppeals {
         return verificationIds.isEmpty() ? Set.of() : Set.copyOf(appeals.openVerificationIds(verificationIds));
     }
 
-    /** Photos already purged cannot be re-reviewed, so those rejections go back to "try again". */
     public boolean canAppeal(IdentityVerification v) {
         if (!VerificationStatuses.REJECTED.equals(v.getStatus()) || v.getFilesPurgedAt() != null) {
             return false;

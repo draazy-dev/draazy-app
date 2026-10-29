@@ -23,25 +23,19 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-// Staff must not see owner self-service quota remedies they cannot perform.
-// This route is staff-only behind its own `postOnBehalf:write` atom, writes two audit rows, and has a person deciding.
 @DisplayName("D239 — the concierge desk could only ever record one listing per owner")
 class ConciergeListingQuotaTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
     PropertyRepository properties;
 
-    // Audit rows and first-time owner provisioning use `REQUIRES_NEW`.
-    // They must survive whatever happens to the listing transaction.
     @AfterAll
     static void removeRowsThatEscapedRollback() {
         cleanup.update("delete from audit_log where action like '%_on_behalf'");
         cleanup.update("delete from users where mobile like '98539000%'");
     }
 
-    /** {@code @AfterAll} is static and cannot be injected; the instance template is borrowed here. */
     private static JdbcTemplate cleanup;
 
     @BeforeEach
@@ -60,8 +54,7 @@ class ConciergeListingQuotaTest extends AbstractApiTest {
                         "locality":"Kothrud","city":"Pune","images":["%s"]}}
             """;
 
-    // An account, saved directly.
-    // Desk-created accounts commit outside rollback, so this class must clean them up.
+    // Desk-created accounts commit outside the test rollback, so this class must clean them up.
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
         u.setName("Concierge " + mobile);
@@ -69,7 +62,6 @@ class ConciergeListingQuotaTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    // A listing already in the catalogue, saved directly rather than posted.
     private Property held(User owner, String title, String status) {
         Property p = new Property(owner, title, "rent", "apartment", 25000L, "Kothrud", "Pune");
         p.setBhk(new BigDecimal("2"));
@@ -141,8 +133,6 @@ class ConciergeListingQuotaTest extends AbstractApiTest {
                 .isEqualTo(201);
     }
 
-    // First desk post provisions a free-tier owner; the exemption lets staff
-    // record more than one listing for that new caller.
     @Test
     @DisplayName("a brand-new owner does not run out after one, which is every first call")
     void aProvisionedOwnerIsNotCappedAtOne() throws Exception {
@@ -173,7 +163,6 @@ class ConciergeListingQuotaTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.overAllowance").value(true));
     }
 
-    // Warn only on exhaustion; warning on every caller trains operators to ignore it.
     @Test
     @DisplayName("at the ceiling is not over it")
     void standingDoesNotCryWolfAtExactlyTheLimit() throws Exception {
@@ -189,8 +178,6 @@ class ConciergeListingQuotaTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.overAllowance").value(false));
     }
 
-    // "No account yet" is the ordinary answer on a first call, so it is a 200.
-    // A 404 would make the console render its error state for the commonest thing that happens at this desk.
     @Test
     @DisplayName("a number with no account answers 200, not 404")
     void anUnknownNumberIsNotAnError() throws Exception {
@@ -206,8 +193,6 @@ class ConciergeListingQuotaTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.overAllowance").value(false));
     }
 
-    // Separators, not a country code.
-    // Mobile is ten digits everywhere; accepting `+91` here would disagree with POST.
     @Test
     @DisplayName("the number is normalised the way an operator types it")
     void spacingAndPunctuationAreStripped() throws Exception {
@@ -233,8 +218,6 @@ class ConciergeListingQuotaTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // The read discloses one person's plan position, so it needs the desk-specific grant.
-    // A buyer must not reach it at all.
     @Test
     @DisplayName("a buyer cannot read anybody's standing")
     void standingIsStaffOnly() throws Exception {

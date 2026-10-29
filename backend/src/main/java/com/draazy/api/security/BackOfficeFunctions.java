@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Set;
 
 public final class BackOfficeFunctions {
-
     private BackOfficeFunctions() {
     }
 
@@ -99,7 +98,6 @@ public final class BackOfficeFunctions {
         return new Function(desk(desk), label, "Service desks", deskAtoms(desk), desk);
     }
 
-    // Home Loans works the ticket board, which TicketService scopes to the caller's desks.
     private static List<String> deskAtoms(String desk) {
         return switch (desk) {
             case Teams.RENTAL -> List.of(BackOfficePermissions.SERVICES_READ,

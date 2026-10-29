@@ -11,10 +11,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/** Room cards need host names and flat-level occupancy, not just room columns. */
 @Component
 class FlatmateRoomCards {
-
     private final FlatmateRoomRepository rooms;
     private final UserRepository users;
     private final FlatmateMapper mapper;
@@ -29,7 +27,6 @@ class FlatmateRoomCards {
         this.reviewStatuses = reviewStatuses;
     }
 
-    /** A list of rooms as a list of cards, in the order given. */
     List<FlatmateRoomFeedDto> render(List<FlatmateRoom> window) {
         Map<UUID, FlatmateMapper.RoomView> views = anonymousViews(window, hostNames(window));
         return window.stream()
@@ -37,7 +34,6 @@ class FlatmateRoomCards {
                 .toList();
     }
 
-    /** Mixed feed passes already-batched host names to avoid reading the same users twice. */
     Map<UUID, FlatmateMapper.RoomView> anonymousViews(
             Collection<FlatmateRoom> window, Map<UUID, String> hostNames) {
         Map<UUID, Integer> ledger = committedByFlat(window);
@@ -50,12 +46,10 @@ class FlatmateRoomCards {
                 (first, duplicate) -> first));
     }
 
-    /** Host view may include the host's own name and number on rows they posted. */
     Map<UUID, FlatmateMapper.RoomView> ownerViews(
             Collection<FlatmateRoom> window, String ownerName, String ownerMobile) {
         Map<UUID, Integer> ledger = committedByFlat(window);
 
-        /** Host sees review verdicts because only they can act on pending or missing badges. */
         Map<UUID, String> verdicts = reviewStatuses.forRooms(window);
         return window.stream().collect(Collectors.toMap(
                 FlatmateRoom::getId,
@@ -65,7 +59,6 @@ class FlatmateRoomCards {
                 (first, duplicate) -> first));
     }
 
-    /** The host's own list: no names; one batched review lookup for the badge state. */
     List<FlatmateRoomCard> ownerCards(List<FlatmateRoom> window) {
         Map<UUID, Integer> ledger = committedByFlat(window);
         Map<UUID, String> verdicts = reviewStatuses.forRooms(window);
@@ -78,7 +71,6 @@ class FlatmateRoomCards {
                 .toList();
     }
 
-    /** Same occupancy rule for public and host views so one room never has two counts. */
     private static int committedFor(FlatmateRoom room, Map<UUID, Integer> ledger) {
         if (!room.isSplitRoom()) {
             return room.getOccupants();
@@ -102,7 +94,6 @@ class FlatmateRoomCards {
         return ledger;
     }
 
-    /** Drop nameless OTP hosts so the card can render its absent-owner placeholder. */
     private Map<UUID, String> hostNames(Collection<FlatmateRoom> window) {
         List<UUID> hostIds = window.stream()
                 .map(FlatmateRoom::getHostId)

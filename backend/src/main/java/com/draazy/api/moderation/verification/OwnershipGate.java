@@ -5,17 +5,13 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-// Pure function so a lapsed badge needs no sweep job.
 final class OwnershipGate {
-
     private OwnershipGate() {
     }
 
-    // until is null when the whole set never expires.
     record State(List<String> missing, Instant until) {
     }
 
-    // Strongest current document wins per fact; earliest expiry wins across facts.
     static State evaluate(Property property, List<OwnershipEvidence> rows, Instant now) {
         List<String> missing = new ArrayList<>();
         Instant until = null;
@@ -59,7 +55,6 @@ final class OwnershipGate {
         return !OwnershipEvidenceTypes.namesASubject(row.getDocType()) || row.getSubjectName() != null;
     }
 
-    // Owners see facts and currency only; doc ids and subject names are staff-only DPDP data.
     static OwnershipVerificationResponse toResponse(Property property,
             List<OwnershipEvidence> rows, Instant now, boolean staffView, boolean ownerIdVerified) {
         List<OwnershipVerificationResponse.Evidence> wire = rows.stream()

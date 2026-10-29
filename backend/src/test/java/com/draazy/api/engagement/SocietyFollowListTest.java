@@ -21,11 +21,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** {@code followedByMe} only answers for societies already in hand, so the dashboard and finder need this read;
- * ordering is newest follow first, and the cards are the directory's own shape. */
 @DisplayName("Societies — which ones do I follow?")
 class SocietyFollowListTest extends AbstractApiTest {
-
     private static final String PATH = "/me/societies/following";
 
     @Autowired MockMvc mvc;
@@ -39,7 +36,6 @@ class SocietyFollowListTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    /** Any three seeded societies: named slugs would tie these tests to demo seed data, which is not contract. */
     private List<String> someSocieties(int n) {
         List<String> slugs = jdbc.queryForList(
                 "select slug from societies order by slug limit ?", String.class, n);
@@ -53,7 +49,6 @@ class SocietyFollowListTest extends AbstractApiTest {
                 .andExpect(status().isNoContent());
     }
 
-    /** Backdated because two follows in one test often share a millisecond, so ordering checks pass by luck. */
     private void followedAgo(User u, String slug, int minutes) {
         jdbc.update("""
                 update society_follows set created_at = ?
@@ -61,7 +56,6 @@ class SocietyFollowListTest extends AbstractApiTest {
                 Timestamp.from(Instant.now().minus(minutes, ChronoUnit.MINUTES)), u.getId(), slug);
     }
 
-    /** The dashboard row: what it draws, nothing the directory card carries beyond that. */
     @Test
     @DisplayName("a follow made through the toggle is readable as a slim dashboard row")
     void followThenRead() throws Exception {
@@ -92,8 +86,6 @@ class SocietyFollowListTest extends AbstractApiTest {
         for (String slug : slugs) {
             follow(u, slug);
         }
-        // Reverse the natural (alphabetical) order of the slugs, so an accidental order-by-slug
-        // or an order-by-nothing that happens to return insertion order both fail.
         followedAgo(u, slugs.get(0), 30);
         followedAgo(u, slugs.get(1), 20);
         followedAgo(u, slugs.get(2), 10);
@@ -152,15 +144,12 @@ class SocietyFollowListTest extends AbstractApiTest {
 
         follow(a, slug);
 
-        // A caller who follows nothing gets an empty page, not a 404.
         mvc.perform(get(PATH).header(HttpHeaders.AUTHORIZATION, bearer(b)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(0))
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
-    /** Paged because nothing caps how many societies one person may follow, and api-standards.md §5.1
-     * permits an array only where growth is bounded. */
     @Test
     @DisplayName("the list is paged — a small page still reports the full total")
     void pagedNotBareArray() throws Exception {
@@ -183,8 +172,6 @@ class SocietyFollowListTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(3));
     }
 
-    /** {@code /me/societies/{slug}/follow} has a segment after the variable, so the literal
-     * cannot be swallowed by it; proved from both directions. */
     @Test
     @DisplayName("the literal path does not collide with the slug-shaped toggle route")
     void doesNotCollideWithTheToggle() throws Exception {
@@ -193,8 +180,6 @@ class SocietyFollowListTest extends AbstractApiTest {
         mvc.perform(get(PATH).header(HttpHeaders.AUTHORIZATION, bearer(u)))
                 .andExpect(status().isOk());
 
-        // There is no society called "following", and asking to follow it must still 404 rather
-        // than resolving against the list route.
         mvc.perform(put("/me/societies/following/follow")
                         .header(HttpHeaders.AUTHORIZATION, bearer(u)))
                 .andExpect(status().isNotFound());

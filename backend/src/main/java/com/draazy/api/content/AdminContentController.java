@@ -18,12 +18,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Staff and admin both: {@code SecurityConfig} only requires authentication on {@code /admin/**}. A method-level
- * {@code @PreAuthorize} replaces the class one, so per-method atoms must repeat the role term. */
+// A method-level @PreAuthorize replaces the class one,
+// so every per-method expression must repeat the role term.
 @RestController
 @PreAuthorize("hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')")
 public class AdminContentController {
-
     private static final String STAFF_OR_ADMIN =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
     private static final String CONTENT_READ =
@@ -37,7 +36,6 @@ public class AdminContentController {
         this.service = service;
     }
 
-    /** {@code GET /admin/content/{type}} (contract {@code adminListContent}). */
     @GetMapping(Routes.Admin.CONTENT)
     @PreAuthorize(CONTENT_READ)
     public List<ContentItem> list(@PathVariable String type,
@@ -46,7 +44,6 @@ public class AdminContentController {
         return service.list(type, archived, translations);
     }
 
-    /** {@code POST /admin/content/{type}} (contract {@code adminCreateContent}). */
     @PostMapping(Routes.Admin.CONTENT)
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize(CONTENT_WRITE)
@@ -55,7 +52,6 @@ public class AdminContentController {
         return service.create(principal, type, body);
     }
 
-    /** {@code PATCH /admin/content/{type}/{id}} (contract {@code adminUpdateContent}). */
     @PatchMapping(Routes.Admin.CONTENT_ITEM)
     @PreAuthorize(CONTENT_WRITE)
     public ContentItem update(@CurrentUser AuthPrincipal principal, @PathVariable String type,
@@ -63,7 +59,6 @@ public class AdminContentController {
         return service.update(principal, type, id, body);
     }
 
-    /** {@code POST /admin/content/{type}/{id}/archive} (contract {@code adminArchiveContent}). */
     @PostMapping(Routes.Admin.CONTENT_ARCHIVE)
     @PreAuthorize(CONTENT_WRITE)
     public ContentItem archive(@CurrentUser AuthPrincipal principal, @PathVariable String type,
@@ -71,7 +66,6 @@ public class AdminContentController {
         return service.archive(principal, type, id);
     }
 
-    /** {@code POST /admin/content/{type}/{id}/restore} (contract {@code adminRestoreContent}). */
     @PostMapping(Routes.Admin.CONTENT_RESTORE)
     @PreAuthorize(CONTENT_WRITE)
     public ContentItem restore(@CurrentUser AuthPrincipal principal, @PathVariable String type,

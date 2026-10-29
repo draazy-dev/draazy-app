@@ -32,15 +32,10 @@ import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
-/** Proves the endpoint routes KYC files to the private bucket: the signed URL opens, the unsigned one is refused
- * (any 4xx; R2 answers 400 where AWS S3 says 403). Gated on {@code STORAGE_ENABLED} and R2 credentials. */
 @EnabledIfEnvironmentVariable(named = "STORAGE_ENABLED", matches = "true")
 class MePersonalDocumentsLiveTest extends AbstractApiTest {
-
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    /** The test-classpath properties shadow main's and omit the storage block,
-     * so without this the flag would be off and the mock would wire. */
     @DynamicPropertySource
     static void storage(DynamicPropertyRegistry registry) {
         registry.add("draazy.providers.storage.enabled", () -> "true");
@@ -87,18 +82,13 @@ class MePersonalDocumentsLiveTest extends AbstractApiTest {
         String key = null;
 
         try {
-            // Listed by prefix rather than trusting the URL: the key is what the row persists, and the prefix
-            // is what makes one owner's documents unreachable from another's id.
             key = onlyKeyUnder("personal/" + owner.getId() + "/");
             assertThat(key).isNotNull();
 
-            // Signed: opens, and the bytes are the ones uploaded.
             HttpResponse<byte[]> ok = get(signed);
             assertThat(ok.statusCode()).isEqualTo(200);
             assertThat(ok.body()).isEqualTo(pdf);
 
-            // Asserted as "4xx and not the file": R2 answers a missing Authorization header with 400, S3 with 403;
-            // pinning either would test Cloudflare's error taxonomy, not our documents staying unreadable.
             HttpResponse<byte[]> denied = get(stripQuery(signed));
             assertThat(denied.statusCode()).isBetween(400, 499);
             assertThat(denied.body()).isNotEqualTo(pdf);
@@ -109,7 +99,6 @@ class MePersonalDocumentsLiveTest extends AbstractApiTest {
         }
     }
 
-    /** Returns {@code null} for an empty prefix so the assertion says "nothing was stored", not an index error. */
     private String onlyKeyUnder(String prefix) {
         try (S3Client s3 = s3()) {
             ListObjectsV2Response res = s3.listObjectsV2(ListObjectsV2Request.builder()
@@ -122,7 +111,6 @@ class MePersonalDocumentsLiveTest extends AbstractApiTest {
         try (S3Client s3 = s3()) {
             s3.deleteObject(b -> b.bucket(bucket).key(key));
         } catch (RuntimeException ignored) {
-            // best-effort cleanup; a leaked sandbox test object is harmless
         }
     }
 
@@ -147,8 +135,6 @@ class MePersonalDocumentsLiveTest extends AbstractApiTest {
         return q < 0 ? url : url.substring(0, q);
     }
 
-    /** Starts with a real PDF signature: {@code DocumentUploads} sniffs content, so arbitrary bytes
-     * would be refused as "not a PDF" before storage is reached. */
     private static byte[] pdfBytes(String marker) {
         return ("%PDF-1.4\n" + marker + "\n%%EOF\n").getBytes(StandardCharsets.UTF_8);
     }

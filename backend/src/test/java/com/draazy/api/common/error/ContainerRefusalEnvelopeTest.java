@@ -11,11 +11,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
-// Raw sockets: a real client would normalise these targets before sending them.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DisplayName("Container-level refusals answer with the JSON error envelope")
 class ContainerRefusalEnvelopeTest {
-
     @LocalServerPort
     int port;
 

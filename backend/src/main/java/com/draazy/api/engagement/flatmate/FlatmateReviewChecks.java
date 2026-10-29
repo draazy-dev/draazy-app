@@ -7,16 +7,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-/** What a reviewer attests to when approving a tenant-tier badge. The date asked for depends on the
- * evidence: an agreement's end date, or a light bill's bill date. */
 record FlatmateReviewChecks(Boolean nameMatches, Boolean addressMatches, LocalDate validTill,
         LocalDate issuedOn) {
-
-    // Same 90-day recurring-proof window as the property ownership gate (OwnershipEvidenceTypes);
-    // engagement may not import moderation, so the number is repeated here.
     static final int BILL_MAX_AGE_DAYS = 90;
 
-    /** One 422 naming everything still missing, so the reviewer fixes it in a single pass. */
     FlatmateReviewChecks validated(String evidenceType, LocalDate today) {
         boolean bill = OwnedDocumentLookup.ELECTRICITY_BILL.equals(evidenceType);
         List<String> problems = new ArrayList<>();
@@ -46,8 +40,6 @@ record FlatmateReviewChecks(Boolean nameMatches, Boolean addressMatches, LocalDa
         return this;
     }
 
-    /** An agreement never outlives its own end date; a bill proves the claim only as of its date, so
-     * the badge runs a fixed term from the approval. */
     LocalDate badgeUntil(String evidenceType, LocalDate today) {
         LocalDate term = today.plusMonths(FlatmateReview.BADGE_MONTHS);
         boolean bill = OwnedDocumentLookup.ELECTRICITY_BILL.equals(evidenceType);

@@ -29,7 +29,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ListingEditRules {
-
     private static final int MAX_CHANGE_TEXT = 300;
 
     private final LocalityBinding localities;
@@ -62,7 +61,6 @@ public class ListingEditRules {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
     }
 
-    /** Did this PATCH relabel the commercial subtype? Absent formDetails is "unchanged", not "cleared". */
     private static boolean commercialTypeChanged(Property property, ListingUpdate update) {
         if (update.formDetails() == null) return false;
         Object incoming = update.formDetails().get("commercialType");
@@ -70,13 +68,9 @@ public class ListingEditRules {
                 ? null
                 : property.getFormDetails().get("commercialType");
 
-        /** Symmetric with the write, which replaces the map rather than merging: a PATCH that merely
-         * omits the key deletes an approved subtype, which is the same moderation event as relabelling. */
         return !Objects.equals(incoming, stored);
     }
 
-    /** Apply a PATCH body and report the re-review it earned; only non-null fields are applied.
-     * The two foundation blocks are kept first and contiguous — see the class Javadoc's rationale. */
     EditImpact apply(Property p, ListingUpdate in) {
         validateSanityPatch(p, in);
         boolean remoderationRequired = false;
@@ -85,8 +79,6 @@ public class ListingEditRules {
         List<Map<String, String>> changes = new ArrayList<>();
         boolean carriesBhk = PropertyKind.carriesBhk(in.propertyType() == null ? p.getPropertyType() : in.propertyType());
 
-        // Foundation, off search: these change what the listing fundamentally *is*, so a stale
-        // index entry is a wrong answer rather than a late one.
         if (in.bhk() != null && carriesBhk && !numericEquals(in.bhk(), p.getBhk())) {
             p.setBhk(in.bhk());
             remoderationRequired = true;
@@ -100,8 +92,6 @@ public class ListingEditRules {
             remoderationRequired = true;
         }
 
-        // Same argument for zoning: an agricultural plot approved against a 7/12 extract must not be
-        // relabelled residential and go on answering a filter it was never checked for.
         if (Boolean.TRUE.equals(in.clearLandUse())) {
             if (p.getLandUse() != null) {
                 p.setLandUse(null);
@@ -122,7 +112,6 @@ public class ListingEditRules {
         if (in.deal() != null && !in.deal().equals(p.getDeal())) {
             p.setDeal(in.deal());
 
-            // Rent and sale require different evidence; publication approval must not reuse the old verdict.
             p.revokeOwnershipVerification();
 
             p.setPriceUnit(DealIntent.priceUnitFor(in.deal()));
@@ -145,11 +134,7 @@ public class ListingEditRules {
             recheckOnly = true;
         }
 
-        // `address` is what AddressKey derives the duplicate signal from, so an edit to it is how a
-        // listing moves onto an address somebody else already holds. Re-check either way.
         if (in.address() != null && !in.address().equals(p.getAddress())) {
-
-            // A legacy/staff correction must not leave components that restore the old address.
             note(rechecked, changes, "address", p.getAddress(), in.address());
             clearStaleAddressParts(p, in);
             p.setAddress(in.address());
@@ -180,8 +165,6 @@ public class ListingEditRules {
             recheckOnly = true;
         }
 
-        /** Photos, prose and amenities are the evidence a reviewer approved against, so swapping them re-sells
-         * that approval. Stays-live because it is the same flat, and going dark would cost a day per photo. */
         if (in.images() != null && !in.images().equals(p.getImages())) {
             note(rechecked, changes, "images", p.getImages() == null ? 0 : p.getImages().size(), in.images().size());
             p.setImages(List.copyOf(in.images()));
@@ -212,8 +195,6 @@ public class ListingEditRules {
         if (in.builtUpArea() != null) p.setBuiltUpArea(in.builtUpArea());
         if (in.superBuiltUpArea() != null) p.setSuperBuiltUpArea(in.superBuiltUpArea());
 
-        /** Non-foundation only because the membership rule holds: a PATCH carrying `floorPlan` alone has
-         * no `images` key, so without it an approved listing could render an unreviewed image. */
         if (in.floorPlan() != null) {
             String plan = in.floorPlan().isBlank() ? null : in.floorPlan();
             if (plan != null && (p.getImages() == null || !p.getImages().contains(plan))) {
@@ -230,7 +211,6 @@ public class ListingEditRules {
             p.setVideo(video);
         }
 
-        // Blank is how an owner withdraws a move-in claim.
         if (AvailableOn.isStated(in.availableOn(), in.availableFrom())) {
             p.setAvailableOn(AvailableOn.resolve(in.availableOn(), in.availableFrom(), true, p.getDeal()));
         }
@@ -278,8 +258,6 @@ public class ListingEditRules {
             p.setFloor(in.floor());
         }
 
-        // Plain non-foundation applies: correcting a bathroom count or a facing is not something the
-        // moderator approved, so it must not knock an approved listing back to pending.
         if (in.bathrooms() != null) {
             p.setBathrooms(in.bathrooms());
         }
@@ -544,13 +522,10 @@ public class ListingEditRules {
         }
     }
 
-    /** The PATCH {@code societyId}: blank clears the binding, which is {@code null}. */
     private static UUID societyOf(String societyId) {
         return societyId.isBlank() ? null : UUID.fromString(societyId);
     }
 
-    /** A stale society id is a {@code 404}, not an FK {@code 409}; an archived society is refused only for a
-     * new binding. Stamps the slug and name formulas so the response carries them. */
     void stampSociety(Property p, UUID societyId, boolean newBinding) {
         if (societyId == null) {
             p.setSocietySlug(null);

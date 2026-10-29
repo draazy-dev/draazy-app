@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ListingModerationService {
-
     private final ListingService listings;
     private final ListingEditRules editRules;
     private final LocalityRepository localities;
@@ -39,7 +38,6 @@ public class ListingModerationService {
         this.notifier = notifier;
     }
 
-    /** Staff edit of someone else's listing; non-effects: docs/flows/consumer/list-property-wizard.md 9.3. */
     @Transactional
     public Property updateAsModerator(AuthPrincipal principal, String idOrSlug, ListingUpdate in) {
         Property p = listings.resolveForWrite(idOrSlug).orElseThrow(() -> NotFoundException.of("Listing"));
@@ -55,8 +53,6 @@ public class ListingModerationService {
             movePinToLocality(p);
         }
 
-        // The key is recomputed so the listing stays findable by a *later* probe, but no probe runs
-        // on this edit: a human is already looking, and is the one making the change.
         duplicates.reindex(p);
         var changes = ListingChanges.diff(before, ListingChanges.snapshot(p));
         audit.record(principal, "property.adminUpdate", "property", p.getId().toString(),
@@ -69,7 +65,6 @@ public class ListingModerationService {
         return p;
     }
 
-    // A moved locality with no pin of its own would otherwise leave the map pointing at the old one.
     private void movePinToLocality(Property p) {
         localities.findById(p.getLocalitySlug())
                 .filter(l -> l.getLat() != null && l.getLng() != null)

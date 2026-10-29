@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 public interface DocumentRepository extends JpaRepository<Document, UUID> {
-
   boolean existsByPropertyIdAndServiceRequestIdIsNull(UUID propertyId);
 
     boolean existsByStorageKey(String storageKey);
@@ -16,7 +15,6 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
     List<Document> findByPropertyIdAndServiceRequestIdIsNullOrderByUploadedAtDesc(UUID propertyId);
 
-    // Group in memory to avoid one count query per inbox row.
     List<Document> findByPropertyIdInAndServiceRequestIdIsNull(Collection<UUID> propertyIds);
 
     List<Document> findByServiceRequestIdOrderByUploadedAtDesc(UUID serviceRequestId);

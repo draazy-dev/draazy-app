@@ -15,7 +15,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Component
 public class MessageEventHub {
-
     static final long STREAM_TIMEOUT_MS = Duration.ofMinutes(5).toMillis();
 
     private final Map<UUID, Set<Client>> clients = new ConcurrentHashMap<>();
@@ -41,7 +40,6 @@ public class MessageEventHub {
         emitter.onCompletion(remove);
         emitter.onTimeout(remove);
         emitter.onError(ignored -> remove.run());
-        // Flushes the headers now, so the client sees the stream open instead of waiting for the first heartbeat.
         client.heartbeat();
         return emitter;
     }
@@ -66,13 +64,12 @@ public class MessageEventHub {
         heartbeats.shutdownNow();
     }
 
-    // An exception escaping a scheduleAtFixedRate task cancels every later run, so one bad client must not.
+    // An exception escaping a scheduleAtFixedRate task cancels all later runs; catch per client.
     private void heartbeat() {
         clients.values().forEach(set -> set.forEach(client -> {
             try {
                 client.heartbeat();
             } catch (RuntimeException ignored) {
-                // The emitter's own timeout removes it.
             }
         }));
     }
@@ -107,7 +104,6 @@ public class MessageEventHub {
                 try {
                     emitter.complete();
                 } catch (IllegalStateException alreadyErrored) {
-                    // A disconnected client's emitter refuses complete(); its onError already removed it.
                 }
             }
         }

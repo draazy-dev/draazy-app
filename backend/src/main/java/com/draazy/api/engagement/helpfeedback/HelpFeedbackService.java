@@ -11,14 +11,10 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The only writer of {@code help_article_feedback}: one current verdict per reader per article. */
 @Service
 public class HelpFeedbackService {
-
     static final int DAILY_IP_SLUG_LIMIT = 20;
 
-    /** Wider than {@code \p{Cntrl}}, which in Java is ASCII only. U+0085, U+2028 and U+2029 break a
-     * CSV row and a log line exactly as a bare {@code \r} does, and arrive readily from a paste. */
     private static final Pattern CONTROL_CHARS =
             Pattern.compile("[\\p{Cntrl}\\u0080-\\u009F\\u0085\\u2028\\u2029&&[^\t\n]]");
 
@@ -50,7 +46,6 @@ public class HelpFeedbackService {
         return voter == null ? ipHash : "b:" + voter.toLowerCase(Locale.ROOT);
     }
 
-    /** Only strip controls; escaping belongs to the read path that knows its output format. */
     private static String blankToNull(String raw) {
         if (raw == null) {
             return null;

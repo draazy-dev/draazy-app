@@ -13,10 +13,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Gateway disputes: one freezes only its own order, and closing it restores that order (won) or ends it. */
 @Service
 public class PaymentDisputes {
-
     private static final Logger log = LoggerFactory.getLogger(PaymentDisputes.class);
 
     private static final String AUDIT_ENTITY = "payment_dispute";
@@ -46,7 +44,6 @@ public class PaymentDisputes {
         this.notifier = notifier;
     }
 
-    /** Any dispute event: the first one seen for a dispute opens it, a terminal status closes it. */
     @Transactional
     public void apply(Event event) {
         if (event.disputeRef() == null || event.orderRef() == null) {
@@ -111,7 +108,6 @@ public class PaymentDisputes {
                 "{\"outcome\":\"" + dispute.getStatus() + "\"}");
     }
 
-    // The bank has taken the money back, so a refund request for it would pay the customer twice.
     private void rejectPendingRequest(Subscription order) {
         requests.findBySubscriptionId(order.getId()).filter(RefundRequest::isPending).ifPresent(request -> {
             request.reject(null, Instant.now(), "The payment was charged back by the bank.");
@@ -120,7 +116,6 @@ public class PaymentDisputes {
         });
     }
 
-    /** Null for a status that is not terminal, so an unknown value leaves the order frozen rather than guessing. */
     static String outcomeOf(String providerStatus) {
         if (providerStatus == null) {
             return null;

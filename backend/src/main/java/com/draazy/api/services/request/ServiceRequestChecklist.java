@@ -7,13 +7,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-// Same names/order as mock defaultDocs so the live swap keeps tracker columns.
 final class ServiceRequestChecklist {
-
     private ServiceRequestChecklist() {
     }
 
-    // Ordered map gives render order and category lookup without parallel structures.
     private static final Map<String, String> ITEMS = new LinkedHashMap<>();
 
     static {

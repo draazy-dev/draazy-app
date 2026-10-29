@@ -3,10 +3,8 @@ package com.draazy.api.services.request;
 import com.draazy.api.billing.entitlement.EntitlementService;
 import org.springframework.stereotype.Service;
 
-// Spends one referral-earned free agreement: Draazy's own fee goes, statutory charges stay.
 @Service
 class ServiceRequestReferralCredit {
-
     private final ServiceRequestRepository requests;
     private final EntitlementService entitlements;
     private final ServiceRequestPricing pricing;
@@ -18,7 +16,6 @@ class ServiceRequestReferralCredit {
         this.pricing = pricing;
     }
 
-    // The caller holds the request's row lock inside a transaction. Returns true only when this call spent a credit.
     boolean spend(ServiceRequest request) {
         if (request.isReferralCredit() || request.getPaymentRef() != null
                 || !ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())

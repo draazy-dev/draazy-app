@@ -10,10 +10,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-// The JSON is generated from frontend/src/content/help by `npm run gen:staff-help`; CI fails when it is stale.
 @RestController
 public class StaffHelpController {
-
     private static final String BACK_OFFICE =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.MANAGER + "', '" + Roles.ADMIN + "')";
 

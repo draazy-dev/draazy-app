@@ -30,19 +30,14 @@ import org.springframework.test.web.servlet.ResultActions;
 
 @DisplayName("Slice 12 — support tickets: the customer's thread with the platform")
 class SupportTicketEndpointsTest extends ServiceFixtures {
-
     @org.springframework.beans.factory.annotation.Autowired
     EntityManager em;
 
-    /** Distinctive enough that a substring search for it is a real leak check. */
     private static final String SECRET = "the card was declined three times";
 
-    // The assertions here are about the independence of the two unread signals, which a single shared column cannot
-    // provide.
     @Nested
     @DisplayName("scope")
     class Scope {
-
         @Test
         @DisplayName("the list is the caller's own — including for admin (S47)")
         void listIsAlwaysMine() throws Exception {
@@ -114,7 +109,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
     @Nested
     @DisplayName("the unread flag")
     class Unread {
-
         @Test
         @DisplayName("staff replying raises it; the customer's own reply does not; read clears it")
         void lifecycle() throws Exception {
@@ -161,7 +155,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
     @Nested
     @DisplayName("the two-sided read model (D50)")
     class TwoSided {
-
         @Test
         @DisplayName("a new ticket is already waiting on the desk — the opening message counts")
         void raisingPutsItOnTheQueue() throws Exception {
@@ -169,8 +162,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             User desk = staff("9840000132", Teams.RENTAL);
             String id = raiseTicket(asha, "Cannot log in");
 
-            // A queue that only counted replies would show an empty board on a day full of new
-            // tickets — the first message is the one nobody has answered.
             expectAwaitingReply(desk, id, true);
             expectUnread(asha, id, false);
         }
@@ -188,7 +179,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             expectAwaitingReply(desk, id, false);
 
             replyTicket(desk, id, "processing it", 201);
-            // Both sides have something outstanding — the state one boolean cannot represent.
             expectUnread(asha, id, true);
 
             expectAwaitingReply(desk, id, false);
@@ -223,12 +213,9 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
         }
     }
 
-    // `GET /support/tickets` stays the caller's own; this paged summary queue is how staff find every ticket without
-    // every message body.
     @Nested
     @DisplayName("the ops queue (D51)")
     class OpsQueue {
-
         @Test
         @DisplayName("staff and admin may read it; a customer may not")
         void authorised() throws Exception {
@@ -270,8 +257,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             raiseTicket(asha, "Second");
             raiseTicket(asha, "Third");
 
-            // The order is fixed server-side, so an unknown property here would otherwise be a 500
-            // any caller can trigger with a guess (api-standards.md §5).
             mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(desk))
                             .param("size", "2"))
@@ -416,8 +401,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
                     .andExpect(jsonPath("$.content[0].raiserMobile").value("9840000149"))
                     .andReturn().getResponse().getContentAsString();
 
-            // Absent, not empty: the thread is read one ticket at a time at GET /support/tickets/{id}, and a page of
-            // twenty threads is the unbounded response the page envelope was meant to prevent.
             assertThat(body).doesNotContain(SECRET).doesNotContain("\"messages\"")
                     .doesNotContain("\"notes\"");
             assertThat(AdminSupportTicketDto.class.getRecordComponents())
@@ -428,7 +411,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
     @Nested
     @DisplayName("opening a ticket on the desk")
     class DeskRead {
-
         @Test
         @DisplayName("reading a ticket does not answer it: only a staff reply clears the desk flag")
         void staffGetMarksRead() throws Exception {
@@ -506,13 +488,9 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             String id = raiseTicket(asha, "Receipt never arrived");
             replyTicket(desk, id, "Re-sending it now.", 201);
 
-            // `author_id` is nullable, and the seed for the e2e database exercises exactly this row: a desk message
-            // written by nobody in particular.
             jdbc.update("update support_ticket_messages set author_id = null where ticket_id = ? and author_role = 'staff'",
                     UUID.fromString(id));
 
-            // The row is already managed; without this the read answers from the first-level cache
-            // and the column change is invisible to the assertion below.
             em.flush();
             em.clear();
 
@@ -539,7 +517,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
     @Nested
     @DisplayName("closing")
     class Closing {
-
         @Test
         @DisplayName("ops close a ticket and the customer sees it closed; the customer cannot close it")
         void staffClosesTheTicket() throws Exception {

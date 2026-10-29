@@ -15,16 +15,10 @@ import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** The call is bounded by a whole-exchange deadline, not a read timeout, which restarts on every byte received;
- * the login thread holds one of five pool connections, so a dribbling peer could stall the app. */
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.whatsapp", name = "enabled", havingValue = "true")
 public class WhatsAppClient {
-
-    /** Ceiling on establishing the TCP+TLS connection to Meta. */
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
-    /** Ceiling on the whole exchange including connecting, so the worst case is this number, not the sum;
-     * short because a login thread and a database connection are parked on a third party meanwhile. */
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
 
     private static final Logger log = LoggerFactory.getLogger(WhatsAppClient.class);
@@ -54,8 +48,6 @@ public class WhatsAppClient {
         }
         JdkClientHttpRequestFactory timeouts = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
-        // Spring installs this as a deadline around sendAsync and the body stream, covering connect, headers
-        // and body, unlike HttpRequest.timeout, which stops at the headers.
         timeouts.setReadTimeout(RESPONSE_TIMEOUT);
 
         this.http = RestClient.builder()
@@ -66,8 +58,6 @@ public class WhatsAppClient {
                 .build();
     }
 
-    /** The reply is not deserialized: nothing consumes the wamid, and parsing could make a successful send throw.
-     * Meta's own error text is logged, never returned, as it names our phone number ID and template. */
     public void post(String path, Object body) {
         try {
             http.post()
@@ -78,8 +68,6 @@ public class WhatsAppClient {
         } catch (RestClientResponseException e) {
             String diagnosis = "http " + e.getStatusCode().value() + " " + describe(e.getResponseBodyAsString());
             log.error("WhatsApp POST {} failed: {}", path, diagnosis);
-            // The cause is dropped: RestClientResponseException embeds the response body in getMessage(),
-            // so passing it on would let the catch-all handler log the raw envelope again.
             throw new WhatsAppException("WhatsApp call failed: " + path + " (" + e.getStatusCode() + ")",
                     diagnosis);
         } catch (RestClientException e) {
@@ -88,8 +76,6 @@ public class WhatsAppClient {
         }
     }
 
-    /** Only identifiers are logged: Meta's free-text error fields can name the recipient's mobile (PII)
-     * and may echo the submitted OTP, which Meta does not publish a contract on. */
     private String describe(String responseBody) {
         try {
             JsonNode error = json.readTree(responseBody).path("error");
@@ -105,8 +91,6 @@ public class WhatsAppClient {
         }
     }
 
-    /** Not an {@code ApiException}: those carry a 4xx for caller mistakes, and Meta being down is not the user's,
-     * so it falls through to the generic 500. */
     public static class WhatsAppException extends RuntimeException implements ProviderCalls.Diagnosed {
         private final String diagnosis;
 

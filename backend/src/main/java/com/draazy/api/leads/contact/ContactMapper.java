@@ -10,11 +10,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
-// Mobile-bearing projections are hand-written defaults so the mask-until-approved rule (ADR-019) is reviewable code,
-// and the mask helper is private so MapStruct cannot adopt it as an implicit String converter.
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface ContactMapper {
-
     @Mapping(target = "id", source = "request.id")
     @Mapping(target = "propertyId", source = "request.propertyId")
     @Mapping(target = "status", source = "request.status")
@@ -42,7 +39,6 @@ public interface ContactMapper {
         return new ContactRequestResponse.Contact(requester.getName(), requester.getMobile());
     }
 
-    /** Opaque-id convention: the wire exposes the UUID as a string. */
     default String map(UUID value) {
         return value == null ? null : value.toString();
     }

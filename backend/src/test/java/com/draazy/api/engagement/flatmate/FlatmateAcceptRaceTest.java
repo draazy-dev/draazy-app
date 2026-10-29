@@ -20,11 +20,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-// Commits for real: a race cannot be staged from the rolled-back AbstractApiTest transaction.
 @SpringBootTest
 @DisplayName("Two owners' clicks accepting different groups at once")
 class FlatmateAcceptRaceTest {
-
     @Autowired FlatmateApplicationService service;
     @Autowired FlatmateGroupApplicationRepository applications;
     @Autowired FlatmateGroupRepository groups;

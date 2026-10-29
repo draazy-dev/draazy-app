@@ -26,10 +26,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Verification thread — participant-or-staff, tested here because a role sweep cannot verify a service-layer rule.
 @DisplayName("Verification thread — participant-or-staff, and both halves of a decision")
 class VerificationThreadTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -37,7 +35,6 @@ class VerificationThreadTest extends AbstractApiTest {
         @Autowired
         com.draazy.api.documents.vault.DocumentRepository documents;
 
-    /** Audit rows are written {@code REQUIRES_NEW} and therefore survive this test's rollback. */
     private final List<String> createdActors = new ArrayList<>();
 
     @AfterEach
@@ -148,8 +145,6 @@ class VerificationThreadTest extends AbstractApiTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.checklist.length()").value(3));
 
-        // Re-submit is idempotent (property_reviews.property_id UNIQUE): row count is the only
-        // evidence, since two cases would each carry three lines. properties.flush() first.
         mvc.perform(post(path(rental, "")).header(HttpHeaders.AUTHORIZATION, token))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.checklist.length()").value(3));
@@ -181,7 +176,6 @@ class VerificationThreadTest extends AbstractApiTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.messages[1].from").value("ops"));
 
-        // The owner reads: only ops' message is marked, never their own.
         mvc.perform(post(path(listing, "/read")).header(HttpHeaders.AUTHORIZATION, ownerToken))
                 .andExpect(status().isNoContent());
         mvc.perform(get(path(listing, "")).header(HttpHeaders.AUTHORIZATION, ownerToken))
@@ -209,8 +203,6 @@ class VerificationThreadTest extends AbstractApiTest {
 
         properties.flush();
 
-        // Both halves move together: there is no state in which the case file says approved and
-        // the listing is still invisible, because that gap had nobody's name on it.
         assertThat(jdbc.queryForObject("select status from properties where id = ?",
                 String.class, listingId)).isEqualTo(PropertyStatus.APPROVED);
         assertThat(jdbc.queryForObject("select status from property_reviews where property_id = ?",
@@ -314,11 +306,8 @@ class VerificationThreadTest extends AbstractApiTest {
                 .content("{\"decision\":\"approve\",\"note\":\"Index II matched.\"}"))
                 .andExpect(status().isOk())
 
-                // "ops" is derived from the sender like every other message, not hard-coded on the
-                // decision path — so a staff member deciding cannot be rendered as the owner.
                 .andExpect(jsonPath("$.messages[0].from").value("ops"))
 
-                // Non-null only because decide() flushes: id and createdAt are assigned at insert.
                 .andExpect(jsonPath("$.messages[0].id").isNotEmpty())
                 .andExpect(jsonPath("$.messages[0].body")
                         .value("\u2705 Your property has been verified and is now live."
@@ -507,8 +496,6 @@ class VerificationThreadTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.error").value("reason_note_required"));
     }
 
-    // Deciding must drain `recheck_requested_at`.
-    // Both verdicts because `approve` clears `flagReason`, tempting a fix that leaves `reject` stranding the row.
     @Test
     @DisplayName("either verdict clears a pending stays-live re-check")
     void aDecisionClearsThePendingRecheck() throws Exception {
@@ -521,8 +508,6 @@ class VerificationThreadTest extends AbstractApiTest {
             listing.requestRecheck(List.of("price"));
             properties.saveAndFlush(listing);
 
-            // requestRecheck is a no-op on a non-public listing, so asserting the queue actually
-            // has something to drain guards against a fixture that silently queues nothing.
             assertThat(listing.isRecheckPending())
                     .as("the fixture did not queue a re-check to begin with")
                     .isTrue();
@@ -564,7 +549,6 @@ class VerificationThreadTest extends AbstractApiTest {
                 String.class, own.getId())).isEqualTo(PropertyStatus.PENDING);
     }
 
-    // What matters is a second reviewer seeing it.
     @Test
     @DisplayName("a tick persists, is addressed by item text, and the next reviewer sees it")
     void tickingAChecklistLineOutlivesTheReviewersSession() throws Exception {
@@ -576,8 +560,6 @@ class VerificationThreadTest extends AbstractApiTest {
         mvc.perform(post(path(listing, "")).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isCreated())
 
-                // Baseline stated positively — a filter for ticked lines returning nothing is
-                // also what an absent checklist returns.
                 .andExpect(jsonPath("$.checklist.length()").value(3))
                 .andExpect(jsonPath("$.checklist[?(@.item == 'Photos are real and match the listing')].pass")
                         .value(false));
@@ -616,8 +598,6 @@ class VerificationThreadTest extends AbstractApiTest {
                 """, Integer.class, ops.getId().toString(), listing.getId().toString(),
                 "Photos are real and match the listing")).isEqualTo(1);
 
-        // Unticking is the same call — a reviewer who ticked the wrong line must be able to undo it
-        // without reopening the case.
         mvc.perform(patch(path(listing, "/checklist")).header(HttpHeaders.AUTHORIZATION, bearer(ops))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"item\":\"Photos are real and match the listing\",\"pass\":false}"))
@@ -646,7 +626,6 @@ class VerificationThreadTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
-    // No role guard here; owner filtering is the only protection between case files.
     @Test
     @DisplayName("the owner queue never names the reviewer")
     void ownerQueueDoesNotNameTheReviewer() throws Exception {
@@ -678,8 +657,6 @@ class VerificationThreadTest extends AbstractApiTest {
         mvc.perform(post(path(theirs, "")).header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
                 .andExpect(status().isCreated());
 
-        // One message each way. Only the ops one should count towards the owner's badge — a badge
-        // that counted your own sent messages would never clear.
         mvc.perform(post(path(mine, "/messages")).header(HttpHeaders.AUTHORIZATION, bearer(owner))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"body\":\"Uploaded the bill.\"}"))
@@ -700,8 +677,6 @@ class VerificationThreadTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(waiting).isNotEmpty());
 
-        // Reading clears one side only — the assertion that would catch {@code markRead} being
-        // widened to every message and silently clearing the badge the other side is waiting on.
         mvc.perform(post(path(mine, "/read")).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isNoContent());
         mvc.perform(get("/me/property-reviews").header(HttpHeaders.AUTHORIZATION, bearer(owner)))

@@ -14,11 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
-/** When a flat owner confirms a tenant's room, gives them an account and a private record of the flat to come back to.
- * Never throws: the owner's answer is already recorded and must not be undone by a failure here. */
 @Component
 class FlatmateOwnerHomeProvisioner {
-
     private static final Logger log = LoggerFactory.getLogger(FlatmateOwnerHomeProvisioner.class);
 
     static final String AUDIT_ACTOR = "owner-link";
@@ -38,8 +35,6 @@ class FlatmateOwnerHomeProvisioner {
         this.audit = audit;
     }
 
-    /** The account is made in its own transaction and the home insert rolls back to a savepoint on a database error,
-     * so a failure here is logged and the answer stands. */
     void saveHome(FlatmateOwnerNotice notice, FlatmateRoom room) {
         try {
             Optional<User> owner = ownerOf(notice);
@@ -61,7 +56,6 @@ class FlatmateOwnerHomeProvisioner {
                 .isPresent();
     }
 
-    /** An archived account is never resurrected, and a closed platform makes no new ones. */
     private Optional<User> ownerOf(FlatmateOwnerNotice notice) {
         String mobile = notice.getOwnerMobile();
         Optional<User> existing = users.findByMobile(mobile);

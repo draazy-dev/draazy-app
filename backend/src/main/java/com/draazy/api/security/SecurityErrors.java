@@ -6,16 +6,7 @@ import java.io.IOException;
 import org.slf4j.MDC;
 import org.springframework.http.MediaType;
 
-/**
- * Writes the contract error envelope from inside the security filter chain, where the
- * {@code @RestControllerAdvice} can't reach (auth failures short-circuit before the controller).
- * Keeps the 401/403 bodies byte-identical to the ones the advice emits.
- *
- * <p>The envelope is hand-serialized rather than pulling in Jackson: the payload is three fixed
- * fields plus an optional trace id, so a tiny writer is lighter than a databind dependency.
- */
 final class SecurityErrors {
-
     private SecurityErrors() {
     }
 
@@ -36,8 +27,6 @@ final class SecurityErrors {
     }
 
     private static String escape(String s) {
-        // RFC 8259 minimal escaping: backslash, quote, and the control chars that would otherwise
-        // produce invalid JSON (or a header/log-injection vector) if they leaked into a message.
         return s.replace("\\", "\\\\")
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n")

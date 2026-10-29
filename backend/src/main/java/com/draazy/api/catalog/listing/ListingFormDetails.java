@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Closed, bounded owner-edit answers; canonical listing fields and trust flags cannot enter here. */
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = ListingFormDetails.Validator.class)
@@ -35,8 +34,6 @@ public @interface ListingFormDetails {
                 "seatCount", "frontage", "floorLoad", "clearHeight", "sanctionedPower", "dockCount",
                 "bestTimeToCall", "plottedProject", "listerRelation");
 
-        /** `naSanctioned` and `satbara` are retired in favour of `naStatus` and `otherRights`; they
-         * stay legal because listings published under them are live and re-save theirs unchanged. */
         private static final Set<String> FLAGS = Set.of(
                 "loanAvailable", "powerBackup", "pantry", "cornerPlot", "boundaryWall",
                 "naSanctioned", "electricity", "roadAccess", "satbara");
@@ -45,8 +42,6 @@ public @interface ListingFormDetails {
                 "flatNumber", 20, "tower", 30, "society", 60, "street", 60, "landmark", 60,
                 "availableFrom", 10, "leaseExpiry", 10);
 
-        /** Picker answers, so a length check would accept what a picker can never produce — and these feed
-         * filters and contract terms. Empty stays legal: that is the owner declining to answer. */
         private static final Map<String, Set<String>> ENUMS = Map.ofEntries(
                 Map.entry("ownership", Set.of("", "Freehold", "Leasehold", "Co-operative Society",
                         "Power of Attorney", "MIDC / Industrial Lease")),
@@ -68,8 +63,6 @@ public @interface ListingFormDetails {
                 Map.entry("plottedProject", Set.of("", "yes", "no")),
                 Map.entry("listerRelation", Set.of("owner", "family")),
 
-                /** Translated into `land_use`, whose CHECK accepts five values — an unrecognised label does
-                 * not fail, it maps to nothing and the plot publishes missing from its only filter. */
                 Map.entry("plotZone", Set.of("", "Residential (R1)", "Residential (R2)",
                         "Commercial (C-1)", "Industrial (I-1)", "Public / Semi-public", "Mixed-Use",
                         "Agriculture Zone", "Green Zone / No-Development Zone",
@@ -80,8 +73,6 @@ public @interface ListingFormDetails {
                 Map.entry("buyerEligibility", Set.of("", "agriculturist", "permission", "converted",
                         "unknown")));
 
-        /** Multi-selects are pickers too. `furniture` and `preferredTenants` stay unbounded: both are
-         * offered per property type from lists this file would have to duplicate four times over. */
         private static final Map<String, Set<String>> ARRAY_ENUMS = Map.of(
                 "suitableFor", Set.of("Office", "Retail", "Restaurant", "Clinic", "Showroom",
                         "Warehouse", "Bank / ATM", "Gym / Studio"),

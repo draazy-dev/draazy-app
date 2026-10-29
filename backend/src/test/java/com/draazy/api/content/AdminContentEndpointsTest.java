@@ -18,9 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** FAQs are the only list authored here, so a retired type must answer 404 rather than land in the FAQ table. */
 class AdminContentEndpointsTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
 
     private String bearer(String mobile, String role) {
@@ -74,7 +72,6 @@ class AdminContentEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.archived").value(false));
     }
 
-    /** The connection between the ops screen and the public site. */
     @Test
     void archivingHidesARowFromThePublicList() throws Exception {
         String token = staff();

@@ -11,9 +11,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface RentAgreementRepository extends JpaRepository<RentAgreement, UUID> {
-
-    /** The two sides match on different columns: owner is a user id, tenant only ever a mobile. Pass a
-     * {@code MobileMask.normalise}d value; the {@code is not null} guard stops blanks matching blanks. */
     @Query("""
             select a from RentAgreement a
             where a.ownerId = :ownerId
@@ -24,7 +21,6 @@ public interface RentAgreementRepository extends JpaRepository<RentAgreement, UU
 
     List<RentAgreement> findByServiceRequestIdOrderByCreatedAtAsc(UUID serviceRequestId);
 
-    /** Filed outside a paid request, so no service request carries them and the overlap check would miss them. */
     @Query("""
             select a from RentAgreement a
             where a.propertyId = :propertyId
@@ -34,13 +30,10 @@ public interface RentAgreementRepository extends JpaRepository<RentAgreement, UU
             """)
     List<RentAgreement> findFiledOnListing(@Param("propertyId") UUID propertyId);
 
-    /** Two checkers deciding one row at once must not both pass the ladder and let the last write win. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from RentAgreement a where a.id = :id")
     Optional<RentAgreement> lockById(@Param("id") UUID id);
 
-    /** Sole evidence for a badge granted with no human in the loop: a new archive column on {@code RentAgreement}
-     * must be excluded here. Matches the licensee only, on paid requests a second staff member verified. */
     @Query("""
             select count(a) > 0 from RentAgreement a
             where a.propertyId = :propertyId
@@ -52,7 +45,6 @@ public interface RentAgreementRepository extends JpaRepository<RentAgreement, UU
             """)
     boolean hasRegisteredTenancy(@Param("propertyId") UUID propertyId, @Param("mobile") String mobile);
 
-    /** Terms ending within the window and not yet reminded; the end is the term's last day, as {@code endDate()}. */
     @Query(value = """
             select * from rent_agreements
             where status in ('registered', 'active')

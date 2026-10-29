@@ -12,11 +12,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-/** At most one paid WhatsApp a day: only requests newer than the user's last app open and previous digest,
- * so each is announced once and never to someone who has seen it. */
 @Service
 public class WaitingDigestService {
-
     private static final Logger log = LoggerFactory.getLogger(WaitingDigestService.class);
     private static final Duration MIN_GAP = Duration.ofHours(20);
 
@@ -82,13 +79,11 @@ public class WaitingDigestService {
         return sent;
     }
 
-    // A send that did not go out must not swallow the requests it was meant to announce.
     private void release(Candidate candidate, Instant now) {
         jdbc.update("update users set waiting_digest_at = ? where id = ? and waiting_digest_at = ?",
                 candidate.previous(), candidate.userId(), Timestamp.from(now));
     }
 
-    // The conditional update is the once-a-day guard even with several instances ticking at once.
     private boolean claim(UUID userId, Instant now) {
         return jdbc.update("""
                 update users set waiting_digest_at = ?

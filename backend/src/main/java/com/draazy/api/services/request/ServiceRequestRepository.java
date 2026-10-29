@@ -13,10 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
-// Customer and queue lists are separate to avoid nullable requester scope leaks.
 public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, UUID> {
-
-    // Only accepted parties can see co-filled requests; invites alone are requester claims.
     @Query("""
             select r from ServiceRequest r
             where (r.requesterId = :requesterId
@@ -35,7 +32,6 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             @Param("ticketId") UUID ticketId,
             Pageable pageable);
 
-    // Single-row form of requester/accepted-party scope behind visible().
     @Query("""
             select count(r) > 0 from ServiceRequest r
             where r.id = :id
@@ -54,12 +50,9 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             """)
     Optional<ServiceRequest> findByIdForUpdate(@Param("id") UUID id);
 
-    // Serialises one user's credit spends; a row lock on the request alone cannot,
-    // as each spend is on a different request.
     @Query(value = "select id from users where id = :id for update", nativeQuery = true)
     Optional<UUID> lockUser(@Param("id") UUID id);
 
-    // Cancelled requests release their credit, so only live and delivered ones are counted.
     @Query("""
             select count(r) from ServiceRequest r
             where r.requesterId = :userId
@@ -68,8 +61,6 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             """)
     long countReferralCreditsHeld(@Param("userId") UUID userId);
 
-    // Awaiting-payment requests are excluded: ops does not work a rent agreement nobody has paid for.
-    // Teams are resolved by the service from the caller, never taken from ?team= as-is.
     @Query("""
             select r from ServiceRequest r
             where r.status <> com.draazy.api.services.request.ServiceRequestStatus.AWAITING_PAYMENT
@@ -168,19 +159,15 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
         Long getTotal();
     }
 
-    // Optional is enforced by uq_service_requests_ticket partial unique index.
     Optional<ServiceRequest> findByTicketId(UUID ticketId);
 
-    // The request behind a Cashfree order, so the payment webhook can settle it.
     Optional<ServiceRequest> findByPaymentRef(String paymentRef);
 
-    // Fast path only: concurrent creates can both count zero before inserting.
     long countByRequesterIdAndTypeAndStatus(UUID requesterId, String type,
             ServiceRequestStatus status);
 
     List<ServiceRequest> findByRequesterIdAndTypeAndPaymentRefNotNull(UUID requesterId, String type);
 
-    // Awaiting-payment with stale update means no settled money arrived yet.
     @Query("""
             select r from ServiceRequest r
             where r.status = :status

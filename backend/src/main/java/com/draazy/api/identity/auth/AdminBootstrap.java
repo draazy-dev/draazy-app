@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class AdminBootstrap implements ApplicationRunner {
-
     private static final Logger log = LoggerFactory.getLogger(AdminBootstrap.class);
     private static final long BOOTSTRAP_LOCK = 0xA88L;
     private static final Duration INVITE_TTL = Duration.ofHours(1);
@@ -115,7 +114,6 @@ public class AdminBootstrap implements ApplicationRunner {
         return adoptEmaillessAdmin(normalisedEmail);
     }
 
-    // A seeded or pre-2FA admin has no email to sign in with; the configured mobile names which one.
     private User adoptEmaillessAdmin(String normalisedEmail) {
         Contact contact = contactOrNull();
         if (contact == null) {

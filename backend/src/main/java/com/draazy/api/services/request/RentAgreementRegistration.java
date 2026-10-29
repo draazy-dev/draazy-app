@@ -28,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RentAgreementRegistration {
-
     private static final int MAX_TERM_MONTHS = 120;
 
     private final ServiceRequestService requests;
@@ -52,8 +51,6 @@ public class RentAgreementRegistration {
         this.users = users;
     }
 
-    // Runs inside the final-document upload's transaction, so a failed upload leaves no rows.
-    // Skip ownerless requests: the row names landlord and receives the registered copy.
     void prepare(AuthPrincipal caller, ServiceRequest request, UUID finalDocumentId) {
         if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())
                 || request.getPropertyId() == null) {
@@ -84,8 +81,6 @@ public class RentAgreementRegistration {
                 agreementRows.findByServiceRequestIdOrderByCreatedAtAsc(request.getId()));
     }
 
-    // Desk-scoped transition: caller must be on the desk, not a party.
-    // Admins alone retire rows the paid flow did not produce.
     @Transactional
     public RentAgreementRecordDto transition(AuthPrincipal caller, UUID agreementId, String status) {
         RentAgreement agreement = agreementRows.findById(agreementId).orElseThrow(() -> NotFoundException.of("Rent agreement"));
@@ -135,7 +130,6 @@ public class RentAgreementRegistration {
         return out;
     }
 
-    // Verified tenants are mobiles proved by OTP: accepted invitees, plus non-owner requester.
     private Map<String, String> verifiedTenants(ServiceRequest request) {
         UUID ownerId = request.getPropertyId() == null ? null : properties.findById(request.getPropertyId()).map(p -> p.getOwner().getId()).orElse(null);
         Stream<UUID> requester = ownerId == null || ownerId.equals(request.getRequesterId())
@@ -189,7 +183,6 @@ public class RentAgreementRegistration {
                 try {
                     return LocalDate.parse(text.strip());
                 } catch (DateTimeParseException ignored) {
-
                 }
             }
         }

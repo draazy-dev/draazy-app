@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ListingQuota implements ListingLiveGate {
-
     private static final Duration PACE_WINDOW = Duration.ofDays(1);
 
     private final PropertyRepository properties;
@@ -49,8 +48,6 @@ public class ListingQuota implements ListingLiveGate {
         return mayGoLive(property, Instant.now());
     }
 
-    /** Pass-covered listings always may; others need a free slot beside the owner's other uncovered live
-     * ones. Holds the owner's slot lock to commit, so two listings cannot both take the last slot. */
     @Transactional
     public boolean mayGoLive(Property property, Instant now) {
         UUID ownerId = property.getOwner().getId();
@@ -63,7 +60,6 @@ public class ListingQuota implements ListingLiveGate {
         return others < allowances.listingAllowance(ownerId);
     }
 
-    /** The owner's uncovered live listings past their allowance; the oldest are kept. */
     @Transactional
     public List<UUID> liveBeyondAllowance(UUID ownerId, Instant now) {
         locks.holdUntilCommit(RateLimitLock.Limit.LISTING_LIVE, ownerId.toString());
@@ -72,8 +68,6 @@ public class ListingQuota implements ListingLiveGate {
         return live.size() <= keep ? List.of() : live.subList(keep, live.size());
     }
 
-    /** How much of their free tier an owner ({@code userId}, not the caller) is using, so the
-     * concierge desk can judge instead of refusing. */
     @Transactional(readOnly = true)
     public ListingStanding standingFor(UUID userId) {
         return new ListingStanding(allowances.listingAllowance(userId),
@@ -81,7 +75,6 @@ public class ListingQuota implements ListingLiveGate {
     }
 
     public record ListingStanding(int allowance, long held) {
-
         public boolean overAllowance() {
             return held > allowance;
         }

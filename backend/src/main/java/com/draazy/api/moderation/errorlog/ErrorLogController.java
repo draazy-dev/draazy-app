@@ -26,10 +26,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// Admin-only: stacks and request paths are operational detail, not for the wider back office.
 @RestController
 public class ErrorLogController {
-
     private static final String GUARD = "hasRole('" + Roles.ADMIN + "') and "
             + BackOfficePermissions.REQUIRE_AUDIT_READ;
     private static final Set<String> SOURCES = Set.of("api", "job", "web");

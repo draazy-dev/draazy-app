@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 class FlatmateAcceptance {
-
     private final FlatmateGroupRepository groups;
     private final FlatmateRoomRepository rooms;
     private final FlatmateSeekerPostRepository posts;
@@ -29,7 +28,6 @@ class FlatmateAcceptance {
         this.genderGate = genderGate;
     }
 
-    /** Only a public ad can take someone on: staff may have hidden it since the ask arrived. */
     void apply(FlatmateRequest request) {
         switch (request.getKind()) {
             case "group" -> joinGroup(request);

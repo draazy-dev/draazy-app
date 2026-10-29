@@ -9,12 +9,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class NotificationRetention {
-
     private static final Logger log = LoggerFactory.getLogger(NotificationRetention.class);
 
     public static final Duration RETENTION = Duration.ofDays(90);
 
-    /** Read rows are already hidden from the inbox after this window, so nothing visible is lost. */
     public static final Duration READ_RETENTION = NotificationService.READ_VISIBILITY;
 
     private final NotificationRepository repository;

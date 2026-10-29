@@ -10,12 +10,8 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-/** The author name is passed in, resolved once per page rather than looked up per row. */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface ReviewMapper {
-
-    /** A constant because a MapStruct interface has no constructor to inject into, same as
-     * {@code SavedSearchMapper.FILTERS_JSON}. */
     ObjectMapper CATEGORIES_JSON = JsonMapper.builder().build();
 
     TypeReference<Map<String, Integer>> CATEGORY_MAP = new TypeReference<>() {
@@ -27,8 +23,6 @@ public interface ReviewMapper {
     @Mapping(target = "mine", source = "mine")
     ReviewResponse toResponse(Review entity, String authorName, Boolean mine);
 
-    /** Falls back to empty on malformed JSON so one corrupt row costs its sub-ratings, not a 500 on the
-     * whole listing page. */
     @Named("jsonToCategories")
     default Map<String, Integer> jsonToCategories(String json) {
         if (json == null || json.isBlank()) {

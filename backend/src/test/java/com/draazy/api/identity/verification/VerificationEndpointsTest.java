@@ -32,7 +32,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
 class VerificationEndpointsTest extends AbstractApiTest {
-
     private static final String PAN = "ABCDE1234F";
     private static final String OTHER_PAN = "FGHIJ5678K";
 
@@ -76,7 +75,6 @@ class VerificationEndpointsTest extends AbstractApiTest {
         return "{\"number\":\"" + number + "\",\"name\":\"Asha Patil\",\"dob\":\"1991-04-12\"}";
     }
 
-    /** A Verhoeff-valid Aadhaar built from an 11-digit body, so the check digit is never guessed. */
     static String validAadhaar(String body) {
         for (char d = '0'; d <= '9'; d++) {
             if (IdentityNumbers.verhoeffValid(body + d)) {
@@ -480,7 +478,6 @@ class VerificationEndpointsTest extends AbstractApiTest {
         submitPan(first, PAN).andExpect(status().isAccepted());
         approve(reviewer, caseOf(first), PAN).andExpect(status().isOk());
 
-        // The phone's OCR already names the taken card: refuse before a reviewer spends time on it.
         submitPan(second, PAN)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value(ErrorCodes.IDENTITY_ALREADY_REGISTERED));
@@ -494,7 +491,6 @@ class VerificationEndpointsTest extends AbstractApiTest {
                 .isEqualTo(VerificationStatuses.PENDING);
     }
 
-    // ---------------- local-only "simulate a reviewer decision" ----------------
     @Test
     void theQueueFlagsASharedClaimOrPersonToTheReviewer() throws Exception {
         User first = user("9830000023");

@@ -10,14 +10,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** Kill switches and the permission allow-list never come through here: they must bite on the next request. */
+// Kill switches and the permission allow-list must never be cached here;
+// they have to bite on the next request.
 @Component
 public class SettingsCache {
-
     private final SettingRepository settings;
     private final long ttlMillis;
     private final Map<String, Entry> entries = new ConcurrentHashMap<>();
-    // Bumped on eviction, so a read that began before a write cannot cache the stale value after it.
     private final AtomicLong generation = new AtomicLong();
 
     public SettingsCache(SettingRepository settings,
@@ -26,7 +25,6 @@ public class SettingsCache {
         this.ttlMillis = ttl.toMillis();
     }
 
-    /** The stored JSON for {@code key}, or empty when there is no row. */
     public Optional<String> value(String key) {
         if (ttlMillis <= 0) {
             return read(key);
@@ -46,7 +44,6 @@ public class SettingsCache {
         return value;
     }
 
-    /** Drops every entry once the current transaction commits, or now outside one. */
     public void evictAfterCommit() {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             evict();

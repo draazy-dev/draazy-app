@@ -27,14 +27,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
-/** Cashfree keeps an order payable after a declined attempt, so the order stays ours to retry: cancelling it
- *  would refund a successful second attempt made in the same checkout. */
 @DisplayName("A declined payment leaves the order open for a retry")
 class FailedPaymentRetryTest extends AbstractApiTest {
-
     private static final String PAID_PLAN = "b1000000-0000-4000-8000-000000000006";
 
-    /** The contact pack's price, so a success settles rather than tripping the amount guard. */
     private static final String WEBHOOK_AMOUNT = "199.00";
 
     @Autowired MockMvc mvc;
@@ -128,7 +124,6 @@ class FailedPaymentRetryTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    /** Every family is offered the event; only the one owning the order acts on it. */
     private void decline(String orderId) throws Exception {
         deliverSigned(webhook(orderId, "FAILED"));
     }

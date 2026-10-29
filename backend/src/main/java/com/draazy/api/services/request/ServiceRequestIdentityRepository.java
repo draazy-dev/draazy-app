@@ -9,15 +9,10 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-// Every finder is scoped to one request.
-// No bulk identity-number reads from this table.
 public interface ServiceRequestIdentityRepository extends JpaRepository<ServiceRequestIdentity, UUID> {
-
     List<ServiceRequestIdentity> findByServiceRequestIdOrderByPartyRoleAscPartyIndexAsc(
             UUID serviceRequestId);
 
-    // Replace writes delete first so corrected parties do not leave old numbers behind.
-    // Scoped to roles so a co-filled tenant side survives the requester's resubmission of theirs.
     void deleteByServiceRequestIdAndPartyRoleIn(UUID serviceRequestId, Collection<String> partyRoles);
 
     @Modifying

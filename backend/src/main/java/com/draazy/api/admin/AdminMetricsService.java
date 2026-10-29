@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdminMetricsService {
-
     private static final int REVENUE_WINDOW_DAYS = 30;
 
     private final AdminMetricsRepository metrics;
@@ -21,13 +20,10 @@ public class AdminMetricsService {
         this.reports = reports;
     }
 
-    // Seven counts and one money figure, deliberately unbatched.
     @Transactional(readOnly = true)
     public AdminKpis dashboard(AuthPrincipal caller) {
         boolean admin = Roles.Wire.ADMIN.equals(caller.role());
 
-        // Read once: two calls either side of midnight would open a 32-day window, and the pair
-        // straddling it is exactly the case nobody would ever reproduce.
         LocalDate today = LocalDate.now(PlatformTime.IST);
         return new AdminKpis(
                 metrics.countListings(null),

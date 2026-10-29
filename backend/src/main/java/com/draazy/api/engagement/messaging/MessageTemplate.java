@@ -10,16 +10,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.Getter;
 
-/**
- * Reusable outreach copy (the wording of a chaser, not the chaser itself). Slugged, not uuid-keyed,
- * so referring to a template by name in code and audit rows stays a direct reference.
- */
 @Entity
 @Table(name = "message_template")
 @Getter
 public class MessageTemplate {
-
-    /** Matches {@code {key}}. {@code \w+} only — richer syntax becomes an admin-editable engine. */
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{(\\w+)}");
 
     @Id
@@ -49,10 +43,6 @@ public class MessageTemplate {
 
     protected MessageTemplate() {}
 
-    /**
-     * Substitute {@code {placeholder}} keys from {@code variables}. Unknown or null keys stay as
-     * literal text so a typo lands loudly in the preview rather than silently blanking the sentence.
-     */
     public String render(Map<String, String> variables) {
         Matcher matcher = PLACEHOLDER.matcher(body);
         StringBuilder out = new StringBuilder();

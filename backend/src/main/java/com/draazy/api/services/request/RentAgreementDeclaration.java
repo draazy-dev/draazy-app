@@ -8,8 +8,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
-// The review tick authorizes drafting/e-registration and use of Aadhaar/PAN.
-// Audit stores the exact text hash because browser-only consent proves nothing later.
 final class RentAgreementDeclaration {
 
     // Must match DECLARATION_VERSION in the wizard's constants.js; bump both with the text.

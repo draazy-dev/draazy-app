@@ -51,9 +51,7 @@ import org.springframework.security.web.method.annotation.AuthenticationPrincipa
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-/** Real controllers, services and scanner; only persistence/storage and authenticated identity are substituted. */
 class UploadPolicyEndpointsTest {
-
     private static final UUID OWNER = UUID.randomUUID();
     private static final UUID PROPERTY = UUID.randomUUID();
     private static final UUID MANAGED = UUID.randomUUID();

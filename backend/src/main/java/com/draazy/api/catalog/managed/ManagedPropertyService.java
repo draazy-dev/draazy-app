@@ -27,11 +27,8 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Owner side of the private property record. Everything is keyed by the token principal, so a
- * cross-owner id is {@code 404} rather than {@code 403} — we never confirm someone else's record. */
 @Service
 public class ManagedPropertyService {
-
     private static final String CITY = "Pune";
 
     private final ManagedPropertyRepository records;
@@ -105,8 +102,6 @@ public class ManagedPropertyService {
         return mapper.toDto(saved);
     }
 
-    /** Resolve the listing a new record claims, or refuse. Someone else's listing is {@code 404} so
-     * the 403 does not confirm it exists; the caller's own, already claimed, is an honest {@code 409}. */
     private UUID adopt(UUID ownerId, String listingId) {
         Property listing = Ids.parseUuid(listingId)
                 .flatMap(properties::findById)
@@ -118,7 +113,6 @@ public class ManagedPropertyService {
         return listing.getId();
     }
 
-    /** Partial update of an owned record; only non-null fields are applied. */
     @Transactional
     public ManagedPropertyDto update(UUID ownerId, String id, ManagedPropertyUpdateRequest in) {
         ManagedProperty m = ownedRecord(ownerId, id);
@@ -181,7 +175,6 @@ public class ManagedPropertyService {
         return announced(records.saveAndFlush(m), named);
     }
 
-    /** Stop tracking rent and forget the tenant. Recorded receipts stay: each is an issued document. */
     @Transactional
     public ManagedPropertyDto stopRentTracking(UUID ownerId, String id) {
         ManagedProperty m = ownedRecord(ownerId, id);
@@ -193,8 +186,6 @@ public class ManagedPropertyService {
         return mapper.toDto(records.saveAndFlush(m));
     }
 
-    /** A tracked tenancy must name who pays, on which number, and how much — the receipt and every
-     * reminder are built from these, and the mobile is what ties the tenant to the owner. */
     private void requireTrackable(UUID ownerId, ManagedProperty m) {
         if (m.getTenantName() == null || m.getTenantName().isBlank()) {
             throw new ValidationException("Add the tenant's full name");
@@ -222,8 +213,6 @@ public class ManagedPropertyService {
         records.delete(ownedRecord(ownerId, id));
     }
 
-    /** Publish an owned record into the marketplace: create an ordinary pending listing from its
-     * facts and link back to it. Idempotent — a record already published is returned unchanged. */
     @Transactional
     public ManagedPropertyDto publish(UUID ownerId, String id) {
         ManagedProperty m = ownedRecordForUpdate(ownerId, id);
@@ -237,20 +226,12 @@ public class ManagedPropertyService {
 
                 null, null, null,
 
-                // address / floor / societyId / electricityMeterNo: a managed record is a private
-                // file on a property already held, so there is no duplicate to detect.
                 null, null, null, null,
 
-                // bathrooms / parking / balconies / facing / overlooking / totalFloors / ageYears
-                // are not collected here, and publishing must not invent them.
                 null, null, null, null, null, null, null,
 
-                // Postcode, exact areas, move-in date, pet policy and supplemental wizard answers
-                // were not collected here, and a managed record is never a plot.
                 null, null, null, null, null, null, null, null, null);
 
-        // Publish is the boundary between a freely captured record and the stricter marketplace
-        // contract, so re-run the listing's bean-validation here — ListingService.create does not.
         Set<ConstraintViolation<ListingCreate>> violations = validator.validate(listing);
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
@@ -260,8 +241,6 @@ public class ManagedPropertyService {
         return mapper.toDto(records.saveAndFlush(m));
     }
 
-    /** Publish through the full listing wizard's payload instead of the record's own thin facts, under the same
-     * lock; the normal owner create still owns pace, photos, quota and moderation. */
     @Transactional
     public Property publishWith(UUID ownerId, String id, ListingCreate body) {
         ManagedProperty m = ownedRecordForUpdate(ownerId, id);
@@ -277,7 +256,7 @@ public class ManagedPropertyService {
         return created;
     }
 
-    // Row lock, so two concurrent publishes of one record cannot both see it unpublished.
+    // Row lock so two concurrent publishes of one record cannot both see it unpublished.
     private ManagedProperty ownedRecordForUpdate(UUID ownerId, String id) {
         return Ids.parseUuid(id)
                 .flatMap(records::findByIdForUpdate)
@@ -296,11 +275,8 @@ public class ManagedPropertyService {
 
     private static final int DEFAULT_RECEIPT_MONTHS = 6;
 
-    /** How far back an owner may record a month they took in cash and never got round to logging. */
     private static final int RECEIPT_BACKDATE_YEARS = 5;
 
-    /** The newest receipts for one owned property, newest month first. {@code months} is a page size,
-     * so it is clamped rather than rejected; a foreign or unparseable id is {@code 404}. */
     @Transactional(readOnly = true)
     public List<ManagedRentReceiptDto> listRentReceipts(UUID ownerId, String id, Integer months) {
         ManagedProperty m = ownedRecord(ownerId, id);
@@ -309,8 +285,6 @@ public class ManagedPropertyService {
                 receipts.findByManagedPropertyIdOrderByRentMonthDesc(m.getId(), Limit.of(limit)));
     }
 
-    /** Record one month as received and mint the immutable receipt. Every figure is snapshotted
-     * server-side: a rent receipt is a tax document, and "the browser said so" is not a provenance. */
     @Transactional
     public ManagedRentReceiptDto recordRentReceipt(UUID ownerId, String id, String rentMonth) {
         ManagedProperty m = ownedRecord(ownerId, id);
@@ -337,8 +311,6 @@ public class ManagedPropertyService {
         return mapper.toDto(receipt);
     }
 
-    /** Refuse a month no tenancy could have paid rent for — a receipt is immutable and undeletable,
-     * so an unbounded month mints nonsense documents without limit. */
     private static void requireReceiptableMonth(String rentMonth) {
         YearMonth now = YearMonth.now(ZoneId.of("Asia/Kolkata"));
         if (rentMonth.compareTo(now.toString()) > 0) {

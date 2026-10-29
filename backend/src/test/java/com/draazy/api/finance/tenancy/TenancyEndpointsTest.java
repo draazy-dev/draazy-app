@@ -32,10 +32,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
-// Contract + behaviour proof for the tenancy lifecycle and tenant screening profile. The load-bearing tests
-// here are the ones that would let somebody read a stranger's income.
 class TenancyEndpointsTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired EntityManager em;
     @Autowired JwtService jwtService;
@@ -81,8 +78,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    // There is no user row to point `tenant_id` at, so the deal closes without a tenancy rather than the platform
-    // inventing a shadow user.
     @Test
     void closingARentDeal_proposesAPendingTenancyForARegisteredTenant() throws Exception {
         User owner = user("9822200001", "owner");
@@ -110,7 +105,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
-    // ---- 4: the tenant profile round-trips, and the score is server-computed ----
     @Test
     void closingARentDeal_offPlatformTenant_opensNoTenancyButStillCloses() throws Exception {
         User owner = user("9822200003", "owner");
@@ -339,7 +333,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
         tenant.setMobileVerified(false);
         users.saveAndFlush(tenant);
         mvc.perform(post(url).header(HttpHeaders.AUTHORIZATION, bearer(tenant))).andExpect(status().isNotFound());
-
     }
 
     @Test
@@ -397,8 +390,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
     void myProfile_emptyBeforeAnySave() throws Exception {
         User tenant = user("9822200012", "buyer");
 
-        // "Never assessed" and "assessed, scored nothing" are different claims about a person, and the screening
-        // meter renders them differently.
         mvc.perform(get(Routes.Tenancies.MY_PROFILE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
                 .andExpect(status().isOk())
@@ -407,7 +398,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.name").doesNotExist());
     }
 
-    // The client must not be able to set its own score or verified badge.
     @Test
     void updateMyProfile_computesTheScoreFromTheStoredFields() throws Exception {
         User tenant = user("9822200013", "buyer");
@@ -426,7 +416,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.income").value(95000));
     }
 
-    // PUT replaces: a field the tenant removed from the form must actually go.
     @Test
     void updateMyProfile_cannotSetItsOwnScoreOrVerifiedBadge() throws Exception {
         User tenant = user("9822200014", "buyer");
@@ -440,7 +429,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.verified").value(false));
     }
 
-    // The three refusals must be indistinguishable.
     @Test
     void updateMyProfile_replacesRatherThanMerges() throws Exception {
         User tenant = user("9822200015", "buyer");
@@ -458,7 +446,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.about").doesNotExist());
     }
 
-    // A screening owner reads the profile, not the number — the contact gate still applies.
     @Test
     void updateMyProfile_rejectsAnUnknownOccupantType() throws Exception {
         User tenant = user("9822200016", "buyer");
@@ -470,7 +457,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // ---- 6: there is deliberately no create route (spec fix S9) ----
     @Test
     void thereIsNoWayForAClientToCreateATenancy() {
         Set<String> mapped = handlerMapping.getHandlerMethods().entrySet().stream()

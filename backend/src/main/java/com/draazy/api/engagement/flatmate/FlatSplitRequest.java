@@ -12,13 +12,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
-/** Room count (from the parent's {@code bhk}) and {@code maxOccupants} (from the room count) are
- * conditional bounds, so {@link FlatSplitService} checks them and names the numbers involved. */
 public record FlatSplitRequest(
         @NotNull @Min(1) @Max(36) Integer maxOccupants,
         @NotEmpty @Size(max = 12) List<@Valid @NotNull RoomSpec> rooms) {
-
-    /** {@code deposit} defaults to twice the rent when omitted, the Pune convention. */
     public record RoomSpec(
             @NotBlank String roomKind,
             @NotNull @Min(1) @Max(10_000_000) Long rent,

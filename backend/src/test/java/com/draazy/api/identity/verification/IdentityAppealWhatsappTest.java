@@ -29,7 +29,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @SpringBootTest
 @DisplayName("Identity appeal decisions and the paid WhatsApp notice")
 class IdentityAppealWhatsappTest {
-
     @MockitoBean
     DecisionMessenger messenger;
 
@@ -50,7 +49,6 @@ class IdentityAppealWhatsappTest {
 
     private final List<UUID> created = new ArrayList<>();
 
-    // The notice fires after commit, so these cases commit and are cleaned up by hand.
     @AfterEach
     void cleanUp() {
         created.forEach(id -> {

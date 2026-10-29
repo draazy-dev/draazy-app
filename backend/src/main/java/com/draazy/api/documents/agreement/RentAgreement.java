@@ -9,13 +9,10 @@ import java.time.LocalDate;
 import java.util.UUID;
 import lombok.Getter;
 
-/** Maps {@code rent_agreements} (V6). {@code tenantMobile} is text, not a user id, because at draft
- * time the tenant may have no Draazy account; {@code status} is ops-owned, written only by {@link #moveTo}. */
 @Entity
 @Table(name = "rent_agreements")
 @Getter
 public class RentAgreement extends AuditedEntity {
-
     @Column(name = "property_id", nullable = false, updatable = false)
     private UUID propertyId;
 
@@ -37,11 +34,9 @@ public class RentAgreement extends AuditedEntity {
     @Column(name = "duration_months")
     private Integer durationMonths;
 
-    /** One of {@link RentAgreementStatuses}; the V6 CHECK rejects anything else. */
     @Column(name = "status", nullable = false)
     private String status = RentAgreementStatuses.DRAFT;
 
-    /** Pre-V39 free-text link. Rows the paid flow creates leave it null and carry {@link #finalDocumentId}. */
     @Column(name = "document_url")
     private String documentUrl;
 
@@ -61,7 +56,6 @@ public class RentAgreement extends AuditedEntity {
     private Instant renewalRemindedAt;
 
     protected RentAgreement() {
-        // JPA
     }
 
     RentAgreement(PreparedAgreement prepared, String tenantMobile) {
@@ -81,14 +75,11 @@ public class RentAgreement extends AuditedEntity {
         this.renewalRemindedAt = at;
     }
 
-    /** Last day of the term; null while the draft has no start or length. */
     public LocalDate endDate() {
         return startDate == null || durationMonths == null
                 ? null : startDate.plusMonths(durationMonths).minusDays(1);
     }
 
-    /** No plain {@code setStatus}: readers treat the field as evidence, so the only writer is a move
-     * the ladder allowed. */
     void moveTo(String next, UUID actor) {
         this.status = next;
         if (RentAgreementStatuses.REGISTERED.equals(next)) {

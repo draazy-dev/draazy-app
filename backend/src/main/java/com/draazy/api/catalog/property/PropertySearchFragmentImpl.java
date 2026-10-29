@@ -12,9 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
-/** Found by Spring Data through the {@code Impl} suffix, so the name is not cosmetic. */
 class PropertySearchFragmentImpl implements PropertySearchFragment {
-
     private final EntityManager em;
 
     PropertySearchFragmentImpl(EntityManager em) {
@@ -27,15 +25,11 @@ class PropertySearchFragmentImpl implements PropertySearchFragment {
         CriteriaQuery<Property> cq = cb.createQuery(Property.class);
         Root<Property> root = cq.from(Property.class);
         cq.select(root);
-        // Applied before the sort is read, because a ranking specification restricts nothing and
-        // instead calls `orderBy` on the query it is given.
         Predicate where = spec.toPredicate(root, cq, cb);
         if (where != null) {
             cq.where(where);
         }
         List<Order> orders = orders(pageable.getSort(), root, cb);
-        // Guarded, not unconditional: `orderBy` with an empty list *clears* the order, which on the
-        // ranked branch would throw away the ranking the specification just set.
         if (!orders.isEmpty()) {
             cq.orderBy(orders);
         }
@@ -55,8 +49,6 @@ class PropertySearchFragmentImpl implements PropertySearchFragment {
         if (where != null) {
             cq.where(where);
         }
-        // JPA has no `FILTER (WHERE ...)`, so each conditional count is spelled as a sum over a CASE.
-        // Same thing to the planner, and it keeps all three aggregates in one pass over one predicate.
         Predicate isVerified = verified.toPredicate(root, cq, cb);
         Predicate isUnstated = unstated.toPredicate(root, cq, cb);
         cq.multiselect(cb.count(root),
@@ -73,7 +65,6 @@ class PropertySearchFragmentImpl implements PropertySearchFragment {
                 .toList();
     }
 
-    /** {@code SUM} over zero rows is {@code NULL}, and the dialect picks the numeric type. */
     private static long toLong(Object value) {
         return value instanceof Number n ? n.longValue() : 0L;
     }

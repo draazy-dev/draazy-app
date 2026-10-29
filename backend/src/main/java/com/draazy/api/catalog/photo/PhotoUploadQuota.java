@@ -9,10 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Caps what one account can put in the public bucket, and records each upload for {@link PhotoUploadSweep}. */
 @Component
 public class PhotoUploadQuota {
-
     static final Duration WINDOW = Duration.ofHours(24);
 
     private final int maxPerWindow;
@@ -30,7 +28,6 @@ public class PhotoUploadQuota {
         return maxPerWindow;
     }
 
-    /** Recorded before the bytes are stored, so a stored file is never one the sweep cannot see. */
     @Transactional
     public void reserve(UUID uploaderId, String storageKey) {
         locks.holdUntilCommit(RateLimitLock.Limit.PHOTO_UPLOAD, uploaderId.toString());

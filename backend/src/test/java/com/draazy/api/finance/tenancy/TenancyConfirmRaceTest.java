@@ -23,11 +23,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-// Not on AbstractApiTest: its rollback hides commits, and these races only exist across commits.
 @SpringBootTest
 @DisplayName("Concurrent answers to a pending tenancy")
 class TenancyConfirmRaceTest {
-
     private static final int ROUNDS = 8;
     private static final String OWNER_MOBILE = "9876000441";
     private static final String TENANT_MOBILE = "9876000442";

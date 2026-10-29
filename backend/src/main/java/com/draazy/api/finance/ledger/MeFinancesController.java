@@ -23,18 +23,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** No {@code @PreAuthorize}: the spec has no {@code x-roles} here,
- * so strict owner-scoping in {@link FinanceService} is the gate (404, not 403). */
 @RestController
 public class MeFinancesController {
-
     private final FinanceService financeService;
 
     public MeFinancesController(FinanceService financeService) {
         this.financeService = financeService;
     }
 
-    /** Sort stripped via {@link Pageables#unsorted(Pageable)}: the contract offers no {@code sort}. */
     @GetMapping(Routes.Finances.TRANSACTIONS)
     public PageResponse<TransactionDto> listTransactions(@CurrentUser AuthPrincipal principal,
                                                  @PathVariable("propId") String propId,
@@ -45,7 +41,6 @@ public class MeFinancesController {
                 dto -> dto);
     }
 
-    /** {@code POST /me/finances/{propId}/transactions} (contract {@code addTransaction}) — 201. */
     @PostMapping(Routes.Finances.TRANSACTIONS)
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionDto addTransaction(@CurrentUser AuthPrincipal principal,
@@ -72,7 +67,6 @@ public class MeFinancesController {
                 principal.userId(), parseUuid(propId), parseTxnUuid(txnId));
     }
 
-    /** {@code PUT /me/finances/{propId}/basis} (contract {@code setBasis}) — upsert. */
     @PutMapping(Routes.Finances.BASIS)
     public OwnershipBasisDto setBasis(@CurrentUser AuthPrincipal principal,
                                       @PathVariable("propId") String propId,
@@ -80,7 +74,6 @@ public class MeFinancesController {
         return financeService.setBasis(principal.userId(), parseUuid(propId), body);
     }
 
-    /** {@code GET /me/finances/{propId}/summary} (contract {@code financeSummary}). */
     @GetMapping(Routes.Finances.SUMMARY)
     public FinanceSummaryDto summary(@CurrentUser AuthPrincipal principal,
                                      @PathVariable("propId") String propId,
@@ -89,7 +82,6 @@ public class MeFinancesController {
         return financeService.summary(principal.userId(), parseUuid(propId), period);
     }
 
-    /** {@code months} sizes the cashflow series (default 12). */
     @GetMapping(Routes.Finances.OVERVIEW)
     public FinanceOverviewDto overview(@CurrentUser AuthPrincipal principal,
                                        @PathVariable("propId") String propId,
@@ -98,12 +90,10 @@ public class MeFinancesController {
         return financeService.overview(principal.userId(), parseUuid(propId), months);
     }
 
-    /** A malformed property id is 404, not 400, as telling the shape from absence would show a prober which ids are worth trying. */
     private static UUID parseUuid(String token) {
         return Ids.parseUuid(token).orElseThrow(() -> NotFoundException.of("Property"));
     }
 
-    /** Same rule for a transaction id, with the message the caller would have got anyway. */
     private static UUID parseTxnUuid(String token) {
         return Ids.parseUuid(token)
                 .orElseThrow(() -> NotFoundException.of("Transaction"));

@@ -29,7 +29,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class FlatmateTrustReconcilerTest {
-
     @Mock
     private FlatmateReviewRepository reviews;
 
@@ -53,7 +52,6 @@ class FlatmateTrustReconcilerTest {
 
     @Mock
     private Notifier notifier;
-
 
     private FlatmateTrustReconciler reconciler;
 
@@ -155,8 +153,6 @@ class FlatmateTrustReconcilerTest {
         verify(badges, never()).apply(any(), anyBoolean());
     }
 
-    // Both halves name the same building, which is strictly stronger than the locality fallback:
-    // the sweep may fire without a person having looked.
     @Test
     void approvesWhenThePostAndTheAgreementNameTheSameSociety() {
         UUID hostId = UUID.randomUUID();
@@ -175,8 +171,6 @@ class FlatmateTrustReconcilerTest {
         assertThat(review.getStatus()).isEqualTo(FlatmateVocabulary.STATUS_APPROVED);
     }
 
-    // The case the locality rung cannot see: two towers in one neighbourhood, with every fact the
-    // coarse check compares agreeing. Falls to the desk rather than being refused.
     @Test
     void doesNotAutoApproveAnAgreementForAnotherSocietyInTheSameLocality() {
         UUID hostId = UUID.randomUUID();

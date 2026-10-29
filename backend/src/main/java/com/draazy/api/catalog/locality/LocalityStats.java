@@ -2,10 +2,8 @@ package com.draazy.api.catalog.locality;
 
 import java.math.BigDecimal;
 
-/** What live listings say about a locality; every average is null below {@link #MIN_SAMPLE} samples. */
 record LocalityStats(long live, Long avgRent, Long ratePerSqft, Long fromPrice,
         long forSale, long forRent, Long fromSale, Long fromRent) {
-
     static final int MIN_SAMPLE = 3;
 
     static final LocalityStats NONE = new LocalityStats(0, null, null, null, 0, 0, null, null);
@@ -14,7 +12,6 @@ record LocalityStats(long live, Long avgRent, Long ratePerSqft, Long fromPrice,
         return live >= MIN_SAMPLE;
     }
 
-    /** Row layout is fixed by {@code PropertyRepository#liveLocalityStats}. */
     static LocalityStats of(Object[] r) {
         long live = ((Number) r[1]).longValue();
         return new LocalityStats(live, average(r[2], r[3]), average(r[4], r[5]), asLong(r[6]),

@@ -30,10 +30,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.RequestBuilder;
 
-// Organised around the invariants rather than the endpoints — strict owner-scoping, the upload allowlist, and the
-// rule that a stored row never carries a persisted URL.
 class DocumentVaultTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -93,7 +90,6 @@ class DocumentVaultTest extends AbstractApiTest {
 
         String id = upload(owner, p, "Sale Deed", pdf("deed.pdf"));
 
-        // A URL in the column would be a permanent, un-revocable credential to a title deed.
         assertThat(documents.findById(UUID.fromString(id)))
                 .get()
                 .satisfies(d -> {
@@ -121,7 +117,6 @@ class DocumentVaultTest extends AbstractApiTest {
         User owner = user("9820001013");
         Property p = listing(owner, "Mislabelled flat");
 
-        // Both types are on the allowlist, so this is caught only by the two claims disagreeing.
         byte[] png = new byte[] {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0};
         mvc.perform(multipart(Routes.MeDocuments.FOR_PROPERTY, p.getId().toString())
                         .file(new MockMultipartFile("file", "scan.jpg", "image/jpeg", png))
@@ -135,8 +130,6 @@ class DocumentVaultTest extends AbstractApiTest {
         User owner = user("9820001014");
         Property p = listing(owner, "Charset flat");
 
-        // A browser-supplied type with a charset parameter must still land as a clean media type,
-        // because this string becomes the response Content-Type when the file is served back.
         mvc.perform(multipart(Routes.MeDocuments.FOR_PROPERTY, p.getId().toString())
                         .file(new MockMultipartFile("file", "deed.pdf", "application/pdf; charset=utf-8",
                                 "%PDF-1.7 deed".getBytes()))
@@ -163,8 +156,6 @@ class DocumentVaultTest extends AbstractApiTest {
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.error").value("unsupported_media_type"));
 
-        // And nothing was written: the scan runs before the object store, so a refusal leaves no
-        // row and no object that a signed URL could still serve.
         assertThat(documents.findAll()).noneMatch(d -> d.getPropertyId().equals(p.getId()));
     }
 
@@ -173,7 +164,6 @@ class DocumentVaultTest extends AbstractApiTest {
         User owner = user("9820001016");
         Property p = listing(owner, "Double extension flat");
 
-        // The bytes are a genuine PDF, so every byte-level guard in the vault passes it.
         mvc.perform(multipart(Routes.MeDocuments.FOR_PROPERTY, p.getId().toString())
                         .file(new MockMultipartFile("file", "deed.pdf.exe", "application/pdf",
                                 "%PDF-1.4 deed".getBytes()))
@@ -284,8 +274,6 @@ class DocumentVaultTest extends AbstractApiTest {
         Property two = listing(owner, "Flat B");
         String idOnTwo = upload(owner, two, "Sale Deed", pdf("deed.pdf"));
 
-        // Owning both is not enough: the doc must belong to the property named in the path, or the
-        // path segment is decorative and a typo silently deletes the wrong file.
         mvc.perform(delete(Routes.MeDocuments.BY_ID, one.getId().toString(), idOnTwo)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isNotFound());

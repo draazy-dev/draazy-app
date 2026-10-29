@@ -16,14 +16,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class MeContactRequestsController {
-
     private final ContactService contactService;
 
     public MeContactRequestsController(ContactService contactService) {
         this.contactService = contactService;
     }
 
-    // Entries mask requester mobile; approved requests reveal it only in `contact`.
     @GetMapping(Routes.MeContactRequests.BASE)
     public PageResponse<ContactRequestResponse> myContactRequests(
             @CurrentUser AuthPrincipal principal,

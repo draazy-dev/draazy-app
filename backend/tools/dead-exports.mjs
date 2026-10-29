@@ -1,19 +1,16 @@
 #!/usr/bin/env node
-/** Dead-export scan for `frontend/src`: reports only zero-occurrence names, as a nonzero count proves nothing for short generic names.
- * `services/providers/**` is excluded because `config.js` loads it through a non-eager `import.meta.glob` that must stay non-eager. */
+// Dead-export scan for frontend/src: reports only zero-occurrence names. services/providers/** is excluded:
+// config.js loads it through a non-eager import.meta.glob.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, extname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SUBJECT_ROOT = join(REPO, 'frontend/src');
-/** Consumer corpora. `e2e` counts as a caller; nothing in it is ever a subject. */
 const CONSUMER_ROOTS = [join(REPO, 'frontend/src'), join(REPO, 'e2e')];
 
-/** See the header: excluded because `services/config.js` reaches these through a non-eager glob. */
 const NOT_SUBJECTS = /[\\/]services[\\/]providers[\\/]/;
 
-/** `export function f`, `export async function f`, `export const F`, `export class C`. */
 const EXPORT_DECL = /^export (?:async )?(?:function|const|class) (\w+)/gm;
 
 function collect(dir, acc = []) {
@@ -33,7 +30,6 @@ const subjects = collect(SUBJECT_ROOT)
 const consumers = CONSUMER_ROOTS.flatMap((r) => collect(r));
 const text = new Map(consumers.map((f) => [f, readFileSync(f, 'utf8')]));
 
-/** Texts are held and the subject's file skipped, avoiding a concatenation rebuilt per subject. */
 function referencedElsewhere(name, ownPath) {
   const needle = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
   for (const [path, body] of text) {

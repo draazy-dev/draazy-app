@@ -20,10 +20,8 @@ import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Staff pull one photo from a listing, short of pulling the whole listing. */
 @Service
 public class PropertyPhotoTakedownService {
-
     static final Map<String, String> REASONS = Map.of(
             "not_the_property", "it does not show this property",
             "people_visible", "it shows people",
@@ -59,7 +57,6 @@ public class PropertyPhotoTakedownService {
         }
         Property property = Ids.parseUuid(id).flatMap(properties::findForVerificationDecision)
                 .orElseThrow(() -> NotFoundException.of("Property"));
-        // The controller maps the owner after this transaction closes.
         Hibernate.initialize(property.getOwner());
         lifecycle.requireChecker(actor, property);
         lifecycle.requireActive(property);
@@ -93,7 +90,6 @@ public class PropertyPhotoTakedownService {
         return property;
     }
 
-    // Approved listings drop back to the queue; one already waiting just gets the question.
     private void sendBack(AuthPrincipal actor, Property property, String ownerNote) {
         if (PropertyStatus.APPROVED.equals(property.getStatus())) {
             lifecycle.reenterPending(actor, property);

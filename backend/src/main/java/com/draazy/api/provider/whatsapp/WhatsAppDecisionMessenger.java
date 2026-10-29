@@ -10,14 +10,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/** A blank template name means skip: unlike a login, a decision notice can fall back on the in-app row. */
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.whatsapp", name = "enabled", havingValue = "true")
 class WhatsAppDecisionMessenger implements DecisionMessenger {
-
     private static final Logger log = LoggerFactory.getLogger(WhatsAppDecisionMessenger.class);
 
-    /** See {@code WhatsAppOtpSender.COUNTRY_CODE}: the upstream normaliser only admits Indian mobiles. */
     private static final String COUNTRY_CODE = "91";
 
     private static final String OPERATION = DecisionMessenger.IDENTITY_DECISION;
@@ -48,7 +45,6 @@ class WhatsAppDecisionMessenger implements DecisionMessenger {
                 List.of(waiting));
     }
 
-    /** Body parameters in order: {{1}} tenant first name, {{2}} place, {{3}} confirm link. */
     @Override
     public boolean sendOwnerNotice(String mobile, String tenantName, String place, String link) {
         return send(DecisionMessenger.OWNER_NOTICE, "Owner notice", "owner-notice-template-name",
@@ -87,7 +83,6 @@ class WhatsAppDecisionMessenger implements DecisionMessenger {
                     () -> client.post("/" + fromNumberId + "/messages", payload));
             return true;
         } catch (WhatsAppClient.WhatsAppException e) {
-            // Best-effort by contract: the in-app row already carries the news.
             log.warn("{} WhatsApp send failed for {}", what, MobileMask.mask(mobile), e);
             return false;
         }

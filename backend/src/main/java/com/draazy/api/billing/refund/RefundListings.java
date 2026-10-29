@@ -13,10 +13,8 @@ import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 
-/** What freezing a listing pass does to its listing, and undoing it. Callers hold the listing row lock. */
 @Component
 class RefundListings {
-
     private final PropertyRepository properties;
     private final ListingQuota quota;
     private final ListingDuplicateProbe duplicates;
@@ -36,7 +34,6 @@ class RefundListings {
         this.entityManager = entityManager;
     }
 
-    /** The lock order every refund path shares: the listing row, then the order row. */
     void lock(Subscription order) {
         if (order.getPropertyId() != null) {
             properties.findForVerificationDecision(order.getPropertyId());
@@ -44,7 +41,6 @@ class RefundListings {
         entityManager.refresh(order, LockModeType.PESSIMISTIC_WRITE);
     }
 
-    /** Pauses the listing when the free tier cannot hold it once the pass stops covering it. */
     boolean pauseIfUncovered(Subscription pass, Instant now, String why) {
         return properties.findForVerificationDecision(pass.getPropertyId())
                 .filter(p -> !p.isArchived() && PropertyStatus.APPROVED.equals(p.getStatus())

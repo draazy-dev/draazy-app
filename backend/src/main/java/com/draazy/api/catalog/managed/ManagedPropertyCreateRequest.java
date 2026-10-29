@@ -13,7 +13,6 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.Map;
 
-/** Server-owned fields are absent so clients cannot supply visibility, status, or owner. */
 public record ManagedPropertyCreateRequest(
         String title,
         @NotNull @Pattern(regexp = DealIntent.PATTERN, message = DealIntent.PATTERN_MESSAGE) String deal,

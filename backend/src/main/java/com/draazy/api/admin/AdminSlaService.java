@@ -10,33 +10,22 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Turnaround runs from the earliest audit_log row; the latest would time re-checks, not the decision. */
 @Service
 public class AdminSlaService {
-
-    /** 24h keeps the bar fixed, so compliance changes reflect real turnaround, not a moved target. */
     private static final int TARGET_HOURS = 24;
 
-    /** Enough to open and act on. A queue view is {@code /admin/properties?status=pending}. */
     private static final int WORST_PENDING_LIMIT = 10;
 
-    /** Assign an incoming service request within four hours. See the class docblock on targets. */
     private static final int PICKUP_TARGET_HOURS = 4;
 
-    /** Finish it within three days. */
     private static final int DELIVERY_TARGET_HOURS = 72;
 
-    /** A staff-posted listing goes live within a week. */
     private static final int CONCIERGE_TARGET_HOURS = 168;
 
-    /** A flatmate post is decided within a day, like a listing. */
     private static final int FLATMATE_TARGET_HOURS = 24;
 
-    /** Guard rail on {@code ?days=}, matching {@code AdminSupplyGapService}. */
     private static final int MAX_WINDOW_DAYS = 365;
 
-    /** Casts uuid to text since audit {@code entity_id} may hold a slug; the window is a {@code having} on
-     * {@code min(a.at)} so a later re-check is never promoted to the first decision. */
     private static final String SUMMARY = """
             with reviewed as (
                 select cast(extract(epoch from (min(a.at) - p.created_at)) / 3600.0
@@ -66,7 +55,6 @@ public class AdminSlaService {
                    (select count(*) from pending where hours > :target)
             """;
 
-    /** Unwindowed like {@code pendingCount}: a {@code ?days=} filter would drop the oldest rows first. */
     private static final String WORST_PENDING = """
             select cast(p.id as text),
                    p.title,
@@ -79,8 +67,6 @@ public class AdminSlaService {
              limit :limit
             """;
 
-    /** Six figures of one track under the review summary's window, cast and no-{@code coalesce} rules, so an empty
-     * set stays null, not a perfect score; a format template keeps the window predicate in one place. */
     private static final String TRACK = """
             with completed as (
                 %s
@@ -96,11 +82,8 @@ public class AdminSlaService {
                    (select count(*) from outstanding where hours > :target)
             """;
 
-    /** Raised to a service desk and not yet finished — the two states of an open ticket. */
     private static final String TICKET_UNRESOLVED = "('open', 'in-progress', 'waiting')";
 
-    /** {@code <> 'none'} is {@code TicketUpdate.UNASSIGN}: handing a ticket back writes a non-null
-     * {@code assigneeId} too, which must not count as a pickup. */
     private static final String PICKUP_COMPLETED = """
             select cast(extract(epoch from (min(a.at) - t.created_at)) / 3600.0
                         as double precision) as hours
@@ -116,7 +99,6 @@ public class AdminSlaService {
                     or min(a.at) >= cast(:since as timestamptz))
             """;
 
-    /** Open work nobody owns. A ticket that was picked up and finished is not waiting for pickup. */
     private static final String PICKUP_OUTSTANDING = """
             select cast(extract(epoch from (now() - t.created_at)) / 3600.0
                         as double precision) as hours
@@ -124,7 +106,6 @@ public class AdminSlaService {
              where t.assignee_id is null
                and t.status in """ + TICKET_UNRESOLVED;
 
-    /** {@code closed} counts too: a desk that closes without resolving would leave tickets outstanding forever. */
     private static final String DELIVERY_COMPLETED = """
             select cast(extract(epoch from (min(a.at) - t.created_at)) / 3600.0
                         as double precision) as hours
@@ -145,7 +126,6 @@ public class AdminSlaService {
               from tickets t
              where t.status in """ + TICKET_UNRESOLVED;
 
-    /** Approved, or approved but held paused by the free tier; the first decision may be a bounce, not go-live. */
     private static final String CONCIERGE_COMPLETED = """
             select cast(extract(epoch from (min(a.at) - p.created_at)) / 3600.0
                         as double precision) as hours
@@ -162,7 +142,6 @@ public class AdminSlaService {
                     or min(a.at) >= cast(:since as timestamptz))
             """;
 
-    /** {@code pending} only: a rejected listing is finished; counting it would punish correct turn-downs. */
     private static final String CONCIERGE_OUTSTANDING = """
             select cast(extract(epoch from (now() - p.created_at)) / 3600.0
                         as double precision) as hours
@@ -186,7 +165,6 @@ public class AdminSlaService {
                        and d.entity in ('flatmateSeekerPost', 'flatmateRoom', 'flatmateGroup')
                        and d.entity_id = cast(f.id as text))""";
 
-    /** First decision only: a re-held post's second review is not timed, nor is a later takedown. */
     private static final String FLATMATE_COMPLETED = """
             select cast(extract(epoch from (min(a.at) - f.created_at)) / 3600.0
                        as double precision) as hours
@@ -202,7 +180,6 @@ public class AdminSlaService {
                    or min(a.at) >= cast(:since as timestamptz))
             """.formatted(FLATMATE_POSTS);
 
-    /** A re-hold writes no audit row, so a post decided before waits from its last write (the hold), not creation. */
     private static final String FLATMATE_OUTSTANDING = """
             select cast(extract(epoch from (now() - case
                         when f.mod_status <> 'pending' then f.recheck_requested_at
@@ -225,14 +202,12 @@ public class AdminSlaService {
         return summarize(days, true);
     }
 
-    /** The dashboard tile: the same figures as the all-time {@link #report}, without the worst-pending listing list. */
     @Transactional(readOnly = true)
     public SlaSummary glance() {
         return summarize(null, false);
     }
 
     private SlaSummary summarize(Integer days, boolean withWorstPending) {
-        // All time by default: a review record is history, and a 30-day default would answer a different question.
         if (days != null && (days < 1 || days > MAX_WINDOW_DAYS)) {
             throw new BadRequestException("days must be between 1 and " + MAX_WINDOW_DAYS);
         }
@@ -248,8 +223,6 @@ public class AdminSlaService {
         Double median = hours(row[2]);
         long breached = num(row[3]);
 
-        // Null, not 100. A team that has decided nothing has not met the SLA perfectly; it has no
-        // record at all, and the only figure that says so is the absence of one.
         Integer slaRate = complianceRate(reviewed, breached);
 
         return new SlaSummary(TARGET_HOURS, reviewed, avg, median, breached, slaRate,
@@ -260,7 +233,6 @@ public class AdminSlaService {
                 track(FLATMATE_COMPLETED, FLATMATE_OUTSTANDING, FLATMATE_TARGET_HOURS, since));
     }
 
-    /** Four statements, not one: a single query would repeat the {@code :target} comparison under four aliases. */
     private SlaSummary.Track track(String completed, String outstanding, int targetHours, Instant since) {
         Object[] row = (Object[]) em.createNativeQuery(TRACK.formatted(completed, outstanding))
                 .setParameter("since", since)
@@ -275,7 +247,6 @@ public class AdminSlaService {
                 num(row[4]), num(row[5]));
     }
 
-    /** Null, not 100: a desk that closed nothing has no compliance record, and 100 would read as doing well. */
     private static Integer complianceRate(long completed, long breached) {
         return completed == 0
                 ? null
@@ -298,12 +269,10 @@ public class AdminSlaService {
         return value == null ? 0L : ((Number) value).longValue();
     }
 
-    /** Null in, null out — the one conversion in this class that must not produce a zero. */
     private static Double hours(Object value) {
         return value == null ? null : round1(((Number) value).doubleValue());
     }
 
-    /** Presentation only; SQL compares exact values, so a 24.04h listing is still counted as a breach. */
     private static double round1(double value) {
         return Math.round(value * 10.0) / 10.0;
     }

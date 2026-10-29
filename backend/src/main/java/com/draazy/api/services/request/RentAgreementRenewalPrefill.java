@@ -16,11 +16,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** What the renewal wizard prefills from. Both parties signed the same registered document, so each
- * may see the other's mobile; a stranger and a draft get 404, never 403. */
 @Service
 public class RentAgreementRenewalPrefill {
-
     public record Party(String name, String mobile) {
     }
 

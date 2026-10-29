@@ -15,10 +15,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Hard-deleted and deduplicated by the database, not by catching exceptions or read-then-write checks. */
 @Service
 public class SocietyFollowService {
-
     private final SocietyFollowRepository followRepo;
     private final SocietyRepository societyRepo;
     private final SocietyService societyService;
@@ -30,8 +28,6 @@ public class SocietyFollowService {
         this.societyService = societyService;
     }
 
-    /** Paged because a user can follow every society (unbounded). {@code findAllById} drops id order,
-     * so it is restored via a {@link LinkedHashMap}. */
     @Transactional(readOnly = true)
     public Page<FollowedSociety> listFollowed(UUID userId, Pageable pageable) {
         Page<UUID> ids = followRepo.findFollowedSocietyIds(userId, pageable);
@@ -43,7 +39,6 @@ public class SocietyFollowService {
         ids.getContent().forEach(id -> byId.put(id, null));
         societyRepo.findAllById(ids.getContent()).forEach(s -> byId.put(s.getId(), s));
 
-        // Filtered, not trusted: the FK makes an orphan join row unreachable; the total still counts follows.
         List<Society> ordered = byId.values().stream().filter(Objects::nonNull).toList();
         Map<UUID, Long> homes = societyService.homeCounts(ordered.stream().map(Society::getId).toList());
         return new PageImpl<>(ordered.stream()
@@ -59,7 +54,6 @@ public class SocietyFollowService {
         followRepo.insertIfAbsent(userId, society.getId());
     }
 
-    /** Unfollow. Idempotent: answers 204 whether or not the row existed. */
     @Transactional
     public void unfollow(UUID userId, String slug) {
         societyRepo.findBySlug(slug).ifPresent(society ->

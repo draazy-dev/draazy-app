@@ -6,7 +6,6 @@ import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.identity.user.User;
 
 public final class VisitMapper {
-
     private VisitMapper() {
     }
 
@@ -28,7 +27,6 @@ public final class VisitMapper {
         return toDto(visit, null, visitor, visibility);
     }
 
-    // Mobile is masked unless viewer is the visitor or confirmed owner.
     private static VisitDto.Party toParty(User visitor, ContactVisibility visibility) {
         if (visitor == null) {
             return null;

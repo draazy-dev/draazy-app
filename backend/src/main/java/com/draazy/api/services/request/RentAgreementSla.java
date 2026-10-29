@@ -6,10 +6,7 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 
-// Computed on read, not swept: sandbox schedulers may never fire.
-// Customer-decision drafts carry no desk deadline.
 public final class RentAgreementSla {
-
     static final String DESK = "desk";
     static final String CUSTOMER = "customer";
 

@@ -28,11 +28,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Staff/admin side of the flatmates market. Verification and moderation stay on separate routes —
- * see {@link FlatmateModerationService} for why they must not collapse into one another. */
 @RestController
 public class FlatmateModerationController {
-
     private static final Set<String> SORTABLE = Set.of("createdAt");
 
     private static final String STAFF_OR_ADMIN =
@@ -56,8 +53,6 @@ public class FlatmateModerationController {
         this.editor = editor;
     }
 
-    /** {@code GET /admin/flatmate-reviews} (contract {@code listFlatmateReviews}) — paged, because
-     * this is a platform-wide table with no scoping. */
     @GetMapping(Routes.Moderation.FLATMATE_REVIEWS)
     @PreAuthorize(FLATMATES_READ)
     public PageResponse<FlatmateReviewRow> queue(@RequestParam(required = false) String status,
@@ -99,7 +94,6 @@ public class FlatmateModerationController {
         return PageResponse.of(service.moderationQueue(kind, modStatus, Pageables.allowSort(pageable, SORTABLE)), dto -> dto);
     }
 
-    /** What the desk's tab labels show: the true size of each tab, not of the window downloaded. */
     @GetMapping(Routes.Moderation.FLATMATE_MODERATION_SUMMARY)
     @PreAuthorize(FLATMATES_READ)
     public FlatmateModerationSummary moderationSummary() {
@@ -120,8 +114,6 @@ public class FlatmateModerationController {
         return details.find(id);
     }
 
-    /** {@code PATCH /admin/flatmates/{id}/moderation}. 200 with no body: the contract declares no
-     * response schema, and a client should refetch the queue rather than re-render a row. */
     @PatchMapping(Routes.Moderation.FLATMATE_MODERATION)
     @PreAuthorize(FLATMATES_WRITE)
     @ResponseStatus(HttpStatus.OK)
@@ -130,15 +122,11 @@ public class FlatmateModerationController {
         service.moderate(principal, id, body.modStatus(), body.note());
     }
 
-    /** Contract schema {@code DecisionRequest}: {@code approved} or {@code rejected}, with a reason
-     * mandatory on a rejection (checked in the service, and again by the database). */
     public record DecisionRequest(@NotBlank String decision, @Size(max = 600) String note,
             @Valid Checks checks) {
     }
 
-    /** What the reviewer confirms when approving a tenant-tier badge; the service names whatever is missing. */
     public record Checks(Boolean nameMatches, Boolean addressMatches, LocalDate validTill, LocalDate issuedOn) {
-
         FlatmateReviewChecks toChecks() {
             return new FlatmateReviewChecks(nameMatches, addressMatches, validTill, issuedOn);
         }
@@ -147,7 +135,6 @@ public class FlatmateModerationController {
     public record RevokeRequest(@NotBlank @Size(max = 300) String reason) {
     }
 
-    /** The contract's inline moderation body. {@code note} is internal and never shown to consumers. */
     public record ModerationRequest(@NotBlank String modStatus, @Size(max = 600) String note) {
     }
 
@@ -159,8 +146,6 @@ public class FlatmateModerationController {
         return PageResponse.of(service.applications(modStatus, Pageables.allowSort(pageable, SORTABLE)), dto -> dto);
     }
 
-    /** Named "decide" by the contract, but it writes the moderation axis only — the owner's
-     * accept/decline is theirs alone. See {@link FlatmateModerationService}. */
     @PatchMapping(Routes.Moderation.GROUP_APPLICATION_BY_ID)
     @PreAuthorize(FLATMATES_WRITE)
     public GroupApplicationDto moderateApplication(@CurrentUser AuthPrincipal principal,

@@ -38,7 +38,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("Messages Phase 2 realtime contract")
 class ConversationRealtimeTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -198,7 +197,6 @@ class ConversationRealtimeTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
         assertDeliveredAt(offline, buyer, null);
-        // The returned ids are who the `delivered` event goes to, so a second pass must find nothing.
         assertThat(messageRepository.markInboxDelivered(owner.getId())).containsExactly(UUID.fromString(offline));
         assertThat(messageRepository.markInboxDelivered(owner.getId())).isEmpty();
 

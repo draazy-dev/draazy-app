@@ -12,14 +12,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** The rollup is the only reader of raw page views and is SQL the compiler can't check, so an error is a plausible
- * wrong number. Three sessions suffice: multi-page, single-page (bounce), and one crossing IST midnight. */
 @DisplayName("Page view rollup")
 class PageViewRollupTest extends AbstractApiTest {
-
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
-    /** Far back enough that no seed or test left views there; fixed so assertions are checkable arithmetic. */
     private static final LocalDate DAY = LocalDate.of(2031, 3, 17);
 
     @Autowired PageViewRollup rollup;
@@ -27,15 +23,12 @@ class PageViewRollupTest extends AbstractApiTest {
     @Test
     @DisplayName("counts sessions, page views, bounces and duration per IST day")
     void rollsUpDayGrain() {
-        // Three pages over five minutes: one session, three views, not a bounce.
         view("sess-multi", null, "/listings", "mobile", at(DAY, 10, 0));
         view("sess-multi", null, "/property/:id", "mobile", at(DAY, 10, 2));
         view("sess-multi", null, "/property/:id/enquire", "mobile", at(DAY, 10, 5));
 
-        // One page: a bounce, and a session of zero duration.
         view("sess-bounce", null, "/", "desktop", at(DAY, 11, 0));
 
-        // Signed in, so the anon/signed-in split has something on both sides.
         view("sess-user", UUID.randomUUID(), "/dashboard", "tablet", at(DAY, 12, 0));
         view("sess-user", UUID.randomUUID(), "/dashboard/saved", "tablet", at(DAY, 12, 1));
 
@@ -92,7 +85,6 @@ class PageViewRollupTest extends AbstractApiTest {
 
         rollUpWholeDay();
 
-        // Attributing a session to its start day would empty day two and make totals depend on the day before.
         assertThat(sessionsOn(DAY)).isEqualTo(1L);
         assertThat(sessionsOn(DAY.plusDays(1))).isEqualTo(1L);
 
@@ -112,7 +104,6 @@ class PageViewRollupTest extends AbstractApiTest {
         rollUpWholeDay();
         rollUpWholeDay();
 
-        // The job recomputes a trailing window hourly; accumulating instead of replacing would make traffic climb.
         assertThat(sessionsOn(DAY)).isEqualTo(1L);
         assertThat(jdbc.queryForObject(
                 "select pageviews from page_view_daily where day = ?", Long.class, DAY))
@@ -132,7 +123,6 @@ class PageViewRollupTest extends AbstractApiTest {
         jdbc.update("delete from page_views where session_id = 'sess-a'");
         rollUpWholeDay();
 
-        // Delete-then-insert, not upsert: an upsert never corrects a day emptied by the retention sweep.
         assertThat(jdbc.queryForObject(
                 "select count(*) from page_view_daily where day = ?", Long.class, DAY))
                 .isZero();
@@ -141,17 +131,12 @@ class PageViewRollupTest extends AbstractApiTest {
     @Test
     @DisplayName("attributes a session to the host it arrived from, once, whatever it read after")
     void rollsUpReferrerGrain() {
-        // Arrived from search, then read three pages. Counting views would make this arrival look
-        // three times the size of the one below it -- and the console presents these as reach.
         view("sess-search", null, "/", "mobile", "google.co.in", at(DAY, 10, 0));
         view("sess-search", null, "/listings", "mobile", "google.co.in", at(DAY, 10, 2));
         view("sess-search", null, "/property/:id", "mobile", "google.co.in", at(DAY, 10, 5));
 
-        // Arrived from search too, so the host aggregates across sessions.
         view("sess-search-2", null, "/", "mobile", "google.co.in", at(DAY, 11, 0));
 
-        // No referring header at all: typed, bookmarked, or withheld -- indistinguishable, and
-        // reported as the one thing all three genuinely are.
         view("sess-typed", null, "/", "desktop", null, at(DAY, 12, 0));
 
         rollUpWholeDay();
@@ -167,8 +152,6 @@ class PageViewRollupTest extends AbstractApiTest {
     @Test
     @DisplayName("a session's referrer is its first view's, not whichever view sorted first")
     void attributesTheEntryReferrer() {
-        // A visitor arrives from search and later follows a link back in from WhatsApp inside the
-        // same tab. Only the arrival is an acquisition; the second host is navigation.
         view("sess-mixed", null, "/", "mobile", "google.co.in", at(DAY, 9, 0));
         view("sess-mixed", null, "/listings", "mobile", "wa.me", at(DAY, 9, 30));
 
@@ -180,8 +163,6 @@ class PageViewRollupTest extends AbstractApiTest {
                 .as("one session contributes to exactly one host, so the shares stay a whole")
                 .isEqualTo(1L);
     }
-
-    // ---------------------------------------------------------------------------------------------
 
     private void rollUpWholeDay() {
         rollup.rollUpBetween(
@@ -209,7 +190,6 @@ class PageViewRollupTest extends AbstractApiTest {
         return day.atTime(hour, minute).atZone(IST).toInstant();
     }
 
-    /** Raw SQL, not the service, which anchors to its own clock and can't build a fixture spanning midnight. */
     private void view(String sessionId, UUID userId, String path, String device, Instant at) {
         view(sessionId, userId, path, device, null, at);
     }

@@ -30,7 +30,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @Service
 public class IdentityAppealService {
-
     private static final int MAX_NOTE_CHARS = 500;
     private static final String VERIFY_LINK = "/verify-identity";
 
@@ -122,7 +121,6 @@ public class IdentityAppealService {
         return IdentityAppealInfo.of(appeal);
     }
 
-    // Attempt counters stay (a reopen is not a user retry); submittedAt restarts so the stale sweep spares it.
     private void reopenCase(IdentityVerification v, Instant now) {
         if (v.getFilesPurgedAt() != null) {
             throw notAllowed("The photos are no longer stored, so this case can't be reopened");

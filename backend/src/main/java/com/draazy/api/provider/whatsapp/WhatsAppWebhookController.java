@@ -26,10 +26,8 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Meta's WhatsApp callbacks: a STOP or START reply, and the delivery failures a send cannot see. */
 @RestController
 class WhatsAppWebhookController {
-
     static final String OPERATION = "webhook";
     static final String DELIVERY = "delivery";
 
@@ -64,8 +62,7 @@ class WhatsAppWebhookController {
         return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(challenge);
     }
 
-    /** A refused signature answers 200 and only logs, so forged traffic cannot pose as WhatsApp failures in the
-     * provider log. A failed opt-out write answers 500 instead, so Meta retries rather than the STOP being lost. */
+    // A refused signature answers 200 and only logs; a failed opt-out write answers 500 so Meta retries.
     @PostMapping(Routes.Webhooks.WHATSAPP)
     @ResponseStatus(HttpStatus.OK)
     void receive(@RequestHeader(name = "X-Hub-Signature-256", required = false) String header,
@@ -124,7 +121,6 @@ class WhatsAppWebhookController {
         return text != null ? text : message.path("button").path("text").asString(null);
     }
 
-    /** Whole-message keywords only, so "please don't stop" is not an opt-out. */
     static Boolean optChoice(String text) {
         if (text == null) {
             return null;

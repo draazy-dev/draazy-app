@@ -35,7 +35,6 @@ import org.springframework.http.MediaType;
 
 @DisplayName("Flatmates — splits, owner consent and group applications")
 class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -116,7 +115,6 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("splitting a flat")
     class Splitting {
-
         @Test
         @DisplayName("an approved, Verified-owner flat's rooms are born owner-tier and badged")
         void approvedParentConfersTheBadge() throws Exception {
@@ -275,8 +273,6 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                             .content("{\"modStatus\":\"approved\"}"))
                     .andExpect(status().isOk());
 
-                    // In a filtered list this can only say "approved"; if filtering regresses,
-                    // it becomes a leaked verdict.
             String feed = moveInFeed();
             assertThat(feed).contains(firstRoom).doesNotContain(sibling);
             String card = "$.content[?(@.id=='" + firstRoom + "')]";
@@ -341,7 +337,6 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
             User owner = user(mobile, "Optimist");
             Property flat = listing(owner, PropertyStatus.APPROVED, 2);
 
-            // Lettable rooms = bedrooms + hall; 422 not 400 because the contract declares only 403/409/422 here.
             mvc.perform(post(Routes.Properties.SPLIT, flat.getId())
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -424,8 +419,6 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.occupants").value(2));
 
-            // The flat cap is 2 and both are taken, so the sibling clamps to 0 however many
-            // the owner claims. Walking around the rooms one at a time cannot exceed the cap.
             mvc.perform(patch(Routes.Flatmates.ROOM_OCCUPANTS, roomIds.get(1))
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -438,7 +431,6 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("owner consent")
     class OwnerConsent {
-
         @Test
         @DisplayName("a wrong code records nothing")
         void wrongCodeIsRefused() throws Exception {
@@ -465,7 +457,6 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
             assertThat(consented).isFalse();
         }
 
-
         private String createGroup(User host) throws Exception {
             String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
@@ -483,7 +474,6 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("group applications")
     class GroupApplications {
-
         @Test
         @DisplayName("the admin board is staff-only")
         void boardIsStaffOnly() throws Exception {
@@ -513,7 +503,6 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                     .andReturn().getResponse().getContentAsString();
             String groupId = groupJson.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
 
-            // No API creates an application, so the row is seeded directly to exercise the two admin operations.
             String appId = jdbc.queryForObject(
                     "insert into flatmate_group_applications (listing_id, group_id, applicant_id) "
                             + "values (?::uuid, ?::uuid, ?::uuid) returning id::text",
@@ -536,8 +525,6 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.modStatus").value("removed"))
 
-                    // "We took this down" and "the owner said no" are different facts, and
-                    // only one of them is true.
                     .andExpect(jsonPath("$.status").value("pending"));
         }
     }

@@ -13,12 +13,9 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** {@code sql} selects {@code id, title, anchor, team, assignee, due_seconds}; a non-null {@code due_seconds}
- * replaces {@code remind}/{@code escalate} for that row. A {@code null} function means administrators only. */
 record StaffSlaRule(String name, String one, String many, boolean announces, Duration remind, Duration escalate,
                     String sql, Function<StaffSlaRule.Item, String> function,
                     Function<StaffSlaRule.Item, String> queueLink, Function<StaffSlaRule.Item, String> itemLink) {
-
     record Item(String id, String title, Instant anchor, String team, UUID assignee, Long dueSeconds) {
     }
 
@@ -75,7 +72,6 @@ record StaffSlaRule(String name, String one, String many, boolean announces, Dur
                       from identity_appeals a
                      where a.status = 'open'
                     """, fixed(BackOfficeFunctions.KYC), fixed("/admin/kyc-review"), fixed("/admin/kyc-review")),
-            // Rent agreements are left to their own per-stage rule below.
             new StaffSlaRule("desk-pickup", "unassigned service request", "unassigned service requests", true,
                     ofHours(4), ofHours(8), """
                     select cast(t.id as text), t.subject, t.created_at, t.team, cast(null as uuid), cast(null as bigint)
@@ -125,7 +121,6 @@ record StaffSlaRule(String name, String one, String many, boolean announces, Dur
                       from flatmate_reviews f
                      where f.status = 'pending'
                     """, fixed(BackOfficeFunctions.FLATMATES), fixed("/admin/flatmates"), fixed("/admin/flatmates")),
-            // RefundStaffAlerts already announces each refund the moment it is filed.
             new StaffSlaRule("refund-review", "refund request", "refund requests", false,
                     ofHours(48), ofHours(72), """
                     select cast(r.id as text), 'Refund request', r.created_at, cast(null as text),

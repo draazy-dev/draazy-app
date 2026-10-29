@@ -14,16 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * {@code POST /me/saved-searches} — the per-user count cap (open-questions Q4).
- *
- * <p>Each blob is already size-bounded; this asserts the other half — that a user cannot accumulate
- * saved searches without limit. The tenth create succeeds and the eleventh is a {@code 409}, a
- * well-formed request that conflicts only with the caller's own current state.
- */
 @DisplayName("Saved searches — count is capped per user")
 class SavedSearchCapTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -67,14 +59,12 @@ class SavedSearchCapTest extends AbstractApiTest {
                         .content("{\"name\":\"one too many\",\"query\":\"overflow\"}"))
                 .andExpect(status().isConflict());
 
-        // The cap counts only this user's rows, so a different user still starts from zero.
         User other = seeker("9820001002");
         createSearch(other, 1);
         mvc.perform(get("/me/saved-searches").header(HttpHeaders.AUTHORIZATION, bearer(other)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
 
-        // The cap is a ceiling, not a lifetime quota.
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .delete("/me/saved-searches/" + firstId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(u)))

@@ -4,17 +4,12 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The core of {@code list-property/validation.js}, enforced when an owner confirms a staff-posted listing,
- * since the desk wizard asks far less. Address lines and photo categories live in free-form details, so are skipped. */
 public final class ListingCompleteness {
-
-    /** Mirrors {@code MIN_PUBLISH_PHOTOS} in the wizard's {@code constants.js}. */
     static final int MIN_PHOTOS = 3;
 
     private ListingCompleteness() {
     }
 
-    /** Human labels of what is missing, in wizard order; empty when the listing meets the bar. */
     public static List<String> missing(Property p) {
         PropertyKind kind = PropertyKind.of(p.getPropertyType());
         boolean residential = kind != null && kind.isResidential();

@@ -37,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ContactService {
-
     private final ContactRequestRepository contactRequests;
     private final PropertyRepository properties;
     private final UserRepository users;
@@ -77,7 +76,6 @@ public class ContactService {
         return describe(viewerId, resolve(propertyId));
     }
 
-    // Idempotent.
     @Transactional
     public ContactStatusResponse request(UUID viewerId, ContactRequestCreate body) {
         Property property = resolve(body.propertyId());
@@ -94,8 +92,8 @@ public class ContactService {
             throw new VerificationRequiredException("This owner only accepts verified contacts");
         }
 
-        // Serialises one buyer's requests so the allowance count is never read stale and a parallel duplicate
-        // finds the winner's row instead of tripping the unique key, which would abort this transaction.
+        // Serialises one buyer's requests so the allowance count is never read stale; a parallel
+        // duplicate then finds the winner's row instead of tripping the unique key.
         locks.holdUntilCommit(RateLimitLock.Limit.CONTACT_REQUEST, viewerId.toString());
         Optional<ContactRequest> existing =
                 contactRequests.findByRequesterIdAndPropertyId(viewerId, property.getId());
@@ -109,7 +107,6 @@ public class ContactService {
                 throw WithdrawnCooldown.refusal(existing.get().getUpdatedAt());
             }
 
-            // A lapsed request does not count, so asking again is a new spend and is checked as one.
             requireRoomForAnotherRequest(viewerId, property.getId(), now);
             if (contactRequests.renewIfLapsed(existing.get().getId(), body.message(), now,
                     window.cutoff(now)) > 0) {
@@ -120,7 +117,6 @@ public class ContactService {
         return describe(viewerId, property);
     }
 
-    // Name only: the requester's mobile stays behind the gate the owner is being asked to open.
     private void announceToOwner(User owner, UUID requesterId, Property property) {
         if (owner == null) {
             return;
@@ -133,14 +129,12 @@ public class ContactService {
                 Notifier.REQUEST_INBOX);
     }
 
-    // A visit reaches the owner just as a contact request does, so it spends from the same allowance.
     @Transactional
     public void requireRoomForVisit(UUID viewerId, UUID propertyId) {
         locks.holdUntilCommit(RateLimitLock.Limit.CONTACT_REQUEST, viewerId.toString());
         requireRoomForAnotherRequest(viewerId, propertyId, Instant.now());
     }
 
-    // A listing already reached by a request or a visit costs nothing more.
     private void requireRoomForAnotherRequest(UUID viewerId, UUID propertyId, Instant now) {
         ContactUsageService.Uses uses = usage.uses(viewerId, window.cutoff(now));
         if (uses.spentAt().containsKey(propertyId)) {
@@ -173,8 +167,6 @@ public class ContactService {
                 .stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
 
-        // One extra query for the whole page, not one per row. The badge rides on the party because
-        // the mobile the owner receives is masked, so the client cannot derive this answer itself.
         Set<UUID> verifiedIds = verifiedTenants.verifiedAmong(requesters.keySet());
 
         Instant now = Instant.now();
@@ -232,7 +224,6 @@ public class ContactService {
         return properties.findById(propertyId).map(Property::isPubliclyVisible).orElse(false);
     }
 
-    // An owner is never blocked from their own contact by their own opt-in.
     private ContactStatusResponse describe(UUID viewerId, Property property) {
         User owner = property.getOwner();
         boolean verifiedContactOnly = owner != null && owner.isVerifiedContactOnly();
@@ -254,7 +245,6 @@ public class ContactService {
         return ContactRequestStatuses.WITHDRAWN.equals(row.getStatus());
     }
 
-    // Read verification live so old tokens do not block newly verified users.
     private boolean hasBadge(UUID userId) {
         return users.findById(userId).map(User::isVerified).orElse(false);
     }
@@ -273,7 +263,6 @@ public class ContactService {
                 ContactRequestStatuses.EXPIRED, response.contact(), response.message(), response.createdAt());
     }
 
-    // Accept UUID or slug here because the property-detail contract accepts both.
     private Property resolve(String idOrSlug) {
         return Ids.parseUuid(idOrSlug)
                 .flatMap(properties::findById)

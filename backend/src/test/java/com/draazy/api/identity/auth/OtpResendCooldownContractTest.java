@@ -17,16 +17,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * The acknowledgement must publish the server's cooldown, or a client constant counts down to a 429.
- * 97 rather than the default so a hardcoded value cannot pass. See docs/flows/consumer/auth.md.
- */
 @SpringBootTest(properties = "draazy.otp.send-cooldown-seconds=97")
 @AutoConfigureMockMvc
 @Transactional
 @DisplayName("OTP send acknowledgement reports the enforced resend cooldown")
 class OtpResendCooldownContractTest {
-
     @Autowired
     MockMvc mvc;
 
@@ -39,10 +34,6 @@ class OtpResendCooldownContractTest {
                 .andExpect(jsonPath("$.resendAfterSeconds").value(97));
     }
 
-    /**
-     * A cross-origin browser cannot read an unexposed header, so the envelope carries the number.
-     * It is the wait remaining, hence a range rather than an equality.
-     */
     @Test
     void aRefusedResendReportsTheWaitThatIsLeft()throws Exception {
         mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)

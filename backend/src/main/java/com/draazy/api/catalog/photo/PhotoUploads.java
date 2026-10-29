@@ -12,14 +12,12 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 
-/** What the world-readable photo bucket accepts: raster images only, a size ceiling, and a magic-byte
- * check, because active content served from our CDN is stored XSS. docs/system/cross-cutting.md#87-uploads. */
+// Raster images only, with a size ceiling and magic-byte check: active content served from
+// the world-readable bucket is stored XSS.
 public final class PhotoUploads {
-
     private PhotoUploads() {
     }
 
-    /** Exclusive decimal limit: compression belongs to the browser, not the upload server. */
     public static final long MAX_BYTES = Routes.MePhotos.MAX_FILE_BYTES;
 
     static final int MAX_EDGE = 10_000;
@@ -27,7 +25,6 @@ public final class PhotoUploads {
 
     private static final Set<String> ALLOWED = Set.of(MediaSignatures.JPEG, MediaSignatures.PNG);
 
-    // Check size before sniffing so oversized content is reported as a size error.
     public static String validate(String contentType, long sizeBytes, byte[] content) {
         return validate(contentType, sizeBytes, content, MAX_BYTES - 1,
                 "Photos must be smaller than 1,000,000 bytes (1 MB)");
@@ -49,7 +46,6 @@ public final class PhotoUploads {
                     "That file is not a photo. Upload the original image, not a document or a link.");
         }
 
-        // Aliases may agree, but PNG bytes labelled JPEG must never acquire the client's type.
         if (!actual.equals(declared)) {
             throw new UnsupportedMediaTypeException(
                     "That file is a " + actual + ", not the " + declared + " it claims to be.");
@@ -65,7 +61,6 @@ public final class PhotoUploads {
         }
     }
 
-    /** Called with dimensions read from the header, before any pixel is decoded. */
     public static void requireSaneSize(long width, long height) {
         if (width > MAX_EDGE || height > MAX_EDGE || width * height > MAX_PIXELS) {
             throw new PayloadTooLargeException(
@@ -91,7 +86,6 @@ public final class PhotoUploads {
         }
     }
 
-    // The shared detector also recognises private-document and messaging formats; this bucket does not.
     static String sniff(byte[] b) {
         String type = MediaSignatures.sniff(b);
         return type != null && ALLOWED.contains(type) ? type : null;

@@ -30,17 +30,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** A duplicate Place ID is for an operator to merge; listings, follows and reviews accumulate on both rows. */
 @Service
 public class SocietyMintService {
-
-    /** The most duplicate hints one candidate may ask for; the console shows a few chips, not a report. */
     private static final int MAX_DUPE_HINTS = 25;
 
-    /** Google lookups one member may cause a day; a place we already hold costs none. */
     private static final int LOOKUPS_PER_DAY = 20;
 
-    /** Literal siblings of {@code /societies/{slug}}; a society minted under one would be unreachable. */
     private static final Set<String> RESERVED_SLUGS = Set.of("resolve", "top");
 
     private static final Logger log = LoggerFactory.getLogger(SocietyMintService.class);
@@ -65,7 +60,6 @@ public class SocietyMintService {
         this.lookupBudget = stores.create("sm", LOOKUPS_PER_DAY, Duration.ofDays(1));
     }
 
-    /** Not one transaction: the Google call must not hold a database connection, so it runs between two. */
     public MintedSociety mint(SocietyMintRequest request, AuthPrincipal caller) {
         UUID authorId = caller.userId();
         String placeId = SocietySpecs.trimmed(request.placeId());
@@ -170,7 +164,6 @@ public class SocietyMintService {
         return societies.candidates(like == null ? "%" : like, pageable).map(societyMapper::toCandidate);
     }
 
-    /** Server-side, as the catalogue is: a client hint list that cannot see community rows says "no duplicate". */
     @Transactional(readOnly = true)
     public List<SocietyDuplicateSuggestion> duplicates(String slug, int limit) {
         if (limit < 1 || limit > MAX_DUPE_HINTS) {
@@ -181,7 +174,6 @@ public class SocietyMintService {
 
         Set<String> mine = SocietyMatching.tokens(candidate.getName());
         if (mine.isEmpty()) {
-            // A name of nothing but stopwords would score against everything; no hint beats a useless one.
             return List.of();
         }
 
@@ -193,7 +185,6 @@ public class SocietyMintService {
                 .toList();
     }
 
-    /** One scan row scored against the candidate, or null if it has no comparable name. */
     private static SocietyDuplicateSuggestion score(Object[] row, Set<String> mine, Society candidate) {
         String name = (String) row[1];
         String localitySlug = (String) row[2];
@@ -214,7 +205,6 @@ public class SocietyMintService {
         return new SocietyDuplicateSuggestion((String) row[0], name, localitySlug, score);
     }
 
-    /** Absent is {@link SocietyMintOrigins#LISTING} for old clients; unknown is a 422, not a CHECK 500. */
     private static String mintOrigin(String supplied) {
         String value = SocietySpecs.trimmed(supplied);
         if (value == null) {
@@ -226,7 +216,6 @@ public class SocietyMintService {
         return value;
     }
 
-    /** Null when none was picked; a slug that is not a live locality is refused. */
     private String knownLocality(String slug) {
         String candidate = SocietySpecs.trimmed(slug);
         if (candidate == null) {
@@ -243,7 +232,6 @@ public class SocietyMintService {
                 .replaceAll("^-+|-+$", "");
     }
 
-    /** The society and whether this call created it: the controller answers 201 for a mint and 200 for a match. */
     public record MintedSociety(SocietyResponse society, boolean created) {
     }
 }

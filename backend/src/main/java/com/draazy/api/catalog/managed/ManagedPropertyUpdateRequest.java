@@ -11,7 +11,6 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.Map;
 
-/** Every field is nullable because PATCH applies only values that are present. */
 public record ManagedPropertyUpdateRequest(
         String title,
         @Pattern(regexp = DealIntent.PATTERN, message = DealIntent.PATTERN_MESSAGE) String deal,

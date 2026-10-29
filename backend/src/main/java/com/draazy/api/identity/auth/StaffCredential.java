@@ -14,12 +14,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** Second factor and guess throttle for one back-office account (V87). */
 @Entity
 @Table(name = "staff_credentials")
 @Getter
 public class StaffCredential {
-
     static final int MAX_FAILED_ATTEMPTS = 5;
     static final Duration LOCKOUT = Duration.ofMinutes(15);
 
@@ -51,7 +49,6 @@ public class StaffCredential {
     private Instant createdAt;
 
     protected StaffCredential() {
-        // JPA
     }
 
     public boolean isEnrolled() {
@@ -62,7 +59,6 @@ public class StaffCredential {
         return lockedUntil != null && now.isBefore(lockedUntil);
     }
 
-    /** The fifth consecutive miss locks the account and restarts the count for after the lock. */
     public void recordFailure(Instant now) {
         failedAttempts++;
         if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
@@ -76,7 +72,6 @@ public class StaffCredential {
         lockedUntil = null;
     }
 
-    /** A fresh, unconfirmed secret; replaces any earlier unconfirmed one. */
     public void startEnrolment(String encryptedSecret) {
         if (isEnrolled()) {
             throw new IllegalStateException("already enrolled: " + userId);
@@ -90,7 +85,6 @@ public class StaffCredential {
         this.recoveryCodeHashes = new ArrayList<>(recoveryHashes);
     }
 
-    /** Codes are single use: a step at or before the last accepted one is a replay. */
     public boolean acceptStep(long step) {
         if (totpLastStep != null && step <= totpLastStep) {
             return false;
@@ -111,7 +105,6 @@ public class StaffCredential {
         return true;
     }
 
-    /** Administrator reset after a lost phone: the next sign-in enrols again. */
     public void resetSecondFactor() {
         totpSecret = null;
         totpConfirmedAt = null;

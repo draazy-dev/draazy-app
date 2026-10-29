@@ -46,7 +46,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("Flatmates — an owner who confirms a room gets an account, a private home, and a way to list it")
 class FlatmateOwnerHomeTest extends AbstractApiTest {
-
     private static final String TOKEN_HEADER = "X-Owner-Notice-Token";
     private static final String OWNER_PREFIX = "98156701";
     private static final String HOST_PREFIX = "98156702";
@@ -78,7 +77,6 @@ class FlatmateOwnerHomeTest extends AbstractApiTest {
         cleanup = jdbc;
     }
 
-    // The audit row and a provisioned owner commit in their own transaction, so the rollback cannot take them back.
     @AfterAll
     static void removeWhatEscapedRollback() {
         cleanup.update("delete from audit_log where actor = 'owner-link'");
@@ -129,7 +127,6 @@ class FlatmateOwnerHomeTest extends AbstractApiTest {
         return postRoom(host, ownerMobile, "Flat");
     }
 
-    // The test transaction never commits, so the after-commit send is driven by hand.
     private void commit() {
         for (TransactionSynchronization s : TransactionSynchronizationManager.getSynchronizations()) {
             if (fired.add(s)) {

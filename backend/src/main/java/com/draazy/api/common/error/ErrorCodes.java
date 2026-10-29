@@ -1,7 +1,6 @@
 package com.draazy.api.common.error;
 
 public final class ErrorCodes {
-
     private ErrorCodes() {
     }
 
@@ -9,10 +8,8 @@ public final class ErrorCodes {
 
     public static final String UNAUTHORIZED = "unauthorized";
 
-    /** 403 — authenticated but not permitted (RBAC deny, or an owner-only action). */
     public static final String FORBIDDEN = "forbidden";
 
-    /** 404 — no such resource, or archived and hidden from this caller. */
     public static final String NOT_FOUND = "not_found";
 
     public static final String CONFLICT = "conflict";
@@ -23,7 +20,6 @@ public final class ErrorCodes {
 
     public static final String ACCOUNT_ARCHIVED = "account_archived";
 
-    // 403 at sign-in or refresh; its own code so clients can tell it from a bot-defence refusal.
     public static final String ACCOUNT_SUSPENDED = "account_suspended";
 
     public static final String SIGNUPS_CLOSED = "signups_closed";
@@ -32,13 +28,10 @@ public final class ErrorCodes {
 
     public static final String ORDER_ALREADY_OPEN = "order_already_open";
 
-    // 403 on /auth/login: back-office accounts sign in with password + authenticator only.
     public static final String STAFF_SIGN_IN_REQUIRED = "staff_sign_in_required";
 
-    // 401: the password-step challenge is missing, forged or older than five minutes.
     public static final String STAFF_SIGN_IN_EXPIRED = "staff_sign_in_expired";
 
-    // 429: five consecutive misses on one back-office account.
     public static final String STAFF_SIGN_IN_LOCKED = "staff_sign_in_locked";
 
     public static final String VERIFICATION_REQUIRED = "verification_required";
@@ -52,7 +45,6 @@ public final class ErrorCodes {
     public static final String IDENTITY_CASE_CLAIMED = "identity_case_claimed";
 
     public static final String IDENTITY_CASE_CLAIM_LIMIT = "identity_case_claim_limit";
-
 
     public static final String IDENTITY_CHALLENGE_INVALID = "identity_challenge_invalid";
 
@@ -70,7 +62,6 @@ public final class ErrorCodes {
 
     public static final String OWNER_SIDE_PENDING = "owner_side_pending";
 
-    // No permission fixes it, only a completed visit or a tenancy does.
     public static final String REVIEW_NOT_ELIGIBLE = "review_not_eligible";
 
     public static final String CONTACT_QUOTA_EXHAUSTED = "contact_quota_exhausted";
@@ -87,13 +78,10 @@ public final class ErrorCodes {
 
     public static final String LISTING_NOT_EDITABLE = "listing_not_editable";
 
-    // 409 on an owner delete: a deal, offer, confirmation or paid service must be settled first.
     public static final String LISTING_HAS_OPEN_WORK = "listing_has_open_work";
 
-    // 409 on a chat message: the owner deleted the listing the chat is about.
     public static final String CONVERSATION_CLOSED = "conversation_closed";
 
-    // 409 on restore: the undo window ended and the listing's photos and details are gone.
     public static final String LISTING_CONTENT_PURGED = "listing_content_purged";
 
     public static final String LISTING_INCOMPLETE = "listing_incomplete";
@@ -110,31 +98,23 @@ public final class ErrorCodes {
 
     public static final String PRECONDITION_FAILED = "precondition_failed";
 
-    /** 429 — rate limit exceeded (e.g. OTP requests); pairs with a Retry-After hint. */
     public static final String RATE_LIMITED = "rate_limited";
 
-    // Its own code because waiting cannot help; see docs/system/api-standards.md §4.2.
     public static final String OTP_ATTEMPTS_EXHAUSTED = "otp_attempts_exhausted";
 
     public static final String MAINTENANCE_MODE = "maintenance_mode";
 
-    // 413 — the uploaded file exceeds the size limit.
-    // Raised by our own check and by the servlet container's multipart limit; both paths must emit this code.
     public static final String PAYLOAD_TOO_LARGE = "payload_too_large";
 
     public static final String UNSUPPORTED_MEDIA_TYPE = "unsupported_media_type";
 
     public static final String METHOD_NOT_ALLOWED = "method_not_allowed";
 
-    /** 503 — an outside service we depend on is down; retrying later can succeed. */
     public static final String SERVICE_UNAVAILABLE = "service_unavailable";
 
-    /** 500 — catch-all. The message is deliberately generic: never leak internals to the client. */
     public static final String INTERNAL = "internal";
 
-    // The filter chain and exception handler share strings so clients see one API.
     public static final class Messages {
-
         private Messages() {
         }
 
@@ -142,7 +122,6 @@ public final class ErrorCodes {
 
         public static final String ACCESS_DENIED = "You do not have permission to perform this action";
 
-        // Hide Jackson details because they can expose Java types and payload fragments.
         public static final String MALFORMED_BODY = "Request body could not be read";
 
         public static final String METHOD_NOT_ALLOWED = "That method is not supported on this resource";

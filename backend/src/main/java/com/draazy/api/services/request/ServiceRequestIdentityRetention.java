@@ -11,10 +11,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class ServiceRequestIdentityRetention {
-
     static final Duration IDLE = Duration.ofDays(60);
 
-    // Counted from the last write: a resubmission replaces the rows, so it restarts this clock.
     static final Duration HELD = Duration.ofDays(180);
 
     private static final Logger log = LoggerFactory.getLogger(ServiceRequestIdentityRetention.class);

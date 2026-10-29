@@ -25,12 +25,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * Absorbs the first-sign-in {@code UNIQUE(mobile)} race: the loser adopts the winner's row instead
- * of surfacing a 500. Pure Mockito, so the branch runs without real thread interleaving.
- */
 class AuthServiceRaceTest {
-
     @Test
     void concurrentFirstSignInAdoptsTheWinnerRowInsteadOf500() {
         UserRepository users = mock(UserRepository.class);
@@ -38,12 +33,9 @@ class AuthServiceRaceTest {
         OtpService otpService = mock(OtpService.class);
         JwtService jwtService = mock(JwtService.class);
         RefreshTokenService refreshTokens = mock(RefreshTokenService.class);
-        // Real mapper and SelfProfile, not mocks: what decides whether a buyer session carries
-        // back-office permission atoms is the thing under assertion below.
         SelfProfile selfProfile = new SelfProfile(new UserMapperImpl(), mock(AccountPermissions.class));
 
         String mobile = "9876500900";
-        // No existing row when we look ⇒ provisioning path; the concurrent winner then beats our insert.
         when(users.findByMobile(mobile)).thenReturn(Optional.empty());
         when(userService.provisionBuyer(mobile))
                 .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"));
@@ -55,8 +47,6 @@ class AuthServiceRaceTest {
         when(jwtService.accessTtl()).thenReturn(Duration.ofMinutes(15));
         when(refreshTokens.issue(any())).thenReturn("refresh-token");
 
-        // The staff gates must stay unstubbed — buyer login never reads them, and stubbing would
-        // hide a regression. Signups must be stubbed open or a mock's default false refuses first.
         PlatformSettings platformSettings = mock(PlatformSettings.class);
         when(platformSettings.signupsEnabled()).thenReturn(true);
         AuthService service = new AuthService(
@@ -68,7 +58,6 @@ class AuthServiceRaceTest {
         assertThat(response.accessToken()).isEqualTo("access-token");
         assertThat(response.user().mobile()).isEqualTo(mobile);
         assertThat(response.user().role()).isEqualTo("buyer");
-        // A consumer session says nothing about back-office access — the key is absent, not empty.
         assertThat(response.user().permissions()).isNull();
     }
 
@@ -82,8 +71,6 @@ class AuthServiceRaceTest {
                 .getField(StaffSignInService.class, "DUMMY_BCRYPT");
         when(passwordEncoder.matches("any-pass", dummyHash)).thenReturn(false);
 
-        // These mocks stay unstubbed deliberately: stubbing one would hide a regression that moved a
-        // gate ahead of the dummy-hash compare and reopened the enumeration timing leak.
         StaffSignInService service = new StaffSignInService(users,
                 mock(StaffCredentialRepository.class), mock(StaffTotpCipher.class),
                 mock(StaffSignInChallenges.class), passwordEncoder, mock(PlatformSettings.class),

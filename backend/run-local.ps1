@@ -30,8 +30,7 @@ if (Test-Path $EnvFile) {
             ($val.StartsWith("'") -and $val.EndsWith("'"))) {
             $val = $val.Substring(1, $val.Length - 2)
         }
-        # DRAAZY_DEV_MACHINE must not travel with copied env files; LocalProfileGuard treats it as
-        # proof this is a developer machine, not a container handed the local profile.
+        # DRAAZY_DEV_MACHINE must come from the user environment, never a copied env file.
         if ($key -eq 'DRAAZY_DEV_MACHINE') {
             Write-Warning "Ignoring DRAAZY_DEV_MACHINE from $EnvFile - it must come from your user environment, not a file. Remove it from the env file; see docs/LOCAL_DEV.md."
             continue
@@ -44,7 +43,6 @@ if (Test-Path $EnvFile) {
     Write-Warning "No env file at $EnvFile - running with defaults (Cashfree disabled). Copy .env.example to .env.local to enable."
 }
 
-# Checked before Maven compiles because LocalProfileGuard would reject the same missing proof at boot.
 if ([string]::IsNullOrWhiteSpace($env:DRAAZY_DEV_MACHINE)) {
     throw @"
 DRAAZY_DEV_MACHINE is not set, and the backend will refuse to start under the 'local' profile
@@ -60,9 +58,8 @@ Write-Host "Dev machine attested (DRAAZY_DEV_MACHINE is set)" -ForegroundColor C
 
 Push-Location $scriptDir
 try {
-    # Its own output directory: a JVM running from `target-cli` breaks the moment any CLI build or
-    # test run recompiles that directory underneath it (classes loaded after the rewrite mismatch).
-    # The app runs in a forked JVM that ignores MAVEN_OPTS; Windows-ROOT holds the corporate TLS proxy's root.
+    # Own build dir: a CLI rebuild of target-cli under a running JVM breaks it.
+    # The forked JVM ignores MAVEN_OPTS; Windows-ROOT holds the corporate TLS proxy's root.
     $mvnArgs = @('-DbuildDirName=target-local', 'spring-boot:run', '-Dspring-boot.run.profiles=local',
         '-Dspring-boot.run.jvmArguments=-Djavax.net.ssl.trustStoreType=Windows-ROOT')
     if ($PSBoundParameters.ContainsKey('Port')) {

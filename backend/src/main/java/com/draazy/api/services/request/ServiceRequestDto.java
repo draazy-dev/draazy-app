@@ -5,8 +5,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-// requesterId stays off wire: requesters know it, ops read names from timeline.
-// Exposing ids invites later client-side filtering leaks.
 public record ServiceRequestDto(
         String id,
         String type,
@@ -48,7 +46,6 @@ public record ServiceRequestDto(
             boolean opened, boolean approved, Instant approvedAt) {
     }
 
-    // Stitches the single-use gateway session onto create response; it is never stored.
     public ServiceRequestDto withPaymentSessionId(String sessionId) {
         return new ServiceRequestDto(id, type, team, status, propertyId, ticketId, details, assignee,
                 assignedToMe, timeline, documents, messages, parties, createdAt, amount, sessionId, registration,

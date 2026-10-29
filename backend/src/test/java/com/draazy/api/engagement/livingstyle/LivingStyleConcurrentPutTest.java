@@ -16,11 +16,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-// Not on AbstractApiTest: a first-PUT race only exists across commits.
 @SpringBootTest
 @DisplayName("Living style — concurrent first PUT and answer constraint")
 class LivingStyleConcurrentPutTest {
-
     private static final String MOBILE = "9876000441";
 
     @Autowired LivingStyleService service;

@@ -13,12 +13,9 @@ import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 
-/** Browser computes hashes because decoding pixels belongs to {@code canvas}. */
 public final class PhotoHash {
-
     public static final int THRESHOLD = 10;
 
-    /** 16 hex characters, because the hash is exactly 64 bits. */
     private static final int HEX_LENGTH = 16;
 
     public static final int MAX_PER_LISTING = 20;
@@ -95,7 +92,6 @@ public final class PhotoHash {
                 .filter(Matcher::find).map(m -> m.group(1)).toList();
     }
 
-    /** Malformed hashes drop the duplicate signal, not the listing submission. */
     public static Long parse(String hex) {
         if (hex == null || hex.length() != HEX_LENGTH) {
             return null;
@@ -115,7 +111,6 @@ public final class PhotoHash {
         return distance(a, b) <= THRESHOLD;
     }
 
-    /** The four 16-bit bands, in the same order as the generated columns. */
     public static int[] bands(long hash) {
         return new int[] {
             (int) ((hash >> 48) & 0xFFFF),

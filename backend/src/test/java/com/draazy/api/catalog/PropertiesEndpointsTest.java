@@ -24,10 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Server-side `/properties` invariants: approval floor, owner scope,
-// foundation-edit reverts and wire shapes.
 class PropertiesEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -136,7 +133,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
     void typesFacetMatchesTheChipTaxonomy_notTheStoredLabel() throws Exception {
         User o = owner("9810000012");
 
-        // The chip taxonomy differs from the free-text {@code property_type} label stored on the row.
         save(o, "Studio unit", "rent", "Studio", new BigDecimal("1"), 18000, "Kothrud", "approved", false);
         save(o, "Penthouse top", "buy", "Penthouse", new BigDecimal("4"), 30000000, "Baner", "approved", false);
         save(o, "Plain apartment", "buy", "apartment", new BigDecimal("2"), 7000000, "Baner", "approved", false);
@@ -145,8 +141,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
         save(o, "Green acres", "buy", "Farm Land", null, 4000000, "Baner", "approved", false);
         save(o, "Houseboat", "buy", "Houseboat", null, 5000000, "Baner", "approved", false);
 
-        // The Flat chip covers flat-or-studio-or-penthouse and the alias table treats apartment as
-        // a flat, so equality against the stored label would match only one of the four.
         mvc.perform(get("/properties").param("types", "flat"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(3));
@@ -163,13 +157,9 @@ class PropertiesEndpointsTest extends AbstractApiTest {
         mvc.perform(get("/properties").param("types", "flat,farmland"))
                 .andExpect(jsonPath("$.totalElements").value(4));
 
-        // Facet takes chip keys, not labels — "studio" is a label so it must match nothing, or a
-        // test against a column holding the raw label would still pass.
         mvc.perform(get("/properties").param("types", "studio"))
                 .andExpect(jsonPath("$.totalElements").value(0));
 
-        // A label the taxonomy has never been taught resolves to a null key, so it answers no chip
-        // rather than being misfiled under one. It is still in the unfiltered catalogue.
         mvc.perform(get("/properties").param("types", "flat,house,villa,commercial,farmland,plot"))
                 .andExpect(jsonPath("$.totalElements").value(6));
         mvc.perform(get("/properties"))
@@ -180,8 +170,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
     void shareChipMatchesShares_andWholeUnitChipsExcludeThem() throws Exception {
         User o = owner("9810000016");
 
-        // Both are stored with a property_type of "Flat", which is how they are really posted: a
-        // flatmate room is a room inside a flat. Only the first is a whole unit.
         save(o, "Whole flat", "rent", "Flat", new BigDecimal("2"), 30000, "Baner", "approved", false);
 
         Property mate = save(o, "Room in a flat", "rent", "Flat", null, 12000, "Baner", "approved", false);
@@ -209,7 +197,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
         save(o, "Desk space", "rent", "Co-working Space", null, 15000, "Baner", "approved", false);
         save(o, "A flat", "rent", "Flat", new BigDecimal("2"), 20000, "Baner", "approved", false);
 
-        // The top-level chip cannot express this: all four commercial labels share one type key.
         mvc.perform(get("/properties").param("types", "commercial"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(4));
@@ -240,7 +227,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
         }
         save(o, "Plain one", "rent", "Flat", new BigDecimal("2"), 20000, "Kothrud", "approved", false);
 
-        // One row per page: if the count were derived from `content` it could only ever be 0 or 1.
         mvc.perform(get("/properties").param("size", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
@@ -267,8 +253,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
                 Instant.now().minus(Duration.ofDays(1)));
         properties.saveAndFlush(lapsed);
 
-        // The card for the lapsed listing shows no ownership badge, because the response field is
-        // computed against the clock. The filter and the count must agree with the card.
         mvc.perform(get("/properties").param("ownershipVerified", "true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
@@ -277,8 +261,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.verifiedElements").value(1));
 
-        // Ordering must agree with the badge: relevance ranking off the raw column would keep
-        // promoting a lapsed listing whose card shows no badge.
         mvc.perform(get("/properties").param("rank", "relevance"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].title").value("Still valid"));
@@ -286,7 +268,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
 
     @Test
     void searchFilterByLocalitySlug() throws Exception {
-
         jdbc.update("INSERT INTO localities (slug, name) VALUES ('koregaon-park', 'Koregaon Park') "
                 + "ON CONFLICT (slug) DO NOTHING");
         User o = owner("9810000009");
@@ -314,7 +295,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
         under.setPossession(PropertyPossession.UNDER_CONSTRUCTION);
         properties.saveAndFlush(under);
 
-        // Left unstated on purpose — this is the case the facet must NOT quietly include.
         save(o, "Unstated Plot", "buy", "plot", null, 5000000, "Baner", "approved", false);
 
         mvc.perform(get("/properties").param("possession", PropertyPossession.READY_TO_MOVE))
@@ -328,8 +308,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Under Flat"));
 
-        // All three are searchable without the facet — proving the filter narrows rather than the
-        // rows simply being invisible.
         mvc.perform(get("/properties"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(3));
@@ -398,7 +376,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].freshness").doesNotExist())
                 .andExpect(jsonPath("$.content[0].coverImage").value("https://img/x.jpg"))
 
-                // owner contact must never appear in the card projection
                 .andExpect(jsonPath("$.content[0].owner").doesNotExist())
                 .andExpect(jsonPath("$.content[0].mobile").doesNotExist());
     }
@@ -681,7 +658,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // The page-size clamp is global, so each endpoint must prove it is still covered.
     @Test
     void myListingsClampsAHostilePageSize() throws Exception {
         User o = owner("9810000018");
@@ -726,8 +702,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.locality").value("Kothrud"))
                 .andExpect(jsonPath("$.localitySlug").value("kothrud"));
 
-        // Approve it, then prove the facet actually finds it — the slug is only worth setting if it
-        // makes the listing reachable.
         Property saved = properties.findAll().stream()
                 .filter(p -> "Owner Typed".equals(p.getTitle())).findFirst().orElseThrow();
         saved.setStatus("approved");
@@ -752,7 +726,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.message").value("Pick the locality from the suggestions."));
     }
 
-    /** Editing the display locality must re-bind the key, or the listing stays in the old market. */
     @Test
     void updatingLocalityRebindsTheSlug() throws Exception {
         jdbc.update("INSERT INTO localities (slug, name) VALUES ('baner', 'Baner') "
@@ -765,13 +738,10 @@ class PropertiesEndpointsTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"locality\":\"Baner\"}"))
                 .andExpect(status().isOk())
 
-                // locality is a foundation field, so the edit also costs re-moderation
                 .andExpect(jsonPath("$.status").value("pending"));
         storedListing(o, p.getId()).andExpect(jsonPath("$.localitySlug").value("baner"));
     }
 
-    // Coordinates are non-foundation; re-resolving them would silently move
-    // an approved listing into another market's search.
     @Test
     void updatingOnlyCoordinatesDoesNotRebindTheSlug() throws Exception {
         jdbc.update("INSERT INTO localities (slug, name, lat, lng) "
@@ -820,8 +790,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-    // BHK changes what the listing fundamentally is, so a stale index entry (a 2BHK appearing
-    // under 3BHK) would be a wrong answer — the listing comes off search until re-moderation.
     @Test
     void updateIdentityFieldRevertsStatusToPending() throws Exception {
         User o = owner("9810000016");
@@ -863,8 +831,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
         storedListing(o, p.getId()).andExpect(jsonPath("$.description").value("Updated copy"));
     }
 
-    // PATCH semantics: null on a foundation field means "leave unchanged" — must not clear the
-    // value nor trigger re-moderation, or every partial update revert-storms back to pending.
     @Test
     void updateWithNullFoundationFieldLeavesValueAndStatusUnchanged() throws Exception {
         User o = owner("9810000024");

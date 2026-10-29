@@ -28,8 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FlatmateModerationService {
-
-    /** A {@code modStatus} value that names a board rather than a state — see {@link #moderationQueue}. */
     static final String SELECTOR_RECHECK = "recheck";
 
     private final FlatmateReviewRepository reviews;
@@ -64,7 +62,6 @@ public class FlatmateModerationService {
         this.locks = locks;
     }
 
-    /** Staff accounts are separate user rows, so this catches the one identity acting as maker and checker. */
     static void requireNotParty(AuthPrincipal caller, UUID... parties) {
         for (UUID party : parties) {
             if (caller.userId().equals(party)) {
@@ -73,8 +70,6 @@ public class FlatmateModerationService {
         }
     }
 
-    /* The page is global: each source yields its first {@code (page + 1) * size} rows in the shared order,
-       and the merge keeps the requested slice. */
     @Transactional(readOnly = true)
     public Page<FlatmateModerationRow> moderationQueue(List<String> kinds, List<String> modStatus,
             Pageable pageable) {
@@ -116,8 +111,6 @@ public class FlatmateModerationService {
                 total += page.getTotalElements();
             }
         }
-        // Ids compare as strings: lowercase UUID text sorts like Postgres' unsigned byte order, so the merge
-        // ranks ties exactly as each DB window did.
         Comparator<Aged> order = Comparator.comparing(Aged::at, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(a -> String.valueOf(a.item().id()));
         candidates.sort(direction.isAscending() ? order : order.reversed());
@@ -128,7 +121,6 @@ public class FlatmateModerationService {
         return new PageImpl<>(slice, pageable, total);
     }
 
-    /** A row and the instant it is ranked by: its creation, or for a re-check the edit that raised it. */
     private record Aged(Instant at, FlatmateModerationQueueDto item) {
     }
 
@@ -136,8 +128,6 @@ public class FlatmateModerationService {
     private static final List<String> HIDDEN = List.of("flagged", "removed", "rejected",
             FlatmateVocabulary.MOD_EXPIRED);
 
-    /** One card per awaiting post or application on Pending; badge claims are counted apart, as the
-     * Badge requests tab lists them on their own. */
     @Transactional(readOnly = true)
     public FlatmateModerationSummary moderationSummary() {
         List<String> pending = List.of(FlatmateVocabulary.MOD_PENDING);
@@ -202,7 +192,6 @@ public class FlatmateModerationService {
                 .map(FlatmateVocabulary::blankToNull).filter(java.util.Objects::nonNull).toList();
     }
 
-    /** {@code expired} is filterable but never a verdict: only the host's renewal leaves it. */
     private static List<String> modStates(List<String> requested, String fallback) {
         if (requested.isEmpty()) {
             return fallback == null ? List.of() : List.of(fallback);
@@ -213,7 +202,6 @@ public class FlatmateModerationService {
                 .distinct().toList();
     }
 
-    /** Authors for one page, in one query rather than one per row. */
     private Map<UUID, User> peopleOf(List<UUID> userIds) {
         if (userIds.isEmpty()) {
             return Map.of();
@@ -222,8 +210,6 @@ public class FlatmateModerationService {
                 .collect(Collectors.toMap(User::getId, u -> u));
     }
 
-    /** The id may name a post, a room or a group, since an abuse report carries an id, not a taxonomy.
-     * Re-stamping the current state is "Looks fine": it only drops the pending re-check. */
     @Transactional
     public void moderate(AuthPrincipal caller, UUID targetId, String modStatus, String note) {
         String requested = FlatmateVocabulary.require(
@@ -270,7 +256,6 @@ public class FlatmateModerationService {
                 "from", before, "modStatus", verdict, "note", why);
     }
 
-    /** Hiding, and undoing a removal or rejection, are the verdicts a later moderator must be able to explain. */
     private static final Set<String> HIDING = Set.of("flagged", "removed", "rejected");
     private static final Set<String> UNDOING = Set.of("removed", "rejected");
 
@@ -302,8 +287,6 @@ public class FlatmateModerationService {
         return new PageImpl<>(hydrated, page.getPageable(), page.getTotalElements());
     }
 
-    /** Writes {@code modStatus} only: "we took this down" and "the owner said no" are different
-     * facts. {@link FlatmateGroupApplication#moderate} cannot reach {@code status} at all. */
     @Transactional
     public GroupApplicationDto moderateApplication(AuthPrincipal caller, UUID applicationId,
             String modStatus, String note) {

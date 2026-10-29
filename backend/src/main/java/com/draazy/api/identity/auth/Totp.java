@@ -9,9 +9,7 @@ import java.time.Instant;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-/** RFC 6238 TOTP (HMAC-SHA1, 6 digits, 30s) — the parameters every authenticator app defaults to. */
 public final class Totp {
-
     static final int STEP_SECONDS = 30;
     private static final String BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -19,7 +17,6 @@ public final class Totp {
     private Totp() {
     }
 
-    /** 160 random bits, the RFC 4226 recommended secret length. */
     public static byte[] newSecret() {
         byte[] secret = new byte[20];
         RANDOM.nextBytes(secret);
@@ -44,10 +41,6 @@ public final class Totp {
         }
     }
 
-    /**
-     * The step in {@code [now-1, now+1]} whose code equals {@code code}, or -1. One step either side
-     * absorbs phone clock drift and the seconds spent typing.
-     */
     public static long matchingStep(byte[] secret, String code, Instant now) {
         long current = stepAt(now);
         byte[] presented = code.getBytes(StandardCharsets.US_ASCII);

@@ -22,10 +22,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Tells both sides of a registered agreement, once, that its term ends within two months. */
 @Service
 public class RentAgreementRenewalSweeper {
-
     static final int REMIND_DAYS_AHEAD = 60;
     static final String TYPE = "agreement.renewal";
 
@@ -44,7 +42,6 @@ public class RentAgreementRenewalSweeper {
         this.settings = settings;
     }
 
-    /** One owner notification per service request, however many tenant rows it holds. */
     @Transactional
     public int remindEnding(Instant now) {
         LocalDate today = now.atZone(PlatformTime.IST).toLocalDate();

@@ -28,7 +28,6 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class OwnerOutreachService {
-
     private static final String CHANNEL = "whatsapp";
     private static final String SUBJECT = "property";
 
@@ -80,7 +79,6 @@ public class OwnerOutreachService {
         return prepared;
     }
 
-    // Staff attest after pressing send in their own WhatsApp; the server never sees delivery.
     @Transactional
     public OwnerOutreachEntry markSent(AuthPrincipal caller, String propertyId, String messageId) {
         Property property = load(propertyId);
@@ -105,7 +103,6 @@ public class OwnerOutreachService {
                 .toList();
     }
 
-    // Narrowed to staff-posted listings because only those render a chaser count.
     @Transactional(readOnly = true)
     public OutreachCounts countsFor(Collection<Property> page) {
         List<UUID> ids = page.stream()
@@ -122,7 +119,6 @@ public class OwnerOutreachService {
         return subject -> counts.getOrDefault(subject, 0);
     }
 
-    // Unresolved placeholders are left standing so the preview exposes the gap.
     private Map<String, String> variables(Property property, User owner, AuthPrincipal caller) {
         Map<String, String> vars = new LinkedHashMap<>();
         vars.put("owner_name", owner.getName() != null ? owner.getName() : "there");
@@ -150,7 +146,6 @@ public class OwnerOutreachService {
         return localities.marketRate(slug).map(Notifier::indianGrouping).orElse(null);
     }
 
-    // Read from the row, not the token, so name changes take effect immediately.
     private String staffName(AuthPrincipal caller) {
         return users.findById(caller.userId())
                 .map(User::getName)
@@ -171,7 +166,6 @@ public class OwnerOutreachService {
             String status,
             String preparedBy,
             java.time.Instant preparedAt) {
-
         static OwnerOutreachEntry of(OutboundMessage message) {
             return new OwnerOutreachEntry(
                     message.getId().toString(),

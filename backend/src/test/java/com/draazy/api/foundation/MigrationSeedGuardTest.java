@@ -16,23 +16,18 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-// Reference data belongs in a repeatable migration, and only a test can hold that line.
 @DisplayName("Migrations — reference data never ships in a versioned file")
 class MigrationSeedGuardTest {
-
     private static final Path MIGRATIONS = Path.of("src/main/resources/db/migration");
 
     private static final Path REFERENCE_SEED = MIGRATIONS.resolve("R__DML_seed_reference_data.sql");
 
-    // Versions whose inserts are one-time backfills, each with why losing them to the reset costs nothing.
     private static final Map<String, String> BACKFILLS = Map.of(
             "26.10.36",
             "Inserts one timeline row per held draft it releases; a reset database has no held drafts to release.",
             "26.10.52",
             "Copies retired per-post lifestyle tags into user_living_style; a reset database has no posts to copy from.");
 
-    // Tables whose rows a versioned migration once seeded, and which the repeatable seed now owns alone.
-    // Keyed by table because the seed owns these rows with no version to point at.
     private static final Map<String, String> RE_HOMED_INTO_REFERENCE_SEED = Map.of(
             "message_template",
             "A versioned migration once created this table and seeded its ten WhatsApp templates in the same "
@@ -44,8 +39,6 @@ class MigrationSeedGuardTest {
 
     private static final Pattern VERSION = Pattern.compile("^(\\d+(?:\\.\\d+)*)__");
 
-    // A table listed as re-homed must still be seeded.
-    // The comment on `#RE_HOMED_INTO_REFERENCE_SEED` claims the rows moved to the repeatable seed.
     @Test
     @DisplayName("a versioned migration that seeds reference data is a silent data-loss bug")
     void versionedMigrationsDoNotSeedReferenceData() {
@@ -81,8 +74,6 @@ class MigrationSeedGuardTest {
                 .isEmpty();
     }
 
-    // A stale entry is worse than no entry: it reads as a considered exception while excusing nothing, and the next
-    // person to reuse that version prefix inherits a blanket pass they never asked for.
     @Test
     @DisplayName("a table listed as re-homed still has its rows in the repeatable seed")
     void reHomedTablesAreStillSeeded() {
@@ -138,13 +129,10 @@ class MigrationSeedGuardTest {
         return m.results().map(r -> r.group(1)).distinct().toList();
     }
 
-    // A trigger function's INSERT runs on later writes, not at migrate time, so it seeds nothing.
     private static String stripFunctionBodies(String sql) {
         return sql.replaceAll("(?is)(create\\s+(?:or\\s+replace\\s+)?function\\b.*?)\\$(\\w*)\\$.*?\\$\\2\\$", "$1");
     }
 
-    // Remove `--` line comments and `/* *``/` blocks before looking for inserts. Otherwise a migration that explains
-    // in prose why it does not insert would be reported as inserting.
     private static String stripComments(String sql) {
         return sql.replaceAll("(?s)/\\*.*?\\*/", " ").replaceAll("--[^\\n]*", " ");
     }

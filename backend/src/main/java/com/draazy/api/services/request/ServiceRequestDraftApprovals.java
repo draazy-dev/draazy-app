@@ -28,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ServiceRequestDraftApprovals {
-
     static final String METHOD_IN_APP = "in_app";
     static final String METHOD_OTP = "otp";
 
@@ -129,7 +128,6 @@ public class ServiceRequestDraftApprovals {
         if (sending) {
             String purpose = purpose(request, party.key());
             otp.sendCode(mobile, purpose, caller.userId());
-            // A share can land while the SMS is out; refusing then rolls the code back so it can never be used.
             if (!purpose.equals(purpose(request, party.key()))) {
                 throw new ConflictException(
                         "The draft changed while the code was being sent. Open the new draft first.");

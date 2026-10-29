@@ -15,7 +15,6 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "user_living_style")
 @Getter
 public class UserLivingStyle {
-
     @Id
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
@@ -28,7 +27,6 @@ public class UserLivingStyle {
     private Instant updatedAt;
 
     protected UserLivingStyle() {
-        // JPA
     }
 
     public UserLivingStyle(UUID userId, Map<String, Integer> answers) {

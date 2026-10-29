@@ -19,16 +19,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * {@code GET/PUT /me/notification-preferences} — the endpoint half of tech debt D94 and D15.
- *
- * <p>The load-bearing assertions are: an absent row reads as today's behaviour and never as
- * silence; the document round-trips field for field under the names the browser already uses; and
- * one user's settings are unreachable from another user's session.
- */
 @DisplayName("Notification preferences — the contract (D94, D15)")
 class NotificationPreferencesEndpointTest extends AbstractApiTest {
-
     private static final String PATH = "/me/notification-preferences";
 
     @Autowired
@@ -44,7 +36,6 @@ class NotificationPreferencesEndpointTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    /** The full document, so a test can vary one field without restating the shape five times. */
     private static String body(boolean email, boolean sms, boolean whatsapp, boolean matchAlerts,
             boolean quietEnabled, String start, String end, String language) {
         return """
@@ -54,8 +45,6 @@ class NotificationPreferencesEndpointTest extends AbstractApiTest {
                 """
                 .formatted(email, sms, whatsapp, matchAlerts, quietEnabled, start, end, language);
     }
-
-    // ============================== defaults ==============================
 
     @Test
     @DisplayName("a user who has never saved settings gets the defaults, not an empty document")
@@ -82,9 +71,6 @@ class NotificationPreferencesEndpointTest extends AbstractApiTest {
     @Test
     @DisplayName("the service's defaults and V73's column defaults are the same document")
     void serviceDefaultsMatchTheDatabaseColumnDefaults() throws Exception {
-        // Three copies of these values exist by necessity (browser, database, service). This is the
-        // one that can be checked from here: insert a row naming nothing but the user, so every
-        // value comes from V73, and read it back through the service's mapper.
         User u = user("9800000102");
         jdbc.update("insert into notification_preferences (user_id) values (?)", u.getId());
 
@@ -98,14 +84,11 @@ class NotificationPreferencesEndpointTest extends AbstractApiTest {
                 .isEqualTo(NotificationPreferenceService.DEFAULTS);
     }
 
-    // ============================== round trip ==============================
-
     @Test
     @DisplayName("PUT round-trips every field, and a later GET agrees with the PUT's own answer")
     void putRoundTripsEveryField() throws Exception {
         User u = user("9800000103");
 
-        // Every field flipped away from its default, so no assertion can pass by accident.
         mvc.perform(put(PATH)
                         .header(HttpHeaders.AUTHORIZATION, bearer(u))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -158,8 +141,6 @@ class NotificationPreferencesEndpointTest extends AbstractApiTest {
                 .isEqualTo(1);
     }
 
-    // ============================== isolation ==============================
-
     @Test
     @DisplayName("one user can neither read nor write another user's preferences")
     void preferencesAreStrictlyCallerScoped() throws Exception {
@@ -172,15 +153,12 @@ class NotificationPreferencesEndpointTest extends AbstractApiTest {
                         .content(body(false, true, false, false, true, "20:00", "04:00", "hi")))
                 .andExpect(status().isOk());
 
-        // B sees the defaults, not A's document. There is no parameter on this endpoint through
-        // which B could name A — the assertion is that the principal is genuinely the scope.
         mvc.perform(get(PATH).header(HttpHeaders.AUTHORIZATION, bearer(b)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.matchAlerts").value(true))
                 .andExpect(jsonPath("$.language").value("en"))
                 .andExpect(jsonPath("$.quietHours.enabled").value(false));
 
-        // And B writing does not disturb A.
         mvc.perform(put(PATH)
                         .header(HttpHeaders.AUTHORIZATION, bearer(b))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -199,8 +177,6 @@ class NotificationPreferencesEndpointTest extends AbstractApiTest {
     void anonymousIsRejected() throws Exception {
         mvc.perform(get(PATH)).andExpect(status().isUnauthorized());
     }
-
-    // ============================== validation ==============================
 
     static Stream<Arguments> rejectedDocuments() {
         return Stream.of(

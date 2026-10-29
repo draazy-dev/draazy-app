@@ -16,10 +16,8 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Runs after the approval commits, in its own transaction, so a slow or failing fan-out can neither hold the approval open nor undo it. */
 @Component
 class SocietyListingAlerts {
-
     static final String TYPE = "match.society-listing";
 
     private static final Logger log = LoggerFactory.getLogger(SocietyListingAlerts.class);

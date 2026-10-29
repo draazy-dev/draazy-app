@@ -8,11 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-/** Captured errors are for triage, not record-keeping: every row goes 30 days after it was first seen. A fault
- * still happening comes straight back as a new row, and nothing can keep a row alive by repeating it. */
 @Component
 public class ErrorEventRetention {
-
     private static final Logger log = LoggerFactory.getLogger(ErrorEventRetention.class);
 
     public static final Duration RETENTION = Duration.ofDays(30);

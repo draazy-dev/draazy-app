@@ -18,11 +18,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-// Registration needs identity rows for every signatory and witness.
-// Each person also needs required papers; the flat needs ownership proof.
 @Component
 class RentAgreementReadiness {
-
     private static final int NAMED_AT_MOST = 6;
     private static final Set<String> PERSON_PAPERS = Set.of("pan", "aadhaar", "passport", "visa", "photo");
 
@@ -49,7 +46,6 @@ class RentAgreementReadiness {
         return PERSON_PAPERS.stream().anyMatch(paper -> c.endsWith("-" + paper)) ? sideOf(c) : null;
     }
 
-    // Categories with no index in their name (ownership-proof, tenant-id) belong to slot 0.
     static int partyIndex(String category) {
         String c = canonical(category);
         Matcher indexed = INDEXED.matcher(c);
@@ -103,7 +99,6 @@ class RentAgreementReadiness {
         }
     }
 
-    // A tenant-side requester cannot file owner papers, so what the owner side lacks is the owner's to supply.
     void requireOwnerSide(ServiceRequest request) {
         if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType()) || ownerSide.requesterIsOwner(request)) {
             return;

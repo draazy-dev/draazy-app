@@ -8,11 +8,8 @@ import java.util.Set;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-// Separate collaborator keeps read-receipt side rules out of ServiceRequestService.
 @Component
 class ServiceRequestReadReceipts {
-
-    // Mark sides, not individuals; co-fill parties are customers, not desk recipients.
     private static final Set<String> OPS = Set.of(Roles.Wire.STAFF, Roles.Wire.MANAGER, Roles.Wire.ADMIN);
     private static final Set<String> CUSTOMER = Set.of(Roles.Wire.BUYER, Roles.Wire.OWNER);
 
@@ -33,8 +30,6 @@ class ServiceRequestReadReceipts {
         this.approvals = approvals;
     }
 
-    // Idempotent: receipt records first seen, not latest open.
-    // 204 avoids tempting clients to render historical counts.
     @Transactional
     void markRead(AuthPrincipal caller, String id) {
         ServiceRequest request = requests.visible(caller, id);

@@ -22,11 +22,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// The lightest gate on the platform, deliberately.
-// Contact-gate prerequisites do not apply because photo requests reveal no phone number.
 @Service
 public class PhotoRequestService {
-
     private final PhotoRequestRepository photoRequests;
     private final PropertyRepository properties;
     private final UserRepository users;
@@ -123,8 +120,6 @@ public class PhotoRequestService {
         return answer;
     }
 
-    // Photo decisions are visible on the listing, so both outcomes are announced.
-    // Contact declines stay silent because a terminal no is not actionable.
     private void announce(UUID requesterId, String decision, PhotoRequestResponse answer) {
         String link = "/property/"
                 + (answer.propertySlug() != null ? answer.propertySlug() : answer.propertyId());
@@ -159,7 +154,6 @@ public class PhotoRequestService {
                 propertiesById.get(row.getPropertyId()), usersById.get(row.getRequesterId()));
     }
 
-    /** Resolve a path token that may be a UUID or a slug — the same either/or the detail endpoint accepts. */
     private Property resolve(String idOrSlug) {
         return Ids.parseUuid(idOrSlug)
                 .flatMap(properties::findById)

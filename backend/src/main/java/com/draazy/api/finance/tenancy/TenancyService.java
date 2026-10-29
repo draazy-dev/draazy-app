@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TenancyService {
-
     private final TenancyRepository tenancies;
     private final UserRepository users;
     private final Notifier notifier;
@@ -38,7 +37,6 @@ public class TenancyService {
         return project(tenancies.findByTenantId(callerId));
     }
 
-    // A close only proposes the tenancy: it activates when the named tenant confirms it.
     @Transactional
     public Optional<Tenancy> openFromClosedDeal(UUID propertyId, UUID ownerId, UUID tenantId,
                                                 String tenantMobile, Long monthlyRent) {
@@ -91,7 +89,7 @@ public class TenancyService {
         return project(List.of(tenancies.findById(tenancyId).orElseThrow())).get(0);
     }
 
-    // Anyone but the account the owner named is a 404, so the id is never confirmed to exist.
+    // Anyone but the account the owner named gets a 404, so the id is never confirmed to exist.
     private Tenancy requireNamedTenant(UUID callerId, UUID tenancyId) {
         Tenancy tenancy = tenancies.findById(tenancyId)
                 .filter(t -> t.getTenantId().equals(callerId))
@@ -105,13 +103,11 @@ public class TenancyService {
         return tenancy;
     }
 
-    // Pending is declined before active is ended: a confirm that lands between the two is still ended.
     @Transactional
     public void endActiveTenancy(UUID propertyId, LocalDate endDate) {
         tenancies.declinePendingByPropertyId(propertyId);
         tenancies.endActiveByPropertyId(propertyId, endDate);
     }
-    // Resolve participants in one query so this otherwise-simple read avoids N+1.
     private List<TenancyDto> project(List<Tenancy> rows) {
         if (rows.isEmpty()) {
             return List.of();

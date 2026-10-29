@@ -22,15 +22,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Why these cannot be unit tests. {@link GlobalExceptionHandlerTest} already proves each handler maps its exception
-// to the right envelope.
 @DisplayName("Error envelope — protocol refusals are the caller's fault, not a 500")
 class ErrorEnvelopeWebTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
-    // The regression this pins is not the status — a malformed body was always a 400 — but the body.
     @Test
     @DisplayName("a wrong verb on a real route is 405 with an Allow header, not 500")
     void wrongVerbIs405() throws Exception {

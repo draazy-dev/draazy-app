@@ -14,11 +14,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-// Keeps the anonymous group card shape a strict projection of the detail shape, so a "while I'm
-// here" field cannot leak the masked owner number, address fingerprint or moderation verdict.
 @DisplayName("D211 — the group feed shape is a projection of the detail shape, and stays one")
 class FlatmateGroupShapeTest {
-
     private static final List<String> FEED_FIELDS = List.of(
             "id", "title", "locality", "policy", "rent", "deposit", "noticePeriodDays",
             "lockInMonths", "maintenanceBilling", "electricityBilling",
@@ -27,7 +24,6 @@ class FlatmateGroupShapeTest {
             "ownerConsent", "reviewStatus", "note", "ownerName", "createdAt",
             "preferences");
 
-    // See {@link FlatmateGroupFeedDto} for the evidence behind each host-only field.
     private static final List<String> DETAIL_ONLY_FIELDS = List.of(
             "ownerConsentMobile", "addressFingerprint", "flagForReview", "modStatus", "ownerMobile");
 
@@ -40,20 +36,17 @@ class FlatmateGroupShapeTest {
     @Nested
     @DisplayName("The feed shape")
     class Feed {
-
         @Test
         @DisplayName("carries exactly the pinned field set — nothing quietly re-fattens it")
         void fieldSetIsPinned() {
             assertThat(componentsOf(FlatmateGroupFeedDto.class).keySet())
                     .containsExactlyInAnyOrderElementsOf(FEED_FIELDS);
         }
-
     }
 
     @Nested
     @DisplayName("The detail shape")
     class Detail {
-
         @Test
         @DisplayName("is the feed shape plus exactly the pinned host-only fields")
         void isFeedPlusHostOnlyFields() {
@@ -69,8 +62,6 @@ class FlatmateGroupShapeTest {
             Map<String, Class<?>> feed = componentsOf(FlatmateGroupFeedDto.class);
             Map<String, Class<?>> detail = componentsOf(FlatmateGroupDto.class);
 
-            // A projection that silently widens Long to String, or int to Integer, would change
-            // the JSON a client already parses while still passing a name-only check.
             assertThat(feed).containsExactlyInAnyOrderEntriesOf(
                     detail.entrySet().stream()
                             .filter(e -> !Set.copyOf(DETAIL_ONLY_FIELDS).contains(e.getKey()))
@@ -81,13 +72,9 @@ class FlatmateGroupShapeTest {
     @Nested
     @DisplayName("The two mappers")
     class Mappers {
-
         @Test
         @DisplayName("produce the same value for every shared field, from the same row")
         void agreeOnEverySharedField() throws Exception {
-
-            // MapStruct cannot inherit @Mapping across differing target types, so seatsOpen,
-            // perHead and ownerName are wired twice — editing one target only still compiles.
             FlatmateGroup group = groupWithOneSeatLeft();
             FlatmateMapper mapper = new FlatmateMapperImpl();
             FlatmateMapper.PartyView view = new FlatmateMapper.PartyView("Asha", "9876543210");
@@ -102,8 +89,6 @@ class FlatmateGroupShapeTest {
             }
         }
 
-        // seatsOpen deliberately disagrees with seatsTotal - members; a memberless fixture would
-        // let both mappers fall back to the same derivation and prove nothing.
         private FlatmateGroup groupWithOneSeatLeft() {
             FlatmateGroup group = new FlatmateGroup();
             group.setTitle("Three of us in Baner");

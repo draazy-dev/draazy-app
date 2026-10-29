@@ -15,17 +15,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.support.PropertiesLoaderUtils;
 
-// Sandbox copies prod rather than inheriting it, so parity is asserted here; values live in ProdProfileContractTest.
 @DisplayName("The sandbox profile — a standalone copy that must not drift from prod")
 class SandboxProfileContractTest {
-
     private static final Set<String> INTENTIONAL_DIVERGENCE = Set.of(
-            // Sandbox adds classpath:db/seed for demo inventory, which makes its database unpromotable.
             "spring.flyway.locations");
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([^}]+)}");
 
-    /** See {@code ProdProfileContractTest.MODULE} — same working-directory hazard, same fix. */
     private static final Path MODULE = Path.of(System.getProperty("basedir", "")).toAbsolutePath();
 
     private static Properties mainResource(String name) throws IOException {
@@ -44,7 +40,6 @@ class SandboxProfileContractTest {
         return mainResource("application-sandbox.properties");
     }
 
-    // Compares the complete maps so a new key is caught without anyone listing it as important.
     @Test
     @DisplayName("sandbox and prod agree on every key except the declared divergences")
     void sandboxDoesNotDriftFromProd() throws IOException {
@@ -81,7 +76,6 @@ class SandboxProfileContractTest {
                 .isEmpty();
     }
 
-    // A defaulted secret like ${DB_PASSWORD:} would boot sandbox against the base file's local Postgres.
     @Test
     @DisplayName("every secret is still an ${ENV} lookup with no fallback")
     void noSecretAcquiredADefaultDuringTheSplit() throws IOException {

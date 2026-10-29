@@ -14,10 +14,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Member-added society duplicate review, guarded by the {@code societies:read} atom like the merge desk. */
 @RestController
 public class SocietyCandidateAdminController {
-
     private static final String STAFF_OR_ADMIN =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
 
@@ -37,8 +35,6 @@ public class SocietyCandidateAdminController {
         return PageResponse.of(minting.candidates(q, Pageables.unsorted(pageable)), s -> s);
     }
 
-    /** Separate from the queue: the scan compares a name against the whole catalogue, so per-row is wasteful.
-     * A read only: an automatic merge on a low score would fold two real buildings together. */
     @GetMapping(Routes.SocietyCandidates.DUPLICATES)
     @PreAuthorize(SOCIETIES_READ)
     public List<SocietyDuplicateSuggestion> duplicates(@PathVariable String slug,

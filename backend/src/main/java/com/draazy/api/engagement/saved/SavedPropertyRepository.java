@@ -11,9 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-/** No entity: the composite key only supports one list, one insert and one hard delete. */
 public interface SavedPropertyRepository extends Repository<Property, UUID> {
-
     interface SavedRow {
         UUID getPropertyId();
 
@@ -44,7 +42,6 @@ public interface SavedPropertyRepository extends Repository<Property, UUID> {
             nativeQuery = true)
     Page<SavedRow> findSavedRows(@Param("userId") UUID userId, Pageable pageable);
 
-    /** Same rows and order as {@link #findSavedRows}, as {@code [id, slug]} pairs and unpaged. */
     @Query(value = """
             select p.id, p.slug
               from saved_properties sp
@@ -58,8 +55,6 @@ public interface SavedPropertyRepository extends Repository<Property, UUID> {
             """, nativeQuery = true)
     List<Object[]> findSavedKeys(@Param("userId") UUID userId);
 
-    /** {@code ON CONFLICT DO NOTHING} makes save idempotent: 1 if inserted, 0 if already present,
-     * never a duplicate-key exception. */
     @Modifying
     @Query(value = "insert into saved_properties (user_id, property_id) values (:userId, :propertyId) on conflict do nothing",
             nativeQuery = true)

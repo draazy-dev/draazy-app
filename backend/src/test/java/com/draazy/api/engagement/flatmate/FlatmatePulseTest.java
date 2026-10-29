@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 @DisplayName("Home flatmate pulse — counted from the board's own public rows")
 class FlatmatePulseTest extends AbstractApiTest {
-
     @Autowired FlatmatePulseService pulse;
 
     @Autowired UserRepository users;
@@ -28,7 +27,6 @@ class FlatmatePulseTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    // A minute ahead so a committed row from another test can never be "newer".
     private void seekerPost(User seeker, String name, String modStatus) {
         jdbc.update("insert into flatmate_seeker_posts (user_id, name, budget, mod_status, created_at)"
                 + " values (?, ?, 20000, ?, now() + interval '1 minute')", seeker.getId(), name, modStatus);

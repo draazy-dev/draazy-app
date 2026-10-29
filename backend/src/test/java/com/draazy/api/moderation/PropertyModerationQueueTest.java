@@ -18,17 +18,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-// Public and owner listing routes cannot expose an unapproved stranger's id,
-// so the moderation queue needs its own reachable read.
 @DisplayName("Moderation — the listing queue is reachable")
 class PropertyModerationQueueTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
     PropertyRepository properties;
 
-    /** Audit rows commit through REQUIRES_NEW, so a rollback does not take them with it. */
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
         jdbc.update("delete from audit_log where entity = 'property'");
@@ -57,12 +53,10 @@ class PropertyModerationQueueTest extends AbstractApiTest {
         p.setArea(new BigDecimal("950"));
         p.setStatus(status);
 
-        // Filed, so queue tests do not fail on locality approval.
         p.setLocalitySlug("baner");
         return properties.saveAndFlush(p);
     }
 
-    // The whole point: the backlog is visible.
     private void tickChecklist(Property p, User staff) throws Exception {
         mvc.perform(post("/properties/" + p.getId() + "/verification/start")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
@@ -100,8 +94,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
 
-    // On the public search a `status` param can only narrow within approved, so `status=pending` yields an empty page.
-    // Here it must widen.
     @Test
     @DisplayName("the status filter widens here and narrows on the public search")
     void statusFilterWidens() throws Exception {
@@ -122,7 +114,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
-    // `archived` is tri-state; omitted means the ops screen shows all listings.
     @Test
     @DisplayName("archived is tri-state — both, only-archived, only-live")
     void archivedIsTriState() throws Exception {
@@ -147,8 +138,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].id").value(live.getId().toString()));
     }
 
-    // Stays-live rechecks remain approved and unarchived,
-    // so only this tri-state filter can surface them to ops.
     @Test
     @DisplayName("recheck is tri-state — the stays-live queue, its complement, and both")
     void recheckIsTriState() throws Exception {
@@ -176,14 +165,10 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(quiet.getId().toString()))
 
-                // NON_NULL: nothing queued, so the two re-check fields are absent rather than
-                // present-and-empty. A client cannot mistake "clean" for "queued at the epoch".
                 .andExpect(jsonPath("$.content[0].recheckRequestedAt").doesNotExist())
                 .andExpect(jsonPath("$.content[0].recheckPending").value(false));
     }
 
-    // Unfiltered queue clients need the archived value,
-    // not a hard-coded `false`, to distinguish rows.
     @Test
     @DisplayName("a badge-only request sits in the badge queue, not the re-check queue, and sorts by age")
     void badgeRequestsHaveTheirOwnQueue() throws Exception {
@@ -247,7 +232,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].archived").value(false));
     }
 
-    /** Free text is the facet ops actually uses; it must reach unapproved rows like the rest. */
     @Test
     @DisplayName("free-text search reaches unapproved listings")
     void freeTextReachesUnapprovedRows() throws Exception {
@@ -280,7 +264,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
         }
     }
 
-    // An ordinary account reaching it would be a disclosure, not a UI bug.
     @Test
     @DisplayName("an ordinary user cannot read the queue")
     void seekersAreForbidden() throws Exception {
@@ -290,14 +273,12 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** And an anonymous caller must not even get as far as the role check. */
     @Test
     @DisplayName("an anonymous caller is unauthorized")
     void anonymousIsUnauthorized() throws Exception {
         mvc.perform(get("/admin/properties")).andExpect(status().isUnauthorized());
     }
 
-    // The assertion is deliberately equality against the seeded number rather than "does not contain X".
     @Test
     @DisplayName("owner contact is revealed in the queue, because the desk phones owners")
     void ownerContactIsRevealed() throws Exception {
@@ -310,7 +291,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].owner.mobile").value("9850000012"));
     }
 
-    // Each half existed before; only together are they a moderation system.
     @Test
     @DisplayName("a listing found in the queue can be approved and then appears publicly")
     void queueAndDecisionCloseTheLoop() throws Exception {
@@ -334,7 +314,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
 
-    // Flagging removes a listing from public search; the queue is where it resurfaces.
     @Test
     @DisplayName("a flagged listing leaves public search and is findable in the queue")
     void flaggedListingsAreFindable() throws Exception {

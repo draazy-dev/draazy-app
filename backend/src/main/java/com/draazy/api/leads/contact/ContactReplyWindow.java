@@ -5,10 +5,8 @@ import java.time.Duration;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 
-/** How long an owner has to answer a contact request before the seeker's contact is returned. */
 @Component
 class ContactReplyWindow {
-
     private final PlatformSettings settings;
 
     ContactReplyWindow(PlatformSettings settings) {
@@ -23,7 +21,6 @@ class ContactReplyWindow {
         return createdAt.plus(Duration.ofDays(settings.contactReplyDays()));
     }
 
-    /** True for a request whose window ran out, whether or not the sweep has stored the expiry yet. */
     boolean lapsed(String status, Instant createdAt, Instant now) {
         return ContactRequestStatuses.EXPIRED.equals(status)
                 || (ContactRequestStatuses.PENDING.equals(status) && createdAt != null

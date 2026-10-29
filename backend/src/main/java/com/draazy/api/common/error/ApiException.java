@@ -1,12 +1,6 @@
 package com.draazy.api.common.error;
 
-/**
- * Base of the typed exception hierarchy. Each subclass fixes a machine-readable {@code code} and an
- * HTTP {@code status}; the {@link com.draazy.api.common.error.GlobalExceptionHandler} turns any
- * {@code ApiException} into the contract error envelope with no per-controller boilerplate.
- */
 public abstract class ApiException extends RuntimeException {
-
     private final String code;
     private final int status;
 

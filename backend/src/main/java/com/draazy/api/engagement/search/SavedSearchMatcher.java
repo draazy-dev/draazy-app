@@ -24,7 +24,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 class SavedSearchMatcher {
-
     private static final long BUY_MAX = 50_000_000L;
     private static final long RENT_MAX = 100_000L;
     private static final int MAX_LIST_VALUES = 12;
@@ -46,7 +45,6 @@ class SavedSearchMatcher {
         this.livingStyle = livingStyle;
     }
 
-    /** The alert's owner stands in for the signed-in caller: only keys they answered narrow the count. */
     private record Vibe(Map<String, List<Integer>> wanted, Map<String, Integer> mine) {
     }
 
@@ -199,7 +197,6 @@ class SavedSearchMatcher {
             params.put("minBudget", min);
         }
         if (max != null) {
-
             sql.append(" and coalesce(round(cast(g.rent_min as numeric) / g.seats_total), g.per_head)"
                     + " <= :maxBudget");
             params.put("maxBudget", max);
@@ -287,7 +284,6 @@ class SavedSearchMatcher {
         sql.append(VibeFilter.sql("p".equals(alias) ? "p.user_id" : alias + ".host_id", vibe.wanted(), vibe.mine(), params));
     }
 
-    /** Only a named gender can be strict: "only any" excludes no one. */
     private static boolean strictGender(Map<String, Object> criteria) {
         String gender = text(criteria, "gender");
         return Boolean.TRUE.equals(booleanValue(criteria, "strictGender"))

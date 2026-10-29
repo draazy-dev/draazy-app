@@ -8,22 +8,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/** No read returns rows: a {@code List<PageView>} by session or user would make this table surveillance. */
 @Repository
 public interface PageViewRepository extends JpaRepository<PageView, UUID> {
-
-    /** Deletes everything before {@code cutoff} (thirty-day retention); uses {@code page_views_occurred_idx}. */
     @Modifying
     @Query("delete from PageView p where p.occurredAt < :cutoff")
     int deleteOlderThan(@Param("cutoff") Instant cutoff);
 
-    /* No pseudonymise-by-user method: ErasureService nulls user_id in its own native statement so per-table
-       counts stay uniform; a second definition could drift. ErasureCoverageTest proves it. */
-
-    // Rollup statements stay native: FILTER, ordered array_agg and a named-timezone day cut are one GROUP BY,
-    // and raw rows never pass through the application.
-
-    /** Delete-then-insert, not upsert: an upsert never corrects days whose raw views expired. */
     @Modifying
     @Query(nativeQuery = true, value = """
             delete from page_view_daily
@@ -31,7 +21,6 @@ public interface PageViewRepository extends JpaRepository<PageView, UUID> {
             """)
     int clearDailyFrom(@Param("fromInstant") Instant fromInstant);
 
-    /** The page-grain half of {@link #clearDailyFrom}, for the same reason. */
     @Modifying
     @Query(nativeQuery = true, value = """
             delete from page_view_daily_paths
@@ -39,7 +28,6 @@ public interface PageViewRepository extends JpaRepository<PageView, UUID> {
             """)
     int clearDailyPathsFrom(@Param("fromInstant") Instant fromInstant);
 
-    /** A session-day, cut at midnight so each day recomputes from its own rows; device is the first view's. */
     @Modifying
     @Query(nativeQuery = true, value = """
             insert into page_view_daily (
@@ -82,7 +70,6 @@ public interface PageViewRepository extends JpaRepository<PageView, UUID> {
             """)
     int rebuildDaily(@Param("fromInstant") Instant fromInstant, @Param("toInstant") Instant toInstant);
 
-    /** {@code exits} counts sessions whose last view that day was this path; left join keeps paths nobody left. */
     @Modifying
     @Query(nativeQuery = true, value = """
             insert into page_view_daily_paths (day, path, pageviews, anon_pageviews, exits)
@@ -122,7 +109,6 @@ public interface PageViewRepository extends JpaRepository<PageView, UUID> {
     int rebuildDailyPaths(@Param("fromInstant") Instant fromInstant,
             @Param("toInstant") Instant toInstant);
 
-    /** The referrer-grain half of {@link #clearDailyFrom}, for the same reason. */
     @Modifying
     @Query(nativeQuery = true, value = """
             delete from page_view_daily_referrers
@@ -130,7 +116,6 @@ public interface PageViewRepository extends JpaRepository<PageView, UUID> {
             """)
     int clearDailyReferrersFrom(@Param("fromInstant") Instant fromInstant);
 
-    /** Sessions by first-view referrer; a null host becomes '' as the column is half the primary key. */
     @Modifying
     @Query(nativeQuery = true, value = """
             insert into page_view_daily_referrers (day, referrer_host, sessions)

@@ -26,7 +26,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @SpringBootTest
 @DisplayName("Identity decisions and the paid WhatsApp notice")
 class IdentityDecisionWhatsappTest {
-
     @MockitoBean
     DecisionMessenger messenger;
 
@@ -44,8 +43,8 @@ class IdentityDecisionWhatsappTest {
 
     private final List<UUID> created = new ArrayList<>();
 
-    // These decisions must commit for the after-commit WhatsApp to fire, so the cases are erased by hand;
-    // a left-over verified case would otherwise leak into later tests.
+    // Decisions must commit for the after-commit WhatsApp to fire, so cases are erased by hand;
+    // a leftover verified case would leak into later tests.
     @AfterEach
     void eraseCases() {
         created.forEach(identity::erase);

@@ -19,11 +19,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Expiry is measured from the document's ISSUE date, not the review date — the two readings only
- *  disagree on an old document, which is why the fixture is a 2019 one. */
 @DisplayName("Ownership evidence — which documents expire, and measured from when")
 class OwnershipEvidenceTypesTest {
-
     private static final Instant LONG_AGO = Instant.parse("2019-04-01T00:00:00Z");
 
     @ParameterizedTest(name = "{0} expires {1} days after it was ISSUED")
@@ -39,7 +36,6 @@ class OwnershipEvidenceTypesTest {
                 .isBefore(Instant.now());
     }
 
-    // Land records can be mutated and a bill goes stale; a building ages slower, hence 180 days.
     static Stream<Arguments> windowedDocuments() {
         return Stream.of(
                 Arguments.of(OwnershipEvidenceTypes.ELECTRICITY_BILL, 90),
@@ -159,8 +155,6 @@ class OwnershipEvidenceTypesTest {
         assertThat(OwnershipEvidenceTypes.isKnown("notarised_vibes")).isFalse();
     }
 
-    /** Asserted over the whole vocabulary rather than by asking about today's two types: restating
-     *  the implementation's own condition would agree with it however wrong it became. */
     @Test
     @DisplayName("identity and authority documents have to name their subject")
     void identityAndAuthorityDocumentsMustNameTheirSubject() {
@@ -173,8 +167,6 @@ class OwnershipEvidenceTypesTest {
                         OwnershipEvidenceTypes.POWER_OF_ATTORNEY);
     }
 
-    /** The entry that matters is the one closing {@code title_proof} on a sale: everything else the
-     *  vault holds costs a reviewer a second look, this one mints the badge a buyer pays on. */
     @Test
     @DisplayName("a document filed as a bill cannot be recorded as the registry's extract")
     void aMislabelledDocumentCannotCloseTheTitleFact() {

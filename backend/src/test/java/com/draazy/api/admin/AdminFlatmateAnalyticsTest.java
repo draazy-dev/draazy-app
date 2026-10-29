@@ -18,11 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/** Flatmate figures on {@code /admin/dashboard}, {@code /admin/analytics/flatmates} and the SLA report. Posts left by
- * other suites make post counts deltas; requests and applications are cleared inside the rolled-back transaction. */
 @DisplayName("Flatmate analytics — dashboard tiles, weekly report and moderation SLA")
 class AdminFlatmateAnalyticsTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
 
     private User admin;
@@ -77,7 +74,6 @@ class AdminFlatmateAnalyticsTest extends AbstractApiTest {
         return id;
     }
 
-    /** {@code repliedAfterHours} null leaves the request pending. */
     private void request(UUID target, String action, String status, int sentHoursAgo, Integer repliedAfterHours) {
         jdbc.update("""
                 insert into flatmate_requests (kind, target_id, host_id, requester_id, action, status,
@@ -120,7 +116,6 @@ class AdminFlatmateAnalyticsTest extends AbstractApiTest {
         assertThat(total(after, "matches")).isEqualTo(2);
 
         assertThat(num(after, "$.replies.sent")).isEqualTo(4);
-        // Judged: the two answered and the one pending past 48h; the fresh one has not had its chance.
         assertThat(num(after, "$.replies.replyRatePct")).isEqualTo(33);
         assertThat(num(after, "$.replies.acceptRatePct")).isEqualTo(50);
         assertThat(((Number) JsonPath.read(after, "$.replies.medianReplyHours")).doubleValue()).isEqualTo(32.5);
@@ -146,7 +141,6 @@ class AdminFlatmateAnalyticsTest extends AbstractApiTest {
         seeker("live", "[\"" + town + "\", \"Stats Other Town\"]", 5);
         seeker("live", "[\"stats gap town \"]", 5);
         seeker("removed", "[\"" + town + "\"]", 5);
-        // Enough demand to rank inside the capped list whatever else the shared database holds.
         for (int i = 0; i < 25; i++) {
             seeker("live", "[\"" + town + "\"]", 5);
         }
@@ -214,7 +208,6 @@ class AdminFlatmateAnalyticsTest extends AbstractApiTest {
         String before = read(Routes.Admin.ANALYTICS_SLA, admin);
         UUID decided = seeker("approved", "[\"Baner\"]", 40);
         moderate("flatmateSeekerPost", decided, "pending", 30);
-        // A takedown of a live post later on is not review turnaround.
         moderate("flatmateSeekerPost", decided, "approved", 5);
         room("pending", "Baner", 30);
         UUID rechecked = group("live", "Baner", 100);

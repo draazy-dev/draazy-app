@@ -6,10 +6,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Decides one held referral once its hold has run out: earn, or reject if the evidence has gone bad. */
 @Service
 public class ReferralHolds {
-
     private final ReferralRepository referrals;
     private final ReferralClawbacks clawbacks;
     private final ReferralOutcomes outcomes;

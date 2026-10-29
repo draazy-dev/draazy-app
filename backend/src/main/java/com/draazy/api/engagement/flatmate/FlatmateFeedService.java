@@ -15,20 +15,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Keyed on seeker intent; the database sorts, counts and pages instead of an in-memory merge.
- * See docs/flows/consumer/flatmates.md §5. */
 @Service
 public class FlatmateFeedService {
-
     private final FlatmateSeekerPostRepository posts;
     private final FlatmateRoomRepository rooms;
     private final FlatmateGroupRepository groups;
     private final FlatmateSearchQueries search;
     private final FlatmateMapper mapper;
     private final UserRepository users;
-    /** The room card's own joins — host name and flat ledger — batched across the window. */
     private final FlatmateRoomCards cards;
-    /** The Ops verdict behind a group's tier badge, batched across the window. */
     private final FlatmateReviewStatuses reviewStatuses;
     private final LivingStyleService livingStyle;
     private final FlatmateFeedMatches feedMatches;
@@ -49,13 +44,10 @@ public class FlatmateFeedService {
         this.feedMatches = feedMatches;
     }
 
-    /** {@code verifiedTotal} spans every match: once the server pages, the browser cannot see enough rows.
-     * {@code tabTotals} counts every tab under the same facets, so the tab strip never needs a second request. */
     public record FeedResult(Page<Object> page, long verifiedTotal, long otherTabTotal,
             Map<String, Long> tabTotals, Map<String, Integer> matches) {
     }
 
-    /** {@code GET /flatmates/feed} — public; {@code viewerId} is null for a guest. One feed per tab. */
     @Transactional(readOnly = true)
     public FeedResult feed(UUID viewerId, FlatmateSearchQuery requested, Pageable pageable) {
         LivingStyleViewer viewer = livingStyle.viewer(viewerId);
@@ -71,8 +63,6 @@ public class FlatmateFeedService {
                 otherTab, tabTotals, feedMatches.forWindow(viewer, window));
     }
 
-    /** The current tab reuses the page's own total; the rest cost two counts, because {@code team-up}
-     * is exactly people plus teams. */
     private Map<String, Long> tabTotals(FlatmateSearchQuery facets, long current) {
         Map<String, Long> totals = new HashMap<>();
         switch (facets.tab()) {
@@ -105,7 +95,6 @@ public class FlatmateFeedService {
         return search.total(facets.withTab(tab));
     }
 
-    /** Sort is re-imposed from the refs because {@code findAllById} makes no promise about order. */
     private List<Object> load(List<FlatmateSearchQueries.Ref> refs) {
         Map<UUID, FlatmateRoom> roomsById = index(rooms.findAllById(idsOf(refs, "room")),
                 FlatmateRoom::getId);
@@ -135,7 +124,6 @@ public class FlatmateFeedService {
         return rows.stream().collect(Collectors.toMap(key, row -> row));
     }
 
-    /** Host names and room-card joins are batched per window; hardcoding occupancy would misprice a full flat. */
     private List<Object> render(List<Object> window) {
         List<UUID> hostIds = window.stream()
                 .map(FlatmateFeedMatches::authorOf)

@@ -1,78 +1,34 @@
-# Container image for draazy-api (platform-architecture.md §6.1: DigitalOcean App Platform, BLR1).
-#
-# Why a Dockerfile and not `spring-boot:build-image`. Buildpacks need a Docker daemon on whatever
-# machine runs the build, which rules out the hosted CI runners and the "push a repo, we build it"
-# hosts we may end up on. A Dockerfile is the one artefact every container host accepts.
-#
-# Two things about this repo make a stock Spring Boot Dockerfile wrong, and both are silent:
-#
-#   1. `.mvn/maven.config` pins `-DbuildDirName=target-cli` so command-line builds do not fight the
-#      VS Code language server over `target/`. Inside a container there is no language server and no
-#      fight, so `-DbuildDirName=target` is passed explicitly below. Explicitly, rather than relying
-#      on maven.config's value, because that file exists to solve a developer-machine problem and is
-#      free to change for reasons that have nothing to do with the deploy — and the failure mode of
-#      guessing wrong is a COPY that matches no jar.
-#
-#   2. `server.port=${PORT:8080}` (application.properties) is the container-host contract. Nothing here
-#      hardcodes a port; EXPOSE is documentation only and the host's PORT wins.
-
-# ---------------------------------------------------------------------------------------------
-# Stage 1 — build
-# ---------------------------------------------------------------------------------------------
 FROM eclipse-temurin:25-jdk AS build
 
 WORKDIR /build
 
-# Dependency layer first. The wrapper and the POM change rarely; `src/` changes every commit. Split
-# this way, an ordinary code change reuses the cached dependency download instead of re-fetching the
-# whole tree — which matters because this build resolves an annotation-processor path (Lombok +
-# MapStruct + their binding) as well as the runtime dependencies.
-# `unzip` is required so `mvnw` unpacks the Maven distribution using `unzip` instead of falling
-# back to `tar xzf`. Modern GNU tar in Ubuntu uses the `openat2()` syscall, which fails with
-# "Function not implemented" under `linux/amd64` emulation on macOS (Apple Silicon Rosetta 2 / QEMU).
+# unzip stops mvnw falling back to GNU tar, whose openat2() fails under amd64 emulation.
 RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/*
 
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
+# Explicit buildDirName: .mvn/maven.config pins target-cli, and a wrong guess leaves the jar COPY matching nothing.
 RUN chmod +x mvnw && ./mvnw -B -DbuildDirName=target dependency:go-offline
 
 COPY src/ src/
 
-# Tests are not run here. CI (.github/workflows/ci.yml) runs them against a real Postgres before
-# anything reaches this file; re-running them in the image build would need a database inside the
-# builder and would make a deploy fail for a reason CI already covers, minutes later and with worse
-# logs. The image build's job is to package a revision CI has already judged.
 RUN ./mvnw -B -DbuildDirName=target -DskipTests package
 
-# ---------------------------------------------------------------------------------------------
-# Stage 2 — runtime
-# ---------------------------------------------------------------------------------------------
 FROM eclipse-temurin:25-jre AS runtime
 
-# Non-root. Nothing in the app writes to the filesystem — uploads go to R2 via `R2FileStorage` — so
-# there is no directory to chown and no reason for the process to own its own code.
 RUN groupadd --system app && useradd --system --gid app --no-create-home app
 
 WORKDIR /app
 COPY --from=build --chown=root:root /build/target/*.jar /app/app.jar
 USER app
 
-# Baked rather than left to the deploy to supply. `application.properties` holds developer defaults
-# on purpose — local Postgres credentials, a committed JWT secret, `trusted-proxies=none` — and
-# Spring does not complain when a profile is simply absent. A deploy that forgets
-# SPRING_PROFILES_ACTIVE would therefore boot on those defaults and report itself healthy, which is
-# the exact failure ProdProfileContractTest exists to argue about. Defaulting it here means the
-# insecure configuration has to be asked for by name. Override it (e.g. `sandbox`) deliberately.
+# Baked so a deploy that forgets the profile cannot boot healthy on the insecure developer defaults.
 ENV SPRING_PROFILES_ACTIVE=prod
 
-# Non-heap runs ~290 MB (metaspace ~120, code cache ~95, symbols, stacks), so heap + caps must stay
-# under the container limit or the kernel kills the JVM silently. 1 GB: 512 MB heap vs ~160 MB live.
+# Non-heap runs ~290 MB, so heap plus these caps must stay under the container limit or the kernel kills the JVM.
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=50.0 -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=128m -XX:+ExitOnOutOfMemoryError"
 
-# Documentation only — the platform injects PORT and the app reads it (see the header note).
 EXPOSE 8080
 
-# `exec` form so the JVM is PID 1 and receives SIGTERM directly. Without it the shell is PID 1, the
-# signal never reaches Java, and every scale-down or revision swap kills in-flight requests instead
-# of draining them.
+# exec form keeps the JVM as PID 1 so SIGTERM reaches it and in-flight requests drain.
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

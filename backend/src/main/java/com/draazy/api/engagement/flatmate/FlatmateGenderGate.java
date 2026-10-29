@@ -8,11 +8,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** A "women only" or "men only" room or group checks the requester's profile gender, which the first
- * binary answer (an ask or a seeker post) saves; afterwards only the profile's capped changes move it. */
 @Component
 class FlatmateGenderGate {
-
     private static final Set<String> BINARY = Set.of("male", "female");
 
     private final UserRepository users;
@@ -29,7 +26,6 @@ class FlatmateGenderGate {
         admit(requesterId, required(policy), stated, "group");
     }
 
-    /** A seeker post keeps the answer it was given; a binary one saves to an empty profile and must match a set one. */
     String forPost(User author, String stated) {
         String picked = FlatmateVocabulary.orDefault(
                 stated, FlatmateVocabulary.GENDER, "any", "gender");

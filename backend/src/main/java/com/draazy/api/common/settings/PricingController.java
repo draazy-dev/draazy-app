@@ -2,17 +2,14 @@ package com.draazy.api.common.settings;
 
 import org.springframework.stereotype.Component;
 
-/** Builds the public {@link PricingResponse}; never the raw {@code fees} block. */
 @Component
 public class PricingController {
-
     private final PlatformSettings settings;
 
     public PricingController(PlatformSettings settings) {
         this.settings = settings;
     }
 
-    /** Each accessor falls back to the seeded figure and logs: a 500 on the plans page beats a stale price. */
     public PricingResponse pricing() {
         return new PricingResponse(
                 settings.listingPass(),

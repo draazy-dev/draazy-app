@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
-/** A browser-side failure report. Every string is scrubbed and truncated by the service, not trusted. */
 public record ClientErrorRequest(
 
         @NotBlank
@@ -30,7 +29,6 @@ public record ClientErrorRequest(
         String build,
         String lastTraceId,
         @Valid Context context) {
-
     public record Context(String viewport, Boolean online, String userAgent, String deployEnv) {
     }
 }

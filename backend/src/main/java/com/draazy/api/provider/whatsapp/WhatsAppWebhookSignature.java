@@ -11,11 +11,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** Meta signs each callback with the app secret ({@code X-Hub-Signature-256}); the verify token only
- * answers the one-off subscribe handshake. Unset, the webhook route answers 404. */
 @Component
 class WhatsAppWebhookSignature {
-
     private static final Logger log = LoggerFactory.getLogger(WhatsAppWebhookSignature.class);
     private static final String HMAC_SHA256 = "HmacSHA256";
     private static final String PREFIX = "sha256=";
@@ -67,7 +64,6 @@ class WhatsAppWebhookSignature {
         return MessageDigest.isEqual(hmac(rawBody), presented);
     }
 
-    /** Exists so tests run the real check rather than a mock of it. */
     String sign(byte[] rawBody) {
         return PREFIX + HexFormat.of().formatHex(hmac(rawBody));
     }

@@ -17,11 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-// Not on AbstractApiTest: its rollback hides commits, and a publish race only exists across commits.
 @SpringBootTest
 @DisplayName("Concurrent publishes of one managed record")
 class ManagedPropertyPublishRaceTest {
-
     private static final int RACERS = 6;
 
     private static final String OWNER_MOBILE = "9876000431";

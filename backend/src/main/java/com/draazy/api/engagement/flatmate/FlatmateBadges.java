@@ -6,11 +6,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** Shared by {@link FlatmateBadgeReviewService} (a moderator's verdict) and
- * {@code FlatmateTrustReconciler} (a scheduled one), so the badge rule lives in exactly one place. */
 @Component
 class FlatmateBadges {
-
     private final FlatmateRoomRepository rooms;
     private final FlatmateGroupRepository groups;
     private final EntityManager em;
@@ -21,8 +18,7 @@ class FlatmateBadges {
         this.em = em;
     }
 
-    /** Post before review, the order a host edit takes, so the two never deadlock. The review is re-read
-     * under the lock, since a caller may already hold a copy read without it. */
+    // Lock the post before the review, the order a host edit takes, or the two paths deadlock.
     void lockWithPost(FlatmateReview review) {
         if (review.getRoomId() != null) {
             rooms.findLockedById(review.getRoomId());
@@ -45,8 +41,6 @@ class FlatmateBadges {
                 .map(FlatmateGroup::getOwnerConsentMobile).orElse(null);
     }
 
-    /** {@link #stillClaimed} stops a stale review deciding a post edited since. Only an approval
-     * clears {@code flagForReview} — only that verdict read the rival address claim and dismissed it. */
     void apply(FlatmateReview review, boolean approved) {
         String tier = tierAfter(review, approved);
         if (review.getRoomId() != null) {
@@ -76,8 +70,6 @@ class FlatmateBadges {
         return postTier != null && postTier.equals(review.getTier());
     }
 
-    /** Only a tenant claim can be answered with a tier: an identity-tier post is queued over a rival
-     * address claim, and promoting on that would mint a badge its host never asked for. */
     private static String tierAfter(FlatmateReview review, boolean approved) {
         boolean claimedAgreement = FlatmateVocabulary.TIER_TENANT.equals(review.getTier());
         return approved && claimedAgreement

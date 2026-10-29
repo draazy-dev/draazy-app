@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 @DisplayName("D169 — one TTL feeds both the sweep's look-back and the gateway's look-forward")
 class CheckoutTtlTest {
-
     private static final Instant NOW = Instant.parse("2026-03-14T09:30:00Z");
 
     @Test
@@ -44,7 +43,6 @@ class CheckoutTtlTest {
         assertThat(new CheckoutTtl(0).duration()).isEqualTo(CheckoutTtl.GATEWAY_MINIMUM);
     }
 
-    // Clamping inside the gateway instead would leave the sweep on the raw value and the windows apart.
     @Test
     @DisplayName("a clamped TTL still leaves both windows in step")
     void clampingKeepsBothWindowsInStep() {

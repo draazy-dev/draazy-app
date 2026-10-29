@@ -15,23 +15,20 @@ import org.springframework.data.jpa.repository.QueryHints;
 
 public interface IdentityVerificationRepository extends JpaRepository<IdentityVerification, UUID>,
         JpaSpecificationExecutor<IdentityVerification> {
-
     Optional<IdentityVerification> findByUserId(UUID userId);
 
     @Query("select v.userId from IdentityVerification v where v.userId in :userIds and v.status = :status")
     List<UUID> userIdsWithStatus(java.util.Collection<UUID> userIds, String status);
 
-    // The row is the attempt counter; concurrent submits must serialise on it.
+    // The row is the attempt counter; concurrent submits must lock it to serialise.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from IdentityVerification v where v.userId = :userId")
     Optional<IdentityVerification> findByUserIdForUpdate(UUID userId);
 
-    // Serialises two reviewers so only one pending decision can pass.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from IdentityVerification v where v.id = :id")
     Optional<IdentityVerification> findByIdForUpdate(UUID id);
 
-    /** Backed by the UNIQUE index; lets approve return 409 rather than a constraint violation. */
     Optional<IdentityVerification> findByIdentityHash(String identityHash);
 
     List<IdentityVerification> findByClaimedHash(String claimedHash);
@@ -59,7 +56,6 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
         long getDecided();
     }
 
-    // An open appeal pins the photos; a decided one restarts the retention clock from its own decision.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
     @Query("""

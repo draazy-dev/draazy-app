@@ -21,11 +21,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** {@code POST} is open to any authenticated user (an unwritable queue reports nothing); {@code GET}
- * is staff/admin as the queue holds unproven allegations; per-method, hence {@code @PreAuthorize}. */
 @RestController
 public class ReportController {
-
     private static final String STAFF_OR_ADMIN =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
     private static final String REPORTS_READ =
@@ -39,7 +36,6 @@ public class ReportController {
         this.reportService = reportService;
     }
 
-    /** No role guard, by contract; the reporter comes from the principal, never from the body. */
     @PostMapping(Routes.Moderation.REPORTS)
     @ResponseStatus(HttpStatus.CREATED)
     public ReportResponse create(@CurrentUser AuthPrincipal principal,
@@ -47,8 +43,6 @@ public class ReportController {
         return reportService.create(principal.userId(), body);
     }
 
-    /** Sort is stripped via {@link Pageables#unsorted(Pageable)}: newest-first is fixed and index-backed,
-     * so a client {@code ?sort=} would be an unmapped-property 500. */
     @GetMapping(Routes.Moderation.REPORTS)
     @PreAuthorize(REPORTS_READ)
     public PageResponse<ReportResponse> list(@RequestParam(required = false) String status,

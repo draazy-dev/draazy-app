@@ -12,13 +12,8 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-// The two properties of `RateLimitLock` that are not visible from a race test.
-// A concurrency test can only show that a limit held.
 @DisplayName("RateLimitLock — the guarantees a race test cannot see")
 class RateLimitLockTest {
-
-    // The namespace lives in the high 32 bits and the key hash in the low 32, so two limits cannot collide however
-    // unluckily their keys hash.
     @Test
     @DisplayName("no two limits can produce the same lock id, even for an identical key")
     void namespacesCannotCollide() {
@@ -31,8 +26,6 @@ class RateLimitLockTest {
                 .hasSize(Limit.values().length);
     }
 
-    // A negative `hashCode` must not bleed into the namespace half: without the mask, sign-extension would land the
-    // id in another limit's namespace.
     @Test
     @DisplayName("a key that hashes negative stays inside its own namespace")
     void negativeHashesStayInTheirNamespace() {
@@ -48,7 +41,6 @@ class RateLimitLockTest {
                 .isEqualTo(3L);
     }
 
-    /** Same limit, same key, same id — the whole mechanism rests on this being stable. */
     @Test
     @DisplayName("the same limit and key always give the same id")
     void theIdIsStable() {
@@ -56,8 +48,6 @@ class RateLimitLockTest {
                 .isEqualTo(RateLimitLock.lockId(Limit.FLATMATE_INTEREST, "abc"));
     }
 
-    // Outside a transaction the lock would be taken and released by the same autocommit statement, so it would guard
-    // nothing and say nothing.
     @Test
     @DisplayName("refuses to run outside a transaction rather than silently guarding nothing")
     void refusesWithoutATransaction() {

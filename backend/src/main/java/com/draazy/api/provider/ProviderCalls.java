@@ -24,11 +24,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 
-/** One background thread writes rows, so recording never blocks, fails or rolls back the call it describes
- * nor competes with that call's transaction for a second pool connection. */
 @Component
 public class ProviderCalls {
-
     public static final String ZEPTOMAIL = "zeptomail";
     public static final String WHATSAPP = "whatsapp";
     public static final String CASHFREE = "cashfree";
@@ -51,7 +48,6 @@ public class ProviderCalls {
         }
     }
 
-    /** An exception that already carries a log-safe vendor diagnosis (codes, never free text). */
     public interface Diagnosed {
         String diagnosis();
     }
@@ -79,7 +75,6 @@ public class ProviderCalls {
         }
     }
 
-    /** Runs {@code call}, records it as ok or failed, and rethrows any failure unchanged. */
     public <T> T track(String provider, String operation, String recipient, String reference,
             Supplier<T> call) {
         long started = System.nanoTime();
@@ -124,7 +119,6 @@ public class ProviderCalls {
                 (int) RETENTION.toDays());
     }
 
-    /** Exact-match search key; null when the value is neither an email nor a 10-digit mobile. */
     public static String hashRecipient(String recipient) {
         String normalised = normalise(recipient);
         if (normalised == null) {
@@ -139,7 +133,6 @@ public class ProviderCalls {
         }
     }
 
-    /** Mobiles in full so ops can trace a delivery to the number; emails stay masked. */
     static String shown(String recipient) {
         if (recipient == null || recipient.isBlank()) {
             return null;

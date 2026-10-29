@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class LocalityService {
-
     private final LocalityRepository localities;
     private final PropertyRepository properties;
     private final LocalityMapper localityMapper;
@@ -40,7 +39,6 @@ public class LocalityService {
                 .toList();
     }
 
-    /** Every row, retired ones included, so an area retired with no listings can still be restored. */
     @Transactional(readOnly = true)
     public List<LocalityAdminRow> adminList() {
         Map<String, LocalityStats> stats = statsBySlug(null);
@@ -49,7 +47,6 @@ public class LocalityService {
                 .toList();
     }
 
-    /** Retiring only closes the area to new listings: live listings and the area's page stay. */
     @Transactional
     public LocalityAdminRow retire(String slug, AuthPrincipal actor) {
         Locality locality = localities.findById(slug).orElseThrow(() -> NotFoundException.of("Locality"));
@@ -76,7 +73,6 @@ public class LocalityService {
         return new LocalityAdminRow(l.getSlug(), l.getName(), l.getLat(), l.getLng(), l.isArchived(), stats.live());
     }
 
-    /** Non-live localities still resolve: their page renders, and indexability follows the live count. */
     @Transactional(readOnly = true)
     public LocalityResponse get(String slug) {
         Locality locality = localities.findById(slug).orElseThrow(() -> NotFoundException.of("Locality"));
@@ -84,7 +80,6 @@ public class LocalityService {
                 statsBySlug(slug).getOrDefault(slug, LocalityStats.NONE));
     }
 
-    /** Asking sale rate per sq ft from live listings; empty below three samples. */
     @Transactional(readOnly = true)
     public Optional<Long> marketRate(String slug) {
         return Optional.ofNullable(statsBySlug(slug).getOrDefault(slug, LocalityStats.NONE).ratePerSqft());

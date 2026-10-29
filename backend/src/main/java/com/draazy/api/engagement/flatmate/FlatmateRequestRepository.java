@@ -14,14 +14,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface FlatmateRequestRepository extends JpaRepository<FlatmateRequest, UUID> {
-
-    /** Re-read behind the advisory lock so duplicate asks return the contract's 409. */
     Optional<FlatmateRequest> findByKindAndTargetIdAndRequesterId(
             String kind, UUID targetId, UUID requesterId);
 
     List<FlatmateRequest> findByKindAndTargetId(String kind, UUID targetId);
 
-    /** Host inbox is paged because popular ads can collect hundreds of stranger asks. */
     Page<FlatmateRequest> findByHostIdOrderByRequestedAtDesc(UUID hostId, Pageable pageable);
 
     Page<FlatmateRequest> findByHostIdAndStatusOrderByRequestedAtDesc(
@@ -40,10 +37,8 @@ public interface FlatmateRequestRepository extends JpaRepository<FlatmateRequest
     Optional<FlatmateRequest> findByIdAndRequesterId(UUID id, UUID requesterId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    /** Host-scoped by id, so deciding somebody else's request is a 404 rather than a 403. */
     Optional<FlatmateRequest> findByIdAndHostId(UUID id, UUID hostId);
 
-    /** Sort by {@code createdAt} to ride the requester's index; timestamps are set together. */
     Page<FlatmateRequest> findByRequesterIdOrderByCreatedAtDesc(UUID requesterId, Pageable pageable);
 
     Page<FlatmateRequest> findByRequesterIdAndStatusOrderByCreatedAtDesc(
@@ -55,7 +50,6 @@ public interface FlatmateRequestRepository extends JpaRepository<FlatmateRequest
             """)
     List<FlatmateInterestKeyDto> findKeysByRequesterId(@Param("requesterId") UUID requesterId);
 
-    /** Rate-limit interests by window because each one broadcasts a stranger's number. */
     long countByRequesterIdAndCreatedAtAfter(UUID requesterId, Instant since);
 
     long countByKindAndTargetIdAndStatus(String kind, UUID targetId, String status);

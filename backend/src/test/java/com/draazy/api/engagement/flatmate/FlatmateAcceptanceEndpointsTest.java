@@ -29,7 +29,6 @@ import org.springframework.test.web.servlet.ResultActions;
 
 @DisplayName("Flatmates — a host's accept takes the seat it promises")
 class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -60,7 +59,6 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
     @Autowired
     jakarta.persistence.EntityManager em;
 
-    /** The created entity is still cached as pending, so the context is cleared after the out-of-band publish. */
     private String publish(String table, String id) {
         em.flush();
         jdbc.update("update " + table + " set mod_status = 'approved' where id = ?::uuid", id);

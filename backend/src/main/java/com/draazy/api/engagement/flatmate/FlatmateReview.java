@@ -17,7 +17,6 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "flatmate_reviews")
 @Getter
 public class FlatmateReview extends AuditedEntity {
-
     @Column(name = "kind", nullable = false, updatable = false)
     private String kind;
 
@@ -36,7 +35,6 @@ public class FlatmateReview extends AuditedEntity {
     @Column(name = "tier", nullable = false)
     private String tier;
 
-    /** A different host already claimed this address. Fuzzy match, so it flags rather than blocks. */
     @Column(name = "flag_for_review", nullable = false)
     private boolean flagForReview = false;
 
@@ -46,22 +44,17 @@ public class FlatmateReview extends AuditedEntity {
     @Column(name = "tenancy_property_id")
     private UUID tenancyPropertyId;
 
-    /** jsonb rather than columns because nothing queries inside it — Ops reads it whole. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "agreement_doc")
     private Map<String, Object> agreementDoc;
 
-    /** Columns rather than keys in {@link #agreementDoc} because {@code validTill} is queried. */
     @Embedded
     private AgreementRegistration agreement = new AgreementRegistration();
 
-    /** Hibernate hydrates an all-null embeddable as null (every row before V28); the empty value
-     * keeps {@code complete()} and {@code expiredOn()} answerable for those rows. */
     AgreementRegistration getAgreement() {
         return agreement == null ? new AgreementRegistration() : agreement;
     }
 
-    /** {@code rent_agreement} or {@code electricity_bill}; null on rows that predate light bills. */
     @Column(name = "evidence_type")
     private String evidenceType;
 
@@ -77,7 +70,6 @@ public class FlatmateReview extends AuditedEntity {
     @Column(name = "status", nullable = false)
     private String status = FlatmateVocabulary.STATUS_PENDING;
 
-    /** Required on reject and shown to the host — a rejection nobody can act on is a dead end. */
     @Column(name = "reason")
     private String reason;
 
@@ -126,8 +118,6 @@ public class FlatmateReview extends AuditedEntity {
         }
     }
 
-    /** Re-opened in place because {@code uq_flatmate_reviews_room} and its group twin allow one row
-     * per target; clearing the verdict also drops the badge, which both feeds derive from it. */
     void reopenAfterEdit(String address, String tier, boolean flagForReview, boolean ownerConsent,
             Map<String, Object> agreementDoc, AgreementRegistration agreement,
             UUID tenancyPropertyId, String evidenceType) {
@@ -154,14 +144,12 @@ public class FlatmateReview extends AuditedEntity {
         this.evidenceIssuedOn = null;
     }
 
-    /** A dated badge request is a fresh claim, so only an undated edit keeps the stored file. */
     private boolean namesStoredFile(Map<String, Object> doc) {
         return doc != null && this.agreementDoc != null && doc.get("dataUrl") == null
                 && !doc.containsKey(AgreementPeriod.TILL)
                 && doc.get("id") != null && doc.get("id").equals(this.agreementDoc.get("id"));
     }
 
-    /** The reviewer's own reading of the document, so the expiry is theirs to state rather than a default. */
     void approveChecked(String why, UUID decider, FlatmateReviewChecks checks, LocalDate today) {
         this.status = FlatmateVocabulary.STATUS_APPROVED;
         this.reason = why;
@@ -172,19 +160,16 @@ public class FlatmateReview extends AuditedEntity {
         this.agreement = new AgreementRegistration(checks.badgeUntil(effectiveEvidenceType(), today));
     }
 
-    /** Rows filed before light bills existed carry no type, and were always agreements. */
     String effectiveEvidenceType() {
         return evidenceType == null ? OwnedDocumentLookup.RENT_AGREEMENT : evidenceType;
     }
 
-    /** Pulled in place so the host can re-request; the reason is what the host reads. */
     void revoke(String why, UUID decider) {
         this.status = FlatmateVocabulary.STATUS_REJECTED;
         this.reason = why;
         this.decidedBy = decider;
     }
 
-    /** Back to the queue, flagged and with the reason on the row Ops reads; the badge goes with the verdict. */
     void holdForReview(String why) {
         this.flagForReview = true;
         this.ownerConsent = false;
@@ -193,14 +178,10 @@ public class FlatmateReview extends AuditedEntity {
         this.decidedBy = null;
     }
 
-    /** One predicate for both {@code requireConsentToApprove} and the unsupervised
-     * {@code FlatmateTrustReconciler} sweep, so a new condition cannot be enforced on only one. */
     boolean badgeable() {
         return ownerConsent;
     }
 
-    /** Reuses {@code rejected} rather than a status every consumer would have to learn. The DB
-     * requires a reason on rejection; {@code decidedBy} stays null because no person decided. */
     void expire(LocalDate on) {
         this.status = FlatmateVocabulary.STATUS_REJECTED;
         this.reason = "The agreement check behind your Verified property badge lapsed on " + on

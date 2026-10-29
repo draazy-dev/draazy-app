@@ -13,11 +13,8 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
-/** Batch-loaded because the contract carries the thread inline, so a per-ticket load would be
- * an N+1 across the caller's whole list. */
 @Component
 public class SupportTicketMapper {
-
     private static final int PREVIEW_CHARS = 160;
 
     private final SupportTicketMessageRepository messages;
@@ -98,8 +95,6 @@ public class SupportTicketMapper {
                 .toList();
     }
 
-    /** Names are resolved for the whole page before {@code Page#map} walks it; a per-element lookup
-     * inside the lambda would be an N+1 that only shows under load. */
     public Page<AdminSupportTicketDto> toAdminPage(Page<SupportTicket> page) {
         Map<UUID, User> raisers = raisers(page.getContent());
         return page.map(t -> {

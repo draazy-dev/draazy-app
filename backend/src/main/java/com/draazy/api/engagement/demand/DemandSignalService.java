@@ -6,11 +6,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Sole writer of {@link DemandSignal}. No dedupe or throttle (repeat interest is the reader's call;
- * WriteRateLimitFilter bounds volume), and slugs stay unvalidated so uncovered places still count. */
 @Service
 public class DemandSignalService {
-
     private final DemandSignalRepository repository;
     private final PropertyRepository properties;
 
@@ -19,8 +16,6 @@ public class DemandSignalService {
         this.properties = properties;
     }
 
-    /** {@code principal} is null for signed-out visitors, the common case; alerts are recorded before the
-     * sign-in redirect so cold-start demand still counts. */
     @Transactional
     public void record(DemandSignalCreate body, AuthPrincipal principal) {
         DemandSignal signal = new DemandSignal();
@@ -36,7 +31,6 @@ public class DemandSignalService {
         }
     }
 
-    // The client sends '' for "no locality"; storing it as-is would group-by into a second, nameless place.
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
     }

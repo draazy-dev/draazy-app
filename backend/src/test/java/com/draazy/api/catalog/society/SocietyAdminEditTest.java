@@ -22,21 +22,17 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 
-/** Admin society edits persist server-side as shared facts. The internal note must never reach the anonymous read,
- * and only it can be cleared with a blank, so omission and blank differ for it alone. */
 @DisplayName("Societies — correcting a building's facts")
 class SocietyAdminEditTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
 
-    /** Audit rows commit via {@code REQUIRES_NEW} past the rollback; swept in static hooks before and after, since
-     * an {@code @AfterEach} sweep rolls back and killed runs leave rows in the shared DB. */
+    // REQUIRES_NEW audit rows survive rollback; sweep in static hooks (an @AfterEach sweep rolls back).
+    // Killed runs leave rows in the shared DB.
     @BeforeAll
     static void removeAuditRowsLeftByAnEarlierRun(@Autowired JdbcTemplate jdbc) {
         sweepOwnAuditRows(jdbc);
     }
 
-    /** @see #removeAuditRowsLeftByAnEarlierRun */
     @AfterAll
     static void removeAuditRowsThatEscapedRollback(@Autowired JdbcTemplate jdbc) {
         sweepOwnAuditRows(jdbc);
@@ -46,7 +42,6 @@ class SocietyAdminEditTest extends AbstractApiTest {
         jdbc.update("delete from audit_log where entity = 'society' and entity_id like '%-d244'");
     }
 
-    /** Mobile block 98690000xx — used by no other test class. */
     private User member(String mobile, String name) {
         User u = new User(mobile, Roles.Wire.BUYER);
         u.setName(name);
@@ -61,7 +56,6 @@ class SocietyAdminEditTest extends AbstractApiTest {
         return bearer(users.saveAndFlush(u));
     }
 
-    /** Minted via the public route like a member's, avoiding the seeded catalogue siblings index into. */
     private String society(User author, String name) throws Exception {
         ResultActions minted = mvc.perform(post("/societies")
                         .header(HttpHeaders.AUTHORIZATION, bearer(author))
@@ -90,8 +84,6 @@ class SocietyAdminEditTest extends AbstractApiTest {
                 + " admin_note from societies where slug = ?", slug);
     }
 
-    // ------------------------------------------------------------- the shared fact
-
     @Test
     @DisplayName("each of the four fields persists, and a second operator reads them back")
     void anEditIsSharedRatherThanHeldInOneBrowser() throws Exception {
@@ -111,8 +103,6 @@ class SocietyAdminEditTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.adminNote")
                         .value("Conveyance deed seen; registration number unconfirmed."));
 
-        // The second operator is the whole point: under the overlay this edit existed only in the
-        // first one's browser, so this read returned the untouched row.
         read(second, slug)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.registration").value(true))
@@ -159,7 +149,6 @@ class SocietyAdminEditTest extends AbstractApiTest {
         edit(staff("9869000005"), slug, "{\"adminNote\":\"Committee unreachable since June.\"}")
                 .andExpect(status().isOk());
 
-        // Anonymous is the reader being protected; the public type lacks the field for everyone.
         mvc.perform(get("/societies/" + slug))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value(slug))
@@ -177,8 +166,6 @@ class SocietyAdminEditTest extends AbstractApiTest {
                 + "\"adminNote\":\"Registration certificate on file.\"}")
                 .andExpect(status().isOk());
 
-        // Only conveyance is sent. A PUT-shaped write from a reopened tab would have reverted
-        // the others to whatever that tab was still showing.
         edit(ops, slug, "{\"conveyance\":true}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.registration").value(true))
@@ -186,14 +173,11 @@ class SocietyAdminEditTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.maintenancePerSqft").value(2.75))
                 .andExpect(jsonPath("$.adminNote").value("Registration certificate on file."));
 
-        // A blank from an emptied textarea must mean "remove"; omission can't express that.
         edit(ops, slug, "{\"adminNote\":\"   \"}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.adminNote").doesNotExist());
         assertThat(row(slug).get("admin_note")).isNull();
     }
-
-    // ------------------------------------------------------------- who may, and what is refused
 
     @Test
     @DisplayName("a member cannot read the back-office view, note and all")
@@ -204,8 +188,6 @@ class SocietyAdminEditTest extends AbstractApiTest {
         edit(staff("9869000015"), slug, "{\"adminNote\":\"Secretary disputes the plot area.\"}")
                 .andExpect(status().isOk());
 
-        // Again the society's own author, who has the strongest claim of anyone outside the desk
-        // and still none: this payload carries ops prose about their neighbours.
         mvc.perform(get("/admin/societies/" + slug)
                         .header(HttpHeaders.AUTHORIZATION, bearer(author)))
                 .andExpect(status().isForbidden());
@@ -217,8 +199,6 @@ class SocietyAdminEditTest extends AbstractApiTest {
     @Test
     @DisplayName("reading an unknown slug is a 404, not an empty society")
     void readingAnUnknownSlugIsNotFound() throws Exception {
-        // A blank form for a society that does not exist is the worse failure: the operator fills
-        // it in and saves, and only the write tells them the slug was stale.
         read(staff("9869000016"), "no-such-society-d244")
                 .andExpect(status().isNotFound());
     }
@@ -229,8 +209,6 @@ class SocietyAdminEditTest extends AbstractApiTest {
         User author = member("9869000008", "Sneha Member");
         String slug = society(author, "Green Acres D244");
 
-        // The author of the society, which is the strongest version of the case: if anyone outside
-        // the back office had a claim to edit these facts it would be them, and they still do not.
         mvc.perform(patch("/admin/societies/" + slug)
                         .header(HttpHeaders.AUTHORIZATION, bearer(author))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -254,15 +232,12 @@ class SocietyAdminEditTest extends AbstractApiTest {
         String ops = staff("9869000011");
         String slug = society(author, "Orchid Enclave D244");
 
-        // 4500 is a plausible monthly bill but an absurd per-sq-ft rate; the server must catch the units mix-up.
         edit(ops, slug, "{\"maintenancePerSqft\":4500}")
                 .andExpect(status().isUnprocessableEntity());
 
         edit(ops, slug, "{\"maintenancePerSqft\":-1}")
                 .andExpect(status().isUnprocessableEntity());
 
-        // Refused, not clamped, and nothing was written on the way to refusing it.
         assertThat(row(slug).get("maintenance_per_sqft")).isNull();
     }
-
 }

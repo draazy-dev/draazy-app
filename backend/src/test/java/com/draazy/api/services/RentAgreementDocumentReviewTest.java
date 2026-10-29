@@ -21,7 +21,6 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.ResultActions;
 
-// A filed paper is draftable only after review; rejection reasons drive the customer's re-upload.
 @DisplayName("Rent agreement documents — verify or reject each paper before drafting")
 class RentAgreementDocumentReviewTest extends ServiceFixtures {
 

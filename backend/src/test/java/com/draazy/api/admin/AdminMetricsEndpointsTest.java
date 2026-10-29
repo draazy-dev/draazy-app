@@ -15,10 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-// Behaviour proof for the three back-office reporting reads (slice 14): revenue doesn't leak
-// sideways, empty buckets are zeros not gaps, unbounded ranges are refused, unknown metrics are 400.
 class AdminMetricsEndpointsTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
 
     private String bearer(String mobile, String role) {
@@ -26,8 +23,6 @@ class AdminMetricsEndpointsTest extends AbstractApiTest {
         u.setName("Metrics " + mobile.substring(6));
         u.setMobileVerified(true);
 
-        // Staff without a desk are refused outright; the seeded document grants all six the same
-        // set, so which one is immaterial here.
         if (Roles.Wire.STAFF.equals(role)) u.setTeam(Teams.RENTAL);
         return super.bearer(users.saveAndFlush(u));
     }
@@ -72,7 +67,6 @@ class AdminMetricsEndpointsTest extends AbstractApiTest {
         String token = admin();
         long before = kpi(token, "newUsers7d");
 
-        // A user who joined today, and one who joined a year ago. Only the first may move the count.
         bearer("9877700010", Roles.Wire.BUYER);
         jdbc.update("insert into users (mobile, role, name, joined_at, mobile_verified, archived) "
                 + "values ('9877700011', 'buyer', 'Old', now() - interval '400 days', true, false)");
@@ -80,7 +74,6 @@ class AdminMetricsEndpointsTest extends AbstractApiTest {
         assertKpi(token, "newUsers7d", before + 1);
     }
 
-    // Soft-deleted rows are not "the platform's users" and must not be counted as such.
     @Test
     void archivedUsersAreExcluded() throws Exception {
         String token = admin();

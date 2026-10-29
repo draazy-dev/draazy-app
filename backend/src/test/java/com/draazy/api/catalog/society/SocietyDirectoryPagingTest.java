@@ -30,10 +30,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** The directory asks for one page at a time, so each filter and ordering must hold over the whole set. */
 @DisplayName("Societies — the paged directory read")
 class SocietyDirectoryPagingTest extends AbstractApiTest {
-
     private static final String FIXTURES = "q=zz socpage";
 
     @Autowired UserRepository users;
@@ -41,7 +39,6 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
 
     private User user;
 
-    /** Names sort after every seeded one, so a sort that only ordered a page could never put them first. */
     private void fixtures() {
         user = new User("9865200001", "owner");
         user.setName("Asha Patil");
@@ -102,7 +99,6 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
         return Arrays.stream(keys).map(k -> "zz-socpage-" + k).toArray(String[]::new);
     }
 
-    /** Every page of a query, {@code size} rows at a time, in the order the server gave them. */
     private List<String> walk(String query, int size) throws Exception {
         List<String> all = new ArrayList<>();
         for (int page = 0; page < 10; page++) {
@@ -165,12 +161,9 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
     void homesSortsTheWholeSetAcrossPages() throws Exception {
         fixtures();
 
-        // Delta (3 with its annexe) ties Bravo (3) and loses on name, then Charlie (2); the rest
-        // have none and fall back to name.
         assertThat(walk(FIXTURES + "&sort=homes", 2)).containsExactly(
                 slugs("bravo", "delta", "charlie", "alpha", "echo", "foxtrot"));
 
-        // None of them is on the first page of an alphabetical read of the whole directory.
         mvc.perform(get("/societies?sort=homes&size=2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].slug").value(contains(slugs("bravo", "delta"))))
@@ -197,7 +190,6 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
     void relevanceSortsTheWholeSetAcrossPages() throws Exception {
         fixtures();
 
-        // Delta 3+1, Bravo 3+.8, Charlie 2+1, Echo 0+1, Alpha 0, Foxtrot 0.
         assertThat(walk(FIXTURES + "&sort=relevance", 2)).containsExactly(
                 slugs("delta", "bravo", "charlie", "echo", "alpha", "foxtrot"));
 
@@ -291,7 +283,6 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
                                 + "|| replace(coalesce(locality_slug, ''), '-', ' ')) like '%kharadi%'")))
                 .andExpect(jsonPath("$.totalElements").value(greaterThan(namedKharadi)));
 
-        // The slug is hyphenated, the typed words are not.
         mvc.perform(get("/societies?q=koregaon park&size=100"))
                 .andExpect(jsonPath("$.totalElements").value(greaterThan(0)))
                 .andExpect(jsonPath("$.content[*].localitySlug").value(hasItem("koregaon-park")));

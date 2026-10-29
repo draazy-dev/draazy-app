@@ -41,7 +41,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @DisplayName("Flatmates — the owner's WhatsApp notice, and the rules that feed it")
 class FlatmateOwnerNoticeTest extends AbstractApiTest {
-
     private static final String TOKEN_HEADER = "X-Owner-Notice-Token";
     private static final String OWNER = "9815660900";
 
@@ -63,7 +62,6 @@ class FlatmateOwnerNoticeTest extends AbstractApiTest {
         cleanup = jdbc;
     }
 
-    // Audit rows commit in their own transaction, so the test rollback cannot take them back.
     @AfterAll
     static void removeAuditRowsThatEscapedRollback() {
         cleanup.update("delete from audit_log where actor = 'owner-link'");
@@ -104,7 +102,6 @@ class FlatmateOwnerNoticeTest extends AbstractApiTest {
         return json.replaceAll("(?s).*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
-    // The test transaction never commits, so the after-commit send is driven by hand.
     private void commit() {
         for (TransactionSynchronization s : TransactionSynchronizationManager.getSynchronizations()) {
             if (fired.add(s)) {

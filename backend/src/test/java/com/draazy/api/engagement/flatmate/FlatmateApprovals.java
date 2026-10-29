@@ -4,10 +4,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 
 final class FlatmateApprovals {
-
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
-    /** Both evidence dates, so the one body approves a rent agreement or a light bill alike. */
     static String checks() {
         LocalDate today = LocalDate.now(IST);
         return "\"checks\":{\"nameMatches\":true,\"addressMatches\":true,\"validTill\":\"%s\",\"issuedOn\":\"%s\"}"

@@ -24,11 +24,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// Rationale: docs/flows/admin/property-verification.md#ownership-gate.
 @RestController
 public class OwnershipVerificationController {
-
-    // GET carries no atom because owners are participants and would be refused by one.
     private static final String PROPERTIES_VERIFY =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "') and "
                     + BackOfficePermissions.REQUIRE_PROPERTIES_VERIFY;
@@ -39,14 +36,12 @@ public class OwnershipVerificationController {
         this.service = service;
     }
 
-    // GET /properties/{id/verification/ownership} (contract getOwnershipVerification).
     @GetMapping(Routes.Moderation.VERIFICATION_OWNERSHIP)
     public OwnershipVerificationResponse get(@CurrentUser AuthPrincipal principal,
             @PathVariable String id) {
         return service.get(principal, id);
     }
 
-    // Signed URLs let reviewers cite uploads as evidence without exposing them to owners.
     @GetMapping(Routes.Moderation.VERIFICATION_OWNERSHIP_DOCUMENTS)
     @PreAuthorize(PROPERTIES_VERIFY)
     public List<DocumentSummary> listDocuments(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
@@ -60,7 +55,6 @@ public class OwnershipVerificationController {
         return service.documentUrl(principal, id, docId);
     }
 
-    // Staff/admin record what they sighted; the gate remains a separate judgement.
     @PostMapping(Routes.Moderation.VERIFICATION_OWNERSHIP_EVIDENCE)
     @PreAuthorize(PROPERTIES_VERIFY)
     @ResponseStatus(HttpStatus.CREATED)
@@ -70,7 +64,6 @@ public class OwnershipVerificationController {
                 body.issuedOn(), body.subjectName());
     }
 
-    // POST /properties/{id/verification/ownership} (contract verifyOwnership, x-roles: [staff, admin]).
     @PostMapping(Routes.Moderation.VERIFICATION_OWNERSHIP)
     @PreAuthorize(PROPERTIES_VERIFY)
     public OwnershipVerificationResponse verify(@CurrentUser AuthPrincipal principal,
@@ -78,7 +71,6 @@ public class OwnershipVerificationController {
         return service.verify(principal, id);
     }
 
-    // Reason is a query parameter because DELETE bodies are widely dropped.
     @DeleteMapping(Routes.Moderation.VERIFICATION_OWNERSHIP)
     @PreAuthorize(PROPERTIES_VERIFY)
     public OwnershipVerificationResponse revoke(@CurrentUser AuthPrincipal principal,
@@ -102,7 +94,6 @@ public class OwnershipVerificationController {
     public record DeclineRequest(@NotBlank @Size(max = 300) String reason) {
     }
 
-    // issuedOn is the document's own day; subjectName is conditionally required in service.
     public record EvidenceRequest(
             @NotBlank String docType,
             String documentId,

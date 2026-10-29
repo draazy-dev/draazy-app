@@ -18,7 +18,6 @@ import java.util.zip.InflaterInputStream;
 import org.junit.jupiter.api.Test;
 
 class ImageMetadataStripperTest {
-
     @Test
     void removesJpegApp1App13AndCommentSegments() {
         byte[] jpeg = jpeg(
@@ -312,8 +311,6 @@ class ImageMetadataStripperTest {
 
     private static final byte[] ICC_PROFILE_FIXTURE = deviceProfile();
 
-    // The JDK's own sRGB profile carries Hewlett-Packard description, copyright and device tags; the
-    // header gets a manufacturer, model and creator the way a camera's profile would.
     private static byte[] deviceProfile() {
         byte[] profile = ICC_Profile.getInstance(ColorSpace.CS_sRGB).getData();
         System.arraycopy("AcmeCam9".getBytes(StandardCharsets.US_ASCII), 0, profile, 48, 8);

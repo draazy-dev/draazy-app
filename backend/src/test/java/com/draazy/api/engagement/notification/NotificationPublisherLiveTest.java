@@ -13,9 +13,7 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** An open tab re-reads its badge when told to, so the stream must say so exactly when it changes. */
 class NotificationPublisherLiveTest {
-
     private final NotificationRepository notifications = mock(NotificationRepository.class);
     private final NotificationPreferenceService preferences = mock(NotificationPreferenceService.class);
     private final LiveUpdates live = mock(LiveUpdates.class);
@@ -35,7 +33,6 @@ class NotificationPublisherLiveTest {
     @Test
     void oneHeldForQuietHoursStaysSilentUntilItIsDue() {
         when(preferences.effective(user)).thenReturn(prefs(true));
-        // 23:30 IST, inside a 22:00-07:00 window.
         publisher.useClock(Clock.fixed(Instant.parse("2026-01-01T18:00:00Z"), ZoneOffset.UTC));
 
         publisher.notify(user, "visit", "Visit booked", "Body", "/visits");

@@ -18,11 +18,9 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-// Place Details (New). One GET, so Spring's RestClient with short timeouts rather than a Google SDK.
 @Component
 @ConditionalOnExpression("!'${draazy.google.places.server-key:}'.isBlank()")
 public class GooglePlacesLookup implements PlacesLookup {
-
     private static final String FIELDS = "id,displayName,location,types,addressComponents";
 
     private static final Pattern REASON = Pattern.compile("\"(?:reason|status)\"\\s*:\\s*\"([A-Z_]+)\"");
@@ -54,7 +52,6 @@ public class GooglePlacesLookup implements PlacesLookup {
         } catch (HttpClientErrorException e) {
             int status = e.getStatusCode().value();
             String reason = reason(e.getResponseBodyAsString());
-            // A 400 about the id is as unknown as a missing place; a 400 about the key says nothing about the place.
             if (status == 404 || (status == 400 && !KEY_PROBLEM.matcher(reason).find())) {
                 return Optional.empty();
             }

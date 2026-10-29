@@ -27,14 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-// Role guards cannot express conversation access; participant checks do.
 @RestController
 @Validated
 public class ConversationsController {
-
     private final ConversationService service;
 
-    // Opening a thread has separate trust rules from carrying one on.
     private final ConversationOpeningService opening;
 
     public ConversationsController(ConversationService service, ConversationOpeningService opening) {

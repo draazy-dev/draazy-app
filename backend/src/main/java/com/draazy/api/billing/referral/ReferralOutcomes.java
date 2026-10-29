@@ -9,10 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
-/** Applies an automatic decision: status move, friend's Featured window, system audit row and referrer notice. */
 @Component
 class ReferralOutcomes {
-
     private static final String REFER_LINK = "/refer";
 
     private final ReferralRepository referrals;
@@ -65,7 +63,6 @@ class ReferralOutcomes {
                 "A referral reward was withdrawn because " + because + ". Contact support if you think this is wrong.");
     }
 
-    // Staff overrides move the status by hand; the friend's Featured window follows the new status.
     void syncFeatured(Referral referral) {
         if (ReferralStatuses.isGranting(referral.getStatus())) {
             grantFeatured(referral);

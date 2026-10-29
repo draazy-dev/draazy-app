@@ -14,7 +14,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface FlatmateReviewRepository extends JpaRepository<FlatmateReview, UUID> {
-
     String POST_NOT_ARCHIVED =
             "and not exists (select 1 from FlatmateRoom fr where fr.id = r.roomId and fr.archived = true) "
             + "and not exists (select 1 from FlatmateGroup fg where fg.id = r.groupId and fg.archived = true)";
@@ -22,7 +21,6 @@ public interface FlatmateReviewRepository extends JpaRepository<FlatmateReview, 
     String QUEUE_WHERE = "from FlatmateReview r where (:status is null or r.status = :status) "
             + "and (:flagged is null or r.flagForReview = :flagged) " + POST_NOT_ARCHIVED;
 
-    /** Columns, not entities: the agreement document is JSONB of up to 3 MB and a queue card never shows it. */
     @Query(value = "select r.id as id, r.kind as kind, r.roomId as roomId, r.groupId as groupId, "
             + "r.hostId as hostId, r.address as address, r.tier as tier, r.flagForReview as flagForReview, "
             + "r.evidenceType as evidenceType, "
@@ -55,11 +53,9 @@ public interface FlatmateReviewRepository extends JpaRepository<FlatmateReview, 
         Instant getCreatedAt();
     }
 
-    /** The rows the Badge requests tab lists: every open claim on a post that is still on the board. */
     @Query("select count(r) from FlatmateReview r where r.status = 'pending' " + POST_NOT_ARCHIVED)
     long countPendingClaims();
 
-    /** One review per target — a host cannot queue the same flat twice for a second opinion. */
     Optional<FlatmateReview> findByRoomId(UUID roomId);
 
     Optional<FlatmateReview> findByGroupId(UUID groupId);
@@ -73,8 +69,6 @@ public interface FlatmateReviewRepository extends JpaRepository<FlatmateReview, 
             + "where (r.roomId = :postId or r.groupId = :postId) and r.status = 'pending'")
     int markOwnerConsent(@Param("postId") UUID postId);
 
-    /** A null {@code validTill} deliberately never matches — "no end date recorded" is not expiry.
-     * Literal status because JPQL cannot dereference {@link FlatmateVocabulary#STATUS_APPROVED}. */
     @Query("select r from FlatmateReview r "
             + "where r.status = 'approved' and r.agreement.validTill < :on " + POST_NOT_ARCHIVED)
     List<FlatmateReview> findLapsedApprovals(@Param("on") LocalDate on);

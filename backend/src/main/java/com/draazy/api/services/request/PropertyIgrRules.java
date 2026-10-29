@@ -66,6 +66,7 @@ final class PropertyIgrRules {
         }
     }
 
+
     private static void optionalArea(Object raw, String path, List<String> problems) {
         if (!isStated(raw)) {
             return;

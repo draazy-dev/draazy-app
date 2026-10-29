@@ -14,10 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Composed from the handlers the client would otherwise call one by one, so no section drifts from them. */
 @RestController
 public class MeBootstrapController {
-
     private static final Logger log = LoggerFactory.getLogger(MeBootstrapController.class);
 
     private final MeController me;
@@ -36,7 +34,6 @@ public class MeBootstrapController {
         this.conversations = conversations;
     }
 
-    /** {@code me} is not isolated: a caller who cannot be read must get that error, not a shell. */
     @GetMapping(Routes.Bootstrap.ME)
     public MeBootstrapResponse bootstrap(@CurrentUser AuthPrincipal principal) {
         return new MeBootstrapResponse(
@@ -47,8 +44,6 @@ public class MeBootstrapController {
                 section("messagesUnread", () -> conversations.unreadCount(principal)));
     }
 
-    // A null section makes the client fall back to that section's own endpoint, which then
-    // reports the real error where the screen that needs it can show it.
     private static <T> T section(String name, Supplier<T> read) {
         try {
             return read.get();

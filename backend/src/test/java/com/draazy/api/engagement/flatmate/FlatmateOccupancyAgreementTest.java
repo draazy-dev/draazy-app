@@ -26,11 +26,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-// `flatCommitted` is not only displayed: `occupancy` and `shareMax` are derived from it.
-// Anonymous must omit occupancy, not publish `0`, or it labels occupied rooms as empty.
 @DisplayName("D212 — the public feed reports a full flat as occupied")
 class FlatmateOccupancyAgreementTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -52,7 +49,6 @@ class FlatmateOccupancyAgreementTest extends AbstractApiTest {
         User admin = user("9830000042", "Moderator3", Roles.Wire.ADMIN);
         Property flat = listing(owner);
 
-        // Two rooms, two people allowed in the whole flat, one person in each: the flat is full.
         String split = mvc.perform(post(Routes.Properties.SPLIT, flat.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -69,7 +65,6 @@ class FlatmateOccupancyAgreementTest extends AbstractApiTest {
         clear(admin, first);
         clear(admin, second);
 
-        // The flat holds two people and allows two: full.
         Map<String, Object> fromFeed = feedCard(first);
 
         assertEquals(2, fromFeed.get("flatCommitted"));
@@ -89,7 +84,6 @@ class FlatmateOccupancyAgreementTest extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString();
     }
 
-    /** The one card with this id, so the assertion survives whatever else the feed is holding. */
     private static Map<String, Object> roomIn(String json, String listPath, String id) {
         List<Map<String, Object>> cards = com.jayway.jsonpath.JsonPath.read(json, listPath);
         return cards.stream()

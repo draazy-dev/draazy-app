@@ -25,12 +25,10 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
-// Not @Transactional: a rolled-back harness hides the bug, as the send rows must outlive a thrown 401 or failed send.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(OtpCaptureConfig.class)
 class OtpServiceDurabilityTest {
-
     private static final String MOBILE = "9876500911";
 
     @Autowired
@@ -51,7 +49,6 @@ class OtpServiceDurabilityTest {
         otp.failNext = false;
     }
 
-    // A rolled-back failure would refund the slot and leave a chosen number rung on demand (see auth.md).
     @Test
     void aFailedDeliveryStillSpendsTheSendBudget() {
         otp.failNext = true;
@@ -64,7 +61,6 @@ class OtpServiceDurabilityTest {
         assertThat(rows).isEqualTo(1);
     }
 
-    // noRollbackFor is per-advice, so every method that can own the transaction must repeat it.
     @Test
     void aFailedDeliverySpendsTheBudgetEvenWhenAnOuterTransactionOwnsIt() {
         otp.failNext = true;
@@ -91,14 +87,12 @@ class OtpServiceDurabilityTest {
     @Test
     void failedAttemptsAccumulateAcrossTransactionsUntilTheCapTrips() {
         otpService.sendLoginCode(MOBILE);
-        // A code guaranteed to differ from the real one, so every verify takes the wrong-guess path.
         String wrong = "000000".equals(otp.lastCode) ? "111111" : "000000";
 
         for (int i = 0; i < otpService.maxVerifyAttempts(); i++) {
             assertThatThrownBy(() -> otpService.verifyLoginCode(MOBILE, wrong))
                     .isInstanceOf(UnauthorizedException.class);
         }
-        // Once the cap is reached the code is burned and further tries are rate-limited (429).
         assertThatThrownBy(() -> otpService.verifyLoginCode(MOBILE, wrong))
                 .isInstanceOf(RateLimitedException.class);
     }

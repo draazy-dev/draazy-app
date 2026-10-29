@@ -13,7 +13,6 @@ import org.hibernate.annotations.UuidGenerator;
 @Table(name = "request_reminders")
 @Getter
 public class RequestReminder {
-
     @Id
     @UuidGenerator
     private UUID id;
@@ -37,7 +36,6 @@ public class RequestReminder {
     private Instant sentAt;
 
     protected RequestReminder() {
-        // JPA
     }
 
     RequestReminder(String kind, UUID refId, UUID requesterId, UUID recipientId, boolean notified, Instant sentAt) {

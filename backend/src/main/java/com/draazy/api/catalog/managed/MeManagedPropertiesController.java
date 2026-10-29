@@ -19,11 +19,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Every route is scoped to the JWT caller; another owner's record is a 404, never a 403, so its existence is not
- * confirmed. Authentication plus owner-scoping is the whole gate. */
 @RestController
 public class MeManagedPropertiesController {
-
     private final ManagedPropertyService service;
     private final PropertyMapper propertyMapper;
 
@@ -61,20 +58,16 @@ public class MeManagedPropertiesController {
         service.delete(principal.userId(), id);
     }
 
-    /** {@code DELETE /me/managed-properties/{id}/rent-tracking}: stop tracking and clear the tenant. Returns the
-     * updated record so the caller needn't re-read it; receipts already issued are kept. */
     @DeleteMapping(Routes.MeManagedProperties.RENT_TRACKING)
     public ManagedPropertyDto stopRentTracking(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         return service.stopRentTracking(principal.userId(), id);
     }
 
-    /** Idempotent: a record already published is returned unchanged. */
     @PostMapping(Routes.MeManagedProperties.PUBLISH)
     public ManagedPropertyDto publish(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         return service.publish(principal.userId(), id);
     }
 
-    /** The full listing wizard's payload, for a home whose facts were captured elsewhere. A repeat is a 409. */
     @PostMapping(Routes.MeManagedProperties.LISTING)
     @ResponseStatus(HttpStatus.CREATED)
     public ListingWriteResult publishWith(@CurrentUser AuthPrincipal principal, @PathVariable String id,
@@ -82,14 +75,12 @@ public class MeManagedPropertiesController {
         return propertyMapper.toWriteResult(service.publishWith(principal.userId(), id, body));
     }
 
-    /** {@code months} is a page size, so it is clamped rather than rejected. */
     @GetMapping(Routes.MeManagedProperties.RENT_RECEIPTS)
     public List<ManagedRentReceiptDto> rentReceipts(@CurrentUser AuthPrincipal principal,
             @PathVariable String id, @RequestParam(required = false) Integer months) {
         return service.listRentReceipts(principal.userId(), id, months);
     }
 
-    /** Only the month is taken from the body; every figure is snapshotted server-side. A repeat month is a 409. */
     @PostMapping(Routes.MeManagedProperties.RENT_RECEIPTS)
     @ResponseStatus(HttpStatus.CREATED)
     public ManagedRentReceiptDto recordRentReceipt(@CurrentUser AuthPrincipal principal,

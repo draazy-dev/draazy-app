@@ -6,10 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** DPDP s.11 export scope: which rows are the subject's, and the redaction rule for shared records.
- * Rationale: docs/system/legal-entity-and-compliance.md (section 12). */
 public final class DataExportScope {
-
     private DataExportScope() {
     }
 
@@ -17,12 +14,10 @@ public final class DataExportScope {
 
     static final String PARTY_REF = "partyRef";
 
-    /** One table's contribution to the export; {@code sql} must be wrappable in {@code select * from (…) d limit ?}. */
     record Dataset(String domain, String name, String describes, String sql,
             Map<String, String> withheld) {
     }
 
-    /** A whole table left out of the export, and why. Serialised into the response. */
     record Exclusion(String name, String reason) {
     }
 
@@ -938,7 +933,6 @@ public final class DataExportScope {
     }
 
     private static void community(List<Dataset> out) {
-
         out.add(new Dataset("community", "reviews_written",
                 "Reviews you wrote. Where you reviewed a person rather than a place, their id is "
                         + "replaced by the same reference used everywhere else in this document.",
@@ -983,8 +977,6 @@ public final class DataExportScope {
                         "flag_for_review", "An internal triage flag rather than an outcome; status "
                                 + "is the decision you are entitled to.")));
 
-        // Split for the same reason as reviews_written; the "subject already knows who they
-        // reported" argument is refused because uniformity is the redaction rule's only guard.
         out.add(new Dataset("community", "reports_filed",
                 "Reports you filed about a listing or another user. Where you reported a person, "
                         + "their id is replaced by a reference.",
@@ -1177,8 +1169,6 @@ public final class DataExportScope {
                         + "returning them would create a correlation token and disclose nothing.")));
     }
 
-    /** Tables holding data about the subject that this export does not return; serialised into every
-     * response so an omission is never silent. */
     static List<Exclusion> exclusions() {
         return List.of(
                 new Exclusion("reports_about_me",
@@ -1244,7 +1234,6 @@ public final class DataExportScope {
         return DATASETS;
     }
 
-    /** Ships the redaction rule in the response payload so it travels with the data itself. */
     static String redactionRule() {
         return "Records you share with somebody else are included in full — that they happened, "
                 + "when, their status, the money, the property — together with everything you "
@@ -1259,7 +1248,6 @@ public final class DataExportScope {
                 + "of another data principal.";
     }
 
-    /** Ordered map literal; the withheld list must diff cleanly between calls. */
     private static Map<String, String> withheld(String... pairs) {
         Map<String, String> map = new LinkedHashMap<>();
         for (int i = 0; i < pairs.length; i += 2) {

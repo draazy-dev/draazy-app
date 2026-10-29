@@ -35,7 +35,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @DisplayName("Moderation — staff take down one photo")
 class PropertyPhotoTakedownTest extends AbstractApiTest {
-
     private static final String PREFIX = "/api/dev/storage/public/";
 
     @Autowired UserRepository users;
@@ -48,7 +47,6 @@ class PropertyPhotoTakedownTest extends AbstractApiTest {
         doReturn(PREFIX).when(storage).publicUrlPrefix();
     }
 
-    // Audit rows commit through REQUIRES_NEW, so a rollback does not take them with it.
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
         jdbc.update("delete from audit_log where action = 'listing.photo.takedown'");

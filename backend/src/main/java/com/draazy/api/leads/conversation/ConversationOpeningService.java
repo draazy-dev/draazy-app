@@ -29,14 +29,10 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-// `ConversationService` owns the thread afterwards: the inbox, the replies, the attachments, the read marks.
-// This one owns the admission decision — the relationship guard, the counterparty derivation.
 @Service
 public class ConversationOpeningService {
-
     private static final Logger log = LoggerFactory.getLogger(ConversationOpeningService.class);
 
-    // Named constraints let us distinguish business conflicts from schema defects.
     private static final String PAIR_PROPERTY_INDEX = "uq_conversations_pair_property";
     private static final String PAIR_GENERAL_INDEX = "uq_conversations_pair_general";
 
@@ -51,7 +47,6 @@ public class ConversationOpeningService {
     private final List<LeadIntroductions> introductions;
     private final AuditService audit;
 
-    // The thread itself, for the one thing opening cannot do alone: put the caller's first message in it.
     private final ConversationService thread;
 
     private final TransactionTemplate transactions;
@@ -111,9 +106,6 @@ public class ConversationOpeningService {
             return transactions.execute(tx -> attempt.get());
         } catch (DataIntegrityViolationException raced) {
             if (!isPairRace(raced) || TransactionSynchronizationManager.isActualTransactionActive()) {
-
-                // Not our collision, or we are inside somebody else's transaction and a retry
-                // cannot work. Either way the honest answer is the one the client already had.
                 throw raced;
             }
             log.info("Concurrent first message lost the conversation find-or-create race for {};"
@@ -131,7 +123,6 @@ public class ConversationOpeningService {
                 ordered ? me : them, ordered ? them : me, null);
         Conversation conversation = existing.orElseGet(() ->
                 conversations.saveAndFlush(new Conversation(me, them, null, null)));
-        // Guarded so re-opening the same post does not bump updatedAt and reorder the inbox.
         if (!accepted.targetId().equals(conversation.getFlatmateTargetId())) {
             conversation.aboutFlatmate(accepted.targetKind(), accepted.targetId());
         }
@@ -142,13 +133,10 @@ public class ConversationOpeningService {
         return mapper.toSummaries(List.of(conversation), me).getFirst();
     }
 
-    // A test that cannot tell those apart silently stops testing this method the first time the timing shifts.
-    // Race tests need to distinguish an actual retry from accidental serialization.
     long racesRetried() {
         return racesRetried.sum();
     }
 
-    // Anything else (a foreign key, a not-null, the ordering CHECK) is a bug in this method.
     private static boolean isPairRace(DataIntegrityViolationException violation) {
         return ConstraintViolations.isOn(violation, PAIR_PROPERTY_INDEX)
                 || ConstraintViolations.isOn(violation, PAIR_GENERAL_INDEX);
@@ -172,7 +160,6 @@ public class ConversationOpeningService {
                         .filter(u -> !u.getId().equals(caller.userId()))
                         .orElseThrow(ConversationOpeningService::refuse);
         if (listing != null) {
-
             if (listing.getOwner() == null
                     || !(listing.getOwner().getId().equals(caller.userId())
                             || listing.getOwner().getId().equals(counterparty.getId()))) {
@@ -186,8 +173,6 @@ public class ConversationOpeningService {
         UUID me = caller.userId();
         UUID them = counterparty.getId();
 
-        // Same ordering rule as the constructor and the the database CHECK -- see Conversation.ordersFirst
-        // for why UUID.compareTo is the wrong comparator here.
         boolean ordered = Conversation.ordersFirst(me, them);
         Optional<Conversation> existing = conversations.findPair(
                 ordered ? me : them, ordered ? them : me, propertyId);
@@ -205,8 +190,6 @@ public class ConversationOpeningService {
         return new Started(mapper.toDetail(conversation, me), existing.isEmpty());
     }
 
-    // Consent is per listing: an approved contact request, a confirmed visit or an accepted offer. A thread without
-    // a listing is only for staff or an owner writing to someone who has an approved request on one of their listings.
     private boolean related(AuthPrincipal caller, UUID counterpartyId, Property listing) {
         if (Roles.isBackOffice(caller.role())) {
             return true;
@@ -221,7 +204,6 @@ public class ConversationOpeningService {
                 || introductions.stream().anyMatch(lead -> lead.introduces(requester, listing.getId()));
     }
 
-    // The relationship guard still runs later; this lookup proves nothing alone.
     private User ownerOf(Property listing, AuthPrincipal caller) {
         if (listing == null || listing.getOwner() == null) {
             throw refuse();
@@ -233,7 +215,7 @@ public class ConversationOpeningService {
         return owner;
     }
 
-    // All start refusals share one response to avoid user enumeration.
+    // All start refusals share one response to prevent user enumeration.
     private static ForbiddenException refuse() {
         return new ForbiddenException(
                 "You can only message people you already have an approved contact with.");

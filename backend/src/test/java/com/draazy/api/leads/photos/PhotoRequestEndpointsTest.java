@@ -26,10 +26,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-// Organised around the invariants rather than the endpoints, because the invariants are what a regression would
-// break.
 class PhotoRequestEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -46,8 +43,6 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    // The slug is set explicitly because nothing in the entity populates it — it is assigned by the listing service,
-    // which this test does not go through.
     private Property listing(User owner, String title, String slug) {
         Property p = new Property(owner, title, "rent", "apartment", 25000L, "Kothrud", "Pune");
         p.setBhk(new BigDecimal("2"));
@@ -58,7 +53,6 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** For the tests that do not care what the slug is, only that the row exists. */
     private Property listing(User owner, String title) {
         return listing(owner, title, "listing-" + UUID.randomUUID());
     }
@@ -78,8 +72,6 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
                 .content("{\"decision\":\"" + decision + "\"}");
     }
 
-    // Asserting only `created=false` would still pass if the service inserted a second row and mislabelled it; a
-    // double-tap must not inflate demand.
     @Test
     void askingTwice_returnsTheOriginalRow_andInsertsNothingTheSecondTime() throws Exception {
         User owner = user("9000000100", "owner", "Rohan Kulkarni");
@@ -98,7 +90,6 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
         assertThat(photoRequests.findAll()).hasSize(1);
     }
 
-    /** An owner cannot manufacture interest in their own listing. */
     @Test
     void anOwnerAskingForPhotosOfTheirOwnListing_is400_andWritesNothing() throws Exception {
         User owner = user("9000000102", "owner", "Rohan Kulkarni");
@@ -110,7 +101,6 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
         assertThat(photoRequests.findAll()).isEmpty();
     }
 
-    /** Sign-in is the gate, so an anonymous caller is turned away before any row exists. */
     @Test
     void anAnonymousCaller_cannotAsk() throws Exception {
         User owner = user("9000000103", "owner", "Rohan Kulkarni");
@@ -121,7 +111,6 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
         assertThat(photoRequests.findAll()).isEmpty();
     }
 
-    // The security claim, and the reason this domain exists as its own type.
     @Test
     void theOwnerSeesWhoAsked_butNeverTheirRealMobile() throws Exception {
         User owner = user("9000000104", "owner", "Rohan Kulkarni");
@@ -138,12 +127,9 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].propertyTitle").value("2 BHK in Kothrud"))
                 .andExpect(jsonPath("$.content[0].propertySlug").value("2-bhk-kothrud-pune"))
 
-                // ...and only now, the claim
                 .andExpect(jsonPath("$.content[0].requester.mobile").value("90XXXXX001"));
     }
 
-    // The request against the other owner's listing is the whole test: it is a real, pending, otherwise-visible row, so
-    // Asserting emptiness without seeding it would pass against a service that returned nothing to anybody.
     @Test
     void anOwnerSeesOnlyRequestsAgainstTheirOwnListings() throws Exception {
         User rohan = user("9000000105", "owner", "Rohan Kulkarni");
@@ -165,7 +151,6 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].propertyTitle").value("Meera's 3 BHK"));
     }
 
-    /** The badge counts pending only, and drops when one is resolved. */
     @Test
     void anOwnerWithNoListings_getsAnEmptyInbox() throws Exception {
         User owner = user("9000000107", "owner", "Rohan Kulkarni");
@@ -180,8 +165,6 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content.length()").value(0));
     }
 
-    // Resolving someone else's row is a 404, not a 403, which would confirm the id exists; the paired proof
-    // that the row is resolvable keeps the 404 from meaning an unknown id; a second owner proves isolation.
     @ParameterizedTest(name = "{0} gets 404 and leaves it pending")
     @ValueSource(strings = {"another owner", "the requester"})
     void resolvingARequestThatIsNotYours_is404_andLeavesItPending(String actor) throws Exception {
@@ -202,14 +185,11 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
         assertThat(photoRequests.findById(row.getId()).orElseThrow().getDecidedAt()).isNull();
         assertThat(notificationsFor(buyer)).isEmpty();
 
-        // the checker, and only the checker, can close it
         mvc.perform(decide(url, meera, PhotoRequestStatuses.RESOLVED))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(PhotoRequestStatuses.RESOLVED));
     }
 
-    // A decision is terminal and repeating it moves nothing: answering twice keeps the original `decidedAt`, and a
-    // decline cannot become `resolved`, else an owner could clear a badge by declining then re-marking it done.
     @ParameterizedTest(name = "{0} then {1} keeps the first decision")
     @CsvSource({"declined,resolved", "resolved,declined", "resolved,resolved", "declined,declined"})
     void aDecidedRequest_staysAsFirstDecided(String first, String second) throws Exception {
@@ -233,8 +213,6 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
                 .isEqualTo(decidedAt);
     }
 
-    // The duplicate guard keeps the count meaning "distinct people who wanted this"; `declined` is a real
-    // status that survives the CHECK, so a guard written as "is this a known status" would accept it.
     @ParameterizedTest(name = "asking again after the owner {0} is still a duplicate")
     @ValueSource(strings = {PhotoRequestStatuses.RESOLVED, PhotoRequestStatuses.DECLINED})
     void askingAgainAfterTheOwnerDecided_isStillADuplicate(String decision) throws Exception {
@@ -257,8 +235,6 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
                 .isEqualTo(decision);
     }
 
-    // The owner's own inbox is asserted empty for the reason the contact gate asserts it: nobody needs telling about
-    // a decision they just made.
     @Test
     void anUnknownDecision_is400_andLeavesTheRowPending() throws Exception {
         User owner = user("9000000123", "owner", "Rohan Kulkarni");
@@ -273,15 +249,11 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest());
         assertThat(photoRequests.findById(row.getId()).orElseThrow().getStatus())
                 .isEqualTo(PhotoRequestStatuses.PENDING);
-        // A notify placed above the guard would announce photos on the strength of a call that
-        // changed no row at all.
         assertThat(notificationsFor(buyer)).isEmpty();
 
         mvc.perform(decide(url, owner, PhotoRequestStatuses.DECLINED)).andExpect(status().isOk());
     }
 
-    // A decline is announced too — the one place this domain parts company with the contact gate, which stays silent
-    // on a decline because "a terminal no is not news the buyer needs pushed at them".
     @Test
     void resolvingARequest_tellsTheBuyerPhotosArrived_andTellsTheOwnerNothingNew() throws Exception {
         User owner = user("9000000130", "owner", "Rohan Kulkarni");

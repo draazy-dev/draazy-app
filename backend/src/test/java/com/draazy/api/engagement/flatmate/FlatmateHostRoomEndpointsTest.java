@@ -32,11 +32,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Room ownership tests focus on plausible regressions: host scoping and soft withdrawal.
-// The second is Withdrawing#aSplitRoomCannotBeWithdrawnAlone().
 @DisplayName("Flatmates — a host's own rooms")
 class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -99,8 +96,6 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
         return moderateTo(id, "approved");
     }
 
-    // The transaction still holds the stale entity after UPDATE;
-    // clear it so routes read the database value, as production would.
     private String moderateTo(String id, String modStatus) {
         jdbc.update("update flatmate_rooms set mod_status = ? where id = ?::uuid", modStatus, id);
         em.clear();
@@ -110,7 +105,6 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("GET /me/flatmate-rooms")
     class MyRooms {
-
         @Test
         @DisplayName("includes a room still waiting on moderation — the host is not a stranger")
         void includesAPendingRoom() throws Exception {
@@ -220,7 +214,6 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("DELETE /flatmates/rooms/{id}")
     class Withdrawing {
-
         @Test
         @DisplayName("204, and the room leaves the public feed")
         void withdrawTakesItDown() throws Exception {
@@ -251,8 +244,6 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(host)))
                     .andExpect(status().isNoContent());
 
-            // Host withdrawal must not look like Ops removal; moderation state
-            // and audit trail still point at this row.
             assertThat(jdbc.queryForObject(
                     "select archived from flatmate_rooms where id = ?::uuid", Boolean.class, id))
                     .isTrue();
@@ -340,8 +331,6 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isUnauthorized());
         }
 
-        // Split-room occupants are the only move-in record, so sibling withdrawal
-        // must not bypass the split delete guard.
         @Test
         @DisplayName("a split room cannot be withdrawn on its own")
         void aSplitRoomCannotBeWithdrawnAlone() throws Exception {

@@ -10,21 +10,14 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Every field is an override merged over the client's {@code CITY_GEO}, so there is no seeded row and a fresh install answers {@code {}};
- * a blacklist entry's {@code note} is dropped because anyone can call this route. */
 @Component
 public class GeoPolicyController {
-
     private static final Logger log = LoggerFactory.getLogger(GeoPolicyController.class);
 
-    /** Not seeded, unlike {@code fees}, {@code flags} and {@code movePack}: defaults live in the client's {@code CITY_GEO}, so a seeded copy would be a second source of truth. */
     private static final String GEO_KEY = "geo";
 
-    /** Matches the client's {@code isBlacklisted} minimum ({@code term.length >= 2}, {@code lib/geoConfig.js});
-     * shorter entries are inert, and a test asserts the two stay in step. */
     private static final int MIN_BLACKLIST_TERM = 2;
 
-    /** Bounds of the coordinate system. A "latitude" outside these is not a mistyped place. */
     private static final double MAX_LATITUDE = 90;
     private static final double MAX_LONGITUDE = 180;
 
@@ -36,7 +29,6 @@ public class GeoPolicyController {
         this.objectMapper = objectMapper;
     }
 
-    /** A missing or malformed row answers the empty policy, as failing would blank every page render over a hand-edited config row. */
     public GeoPolicyResponse geo() {
         JsonNode stored = storedGeo();
         if (stored == null) {
@@ -49,7 +41,6 @@ public class GeoPolicyController {
                 blacklist(stored.get("blacklist")));
     }
 
-    /** The parsed {@code geo} row, or null for every way reading it can fail. */
     private JsonNode storedGeo() {
         return settings.value(GEO_KEY).map(row -> {
             JsonNode parsed;
@@ -69,7 +60,6 @@ public class GeoPolicyController {
         }).orElse(null);
     }
 
-    /** Per-city map overrides keyed by the client's city name; a city with nothing set is omitted, as an empty entry implies an override exists. */
     private static Map<String, GeoPolicyResponse.CityGeo> cities(JsonNode node) {
         Map<String, GeoPolicyResponse.CityGeo> out = new LinkedHashMap<>();
         if (node == null || !node.isObject()) {
@@ -90,8 +80,6 @@ public class GeoPolicyController {
         return out;
     }
 
-    /** Null unless both coordinates are finite and in range: a half point mis-centres the map,
-     * and {@code Infinity} is not valid JSON, so it would make the client drop the whole policy. */
     private static GeoPolicyResponse.LatLng latLng(JsonNode node) {
         if (node == null || !node.isObject()) {
             return null;
@@ -104,8 +92,6 @@ public class GeoPolicyController {
         return new GeoPolicyResponse.LatLng(lat, lng);
     }
 
-    /** Null unless all four edges are finite, in range and non-inverted: a gapped or empty box silently breaks
-     * the client's Places restriction. Dropped, not repaired; the built-in bounds then apply. */
     private static GeoPolicyResponse.Bounds bounds(JsonNode node) {
         if (node == null || !node.isObject()) {
             return null;
@@ -123,7 +109,6 @@ public class GeoPolicyController {
         return new GeoPolicyResponse.Bounds(north, south, east, west);
     }
 
-    /** Null rather than clamped: clamping 200 to 90 invents a place the operator never named. */
     private static Double coordinate(JsonNode node, double limit) {
         if (node == null || !node.isNumber()) {
             return null;
@@ -135,7 +120,6 @@ public class GeoPolicyController {
         return value;
     }
 
-    /** Drops the operator's {@code note} (moderator prose; route is anonymous) and entries matching nothing. */
     private static List<GeoPolicyResponse.BlacklistEntry> blacklist(JsonNode node) {
         List<GeoPolicyResponse.BlacklistEntry> out = new ArrayList<>();
         if (node == null || !node.isArray()) {
@@ -158,7 +142,6 @@ public class GeoPolicyController {
         return out;
     }
 
-    /** A trimmed string field, or null when it is absent, the wrong type, or blank. */
     private static String text(JsonNode node) {
         if (node == null || !node.isString()) {
             return null;

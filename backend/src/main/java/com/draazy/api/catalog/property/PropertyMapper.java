@@ -22,19 +22,13 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
-/** Entity→wire mapper for the catalogue. Mechanical fields are generated; the trust decisions —
- * {@link #toOwner} masking and {@link #toAdminPipeline} — are hand-written so a refactor cannot lose them. */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface PropertyMapper {
-
-    /** The freshness tier, derived at map time. {@link Freshness} takes the clock, so boundaries stay testable. */
     String FRESHNESS = "java(Freshness.of(property.getLastConfirmedAt(), property.getCreatedAt(),"
             + " java.time.Instant.now()).wire())";
 
-    /** The cover, derived at map time so a listing's own photos are its card image. */
     String COVER = "java(coverImage(property))";
 
-    /** Prefix of an expression that emits the value only on the owner's and the desk's views. */
     String OWN_SIDE = "java(privateFields == com.draazy.api.common.trust.PrivateFieldVisibility.VISIBLE ? ";
 
     List<String> LAND_KEYS = List.of("plotZone", "waterSource", "naStatus", "otherRights",
@@ -133,8 +127,6 @@ public interface PropertyMapper {
                         ? FlagReasonVisibility.VISIBLE : FlagReasonVisibility.HIDDEN);
     }
 
-    /** Copy the client-settable half of a create body onto a listing the service already constructed.
-     * {@code ignoreByDefault} makes this an allowlist, so granting a client-settable field is a diff. */
     @BeanMapping(ignoreByDefault = true,
             nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "bhk", source = "bhk")
@@ -159,7 +151,6 @@ public interface PropertyMapper {
     @Mapping(target = "amenities", source = "amenities")
     @Mapping(target = "images", source = "images")
 
-    // Blank is the wizard's "no photo tagged"; the column's word for that is NULL, not "".
     @Mapping(target = "floorPlan",
             expression = "java(in.floorPlan() == null || in.floorPlan().isBlank() ? null : in.floorPlan())")
     @Mapping(target = "video",
@@ -168,8 +159,8 @@ public interface PropertyMapper {
     @Mapping(target = "address", source = "address")
     @Mapping(target = "floor", source = "floor")
 
-    /** A field to ListingCreate WITHOUT a line here is dropped in silence: it compiles, no test
-     * fails, the POST returns 201, and the value never reaches the row. Add both in the same edit. */
+    // A ListingCreate field without a mapping line is dropped silently: it compiles, no test
+    // fails, POST returns 201. Add both in the same edit.
     @Mapping(target = "bathrooms", source = "bathrooms")
     @Mapping(target = "parking", source = "parking")
     @Mapping(target = "balconies", source = "balconies")
@@ -181,8 +172,8 @@ public interface PropertyMapper {
     @Mapping(target = "electricityMeterNo", source = "electricityMeterNo")
     void applyTo(ListingCreate in, @MappingTarget Property property);
 
-    /** Hand-written owner projection — the trust boundary. Masked unless the caller's gate status is
-     * {@link ContactVisibility#REVEALED}, kept explicit so a DTO refactor cannot drop the masking. */
+    // Trust boundary: owner mobile stays masked unless the gate status is REVEALED. Kept explicit
+    // so a DTO refactor cannot drop the masking.
     default PropertyResponse.Owner toOwner(User owner, @Context ContactVisibility visibility) {
         if (owner == null) {
             return null;
@@ -194,7 +185,6 @@ public interface PropertyMapper {
                 owner.getId().toString(), owner.getName(), mobile, owner.isVerified());
     }
 
-    /** Opaque-id convention: the wire exposes the UUID as a string. Shared by every id field here. */
     default String map(UUID value) {
         return value == null ? null : value.toString();
     }
@@ -230,8 +220,6 @@ public interface PropertyMapper {
         return value instanceof Boolean flag ? flag : value instanceof String text && !text.isBlank();
     }
 
-    /** The commercial answers, or null when the listing holds none. Presence decides rather than the
-     * declared type, which is a free-text label a legacy row may carry any spelling of. */
     default PropertyResponse.Commercial toCommercial(Property property) {
         if (formDetail(property, "commercialType") == null) {
             return null;
@@ -258,8 +246,6 @@ public interface PropertyMapper {
                 formDetailText(property, "dockCount"));
     }
 
-    /** The land answers, or null when none was answered. Unlike the commercial keys these are not
-     * stripped from a residential post, so keying off presence would hang an empty plot panel on every flat. */
     default PropertyResponse.Land toLand(Property property) {
         if (LAND_KEYS.stream().noneMatch(key -> answered(formDetail(property, key)))) {
             return null;
@@ -282,7 +268,6 @@ public interface PropertyMapper {
                 formDetailBoolean(property, "satbara"));
     }
 
-    /** Staff free text stays private; only the duplicate verdict is stated to the owner. */
     default String archivedNote(Property property) {
         String reason = property.getArchiveReason();
         return property.isArchived() && reason != null
@@ -290,8 +275,6 @@ public interface PropertyMapper {
                 ? "Archived as a duplicate of another listing." : null;
     }
 
-    /** The card image: the stored cover, else the first gallery photo. Derived rather than
-     * denormalised so it cannot drift from the gallery it is the first frame of. */
     default String coverImage(Property property) {
         String stored = property.getCoverImage();
         if (stored != null && !stored.isBlank()) {
@@ -306,7 +289,6 @@ public interface PropertyMapper {
         return images == null ? List.of() : images.stream().limit(max).toList();
     }
 
-    /** The gallery size, or one for a lone cover: what the quality score counts as photos. */
     default int photoCount(Property property) {
         var images = property.getImages();
         if (images != null && !images.isEmpty()) {
@@ -315,8 +297,6 @@ public interface PropertyMapper {
         return coverImage(property) == null ? 0 : 1;
     }
 
-    /** Hand-written back-office projection — null for everyone but staff, and null for listings staff
-     * never posted, since an all-false funnel would sit on the board as work that never completes. */
     default PropertyResponse.AdminPipeline toAdminPipeline(Property property,
             @Context BackOfficeVisibility backOffice, @Context OutreachCounts outreach) {
         if (backOffice != BackOfficeVisibility.VISIBLE || property == null
@@ -335,8 +315,8 @@ public interface PropertyMapper {
                 ? ListingProgress.of(property, backOffice == BackOfficeVisibility.VISIBLE) : null;
     }
 
-    /** Mask a mobile via {@link MobileMask}; anything not a clean 10-digit number becomes null rather
-     * than a partial leak. {@code private} so MapStruct cannot apply it to other String fields. */
+    // Anything that is not a clean 10-digit number becomes null, never a partial leak. Private so
+    // MapStruct cannot apply it to other String fields.
     private String maskMobile(String mobile) {
         return MobileMask.mask(mobile);
     }

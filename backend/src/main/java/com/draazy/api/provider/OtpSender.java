@@ -10,17 +10,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-// Seam for outbound OTP delivery (ADR-007 provider strategy).
-// The app must run and be demoable with zero paid keys, so the `dev` profile logs the code instead of sending it.
 public interface OtpSender {
-
     String OPERATION = "otp";
 
-    /** Deliver {@code code} to {@code mobile}. Implementations must not block the request thread long. */
     void send(String mobile, String code);
 
-    // Delivery was attempted and did not demonstrably fail before leaving this process. A 503, because a
-    // provider outage is not the caller's fault and retrying after the hint can succeed.
     class DeliveryFailedException extends ServiceUnavailableException {
         static final int RETRY_AFTER_SECONDS = 60;
 
@@ -31,14 +25,11 @@ public interface OtpSender {
     }
 }
 
-// Dev only: log the OTP so testers can read it from the console — no external call, no key.
-// Disabled when WhatsApp is enabled so Meta test-number credentials hit the real sender.
 @Component
 @LocalOnly
 @ConditionalOnProperty(prefix = "draazy.providers.whatsapp", name = "enabled",
         havingValue = "false", matchIfMissing = true)
 class MockOtpSender implements OtpSender {
-
     private static final Logger log = LoggerFactory.getLogger(MockOtpSender.class);
 
     private final ProviderCalls calls;
@@ -54,14 +45,11 @@ class MockOtpSender implements OtpSender {
     }
 }
 
-// Non-dev stub: fail loudly until WhatsApp credentials are supplied (ADR-020).
-// Before turning the flag on, add a spend control.
 @Component
 @Profile(SandboxOtpSender.PROFILE + " & " + LocalProfileGuard.NOT_LOCAL)
 @ConditionalOnProperty(prefix = "draazy.providers.whatsapp", name = "enabled",
         havingValue = "false", matchIfMissing = true)
 class SandboxOtpSender implements OtpSender {
-
     static final String PROFILE = LocalProfileGuard.SANDBOX_PROFILE;
 
     private static final Logger log = LoggerFactory.getLogger(SandboxOtpSender.class);
@@ -84,7 +72,6 @@ class SandboxOtpSender implements OtpSender {
 @ConditionalOnProperty(prefix = "draazy.providers.whatsapp", name = "enabled",
         havingValue = "false", matchIfMissing = true)
 class UnconfiguredOtpSender implements OtpSender {
-
     @Override
     public void send(String mobile, String code) {
         throw new UnsupportedOperationException(

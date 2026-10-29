@@ -10,10 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Rebuilds an embedded ICC profile from its colour-rendering tags only, so pixels look the same but device
- * make/model, description, copyright and creator fields do not survive. */
+// Keeps only colour-rendering tags so device make/model, copyright and creator data do not survive.
 final class IccProfileScrubber {
-
     static final int MAX_BYTES = 4 << 20;
 
     private static final int HEADER = 128;
@@ -26,7 +24,6 @@ final class IccProfileScrubber {
     private IccProfileScrubber() {
     }
 
-    /** Null when the profile is malformed or has nothing to render with: browsers ignore those anyway. */
     static byte[] scrub(byte[] p) {
         if (p.length < HEADER + 4 || p.length > MAX_BYTES) {
             return null;

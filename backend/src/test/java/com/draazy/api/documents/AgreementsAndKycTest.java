@@ -23,7 +23,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
 class AgreementsAndKycTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -84,8 +83,6 @@ class AgreementsAndKycTest extends AbstractApiTest {
         unlinked(owner, listing(owner, "Mine"));
         unlinked(otherOwner, listing(otherOwner, "Theirs"));
 
-        // The tenant half of the query is an equality on a mobile: this is the assertion that would
-        // fail if the null/blank handling ever collapsed into matching every row.
         mvc.perform(get(Routes.MeRentAgreements.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
@@ -188,5 +185,4 @@ class AgreementsAndKycTest extends AbstractApiTest {
                         .content("{\"status\":\"notarised\"}"))
                 .andExpect(status().isUnprocessableEntity());
     }
-
 }

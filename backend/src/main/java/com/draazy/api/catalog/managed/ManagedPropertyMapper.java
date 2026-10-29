@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ManagedPropertyMapper {
-
     public ManagedPropertyDto toDto(ManagedProperty m) {
         return new ManagedPropertyDto(
                 m.getId().toString(),
@@ -39,7 +38,6 @@ public class ManagedPropertyMapper {
         return records.stream().map(this::toDto).toList();
     }
 
-    /** Never re-derived from the parent property: reading it would rewrite receipts a tenant already holds. */
     public ManagedRentReceiptDto toDto(ManagedRentReceipt r) {
         return new ManagedRentReceiptDto(
                 r.getId().toString(),
@@ -51,7 +49,6 @@ public class ManagedPropertyMapper {
                 r.getCreatedAt());
     }
 
-    /** Not {@code toDtos}: erasure makes both list overloads the same signature. */
     public List<ManagedRentReceiptDto> toReceiptDtos(List<ManagedRentReceipt> receipts) {
         return receipts.stream().map(this::toDto).toList();
     }

@@ -32,15 +32,10 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Re-derives eligibility server-side, since hiding the button is no control.
- * Moderation is post-hoc: pre-moderation hides an author's review from them and suppresses honest ones. */
 @Service
 public class ReviewService {
-
-    /** Writer for the {@code categories} column; symmetric with the mapper's reader. */
     private static final ObjectMapper CATEGORIES_JSON = JsonMapper.builder().build();
 
-    /** One decimal place, matching how the UI renders a rating ("4.3") and {@code Society}. */
     private static final int RATING_SCALE = 1;
 
     private final ReviewRepository reviews;
@@ -63,7 +58,6 @@ public class ReviewService {
         this.ownerRelationship = ownerRelationship;
     }
 
-    /** Unpaged because per-property reviews are bounded; the summary comes from the database, not the rows. */
     @Transactional(readOnly = true)
     public ReviewListResponse listForProperty(UUID propertyId, UUID viewerId) {
         requireReachableProperty(propertyId);
@@ -72,7 +66,6 @@ public class ReviewService {
         return ReviewListResponse.of(new PageImpl<>(rows), summaryOf(ReviewTargetTypes.PROPERTY, targetId));
     }
 
-    /** Paged, unlike {@link #listForProperty}, because no unique index bounds the moderation queue's count. */
     @Transactional(readOnly = true)
     public Page<ReviewModerationRow> listForModeration(String status, String q, Integer days, Pageable pageable) {
         Instant since = PlatformTime.sinceOrNull(days);
@@ -83,7 +76,6 @@ public class ReviewService {
         return page.map(r -> ReviewModerationRow.of(r, authorOf(authors, r)));
     }
 
-    /** Whole-queue totals for the status chips: {@code all} plus one key per status, zero when none. */
     @Transactional(readOnly = true)
     public Map<String, Long> moderationCounts() {
         Map<String, Long> counts = new LinkedHashMap<>();
@@ -100,8 +92,6 @@ public class ReviewService {
         return counts;
     }
 
-    /** {@link ReviewTargetKey#resolve} 404s an unknown target, so a bad locality slug is an error
-     * rather than a zero-review summary. */
     @Transactional(readOnly = true)
     public ReviewListResponse listForEntity(String entityType, String entityId, Pageable pageable, UUID viewerId) {
         String key = targetKey.resolve(entityType, entityId);
@@ -112,8 +102,6 @@ public class ReviewService {
                 summaryOf(entityType, key));
     }
 
-    /** Checks run in order so the caller gets the most specific true reason, with a clean 409 on a duplicate
-     * before the write. */
     @Transactional
     public ReviewResponse createForProperty(UUID authorId, UUID propertyId,
             ReviewCreateRequest body) {
@@ -135,8 +123,6 @@ public class ReviewService {
         return mapper.toResponse(review, displayName(authorId), Boolean.TRUE);
     }
 
-    /** No {@code context} badge: a neighbourhood has no visit or tenancy to evidence, and an owner
-     * review is gated by {@link OwnerRelationship} instead. */
     @Transactional
     public ReviewResponse createForEntity(UUID authorId, String entityType, String entityId,
             ReviewCreateRequest body) {
@@ -148,7 +134,6 @@ public class ReviewService {
         return mapper.toResponse(review, displayName(authorId), Boolean.TRUE);
     }
 
-    /** A full replace of what the author wrote; the badge, target and date stay as first posted. */
     @Transactional
     public ReviewResponse update(UUID authorId, UUID reviewId, ReviewCreateRequest body) {
         Review review = requireOwnEditable(authorId, reviewId);
@@ -175,8 +160,6 @@ public class ReviewService {
         }
     }
 
-    /** 404 for someone else's review too, so ids cannot be probed; a rejected one stays put, or
-     * delete-and-repost would undo a takedown. */
     private Review requireOwnEditable(UUID authorId, UUID reviewId) {
         return reviews.findById(reviewId)
                 .filter(r -> authorId.equals(r.getAuthorId()))
@@ -197,14 +180,12 @@ public class ReviewService {
         review.setRecommend(body.recommend());
         review.setContext(context);
         review.setCategories(categories);
-        // Post-moderation, deliberately. See the class Javadoc.
         review.setStatus(ReviewStatuses.PUBLISHED);
         return reviews.save(review);
     }
 
     private static String categoriesJson(String targetType, Map<String, Integer> given) {
         try {
-            // Other-vocabulary keys are refused, not dropped, which would save a review with an empty aspect bar.
             return CATEGORIES_JSON.writeValueAsString(ReviewCategories.validated(targetType, given));
         } catch (IllegalArgumentException rejected) {
             throw new BadRequestException(rejected.getMessage());
@@ -216,8 +197,6 @@ public class ReviewService {
                 .orElseThrow(() -> NotFoundException.of("Property"));
     }
 
-    /** The 404 gate for the anonymous read: applies the public detail route's visibility floor, or a UUID would
-     * confirm that a rejected or archived listing is on file. The write path stays unfiltered on purpose. */
     private void requireReachableProperty(UUID propertyId) {
         if (!properties.existsByIdAndArchivedFalseAndStatusIn(
                 propertyId, PropertyStatus.DIRECTLY_REACHABLE)) {
@@ -225,8 +204,6 @@ public class ReviewService {
         }
     }
 
-    /** Guarded because {@link #authors} returns {@code Map.of()} when no row has an author,
-     * and an immutable map NPEs on a null key. */
     private static User authorOf(Map<UUID, User> authors, Review row) {
         return row.getAuthorId() == null ? null : authors.get(row.getAuthorId());
     }
@@ -243,12 +220,10 @@ public class ReviewService {
                 .toList();
     }
 
-    /** Null rather than false, so every other reader's rows stay exactly as before. */
     private static Boolean mineFor(Review row, UUID viewerId) {
         return viewerId != null && viewerId.equals(row.getAuthorId()) ? Boolean.TRUE : null;
     }
 
-    /** One query per page: resolving authors in the row mapping is an N+1 on a public anonymous endpoint. */
     private Map<UUID, User> authors(List<Review> rows) {
         Set<UUID> ids = rows.stream()
                 .map(Review::getAuthorId)
@@ -272,14 +247,12 @@ public class ReviewService {
         ReviewRatingTally tally = reviews.tallyFor(targetType, targetId);
         long total = nonNull(tally.reviewCount());
         return new ReviewSummaryResponse(
-                // Null, not 0.0, when nobody has reviewed it — see ReviewSummaryResponse.
                 total == 0 ? null : rounded(tally.avgRating()),
                 total,
                 distributionOf(tally),
                 categoryAveragesFor(targetType, targetId));
     }
 
-    /** Always all five buckets, zero-filled once here rather than by every client. */
     private static Map<String, Long> distributionOf(ReviewRatingTally tally) {
         Map<String, Long> stars = new LinkedHashMap<>();
         stars.put("1", nonNull(tally.star1()));
@@ -290,8 +263,6 @@ public class ReviewService {
         return stars;
     }
 
-    /** Uses this target kind's vocabulary, the same list {@link #persist} validates against, or the
-     * {@code c.key in (:keys)} filter drops aspects. */
     private Map<String, BigDecimal> categoryAveragesFor(String targetType, String targetId) {
         Map<String, BigDecimal> averages = new LinkedHashMap<>();
         for (ReviewCategoryAverage row : reviews.categoryAveragesFor(
@@ -309,7 +280,6 @@ public class ReviewService {
                 : BigDecimal.valueOf(average).setScale(RATING_SCALE, RoundingMode.HALF_UP);
     }
 
-    /** {@code count()} cannot be null, but a constructor expression cannot select a primitive. */
     private static long nonNull(Long count) {
         return count == null ? 0L : count;
     }

@@ -18,12 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Spring test annotations must live on the class hierarchy; fields cannot inject the context.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
 public abstract class AbstractApiTest {
-
     @Autowired
     protected MockMvc mvc;
 
@@ -52,7 +50,6 @@ public abstract class AbstractApiTest {
         liveLocality(COMMON_LOCALITIES.toArray(String[]::new));
     }
 
-    /** Makes each name a live, picked locality for this test (rolled back with it); revives a retired seeded row. */
     protected void liveLocality(String... names) {
         jdbc.update("""
                 insert into localities (slug, name, city, lat, lng, place_id, active, archived_at)
@@ -68,11 +65,6 @@ public abstract class AbstractApiTest {
         return "Bearer " + jwtService.issueAccessToken(u);
     }
 
-    /**
-     * A staff account with no stored functions is dashboard-only (fail-closed). Tests written before
-     * functions expect the old staff baseline, so they get what V90 gave existing staff: every
-     * non-desk function plus their own desk. Tests of the fail-closed path mint tokens directly.
-     */
     private void grantLegacyStaffFunctions(User u) {
         if (!Roles.Wire.STAFF.equals(u.getRole()) || u.getId() == null) {
             return;
@@ -90,7 +82,6 @@ public abstract class AbstractApiTest {
     private static final java.util.regex.Pattern SOCIETY_TEXT =
             java.util.regex.Pattern.compile("\"society\"\\s*:\\s*\"([^\"]+)\"");
 
-    /** A community society with this name, created on first use; returns its id. */
     protected UUID societyNamed(String name) {
         String slug = name.toLowerCase().replaceAll("[^a-z0-9]+", "-");
         jdbc.update("INSERT INTO societies (slug, name, source, place_id) VALUES (?, ?, 'community', ?) "
@@ -98,7 +89,6 @@ public abstract class AbstractApiTest {
         return jdbc.queryForObject("SELECT id FROM societies WHERE slug = ?", UUID.class, slug);
     }
 
-    /** Rewrites a legacy typed {@code "society":"X"} body field into the {@code societyId} the API now takes. */
     protected String withSocietyIds(String json) {
         return SOCIETY_TEXT.matcher(json).replaceAll(m ->
                 "\"societyId\":\"" + societyNamed(m.group(1)) + "\"");
@@ -112,7 +102,6 @@ public abstract class AbstractApiTest {
         return "\"images\":[\"" + listingPhoto(owner) + "\"]";
     }
 
-    /** The owner's full record. Create, edit and take-down answer only the identity and verdict. */
     protected ResultActions storedListing(User owner, Object id) throws Exception {
         return mvc.perform(get("/me/listings/" + id).header("Authorization", bearer(owner)))
                 .andExpect(status().isOk());

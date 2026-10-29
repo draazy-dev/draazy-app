@@ -19,7 +19,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class ErrorLogRepository {
-
     public enum Status { OPEN, RESOLVED, ALL }
 
     private static final RowMapper<ErrorEventSummary> SUMMARY = (rs, i) -> new ErrorEventSummary(
@@ -66,7 +65,6 @@ public class ErrorLogRepository {
             for (int i = 0; i < 5; i++) {
                 args.add(pattern);
             }
-            // The user-quoted crash reference is matched from its start, not anywhere inside it.
             args.add(pattern.substring(1));
         }
 

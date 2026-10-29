@@ -19,15 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.OptimisticLockingFailureException;
 
-/**
- * Deterministic stale-write proof for visits (D146).
- *
- * <p>Threaded races are flaky. This test reproduces the real failure mode deterministically by
- * detaching one copy, committing another, and then trying to save the stale copy.
- */
 @DisplayName("Slice D146 - visits optimistic locking")
 class VisitConcurrencyTest extends AbstractApiTest {
-
     @Autowired
     VisitRepository visits;
 
@@ -85,8 +78,6 @@ class VisitConcurrencyTest extends AbstractApiTest {
             .isEqualTo(VisitStatuses.CONFIRMED);
 
         stale.reschedule(Instant.now().plus(5, ChronoUnit.DAYS));
-        // Nothing should follow this assertion in this test transaction: a failed optimistic lock
-        // marks it rollback-only, so the winner-survived half is asserted above.
         assertThatThrownBy(() -> visits.saveAndFlush(stale))
                 .isInstanceOf(OptimisticLockingFailureException.class);
     }

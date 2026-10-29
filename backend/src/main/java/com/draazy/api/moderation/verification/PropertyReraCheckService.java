@@ -16,10 +16,8 @@ import com.draazy.api.security.BackOfficePermissions;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Records what staff found when they looked the listing's RERA ID up on MahaRERA. */
 @Service
 public class PropertyReraCheckService {
-
     private final PropertyRepository properties;
     private final PropertyLifecycle lifecycle;
     private final VerificationCases cases;

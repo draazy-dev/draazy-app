@@ -33,10 +33,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// The assertions are about who is talking: a platform note must come back as `ops`, or it counts as owner-read.
 @DisplayName("Listing writes — server-authored re-review notes and duplicate flags")
 class ListingNoticesTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -48,7 +46,6 @@ class ListingNoticesTest extends AbstractApiTest {
     @Autowired
     TestPlanGrants plans;
 
-    /** Audit rows are written {@code REQUIRES_NEW} and therefore survive this test's rollback. */
     private final List<String> createdActors = new ArrayList<>();
 
     @AfterEach
@@ -61,8 +58,6 @@ class ListingNoticesTest extends AbstractApiTest {
         return user(mobile, Roles.Wire.OWNER);
     }
 
-    // Staff notes require the ordinary baseline, including `properties:read`.
-    // The narrowed-account test below proves the grant is load-bearing.
     private User staff(String mobile) {
         return user(mobile, Roles.Wire.STAFF);
     }
@@ -76,7 +71,6 @@ class ListingNoticesTest extends AbstractApiTest {
         return saved;
     }
 
-    /** A create body with only the fields these tests care about; everything else takes its default. */
     private String body(String token, String meter, String address) {
         User photoOwner = users.findById(jwtService.parse(token.replace("Bearer ", "")).userId()).orElseThrow();
         return """
@@ -179,8 +173,6 @@ class ListingNoticesTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.messages.length()").value(1))
                 .andExpect(jsonPath("$.messages[0].body").value(containsString("You updated: price")));
 
-        // Suppressing the repeat must not suppress the next real thing. A field the desk has not been
-        // told about yet still earns its note, because the work item genuinely grew.
         patchOk(id, token, "{\"furnishing\":\"furnished\"}");
 
         mvc.perform(get("/properties/" + id + "/verification")
@@ -210,8 +202,6 @@ class ListingNoticesTest extends AbstractApiTest {
             properties.saveAndFlush(p);
         });
 
-        // Both halves in one PATCH: bhk is an identity field, price a stays-live one. The revert
-        // wins, and the owner must not be told two contradictory things about the same edit.
         mvc.perform(patch("/me/listings/" + id).header(HttpHeaders.AUTHORIZATION, token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"bhk\":3,\"price\":34000}"))
@@ -235,8 +225,6 @@ class ListingNoticesTest extends AbstractApiTest {
         String token = bearer(owner);
         UUID id = create(token, null, null);
 
-        // Approved, because the control at the end of this test is a stays-live edit, which only raises
-        // anything on a live listing. See aPendingListingIsNotToldItStaysLive for the other half.
         properties.findById(id).ifPresent(p -> {
             p.setStatus(PropertyStatus.APPROVED);
             properties.saveAndFlush(p);
@@ -247,8 +235,6 @@ class ListingNoticesTest extends AbstractApiTest {
                         .content("{\"deposit\":60000}"))
                 .andExpect(status().isOk());
 
-        // 404 is "no case file": a deposit edit must not manufacture a moderation work item or an unread
-        // badge. Prose and photographs deliberately do not qualify — a reviewer looked at those.
         mvc.perform(get("/properties/" + id + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, token))
                 .andExpect(status().isNotFound());
@@ -277,8 +263,6 @@ class ListingNoticesTest extends AbstractApiTest {
 
                 .andExpect(jsonPath("$.recheckPending").value(false));
 
-        // The note has to refuse with it, or an off-search listing's owner is told "your listing stays live"
-        // and gets an unread badge pointing at a thread whose only message is false.
         mvc.perform(get("/properties/" + id + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, token))
                 .andExpect(status().isNotFound());
@@ -304,8 +288,6 @@ class ListingNoticesTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, secondToken))
                 .andExpect(status().isNotFound());
 
-        // Staff see it, and it names the listing to compare against — without the other listing's
-        // identity the note is a rumour rather than a work item.
         mvc.perform(get("/properties/" + second + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff("9871115533"))))
                 .andExpect(status().isOk())
@@ -384,14 +366,11 @@ class ListingNoticesTest extends AbstractApiTest {
         String secondToken = bearer(owner("9820000543"));
         UUID second = create(secondToken, "MSEDCL-170046200", null);
 
-        // The duplicate note is already filed and is not rewritten.
         properties.findById(second).ifPresent(p -> {
             p.setStatus(PropertyStatus.APPROVED);
             properties.saveAndFlush(p);
         });
 
-        // An owner-addressed note in the same case file lifts the 404, leaving the per-message filter as the
-        // only thing between the owner and the flag. Elsewhere that filter is shadowed by the 404.
         mvc.perform(patch("/me/listings/" + second).header(HttpHeaders.AUTHORIZATION, secondToken)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"price\":45000}"))
                 .andExpect(status().isOk());
@@ -410,7 +389,6 @@ class ListingNoticesTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.messages[0].body").value(
                         org.hamcrest.Matchers.containsString("Possible duplicate")));
 
-        // And the dashboard counts one unread, not two — the flag must not inflate a badge either.
         mvc.perform(get("/me/property-reviews").header(HttpHeaders.AUTHORIZATION, secondToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
@@ -425,8 +403,6 @@ class ListingNoticesTest extends AbstractApiTest {
         String secondToken = bearer(owner("9820000541"));
         UUID second = create(secondToken, "MSEDCL-170047002", "B-402 Rohan Nilay");
 
-        // Distinct meters, so only the (address_key, locality_slug) arm can have matched. The body is asserted
-        // too, because "exactly one message" is satisfied by the ordinary re-review notice as well.
         mvc.perform(get("/properties/" + second + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff("9871115540"))))
                 .andExpect(status().isOk())
@@ -442,8 +418,6 @@ class ListingNoticesTest extends AbstractApiTest {
         String secondToken = bearer(owner("9820000571"));
         UUID second = createWithPhotos(secondToken, NEAR);
 
-        // The positive anchor, first: every claim below about what the owner cannot see is worthless unless the
-        // note provably exists. The other listing's id is asserted, since a note about the wrong one would pass.
         mvc.perform(get("/properties/" + second + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff("9871115570"))))
                 .andExpect(status().isOk())
@@ -452,8 +426,6 @@ class ListingNoticesTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.messages[0].body").value(containsString(first.toString())))
                 .andExpect(jsonPath("$.messages[0].internal").value(true));
 
-        // No case file at all, not a redacted one: the staff read above proves the record exists, so 404 here
-        // can only be the owner filter. An empty 200 would itself answer the probe. See #ownerVisibleCase.
         mvc.perform(get("/properties/" + second + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, secondToken))
                 .andExpect(status().isNotFound());
@@ -474,8 +446,6 @@ class ListingNoticesTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff("9871115562"))))
                 .andExpect(status().isNotFound());
 
-        // The row that would otherwise pass: same anchor, same stranger, same band hit, two bits away instead
-        // of sixteen. Without it, "no case file" is equally the arm never running or the band query missing.
         UUID near = createWithPhotos(bearer(owner("9820000567")), NEAR);
         mvc.perform(get("/properties/" + near + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff("9871115567"))))
@@ -489,21 +459,16 @@ class ListingNoticesTest extends AbstractApiTest {
     void thePhotoArmSkipsTheSameOwner() throws Exception {
         User both = owner("9820000564");
 
-        // Two listings need two slots, and the free allowance is one.
         plans.grant(both.getId(), TestPlanGrants.OWNER_PLUS);
         String token = bearer(both);
 
         UUID first = createWithPhotos(token, BASE);
         UUID second = createWithPhotos(token, BASE);
 
-        // Distance zero and still nothing, because an owner photographing two flats in the same building is
-        // not fraud. The exclusion lives in findBandCandidates' own `owner.id <> :ownerId`, not the doorway arm's.
         mvc.perform(get("/properties/" + second + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff("9871115564"))))
                 .andExpect(status().isNotFound());
 
-        // The row that would otherwise pass: a stranger posting the very same hash. Only the owner differs,
-        // so this stops "nothing happened" from being the answer to every question in this test.
         UUID stranger = createWithPhotos(bearer(owner("9820000568")), BASE);
         mvc.perform(get("/properties/" + stranger + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff("9871115568"))))
@@ -526,8 +491,6 @@ class ListingNoticesTest extends AbstractApiTest {
                         .content("{\"images\":[" + imagesJson(secondOwner, NEAR) + "]}"))
                 .andExpect(status().isOk());
 
-        // Nothing in signalOf moved, so only the photo set can have re-run the probe. This is the edit the
-        // address arm is structurally blind to: retype nothing, replace the pictures.
         mvc.perform(get("/properties/" + second + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff("9871115565"))))
                 .andExpect(status().isOk())
@@ -561,14 +524,11 @@ class ListingNoticesTest extends AbstractApiTest {
     @Test
     @DisplayName("the catch-up sweep reaches a listing whose only signal is its photographs")
     void theSweepReadsPhotoOnlyListings() throws Exception {
-
-        // Photographs are the only thing either listing is findable by.
         UUID first = createWithPhotos(bearer(owner("9820000572")), BASE);
         UUID second = createWithPhotos(bearer(owner("9820000573")), NEAR);
 
         String staffToken = bearer(staff("9871115572"));
 
-        // The precondition, asserted rather than assumed: nothing is on file against the first listing yet.
         mvc.perform(get("/properties/" + first + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, staffToken))
                 .andExpect(status().isNotFound());
@@ -600,16 +560,12 @@ class ListingNoticesTest extends AbstractApiTest {
             properties.saveAndFlush(p);
         });
 
-        // A stays-live edit puts an owner-addressed note beside the duplicate flag, so the receipt has
-        // something it is entitled to mark. Without it, "nothing got marked" would prove nothing.
         patchOk(second, secondToken, "{\"price\":45000}");
 
         mvc.perform(post("/properties/" + second + "/verification/read")
                         .header(HttpHeaders.AUTHORIZATION, secondToken))
                 .andExpect(status().isNoContent());
 
-        // Staff see both. The duplicate stays unread — a receipt cannot speak for a message its sender never
-        // saw — while the note they were shown is read, proving the receipt still works at all.
         mvc.perform(get("/properties/" + second + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff("9871115545"))))
                 .andExpect(status().isOk())
@@ -631,15 +587,11 @@ class ListingNoticesTest extends AbstractApiTest {
             properties.saveAndFlush(p);
         });
 
-        // The owner's own route returns it, because an edit form that cannot show the stored value
-        // clears it on the next save.
         mvc.perform(get("/me/listings/" + id).header(HttpHeaders.AUTHORIZATION, token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.electricityMeterNo").value("MSEDCL-170048777"))
                 .andExpect(jsonPath("$.address").value("A-902, Rohan Nilay, Baner"));
 
-        // The public detail route does not. The address is on this list because it carries the flat number for
-        // AddressKey, and the contact gate is worth nothing against a stranger who knows which door.
         mvc.perform(get("/properties/" + id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.electricityMeterNo").doesNotExist())
@@ -651,8 +603,6 @@ class ListingNoticesTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.address").doesNotExist());
     }
 
-    // Forces the projection to prove `flagReason` is hidden for approved listings,
-    // instead of trusting every caller to omit it.
     @Test
     @DisplayName("the flag reason reaches only the desk, never the public or the listing owner")
     void theFlagReasonReachesOnlyStaff() throws Exception {
@@ -688,8 +638,6 @@ class ListingNoticesTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.flagReason")
                         .value("reporter says the photos are from a hotel listing"));
 
-        // And the assertion that stops this from being satisfied by dropping the field: the desk
-        // still gets it, from the review detail the desk opens.
         mvc.perform(get("/admin/properties/" + id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff("9871115571"))))
                 .andExpect(status().isOk())
@@ -711,8 +659,6 @@ class ListingNoticesTest extends AbstractApiTest {
 
         UUID second = create(bearer(owner("9820000545")), "MSEDCL-170049100", null);
 
-        // Without these the note is a suspicion, not a work item: it names two listings and no way to tell which
-        // moved. A throwaway carrying a competitor's meter differs only in being newer, dark and unverified.
         String body = mvc.perform(get("/properties/" + second + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff("9871115544"))))
                 .andExpect(status().isOk())
@@ -734,14 +680,10 @@ class ListingNoticesTest extends AbstractApiTest {
         create(bearer(owner("9820000546")), "MSEDCL-170049200", null);
         UUID second = create(bearer(owner("9820000547")), "MSEDCL-170049200", null);
 
-        // This route cannot be grant-gated at the controller, being participant-or-staff, so the service
-        // decides — and deciding on the bare role would let a deliberately narrowed account read every note.
         User narrowed = staff("9871115546");
         grants.saveAndFlush(new com.draazy.api.common.access.BackOfficeGrant(
                 narrowed.getId(), "[\"users:read\"]", narrowed.getId()));
 
-        // Answered exactly as the owner is answered, because to this account the case is one that
-        // holds nothing but staff-only material and nothing it may read.
         mvc.perform(get("/properties/" + second + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, bearer(narrowed)))
                 .andExpect(status().isNotFound());
@@ -755,7 +697,6 @@ class ListingNoticesTest extends AbstractApiTest {
     @Test
     @DisplayName("a flag on an old case file lifts it back up the ops queue instead of sinking")
     void anInternalNoteResurfacesTheCase() throws Exception {
-
         create(bearer(owner("9820000548")), "MSEDCL-170049300", null);
 
         String ownerToken = bearer(owner("9820000549"));
@@ -777,8 +718,6 @@ class ListingNoticesTest extends AbstractApiTest {
         properties.flush();
         assertThat(jdbc.queryForObject(latest, String.class, stale, newer)).isEqualTo(newer.toString());
 
-        // review_messages owns the association, so inserting a message does not dirty property_reviews by
-        // itself and an old case would stay out of sight. What is pinned: something said in a case moves it.
         mvc.perform(patch("/me/listings/" + stale).header(HttpHeaders.AUTHORIZATION, ownerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"electricityMeterNo\":\"MSEDCL-170049300\"}"))
@@ -809,8 +748,6 @@ class ListingNoticesTest extends AbstractApiTest {
     void oneOwnerDoesNotCollideWithThemselves() throws Exception {
         User owner = owner("9820000535");
 
-        // Two live listings is over the free tier's one. Granted rather than worked around: seeding the second
-        // past the endpoint would skip the reindex that creates the collision this test looks for.
         plans.grant(owner.getId(), TestPlanGrants.OWNER_PLUS);
         String token = bearer(owner);
         create(token, "MSEDCL-170045999", null);
@@ -840,16 +777,12 @@ class ListingNoticesTest extends AbstractApiTest {
         String b = AddressKey.of("B-402 Rohan Nilay, Baner, Pune 411045", "Pune", "Baner");
         assertThat(a).isEqualTo(b).isEqualTo("402 b nilay rohan");
 
-        // Different unit in the same building must not collapse — the whole rule is worthless if it
-        // cannot tell 402 from 403.
         assertThat(AddressKey.of("Flat 403, B Wing, Rohan Nilay, Baner", "Pune", "Baner"))
                 .isNotEqualTo(a);
 
         assertThat(AddressKey.of("The society building", "Pune", "Baner")).isNull();
         assertThat(AddressKey.of(null, "Pune", "Baner")).isNull();
 
-        // So does one reducing to a single token: "Flat 402" is "402", true of one flat per floor in every
-        // building in Baner, and a key that selective files moderation cases against strangers.
         assertThat(AddressKey.of("Flat 402", "Pune", "Baner")).isNull();
     }
 
@@ -859,8 +792,6 @@ class ListingNoticesTest extends AbstractApiTest {
         String firstToken = bearer(owner("9820000560"));
         UUID first = create(firstToken, "MSEDCL-170047100", null);
 
-        // Staging the race a single-threaded test cannot have: created meterless
-        // so the probe early-outs, then the second writer adds the same meter.
         String secondToken = bearer(owner("9820000561"));
         UUID second = create(secondToken, null, null);
         Property racer = properties.findById(second).orElseThrow();
@@ -870,15 +801,12 @@ class ListingNoticesTest extends AbstractApiTest {
 
         String staffToken = bearer(staff("9871115560"));
 
-        // Neither listing knows about the other; otherwise the later assertion
-        // could pass on a note the create path already filed.
         mvc.perform(get("/properties/" + second + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, staffToken))
                 .andExpect(status().isNotFound());
 
         probe.resweepRecent(Instant.now().minus(Duration.ofMinutes(20)), 500);
 
-        // The sweep has no notion of who was first, so both desks must see the collision.
         mvc.perform(get("/properties/" + second + "/verification")
                         .header(HttpHeaders.AUTHORIZATION, staffToken))
                 .andExpect(status().isOk())
@@ -890,7 +818,6 @@ class ListingNoticesTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.messages[0].body").value(containsString("Possible duplicate")));
 
-        // Consecutive ticks intentionally re-read the same window; the second pass must stay silent.
         probe.resweepRecent(Instant.now().minus(Duration.ofMinutes(20)), 500);
 
         mvc.perform(get("/properties/" + second + "/verification")
@@ -909,8 +836,6 @@ class ListingNoticesTest extends AbstractApiTest {
         racer.setElectricityMeterNo("MSEDCL-170047200");
         properties.saveAndFlush(racer);
 
-        // Ending the bounded scan before these writes is the only way to prove it
-        // is not quietly growing with the platform.
         probe.resweepRecent(Instant.now().plus(Duration.ofMinutes(1)), 500);
 
         mvc.perform(get("/properties/" + second + "/verification")

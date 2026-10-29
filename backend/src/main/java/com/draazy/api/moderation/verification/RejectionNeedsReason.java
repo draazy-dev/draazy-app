@@ -9,7 +9,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-// Report against note so the console can mark the field the reviewer must fill in.
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = RejectionNeedsReason.Validator.class)
@@ -22,7 +21,6 @@ public @interface RejectionNeedsReason {
 
     class Validator implements ConstraintValidator<RejectionNeedsReason,
             PropertyVerificationController.DecisionRequest> {
-
         @Override
         public boolean isValid(PropertyVerificationController.DecisionRequest body,
                 ConstraintValidatorContext context) {

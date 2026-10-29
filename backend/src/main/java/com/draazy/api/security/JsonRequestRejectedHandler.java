@@ -11,10 +11,8 @@ import org.springframework.security.web.firewall.RequestRejectedException;
 import org.springframework.security.web.firewall.RequestRejectedHandler;
 import org.springframework.stereotype.Component;
 
-/** Answers a path the firewall refuses (encoded slash, "..", semicolon) with the JSON envelope. */
 @Component
 class JsonRequestRejectedHandler implements RequestRejectedHandler {
-
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
             RequestRejectedException ex) throws IOException {

@@ -10,21 +10,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.mock.env.MockEnvironment;
 
-/** The header carries no unit and Cashfree sends seconds while fixtures sign millis; signer and verifier
- * are the same object, so agreement proves nothing about which unit is real. */
 @DisplayName("the webhook freshness window accepts the unit Cashfree actually sends")
 class WebhookFreshnessTest {
-
     private static final String SECRET = "test-secret-not-the-committed-default";
     private static final String BODY = "{\"type\":\"PAYMENT_SUCCESS_WEBHOOK\"}";
     private static final byte[] BODY_BYTES = BODY.getBytes(StandardCharsets.UTF_8);
 
-    /** The environment is only consulted when the secret is the committed default; this is not. */
     private final WebhookSignature signature =
             new WebhookSignature(SECRET, false, new MockEnvironment());
 
-    /** A correctly signed callback in Cashfree's own unit (seconds) is accepted; milliseconds stay valid
-     * because every fixture in this suite signs with them. */
     @ParameterizedTest(name = "{0} verifies")
     @CsvSource({"epoch seconds,1000", "epoch milliseconds,1"})
     void aFreshTimestampVerifies(String unit, long divisor) {
@@ -34,7 +28,6 @@ class WebhookFreshnessTest {
                 .isEqualTo(Verification.VERIFIED);
     }
 
-    /** A signature over a different body is not rescued by a fresh timestamp. */
     @Test
     @DisplayName("a valid timestamp does not excuse a wrong signature")
     void theHmacStillHasToMatch() {
@@ -44,8 +37,6 @@ class WebhookFreshnessTest {
                 .isEqualTo(Verification.MISMATCH);
     }
 
-    /** The sentAt < 0 guard's one killing value is now + Long.MIN_VALUE, but now is read inside the
-     * verifier, so only the ordinary negative case is testable. */
     @Test
     @DisplayName("a negative timestamp is never fresh")
     void negativeIsRefused() {
@@ -66,8 +57,6 @@ class WebhookFreshnessTest {
                 body.getBytes(StandardCharsets.UTF_8))).isEqualTo(Verification.VERIFIED);
     }
 
-    /** The one non-self-referential assertion: the expected value is computed outside this codebase, so
-     * reversing the concatenation or switching to hex must disagree. */
     @Test
     @DisplayName("the MAC is Base64 HMAC-SHA256 over timestamp + body, in that order")
     void theWireFormatIsTheVendorsOwn() {
@@ -75,8 +64,6 @@ class WebhookFreshnessTest {
                 .isEqualTo("MFc5Evb/LIyj+Nfm11rW5pqXAB4LjBD4QHo3gA1mC2g=");
     }
 
-    /** Pins the window's size, which the hour-old test does not; the five-second margin is because now is
-     * read inside the verifier, so an exact boundary is a coin flip on CI. */
     @Test
     @DisplayName("the window is five minutes wide in seconds and in milliseconds")
     void theWindowEdgesHold() {
@@ -101,8 +88,6 @@ class WebhookFreshnessTest {
         }
     }
 
-    /** Only {@link Verification#MISMATCH} means the key is wrong; an undifferentiated refusal sent
-     * the last reader after a secret that was correct. */
     @Test
     @DisplayName("each refusal names its own cause")
     void theReasonsAreDistinct() {

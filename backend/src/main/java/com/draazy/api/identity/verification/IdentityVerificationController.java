@@ -13,10 +13,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-// Multipart, not pre-signed: images must land atomically with consent and claims.
 @RestController
 public class IdentityVerificationController {
-
     private final IdentityVerificationService service;
     private final LivenessCheck livenessCheck;
 
@@ -26,7 +24,6 @@ public class IdentityVerificationController {
         this.livenessCheck = livenessCheck;
     }
 
-    /** {@code GET /me/verification/identity} (contract {@code getIdentityVerification}). */
     @GetMapping(Routes.Verification.IDENTITY)
     public IdentityVerificationResponse status(@CurrentUser AuthPrincipal principal) {
         return service.status(principal.userId());
@@ -37,7 +34,6 @@ public class IdentityVerificationController {
         return livenessCheck.issue(principal.userId());
     }
 
-    // 202 because acceptance into the queue is not a decision.
     @PostMapping(value = Routes.Verification.IDENTITY, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.ACCEPTED)
     public IdentityVerificationResponse submit(@CurrentUser AuthPrincipal principal,

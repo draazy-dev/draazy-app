@@ -28,16 +28,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** A referral scheme is an endpoint that pays strangers: redeeming grants nothing, every refusal is
- *  identical so codes cannot be probed, the desk is staff-only and shows both mobiles in full. */
 class ReferralEndpointsTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired JwtService jwtService;
     @Autowired UserRepository users;
     @Autowired ReferralRepository referrals;
-
-    // ---- fixtures ----
 
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
@@ -51,8 +46,6 @@ class ReferralEndpointsTest extends AbstractApiTest {
         return body.substring(i, body.indexOf('"', i));
     }
 
-    /** Minted from a fixed non-loopback address: MockMvc gives every request the same remote
-     *  address, so otherwise every referral here would come back flagged for correlation. */
     private String codeOf(User u) throws Exception {
         return jsonField(mvc.perform(get(Routes.Referrals.MINE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(u))
@@ -72,13 +65,10 @@ class ReferralEndpointsTest extends AbstractApiTest {
                 .andExpect(status().is(expectedStatus));
     }
 
-    /** One redeemed referral, returning the referrer and the referral's id. */
     private String referralFrom(User referrer, User referred) throws Exception {
         redeem(referred, codeOf(referrer), 200);
         return referrals.findByReferrerId(referrer.getId()).getFirst().getId().toString();
     }
-
-    // ---- 1: the code ----
 
     @Test
     void theCodeIsMintedOnceAndNeverChanges() throws Exception {
@@ -86,7 +76,6 @@ class ReferralEndpointsTest extends AbstractApiTest {
 
         String first = codeOf(u);
         assertThat(first).startsWith("PUNE-").hasSize(9);
-        // Deliberately excluded from the alphabet: these are the characters people misread aloud.
         assertThat(first.substring(5)).doesNotContainAnyWhitespaces()
                 .matches("[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}");
         assertThat(codeOf(u)).isEqualTo(first);
@@ -108,8 +97,6 @@ class ReferralEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.contactsEarned").doesNotExist())
                 .andExpect(jsonPath("$.contactsPending").doesNotExist());
     }
-
-    // ---- 2: redeeming ----
 
     @Test
     void redeemingCountsAsInvitedAndPendingButNotYetEarned() throws Exception {
@@ -145,11 +132,8 @@ class ReferralEndpointsTest extends AbstractApiTest {
         User referred = user("9866600021", "buyer");
         String code = codeOf(referrer);
 
-        // A code nobody holds.
         redeem(referred, "PUNE-ZZZZ", 409);
-        // Your own.
         redeem(referrer, code, 409);
-        // A mobile that has already been referred.
         redeem(referred, code, 200);
         redeem(referred, code, 409);
 
@@ -163,8 +147,6 @@ class ReferralEndpointsTest extends AbstractApiTest {
                         .content("{\"code\":\"PUNE-ABCD\"}"))
                 .andExpect(status().isUnauthorized());
     }
-
-    // ---- 3: the fraud desk ----
 
     @ParameterizedTest(name = "{0} is refused the queue and every decision")
     @ValueSource(strings = {"a plain caller", "staff without reports.write"})
@@ -205,8 +187,6 @@ class ReferralEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].autoReason").doesNotExist())
                 .andExpect(jsonPath("$.content[0].referrerMobile").value(referrer.getMobile()))
                 .andExpect(jsonPath("$.content[0].referredMobile").value(referred.getMobile()))
-                // False because the fixture redeems from a different address than the code was
-                // minted from — see codeOf. False means "no correlation found".
                 .andExpect(jsonPath("$.content[0].sameDevice").value(false))
                 .andExpect(jsonPath("$.content[0].sameIp").value(false))
                 .andExpect(jsonPath("$.counts").doesNotExist())
@@ -368,7 +348,6 @@ class ReferralEndpointsTest extends AbstractApiTest {
         String id = referralFrom(referrer, referred);
         String auth = bearer(staff);
 
-        // Nothing was ever paid, so there is nothing to recover.
         mvc.perform(post("/referrals/" + id + "/clawback")
                         .header(HttpHeaders.AUTHORIZATION, auth)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -383,13 +362,10 @@ class ReferralEndpointsTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"Fraud ring\"}"))
                 .andExpect(status().isOk())
-                // Distinct from `rejected` on purpose: this one was paid and taken back.
                 .andExpect(jsonPath("$.status").value(ReferralStatuses.CLAWED_BACK));
 
         mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(status().isOk())
-                // The grant is derived from the row's status, so the clawback withdrew it with no
-                // compensating write.
                 .andExpect(jsonPath("$.converted").value(0));
     }
 
@@ -399,7 +375,6 @@ class ReferralEndpointsTest extends AbstractApiTest {
         mvc.perform(post("/referrals/" + java.util.UUID.randomUUID() + "/approve")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isNotFound());
-        // A non-UUID path token is a 404 too, not a 400 — Ids.parseUuid returns empty.
         mvc.perform(post("/referrals/not-a-uuid/approve")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isNotFound());

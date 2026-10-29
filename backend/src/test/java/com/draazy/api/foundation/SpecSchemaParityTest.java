@@ -27,47 +27,12 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.yaml.snakeyaml.Yaml;
 
-/**
- * The other half of {@link SpecCoverageTest}: that test proves every declared route is served and
- * every served route is declared, but it says nothing about what those routes <em>return</em>.
- *
- * <p>That gap was load-bearing. Roughly 6,000 of the contract's lines are schemas, and until this
- * test none of them were checked against anything. A renamed DTO field, a property that quietly
- * stopped being serialised, or a schema written for an endpoint that later changed shape all passed
- * a fully green build — and the failure would surface in a generated client, or in the browser, long
- * after the commit that caused it.
- *
- * <p><strong>Why the handler's return type, and not the schema's name.</strong> The obvious
- * implementation matches {@code components.schemas.X} to a Java class called {@code X}. It is wrong
- * here, and dangerously so: the contract's {@code ContactRequest} schema describes the DTO
- * {@code ContactRequestResponse}, while a JPA <em>entity</em> named {@code ContactRequest} also
- * exists. Name-matching would compare the contract against the database entity, agree with itself,
- * and prove nothing. Only 30 of 147 schema names match a record name anyway — the DTOs are variously
- * suffixed {@code Response}, {@code Dto}, {@code Create} or nothing at all. So the link used here is
- * the one the framework itself uses: the type Spring will actually serialise.
- *
- * <p><strong>What is deliberately not checked.</strong> Types, formats, nullability and required-ness
- * are all left alone. Property <em>names</em> are where the drift that reaches a client lives, and
- * checking names only keeps this test free of false positives that would get it disabled. Operations
- * whose return type or response schema this test cannot resolve are skipped rather than guessed at,
- * and {@link #COMPARABLE_FLOOR} stops that skip-list from silently growing into "checks nothing".
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("The contract — declared response fields match what the handlers actually return")
 class SpecSchemaParityTest {
-
-    /**
-     * The number of operations whose response shape this test can resolve on both sides. It may rise
-     * and must not fall.
-     *
-     * <p>Without this floor the test has a silent failure mode that is worse than not having it: a
-     * refactor that made return types unresolvable would shrink the comparison to nothing and still
-     * report success. The floor converts "I checked less" into a failure.
-     */
     private static final int COMPARABLE_FLOOR = 60;
 
-    /** Infrastructure Spring maps for us; none of it is part of the public contract. */
     private static final List<String> NOT_OURS = List.of("/error", "/actuator");
 
     @Autowired
@@ -122,7 +87,6 @@ class SpecSchemaParityTest {
                 .isGreaterThanOrEqualTo(COMPARABLE_FLOOR);
     }
 
-    /** One operation whose response shape could be resolved on both sides. */
     private record Comparison(
             String operation, String schemaName, String typeName, Set<String> declared, Set<String> served) {}
 
@@ -178,20 +142,6 @@ class SpecSchemaParityTest {
                 served));
     }
 
-    /**
-     * True when Jackson will leave this component out of the body, so this test should too.
-     *
-     * <p>{@code AuthResponse.refreshToken} is the case that needed it: the component carries the raw
-     * token from the service to {@code AuthController}, which puts it in an {@code HttpOnly} cookie
-     * rather than the response. Counting it as served would push us to *document* a field whose
-     * entire point is that no client ever receives it.
-     *
-     * <p>All three of component, accessor and field are checked because {@code @JsonIgnore} declares
-     * {@code @Target({ANNOTATION_TYPE, METHOD, CONSTRUCTOR, FIELD})} — no {@code RECORD_COMPONENT} —
-     * so javac propagates it to the generated members and {@code component.isAnnotationPresent} is
-     * false. That reads as "the annotation is not there", which is the trap: it is there, it is
-     * working, and only this reflection call cannot see it.
-     */
     private static boolean suppressedFromJson(RecordComponent component) {
         if (component.isAnnotationPresent(JsonIgnore.class)
                 || component.getAccessor().isAnnotationPresent(JsonIgnore.class)) {
@@ -202,12 +152,10 @@ class SpecSchemaParityTest {
                     .getDeclaredField(component.getName())
                     .isAnnotationPresent(JsonIgnore.class);
         } catch (NoSuchFieldException unreachable) {
-            // Every record component has a backing field of the same name; this cannot happen.
             return false;
         }
     }
 
-    /** The 2xx JSON body, or {@code null} when the operation has no JSON response body. */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> successSchema(Map<String, Object> operation) {
         Map<String, Object> responses = (Map<String, Object>) operation.get("responses");
@@ -231,19 +179,8 @@ class SpecSchemaParityTest {
         return null;
     }
 
-    /** A schema plus the component name it was reached through, for a readable failure message. */
     private record Named(String name, Map<String, Object> schema) {}
 
-    /**
-     * Reduce a response schema to the object whose fields the handler actually returns.
-     *
-     * <p>Three wrappers are unwrapped, and they mirror the Java side exactly: a {@code $ref} to a
-     * component, an array (the handler returns a {@code List}), and the paged {@code allOf} of
-     * {@code PageEnvelope} plus a {@code content} array (the handler returns a
-     * {@link PageResponse}). Anything else composed with {@code allOf}/{@code oneOf} is returned as
-     * {@code null} rather than guessed at — a wrong guess here would be a false failure, and a test
-     * that cries wolf gets switched off.
-     */
     @SuppressWarnings("unchecked")
     private static Named leafSchema(Map<String, Object> spec, Map<String, Object> schema, String name) {
         if (schema == null) {
@@ -275,16 +212,6 @@ class SpecSchemaParityTest {
         return (Map<String, Object>) schemas.get(component);
     }
 
-    /**
-     * Peel the generic wrappers off a handler's return type to reach the record being serialised.
-     *
-     * <p>{@code ResponseEntity}, {@code PageResponse}, {@code List} and {@code Optional} are all
-     * transport, not payload — and each one has an exact counterpart on the schema side, which is
-     * what makes the two resolutions comparable. {@link PropertySearchResponse} is the page envelope
-     * plus one aggregate about the whole match, and is peeled for the same reason: its extra field
-     * is metadata about the result set, declared beside {@code content} in the contract, not part of
-     * the payload record whose fields this compares.
-     */
     private static Class<?> leafType(Type type) {
         if (type instanceof ParameterizedType parameterized) {
             Class<?> raw = (Class<?>) parameterized.getRawType();
@@ -298,10 +225,6 @@ class SpecSchemaParityTest {
         return type instanceof Class<?> clazz ? clazz : null;
     }
 
-    /**
-     * Spring's pattern and the contract's path differ only in parameter spelling, so both are
-     * compared with parameter names erased — the same rule {@link SpecCoverageTest} uses.
-     */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> findOperation(Map<String, Object> spec, String verb, String pattern) {
         Map<String, Map<String, Object>> paths = (Map<String, Map<String, Object>>) spec.get("paths");

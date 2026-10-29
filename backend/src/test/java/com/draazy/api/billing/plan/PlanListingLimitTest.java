@@ -17,14 +17,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 
-/**
- * A null {@code plans.listing_limit} resolves to the free floor of one, not to unlimited. Both halves
- * are pinned: the resolution, and the CHECK that stops an owner plan being minted without a number.
- */
 @DisplayName("Plans — a null listing limit is the free floor, not a licence")
 class PlanListingLimitTest extends AbstractApiTest {
-
-    /** Seeker Plus. A tenant plan, and the only seeded row with a null {@code listing_limit}. */
     private static final String NO_LISTING_NUMBER_PLAN = "b1000000-0000-4000-8000-000000000004";
 
     @Autowired UserRepository users;
@@ -40,7 +34,6 @@ class PlanListingLimitTest extends AbstractApiTest {
     @Test
     @DisplayName("holding a plan that states no listing number grants one listing, not unlimited")
     void aNullLimitResolvesToTheFreeFloor() throws Exception {
-        // Read first: the assertion below is vacuous if somebody gives Seeker Plus a number.
         assertThat(jdbc.queryForObject("SELECT listing_limit FROM plans WHERE id = ?::uuid",
                 Integer.class, NO_LISTING_NUMBER_PLAN)).isNull();
 
@@ -55,8 +48,6 @@ class PlanListingLimitTest extends AbstractApiTest {
     @Test
     @DisplayName("an owner plan may not leave the listing limit unstated")
     void ownerPlansMustStateTheNumber() {
-        // Counterweight runs first: a failed statement aborts the transaction, so a guard nobody
-        // can satisfy would forbid every owner plan.
         jdbc.update("INSERT INTO plans (name, audience, listing_limit) VALUES (?, 'owner', 9999)",
                 "Owner Effectively Uncapped");
 

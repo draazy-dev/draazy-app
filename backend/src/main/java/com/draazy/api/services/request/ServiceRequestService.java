@@ -37,27 +37,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
 
-// The maker-checker is the security of this class.
-// The requester is the checker, so only their approval can move a draft to approved.
 @Service
 public class ServiceRequestService implements AbandonedCheckouts {
-
     private static final Logger log = LoggerFactory.getLogger(ServiceRequestService.class);
 
-    // Details cap bounds worst-case rent-agreement jsonb near 48 KB.
-    // String.length is enough: Devanagari is BMP; disk bytes may triple.
     private static final int DETAILS_MAX_CHARS = 16000;
 
-    // One unpaid priced request is legitimate; more means live gateway order spam.
     private static final int MAX_OPEN_UNPAID_PER_TYPE = 1;
 
-    // Index name lets us translate only the unpaid-cap collision to its 409.
     private static final String OPEN_UNPAID_INDEX = "uq_service_requests_open_unpaid";
 
-    // Not payment.failed: this means no money was attempted, not a declined card.
     private static final String ABANDONED_EVENT = "payment.abandoned";
 
-    // Only the rent-agreement flow opens a checkout for a request or its revised terms.
     static final String RETURN_PATH = "/services/rent-agreement";
 
     static final Duration INCOMPLETE_TTL = Duration.ofDays(30);
@@ -68,10 +59,8 @@ public class ServiceRequestService implements AbandonedCheckouts {
     private final ServiceRequestMapper mapper;
     private final DocumentService documents;
 
-    // TicketMirror owns the only reach this flow makes into the ops board.
     private final TicketMirror ticketMirror;
 
-    // Held only so transitions can purge; this class never reads identity numbers.
     private final ServiceRequestIdentityService identities;
     private final UserRepository users;
     private final PropertyRepository properties;
@@ -130,8 +119,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
-    // Priced requests start unpaid because readiness needs a request id.
-    // Checkout later refuses until identities and papers are complete.
     public ServiceRequestDto create(AuthPrincipal caller, ServiceRequestCreate body) {
         Opened opened = transactions.execute(tx -> open(caller, body));
         if (opened.settled() != null) {
@@ -145,15 +132,12 @@ public class ServiceRequestService implements AbandonedCheckouts {
                 ? null
                 : Ids.parseUuid(body.propertyId()).orElseThrow(() -> new BadRequestException("propertyId must be a valid id"));
 
-        // Listing existence must be checked before FK failure.
-        // Missing listing is 404; malformed id is 400.
         if (propertyId != null && !properties.existsById(propertyId)) {
             throw NotFoundException.of("Property");
         }
 
         String type = body.type().trim();
 
-        // Unknown service types are refused so misspelled rent agreements cannot price as free.
         if (!ServiceRequestTypes.isKnown(type)) {
             throw new BadRequestException("Unknown service request type '" + type + "'; expected one of "
                     + ServiceRequestTypes.known());
@@ -162,9 +146,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
         UUID ticketId = ticketMirror.resolve(caller, body.ticketId());
         Long price = pricing.priceFor(type, details);
         if (price != null) {
-
-            // Each priced request can open a live gateway order at checkout.
-            // Cap it here because there is no other throttle.
             long openUnpaid = requests.countByRequesterIdAndTypeAndStatus(
                     caller.userId(), type, ServiceRequestStatus.AWAITING_PAYMENT);
             if (openUnpaid >= MAX_OPEN_UNPAID_PER_TYPE) {
@@ -173,24 +154,18 @@ public class ServiceRequestService implements AbandonedCheckouts {
         }
         ServiceRequest draft = new ServiceRequest(caller.userId(), type, propertyId, details, ticketId);
         if (price != null) {
-
-            // Awaiting-payment is set before INSERT so the partial unique index catches races.
             draft.awaitPayment(price);
         }
         ServiceRequest request;
         try {
-
             request = requests.saveAndFlush(draft);
         } catch (DataIntegrityViolationException violation) {
-
-            // Translate only the cap's 409; other integrity failures are defects.
             if (isOpenUnpaidCollision(violation)) {
                 log.info("Concurrent create lost the open-unpaid race for {} on desk {}",
                         caller.userId(), type);
                 throw openUnpaidConflict(type);
             }
 
-            // The other rule with a unique index behind it : one ticket, one request.
             if (ConstraintViolations.isOn(violation, TicketMirror.INDEX)) {
                 log.info("Service request for {} refused: ticket {} is already mirrored",
                         caller.userId(), ticketId);
@@ -200,7 +175,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
         }
         record(request, "request.created", displayName(caller.userId()));
         if (price == null) {
-
             return Opened.settled(mapper.toDto(request, caller));
         }
         record(request, "payment.pending", null);
@@ -261,7 +235,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
 
     private record Opened(ServiceRequestDto settled, UUID requestId, long price,
             PaymentGateway.Customer customer) {
-
         static Opened settled(ServiceRequestDto dto) {
             return new Opened(dto, null, 0, null);
         }
@@ -273,12 +246,10 @@ public class ServiceRequestService implements AbandonedCheckouts {
                 + "is cancelled automatically once its checkout has expired.");
     }
 
-    // Match driver's index name so unrelated constraint failures are not hidden as cap errors.
     private static boolean isOpenUnpaidCollision(DataIntegrityViolationException violation) {
         return ConstraintViolations.isOn(violation, OPEN_UNPAID_INDEX);
     }
 
-    // Blank gateway order ids are refusals; otherwise webhooks cannot find the row.
     private PaymentGateway.PaymentOrder openOrder(Opened opened) {
         PaymentGateway.PaymentOrder order = gateway.createOrder(opened.price(),
                 "service-request:" + opened.requestId(), opened.customer(), RETURN_PATH);
@@ -288,7 +259,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
         return order;
     }
 
-    // Webhook handling is idempotent by status; unknown order ids belong to other payers.
     @Transactional
     public boolean applyWebhookOutcome(String orderId, boolean paid, BigDecimal providerAmount, String currency) {
         if (orderId == null || orderId.isBlank()) {
@@ -311,7 +281,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
             record(request, "payment.received", null);
             invoicing.checkoutPaid(request);
         } else {
-            // Cashfree keeps the order payable after a declined attempt; cancelling here would refund a retry.
             record(request, "payment.failed", null);
         }
         return true;
@@ -344,7 +313,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
                 + "reconcile.", request.getId(), request.getPaymentRef(), request.getRequesterId());
     }
 
-    // Guard by status, not paymentRef: a customer who closed the payment modal already holds a ref.
     @Transactional
     public ServiceRequestDto cancelUnpaid(AuthPrincipal caller, String id) {
         ServiceRequest request = visible(caller, id);
@@ -364,7 +332,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
         return mapper.toDto(request, caller);
     }
 
-    // {@inheritDoc} — "service request", so a sweep log line names the table that moved.
     @Override
     public String family() {
         return "service request";
@@ -397,8 +364,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
         try {
             json = objectMapper.writeValueAsString(details);
         } catch (RuntimeException unserializable) {
-
-            // Jackson 3 throws unchecked; a body that will not serialize cannot be stored as jsonb.
             throw new BadRequestException("details must be a serializable object");
         }
         if (json.length() > DETAILS_MAX_CHARS) {
@@ -409,14 +374,11 @@ public class ServiceRequestService implements AbandonedCheckouts {
         return details;
     }
 
-    // get() and checklist share visible(); documents come from same DTO list.
-    // A second vault query could drift from the documents tab.
     @Transactional(readOnly = true)
     public ServiceRequestDto get(AuthPrincipal caller, String id) {
         return mapper.toDto(visible(caller, id), caller);
     }
 
-    // The signed link for one file, minted when it is opened rather than with every read of the request.
     @Transactional(readOnly = true)
     public DocumentUrl documentUrl(AuthPrincipal caller, String id, String documentId) {
         ServiceRequest request = visible(caller, id);
@@ -426,7 +388,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
                 .orElseThrow(() -> NotFoundException.of("Document"));
     }
 
-    // authorRole is taken from the principal, so a customer cannot post as staff.
     @Transactional
     public MessageDto addMessage(AuthPrincipal caller, String id, String body) {
         ServiceRequest request = visible(caller, id);
@@ -446,7 +407,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
                 "document.uploaded");
     }
 
-    // Ops cannot file customer vault docs; draft authors must not approve their own draft.
     @Transactional
     public DocumentDto addDocumentFromVault(AuthPrincipal caller, String id, String documentId,
             String category) {
@@ -561,7 +521,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
         return dto;
     }
 
-    // Purge is visible on the customer timeline: it completes the retention promise.
     ServiceRequestStatus transition(ServiceRequest request, ServiceRequestStatus target) {
         ServiceRequestStatus from = request.getStatus();
         if (!from.canTransitionTo(target)) {
@@ -599,7 +558,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
         return Ids.parseUuid(id).flatMap(requests::findByIdForUpdate).orElseThrow(() -> NotFoundException.of("Service request"));
     }
 
-    // Package-private so read receipts reuse the same participant guard.
     ServiceRequest visible(AuthPrincipal caller, String id) {
         ServiceRequest request = found(id);
         if (requests.isParticipant(request.getId(), caller.userId())) {
@@ -612,13 +570,11 @@ public class ServiceRequestService implements AbandonedCheckouts {
                 accountPermissions.desksFor(caller));
     }
 
-    // Same guard as visible(), on a row locked first so a concurrent draft share waits for this one.
     ServiceRequest visibleLocked(AuthPrincipal caller, String id) {
         foundForUpdate(id);
         return visible(caller, id);
     }
 
-    // Only the caller's own desk, and never a case they are a side of, so staff cannot work their own agreement.
     ServiceRequest opsAccessible(AuthPrincipal caller, String id) {
         return deskWorkable(caller, found(id));
     }
@@ -646,8 +602,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
         return users.findById(userId).map(User::getName).orElse(null);
     }
 
-    // Co-fill files without checkout so both sides can complete a priced agreement first.
-    // Free requests have no payment to defer.
     UUID fileDeferred(AuthPrincipal caller, ServiceRequestCreate body) {
         Opened opened = open(caller, body);
         if (opened.settled() != null) {
@@ -656,7 +610,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
         return opened.requestId();
     }
 
-    // Not desk-scoped like visible(): its callers then refuse anyone but the requester.
     ServiceRequest visibleForUpdate(AuthPrincipal caller, String id) {
         ServiceRequest request = foundForUpdate(id);
         if (!isOps(caller) && !requests.isParticipant(request.getId(), caller.userId())) {

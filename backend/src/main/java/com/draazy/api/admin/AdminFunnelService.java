@@ -12,18 +12,13 @@ import java.util.TreeMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Weekly counts behind {@code GET /admin/analytics/funnel}; see {@link AdminAnalyticsFunnel}. */
 @Service
 public class AdminFunnelService {
-
     static final int DEFAULT_DAYS = 90;
     static final int MAX_DAYS = 365;
 
-    /** Column order of {@link AdminAnalyticsFunnel.Week} after {@code week}. */
     private static final List<String> STAGES = List.of("posted", "approved", "contacts", "visits", "deals");
 
-    /* First approval audit row per listing, so a re-approval is not a second go-live; the join matches
-       id or slug because routes record whichever key the caller used. */
     private static final String EVENTS = """
             with events(stage, at) as (
                 select 'posted', p.created_at from properties p where p.archived = false
@@ -66,7 +61,6 @@ public class AdminFunnelService {
         LocalDate to = LocalDate.now(PlatformTime.IST).plusDays(1);
         LocalDate from = to.minusDays(days);
 
-        // Zero-filled so a quiet week is drawn as zero rather than skipped by the chart.
         Map<LocalDate, long[]> weekly = new TreeMap<>();
         for (LocalDate w = from.with(DayOfWeek.MONDAY); w.isBefore(to); w = w.plusWeeks(1)) {
             weekly.put(w, new long[STAGES.size()]);

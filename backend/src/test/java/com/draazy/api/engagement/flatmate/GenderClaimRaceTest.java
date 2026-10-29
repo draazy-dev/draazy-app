@@ -19,11 +19,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
-// Commits for real: a first-claim race cannot be staged inside AbstractApiTest's single transaction.
 @SpringBootTest
 @DisplayName("Two first claims of a profile gender at once")
 class GenderClaimRaceTest {
-
     @Autowired UserService userService;
     @Autowired FlatmateGenderGate gate;
     @Autowired UserRepository users;

@@ -20,10 +20,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 
-// The desk SLA is measured from when a rent agreement became actionable, without a sweep.
 @DisplayName("Rent agreement SLA — due-by per status, overdue on the queue")
 class RentAgreementSlaTest extends ServiceFixtures {
-
     @Autowired
     JdbcTemplate jdbc;
     @Autowired
@@ -33,7 +31,6 @@ class RentAgreementSlaTest extends ServiceFixtures {
         em.flush();
         jdbc.update("update service_requests set status_changed_at = ? where id = ?",
                 java.sql.Timestamp.from(Instant.now().minus(ago)), UUID.fromString(id));
-        // The test transaction spans the request, so cached entities must be dropped to see the write.
         em.clear();
     }
 

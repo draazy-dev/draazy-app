@@ -12,10 +12,8 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Writes {@code error_event}: one row per fingerprint, counted rather than repeated. */
 @Component
 public class ErrorEventStore {
-
     public static final int MAX_MESSAGE = 1_000;
     public static final int MAX_STACK = 16_000;
 
@@ -25,8 +23,6 @@ public class ErrorEventStore {
     private static final Pattern DIGITS = Pattern.compile("\\d+");
     private static final int FINGERPRINT_MESSAGE = 200;
 
-    // A server repeat refreshes the row and reopens it if resolved (the fix did not hold). A browser repeat, which
-    // anyone can send, only counts and records its support reference (a validated UUID); the rest stays as first seen.
     private static final String UPSERT = """
             INSERT INTO error_event (fingerprint, source, error_type, message, stack, path, http_method,
                                      http_status, build, user_role, last_user_id, last_trace_id, context)
@@ -46,7 +42,6 @@ public class ErrorEventStore {
                 resolved_at = CASE WHEN error_event.source = 'web' THEN error_event.resolved_at END,
                 resolved_by = CASE WHEN error_event.source = 'web' THEN error_event.resolved_by END""";
 
-    /** Every field already scrubbed and capped by the caller. */
     public record Capture(String fingerprint, String source, String errorType, String message, String stack,
             String path, String httpMethod, Integer httpStatus, String build, String userRole, UUID userId,
             String traceId, Map<String, Object> context) {
@@ -64,7 +59,6 @@ public class ErrorEventStore {
                 JSON.writeValueAsString(c.context()));
     }
 
-    /** Digits and UUIDs collapse so the same fault with a different id is still one row. */
     public static String normalise(String message) {
         if (message == null) {
             return "";

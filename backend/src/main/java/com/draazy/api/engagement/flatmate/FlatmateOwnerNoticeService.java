@@ -23,11 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** WhatsApps the flat owner when a tenant lists a room in their flat, with a one-tap agree/decline link.
- * The link token is the only credential on the public routes; only its hash is stored. */
 @Service
 public class FlatmateOwnerNoticeService {
-
     private static final Logger log = LoggerFactory.getLogger(FlatmateOwnerNoticeService.class);
 
     static final Duration VALIDITY = Duration.ofDays(30);
@@ -75,13 +72,11 @@ public class FlatmateOwnerNoticeService {
         this.maxPerHour = maxPerHour;
     }
 
-    /** Old links answer 404 anyway; this only stops the table keeping an owner's number for ever. */
     @Transactional
     public long purgeExpired() {
         return notices.deleteExpired(Instant.now());
     }
 
-    /** Never fails the post: a capped or unsendable notice only means the owner is not messaged. */
     @Transactional
     public void noticeIfNeeded(FlatmateRoom room) {
         if (!needsNotice(room)) {
@@ -99,7 +94,6 @@ public class FlatmateOwnerNoticeService {
             log.info("Owner notice for {} skipped: send cap reached", MobileMask.mask(room.getOwnerConsentMobile()));
             return;
         }
-        // Throwaway accounts each get MAX_PER_HOST, so only a platform budget bounds the paid sends.
         if (notices.countByCreatedAtAfter(Instant.now().minus(PLATFORM_WINDOW)) >= maxPerHour) {
             log.warn("Owner notice for {} skipped: the platform's {} an hour are spent",
                     MobileMask.mask(room.getOwnerConsentMobile()), maxPerHour);
@@ -133,7 +127,6 @@ public class FlatmateOwnerNoticeService {
                 && !room.isOwnerConsent();
     }
 
-    // A rolled-back post must message nobody.
     private static void afterCommit(Runnable send) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             send.run();
@@ -218,8 +211,6 @@ public class FlatmateOwnerNoticeService {
         reviews.saveAndFlush(review);
     }
 
-    /** An edit that moved the flat or the owner's number voids the old link rather than letting it
-     * vouch for a different address. */
     private Standing standing(Optional<FlatmateOwnerNotice> found) {
         FlatmateOwnerNotice notice = found
                 .filter(n -> n.getExpiresAt().isAfter(Instant.now()))

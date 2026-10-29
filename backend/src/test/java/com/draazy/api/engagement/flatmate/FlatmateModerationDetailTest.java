@@ -30,7 +30,6 @@ import org.springframework.http.MediaType;
 
 @DisplayName("Flatmate moderation desk — the review popup's detail read and multi-state queues")
 class FlatmateModerationDetailTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -227,7 +226,6 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
-        // No API creates an application, so the row is seeded directly.
         String appId = jdbc.queryForObject(
                 "insert into flatmate_group_applications (listing_id, group_id, applicant_id) "
                         + "values (?::uuid, ?::uuid, ?::uuid) returning id::text",

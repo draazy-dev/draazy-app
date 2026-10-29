@@ -1,8 +1,6 @@
 package com.draazy.api.catalog.fee;
 
-/** Stamp duty depends on rent, term and deposit, so no single platform fee can be seeded. */
 public final class LeaveAndLicenceCharges {
-
     private static final long BPS = 10_000L;
 
     private static final long STAMP_DUTY_BPS = 25L;
@@ -17,16 +15,13 @@ public final class LeaveAndLicenceCharges {
 
     public static final long HANDLING_CHARGE = 300L;
 
-    /** Past sixty months this becomes a lease with different duty; pricing it here would be wrong. */
     public static final int MAX_MONTHS = 60;
 
-    /** A ₹100 crore cap rejects typos/attacks and keeps exact arithmetic below {@link Long#MAX_VALUE}. */
     public static final long MAX_AMOUNT = 1_000_000_000L;
 
     private LeaveAndLicenceCharges() {
     }
 
-    /** Rent and term must be positive; zero deposits are valid and add nothing. */
     public record Terms(long monthlyRentInRupees,
             long refundableDepositInRupees,
             long nonRefundableDepositInRupees,
@@ -34,7 +29,6 @@ public final class LeaveAndLicenceCharges {
             boolean urban,
             int incrementBps,
             int incrementEveryMonths) {
-
         public Terms {
             require(monthlyRentInRupees > 0 && monthlyRentInRupees <= MAX_AMOUNT, "rent");
             require(refundableDepositInRupees >= 0 && refundableDepositInRupees <= MAX_AMOUNT,
@@ -67,7 +61,6 @@ public final class LeaveAndLicenceCharges {
         }
     }
 
-    /** Use half-up rounding to match the wizard's {@code Math.round}; operands are non-negative. */
     public static Charges on(Terms terms) {
         long rentForTerm = rentForTerm(terms);
 
@@ -101,7 +94,6 @@ public final class LeaveAndLicenceCharges {
         return total;
     }
 
-    /** Round up: even the common eleven-month term holds the deposit for one chargeable year. */
     private static long years(int months) {
         return (months + 11) / 12;
     }

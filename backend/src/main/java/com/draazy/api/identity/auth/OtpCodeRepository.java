@@ -12,9 +12,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface OtpCodeRepository extends JpaRepository<OtpCode, UUID> {
-
-    /** Row-locked so two concurrent verifies cannot both read the same {@code attempts} and slip
-     * past the brute-force ceiling. Verify runs in a transaction, so the lock stays tightly scoped. */
+    // Row-locked so concurrent verifies cannot share one read of attempts and slip past the
+    // brute-force ceiling.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<OtpCode> findFirstByMobileAndPurposeAndConsumedFalseOrderByCreatedAtDesc(
             String mobile, String purpose);
@@ -25,13 +24,9 @@ public interface OtpCodeRepository extends JpaRepository<OtpCode, UUID> {
     List<Instant> findRecentSendTimesForRecipient(@Param("mobile") String mobile,
 
             @Param("family") String family, Pageable pageable);
-    /** Platform-wide ceiling, keyed on nothing so a rotating recipient cannot walk past the
-     * per-mobile limits. Oldest first: row one is the send whose expiry reopens a slot. */
     @Query("select c.createdAt from OtpCode c where c.createdAt >= :since order by c.createdAt")
     List<Instant> findSendTimesSince(@Param("since") Instant since, Pageable pageable);
 
-    /** Per-purpose share of that ceiling, so a side flow whose caller names the recipient cannot
-     * spend the whole pool. */
     @Query("select c.createdAt from OtpCode c"
             + " where (c.purpose = :family or c.purpose like concat(:family, ':%'))"
             + " and c.createdAt >= :since order by c.createdAt")

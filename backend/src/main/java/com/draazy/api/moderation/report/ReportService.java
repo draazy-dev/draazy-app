@@ -33,10 +33,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Any signed-in user may file; only ops read or act. Filing is unaudited to keep reporters out of audit_log. */
 @Service
 public class ReportService {
-
     private static final int MAX_PER_HOUR = 10;
     private static final Duration WINDOW = Duration.ofHours(1);
 
@@ -65,8 +63,6 @@ public class ReportService {
         this.locks = locks;
     }
 
-    /** Target is deliberately not resolved for listings and posts: a scammer deleting the listing must not also
-     * delete the complaint. A person must exist, or "suspend" would later have nobody to act on. */
     @Transactional
     public ReportResponse create(UUID reporterId, ReportCreateRequest body) {
         String targetType = body.targetType();
@@ -94,13 +90,10 @@ public class ReportService {
         try {
             return mapper.toResponse(reports.saveAndFlush(report));
         } catch (DataIntegrityViolationException duplicate) {
-            // Concurrent submissions both pass the check above; the V18 partial unique index is the serialiser.
             throw new ConflictException("You have already reported this, and it is still being reviewed");
         }
     }
 
-    /** Filters are validated: an unknown value would give an empty page that reads as "queue clear".
-     * Each row carries how many reports its target has drawn, counted for this page only. */
     @Transactional(readOnly = true)
     public Page<ReportResponse> list(String status, String reason, String targetType, String q,
             Integer sinceDays, Pageable pageable) {
@@ -151,7 +144,6 @@ public class ReportService {
         return users.findAllById(ids).stream().collect(Collectors.toMap(u -> u.getId().toString(), u -> u));
     }
 
-    /** Undecided per target type for the tab badges, and per status within {@code targetType} for the chips. */
     @Transactional(readOnly = true)
     public Map<String, Long> counts(String targetType) {
         String wantedTargetType = blankToNull(targetType);
@@ -191,14 +183,11 @@ public class ReportService {
         return out;
     }
 
-    /** Defined here so "outstanding" stays with the status vocabulary and the tile matches the screen. */
     @Transactional(readOnly = true)
     public long openCount() {
         return reports.countByStatusIn(ReportStatuses.LIVE);
     }
 
-    /** Decision and enforcement commit in one transaction; only {@code actioned} may enforce, since "dismissed
-     * and taken down" would leave a self-contradicting audit trail. */
     @Transactional
     public ReportResponse triage(AuthPrincipal actor, String id, ReportTriageRequest body) {
         if (!ReportStatuses.isValid(body.status())) {
@@ -273,8 +262,6 @@ public class ReportService {
                 .orElse(null);
     }
 
-    /** Delegates to the moderation services that own these transitions so their self-dealing guards and audit rows
-     * apply; a missing target is a 404 so the moderator never closes a report believing something was done. */
     private void enforce(AuthPrincipal actor, Report report, String enforcement, String note) {
         String because = "Reported: " + report.getReason()
                 + (note == null || note.isBlank() ? "" : " — " + note.trim());
@@ -289,17 +276,14 @@ public class ReportService {
             case ReportEnforcement.SUSPEND_ACCOUNT ->
                     userAdmin.archive(actor, report.getTargetId(), because);
             default -> {
-                // ReportEnforcement.NONE — the moderator decided the complaint and touched nothing.
             }
         }
     }
 
-    /** A malformed id is a 404 for the same reason somebody else's is: it does not exist for you. */
     private static UUID parseId(String token) {
         return Ids.parseUuid(token).orElseThrow(() -> NotFoundException.of("Report"));
     }
 
-    /** A blank filter means "no filter": {@code ""} is a legal column value and would match nothing. */
     private static String blankToNull(String value) {
         return (value == null || value.isBlank()) ? null : value;
     }

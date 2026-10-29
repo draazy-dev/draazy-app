@@ -21,14 +21,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Owner-only, 404 never 403, so a property id's existence isn't leaked.
- * Dates use {@link PlatformTime#IST}: a UTC host lags 5.5 hours and would misfile month ends and 1 April. */
+// Owner-only, 404 never 403, so a property id's existence is not leaked.
+// Dates use PlatformTime.IST: a UTC host lags 5.5 hours and misfiles month ends and 1 April.
 @Service
 public class FinanceService {
-
     private static final DateTimeFormatter MONTH_KEY = DateTimeFormatter.ofPattern("yyyy-MM");
 
-    /** Cap matching the contract's {@code months} parameter — a five-year chart is already absurd. */
     private static final int MAX_CASHFLOW_MONTHS = 60;
 
     private final TransactionRepository transactions;
@@ -37,8 +35,6 @@ public class FinanceService {
     private final PropertyRepository properties;
     private final FinanceMapper mapper;
 
-    /** Zone-agnostic instant source: tests pin it to UTC so the IST answer is the service's doing.
-     * Not injected, as no {@code Clock} bean exists. */
     private Clock clock = Clock.systemUTC();
 
     public FinanceService(TransactionRepository transactions,
@@ -53,31 +49,24 @@ public class FinanceService {
         this.mapper = mapper;
     }
 
-    /** Tests only; the bean is proxied, so unwrap it with {@code AopTestUtils} and restore the clock after. */
     void useClock(Clock pinned) {
         this.clock = pinned == null ? Clock.systemUTC() : pinned;
     }
 
-    /** Today's date <em>in India</em>, whatever timezone this process was started in. */
     private LocalDate todayIst() {
         return LocalDate.now(clock.withZone(PlatformTime.IST));
     }
 
-    /** The calendar month currently running <em>in India</em>. */
     private YearMonth currentMonthIst() {
         return YearMonth.now(clock.withZone(PlatformTime.IST));
     }
 
-    // ---- transactions ----
-
-    /** Contract {@code listTransactions} — the caller's ledger for one property, newest first. */
     @Transactional(readOnly = true)
     public Page<TransactionDto> listTransactions(UUID callerId, UUID propertyId, Pageable pageable) {
         ownedPropertyId(callerId, propertyId);
         return transactions.findLiveByPropertyId(propertyId, pageable).map(mapper::toDto);
     }
 
-    /** Contract {@code addTransaction} — records one row. Returns 201. */
     @Transactional
     public TransactionDto addTransaction(UUID callerId, UUID propertyId,
                                          TransactionCreateRequest body) {
@@ -93,7 +82,6 @@ public class FinanceService {
         return mapper.toDto(transactions.save(row));
     }
 
-    /** Partial update: absent fields are left alone, and an empty string clears the two free-text fields. */
     @Transactional
     public TransactionDto updateTransaction(UUID callerId, UUID propertyId, UUID txnId,
                                             TransactionUpdateRequest body) {
@@ -113,8 +101,6 @@ public class FinanceService {
         if (body.recurring() != null) {
             row.setRecurring(normaliseRecurring(body.recurring()));
         }
-        // Free text: present-but-empty means "clear it", which is the only way a PATCH bound to a
-        // record can express erasure (see TransactionUpdateRequest).
         if (body.category() != null) {
             row.setCategory(blankToNull(body.category()));
         }
@@ -124,7 +110,6 @@ public class FinanceService {
         return mapper.toDto(transactions.save(row));
     }
 
-    /** Soft delete: the row feeds totals the owner may have reconciled; losing it would shift past nets. */
     @Transactional
     public void deleteTransaction(UUID callerId, UUID propertyId, UUID txnId) {
         ownedPropertyId(callerId, propertyId);
@@ -134,9 +119,6 @@ public class FinanceService {
         transactions.save(row);
     }
 
-    // ---- ownership basis ----
-
-    /** {@code basis} is {@code null} when nothing is recorded: a normal state of a real listing, not a missing resource. */
     @Transactional(readOnly = true)
     public FinanceOverviewDto overview(UUID callerId, UUID propertyId, Integer months) {
         ownedPropertyId(callerId, propertyId);
@@ -146,7 +128,6 @@ public class FinanceService {
                 cashflowOf(propertyId, months));
     }
 
-    /** Contract {@code setBasis} — upserts the basis. Keyed by property, so save is idempotent. */
     @Transactional
     public OwnershipBasisDto setBasis(UUID callerId, UUID propertyId, OwnershipBasisDto body) {
         ownedPropertyId(callerId, propertyId);
@@ -161,9 +142,6 @@ public class FinanceService {
         return mapper.toDto(bases.save(basis));
     }
 
-    // ---- aggregates ----
-
-    /** Totals are summed in the database so a three-integer answer doesn't grow with the owner's history. */
     @Transactional(readOnly = true)
     public FinanceSummaryDto summary(UUID callerId, UUID propertyId, String period) {
         ownedPropertyId(callerId, propertyId);
@@ -183,7 +161,6 @@ public class FinanceService {
                 occupancyRate(propertyId, from, today));
     }
 
-    /** Months with no activity are filled with zeros here, as a missing chart bar differs from a zero one. */
     private List<CashflowPointDto> cashflowOf(UUID propertyId, Integer months) {
         int window = months == null ? 12 : months;
         if (window < 1 || window > MAX_CASHFLOW_MONTHS) {
@@ -194,8 +171,6 @@ public class FinanceService {
         YearMonth thisMonth = currentMonthIst();
         YearMonth firstMonth = thisMonth.minusMonths(window - 1L);
 
-        // Half-open [first day of the earliest month, first day of next month): the upper bound restates the series end,
-        // as a post-dated row is legal and would otherwise aggregate months the loop never reads.
         Map<String, long[]> byMonth = new HashMap<>();
         for (Object[] row : transactions.monthlyTotalsBetween(
                 propertyId, firstMonth.atDay(1), thisMonth.plusMonths(1).atDay(1))) {
@@ -212,7 +187,6 @@ public class FinanceService {
         return series;
     }
 
-    /** Sorted by {@code nextDue}, as "what do I owe next" is not the row recorded longest ago. */
     private List<DueDto> duesOf(UUID propertyId) {
         LocalDate today = todayIst();
 
@@ -227,17 +201,12 @@ public class FinanceService {
                 .toList();
     }
 
-    // ---- internal helpers ----
-
-    /** 404 if the property does not exist or is not theirs, never 403, which would confirm someone else's listing exists. */
     private void ownedPropertyId(UUID callerId, UUID propertyId) {
         if (properties.findByIdAndOwner_Id(propertyId, callerId).isEmpty()) {
             throw NotFoundException.of("Property");
         }
     }
 
-    /** Null, not 0.0: zero asserts vacancy, null means not applicable (sale listing, owner-occupied).
-     * Counts are half-open [start, end), so no {@code +1}; inclusive bounds would double-count changeover days. */
     private Double occupancyRate(UUID propertyId, LocalDate from, LocalDate today) {
         List<Tenancy> history = tenancies.findByPropertyId(propertyId);
         if (history.isEmpty()) {
@@ -256,7 +225,6 @@ public class FinanceService {
             if (start == null) {
                 continue;
             }
-            // An active tenancy with no end date runs to today; a terminal one ends when it ended.
             LocalDate end = tenancy.getEndDate() != null ? tenancy.getEndDate() : today;
             LocalDate overlapStart = start.isAfter(windowStart) ? start : windowStart;
             LocalDate overlapEnd = end.isBefore(today) ? end : today;
@@ -264,8 +232,6 @@ public class FinanceService {
                 tenantedDays += ChronoUnit.DAYS.between(overlapStart, overlapEnd);
             }
         }
-        // Clamp: overlapping historical rows (possible before the old V12's unique index existed) must not
-        // produce a rate above 1.0, which would read as more than fully occupied.
         return Math.min(1.0, (double) tenantedDays / windowDays);
     }
 
@@ -296,7 +262,6 @@ public class FinanceService {
         return recurring;
     }
 
-    /** Money fields may be absent but not negative: amounts are unsigned platform-wide. */
     private static Long requireNonNegative(Long value, String field) {
         if (value != null && value < 0) {
             throw new BadRequestException(field + " must not be negative");

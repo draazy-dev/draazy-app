@@ -20,17 +20,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// A Leave &amp; License prints PAN and Aadhaar, so the drafting desk needs them; the security pass that closed the
-// {@code details} leak stopped them reaching the server at all, and this is the replacement.
 @DisplayName("D151 — service-request identities: one reader, recorded, and discarded when done")
 class ServiceRequestIdentityTest extends ServiceFixtures {
-
     private static final String OWNER_PAN = "ABCDE1234F";
     private static final String OWNER_AADHAAR = "211122223335";
     private static final String TENANT_AADHAAR = "444455556666";
 
-    // `AuditService` writes in `REQUIRES_NEW`, so its rows commit outside this test's transaction and survive the
-    // rollback.
     @AfterEach
     void clearAuditRows() {
         jdbc.update("delete from audit_log where action in "
@@ -41,7 +36,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
     @Nested
     @DisplayName("only the assigned operator can read them")
     class OneReader {
-
         @Test
         @DisplayName("the assignee reads the full numbers; a second staff member cannot")
         void onlyTheAssignee() throws Exception {
@@ -111,8 +105,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
             record(buyer, id, 204);
             setStatus(desk, id, "assigned", 200);
 
-            // The role guard, not the assignee check — but the outcome the wizard depends on is the
-            // same: nothing restores these into a form, and no customer-facing read exists.
             readIdentities(buyer, id, 403);
         }
 
@@ -125,8 +117,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
             record(buyer, id, 204);
             setStatus(desk, id, "assigned", 200);
 
-            // Assert on the raw JSON rather than on a field, because the failure being guarded against is a number
-            // appearing somewhere nobody thought to look.
             assertThat(detail(desk, id)).doesNotContain(OWNER_AADHAAR, OWNER_PAN, TENANT_AADHAAR);
             assertThat(queue(desk)).doesNotContain(OWNER_AADHAAR, OWNER_PAN, TENANT_AADHAAR);
             assertThat(detail(buyer, id)).doesNotContain(OWNER_AADHAAR, TENANT_AADHAAR);
@@ -136,7 +126,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
     @Nested
     @DisplayName("only the requester writes them")
     class OneWriter {
-
         @Test
         @DisplayName("staff and admin are refused — a desk that could write them could invent them")
         void staffCannotWrite() throws Exception {
@@ -173,8 +162,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
             String id = raise(buyer, "rent-agreement", listing(buyer));
             record(buyer, id, 204);
 
-            // The old value must not survive under a shifted index, or the desk has two candidates; the tenant's row
-            // is the co-filling tenant's to write and must survive.
             putIdentities(buyer, id, """
                     {"parties":[
                       {"partyRole":"owner","partyIndex":0,"partyName":"Asha Patil",
@@ -259,7 +246,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
     @Nested
     @DisplayName("the numbers do not outlive the matter")
     class Retention {
-
         @Test
         @DisplayName("completing the request discards them and says so on the timeline")
         void completionPurges() throws Exception {
@@ -314,7 +300,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
     @Nested
     @DisplayName("every access is recorded")
     class Audited {
-
         @Test
         @DisplayName("a read and a refused read both leave an audit row naming the caller")
         void readsAreAudited() throws Exception {
@@ -338,7 +323,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
         }
     }
 
-    /** Record the standard two-party set: an owner with both numbers, a tenant with only Aadhaar. */
     private void record(User caller, String id, int expected) throws Exception {
         putIdentities(caller, id, """
                 {"parties":[
@@ -371,8 +355,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
                 .andReturn().getResponse().getContentAsString();
     }
 
-    // Read straight from the table: `AuditService` writes in `REQUIRES_NEW`, so a JPA read of the rolled-back session
-    // cannot see the rows.
     private List<String> auditActions(String requestId, UUID actorId) {
         return jdbc.queryForList(
                 "SELECT action FROM audit_log WHERE entity = 'service_request' AND entity_id = ? "

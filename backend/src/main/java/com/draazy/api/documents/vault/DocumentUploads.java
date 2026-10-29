@@ -5,16 +5,10 @@ import com.draazy.api.common.error.UnsupportedMediaTypeException;
 import com.draazy.api.common.validation.MediaSignatures;
 import java.util.Set;
 
-/**
- * Upload gate: allowlist + size ceiling + magic-byte check (declared and sniffed must agree, both
- * on the allowlist). Rationale: docs/system/cross-cutting.md#document-vault-allowlist-sniff-scan-store
- */
 public final class DocumentUploads {
-
     private DocumentUploads() {
     }
 
-    /** Exclusive decimal limit: compression belongs to the browser, not the upload server. */
     public static final long MAX_BYTES = 1_000_000L;
 
     static final String PDF = MediaSignatures.PDF;
@@ -23,7 +17,6 @@ public final class DocumentUploads {
     static final String HEIC = MediaSignatures.HEIC;
     private static final Set<String> ALLOWED = Set.of(PDF, JPEG, PNG, HEIC);
 
-    // Check size before sniffing so oversized content is reported as a size error.
     public static String validate(String contentType, long sizeBytes, byte[] content) {
         String declared = switch (MediaSignatures.normalise(contentType)) {
             case "image/jpg" -> JPEG;
@@ -44,23 +37,17 @@ public final class DocumentUploads {
                     "That file is not a PDF or an image. Upload the original scan or photo.");
         }
         if (!actual.equals(declared)) {
-            // The uploader knows the file, so naming both types helps diagnose an honest mismatch.
             throw new UnsupportedMediaTypeException(
                     "That file is a " + actual + ", not the " + declared + " it claims to be.");
         }
         return actual;
     }
 
-    // Restrict this vault without removing formats used by message attachments from the shared detector.
     static String sniff(byte[] b) {
         String type = MediaSignatures.sniff(b);
         return type != null && ALLOWED.contains(type) ? type : null;
     }
 
-    /**
-     * Strip a client filename to something safe to store and show. Never used as a path (key is a
-     * server-minted UUID); this only stops echoing {@code <script>} back into the dashboard.
-     */
     public static String safeFileName(String raw) {
         return MediaSignatures.safeFileName(raw, "document");
     }

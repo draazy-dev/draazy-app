@@ -35,13 +35,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Composed from the handlers the client would otherwise call one by one, so no section drifts from them. */
 @RestController
 public class MeDashboardController {
-
     private static final Logger log = LoggerFactory.getLogger(MeDashboardController.class);
 
-    // The client's MAX_PAGE_SIZE: the page every one of these inbox reads asks for.
     private static final Pageable INBOX_PAGE = PageRequest.of(0, 100);
 
     private final MeListingsController listings;
@@ -87,13 +84,11 @@ public class MeDashboardController {
         this.entitlements = entitlements;
     }
 
-    /** {@code listingTools} adds what only the My Listings panel reads (quota), for a landing on that tab. */
     @GetMapping(Routes.Bootstrap.ME_DASHBOARD)
     public MeDashboardResponse dashboard(@CurrentUser AuthPrincipal principal,
             @RequestParam(defaultValue = "false") boolean listingTools) {
         PageResponse<OwnerListingCard> mine =
                 section("listings", () -> listings.myListings(principal, INBOX_PAGE));
-        // Each inbox below is scoped to the caller's listings, so without one it is empty by definition.
         boolean owner = mine == null || mine.totalElements() > 0;
         List<TenancyDto> rented = section("tenancies", () -> tenancies.myTenancies(principal));
         List<ServiceRequestPartyDto> invites =
@@ -129,8 +124,6 @@ public class MeDashboardController {
         return PageResponse.of(Page.<T>empty(INBOX_PAGE), t -> t);
     }
 
-    // A null section makes the client fall back to that section's own endpoint, which then
-    // reports the real error where the screen that needs it can show it.
     private static <T> T section(String name, Supplier<T> read) {
         try {
             return read.get();

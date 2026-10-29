@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 class OfferRequestSource implements RequestSource {
-
     private final OfferRepository offers;
     private final OfferHistoryRepository history;
     private final PropertyRepository properties;
@@ -91,7 +90,6 @@ class OfferRequestSource implements RequestSource {
 
     private RequestView view(Offer offer, String lastBy, Property listing, UUID ownerId, Party party, boolean received) {
         boolean ownerMovedLast = OfferStatuses.BY_OWNER.equals(lastBy);
-        // After the owner's counter the buyer answers next, so neither box treats it as pending.
         String state = switch (offer.getStatus()) {
             case OfferStatuses.PENDING, OfferStatuses.COUNTERED -> ownerMovedLast ? OfferStatuses.COUNTERED : PENDING;
             case OfferStatuses.ACCEPTED -> ACCEPTED;

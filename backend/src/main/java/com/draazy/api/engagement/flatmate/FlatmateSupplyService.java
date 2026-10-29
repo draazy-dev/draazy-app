@@ -35,7 +35,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FlatmateSupplyService {
-
     private static final Logger log = LoggerFactory.getLogger(FlatmateSupplyService.class);
 
     private static final int MAX_INTERESTS = 10;
@@ -52,7 +51,6 @@ public class FlatmateSupplyService {
     private final FlatmateGroupRepository groups;
     private final FlatmateRequestRepository requests;
 
-    /** Owner-consent fact keyed by (owner mobile, tenant) — outlives any one group. */
     private final FlatmateOwnerConsentService consentService;
     private final FlatmateGuardrails guardrails;
 
@@ -70,7 +68,6 @@ public class FlatmateSupplyService {
 
     private final FlatmateReviewStatuses reviewStatuses;
 
-    /** Which edits earn a moderator's attention — asked before the mapper overwrites the answer. */
     private final FlatmateEditRules editRules;
     private final OwnedDocumentLookup ownedDocuments;
     private final FlatmateMembershipService membership;
@@ -145,21 +142,16 @@ public class FlatmateSupplyService {
                 locality,
                 body.rentShare());
 
-        // nameOf above refused a bad id before the mapper could turn it into null and file the room
-        // attached to nothing. See SocietyReference.
         mapper.applyTo(body, room);
         room.setLocalities(List.of(locality));
         room.setSociety(societyName);
 
-        // Everything the client is not. These four are the trust decision, kept here rather than in
-        // the mapper so they stay reviewable as a block (api-standards 8.1).
         room.setHostRole(hostRole);
         room.setAgreementDeclared(declared);
         room.setAddressFingerprint(eligibility.fingerprint());
         room.setFlagForReview(eligibility.flagForReview());
         room.setVerificationTier(tier);
 
-        // Consent is the consent table's answer, never the client's. See settleRoomConsent.
         consentService.settleRoomConsent(caller, room);
 
         room.setModStatus(publication.stateFor(tier, eligibility.flagForReview() || room.getPhotos().isEmpty(), false));
@@ -175,7 +167,6 @@ public class FlatmateSupplyService {
         return mapper.toDto(saved, ownView(caller, saved, saved.getOccupants()));
     }
 
-    /** Tier is preserved: the flat did not stop being the flat because somebody moved out. */
     @Transactional
     public FlatmateRoomDto setSeats(AuthPrincipal caller, UUID roomId, int seatsOpen) {
         FlatmateRoom room = ownedRoom(caller, roomId);
@@ -197,15 +188,11 @@ public class FlatmateSupplyService {
         return mapper.toDto(saved, ownView(caller, saved, committedInFlat(saved)));
     }
 
-    /** Clamped to {@code min(3, maxOccupants - siblings)} so a host cannot exceed the flat cap
-     * room-by-room. */
     @Transactional
     public FlatmateRoomDto setOccupants(AuthPrincipal caller, UUID roomId, int occupants) {
         rooms.findPropertyId(roomId).ifPresent(rooms::lockFlat);
         FlatmateRoom room = ownedRoom(caller, roomId);
 
-        // A room keeps one ledger or the other: an occupant count on a seat-model room writes a
-        // figure the feed ignores, so the host's edit succeeds and nothing changes.
         if (!room.isSplitRoom()) {
             throw new ForbiddenException(
                     "Only rooms created by splitting a flat track occupants.");
@@ -281,8 +268,6 @@ public class FlatmateSupplyService {
         group.setAgreementDeclared(declared);
         group.setAddressFingerprint(eligibility.fingerprint());
 
-        // Consent flag decided here by asking the consent table; client cannot set it. Set after
-        // the fingerprint because the question asked is about this flat, not about this owner.
         group.setOwnerConsent(consentService.has(
                 group.getOwnerConsentMobile(), caller.userId(), group.getAddressFingerprint()));
         group.setFlagForReview(eligibility.flagForReview());
@@ -290,7 +275,6 @@ public class FlatmateSupplyService {
         group.setModStatus(state);
         FlatmatePublication.queueUnreviewed(group.getRecheck(), state, group.isHunting());
 
-        // Only honoured when the tier actually came out as owner — see deriveTier.
         group.setPropertyId(FlatmateVocabulary.TIER_OWNER.equals(tier) ? propertyId : null);
 
         group.addMember(new FlatmateGroupMember(hostName, caller.userId(), caller.verified()));
@@ -304,8 +288,6 @@ public class FlatmateSupplyService {
         return mapper.toDto(saved, ownParty(caller));
     }
 
-    /** Full body (same shape as POST) so "absent" and "cleared" stay distinguishable. Split rooms
-     * are refused — the address belongs to the flat. */
     @Transactional
     public FlatmateRoomDto updateRoom(AuthPrincipal caller, UUID roomId,
             FlatmateRoomCreateRequest body) {
@@ -330,14 +312,12 @@ public class FlatmateSupplyService {
         String societyName = society.name();
         String locality = localities.canonicalName(body.localitySlug(), body.locality().strip(), List.of(room.getLocality()));
 
-        // Before applyTo, which is the only moment the stored values still exist to compare against.
         FlatmateEditImpact impact = editRules.classify(room, body);
         boolean reopenBlocked = isFull(room) && guardrails.capBlocksReopen(caller.userId(), tier);
         mapper.applyTo(body, room);
         room.setSocietyId(society.id());
         room.setSociety(societyName);
 
-        // Constructor invariants, editable here because a wrong locality is the commonest fix.
         room.setRoomType(FlatmateVocabulary.require(
                 body.roomType(), FlatmateVocabulary.ROOM_TYPE, "room type"));
         room.setLocality(locality);
@@ -391,8 +371,6 @@ public class FlatmateSupplyService {
         }
     }
 
-    /** {@code seatsTotal} can move here only, and never below the members already in the group —
-     * that would be an eviction, which no route means. */
     @Transactional
     public FlatmateGroupDto updateGroup(AuthPrincipal caller, UUID groupId,
             FlatmateGroupCreateRequest body) {
@@ -438,8 +416,6 @@ public class FlatmateSupplyService {
         group.setVerificationTier(tier);
         group.setPropertyId(FlatmateVocabulary.TIER_OWNER.equals(tier) ? propertyId : null);
 
-        /** Re-derived, exactly as createGroup does it, because the mapper has just overwritten the
-         * number this flag is about — otherwise a standing `true` rides on against a new number. */
         group.setOwnerConsent(consentService.has(
                 group.getOwnerConsentMobile(), caller.userId(), group.getAddressFingerprint()));
 
@@ -451,8 +427,6 @@ public class FlatmateSupplyService {
         return mapper.toDto(saved, ownParty(caller));
     }
 
-    /** A null {@code seatsOpen} is not a zero — it means the form did not ask, and unboxing it
-     * would throw an NPE out of every create that leaves the field out. */
     private static void rejectMoreOpenSeatsThanSeats(FlatmateGroup group) {
         Integer open = group.getSeatsOpen();
         if (open != null && open > group.getSeatsTotal()) {
@@ -495,8 +469,6 @@ public class FlatmateSupplyService {
         return mapper.toDto(groups.saveAndFlush(group), ownParty(caller));
     }
 
-    /** Always a pending request, whatever the group's gender policy: nobody joins until the host
-     * has vetted them and accepted. */
     @Transactional
     public FlatmateRequestDto join(AuthPrincipal caller, UUID groupId, String share, String message,
             String gender) {
@@ -524,8 +496,6 @@ public class FlatmateSupplyService {
                 requester == null ? null : requester.getMobile());
     }
 
-    /** A group is people renting a flat together; an owner letting one lists its rooms instead. Older
-     * owner-hosted groups stay editable. */
     private static void refuseOwnerGroup(String hostRole) {
         if (FlatmateVocabulary.ROLE_OWNER.equals(hostRole)) {
             throw new ConflictException("owner_lists_rooms",
@@ -533,8 +503,6 @@ public class FlatmateSupplyService {
         }
     }
 
-    /** The one place a verification tier is decided: owner requires the caller's own approved listing that carries the
-     * Verified property badge, tenant is a claim, identity is the floor. */
     private String deriveTier(AuthPrincipal caller, String hostRole, UUID propertyId,
             boolean agreementDeclared) {
         if (FlatmateVocabulary.ROLE_OWNER.equals(hostRole) && propertyId != null) {
@@ -609,14 +577,11 @@ public class FlatmateSupplyService {
         return text == null || text.isBlank() ? null : text;
     }
 
-    /** Gated on the tier rather than the request, so a stranger cannot reserve somebody else's flat
-     * by guessing its id. A spare room never stores the id — the schema forbids seats on a split row. */
+    // Gated on the tier, not the request, so a stranger cannot reserve another's flat by guessing its id.
     private static UUID ownedFlat(String tier, UUID propertyId) {
         return FlatmateVocabulary.TIER_OWNER.equals(tier) ? propertyId : null;
     }
 
-    /** {@code ownerConsent} comes from the saved row, never the request, so the value filed with Ops
-     * is the one {@link FlatmateOwnerConsentService#settleRoomConsent} derived. */
     private FlatmatePublication.AgreementClaim claimOf(AuthPrincipal caller,
             FlatmateRoomCreateRequest body, boolean ownerConsent) {
         return new FlatmatePublication.AgreementClaim(body.agreementDoc(),
@@ -649,8 +614,6 @@ public class FlatmateSupplyService {
 
         locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_INTEREST, caller.userId().toString());
 
-        // Existence check AFTER the lock: under READ COMMITTED the double-press loser sees the row.
-        // Ahead of rate-limit on purpose — a repeat ask is not a delivery.
         if (requests.findByKindAndTargetIdAndRequesterId(kind, targetId, caller.userId())
                 .isPresent()) {
             throw alreadyInterested();
@@ -671,14 +634,10 @@ public class FlatmateSupplyService {
             saved = requests.saveAndFlush(new FlatmateRequest(
                     kind, targetId, hostId, caller.userId(), intent, body));
         } catch (DataIntegrityViolationException raced) {
-
-            // V27's unique index is the backstop for repeatable-read sessions; only that index is translated to 409 —
-            // other integrity violations propagate untranslated.
             if (!isDuplicateInterest(raced)) {
                 throw raced;
             }
 
-            // Reaching this line means the re-read did not do its job; caller sees the same 409.
             log.debug("duplicate flatmate interest reached the index: kind={} target={} requester={}",
                     kind, targetId, caller.userId());
             throw alreadyInterested();
@@ -687,7 +646,6 @@ public class FlatmateSupplyService {
         User requester = users.findById(caller.userId())
                 .orElseThrow(() -> NotFoundException.of("User"));
 
-        // `users.name` is nullable (OTP sign-in with no profile); "Someone" beats concatenating null.
         String requesterName = FlatmateVocabulary.blankToNull(requester.getName());
         notifier.notify(
                 hostId,
@@ -702,8 +660,6 @@ public class FlatmateSupplyService {
         return ConstraintViolations.isOn(violation, ONE_PER_TARGET_INDEX);
     }
 
-    /** {@link FlatmateConflicts} appends the marker after the message, so nothing follows it by
-     * accident. */
     private static ConflictException alreadyInterested() {
         return FlatmateConflicts.alreadyInterested(
                 "You have already sent this host a request — your earlier message is with them.");
@@ -718,8 +674,7 @@ public class FlatmateSupplyService {
                 .sum();
     }
 
-    /** Locked, so the host's write and a staff verdict or a seat-taking acceptance cannot interleave;
-     * a stranger's id is a 404 so ids do not become an existence oracle. */
+    // Locked so host writes cannot interleave with staff verdicts; a stranger's id is 404, not 403.
     private FlatmateRoom ownedRoom(AuthPrincipal caller, UUID roomId) {
         return rooms.lockLive(roomId)
                 .filter(r -> r.getHostId().equals(caller.userId()))
@@ -736,8 +691,6 @@ public class FlatmateSupplyService {
         return users.findById(hostId).map(User::getName).orElse(null);
     }
 
-    /** Carries the Ops verdict because the badge is derived from it: a response omitting it would
-     * answer {@code verified: false} for a room the feed badges. */
     private FlatmateMapper.RoomView ownView(AuthPrincipal caller, FlatmateRoom room, int flatCommitted) {
         return new FlatmateMapper.RoomView(flatCommitted, hostName(caller.userId()),
                 callerMobile(caller), reviewStatuses.forRooms(List.of(room)).get(room.getId()));
@@ -767,10 +720,7 @@ public class FlatmateSupplyService {
         };
     }
 
-    /** Carries the eligibility result so the client can explain the refusal; the contract declares
-     * {@code HostEligibility} as the 409 body for both creates. */
     public static class HostBlockedException extends ConflictException {
-
         private final transient FlatmateGuardrails.HostEligibility eligibility;
 
         HostBlockedException(FlatmateGuardrails.HostEligibility eligibility) {

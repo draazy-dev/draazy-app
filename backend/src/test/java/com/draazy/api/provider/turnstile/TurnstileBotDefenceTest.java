@@ -14,19 +14,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * Cloudflare Turnstile verification (tech-debt D130), against a real HTTP server on loopback.
- *
- * <p><strong>Why a real server and not a mocked client.</strong> The three things worth proving here
- * are all below the API a mock would replace: that a {@code success: false} body is a refusal, that
- * a transport failure is a refusal rather than an exception escaping into a servlet filter, and that
- * the secret reaches the provider without being logged or returned. A stubbed {@code RestClient}
- * would prove the first and assume the other two. The JDK's own {@code HttpServer} costs no
- * dependency and no fixture.
- */
 @DisplayName("Turnstile verification (D130)")
 class TurnstileBotDefenceTest {
-
     private HttpServer server;
 
     @AfterEach
@@ -36,7 +25,6 @@ class TurnstileBotDefenceTest {
         }
     }
 
-    /** Starts a stand-in for Cloudflare that returns {@code body} and records what it was sent. */
     private String startServer(String body) throws IOException {
         StringBuilder received = new StringBuilder();
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -73,8 +61,6 @@ class TurnstileBotDefenceTest {
                 .contains("remoteip=203.0.113.9");
     }
 
-    // A proxy, a WAF error page or a future API change can produce a wrong-typed body. It must be
-    // a refusal, not a ClassCastException surfacing as a 500 from a public endpoint.
     @ParameterizedTest(name = "refuses {0}")
     @ValueSource(strings = {
             "{\"success\":false,\"error-codes\":[\"invalid-input-response\"]}",
@@ -89,7 +75,6 @@ class TurnstileBotDefenceTest {
     @Test
     @DisplayName("refuses when the provider is unreachable — fail closed, and without throwing")
     void refusesWhenUnreachable() throws Exception {
-        // A port nothing is listening on: bind one to learn a free number, then release it.
         int deadPort;
         try (ServerSocket probe = new ServerSocket(0)) {
             deadPort = probe.getLocalPort();

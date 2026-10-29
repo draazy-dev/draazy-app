@@ -17,11 +17,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Uses the same {@code societies:read}/{@code societies:write} atoms as the other society desks: an operator who
- * can verify a member-added society can already vouch for its facts, so a sixth atom would block existing ops. */
 @RestController
 public class SocietyAdminController {
-
     private static final String STAFF_OR_ADMIN =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
 
@@ -44,16 +41,12 @@ public class SocietyAdminController {
         return PageResponse.of(societies.directory(q, pageable), row -> row);
     }
 
-    /** The note is moderator prose about a named building, so it stays off the anonymous directory payload;
-     * guarded on {@code societies:read} so read-only operators see why a society was left as it is. */
     @GetMapping(Routes.AdminSocieties.BY_SLUG)
     @PreAuthorize(SOCIETIES_READ)
     public SocietyAdminResponse get(@PathVariable String slug) {
         return societies.get(slug);
     }
 
-    /** {@code PATCH}, not {@code PUT}, so absent fields are left alone and unseen columns are not erased; by slug,
-     * the public alias, as the id is an internal key no operator screen shows. */
     @PatchMapping(Routes.AdminSocieties.BY_SLUG)
     @PreAuthorize(SOCIETIES_WRITE)
     public SocietyAdminResponse edit(@CurrentUser AuthPrincipal principal,

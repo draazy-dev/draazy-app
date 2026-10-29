@@ -35,10 +35,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 
-// A paid rent agreement is the only road to the Tenant-verified badge, and no single account can walk it alone.
 @DisplayName("Rent agreement registration — from paid request to trust evidence")
 class RentAgreementRegistrationTest extends ServiceFixtures {
-
     private static final String TENANT_ONE = "9876500001";
     private static final String TENANT_TWO = "9876500002";
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -83,7 +81,6 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
         return id;
     }
 
-    /** {@code tenant} accepts a co-fill invite (an OTP-held number); TENANT_TWO is only typed. */
     private String raiseWithInvitee(User owner, Property property, User tenant) throws Exception {
         String created = mvc.perform(post(Routes.ServiceRequests.CO_FILL_CREATE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -311,7 +308,6 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
         assertThat(row(id, TENANT_ONE).getVerifiedBy()).isEqualTo(checker.getId());
         assertThat(agreements.hasRegisteredTenancy(p.getId(), TENANT_TWO)).isFalse();
 
-        // Typed, never OTP-held: whoever answers that number has not proved it is theirs.
         verify(checker, row(id, TENANT_TWO).getId(), "registered", 422);
         assertThat(row(id, TENANT_TWO).getStatus()).isEqualTo("draft");
         verify(checker, row(id, TENANT_TWO).getId(), "expired", 200);

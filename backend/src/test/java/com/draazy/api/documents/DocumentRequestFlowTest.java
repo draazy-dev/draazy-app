@@ -30,10 +30,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
-/** Organised around invariants: the share token is the only credential, every failure on it looks identical,
- * expiry is authoritative over the status label, and the requester's mobile is never revealed. */
 class DocumentRequestFlowTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -93,7 +90,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
         return json.replaceAll("^.*?\"" + name + "\":\"([^\"]+)\".*$", "$1");
     }
 
-    /** Ask, then grant, and hand back the minted share token. */
     private String grantedToken(User owner, User buyer, Property p, String categoriesJson)
             throws Exception {
         ask(buyer, p, categoriesJson);
@@ -105,8 +101,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(status().isOk());
         return requests.findById(UUID.fromString(reqId)).orElseThrow().getShareToken();
     }
-
-    // ---------------- POST /documents/requests ----------------
 
     @Test
     void requestAccess_recordsTheAskAgainstTheOwnersListing() throws Exception {
@@ -159,16 +153,12 @@ class DocumentRequestFlowTest extends AbstractApiTest {
         User owner = user("9820002007", "owner");
         Property p = listing(owner, "Self ask flat");
 
-        // The owner's own paperwork is at /me/documents/{propId}; a self-request would sit in the
-        // owner's own inbox waiting for the owner to answer it.
         mvc.perform(post(Routes.Documents.REQUESTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"propertyId\":\"" + p.getId() + "\"}"))
                 .andExpect(status().isConflict());
     }
-
-    // ---------------- GET /me/documents/requests ----------------
 
     @Test
     void ownerInbox_showsOnlyRequestsAgainstListingsTheCallerOwns() throws Exception {
@@ -202,8 +192,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
         User buyer = user("9820002015", "buyer");
         ask(buyer, listing(owner, "Masked flat"), "[\"Sale Deed\"]");
 
-        // Granting document access must not become a side door around the contact gate: unlike
-        // /contacts/status there is no reveal on this surface at all.
         String json = inbox(owner);
         assertThat(json).doesNotContain("9820002015");
         mvc.perform(get(Routes.MeDocuments.REQUESTS)
@@ -211,9 +199,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].requester.mobile").value("98XXXXX015"));
     }
 
-
-    /** The buyer-side list must be scoped to the requester: the owner-scoped inbox query
-     * would show this buyer nothing while showing an owner-buyer everyone's. */
     @Test
     void myAsks_showOnlyTheCallersOwnRequests() throws Exception {
         User owner = user("9820002040", "owner");
@@ -230,7 +215,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].propertyId").value(p.getId().toString()))
-                // A pending ask is not permission to inventory the owner's private vault.
                 .andExpect(jsonPath("$.content[0].sharedDocumentCount").value(0));
     }
 
@@ -252,8 +236,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].propertyId").value(p2.getId().toString()));
     }
 
-    /** The list reports status but never the share token, the sole credential for {@code GET /documents/shared};
-     * echoing it would let one intercepted page open every granted vault. */
     @Test
     void myAsks_neverCarryTheShareToken_evenOnceGranted() throws Exception {
         User owner = user("9820002043", "owner");
@@ -270,7 +252,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
         assertThat(json).doesNotContain(token);
     }
 
-    /** Newest first, with the count of the whole history rather than the slice, as the owner's inbox does. */
     @Test
     void myAsks_areNewestFirst_andKeepTheTotalAcrossPages() throws Exception {
         User owner = user("9820002045", "owner");
@@ -291,8 +272,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].propertyId").value(third.getId().toString()));
     }
 
-    /** {@code totalElements} is the whole inbox, not the slice. The size clamp is asserted because it lives in two
-     * properties files and the front end relies on it; if lost, one query could pull an owner's entire history. */
     @Test
     void ownerInbox_pagesWithoutLosingTheTotal_andClampsAnOversizedPage() throws Exception {
         User owner = user("9820002016", "owner");
@@ -301,7 +280,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
             ask(user("982000201" + (7 + i), "buyer"), p, "[\"Sale Deed\"]");
         }
 
-        // Unspecified page: the whole inbox at the default size, exactly as before paging.
         mvc.perform(get(Routes.MeDocuments.REQUESTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
@@ -310,7 +288,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(20));
 
-        // Second page of two: one row left, and the total still describes the inbox.
         mvc.perform(get(Routes.MeDocuments.REQUESTS)
                         .param("page", "1").param("size", "2")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
@@ -319,7 +296,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(3))
                 .andExpect(jsonPath("$.totalPages").value(2));
 
-        // An oversized page is clamped, not honoured and not rejected.
         mvc.perform(get(Routes.MeDocuments.REQUESTS)
                         .param("size", "500")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
@@ -327,8 +303,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.size").value(100));
     }
 
-    /** {@code /me/documents/requests} outranks the {@code {propId}} template only by PathPattern ranking,
-     * which is load-bearing and could be flipped silently by a refactor. */
     @Test
     void inboxRoute_beatsThePropertyVaultTemplateItSitsUnder() throws Exception {
         var request = new org.springframework.mock.web.MockHttpServletRequest("GET",
@@ -339,8 +313,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
         assertThat(chain.getHandler().toString()).contains("myDocumentRequests");
     }
 
-    // ---------------- PATCH /me/documents/requests/{reqId} ----------------
-
     @Test
     void grant_mintsAShareTokenAndAnExpiry() throws Exception {
         User owner = user("9820002020", "owner");
@@ -349,8 +321,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
 
         String token = grantedToken(owner, buyer, p, "[\"Sale Deed\"]");
 
-        // 256 bits of SecureRandom, URL-safe base64, unpadded: this string is the entire credential
-        // for an anonymous read of a sale deed, so its length is a security property.
         assertThat(token).hasSizeGreaterThanOrEqualTo(43).doesNotContain("=", "+", "/");
         mvc.perform(get(Routes.MeDocuments.REQUESTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
@@ -406,7 +376,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                         .content("{\"status\":\"granted\"}"))
                 .andExpect(status().isOk());
 
-        // A grant the buyer may already have followed cannot be quietly turned back into a decline.
         mvc.perform(patch(Routes.MeDocuments.REQUEST_BY_ID, reqId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -414,10 +383,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
     }
 
-    // -------- GET /me/document-requests/{reqId}/documents (requester) --------
-
-    /** The signed-in door must unlock the same category slice as the token door: the token is owner-facing,
-     * so a buyer whose owner never forwarded it would otherwise see "granted" and open nothing. */
     @Test
     void myGrantedDocuments_returnsOnlyWhatTheCallersGrantUnlocked() throws Exception {
         User owner = user("9820002060", "owner");
@@ -452,8 +417,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[0].category").value("Sale Deed"));
     }
 
-    /** Possessing a UUID is not authority: unknown, pending and others' requests all look absent,
-     * so ids cannot be enumerated to learn who asked for a listing's paperwork. */
     @Test
     void myGrantedDocuments_isRequesterScopedAndGrantScoped() throws Exception {
         User owner = user("9820002062", "owner");
@@ -482,7 +445,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    /** Expiry closes the JWT-authenticated door at the same instant as the token door. */
     @Test
     void myGrantedDocuments_stopsWorkingWhenTheGrantLapses() throws Exception {
         User owner = user("9820002065", "owner");
@@ -519,7 +481,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.url").isNotEmpty());
-        // A file outside the granted categories is absent, not forbidden.
         mvc.perform(get(Routes.MeDocumentRequests.DOCUMENT_URL, reqId, indexId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isNotFound());
@@ -546,8 +507,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-    // ---------------- GET /documents/shared (X-Share-Token) ----------------
-
     @Test
     void sharedRead_isAnonymousAndReturnsOnlyTheGrantedCategories() throws Exception {
         User owner = user("9820002030", "owner");
@@ -558,7 +517,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
 
         String token = grantedToken(owner, buyer, p, "[\"Sale Deed\"]");
 
-        // No Authorization header: the lawyer or banker the link is forwarded to has no account.
         mvc.perform(get(Routes.Documents.SHARED).header(ShareTokens.HEADER, token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
@@ -567,8 +525,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
 
     @Test
     void sharedRead_tellsTheBrowserNeverToForwardThisUrl() throws Exception {
-        // `no-referrer` stops a browser holding a Draazy URL from sending it in a Referer header elsewhere;
-        // asserted on this route because a chain-wide change could silently drop a per-route claim.
         User owner = user("9820002050", "owner");
         User buyer = user("9820002051", "buyer");
         Property p = listing(owner, "Referrer flat");
@@ -583,8 +539,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
 
     @Test
     void sharedRead_isNeverStoredByAnySharedCache() throws Exception {
-        // `no-store` stops an intermediary caching the response against a URL identical for every buyer and
-        // serving one person's title deeds to the next; it is a chain default someone could reconfigure unaware.
         User owner = user("9820002052", "owner");
         User buyer = user("9820002053", "buyer");
         Property p = listing(owner, "Cacheable flat");
@@ -600,8 +554,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
 
     @Test
     void sharedRead_staysUsableForTheWholeGrant_notJustTheFirstOpen() throws Exception {
-        // The grant is reusable until expiry: the buyer forwards the link to a lawyer who opens it repeatedly.
-        // Single-use would be a product decision, and a header is easier to drop on retry than a URL.
         User owner = user("9820002056", "owner");
         User buyer = user("9820002057", "buyer");
         Property p = listing(owner, "Reused flat");
@@ -686,7 +638,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                 .andExpect(status().isUnauthorized())
                 .andReturn().getResponse().getContentAsString();
 
-        // Telling the two apart would make this endpoint an oracle for probing forwarded links.
         assertThat(unknown).contains("This share link is not valid");
     }
 
@@ -698,8 +649,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
         upload(owner, p, "Sale Deed", "deed.pdf");
         String token = grantedToken(owner, buyer, p, "[\"Sale Deed\"]");
 
-        // Nothing sweeps rows to `expired`; the clock is checked on every read, so backdating the
-        // expiry alone -- leaving status `granted` -- must be enough to close the link.
         var row = requests.findByShareToken(token).orElseThrow();
         row.grant(token, Instant.now().minusSeconds(60));
         requests.saveAndFlush(row);
@@ -710,15 +659,12 @@ class DocumentRequestFlowTest extends AbstractApiTest {
 
     @Test
     void sharedRead_ignoresATokenOfferedInTheQueryString() throws Exception {
-        // A valid token sent as the legacy `?token=` query must buy nothing and look identical to a wrong one,
-        // since a credential carried in the URL is the vulnerability itself.
         User owner = user("9820002054", "owner");
         User buyer = user("9820002055", "buyer");
         Property p = listing(owner, "Legacy link flat");
         upload(owner, p, "Sale Deed", "deed.pdf");
         String token = grantedToken(owner, buyer, p, "[\"Sale Deed\"]");
 
-        // Proof the token itself is live, so the 401 below is about *where* it was presented.
         mvc.perform(get(Routes.Documents.SHARED).header(ShareTokens.HEADER, token))
                 .andExpect(status().isOk());
 
@@ -730,8 +676,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
 
     @Test
     void sharedRead_answersAMissingOrBlankHeaderWithTheSameOpaque401() throws Exception {
-        // A stale `?token=` link arrives as no header and must look identical to a wrong one: Spring's own
-        // 400 would be the first bit of an oracle, and a blank header must not reach the repository lookup either.
         for (var request : java.util.List.of(
                 get(Routes.Documents.SHARED),
                 get(Routes.Documents.SHARED).header(ShareTokens.HEADER, ""),
@@ -742,7 +686,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
             assertThat(body).contains("This share link is not valid");
         }
     }
-
 
     private java.util.List<java.util.Map<String, Object>> notificationsFor(User u) {
         return jdbc.queryForList(
@@ -760,21 +703,13 @@ class DocumentRequestFlowTest extends AbstractApiTest {
 
         assertThat(notificationsFor(buyer)).singleElement().satisfies(row -> {
             assertThat(row.get("type")).isEqualTo("document.granted");
-            // The request id is an identifier, not a capability: the endpoint also demands the JWT user id match
-            // the requester, so it is safe to store in a row.
             assertThat(row.get("link")).isEqualTo("/view-documents/" + reqId);
-            // Pinned separately from the equality above so that a future edit which merely appends
-            // to the link cannot quietly put the listing back in the buyer's path.
             assertThat((String) row.get("link")).doesNotContain(p.getId().toString());
-            // The token is the only credential on the shared read; a stored, forwardable row is
-            // the last place it should be able to turn up.
             assertThat((String) row.get("link")).doesNotContain(token);
             assertThat((String) row.get("body")).doesNotContain(token);
-            // The buyer is told the clock is running without being told the number.
             assertThat((String) row.get("body")).contains("7 days");
         });
 
-        // The owner made the decision; their only row is the request that asked for it.
         assertThat(notificationsFor(owner)).extracting(row -> row.get("type"))
                 .containsExactly("document.requested");
     }
@@ -793,7 +728,6 @@ class DocumentRequestFlowTest extends AbstractApiTest {
                         .content("{\"status\":\"declined\"}"))
                 .andExpect(status().isOk());
 
-        // Same reading as ContactService.respond: a terminal "no" is not news to push at someone.
         assertThat(notificationsFor(buyer)).isEmpty();
         assertThat(notificationsFor(owner)).extracting(row -> row.get("type"))
                 .containsExactly("document.requested");

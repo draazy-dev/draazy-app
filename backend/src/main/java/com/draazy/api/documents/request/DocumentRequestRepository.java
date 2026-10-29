@@ -13,8 +13,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface DocumentRequestRepository extends JpaRepository<DocumentRequest, UUID> {
-
-    // Rides the migration `idx_document_requests_property_created`: with the sort column in the index.
     Page<DocumentRequest> findByPropertyIdInAndStatusNotOrderByCreatedAtDesc(
             Collection<UUID> propertyIds, String status, Pageable pageable);
 
@@ -44,7 +42,6 @@ public interface DocumentRequestRepository extends JpaRepository<DocumentRequest
     Page<DocumentRequest> findByRequesterIdAndPropertyIdOrderByCreatedAtDesc(
             UUID requesterId, UUID propertyId, Pageable pageable);
 
-    /** The idempotency read behind {@code POST /documents/requests}. */
     Optional<DocumentRequest> findByRequesterIdAndPropertyIdAndStatus(
             UUID requesterId, UUID propertyId, String status);
 

@@ -4,15 +4,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** What erasure deletes, what it keeps, and on whose authority. Statutory reasoning per category:
- * docs/system/legal-entity-and-compliance.md §11. */
 public final class ErasureRetention {
-
     private ErasureRetention() {
     }
 
-    /** Written into {@code erasure_requests.retained} at execution; ordered so two stored documents
-     * diff cleanly. */
     public static Map<String, String> retainedWithReasons() {
         Map<String, String> reasons = new LinkedHashMap<>();
 
@@ -87,8 +82,6 @@ public final class ErasureRetention {
         return reasons;
     }
 
-    /** Personal data this sweep does not reach, disclosed to the subject alongside the retentions.
-     * Derived from the schema by {@code ErasureCoverageTest}, which fails the build on any omission. */
     public static List<String> knownGaps() {
         return List.of(
                 "referrals — referrer_mobile and referred_mobile are stored numbers, not references,"

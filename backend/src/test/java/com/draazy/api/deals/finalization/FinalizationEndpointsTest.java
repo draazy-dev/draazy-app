@@ -27,17 +27,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** Finalization lifecycle through the real filter chain against Postgres. */
 class FinalizationEndpointsTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired JwtService jwtService;
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
     @Autowired FinalizationRequestRepository finalizationRepo;
     @Autowired JdbcTemplate jdbc;
-
-    // ---- helpers ----
 
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
@@ -73,8 +69,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
         return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
     }
 
-    // ---- §11 test 1: request with a registered counterparty → 200, row stored pending ----
-
     @Test
     void requestFinalization_registeredCounterparty_returns200Pending() throws Exception {
         User owner = user("9830100001", "owner");
@@ -95,8 +89,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.counterparty.id").value(owner.getId().toString()));
     }
 
-    // ---- §11 test 2: unregistered mobile → 422 ----
-
     @Test
     void requestFinalization_unregisteredMobile_returns400() throws Exception {
         User owner = user("9830100003", "owner");
@@ -108,12 +100,9 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"counterpartyMobile\":\"9999999999\",\"agreedPrice\":5000000}"))
                 .andExpect(status().isBadRequest())
-                // Must not say whether the mobile has an account, or the endpoint becomes an enumeration oracle.
                 .andExpect(jsonPath("$.message").value(
                         org.hamcrest.Matchers.containsString("listing owner")));
     }
-
-    // ---- §11 test 3: body propertyId mismatching path → 400 (S4) ----
 
     @Test
     void requestFinalization_bodyPropertyIdMismatch_returns400() throws Exception {
@@ -130,8 +119,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // ---- §11 test 4: auto-decline — three requests, accept one → siblings declined, deal closed ----
-
     @Test
     void acceptFinalization_autoDeclinesSiblingsAndClosesDeal() throws Exception {
         User owner = user("9830100007", "owner");
@@ -144,14 +131,12 @@ class FinalizationEndpointsTest extends AbstractApiTest {
         String reqId2 = requestFinalization(buyer2, p, owner, 5500000L);
         String reqId3 = requestFinalization(buyer3, p, owner, 6000000L);
 
-        // Owner accepts request 2.
         mvc.perform(post("/finalization/requests/" + reqId2 + "/accept")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
 
-        // Assert: req2 accepted, req1 and req3 declined.
         assertThat(finalizationRepo.findById(UUID.fromString(reqId2)).orElseThrow().getStatus())
                 .isEqualTo(FinalizationStatuses.ACCEPTED);
         assertThat(finalizationRepo.findById(UUID.fromString(reqId1)).orElseThrow().getStatus())
@@ -159,14 +144,11 @@ class FinalizationEndpointsTest extends AbstractApiTest {
         assertThat(finalizationRepo.findById(UUID.fromString(reqId3)).orElseThrow().getStatus())
                 .isEqualTo(FinalizationStatuses.DECLINED);
 
-        // Assert: deal is closed.
         String dealStatus = jdbc.queryForObject(
                 "SELECT status FROM deals WHERE property_id = ?",
                 String.class, p.getId());
         assertThat(dealStatus).isEqualTo(DealStatuses.CLOSED);
     }
-
-    // ---- §11 test 5: atomicity — force deal close failure → nothing committed ----
 
     @Test
     void acceptFinalization_dealAlreadyClosed_rollsBackEverything() throws Exception {
@@ -178,25 +160,20 @@ class FinalizationEndpointsTest extends AbstractApiTest {
         String reqId1 = requestFinalization(buyer1, p, owner, 5000000L);
         String reqId2 = requestFinalization(buyer2, p, owner, 5500000L);
 
-        // Pre-close the deal directly via JDBC so the service call will fail.
         jdbc.update("INSERT INTO deals (id, property_id, deal, status) VALUES (?, ?, 'rent', 'closed')",
                 UUID.randomUUID(), p.getId());
 
-        // Attempt to accept — should fail (deal already closed cannot transition to closed again).
         mvc.perform(post("/finalization/requests/" + reqId1 + "/accept")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isConflict());
 
-        // Assert: both requests remain pending — nothing committed.
         assertThat(finalizationRepo.findById(UUID.fromString(reqId1)).orElseThrow().getStatus())
                 .isEqualTo(FinalizationStatuses.PENDING);
         assertThat(finalizationRepo.findById(UUID.fromString(reqId2)).orElseThrow().getStatus())
                 .isEqualTo(FinalizationStatuses.PENDING);
     }
-
-    // ---- §11 test 6: initiator attempting to accept own request → 403, row stays pending ----
 
     @Test
     void initiatorCannotAcceptOwnRequest() throws Exception {
@@ -216,8 +193,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                 .isEqualTo(FinalizationStatuses.PENDING);
     }
 
-    // ---- §11 test 7: complete stranger → 404 each ----
-
     @Test
     void stranger_allOperations_return404() throws Exception {
         User owner = user("9830100016", "owner");
@@ -227,32 +202,26 @@ class FinalizationEndpointsTest extends AbstractApiTest {
 
         String reqId = requestFinalization(buyer, p, owner, 5000000L);
 
-        // accept
         mvc.perform(post("/finalization/requests/" + reqId + "/accept")
                         .header(HttpHeaders.AUTHORIZATION, bearer(stranger))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isNotFound());
 
-        // decline
         mvc.perform(post("/finalization/requests/" + reqId + "/decline")
                         .header(HttpHeaders.AUTHORIZATION, bearer(stranger))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isNotFound());
 
-        // status (stranger is not a participant on this property): nothing to show, not an error
         mvc.perform(get("/finalization/" + p.getId() + "/status")
                         .header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
                 .andExpect(status().isNoContent());
 
-        // cancel (stranger is not a participant)
         mvc.perform(delete("/finalization/" + p.getId() + "/status")
                         .header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
                 .andExpect(status().isNotFound());
     }
-
-    // ---- §11 test 8: cancel → 204, status='cancelled', row still physically exists ----
 
     @Test
     void cancelFinalization_returns204_softTransition() throws Exception {
@@ -266,13 +235,11 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isNoContent());
 
-        // Verify via JdbcTemplate the row still physically exists and is cancelled.
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM finalization_requests WHERE id = ?::uuid AND status = 'cancelled'",
                 Integer.class, reqId);
         assertThat(count).isEqualTo(1);
     }
-
 
     @Test
     void statusAfterDecline_returnsDeclinedRow() throws Exception {
@@ -282,21 +249,17 @@ class FinalizationEndpointsTest extends AbstractApiTest {
 
         String reqId = requestFinalization(buyer, p, owner, 5000000L);
 
-        // Owner declines the request.
         mvc.perform(post("/finalization/requests/" + reqId + "/decline")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
 
-        // The declined row stays readable so the page can explain the refusal.
         mvc.perform(get("/finalization/" + p.getId() + "/status")
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(FinalizationStatuses.DECLINED));
     }
-
-    // ---- §11 test 9: /me/finalization-requests returns only caller's requests ----
 
     @Test
     void myFinalizationRequests_returnsOnlyCallersRequests() throws Exception {
@@ -309,7 +272,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
         requestFinalization(buyer, p1, owner1, 5000000L);
         requestFinalization(buyer, p2, owner2, 6000000L);
 
-        // owner1 sees only the request where they are the counterparty.
         mvc.perform(get(Routes.Finalization.ME_REQUESTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner1)))
                 .andExpect(status().isOk())
@@ -317,7 +279,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].propertyId").value(p1.getId().toString()));
 
-        // owner2 sees only their own.
         mvc.perform(get(Routes.Finalization.ME_REQUESTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner2)))
                 .andExpect(status().isOk())
@@ -326,8 +287,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].propertyId").value(p2.getId().toString()));
     }
 
-
-    // The inbox read and count queries are separate JPQL; a declined row must be counted by neither.
     @Test
     void myFinalizationRequests_isPaged_andTheTotalCountsOnlyPendingRows() throws Exception {
         User owner = user("9830100040", "owner");
@@ -335,8 +294,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
         Property p2 = listing(owner, "Fin paging B");
         Property p3 = listing(owner, "Fin paging C");
         Property p4 = listing(owner, "Fin paging D");
-        // One request per property: `uq_finalization_live_per_user_property` forbids a second live
-        // request from the same initiator on the same listing.
         requestFinalization(user("9830100041", "buyer"), p1, owner, 5000000L);
         requestFinalization(user("9830100042", "buyer"), p2, owner, 5100000L);
         requestFinalization(user("9830100043", "buyer"), p3, owner, 5200000L);
@@ -361,8 +318,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(3));
     }
 
-    // ---- §11 test 10: mobile masking — masked while pending, stays masked to counterparty once accepted ----
-
     @Test
     void mobileMasking_staysMaskedToCounterparty_evenOnceAccepted() throws Exception {
         User owner = user("9830100024", "owner");
@@ -371,14 +326,12 @@ class FinalizationEndpointsTest extends AbstractApiTest {
 
         requestFinalization(buyer, p, owner, 5000000L);
 
-        // Owner views status — buyer's mobile should be masked.
         MvcResult pendingResult = mvc.perform(get("/finalization/" + p.getId() + "/status")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.initiator.mobile").value("98XXXXX210"))
                 .andReturn();
 
-        // Now accept.
         String reqId = extractId(pendingResult);
         mvc.perform(post("/finalization/requests/" + reqId + "/accept")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -386,18 +339,13 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                         .content("{}"))
                 .andExpect(status().isOk());
 
-        // After acceptance, query the DB and verify with a fresh projection.
         FinalizationRequest accepted = finalizationRepo.findById(UUID.fromString(reqId)).orElseThrow();
         assertThat(accepted.getStatus()).isEqualTo(FinalizationStatuses.ACCEPTED);
-        // D5 (global policy): the counterparty's mobile stays masked even once accepted. Re-projected
-        // directly here with the owner as viewer to assert the masking in isolation.
         User buyerUser = users.findById(buyer.getId()).orElseThrow();
         FinalizationRequestDto dto = FinalizationMapper.toDto(
                 accepted, buyerUser, owner, owner.getId(), Set.of());
         assertThat(dto.initiator().mobile()).isEqualTo("98XXXXX210");
     }
-
-    // ---- §11 test 11: duplicate live request → 409 ----
 
     @Test
     void duplicateLiveRequest_returns409() throws Exception {
@@ -407,7 +355,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
 
         requestFinalization(buyer, p, owner, 5000000L);
 
-        // Second attempt should conflict.
         mvc.perform(post(Routes.Finalization.REQUEST.replace("{propId}", p.getId().toString()))
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -415,8 +362,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                                 + "\",\"agreedPrice\":6000000}"))
                 .andExpect(status().isConflict());
     }
-
-    // ---- §11 test 12: illegal transition — accept already declined → 409 ----
 
     @Test
     void illegalTransition_acceptDeclinedRequest_returns409() throws Exception {
@@ -426,21 +371,18 @@ class FinalizationEndpointsTest extends AbstractApiTest {
 
         String reqId = requestFinalization(buyer, p, owner, 5000000L);
 
-        // Owner declines first.
         mvc.perform(post("/finalization/requests/" + reqId + "/decline")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
 
-        // Attempt to accept the now-declined request → 409.
         mvc.perform(post("/finalization/requests/" + reqId + "/accept")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isConflict());
     }
-
 
     @Test
     void cannotAimAFinalizationRequestAtSomeoneWhoIsNotTheOwner() throws Exception {
@@ -456,7 +398,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                                 + "\",\"agreedPrice\":5000000}"))
                 .andExpect(status().isBadRequest());
 
-        // The bystander's inbox stays empty.
         mvc.perform(get(Routes.Finalization.ME_REQUESTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(bystander)))
                 .andExpect(status().isOk())
@@ -464,7 +405,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
-    // An unregistered mobile and a wrong registered one must look identical.
     @Test
     void wrongMobileAndUnregisteredMobileAreIndistinguishable() throws Exception {
         User owner = user("9820100094", "owner");
@@ -488,7 +428,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest())
                 .andReturn().getResponse().getContentAsString();
 
-        // Compare the caller-visible parts only. traceId is per-request by design.
         assertThat(messageOf(registeredResponse)).isEqualTo(messageOf(unregisteredResponse));
         assertThat(errorOf(registeredResponse)).isEqualTo(errorOf(unregisteredResponse));
     }

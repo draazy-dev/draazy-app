@@ -8,14 +8,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-/** One person asking one host for one seat. No FK on {@code (kind, targetId)}: every target is soft-deleted;
- *  {@code hostId} is denormalised so the inbox never resolves targets. */
 @Entity
 @Table(name = "flatmate_requests")
 @Getter
 public class FlatmateRequest extends AuditedEntity {
-
-    /** Which collection {@link #targetId} points into: {@code flatmate}, {@code room} or {@code group}. */
     @Column(name = "kind", nullable = false, updatable = false)
     private String kind;
 
@@ -28,7 +24,6 @@ public class FlatmateRequest extends AuditedEntity {
     @Column(name = "requester_id", nullable = false, updatable = false)
     private UUID requesterId;
 
-    /** Always {@code request} now; {@code join} survives only on rows from the retired auto-join. */
     @Column(name = "action", nullable = false)
     private String action = "request";
 
@@ -60,7 +55,6 @@ public class FlatmateRequest extends AuditedEntity {
         this.message = message;
     }
 
-    /** The host's decision. The check constraint guarantees the timestamp travels with it. */
     void decide(String decision) {
         this.status = decision;
         this.decidedAt = Instant.now();

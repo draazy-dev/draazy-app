@@ -24,7 +24,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @DisplayName("D161 — abandoned subscription checkouts are retired")
 class BillingCheckoutSweepTest extends AbstractApiTest {
-
     private static final String PAID_PLAN = "b1000000-0000-4000-8000-000000000006";
 
     @Autowired MockMvc mvc;
@@ -36,13 +35,10 @@ class BillingCheckoutSweepTest extends AbstractApiTest {
     @Nested
     @DisplayName("subscriptions")
     class Subscriptions {
-
-        /** A guard on {@code paymentRef == null} would skip the orders whose modal was merely closed. */
         @Test
         @DisplayName("a pending order past its TTL is cancelled once, and the customer can buy again")
         void staleOrdersAreCancelled() throws Exception {
             User u = owner("9866600101");
-            // The unpaid-order cap must not hold a customer who never came back.
             subscribe(u, 201);
 
             assertThat(subscriptionSweeper.expireAbandonedCheckouts(future())).isEqualTo(1);
@@ -126,8 +122,6 @@ class BillingCheckoutSweepTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    /** Read through the repository, not {@code jdbc}: the sweep mutates managed entities and only a
-     *  JPA query forces the flush that makes its work visible. */
     private String statusOfLatestSubscription(User u) {
         return subscriptions.findByUserIdOrderByStartedAtDesc(u.getId())
                 .getFirst().getStatus();

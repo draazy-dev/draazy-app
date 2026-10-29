@@ -20,18 +20,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdminFinanceService {
-
-    // The console offers 6, 12 and 24; the extra headroom is for an operator typing a range by hand.
     private static final int MAX_FINANCE_MONTHS = 60;
 
     private static final int MAX_LEDGER_PAGE = 100;
 
     private static final long MAX_LEDGER_OFFSET = 100_000L;
 
-    // A contract enum, not a query result: an unknown kind is a 400, not an empty page.
     private static final List<String> LEDGER_KINDS = List.of("subscription", "service", "refund");
 
-    // Includes the tiebreaks so the page envelope matches the stable SQL order.
     private static final Sort LEDGER_SORT = Sort.by(Sort.Order.desc("date").nullsLast(),
             Sort.Order.desc("number"), Sort.Order.asc("id"));
 
@@ -91,16 +87,12 @@ public class AdminFinanceService {
         int safeSize = Math.clamp(size, 1, MAX_LEDGER_PAGE);
         int safePage = Math.max(page, 0);
 
-        // Widened before multiplying, and capped after.
-        // The long prevents overflow; the cap prevents pointless full ledger scans.
         long offset = (long) safePage * safeSize;
         if (offset > MAX_LEDGER_OFFSET) {
             throw new BadRequestException(
                     "page is beyond the ledger; at most " + MAX_LEDGER_OFFSET + " rows may be skipped");
         }
 
-        // Escaped before wrapping: an operator searching for a party with an underscore or a
-        // percent in the name would otherwise be running a wildcard they did not type.
         String term = (q == null || q.isBlank()) ? null : "%" + LikePatterns.escape(q.trim()) + "%";
 
         Instant since = PlatformTime.sinceOrNull(days);

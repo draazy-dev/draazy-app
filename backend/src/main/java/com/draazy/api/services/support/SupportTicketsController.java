@@ -18,10 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// Caller-owned support history is a bare array; platform-wide support is paged elsewhere.
 @RestController
 public class SupportTicketsController {
-
     private final SupportTicketService service;
 
     public SupportTicketsController(SupportTicketService service) {

@@ -5,11 +5,8 @@ import com.draazy.api.catalog.property.PropertyClosed;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-// Runs in the deal-close or archive transaction: approving is refused once the listing is not live, so a pending
-// request left behind could only be answered with an error.
 @Component
 class ClosedListingContactRequests {
-
     private final ContactReturns returns;
 
     ClosedListingContactRequests(ContactReturns returns) {

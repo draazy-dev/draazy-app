@@ -21,11 +21,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** {@code POST /tenant-profiles/verified}. Every refusal must look identical, or the endpoint
- *  becomes an oracle for which of ten billion mobile numbers are registered. */
 @DisplayName("The batch verified-tenant badge — one bit per row, and never a fourth answer")
 class TenantVerifiedBatchTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
     @Autowired TenantProfileRepository profiles;
@@ -47,7 +44,6 @@ class TenantVerifiedBatchTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** Opens a tenancy the only way the platform allows — by closing a rent deal — and the tenant confirms it. */
     private void closeRentDeal(User owner, Property p, User tenant) throws Exception {
         mvc.perform(post("/me/deals/" + p.getId() + "/close")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -69,8 +65,6 @@ class TenantVerifiedBatchTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    /** Through the repository, not raw SQL: the profile may still be an unflushed insert, and an
-     *  {@code UPDATE} behind Hibernate's back would match no row and quietly award nothing. */
     private void awardBadge(User tenant) {
         TenantProfile profile = profiles.findById(tenant.getId()).orElseThrow();
         profile.setVerified(true);
@@ -92,7 +86,6 @@ class TenantVerifiedBatchTest extends AbstractApiTest {
         saveProfile(tenant, "Asha K");
         awardBadge(tenant);
 
-        // Before the tenancy the landlord is just another stranger, and a stranger is told nothing.
         mvc.perform(post(Routes.Tenancies.PROFILES_VERIFIED)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,8 +103,6 @@ class TenantVerifiedBatchTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[0].verified").value(true));
     }
 
-    /** All five cases in one response on purpose: asserted separately, the shapes could drift apart
-     *  without failing, and any difference between them confirms who is registered. */
     @Test
     void everyRefusalIsTheSameRefusal() throws Exception {
         User owner = user("9822300003", "owner");
@@ -146,7 +137,6 @@ class TenantVerifiedBatchTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[4].verified").value(false));
     }
 
-    /** The endpoint emits only the numbers it was handed, so it cannot reveal a mobile the caller lacked. */
     @Test
     void aRowCarriesTheFlagAndTheCallersOwnInputAndNothingElse() throws Exception {
         User owner = user("9822300007", "owner");
@@ -173,7 +163,6 @@ class TenantVerifiedBatchTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[0].reason").doesNotExist());
     }
 
-    /** A tenant asking about themselves is the one caller who never needs a relationship. */
     @Test
     void aBatchLargerThanTheCapIsRefusedAndTheCapItselfIsAccepted() throws Exception {
         User caller = user("9822300011", "owner");

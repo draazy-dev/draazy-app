@@ -7,10 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
-/** {@code GET /me/rent-agreements/{id}/renewal}: the terms a party of a registered agreement renews from. */
 @RestController
 public class RentAgreementRenewalController {
-
     private final RentAgreementRenewalPrefill prefill;
 
     public RentAgreementRenewalController(RentAgreementRenewalPrefill prefill) {

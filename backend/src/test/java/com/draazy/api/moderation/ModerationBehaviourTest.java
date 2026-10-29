@@ -26,13 +26,11 @@ import org.springframework.http.MediaType;
 
 @DisplayName("Moderation — accountability, self-dealing and blast radius")
 class ModerationBehaviourTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
     PropertyRepository properties;
 
-    // Audit writes use `REQUIRES_NEW`, so they escape this test's rollback too.
     private final List<String> createdActors = new ArrayList<>();
 
     @AfterEach
@@ -65,13 +63,10 @@ class ModerationBehaviourTest extends AbstractApiTest {
         p.setArea(new BigDecimal("950"));
         p.setStatus(PropertyStatus.PENDING);
 
-        // Filed, because approval refuses an unfiled listing — a fixture tripping a guard it never mentions
-        // gets "fixed" by weakening it.
         p.setLocalitySlug("baner");
         return properties.saveAndFlush(p);
     }
 
-    /** Audit rows for one action <em>on one specific entity</em> — never the whole action. */
     private List<Map<String, Object>> auditRows(String action, Object entityId) {
         return jdbc.queryForList(
                 "select * from audit_log where action = ? and entity_id = ? order by at desc",
@@ -155,7 +150,6 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 String.class, key, auditRow.get("id"));
     }
 
-    // The checklist stays unticked on purpose — that is the whole difference between the two.
     @Test
     @DisplayName("a queue approval is refused until the checklist is complete")
     void queueApprovalRequiresChecklist() throws Exception {
@@ -332,7 +326,6 @@ class ModerationBehaviourTest extends AbstractApiTest {
         }
     }
 
-    // Bulk approve must not create an all-false checklist for every row.
     @Test
     @DisplayName("bulk-style approvals gate each row independently")
     void bulkStyleApprovalGatesEachRow() throws Exception {
@@ -564,7 +557,6 @@ class ModerationBehaviourTest extends AbstractApiTest {
         assertThat(auditRows("property.status", own.getId())).isEmpty();
     }
 
-    // A self-archiving sole admin would lock the back office permanently.
     @Test
     @DisplayName("staff cannot flag a listing they posted for the owner")
     void staffCannotFlagListingTheyPostedOnBehalf() throws Exception {
@@ -631,7 +623,6 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(3));
     }
 
-    // Every signed-in user can add to the report queue and only ops can take anything out.
     @Test
     @DisplayName("back-office lists cap page size and ignore a client sort")
     void listsAreBounded() throws Exception {
@@ -648,8 +639,6 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.size").value(org.hamcrest.Matchers.lessThanOrEqualTo(100)));
     }
 
-    // Prefix indexes need an anchored, escaped term; `%` must not smuggle in
-    // a full-table wildcard scan.
     @Test
     @DisplayName("a wildcard in the search term is matched literally, not interpreted")
     void searchWildcardsAreNeutralised() throws Exception {
@@ -661,20 +650,17 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(0));
 
-        // '_' is a single-character wildcard; "W_ldcard" must not match "Wildcard Target".
         mvc.perform(get("/users").param("q", "W_ldcard")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(0));
 
-        // The honest prefix still works — the escaping must not break the feature it protects.
         mvc.perform(get("/users").param("q", "Wildcard")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
 
-    // Anyone signed in may file; duplicate complaints must not masquerade as consensus.
     @Test
     @DisplayName("a second live report on the same target by the same reporter is refused")
     void duplicateLiveReportIsRefused() throws Exception {
@@ -708,7 +694,6 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // Triage is the only verb that moves a report out of `open`.
     @Test
     @DisplayName("a decided report cannot be reopened")
     void decidedReportsAreFinal() throws Exception {
@@ -734,7 +719,6 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
     }
 
-    // The reporter's identity must not travel with the report into the ops queue.
     @Test
     @DisplayName("the ops queue does not carry the reporter's identity")
     void queueDoesNotLeakReporter() throws Exception {

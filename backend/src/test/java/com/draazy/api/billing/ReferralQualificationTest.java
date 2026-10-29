@@ -29,10 +29,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** Qualification by ownership verification: minting, minting once, and no raw IP or User-Agent stored. */
 class ReferralQualificationTest extends AbstractApiTest {
-
-    /** Matches the seeded {@code fees.referralQualifyPerMonth}. */
     private static final long SEEDED_CAP = 10L;
 
     private static final String UA = "DraazyTest/1.0 (referral qualification)";
@@ -45,14 +42,11 @@ class ReferralQualificationTest extends AbstractApiTest {
     @Autowired PlatformSettings settings;
     @Autowired EntityManager entityManager;
 
-    /** Moves the cap as an admin would; the clear drops a settings row already cached in the persistence context. */
     private void setCap(long cap) {
         jdbc.update("update settings set value = jsonb_set(value, "
                 + "'{referralQualifyPerMonth}', ?::jsonb) where key = 'fees'", String.valueOf(cap));
         entityManager.clear();
     }
-
-    // ---- fixtures ----
 
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
@@ -61,7 +55,6 @@ class ReferralQualificationTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    // An account past the new-referrer age, so that alone does not raise the risk band.
     private User referrer(String mobile) {
         User u = user(mobile, "owner");
         jdbc.update("update users set created_at = now() - interval '30 days' where id = ?", u.getId());
@@ -74,7 +67,6 @@ class ReferralQualificationTest extends AbstractApiTest {
         return body.substring(i, body.indexOf('"', i));
     }
 
-    /** The caller's own code, as the share screen would read it — and where their digests are set. */
     private String codeOf(User u, String ip, String userAgent) throws Exception {
         return jsonField(mvc.perform(get(Routes.Referrals.MINE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(u))
@@ -105,7 +97,6 @@ class ReferralQualificationTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    /** One pending referral between two fresh users, redeemed from a different device. */
     private Referral referral(String referrerMobile, String referredMobile) throws Exception {
         User referrer = referrer(referrerMobile);
         User referred = user(referredMobile, "owner");
@@ -117,15 +108,11 @@ class ReferralQualificationTest extends AbstractApiTest {
         return referrals.findById(id).orElseThrow();
     }
 
-    // ---- 1: the qualifying action ----
-
     @Test
     void aVerifiedFirstListingQualifiesTheReferral() throws Exception {
         Referral referral = referral("9866610010", "9866610011");
         assertThat(referral.getStatus()).isEqualTo(ReferralStatuses.PENDING);
         assertThat(referral.getQualifiedAt()).isNull();
-        // Redemption is the whole of "joined". Q17 rejected it as the trigger because a SIM costs
-        // less than the credit it would mint.
         assertThat(referral.isActivated()).isFalse();
 
         UUID owner = users.findByMobile(referral.getReferredMobile()).orElseThrow().getId();
@@ -138,7 +125,6 @@ class ReferralQualificationTest extends AbstractApiTest {
         assertThat(after.getStatus()).isEqualTo(ReferralStatuses.QUALIFIED);
         assertThat(after.getQualifiedPropertyId()).isEqualTo(property);
         assertThat(after.getQualifiedAt()).isNotNull();
-        // `activated` was the same undelivered promise as `qualified`; the two move together now.
         assertThat(after.isActivated()).isTrue();
         assertThat(after.getTrack()).isEqualTo(ReferralStatuses.TRACK_OWNER);
         assertThat(after.getGrantedAt()).isNotNull();
@@ -160,12 +146,9 @@ class ReferralQualificationTest extends AbstractApiTest {
         Instant firstQualifiedAt = reload(referral.getId()).getQualifiedAt();
         UUID firstProperty = reload(referral.getId()).getQualifiedPropertyId();
 
-        // A retried verification write announces again with the same arguments; the port's Javadoc
-        // requires this to be survivable, and re-verification after a lapse looks identical.
         qualification.announceOwnershipVerified(
                 owner, sameProperty ? property : UUID.randomUUID(), Instant.now().plusSeconds(60));
 
-        // Counted across every referral of the referrer, so a second announcement inserting a row cannot hide.
         List<Referral> all = referrals.findByReferrerId(referral.getReferrerId());
         assertThat(all).hasSize(1);
         assertThat(all).filteredOn(r -> r.getQualifiedAt() != null).hasSize(1);
@@ -200,8 +183,6 @@ class ReferralQualificationTest extends AbstractApiTest {
         assertThat(after.getStatus()).isEqualTo(ReferralStatuses.REJECTED);
         assertThat(after.getQualifiedAt()).isNull();
     }
-
-    // ---- 2: the cap ----
 
     @Test
     void theCapIsConfigurationAndDefaultsToTenAMonth() {
@@ -262,8 +243,6 @@ class ReferralQualificationTest extends AbstractApiTest {
                 .hasSize(2);
     }
 
-    // ---- 3: the share channel ----
-
     @Test
     void theShareChannelIsRecordedWhenTheClientReportsOne() throws Exception {
         User referrer = referrer("9866610090");
@@ -273,7 +252,6 @@ class ReferralQualificationTest extends AbstractApiTest {
 
         Referral referral = referrals.findByReferrerId(referrer.getId()).getFirst();
         assertThat(referral.getShareChannel()).isEqualTo(ShareChannels.WHATSAPP);
-        // `channel` is a different dimension: it stays `seeker` and never takes the share channel's value.
         assertThat(referral.getChannel()).isEqualTo("seeker");
     }
 
@@ -281,8 +259,6 @@ class ReferralQualificationTest extends AbstractApiTest {
     void anUnknownShareChannelIsDroppedRatherThanFailingTheRedemption() throws Exception {
         User referrer = referrer("9866610100");
         User referred = user("9866610101", "owner");
-        // An older client, or a channel this build has no name for. Redemption must still succeed:
-        // failing a real referral to protect an analytics field is the wrong trade.
         redeem(referred, codeOf(referrer, "198.51.100.5", "Referrer/1.0"),
                 "carrier-pigeon", IP, UA);
 
@@ -292,8 +268,6 @@ class ReferralQualificationTest extends AbstractApiTest {
 
     @Test
     void everyDeclaredShareChannelIsAcceptedByTheDatabase() {
-        // The vocabulary and the V64 CHECK failing apart is silent in one direction: a value the
-        // constant set allows and the constraint refuses turns a good redemption into a 500.
         Set<String> declared = ShareChannels.all();
         assertThat(declared).isNotEmpty();
         for (String channel : declared) {
@@ -305,8 +279,6 @@ class ReferralQualificationTest extends AbstractApiTest {
         }
     }
 
-    // ---- 4: the correlation signals ----
-
     @Test
     void redeemingFromTheReferrersOwnNetworkAndBrowserIsHighRisk() throws Exception {
         User referrer = referrer("9866610110");
@@ -317,7 +289,6 @@ class ReferralQualificationTest extends AbstractApiTest {
         Referral referral = referrals.findByReferrerId(referrer.getId()).getFirst();
         assertThat(referral.isSameIp()).isTrue();
         assertThat(referral.isSameDevice()).isTrue();
-        // Redeeming never refuses on these; the decision falls at qualification.
         assertThat(referral.getStatus()).isEqualTo(ReferralStatuses.PENDING);
         assertThat(referral.getRisk()).isEqualTo("high");
     }
@@ -336,8 +307,6 @@ class ReferralQualificationTest extends AbstractApiTest {
         assertThat(ipHash).isNotNull().matches("[0-9a-f]{64}").isNotEqualTo(IP).doesNotContain(IP);
         assertThat(uaHash).isNotNull().matches("[0-9a-f]{64}").doesNotContain("Draazy");
 
-        // Nothing on the wire carries them either: the DTO has no field for a digest, and the
-        // fraud desk is served by the two booleans computed from them.
         String queue = mvc.perform(get(Routes.Referrals.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(user("9866610132", "staff"))))
                 .andExpect(status().isOk())
@@ -367,7 +336,6 @@ class ReferralQualificationTest extends AbstractApiTest {
         assertThat(jdbc.queryForObject("select signals_at from referral_codes where user_id = ?",
                 Object.class, referrerId)).isNull();
 
-        // The findings outlive the evidence — clearing a digest must not erase what it proved.
         Referral after = reload(referral.getId());
         assertThat(after.isSameIp()).isFalse();
         assertThat(after.getStatus()).isEqualTo(ReferralStatuses.PENDING);

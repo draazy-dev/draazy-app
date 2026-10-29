@@ -24,8 +24,6 @@ import org.springframework.http.HttpHeaders;
 
 @DisplayName("Rent agreement renewal reminders")
 class RentAgreementRenewalSweepTest extends AbstractApiTest {
-
-    // 09:30 IST on 11 Oct 2026, so the window is 11 Oct .. 10 Dec inclusive.
     private static final Instant NOW = Instant.parse("2026-10-11T04:00:00Z");
 
     @Autowired UserRepository users;

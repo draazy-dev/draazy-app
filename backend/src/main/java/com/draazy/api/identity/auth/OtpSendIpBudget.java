@@ -8,11 +8,8 @@ import java.time.Instant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** Caps anonymous login-code send attempts per address: every {@link OtpSendBudget} key rotates with the
- * number. Kept loose because Indian mobile carriers put many subscribers behind one IPv4 address. */
 @Component
 public class OtpSendIpBudget {
-
     private final WriteRateLimitStore store;
 
     public OtpSendIpBudget(WriteRateLimitStore.Factory stores,

@@ -13,12 +13,10 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import org.hibernate.annotations.UuidGenerator;
 
-// One line of the verification checklist (table property_review_checklist, ). Rows rather than a jsonb blob, matching.
 @Entity
 @Table(name = "property_review_checklist")
 @Getter
 public class ReviewChecklistItem {
-
     @Id
     @UuidGenerator
     @Column(name = "id", nullable = false, updatable = false)
@@ -42,7 +40,6 @@ public class ReviewChecklistItem {
     private Instant checkedAt;
 
     protected ReviewChecklistItem() {
-
     }
 
     ReviewChecklistItem(PropertyReview review, String item) {

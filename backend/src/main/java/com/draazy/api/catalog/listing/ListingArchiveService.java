@@ -22,10 +22,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Archive/restore use an unscoped lookup, so their owner-or-staff authorization lives here. */
 @Service
 public class ListingArchiveService {
-
     public static final String DUPLICATE_REASON = "Merged duplicate";
 
     private static final Map<String, String> OPEN_WORK = Map.of(
@@ -57,7 +55,7 @@ public class ListingArchiveService {
         this.notifier = notifier;
     }
 
-    /** Unauthorized callers get {@code 404}, not {@code 403}, to avoid listing enumeration. */
+    // Unauthorized callers get 404, not 403, to avoid listing enumeration.
     @Transactional
     public Property archive(AuthPrincipal principal, String idOrSlug, String reason) {
         Property p = resolvePermitted(principal, idOrSlug);
@@ -73,7 +71,6 @@ public class ListingArchiveService {
         return p;
     }
 
-    /** The owner-facing route: staff taking a listing down tell its owner why. */
     @Transactional
     public Property archiveAndNotify(AuthPrincipal principal, String idOrSlug, String reason) {
         Property p = archive(principal, idOrSlug, reason);
@@ -85,8 +82,6 @@ public class ListingArchiveService {
         return p;
     }
 
-    /** Refused while money or a counterparty's answer still rides on the listing; the content is
-     * purged after the undo window. */
     @Transactional
     public Property deleteByOwner(UUID userId, String idOrSlug) {
         UUID id = Ids.parseUuid(idOrSlug).orElse(null);
@@ -105,7 +100,6 @@ public class ListingArchiveService {
         return properties.save(p);
     }
 
-    /** Restored listings reenter moderation and duplicate probing before going live again. */
     @Transactional
     public Property restore(AuthPrincipal principal, String idOrSlug) {
         Property p = resolvePermitted(principal, idOrSlug);
@@ -125,7 +119,6 @@ public class ListingArchiveService {
         return p;
     }
 
-    /** Lookup is deliberately unscoped; this authorization gate protects every listing. */
     private Property resolvePermitted(AuthPrincipal principal, String idOrSlug) {
         UUID id = Ids.parseUuid(idOrSlug).orElse(null);
         Property p = (id != null ? properties.findById(id) : properties.findBySlug(idOrSlug))

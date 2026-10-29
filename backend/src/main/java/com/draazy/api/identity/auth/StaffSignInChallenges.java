@@ -14,20 +14,14 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/**
- * The short-lived proof that a caller passed the password step, carried into the code step.
- * Deliberately not a JWT: nothing that parses access tokens can mistake one for a session.
- */
 @Component
 public class StaffSignInChallenges {
-
     static final Duration TTL = Duration.ofMinutes(5);
     private static final String EXPIRED = "Your sign-in has expired. Enter your email and password again.";
 
     private final byte[] key;
 
     public StaffSignInChallenges(@Value("${draazy.security.jwt.secret}") String jwtSecret) {
-        // Derived, so the JWT key itself never signs anything but access tokens.
         this.key = hmac(jwtSecret.getBytes(StandardCharsets.UTF_8), "staff-sign-in-challenge-v1");
     }
 

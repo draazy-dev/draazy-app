@@ -29,10 +29,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
-// Contract + behaviour proof for the contacts + contact-gate slice, organised around invariants:
-// badge-not-gate, reveal-only-on-owner-or-approved, owner-scoping, and request idempotency.
 class ContactGateEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -82,7 +79,6 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                 .content("{\"propertyId\":\"" + p.getId() + "\"}"));
     }
 
-    // The id of the single request in an owner's inbox — the {@code reqId} path token.
     private String requestId(User owner) throws Exception {
         String json = mvc.perform(get(Routes.MeContactRequests.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
@@ -90,16 +86,12 @@ class ContactGateEndpointsTest extends AbstractApiTest {
         return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
     }
 
-    // Badge-not-gate: unverified callers must succeed against an ordinary owner; the badge
-    // bites only when the owner opts in.
     @Test
     void myContactRequests_isEmptyForAnOwnerWithNoListings_ratherThanEveryonesInbox() throws Exception {
         User busyOwner = user("9820000090", "owner");
         User idleOwner = user("9820000091", "owner");
         ask(user("9820000092", "buyer"), listing(busyOwner, "Busy owner flat"));
 
-        // The buyer's number stays masked to the owner too: the inbox never emits a raw contact
-        // number, so the revealed `contact` object is absent.
         mvc.perform(get(Routes.MeContactRequests.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(idleOwner)))
                 .andExpect(status().isOk())

@@ -8,11 +8,8 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/** Spring Data caps the page size but not the page number; past this bound page × size overflows the int offset
- * every repository pages with, and the request would 500 instead of being refused. */
 @Configuration
 public class PageBoundsConfig implements WebMvcConfigurer {
-
     private static final int MAX_PAGE = 10_000;
 
     @Override

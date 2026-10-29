@@ -22,7 +22,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 @DisplayName("Staff SLA sweep: announce, remind, escalate")
 class StaffSlaSweepTest extends AbstractApiTest {
-
     private static final Instant BASE = Instant.parse("2026-09-01T04:00:00Z");
 
     @Autowired
@@ -34,7 +33,6 @@ class StaffSlaSweepTest extends AbstractApiTest {
 
     @BeforeEach
     void absorbExistingBacklog() {
-        // Logs every row already in the database as escalated, so only this test's rows can alert.
         sweep.sweep(BASE.plus(Duration.ofDays(3650)));
     }
 

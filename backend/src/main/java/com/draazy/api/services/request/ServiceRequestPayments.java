@@ -7,10 +7,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** A customer's paid rent-agreement checkouts and top-ups, with where each refund stands. */
 @Service
 public class ServiceRequestPayments {
-
     public static final String KIND_AGREEMENT = "rent_agreement";
 
     public static final String KIND_AMENDMENT = "ra_amendment";
@@ -21,7 +19,6 @@ public class ServiceRequestPayments {
 
     public static final String REFUND_REJECTED = "rejected";
 
-    /** @param refundState the latest refund drawn on this payment: one of the {@code REFUND_*} values, or null */
     public record Payment(UUID id, String kind, UUID serviceRequestId, UUID propertyId, long amount, Instant paidAt,
             String paymentRef, String refundState) {
     }

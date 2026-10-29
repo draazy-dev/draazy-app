@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 // HMAC, not plain SHA-256: the Aadhaar space is brute-forceable from a leaked dump.
 @Component
 public class IdentityHasher {
-
     private final byte[] key;
 
     public IdentityHasher(@Value("${draazy.security.identity-hash-secret}") String secret) {
@@ -23,12 +22,10 @@ public class IdentityHasher {
         this.key = secret.getBytes(StandardCharsets.UTF_8);
     }
 
-    /** Hash of a canonical document number, namespaced by type so a PAN can never collide with a DL. */
     public String docHash(String docType, String canonicalNumber) {
         return hmac(docType + ":" + canonicalNumber);
     }
 
-    /** Soft "same person" key (name+DOB); a reviewer signal only, never a rejection basis. */
     public String personKey(String name, LocalDate dob) {
         if (name == null || name.isBlank() || dob == null) {
             return null;

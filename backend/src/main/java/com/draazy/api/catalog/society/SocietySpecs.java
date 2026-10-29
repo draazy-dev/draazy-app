@@ -16,20 +16,15 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.jpa.domain.Specification;
 
-/** A {@link Specification} avoids a derived-query method per filter combination, as in {@code PropertySpecs}. */
 public final class SocietySpecs {
-
     private SocietySpecs() {
     }
 
-    /** {@code findAll} only, never delete-by-Specification (societies.md section 9.5). */
     public static Specification<Society> browse(
             String q, String localitySlug, Boolean hasListings, Boolean mapped) {
         return (root, query, cb) -> {
             List<Predicate> where = new ArrayList<>();
 
-            // Merged-away duplicates are not results, and not a caller-supplied flag: listing both
-            // splits one building's listings, followers and reviews across two cards.
             where.add(cb.isNull(root.get("mergedInto")));
             where.add(cb.isNull(root.get("archivedAt")));
 
@@ -49,17 +44,14 @@ public final class SocietySpecs {
         };
     }
 
-    /** The lower-cased {@code LIKE} pattern for a free-text query, or null when there is none. */
     public static String likePattern(String q) {
         return LikePatterns.contains(q);
     }
 
-    /** The locality filter value, or null when blank. */
     public static String trimmed(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    /** Name, builder and the locality as words ("baner-road" is "baner road"), so a typed query finds all three. */
     private static Expression<String> searchText(Root<Society> root, CriteriaBuilder cb) {
         Expression<String> locality = cb.function("replace", String.class,
                 cb.coalesce(root.<String>get("localitySlug"), ""), cb.literal("-"), cb.literal(" "));
@@ -67,7 +59,6 @@ public final class SocietySpecs {
         return cb.concat(cb.concat(cb.concat(cb.concat(root.<String>get("name"), " "), builder), " "), locality);
     }
 
-    /** The second root is the merge family, and it is load-bearing: societies.md section 9.4. */
     private static Subquery<Integer> hasLiveListing(
             Root<Society> society, CriteriaQuery<?> query, CriteriaBuilder cb) {
         Subquery<Integer> sub = query.subquery(Integer.class);

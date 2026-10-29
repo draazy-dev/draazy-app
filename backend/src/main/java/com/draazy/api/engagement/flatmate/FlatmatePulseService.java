@@ -9,10 +9,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Reads the homepage flatmate panel off the same public rows the board's "team-up" tab lists. */
 @Service
 public class FlatmatePulseService {
-
     private static final FlatmateSearchQuery NEWEST_SEEKERS = new FlatmateSearchQuery(
             FlatmateVocabulary.TAB_TEAM_UP, null, null, null, null, null, null, null, null,
             false, null, Map.of(), null, null, FlatmateSearchQuery.SORT_NEWEST, List.of(), null, null);
@@ -34,7 +32,6 @@ public class FlatmatePulseService {
         return new FlatmatePulse(seekers.total(), faces(seekers.refs()), search.newestSplit());
     }
 
-    /** A group shows the face its card leads with: its first member who has initials. */
     private List<String> faces(List<FlatmateSearchQueries.Ref> refs) {
         Map<UUID, String> faces = new HashMap<>();
         posts.findAllById(idsOf(refs, "post"))

@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 class FlatmateErasure {
-
     static final String REASON = "account erased";
 
     private final FlatmateMembershipService membership;
@@ -47,7 +46,6 @@ class FlatmateErasure {
         posts.findByUserIdAndArchivedFalse(userId).ifPresent(p -> p.archive(REASON));
         requests.deletePendingInvolving(userId);
         applications.deletePendingByApplicant(userId);
-        // The listener runs before the users row is pseudonymised, so the number is still readable here.
         String mobile = users.findById(userId).map(User::getMobile).orElse(null);
         ownerNotices.deleteForErasedAccount(userId, mobile);
     }

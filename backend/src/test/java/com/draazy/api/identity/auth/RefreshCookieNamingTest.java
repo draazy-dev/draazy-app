@@ -10,23 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseCookie;
 import org.springframework.mock.web.MockHttpServletRequest;
 
-/**
- * The {@code __Host-} shape, which no other test in the suite can reach.
- *
- * <p>Every {@code @SpringBootTest} here runs on one profile, so it exercises one value of
- * {@code refresh-cookie.secure} and therefore one set of cookie names — and it is the <em>other</em>
- * one that ships. A prefix that silently failed its own constraints would look perfect in CI and be
- * rejected outright by the browser in production, where the symptom is not an error but an empty
- * cookie jar: every session dying at the fifteen-minute mark with the logs of ordinary anonymous
- * traffic. That is the exact class of profile-shaped blindness {@code CookieDeliveryCheck} exists to
- * abolish, so it would be poor form to reintroduce it here.
- *
- * <p>Plain constructor calls rather than a context: the naming rule is a pure function of one
- * boolean, and a test that had to boot Spring to ask would be slower and no more convincing.
- */
 @DisplayName("Refresh cookie naming — the __Host- prefix and what it demands")
 class RefreshCookieNamingTest {
-
     private static final JwtProperties JWT =
             new JwtProperties("x".repeat(48), Duration.ofMinutes(15), Duration.ofDays(30), Duration.ofSeconds(15));
 
@@ -34,16 +19,6 @@ class RefreshCookieNamingTest {
         return new RefreshCookie(JWT, secure, "Lax");
     }
 
-    /**
-     * The prefix is the only thing that stops a sibling host planting a twin.
-     *
-     * <p>{@code Secure}, {@code HttpOnly} and {@code SameSite} all constrain what a <em>page</em>
-     * may do with a cookie; none of them constrain what another host under the registrable domain
-     * may put in the jar. A {@code Domain=.draazy.in} twin is a distinct entry that neither our
-     * clear nor the client's can remove, and it turns a best-effort sign-out into a sign-back-in and
-     * an ITP recovery into a session fixation. Browsers refuse to store a {@code __Host-} cookie at
-     * all unless it is host-only, so the prefix converts "we set no Domain" into "no one can".
-     */
     @Test
     void aSecureDeploymentPrefixesBothCookies() {
         RefreshCookie cookie = secure(true);
@@ -51,12 +26,6 @@ class RefreshCookieNamingTest {
         assertThat(cookie.hintName()).isEqualTo("__Host-draazy_session");
     }
 
-    /**
-     * The prefix is refused without {@code Secure}, so plain-http development keeps the bare names.
-     *
-     * <p>Not a concession — a browser would reject the {@code Set-Cookie} outright and the developer
-     * would see no session at all.
-     */
     @Test
     void plainHttpDevelopmentKeepsTheBareNames() {
         RefreshCookie cookie = secure(false);
@@ -64,13 +33,6 @@ class RefreshCookieNamingTest {
         assertThat(cookie.hintName()).isEqualTo("draazy_session");
     }
 
-    /**
-     * Every cookie the prefixed deployment emits must satisfy the prefix's own rules.
-     *
-     * <p>The clears matter as much as the issues: a clear the browser rejects leaves the credential
-     * in place while the application believes it is gone, which is worse than never clearing at all
-     * because nothing downstream will look again.
-     */
     @Test
     void everyPrefixedCookieMeetsTheHostRules() {
         RefreshCookie cookie = secure(true);
@@ -92,13 +54,6 @@ class RefreshCookieNamingTest {
         }
     }
 
-    /**
-     * Two cookies of one name is an attack signature, not a value to pick from.
-     *
-     * <p>Which one the servlet hands over first is creation-ordered and unspecifiable, so honouring
-     * either is a coin flip on whose session the caller ends up in — and one of the two candidates
-     * arrived from somewhere we do not control. Refusing both costs a real user one sign-in.
-     */
     @Test
     void aDuplicatedCookieIsRefusedRatherThanChosenBetween() {
         RefreshCookie cookie = secure(false);
@@ -121,7 +76,6 @@ class RefreshCookieNamingTest {
         assertThat(secure(false).presented(dev)).isEqualTo("token");
     }
 
-    /** No jar, an empty value, and a jar without ours are all "no token presented". */
     @Test
     void anAbsentOrEmptyCookieReadsAsNoSession() {
         RefreshCookie cookie = secure(false);

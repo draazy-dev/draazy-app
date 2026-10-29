@@ -17,10 +17,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Staff decide a refund request once. Lock order: the request row, the listing row, the order row. */
 @Service
 public class RefundDecisions {
-
     private final RefundRequestRepository requests;
     private final SubscriptionRepository subscriptions;
     private final PlanRepository plans;

@@ -13,9 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-// Ownership gate vocabulary: which documents count, what they prove, and for how long.
 public final class OwnershipEvidenceTypes {
-
     private OwnershipEvidenceTypes() {
     }
 
@@ -23,15 +21,12 @@ public final class OwnershipEvidenceTypes {
 
     public static final String ADDRESS_PROOF = "address_proof";
 
-    /** A conveyance record consistent with the claimed title. Supporting only. */
     public static final String TITLE_SUPPORT = "title_support";
 
-    /** The person listing it is that somebody. Supporting only. */
     public static final String OWNER_IDENTITY = "owner_identity";
 
     public static final String AUTHORITY_PROOF = "authority_proof";
 
-    /** The place physically exists and looks like the listing says it does. Supporting only. */
     public static final String SITE_PRESENCE = "site_presence";
 
     public static final List<String> KINDS =
@@ -40,7 +35,6 @@ public final class OwnershipEvidenceTypes {
     private static final List<Set<String>> REQUIRED_FOR_RENT = List.of(Set.of(ADDRESS_PROOF, TITLE_PROOF));
     private static final List<Set<String>> REQUIRED_FOR_SALE = List.of(Set.of(TITLE_PROOF));
 
-    // Unrecognised intent falls to the safer sale gate.
     public static List<String> requiredKinds(String deal) {
         return requiredKindAlternatives(deal).stream()
                 .flatMap(Set::stream)
@@ -78,11 +72,9 @@ public final class OwnershipEvidenceTypes {
 
     private static final Duration SITE_PHOTO_VALIDITY = Duration.ofDays(180);
 
-    // validity null means never stale; vaultCategory null means the wizard does not offer it.
     private record Type(String docType, String kind, Duration validity, String vaultCategory) {
     }
 
-    // Single source of truth so a type cannot be known to one lookup and unknown to another.
     private static final List<Type> TYPES = List.of(
             new Type(INDEX_II, TITLE_PROOF, null, "Index II"),
             new Type(SATBARA_7_12, TITLE_PROOF, LAND_RECORD_VALIDITY, "7/12 Extract"),
@@ -119,18 +111,15 @@ public final class OwnershipEvidenceTypes {
         return labelled != null && !labelled.equals(docType);
     }
 
-    // Derived from kind so future identity documents inherit the subject-name rule.
     public static boolean namesASubject(String docType) {
         String kind = kindOf(docType);
         return OWNER_IDENTITY.equals(kind) || AUTHORITY_PROOF.equals(kind);
     }
 
-    // Unknown type here is a bug because callers validate at the boundary.
     public static String kindOf(String docType) {
         return type(docType).kind();
     }
 
-    // Measured from issuedAt, never from review time; null means it does not go stale.
     public static Instant expiryOf(String docType, Instant issuedAt) {
         if (TAX_RECEIPT.equals(docType)) {
             return financialYearEnd(issuedAt);

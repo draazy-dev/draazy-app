@@ -24,15 +24,10 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Letting a whole-flat listing room by room: the listing stays, rooms inherit its approval and Verified
- * owner badge, and split rooms track occupancy rather than seats. */
 @Service
 public class FlatSplitService {
-
     private static final int MAX_PER_ROOM = 3;
 
-    /** Lettable rooms are bedrooms plus the hall. Unbounded when {@code bhk} is {@code "4"} (4+):
-     * there is no ceiling to compute from, so only the flat's occupancy cap binds. */
     private static final int HALL = 1;
 
     private final PropertyRepository properties;
@@ -55,8 +50,6 @@ public class FlatSplitService {
         this.locks = locks;
     }
 
-    /** A property that is not the caller's answers exactly as an unknown id, so ids cannot be probed.
-     * Split and unsplit serialise on the listing, so neither acts on a check the other just made stale. */
     private Property ownedBy(AuthPrincipal caller, UUID propertyId) {
         Property parent = properties.findById(propertyId)
                 .filter(p -> !p.isArchived() && p.getOwner() != null && p.getOwner().getId().equals(caller.userId()))
@@ -65,7 +58,6 @@ public class FlatSplitService {
         return parent;
     }
 
-    /** {@code POST /properties/{id}/split} — owner-only, rent-only, once-only. */
     @Transactional
     public FlatSplitResult split(AuthPrincipal caller, UUID propertyId, FlatSplitRequest body) {
         Property parent = ownedBy(caller, propertyId);
@@ -82,8 +74,6 @@ public class FlatSplitService {
         validateRoomCount(parent, specs.size());
         validateOccupancy(body.maxOccupants(), specs.size());
 
-        // An owner splitting their own approved, Verified-owner flat is exempt from the CAP but never from the
-        // address dedupe -- two people claiming one flat is what the fingerprint exists to catch.
         boolean badged = standsAsOwnerTier(parent);
         String tier = badged ? FlatmateVocabulary.TIER_OWNER : FlatmateVocabulary.TIER_IDENTITY;
         var address = new FlatmateGuardrails.Address(propertyId, null, parent.getLocality(), null);
@@ -101,11 +91,8 @@ public class FlatSplitService {
                     eligibility.fingerprint(), eligibility.flagForReview());
             created.add(mapper.toDto(rooms.saveAndFlush(room), new FlatmateMapper.RoomView(
 
-                    // No verdict to read: the tier here is owner or identity (never tenant), so the
-                    // badge is already decided by the parent listing's own Ops approval.
                     0, owner.getName(), owner.getMobile(), null)));
         }
-
 
         return new FlatSplitResult(created.size(), tier, !badged, eligibility.flagForReview(),
                 created);
@@ -121,7 +108,6 @@ public class FlatSplitService {
         promoteIfStanding(event.propertyId());
     }
 
-    /** Both halves of the badge must hold, so whichever event arrives second does the promoting. */
     private void promoteIfStanding(UUID propertyId) {
         if (properties.findById(propertyId).filter(FlatSplitService::standsAsOwnerTier).isEmpty()) {
             return;
@@ -139,8 +125,6 @@ public class FlatSplitService {
                 && property.isOwnershipVerified();
     }
 
-    /** Refused once anyone has moved in: the occupancy ledger is the only record those people are
-     * there, and an owner should not make their tenants disappear by pressing undo. */
     @Transactional
     public void unsplit(AuthPrincipal caller, UUID propertyId) {
         Property parent = ownedBy(caller, propertyId);
@@ -172,11 +156,8 @@ public class FlatSplitService {
         room.setPropertyId(parent.getId());
         room.setRoomKind(kind);
 
-        // A master bedroom's private bathroom is implied, so the owner is never asked twice.
         room.setAttachedBath("master".equals(kind) ? "attached" : "shared");
 
-        // Per ROOM, not per person — this is what stops a shared bed looking pricier than a private
-        // room.
         room.setPriceBasis("room");
         room.setDeposit(spec.deposit() == null ? spec.rent() * 2 : spec.deposit());
         room.setMaxOccupants(maxOccupants);
@@ -199,8 +180,6 @@ public class FlatSplitService {
         return room;
     }
 
-    /** Lettable rooms = bedrooms + hall. {@code bhk} is a {@link BigDecimal} because half-rooms are
-     * real (2.5 BHK); the ceiling floors it. Unbounded at 4 or more, where the room enum saturates. */
     private static void validateRoomCount(Property parent, int requested) {
         BigDecimal bhk = parent.getBhk();
         if (bhk == null || bhk.compareTo(BigDecimal.valueOf(4)) >= 0) {
@@ -215,8 +194,6 @@ public class FlatSplitService {
         }
     }
 
-    /** The room contract's enum: {@code 1}-{@code 4}, where {@code 4} means 4+. Floored and clamped,
-     * because a room card says "in a 3 BHK" rather than quoting a decimal. */
     private static String bhkLabel(BigDecimal bhk) {
         if (bhk == null) {
             return null;

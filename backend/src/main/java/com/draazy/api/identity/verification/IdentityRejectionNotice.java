@@ -9,11 +9,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** The inbox row joins the caller's transaction; the WhatsApp line leaves only once it commits, so a rolled-back
- * decision never reaches the user. */
+// The inbox row joins the caller's transaction; the WhatsApp line leaves only after commit,
+// so a rolled-back decision never reaches the user.
 @Component
 class IdentityRejectionNotice {
-
     private static final String WHATSAPP_LINE = "Your Draazy identity verification could not be completed. "
             + "Open the app to see the reason and retake your photos.";
 

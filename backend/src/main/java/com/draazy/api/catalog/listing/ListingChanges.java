@@ -9,9 +9,7 @@ import java.util.TreeMap;
 import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.PropertyAccessorFactory;
 
-/** Before/after of the listing fields an edit is allowed to touch, as strings safe for the audit metadata. */
 final class ListingChanges {
-
     private ListingChanges() {
     }
 
@@ -27,7 +25,6 @@ final class ListingChanges {
         return values;
     }
 
-    // Scale and key order are storage noise, so equal values must render equal.
     static String render(Object value) {
         if (value instanceof BigDecimal number) {
             return number.signum() == 0 ? "0" : number.stripTrailingZeros().toPlainString();

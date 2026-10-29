@@ -5,10 +5,8 @@ import com.draazy.api.billing.referral.ReferralSignals;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Remembers, as a salted hash, which card or UPI id paid an order, so repeat refunds can be linked across accounts. */
 @Service
 public class PaymentInstruments {
-
     private final SubscriptionRepository subscriptions;
     private final ReferralSignals signals;
 

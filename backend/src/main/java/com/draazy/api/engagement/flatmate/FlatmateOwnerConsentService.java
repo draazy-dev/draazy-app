@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FlatmateOwnerConsentService {
-
     private final FlatmateOwnerConsentRepository consents;
     private final FlatmateRoomRepository rooms;
     private final FlatmateGroupRepository groups;
@@ -47,8 +46,8 @@ public class FlatmateOwnerConsentService {
         this.audit = audit;
     }
 
-    /* {@code noRollbackFor} must repeat {@link OtpService#verifyCode}'s list: rollback rules apply at every
-       boundary, so a shorter list here resets the 3-guess ceiling. */
+    // noRollbackFor must repeat OtpService.verifyCode's list,
+    // or a shorter list here resets the 3-guess ceiling.
     @Transactional(noRollbackFor = {OtpSender.DeliveryFailedException.class,
             UnauthorizedException.class, RateLimitedException.class})
     public boolean ownerConsent(AuthPrincipal caller, String title, String society, String locality,
@@ -69,15 +68,13 @@ public class FlatmateOwnerConsentService {
         return true;
     }
 
-    /** Asked of the consent table, never of the request — a client-typed number would otherwise set the
-     * field Ops reads for the badge. Must run after {@code mapper.applyTo} and after the fingerprint. */
+    // Consent comes from the consent table, never the request.
+    // Must run after mapper.applyTo and after the fingerprint.
     void settleRoomConsent(AuthPrincipal caller, FlatmateRoom room) {
         room.setOwnerConsent(
                 has(room.getOwnerConsentMobile(), caller.userId(), room.getAddressFingerprint()));
     }
 
-    /** Without this sweep the flag stays false and Ops cannot approve the post. Single-column updates in
-     * id order, posts before reviews, so they neither overwrite a newer verdict nor deadlock the jobs. */
     private void applyConsentToLivePosts(UUID hostId, String mobile, String fingerprint) {
         List<UUID> roomIds = rooms.findByAddressFingerprintAndArchivedFalseOrderByIdAsc(fingerprint).stream()
                 .filter(room -> hostId.equals(room.getHostId()))
@@ -92,14 +89,11 @@ public class FlatmateOwnerConsentService {
         Stream.concat(roomIds.stream(), groupIds.stream()).forEach(reviews::markOwnerConsent);
     }
 
-    /** The owner tapped "I agree" on the WhatsApp link, so the link is the proof an OTP would otherwise be. */
     void grantFromNotice(UUID hostId, String ownerMobile, String addressFingerprint) {
         consents.insertIfAbsent(ownerMobile, hostId.toString(), addressFingerprint);
         applyConsentToLivePosts(hostId, ownerMobile, addressFingerprint);
     }
 
-    /** Canonicalise the owner's number so the self-check, the OTP and the stored row key off the
-     * same ten digits, and refuse the shortcut the edge cannot catch: consenting to yourself. */
     public String normalise(AuthPrincipal caller, String ownerMobile) {
         String mobile = MobileMask.normalise(ownerMobile);
         if (mobile == null) {
@@ -114,20 +108,14 @@ public class FlatmateOwnerConsentService {
         return mobile;
     }
 
-    /** The caller travels because the recipient is a number they typed: every recipient-keyed budget
-     * is one they can reset by typing a different one. {@code requestedBy} is the key they are stuck with. */
     public void send(UUID caller, String ownerMobile, String addressFingerprint) {
         otpService.sendCode(ownerMobile, purposeFor(addressFingerprint), caller);
     }
 
-    /** Delegated because this flow spends the same {@link OtpService} send budget as login, and a
-     * second copy is a second thing to get wrong. */
     public int resendCooldownSeconds() {
         return otpService.resendCooldownSeconds();
     }
 
-    /** The rollback rules are inert under self-invocation but must match the boundary this claims to
-     * be, or the first cross-bean caller resets the 3-guess ceiling. */
     @Transactional(noRollbackFor = {OtpSender.DeliveryFailedException.class,
             UnauthorizedException.class, RateLimitedException.class})
     public void record(AuthPrincipal caller, String ownerMobile, String otp,
@@ -146,8 +134,6 @@ public class FlatmateOwnerConsentService {
         return OtpCode.PURPOSE_OWNER_CONSENT + ":" + Tokens.sha256Hex(addressFingerprint);
     }
 
-    /** Mobile must be normalised and the fingerprint must be the one the post was filed under; a null
-     * one answers false, because a post whose flat cannot be named has nothing to be consented about. */
     @Transactional(readOnly = true)
     public boolean has(String ownerMobile, UUID grantedBy, String addressFingerprint) {
         return ownerMobile != null && addressFingerprint != null

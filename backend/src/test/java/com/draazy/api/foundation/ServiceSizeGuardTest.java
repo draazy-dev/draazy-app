@@ -18,13 +18,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("Architecture — service size (package-structure.md §4.1)")
 class ServiceSizeGuardTest {
-
     private static final Path MAIN = Path.of("src", "main", "java");
 
     private static final int MAX_LINES = 450;
 
-    /** Services already over the line when §4.1 was agreed, pinned at their size on that day; a pin
-     * may only shrink, and must be deleted once the service reaches {@link #MAX_LINES} or below. */
     private static final Map<String, Integer> BASELINE = new LinkedHashMap<>();
 
     static {
@@ -32,8 +29,6 @@ class ServiceSizeGuardTest {
         BASELINE.put("com/draazy/api/engagement/flatmate/FlatmateSupplyService.java", 876);
     }
 
-    /** Names that are a service plus a filler word — the file split §4.1 forbids. Deliberately
-     * narrow: a bare {@code …ServiceImpl} is not matched, {@code …ServiceImpl2} is. */
     private static final Pattern FILLER_SUFFIX =
             Pattern.compile("Service(Helpers?|Supports?|Utils?|Extras?|Parts?\\d*|Impl\\d+|\\d+)\\.java$");
 

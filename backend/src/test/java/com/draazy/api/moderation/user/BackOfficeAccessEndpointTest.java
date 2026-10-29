@@ -20,11 +20,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** Mostly refusals: storing whatever was sent would leave names the server ignores. Audit rows commit via
- * {@code REQUIRES_NEW} and survive the rollback, so successful writes clean {@code audit_log} themselves. */
 @DisplayName("D192/D13 — the per-account permission endpoints")
 class BackOfficeAccessEndpointTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -65,7 +62,6 @@ class BackOfficeAccessEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[?(@.name == 'desk:rental')].desk").value(Teams.RENTAL));
     }
 
-    /** Staff are refused: editing who may do what is the same privilege as minting a colleague. */
     @Test
     @DisplayName("staff cannot read the catalogue or write a document")
     void staffAreRefused() throws Exception {
@@ -80,7 +76,6 @@ class BackOfficeAccessEndpointTest extends AbstractApiTest {
                 .isEqualTo(403);
     }
 
-    /** The end-to-end claim: an administrator's write actually removes access. */
     @Test
     @DisplayName("a written document narrows the account it names")
     void aWrittenDocumentNarrows() throws Exception {
@@ -97,7 +92,6 @@ class BackOfficeAccessEndpointTest extends AbstractApiTest {
                 .andReturn().getResponse().getStatus()).isEqualTo(200);
     }
 
-    /** The response shows the outcome, not the input — see {@link BackOfficeAccessResponse}. */
     @Test
     @DisplayName("the read reports stored, effective and whether a document exists at all")
     void theReadReportsStoredAndEffective() throws Exception {
@@ -122,7 +116,6 @@ class BackOfficeAccessEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.effective").value(hasItem("dashboard:read")));
     }
 
-    /** The console's own vocabulary is refused, not stored: {@code properties:verify} has no server meaning. */
     @Test
     @DisplayName("a name the server does not enforce is refused, not stored")
     void unknownNamesAreRefused() throws Exception {
@@ -138,7 +131,6 @@ class BackOfficeAccessEndpointTest extends AbstractApiTest {
                 Integer.class, target.getId().toString())).isZero();
     }
 
-    /** A name the target's role can never hold reads like a grant, so it is refused as one. */
     @Test
     @DisplayName("an admin-only permission cannot be written onto a staff account")
     void aboveTheCeilingIsRefused() throws Exception {
@@ -152,7 +144,6 @@ class BackOfficeAccessEndpointTest extends AbstractApiTest {
                 Integer.class, target.getId().toString())).isZero();
     }
 
-    /** A buyer has no baseline to narrow, so a document for one could only read as a grant. */
     @Test
     @DisplayName("a non back-office account cannot be given a permission document")
     void nonOpsTargetsAreRefused() throws Exception {
@@ -162,7 +153,6 @@ class BackOfficeAccessEndpointTest extends AbstractApiTest {
         assertThat(putPermissions(admin, buyer, "{\"functions\":[]}")).isEqualTo(422);
     }
 
-    /** Self-edit is refused so an admin can't remove their own ability to undo it; admins can scope each other. */
     @Test
     @DisplayName("an administrator cannot edit their own permissions")
     void selfEditIsRefused() throws Exception {

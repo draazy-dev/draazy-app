@@ -43,13 +43,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Every scheduled job, its group, and the name behind its {@code draazy.jobs.<name>.enabled} flag. */
 @Configuration
 class JobCatalog {
-
     private static final int MAX_PAGES = 10;
 
-    // These read one capped page per call, sized for hourly runs; a daily run repeats until a page comes back empty.
     static LongSupplier drain(LongSupplier page) {
         return () -> {
             long total = 0;
@@ -165,7 +162,6 @@ class JobCatalog {
         return new ScheduledJob("identity-image-purge", NIGHTLY, drain(() -> identity.purgeExpiredFiles(retentionDays)));
     }
 
-    // Not drained: a failing delete stays due, so a second page would retry it in the same run.
     @Bean
     ScheduledJob identityDeleteRetryJob(IdentityFilePurgeService filePurge) {
         return new ScheduledJob("identity-delete-retry", NIGHTLY,
@@ -227,7 +223,6 @@ class JobCatalog {
         return new ScheduledJob("flatmate-post-reminders", DAYTIME, expiry::remindExpiring);
     }
 
-    // Hourly because public reads don't check active_until: a lapsed post stays on the board until this runs.
     @Bean
     ScheduledJob flatmatePostExpiryJob(FlatmateExpiryService expiry) {
         return new ScheduledJob("flatmate-post-expiry", HOURLY, expiry::expireLapsed);

@@ -31,12 +31,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import tools.jackson.databind.ObjectMapper;
 
-/** Anyone signed in can raise a ticket but only ops can read the board, so POST /tickets carries no x-roles;
- * team scoping fails closed: a staff account with no desk sees nothing, not everything. */
 @DisplayName("Slice 11 — the ops ticket board")
 class TicketQueueTest extends ServiceFixtures {
-
-    /** Distinctive enough that a substring search for it is a real leak check. */
     private static final String SECRET = "owner says the tenant defaulted twice";
 
     @Autowired
@@ -51,7 +47,6 @@ class TicketQueueTest extends ServiceFixtures {
     @Nested
     @DisplayName("who may do what")
     class Access {
-
         @Test
         @DisplayName("a customer can raise a ticket but cannot read the board")
         void customersRaiseButDoNotRead() throws Exception {
@@ -109,7 +104,6 @@ class TicketQueueTest extends ServiceFixtures {
     @Nested
     @DisplayName("team scoping")
     class Scoping {
-
         @Test
         @DisplayName("a staff member sees only their own desk")
         void staffSeeOneDesk() throws Exception {
@@ -219,7 +213,6 @@ class TicketQueueTest extends ServiceFixtures {
     @Nested
     @DisplayName("working a ticket")
     class Working {
-
         @Test
         @DisplayName("assignment is by user id and resolves to a display name")
         void assignmentByIdShowsAName() throws Exception {
@@ -312,12 +305,9 @@ class TicketQueueTest extends ServiceFixtures {
         }
     }
 
-    /** The raiser and the desk are two audiences: assert against a ticket that already has a note, since an
-     * empty array on a fresh ticket would only prove a coincidence, not the control. */
     @Nested
     @DisplayName("what the raiser may see (D47)")
     class RaiserView {
-
         @Test
         @DisplayName("the note exists, ops read it, and the raiser's copy has no notes field at all")
         void internalNotesAreAbsentFromTheRaisersCopy() throws Exception {
@@ -331,15 +321,11 @@ class TicketQueueTest extends ServiceFixtures {
             String id = field(created, "id");
             User legal = staff("9820000327", Teams.LEGAL);
 
-            // Absent, not null — a null would still be a property the schema promises and a future
-            // mapper could fill.
             assertThat(json.readTree(created).has("notes")).isFalse();
 
-            // Now the note genuinely exists. Everything below is about a ticket that has one.
             note(legal, id, SECRET, 201);
             assertThat(noteRepo.findByTicketIdOrderByAtAsc(UUID.fromString(id))).hasSize(1);
 
-            // The desk still gets it — a leak closed by deleting the feature is not a fix.
             mvc.perform(get(Routes.Tickets.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(legal)))
                     .andExpect(status().isOk())
@@ -350,8 +336,6 @@ class TicketQueueTest extends ServiceFixtures {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].notes").doesNotExist());
 
-            // There is no customer read endpoint on this board, so the guarantee is asserted on the type
-            // the customer path returns.
             Ticket annotated = ticketRepo.findById(UUID.fromString(id)).orElseThrow();
             String raiserView = json.writeValueAsString(mapper.toCustomer(annotated));
 
@@ -374,7 +358,6 @@ class TicketQueueTest extends ServiceFixtures {
     @Nested
     @DisplayName("the date window")
     class DateWindow {
-
         @Test
         @DisplayName("days=1 keeps today's tickets and drops yesterday's; days=7 keeps both; the summary ignores days")
         void daysNarrowsRowsNotCounts() throws Exception {

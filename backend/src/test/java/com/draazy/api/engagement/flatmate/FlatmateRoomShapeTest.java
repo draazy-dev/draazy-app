@@ -14,11 +14,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** Pins the public projection so adding host-only fields requires an explicit contract decision. */
 @DisplayName("D80 — the room feed shape is a projection of the detail shape, and stays one")
 class FlatmateRoomShapeTest {
-
-    // Public fields must serve a card, filter, map or flat ledger; host-only data stays below.
     private static final List<String> FEED_FIELDS = List.of(
             "id", "type", "title", "propertyId", "roomKind", "roomType", "attachedBath", "priceBasis",
             "budget", "deposit", "noticePeriodDays", "lockInMonths", "maintenanceBilling",
@@ -29,7 +26,6 @@ class FlatmateRoomShapeTest {
             "availableFrom", "gender", "food", "note", "cover", "owner", "createdAt", "facing",
             "overlooking");
 
-    // Contact and moderation forensics have no place on the anonymous feed.
     private static final List<String> DETAIL_ONLY_FIELDS = List.of(
             "agreementDeclared", "addressFingerprint", "flagForReview", "flatNumber", "societyId",
             "photos", "ownerMobile", "status", "modStatus", "host");
@@ -43,7 +39,6 @@ class FlatmateRoomShapeTest {
     @Nested
     @DisplayName("The feed shape")
     class Feed {
-
         @Test
         @DisplayName("carries exactly the pinned field set — nothing quietly re-fattens it")
         void fieldSetIsPinned() {
@@ -55,7 +50,6 @@ class FlatmateRoomShapeTest {
     @Nested
     @DisplayName("The detail shape")
     class Detail {
-
         @Test
         @DisplayName("is the feed shape plus exactly the pinned host-only fields")
         void isFeedPlusHostOnlyFields() {
@@ -71,8 +65,6 @@ class FlatmateRoomShapeTest {
             Map<String, Class<?>> feed = componentsOf(FlatmateRoomFeedDto.class);
             Map<String, Class<?>> detail = componentsOf(FlatmateRoomDto.class);
 
-            // A projection that silently widens Long to String, or int to Integer, would change
-            // the JSON a client already parses while still passing a name-only check.
             assertThat(feed).containsExactlyInAnyOrderEntriesOf(
                     detail.entrySet().stream()
                             .filter(e -> !Set.copyOf(DETAIL_ONLY_FIELDS).contains(e.getKey()))
@@ -83,12 +75,9 @@ class FlatmateRoomShapeTest {
     @Nested
     @DisplayName("The two mappers")
     class Mappers {
-
         @Test
         @DisplayName("produce the same value for every shared field, from the same row")
         void agreeOnEverySharedField() throws Exception {
-
-            // Each projection wires its own derivations; matching field names cannot prove parity.
             FlatmateRoom room = splitRoomInAPartlyOccupiedFlat();
             FlatmateMapper mapper = new FlatmateMapperImpl();
             FlatmateMapper.RoomView view = new FlatmateMapper.RoomView(2, "Asha", "9876543210", null);

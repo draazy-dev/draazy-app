@@ -17,11 +17,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** A property-name typo in ConditionalOnProperty would silently unreach the real provider; the enabled base
- * URL is localhost:1 so a wiring mistake fails as a connection error, never a real Cashfree call from CI. */
 @DisplayName("Provider wiring — Cashfree")
 class CashfreeProviderWiringTest {
-
     @Configuration
     @EnableConfigurationProperties(CashfreeProperties.class)
     static class Wiring {

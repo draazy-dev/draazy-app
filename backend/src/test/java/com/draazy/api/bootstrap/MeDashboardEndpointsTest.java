@@ -24,8 +24,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 class MeDashboardEndpointsTest extends AbstractApiTest {
-
-    // Each section against the exact read the client's own provider makes for it.
     private static final Map<String, String> SECTION_READS = new LinkedHashMap<>();
 
     static {
@@ -45,7 +43,6 @@ class MeDashboardEndpointsTest extends AbstractApiTest {
         SECTION_READS.put("managedProperties", "/me/managed-properties");
     }
 
-    // Only on ?listingTools=true, for a landing on the My Listings panel.
     private static final Map<String, String> TOOL_READS = Map.of("entitlements", "/me/entitlements");
 
     @Autowired UserRepository users;
@@ -85,7 +82,6 @@ class MeDashboardEndpointsTest extends AbstractApiTest {
         mvc.perform(get(Routes.Bootstrap.ME_DASHBOARD)).andExpect(status().isUnauthorized());
     }
 
-    // Per-user data: a shared cache (PublicReadCacheFilter, a CDN) must never keep it.
     @Test
     void theDashboardIsNeverStoredByASharedCache() throws Exception {
         String token = bearer(owner("9877730105"));
@@ -96,8 +92,6 @@ class MeDashboardEndpointsTest extends AbstractApiTest {
         assertThat(cacheControl).contains("no-store");
     }
 
-    // The client primes each section into the cache slot of the endpoint it replaces, so a section
-    // that differs from that endpoint's own answer would be served as if the endpoint had said it.
     @Test
     void everySectionIsExactlyWhatItsOwnEndpointAnswers() throws Exception {
         User u = owner("9877730101");
@@ -114,7 +108,6 @@ class MeDashboardEndpointsTest extends AbstractApiTest {
         assertSectionsMatch(dashboard, token, TOOL_READS);
     }
 
-    // A seeker's owner inboxes are skipped, so the skipped answer must still equal the real (empty) one.
     @Test
     void aSeekersDashboardSkipsTheOwnerInboxesButMatchesThem() throws Exception {
         String token = bearer(owner("9877730106"));

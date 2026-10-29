@@ -26,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ServiceRequestQueryService {
-
     private final ServiceRequestRepository requests;
     private final ServiceRequestMapper mapper;
     private final AccountPermissions accountPermissions;
@@ -56,7 +55,6 @@ public class ServiceRequestQueryService {
         this.rows = rows;
     }
 
-    // Scope comes only from principal role; clients cannot set or remove requester scope.
     @Transactional(readOnly = true)
     public Page<ServiceRequestDto> list(AuthPrincipal caller, String type, String status, String team,
             String ticketId, boolean unassigned, boolean overdue, boolean mine, String q, Pageable pageable) {
@@ -80,7 +78,6 @@ public class ServiceRequestQueryService {
         return new PageImpl<>(content, page.getPageable(), page.getTotalElements());
     }
 
-    // The desk's rows: the same scope and filters as `list`, projected to what a row draws.
     @Transactional(readOnly = true)
     public Page<ServiceRequestQueueRow> queue(AuthPrincipal caller, String type, String status, String team,
             String ticketId, boolean unassigned, boolean overdue, boolean mine, String q, Integer days, Pageable pageable) {
@@ -183,7 +180,6 @@ public class ServiceRequestQueryService {
     private record QueueScope(boolean allTeams, List<String> teams) {
     }
 
-    // An unescaped % would slip the caller's own wildcard past the anchor and scan every user.
     private static String anchoredPrefix(String term) {
         return LikePatterns.escape(term.toLowerCase(Locale.ROOT)) + "%";
     }

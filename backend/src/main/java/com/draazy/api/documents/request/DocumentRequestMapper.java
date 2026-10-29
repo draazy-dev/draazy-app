@@ -5,11 +5,9 @@ import com.draazy.api.identity.user.User;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 
-/** Requester mobile is masked unconditionally: granting documents must not also hand over a number and
- * bypass the contact gate. Hand-written so no configuration can turn that off. */
+// Requester mobile is always masked: granting documents must not also bypass the contact gate.
 @Component
 public class DocumentRequestMapper {
-
     public DocumentRequestDto toDto(DocumentRequest row, User requester, int sharedDocumentCount) {
         String status = projectedStatus(row);
         return new DocumentRequestDto(
@@ -24,7 +22,6 @@ public class DocumentRequestMapper {
                 row.getCreatedAt());
     }
 
-    /** The requester's own projection of the row: a document count only once the ask is granted. */
     public DocumentRequestDto toRequesterDto(
             DocumentRequest row, User requester, int sharedDocumentCount) {
         String status = projectedStatus(row);
@@ -40,7 +37,6 @@ public class DocumentRequestMapper {
                 row.getCreatedAt());
     }
 
-    /** Expiry is derived from the clock so a lapsed row never renders "granted" while reads refuse it. */
     private String projectedStatus(DocumentRequest row) {
         if (DocumentRequestStatuses.GRANTED.equals(row.getStatus())
                 && row.getExpiresAt() != null && !row.getExpiresAt().isAfter(Instant.now())) {

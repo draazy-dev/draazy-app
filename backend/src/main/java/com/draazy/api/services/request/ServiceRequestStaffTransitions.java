@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ServiceRequestStaffTransitions {
-
     private final ServiceRequestService requests;
     private final ServiceRequestMessageRepository messages;
     private final ServiceRequestMapper mapper;
@@ -31,7 +30,6 @@ public class ServiceRequestStaffTransitions {
         this.notifier = notifier;
     }
 
-    // Assignment and acknowledgement are one act; no assigning work to someone else by id.
     @Transactional
     public ServiceRequestDto updateStatus(AuthPrincipal caller, String id, String status, String note) {
         ServiceRequest request = requests.opsAccessible(caller, id);
@@ -64,7 +62,6 @@ public class ServiceRequestStaffTransitions {
         return mapper.toDto(request, caller);
     }
 
-    // The shared StatusUpdate schema cannot make `note` required for one target, so it is enforced here.
     private static String reasonFor(ServiceRequestStatus target, String note) {
         String reason = note == null || note.isBlank() ? null : note.trim();
         if (target == ServiceRequestStatus.CANCELLED && reason == null) {
@@ -74,7 +71,6 @@ public class ServiceRequestStaffTransitions {
         return reason;
     }
 
-    // Managers/admins are exempt: there is no release verb, so a leaver's matter must stay drainable.
     private void refuseSeizure(AuthPrincipal caller, UUID heldBy) {
         if (heldBy == null || heldBy.equals(caller.userId())
                 || Roles.Wire.ADMIN.equals(caller.role()) || Roles.Wire.MANAGER.equals(caller.role())) {
@@ -85,7 +81,6 @@ public class ServiceRequestStaffTransitions {
                 "%s is already working this request. Ask them to hand it over, or ask an admin to reassign it.".formatted(holder == null ? "Another operator" : holder));
     }
 
-    // Runs in the caller's transaction (see Notifier), so a rolled-back cancel announces nothing.
     private void announceCancellation(AuthPrincipal caller, ServiceRequest request, String reason) {
         messages.save(new ServiceRequestMessage(
                 request.getId(), caller.userId(), caller.role(), reason));

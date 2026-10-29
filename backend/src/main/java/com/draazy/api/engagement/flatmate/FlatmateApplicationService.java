@@ -21,10 +21,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Group applications are not requests: a host binds the whole group to a listing. */
 @Service
 public class FlatmateApplicationService {
-
     private static final String CLOSED_TO_GROUPS =
             "This flat has already been given to a group and is closed to new group applications.";
 
@@ -49,7 +47,6 @@ public class FlatmateApplicationService {
         this.reviewStatuses = reviewStatuses;
     }
 
-    /** Host view: the card draws the moderation state and the seats; the edit form reads the one group it opens. */
     @Transactional(readOnly = true)
     public Page<FlatmateGroupCard> myGroups(AuthPrincipal caller, Pageable pageable) {
         Page<FlatmateGroup> page = groups.findMine(caller.userId(), pageable);
@@ -67,7 +64,6 @@ public class FlatmateApplicationService {
                 group.isHunting(), group.getVerificationTier(), reviewStatus);
     }
 
-    /** Host-only, and a stranger's group id is a 404: applying binds every group member to a flat and rent. */
     @Transactional
     public GroupApplicationDto apply(AuthPrincipal caller, UUID groupId, UUID listingId) {
         FlatmateGroup group = groups.findById(groupId)
@@ -122,7 +118,6 @@ public class FlatmateApplicationService {
         return hydrator.hydrateOne(saved);
     }
 
-    /** Scope by owned listing ids because the application row has no owner column. */
     @Transactional(readOnly = true)
     public Page<GroupApplicationDto> inbox(AuthPrincipal caller, Pageable pageable) {
         List<UUID> listingIds = properties.findIdsByOwnerId(caller.userId());
@@ -136,7 +131,6 @@ public class FlatmateApplicationService {
                 page.getTotalElements());
     }
 
-    /** Stranger ids return 404, not 403, so application ids do not become existence oracles. */
     @Transactional
     public GroupApplicationDto decide(AuthPrincipal caller, UUID applicationId, String status) {
         String verdict = FlatmateVocabulary.require(

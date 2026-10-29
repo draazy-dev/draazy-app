@@ -7,27 +7,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/**
- * The instalment arithmetic behind the Rent Wallet, pinned on fixed dates.
- *
- * <p><strong>Why this exists separately from the endpoint test.</strong> The endpoint test builds
- * its leases relative to today, so it can only ever exercise whichever day of the month it happens
- * to run on — it never sees a lease starting on the 31st, and it never crosses 1 April. Those are
- * the two cases this arithmetic is hard to get right, and both were wrong before this test was
- * written: {@code ChronoUnit.MONTHS.between} clamps to the shorter month, so a lease starting on
- * the 31st under-counted by one for the last days of February, and a lease starting on 31 March
- * reported nothing at all for the whole of April — the figure a tenant repeats to their employer
- * when claiming HRA.
- *
- * <p>Plain JUnit: {@link RentalTotals} is static and has no collaborators, so a Spring context here
- * would buy nothing and cost seconds.
- */
 class RentalTotalsTest {
-
     @Nested
     @DisplayName("months due")
     class MonthsDue {
-
         @Test
         @DisplayName("the month the lease starts counts from the start date, not before it")
         void firstInstalmentFallsOnTheStartDate() {
@@ -45,11 +28,6 @@ class RentalTotalsTest {
             assertThat(RentalTotals.monthsDue(start, null, LocalDate.of(2025, 2, 10))).isEqualTo(2);
         }
 
-        /**
-         * A lease starting on the 31st has no 31st in February, so its February instalment falls on
-         * the 28th. Counting with a day-clamped month difference put it on 1 March instead, which
-         * self-corrected the next day and so read as plausible rather than broken.
-         */
         @Test
         @DisplayName("a lease starting on the 31st falls due on the 28th in February")
         void monthEndStartsClampToTheShorterMonth() {
@@ -74,7 +52,6 @@ class RentalTotalsTest {
             LocalDate start = LocalDate.of(2025, 1, 1);
             LocalDate end = LocalDate.of(2025, 6, 1);
             assertThat(RentalTotals.monthsDue(start, end, LocalDate.of(2025, 12, 31))).isEqualTo(6);
-            // Still 6 years later: the window is closed, not merely paused.
             assertThat(RentalTotals.monthsDue(start, end, LocalDate.of(2031, 12, 31))).isEqualTo(6);
         }
 
@@ -91,7 +68,6 @@ class RentalTotalsTest {
     @Nested
     @DisplayName("the financial year")
     class FinancialYear {
-
         @Test
         @DisplayName("runs 1 April to 31 March")
         void yearStartsInApril() {
@@ -103,15 +79,12 @@ class RentalTotalsTest {
                     .isEqualTo(LocalDate.of(2025, 4, 1));
         }
 
-        /** The case that was silently zero: a lease that begins on the last day of a year. */
         @Test
         @DisplayName("a lease starting 31 March counts its April instalment in the new year")
         void leaseStartingOnTheLastDayOfTheYear() {
             LocalDate start = LocalDate.of(2025, 3, 31);
-            // 31 March belongs to the old year, so the new year has nothing in it yet.
             assertThat(RentalTotals.monthsDueInFinancialYear(start, null, LocalDate.of(2025, 3, 31)))
                     .isEqualTo(1);
-            // 30 April is the April instalment, clamped — and it is the only one in the new year.
             assertThat(RentalTotals.monthsDueInFinancialYear(start, null, LocalDate.of(2025, 4, 30)))
                     .isEqualTo(1);
             assertThat(RentalTotals.monthsDue(start, null, LocalDate.of(2025, 4, 30))).isEqualTo(2);
@@ -123,7 +96,6 @@ class RentalTotalsTest {
             LocalDate start = LocalDate.of(2025, 4, 1);
             assertThat(RentalTotals.monthsDueInFinancialYear(start, null, LocalDate.of(2026, 3, 1)))
                     .isEqualTo(12);
-            // The 13th instalment lands in the next year, and resets the yearly count to one.
             assertThat(RentalTotals.monthsDueInFinancialYear(start, null, LocalDate.of(2026, 4, 1)))
                     .isEqualTo(1);
         }
@@ -155,7 +127,6 @@ class RentalTotalsTest {
     @Nested
     @DisplayName("totals")
     class Totals {
-
         @Test
         @DisplayName("multiply the instalments by the rent, and read an absent rent as zero")
         void multipliesInstalmentsByRent() {

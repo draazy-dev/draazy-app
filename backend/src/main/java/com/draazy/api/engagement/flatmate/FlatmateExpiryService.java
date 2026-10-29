@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FlatmateExpiryService {
-
     static final String DASHBOARD = "/dashboard#listings";
 
     private final FlatmateRoomRepository rooms;
@@ -96,7 +95,6 @@ public class FlatmateExpiryService {
         }
     }
 
-    /** A stranger's id is a 404, as on every other owner-scoped flatmate write. */
     private static void requireOwner(AuthPrincipal caller, UUID ownerId) {
         if (!ownerId.equals(caller.userId())) {
             throw NotFoundException.of("Flatmate post");

@@ -6,10 +6,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Issues the invoice when a payment succeeds. One per source, numbered per financial year. */
 @Service
 public class Invoices {
-
     public static final String SUBSCRIPTION = "subscription";
 
     public static final String SERVICE_REQUEST = "service_request";
@@ -24,8 +22,6 @@ public class Invoices {
         this.documents = documents;
     }
 
-    /** {@code taxable} is the part of {@code amount} that is Draazy's own fee; the rest is pass-through.
-     * Returns the existing invoice when this source already has one, so a replayed callback issues nothing new. */
     @Transactional
     public Optional<Invoice> issue(UUID userId, String sourceType, UUID sourceId, String orderRef, long amount,
             long taxable, Instant now) {

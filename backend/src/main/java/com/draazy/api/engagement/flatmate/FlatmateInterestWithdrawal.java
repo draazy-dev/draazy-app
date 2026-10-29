@@ -13,7 +13,6 @@ import org.hibernate.annotations.UuidGenerator;
 @Table(name = "flatmate_interest_withdrawals")
 @Getter
 public class FlatmateInterestWithdrawal {
-
     @Id
     @UuidGenerator
     private UUID id;
@@ -34,7 +33,6 @@ public class FlatmateInterestWithdrawal {
     private Instant withdrawnAt;
 
     protected FlatmateInterestWithdrawal() {
-        // JPA
     }
 
     FlatmateInterestWithdrawal(FlatmateRequest request, Instant withdrawnAt) {

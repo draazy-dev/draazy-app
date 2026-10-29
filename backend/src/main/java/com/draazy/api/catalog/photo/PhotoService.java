@@ -14,7 +14,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class PhotoService {
-
     private static final Logger log = LoggerFactory.getLogger(PhotoService.class);
 
     private final FileStorage storage;
@@ -28,8 +27,6 @@ public class PhotoService {
     }
 
     public PhotoDto upload(UUID ownerId, MultipartFile file) {
-
-        // Reject a known oversized upload before buffering; validation also checks the actual bytes.
         if (file.getSize() >= PhotoUploads.MAX_BYTES) {
             throw new PayloadTooLargeException("Photos must be smaller than 1,000,000 bytes (1 MB)");
         }
@@ -48,7 +45,6 @@ public class PhotoService {
         return new PhotoDto(storage.storePublic(key, bytes, type));
     }
 
-    /** Removes an uploaded photo and its card-size copies. Anything that is not one of our photo URLs is left alone. */
     public void delete(String url) {
         String prefix = storage.publicUrlPrefix();
         if (url == null || !url.startsWith(prefix)) {
@@ -64,8 +60,6 @@ public class PhotoService {
         }
     }
 
-    // Copies first, so a URL this returns never has a missing copy. Best effort: a card whose copy is
-    // missing (an older or undecodable photo) falls back to the original in PropertyImage.jsx.
     private void storeVariants(String key, byte[] bytes) {
         Map<Integer, byte[]> variants;
         try {

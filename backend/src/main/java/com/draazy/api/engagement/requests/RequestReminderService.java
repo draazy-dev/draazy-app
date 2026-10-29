@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RequestReminderService {
-
     private static final DateTimeFormatter WHEN =
             DateTimeFormatter.ofPattern("d MMM, h:mm a", Locale.ENGLISH).withZone(ZoneId.of("Asia/Kolkata"));
 
@@ -42,7 +41,6 @@ public class RequestReminderService {
                 .filter(v -> v.recipientId() != null).orElseThrow(() -> NotFoundException.of("Request"));
         UUID recipientId = view.recipientId();
 
-        // One recipient's reminders are serialised so the once-a-day notification cannot be doubled by a race.
         locks.holdUntilCommit(RateLimitLock.Limit.REQUEST_REMINDER, recipientId.toString());
         Instant now = Instant.now();
         Instant earliest = ReminderSchedule.earliest(view.createdAt(), reminders.lastSentAt(kind, id));

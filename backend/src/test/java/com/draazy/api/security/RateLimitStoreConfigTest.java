@@ -9,16 +9,8 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Which rate-limit store the configuration selects (tech-debt D158).
- *
- * <p>The property under test is not really "does it return the right class" — it is that none of the
- * ways this can be misconfigured ends in the platform quietly counting somewhere other than where
- * the operator believes it is.
- */
 @DisplayName("Rate limit store selection (D158)")
 class RateLimitStoreConfigTest {
-
     private static final Duration WINDOW = Duration.ofSeconds(60);
     private static final RedisEval REDIS = (script, keys, args) -> List.of(1L, 60_000L);
 

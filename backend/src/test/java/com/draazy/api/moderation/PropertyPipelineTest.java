@@ -19,16 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-// Staff-posted hand-back data is gated so buyers cannot see platform-made listings.
 @DisplayName("D215 — the post-on-behalf hand-back funnel")
 class PropertyPipelineTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
     PropertyRepository properties;
 
-        // AuditService commits in its own transaction, so its rows outlive this test's rollback.
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
         u.setName("Pipeline " + mobile);
@@ -58,17 +55,13 @@ class PropertyPipelineTest extends AbstractApiTest {
         mvc.perform(get("/admin/properties").param("q", "Pipeline flat")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
-                // Reaching hand-back pins the acquisition funnel at its last stage: leaving it at
-                // {@code listed} would show the board a listing still waiting for its paperwork.
                 .andExpect(jsonPath("$.content[0].adminPipeline.postedByAdmin").value(true))
                 .andExpect(jsonPath("$.content[0].progress.track").value("staff"))
                 .andExpect(jsonPath("$.content[0].progress.step").value("created"))
                 .andExpect(jsonPath("$.content[0].progress.flags").value(hasItem("no_photos")));
     }
 
-    // Acquisition stage and hand-back milestone are independent axes.
     @Test
-        // Both were board-only vocabulary and would have been refused at the CHECK constraint.
     @DisplayName("the owner's authenticated open is a flag for staff, not a step")
     void claimLinkOpenedIsAFlag() throws Exception {
         User owner = user("9852000091", "owner");
@@ -83,7 +76,6 @@ class PropertyPipelineTest extends AbstractApiTest {
         properties.flush();
         mvc.perform(get("/admin/properties").param("q", "Pipeline flat")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
-    // `under_review` and `live` duplicate status and would create conflicting truth.
                 .andExpect(jsonPath("$.content[0].progress.step").value("link_sent"))
                 .andExpect(jsonPath("$.content[0].progress.flags").value(hasItem("opened")));
         mvc.perform(get("/me/listings").header(HttpHeaders.AUTHORIZATION, bearer(owner)))
@@ -91,13 +83,11 @@ class PropertyPipelineTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].progress.flags").value(not(hasItem("opened"))));
     }
 
-    // Stepping back onto acquisition also clears the milestone, or a row contradicts itself on paperwork.
     @Test
     @DisplayName("the manual stage route is gone")
     void manualStageRouteIsGone() throws Exception {
         User owner = user("9852000005", "owner");
         User staff = user("9852000006", "staff");
-    // Untouched concierge rows have null funnel columns; derivation must not 500.
         Property p = listing(owner, true, staff.getId().toString(), PropertyStatus.PENDING);
         int code = mvc.perform(post("/properties/" + p.getId() + "/pipeline")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
@@ -106,7 +96,6 @@ class PropertyPipelineTest extends AbstractApiTest {
         org.assertj.core.api.Assertions.assertThat(code).isIn(404, 405);
     }
 
-    // `PropertyResponse` is public too, so the funnel must be omitted from projection.
     @Test
     @DisplayName("a buyer reading the listing is not told the platform posted it")
     void consumersNeverSeeTheFunnel() throws Exception {
@@ -121,11 +110,9 @@ class PropertyPipelineTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.adminPipeline").doesNotExist())
                 .andExpect(jsonPath("$.progress").doesNotExist());
 
-        // And the owner cannot see it either: it names a colleague and describes internal chasing.
         mvc.perform(get("/me/listings")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].adminPipeline").doesNotExist());
-    // Hand-back approval uses post-on-behalf authority, not generic property write.
     }
 }

@@ -19,7 +19,6 @@ import lombok.Setter;
 @Table(name = "property_reviews")
 @Getter
 public class PropertyReview extends AuditedEntity {
-
     @Column(name = "property_id", nullable = false, unique = true, updatable = false)
     private UUID propertyId;
 
@@ -52,7 +51,6 @@ public class PropertyReview extends AuditedEntity {
     private List<ReviewMessage> messages = new ArrayList<>();
 
     protected PropertyReview() {
-
     }
 
     public PropertyReview(UUID propertyId) {
@@ -71,14 +69,12 @@ public class PropertyReview extends AuditedEntity {
         return add(senderId, body, false, clarificationRequested);
     }
 
-    // An approval asks the owner for nothing, so it must not count as an unread message from the desk.
     public ReviewMessage addApprovalMessage(UUID senderId, String body) {
         ReviewMessage message = addMessage(senderId, body);
         message.markRead();
         return message;
     }
 
-    // No sender: a system user would add a fictional participant to the thread.
     public ReviewMessage addInternalNote(String body) {
         return add(null, body, true, false);
     }
@@ -111,5 +107,4 @@ public class PropertyReview extends AuditedEntity {
         this.reasonCode = null;
         this.checklist.forEach(ReviewChecklistItem::reset);
     }
-
 }

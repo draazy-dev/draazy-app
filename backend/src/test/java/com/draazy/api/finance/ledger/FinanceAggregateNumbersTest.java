@@ -25,19 +25,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** Pins every number {@code /summary} and {@code /cashflow} return for one awkward ledger. Dates derive from
- * {@link #thisMonth()} in {@link PlatformTime#IST}, the service's calendar. */
 class FinanceAggregateNumbersTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
 
-    /** The month the <em>service</em> considers current — India's, not the host's. */
     private static YearMonth thisMonth() {
         return YearMonth.now(PlatformTime.IST);
     }
-
-    // ---- the seeded ledger, stated once so the expected totals below can be read against it ----
 
     private static final long THIS_MONTH_INCOME = 100_000L;
     private static final long THIS_MONTH_EXPENSE = 40_000L;
@@ -45,8 +39,6 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
     private static final long TWO_MONTHS_AGO_EXPENSE = 30_000L;
     private static final long FUTURE_INCOME = 777L;
     private static final long DELETED_INCOME = 999_999L;
-
-    // ---- helpers ----
 
     private User owner(String mobile) {
         User u = new User(mobile, "owner");
@@ -78,7 +70,6 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                 .replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
     }
 
-    /** Rows sit on the 1st, the boundary: {@code date >= from} is inclusive and an off-by-one would drop them. */
     private void seed(User owner, Property p) throws Exception {
         YearMonth thisMonth = thisMonth();
 
@@ -91,7 +82,6 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
         addTxn(owner, p, TransactionTypes.INCOME, FUTURE_INCOME,
                 thisMonth.plusMonths(2).atDay(5));
 
-        // Soft-deleted: recorded, then removed. It must appear in no aggregate and in no month.
         String doomed = addTxn(owner, p, TransactionTypes.INCOME, DELETED_INCOME,
                 thisMonth.atDay(1));
         mvc.perform(delete("/me/finances/" + p.getId() + "/transactions/" + doomed)
@@ -99,9 +89,6 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                 .andExpect(status().isNoContent());
     }
 
-    // ---- 1: /summary?period=all ----
-
-    /** No {@code period} at all must be identical to {@code period=all} - the documented default. */
     @ParameterizedTest(name = "summary{0} counts every live row including future-dated ones")
     @ValueSource(strings = {"?period=all", ""})
     void summary_allTime_countsEveryLiveRowIncludingFutureDatedOnes(String query) throws Exception {
@@ -120,16 +107,12 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.net").value(income - expense));
     }
 
-    // ---- 2: /summary?period=month — a lower bound only, so the future row still counts ----
-
     @Test
     void summary_month_isLowerBoundedOnly_soTheFutureRowStillCounts() throws Exception {
         User owner = owner("9832100003");
         Property p = listing(owner);
         seed(owner, p);
 
-        // The window is `date >= 1st of this month` with no upper bound. Last month's income and
-        // the older expense fall out; the post-dated row does not.
         mvc.perform(get("/me/finances/" + p.getId() + "/summary?period=month")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
@@ -138,8 +121,6 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.net")
                         .value(THIS_MONTH_INCOME + FUTURE_INCOME - THIS_MONTH_EXPENSE));
     }
-
-    // ---- 3: /cashflow — the series, its length, and its zero-filled gaps ----
 
     @Test
     void cashflow_bucketsByMonth_andEndsWithThisMonth() throws Exception {
@@ -153,24 +134,20 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cashflow.length()").value(3))
-                // oldest first: two months ago, carrying only the expense
                 .andExpect(jsonPath("$.cashflow[0].month").value(thisMonth.minusMonths(2).toString()))
                 .andExpect(jsonPath("$.cashflow[0].income").value(0))
                 .andExpect(jsonPath("$.cashflow[0].expense").value(TWO_MONTHS_AGO_EXPENSE))
                 .andExpect(jsonPath("$.cashflow[0].net").value(-TWO_MONTHS_AGO_EXPENSE))
-                // last month
                 .andExpect(jsonPath("$.cashflow[1].month").value(thisMonth.minusMonths(1).toString()))
                 .andExpect(jsonPath("$.cashflow[1].income").value(LAST_MONTH_INCOME))
                 .andExpect(jsonPath("$.cashflow[1].expense").value(0))
                 .andExpect(jsonPath("$.cashflow[1].net").value(LAST_MONTH_INCOME))
-                // this month: the deleted row is absent from the bucket
                 .andExpect(jsonPath("$.cashflow[2].month").value(thisMonth.toString()))
                 .andExpect(jsonPath("$.cashflow[2].income").value(THIS_MONTH_INCOME))
                 .andExpect(jsonPath("$.cashflow[2].expense").value(THIS_MONTH_EXPENSE))
                 .andExpect(jsonPath("$.cashflow[2].net").value(THIS_MONTH_INCOME - THIS_MONTH_EXPENSE));
     }
 
-    /** The chart series stops at this month, so the post-dated row is hidden though {@code /summary} counts it. */
     @Test
     void cashflow_neverEmitsAMonthBeyondThisOne() throws Exception {
         User owner = owner("9832100005");
@@ -188,7 +165,6 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
         assertThat(body).doesNotContain(String.valueOf(FUTURE_INCOME));
     }
 
-    /** Months with no rows are emitted as zero points, not skipped — a gap is a different chart. */
     @Test
     void cashflow_emitsZeroPointsForMonthsWithNoRows() throws Exception {
         User owner = owner("9832100006");
@@ -210,8 +186,6 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.cashflow[1].expense").value(0))
                 .andExpect(jsonPath("$.cashflow[1].net").value(0));
     }
-
-    // ---- 4: an empty ledger is a well-formed answer, not a null or a 404 ----
 
     @Test
     void emptyLedger_summaryIsZeroed_andCashflowIsAllZeroPoints() throws Exception {
@@ -237,15 +211,11 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.cashflow[1].net").value(0));
     }
 
-    // ---- 5: signs. The API refuses a negative; the sum, if one exists, is verbatim ----
-
     @Test
     void addTransaction_rejectsANegativeAmount() throws Exception {
         User owner = owner("9832100008");
         Property p = listing(owner);
 
-        // A refund is an `income` row, not a negative `expense` — direction lives in `type`
-        // (TransactionCreateRequest). Pinned so nobody "fixes" the aggregate to handle signs.
         mvc.perform(post("/me/finances/" + p.getId() + "/transactions")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -254,7 +224,6 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    /** Inserted via JDBC since the API refuses it: a negative amount must be summed as written. */
     @Test
     void aggregates_sumTheColumnVerbatim_evenWhenARowIsNegative() throws Exception {
         User owner = owner("9832100009");
@@ -278,8 +247,6 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.cashflow[0].expense").value(THIS_MONTH_EXPENSE - 5000));
     }
 
-    // ---- 6: another owner's numbers stay another owner's ----
-
     @Test
     void aggregates_areScopedToTheCallersOwnProperty() throws Exception {
         User owner = owner("9832100010");
@@ -295,7 +262,6 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-    /** A second property's ledger must not bleed into the first one's totals. */
     @Test
     void aggregates_doNotMixTwoPropertiesOfTheSameOwner() throws Exception {
         User owner = owner("9832100012");
@@ -317,9 +283,6 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                         .value(THIS_MONTH_INCOME + LAST_MONTH_INCOME + FUTURE_INCOME));
     }
 
-    // ---- 7: the index the aggregates are only cheap because of ----
-
-    /** Asserted on {@code pg_indexes}: the V51 covering index leaves no trace in results if dropped. */
     @Test
     void v51_coveringIndexExists_andCarriesTheColumnsTheAggregatesSum() {
         var defs = jdbc.queryForList(
@@ -328,15 +291,13 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
 
         assertThat(defs).hasSize(1);
         assertThat(defs.getFirst())
-                .contains("property_id")      // the equality, leading
-                .contains("date")             // the range both windows are expressed on
-                .contains("INCLUDE")          // payload, so the sum needs no heap visit
+                .contains("property_id")
+                .contains("date")
+                .contains("INCLUDE")
                 .contains("type")
                 .contains("amount")
-                .contains("archived = false"); // partial: no read here ever wants an archived row
+                .contains("archived = false");
 
-        // The old V12's index had the same key and was replaced, not kept alongside. Two indexes the
-        // planner cannot tell apart are paid for on every write and chosen for nothing.
         assertThat(jdbc.queryForList(
                 "select indexdef from pg_indexes where indexname = ?",
                 String.class, "idx_transactions_property")).isEmpty();

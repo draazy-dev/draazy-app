@@ -13,17 +13,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Read is public ({@code security: []}), write is authenticated; {@code SecurityConfig} permits by method. */
 @RestController
 public class PropertyReviewController {
-
     private final ReviewService reviewService;
 
     public PropertyReviewController(ReviewService reviewService) {
         this.reviewService = reviewService;
     }
 
-    /** Unpaged because the list is structurally bounded; carries the rating summary over every published review. */
     @GetMapping(Routes.Reviews.FOR_PROPERTY)
     public ReviewListResponse list(@CurrentUser AuthPrincipal viewer, @PathVariable UUID propId) {
         return reviewService.listForProperty(propId, viewer == null ? null : viewer.userId());

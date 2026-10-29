@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 
 @DisplayName("Review categories — vocabulary per target type")
 class ReviewCategoriesTest {
-
     @Test
     @DisplayName("the categories vocabulary is per target type, and is the one the UI renders")
     void categoryVocabularyMatchesTheUi() {
@@ -23,14 +22,9 @@ class ReviewCategoriesTest {
                 .containsExactlyInAnyOrder(
                         "Safety", "Maintenance", "Management", "Amenities", "Connectivity");
 
-        // The two vocabularies are disjoint, which is why a shared key set could never have served
-        // both: there is no aspect a listing and a housing society are both rated on.
         assertThat(ReviewCategories.PROPERTY_KEYS)
                 .doesNotContainAnyElementsOf(ReviewCategories.SOCIETY_KEYS);
 
-        // locality and owner keep the property vocabulary. Neither surface renders per-aspect bars
-        // and nothing in the product names a vocabulary for them, so this is the status quo held
-        // in place deliberately rather than a choice — see ReviewCategories' class Javadoc.
         assertThat(ReviewCategories.forTarget(ReviewTargetTypes.LOCALITY))
                 .isEqualTo(ReviewCategories.PROPERTY_KEYS);
         assertThat(ReviewCategories.forTarget(ReviewTargetTypes.OWNER))

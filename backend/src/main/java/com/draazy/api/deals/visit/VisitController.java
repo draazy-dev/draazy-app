@@ -21,18 +21,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Either participant may reschedule, so participation is checked in {@link VisitService#reschedule},
- * not by a route-level role guard. */
 @RestController
 public class VisitController {
-
     private final VisitService visitService;
 
     public VisitController(VisitService visitService) {
         this.visitService = visitService;
     }
 
-    /** Sort is fixed server-side; {@code Pageables.unsorted} strips a client-supplied one. */
     @GetMapping(Routes.Visits.BASE)
     public PageResponse<VisitDto> listVisits(@CurrentUser AuthPrincipal principal,
                                              @RequestParam(required = false) UUID propertyId,

@@ -5,10 +5,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Map;
 
-/** The host's own reading of the agreement's term. A claim for the reviewer to confirm against the
- * document, never the badge expiry: that comes from the reviewer's checks. */
 record AgreementPeriod(LocalDate from, LocalDate till) {
-
     static final String FROM = "validFrom";
     static final String TILL = "validTill";
 

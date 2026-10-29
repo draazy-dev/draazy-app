@@ -9,11 +9,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-// page_views holds session and sometimes user ids, so the 30-day window is a promise to data subjects, and a sweep
-// deleting nothing has no symptom. Erasure is proved by ErasureCoverageTest, which reads rows back, not counts.
 @DisplayName("Page view retention")
 class PageViewRetentionTest extends AbstractApiTest {
-
     @Autowired PageViewRetention retention;
 
     @Test
@@ -22,7 +19,6 @@ class PageViewRetentionTest extends AbstractApiTest {
         Instant now = Instant.now();
         Instant cutoff = now.minus(PageViewRetention.RETENTION);
 
-        // Uses the real constant, not a retyped literal, so the test cannot outlive a policy change.
         view("sess-old", cutoff.minus(Duration.ofDays(1)));
         view("sess-edge", cutoff.plusSeconds(60));
         view("sess-new", now.minus(Duration.ofDays(1)));
@@ -41,8 +37,6 @@ class PageViewRetentionTest extends AbstractApiTest {
     void sweepingWithNothingToDoRemovesNothing() {
         view("sess-new", Instant.now());
 
-        // The scheduled sweep runs daily and will find nothing on most of them. Returning zero is
-        // the expected steady state, not an error condition to log about.
         assertThat(retention.expirePageViewsOlderThan(
                 Instant.now().minus(PageViewRetention.RETENTION)))
                 .isZero();

@@ -15,12 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// The live API must own checklist names; frontend-only mock data emptied the missing-docs tracker.
 @DisplayName("D120 — service-request document checklist")
 class ServiceRequestChecklistTest extends ServiceFixtures {
-
-    // The point of the endpoint is the absent items, so a fresh request must return all of them with nothing done —
-    // not an empty list.
     @Test
     @DisplayName("a fresh request lists every item, none of them done")
     void freshRequestListsEveryItemUnticked() throws Exception {
@@ -38,8 +34,6 @@ class ServiceRequestChecklistTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.items[0].done").value(false));
     }
 
-    // Would fail if the match were made on file name or mime type, or if `ready` were counted from the document list
-    // rather than the items.
     @Test
     @DisplayName("a non-rent request keeps the legacy five-item checklist")
     void nonRentRequestKeepsTheStaticChecklist() throws Exception {
@@ -53,8 +47,6 @@ class ServiceRequestChecklistTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.items[0].id").value("owner-id"));
     }
 
-    // Counting it would inflate the badge with output rather than input — a customer who had sent nothing would see
-    // progress because staff shared a draft.
     @Test
     @DisplayName("a document filed under an item's id ticks exactly that item")
     void uploadTicksTheMatchingItem() throws Exception {
@@ -72,8 +64,6 @@ class ServiceRequestChecklistTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.items[1].done").value(false));
     }
 
-    // An id rather than a URL, so this route never mints a download credential and the bytes stay behind {@code
-    // getServiceRequest}, where the vault's read rules already live.
     @Test
     @DisplayName("NRI and foreign parties get passport and visa slots instead of Aadhaar slots")
     void offlinePartiesGetPassportSlots() throws Exception {
@@ -99,8 +89,6 @@ class ServiceRequestChecklistTest extends ServiceFixtures {
         assertTenantPoliceItems("9820000815", police("uid", true, "uid", "salaried"), 0, 0, 1);
     }
 
-    // The guard is the same one `GET /service-requests/{id}` uses, deliberately: a checklist that leaked existence
-    // would be a side door around it.
     @Test
     @DisplayName("the desk's draft and final document do not count towards the customer's total")
     void deskOutputIsNotCustomerInput() throws Exception {
@@ -163,7 +151,6 @@ class ServiceRequestChecklistTest extends ServiceFixtures {
         mvc.perform(get(Routes.ServiceRequests.CHECKLIST, id))
                 .andExpect(status().isUnauthorized());
     }
-
 
     private String createWithState(User caller, String state) throws Exception {
         String json = mvc.perform(post(Routes.ServiceRequests.BASE)

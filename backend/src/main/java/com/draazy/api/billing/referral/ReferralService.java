@@ -29,14 +29,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Referral scheme: caller's code and rewards, redemption, and the ops desk's overrides.
- * Rationale: docs/flows/consumer/plans-billing-refer.md, docs/flows/ops/referrals-fraud.md. */
 @Service
 public class ReferralService {
-
     private static final String CODE_PREFIX = "PUNE-";
 
-    // Excludes I, O, 0, 1: codes are dictated aloud and typo-prone.
     private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
     private static final int CODE_LENGTH = 4;
@@ -72,7 +68,6 @@ public class ReferralService {
         this.outcomes = outcomes;
     }
 
-    /** {@code GET /me/referrals}: mints on first read and refreshes the referrer's own signals every time. */
     @Transactional
     public ReferralSummaryDto summary(AuthPrincipal caller, HttpServletRequest request) {
         String code = codeFor(caller.userId(), request);
@@ -105,7 +100,6 @@ public class ReferralService {
                 featured ? Math.toIntExact(settings.referralOwnerFeaturedDays()) : 0);
     }
 
-    /** {@code POST /referrals/redeem}: 200, or a single indistinguishable 409 for every refusal. */
     @Transactional
     public void redeem(AuthPrincipal caller, String rawCode, String shareChannel,
             HttpServletRequest request) {
@@ -163,8 +157,6 @@ public class ReferralService {
                 .plus(Duration.ofHours(settings.referralSignupWindowHours())).isAfter(Instant.now());
     }
 
-    // Velocity alone is high; otherwise two of the other signals together are, one is medium. An omitted
-    // device id is a signal, so leaving the header out is never easier than sending it.
     private static String risk(boolean velocityHigh, boolean sameIp, boolean sameUa, boolean newReferrer,
             boolean noDeviceId) {
         int correlated = (sameIp ? 1 : 0) + (sameUa ? 1 : 0) + (newReferrer ? 1 : 0) + (noDeviceId ? 1 : 0);
@@ -174,7 +166,6 @@ public class ReferralService {
         return correlated == 1 ? ReferralStatuses.RISK_MEDIUM : ReferralStatuses.RISK_LOW;
     }
 
-    /** The paged queue ({@code x-roles: [staff, admin]}); {@code status} is a comma-separated set. */
     @Transactional(readOnly = true)
     public Page<ReferralDto> queue(String status, String risk, String q, Integer days, Pageable pageable) {
         List<String> statuses = blankToNull(status) == null ? List.of()
@@ -196,7 +187,6 @@ public class ReferralService {
                 "highRisk", (Long) row[3], "rewarded", (Long) row[4], "refused", (Long) row[5]);
     }
 
-    /** Override: earns the reward whatever the automatic decision was. A rejected row is an appeal: reason required. */
     @Transactional
     public ReferralDto approve(AuthPrincipal actor, String id, String reason) {
         return decide(actor, id, ReferralStatuses.REWARDED, reason, r -> {
@@ -217,7 +207,6 @@ public class ReferralService {
                 "referral.reject");
     }
 
-    /** Reverses a reward that was granted, so history never says something was paid when it was not. */
     @Transactional
     public ReferralDto clawback(AuthPrincipal actor, String id, String reason) {
         return decide(actor, id, ReferralStatuses.CLAWED_BACK, reason,
@@ -229,7 +218,6 @@ public class ReferralService {
         return "Referral is " + referral.getStatus() + " and cannot be " + nextStatus;
     }
 
-    // Write-locked check-then-act; `refusal` returns the exact sentence to send back, or null.
     private ReferralDto decide(AuthPrincipal actor, String id, String nextStatus, String reason,
             Function<Referral, String> refusal, String action) {
         Referral referral = Ids.parseUuid(id)
@@ -247,7 +235,6 @@ public class ReferralService {
         return mapper.toDto(referral);
     }
 
-    // Looks before leaping: a constraint violation would poison the persistence context.
     private String codeFor(UUID userId, HttpServletRequest request) {
         ReferralSignals.Signals observed = signals.of(request);
         Optional<ReferralCode> existing = codes.findById(userId);
@@ -272,7 +259,6 @@ public class ReferralService {
         return code.toString();
     }
 
-    // Codes are dictated aloud and pasted with stray spaces; store and match one canonical form.
     private static String normalise(String code) {
         if (code == null) {
             return null;

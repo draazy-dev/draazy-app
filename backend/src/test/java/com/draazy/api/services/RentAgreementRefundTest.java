@@ -19,11 +19,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
-// Everything paid comes back until GRAS duty is paid; after that only the service fee can refund.
-// A second operator must approve so no refund leaves on one person's word.
 @DisplayName("Rent agreement refunds — one operator asks, a second approves, within what D-b allows")
 class RentAgreementRefundTest extends ServiceFixtures {
-
     private static final String TERMS = "{\"type\":\"rent-agreement\",\"details\":{\"rent\":20000,"
             + "\"deposit\":60000,\"months\":11,\"_state\":{\"prop\":{\"gramPanchayat\":false},\"terms\":{\"rent\":\"20000\",\"deposit\":\"60000\","
             + "\"months\":\"11\"}}}}";

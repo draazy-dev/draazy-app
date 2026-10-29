@@ -9,10 +9,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Counts are computed because cached listing_count columns are not maintained. */
 @Service
 public class ListingCounts {
-
     private final PropertyRepository properties;
 
     public ListingCounts(PropertyRepository properties) {
@@ -28,21 +26,18 @@ public class ListingCounts {
                 Freshness.dormantCutoff(Instant.now())), k -> (UUID) k);
     }
 
-    /** City names are free text, so both query and callers lower-case before matching. */
     @Transactional(readOnly = true)
     public Map<String, Long> byCity() {
         return toMap(properties.countLiveByCity(PropertyStatus.APPROVED,
                 Freshness.dormantCutoff(Instant.now())), k -> (String) k);
     }
 
-    /** The public count matches the visible owner listing search, not the owner's billing slots. */
     @Transactional(readOnly = true)
     public long forOwner(UUID ownerId) {
         return properties.countPublicByOwner(ownerId, PropertyStatus.APPROVED,
                 Freshness.dormantCutoff(Instant.now()));
     }
 
-    /** Whole-catalogue headline: three counts in one statement. */
     @Transactional(readOnly = true)
     public TrustStatsResponse trustStats() {
         Instant now = Instant.now();
@@ -51,7 +46,6 @@ public class ListingCounts {
                 tally.verifiedListings(), tally.totalListings(), tally.verifiedOwners());
     }
 
-    /** Confine JPQL's {@code Object[]} casts here so callers never see untyped arrays. */
     private static <K> Map<K, Long> toMap(
             Iterable<Object[]> rows, Function<Object, K> keyCast) {
         return java.util.stream.StreamSupport.stream(rows.spliterator(), false)

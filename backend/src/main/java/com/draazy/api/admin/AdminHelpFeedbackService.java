@@ -18,10 +18,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-/** The reader of {@code help_article_feedback}, which {@code HelpFeedbackService} only writes. */
 @Service
 public class AdminHelpFeedbackService {
-
     private static final Pattern SLUG = Pattern.compile("[a-z0-9-]{1,120}");
     private static final int MAX_PAGE = 100;
     private static final int MIN_VOTES = 5;
@@ -32,8 +30,6 @@ public class AdminHelpFeedbackService {
         this.jdbc = jdbc;
     }
 
-    /** Worst "not helpful" share first among articles with {@code MIN_VOTES}+ verdicts, so one early thumbs-down
-     * does not top the list; per language, so a weak translation is not averaged away. */
     public PageResponse<AdminHelpFeedbackArticle> articles(Integer days, int page, int size) {
         int safeSize = Math.clamp(size, 1, MAX_PAGE);
         int safePage = Math.max(page, 0);

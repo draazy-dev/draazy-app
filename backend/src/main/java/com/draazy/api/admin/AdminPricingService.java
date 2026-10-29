@@ -8,10 +8,8 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Averages are null under {@link #MIN_SAMPLE} flats: one or two listings are an owner's opinion, not a locality's price. */
 @Service
 public class AdminPricingService {
-
     private static final String PRICING_INSIGHTS = """
             select l.slug,
                    l.name,

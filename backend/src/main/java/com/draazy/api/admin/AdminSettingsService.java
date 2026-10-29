@@ -28,15 +28,12 @@ import tools.jackson.databind.node.ObjectNode;
 
 @Service
 public class AdminSettingsService {
-
     private static final Logger log = LoggerFactory.getLogger(AdminSettingsService.class);
 
-    /** Bounded because the merge recurses over attacker-influenced structure; unbounded means a
-     * {@code StackOverflowError} in a request thread. */
+    // Depth is bounded: the merge recurses over attacker-influenced structure,
+    // and unbounded depth throws StackOverflowError in a request thread.
     private static final int MAX_MERGE_DEPTH = 12;
 
-    /** Top-level keys refused outright: configuration that would be stored and enforced by nothing.
-     * A deny-list, not an allow-list, because the table is deliberately open. */
     private static final Set<String> UNSUPPORTED_KEYS = Set.of("customRoles");
 
     private static final String ADMIN_FLAGS_KEY = "adminFlags";
@@ -61,8 +58,6 @@ public class AdminSettingsService {
         this.audit = audit;
     }
 
-    // `GET /admin/settings` - every stored block folded into one document, with its tag, from one read.
-    // An unparseable row is skipped: an admin locked out cannot fix the row that locked them out.
     @Transactional(readOnly = true)
     public SettingsDocument current() {
         List<Object[]> rows = settings.storedText();
@@ -76,7 +71,6 @@ public class AdminSettingsService {
         return new SettingsDocument(document, etag(rows));
     }
 
-    // `GET /admin/settings/flags` - the console's module switches alone, one row instead of the whole table.
     @Transactional(readOnly = true)
     public Map<String, Object> adminFlags() {
         return settings.findById(ADMIN_FLAGS_KEY)
@@ -86,7 +80,6 @@ public class AdminSettingsService {
                 .orElseGet(Map::of);
     }
 
-    // Strong hash of every stored block as jsonb renders it, so a tag taken after a write matches the next read.
     private String etag() {
         settings.flush();
         return etag(settings.storedText());
@@ -116,7 +109,6 @@ public class AdminSettingsService {
         Map<String, Object> saved = new TreeMap<>();
         for (Map.Entry<String, Object> entry : patch.entrySet()) {
             if (entry.getValue() == null) {
-
                 continue;
             }
             String key = entry.getKey();
@@ -149,7 +141,6 @@ public class AdminSettingsService {
                 PlatformSettings.MIN_LISTING_PHOTOS, PlatformSettings.MAX_LISTING_PHOTOS);
         rejectOutOfRange(patch, PlatformSettings.FLATMATES_KEY, "maxGroupsPerPerson",
                 PlatformSettings.MIN_GROUPS_PER_PERSON, PlatformSettings.MAX_GROUPS_PER_PERSON);
-        // Floor of 1: a cleared field arrives as 0, and a ₹0 plan activates without payment.
         for (String price : PlatformSettings.PRICE_FIELDS) {
             rejectOutOfRange(patch, PlatformSettings.FEES_KEY, price, 1, PlatformSettings.MAX_PRICE);
         }
@@ -212,7 +203,6 @@ public class AdminSettingsService {
         }
     }
 
-    // City launch state lives on `cities`; public visibility cannot depend on admin-only JSON.
     private static void rejectRetiredCityLive(Map<String, Object> patch) {
         if (!(patch.get("geo") instanceof Map<?, ?> geo)
                 || !(geo.get("cities") instanceof Map<?, ?> cities)) {

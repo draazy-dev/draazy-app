@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Author's and staff's view only; everyone else gets {@link FlatmateSeekerFeedDto}. */
 public record FlatmateSeekerPostDto(
         UUID id,
         String title,

@@ -9,12 +9,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.SchedulingConfigurer;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 
-/** Every scheduled run goes through {@link JobRunScheduler}: a {@code job-...} trace id and an advisory lock, off with
- * {@code draazy.scheduling.job-lock.enabled=false}. */
 @Configuration
 @EnableScheduling
 public class SchedulingConfig implements SchedulingConfigurer {
-
     private final ObjectProvider<TaskScheduler> scheduler;
     private final ObjectProvider<DataSource> dataSource;
     private final boolean lockEnabled;

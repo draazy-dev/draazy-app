@@ -13,11 +13,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The owner's side of a confirmed flatmate room: their flats, the rooms tenants have in them, and the answers the
- * listing wizard can start from. Everything is keyed by the caller, so a stranger's id is a 404. */
 @Service
 public class FlatmateOwnerHomeService {
-
     private static final String FALLBACK_NAME = "Your tenant";
 
     private final ManagedFlatmateHomes homes;

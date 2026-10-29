@@ -16,7 +16,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("Two parallel checkouts cannot both spend the last referral credit")
 class ReferralCreditRaceTest extends AbstractCommittedApiTest {
-
     @Autowired ServiceRequestRepository requests;
     @Autowired ServiceRequestReferralCredit referralCredit;
     @Autowired TransactionTemplate tx;
@@ -67,7 +66,6 @@ class ReferralCreditRaceTest extends AbstractCommittedApiTest {
                 """, Long.class, caller.getId())).isEqualTo(1L);
     }
 
-    // Holds the lock long enough that an unserialised second spend would have read the stale balance.
     private static void pause() {
         try {
             Thread.sleep(300);

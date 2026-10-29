@@ -25,7 +25,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @DisplayName("D160 — one outstanding unpaid subscription order per user")
 class UnpaidOrderCapTest extends AbstractApiTest {
-
     private static final String PAID_PLAN = "b1000000-0000-4000-8000-000000000006";
 
     @Autowired MockMvc mvc;
@@ -35,7 +34,6 @@ class UnpaidOrderCapTest extends AbstractApiTest {
     @Test
     @DisplayName("the index exists under the exact name the service translates on")
     void indexNamesMatchTheConstantsTheServicesMatchOn() {
-
         assertThat(indexExists("uq_subscriptions_open_unpaid"))
                 .as("SubscriptionService.OPEN_UNPAID_INDEX must name a real index")
                 .isTrue();
@@ -50,7 +48,6 @@ class UnpaidOrderCapTest extends AbstractApiTest {
     @Nested
     @DisplayName("subscriptions")
     class Subscriptions {
-
         @Test
         @DisplayName("a second priced order is refused by the count, naming two real actions, and nothing is inserted")
         void theCountRefusesTheDoubleClick() throws Exception {
@@ -63,23 +60,17 @@ class UnpaidOrderCapTest extends AbstractApiTest {
                             .content("{\"planId\":\"" + PAID_PLAN + "\"}"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message", containsString("Finish paying")))
-                    // ...or wait, because the sweep clears it.
                     .andExpect(jsonPath("$.message", containsString("expire")));
 
-            // Still one row: the count answered before the insert, so no constraint was reached and
-            // this transaction is still usable.
             assertThat(pendingSubscriptions(u)).isEqualTo(1);
         }
 
-        /** A raw INSERT is what a lost race amounts to: a second row arriving after the count read
-         *  zero. Without {@code uq_subscriptions_open_unpaid} it would succeed. */
         @Test
         @DisplayName("a second open unpaid row is refused by the database, not just by the service")
         void theDatabaseRefusesTheSecondRow() throws Exception {
             User u = owner("9866600002");
             subscribe(u, PAID_PLAN, 201);
 
-            // Nothing may follow: a constraint violation leaves the transaction rollback-only.
             assertThatThrownBy(() -> insertPendingSubscription(u))
                     .isInstanceOf(DataIntegrityViolationException.class);
         }
@@ -91,7 +82,6 @@ class UnpaidOrderCapTest extends AbstractApiTest {
             User second = owner("9866600004");
             subscribe(first, PAID_PLAN, 201);
 
-            // Somebody else's unpaid order is not in conflict with this one.
             insertPendingSubscription(second);
 
             assertThat(pendingSubscriptions(first)).isEqualTo(1);
@@ -116,8 +106,6 @@ class UnpaidOrderCapTest extends AbstractApiTest {
             String first = subscribeWithKey(u, "sub-cap-replay", 201);
             String again = subscribeWithKey(u, "sub-cap-replay", 201);
 
-            // The replay is answered before the cap is consulted, so a client retrying a request
-            // whose response it never saw is given the order it already has.
             assertThat(jsonField(again, "id")).isEqualTo(jsonField(first, "id"));
             assertThat(pendingSubscriptions(u)).isEqualTo(1);
         }

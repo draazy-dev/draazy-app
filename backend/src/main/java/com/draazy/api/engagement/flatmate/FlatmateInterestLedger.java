@@ -5,10 +5,8 @@ import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** Withdrawn interests are hard-deleted, but each already reached a host, so the ledger keeps them counting. */
 @Component
 class FlatmateInterestLedger {
-
     private final FlatmateRequestRepository requests;
     private final FlatmateInterestWithdrawalRepository withdrawals;
 

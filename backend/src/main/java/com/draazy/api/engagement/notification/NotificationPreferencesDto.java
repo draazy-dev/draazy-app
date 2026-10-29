@@ -1,6 +1,5 @@
 package com.draazy.api.engagement.notification;
 
-/** Names mirror existing browser settings so persisted documents can move without transformation. */
 public record NotificationPreferencesDto(
         boolean email,
         boolean sms,
@@ -8,7 +7,6 @@ public record NotificationPreferencesDto(
         boolean matchAlerts,
         QuietHoursDto quietHours,
         String language) {
-
     static NotificationPreferencesDto of(NotificationPreference row) {
         return new NotificationPreferencesDto(
                 row.isEmail(),

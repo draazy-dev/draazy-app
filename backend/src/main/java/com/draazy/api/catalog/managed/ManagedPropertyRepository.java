@@ -10,11 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ManagedPropertyRepository extends JpaRepository<ManagedProperty, UUID> {
-
-    /** The caller's own managed records, newest first (id tiebreaker for a deterministic order). */
     List<ManagedProperty> findByOwnerIdOrderByCreatedAtDescIdDesc(UUID ownerId);
 
-    // Not owner-scoped on purpose: register only reads whether the listing is already adopted, never the record.
     Optional<ManagedProperty> findByPublishedListingId(UUID publishedListingId);
 
     List<ManagedProperty> findByTenantMobileAndRentedTrueOrderByCreatedAtDescIdDesc(String tenantMobile);

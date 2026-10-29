@@ -19,15 +19,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Either the existence check or {@code uq_flatmate_requests_target_requester} may refuse the loser,
- *  and both must answer the same 409. Commits, so it cannot extend {@code AbstractApiTest}. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("Two interests in the same post, sent together")
 class FlatmateDuplicateInterestRaceTest {
-
-    /** Two, capped by the 4-connection test pool: the winner needs two (its own plus the
-     *  {@code REQUIRES_NEW} audit write) and the parked loser a third. */
     private static final int RACERS = 2;
 
     @Autowired FlatmateSeekerService seekers;
@@ -47,7 +42,6 @@ class FlatmateDuplicateInterestRaceTest {
         requester = saveUser("9876000380", "Duplicate Racer");
         host = saveUser("9876000381", "Duplicate Host");
         FlatmateSeekerPost post = new FlatmateSeekerPost(host.getId(), host.getName(), 15_000L);
-        // findVisible only returns publicly-visible posts, and a new one starts pending.
         post.setModStatus(FlatmateVocabulary.MOD_LIVE);
         postId = posts.saveAndFlush(post).getId();
         FlatmateRoom room = new FlatmateRoom(host.getId(), "Private room", "Baner", 12_000L);
@@ -63,8 +57,6 @@ class FlatmateDuplicateInterestRaceTest {
         if (host != null) {
             jdbc.update("delete from flatmate_requests where host_id = ?", host.getId());
         }
-        // The interest audit row commits in its own REQUIRES_NEW transaction, so it outlives
-        // everything else here and has to be removed by hand.
         if (postId != null) {
             jdbc.update("delete from audit_log where entity_id = ?", postId.toString());
             jdbc.update("delete from flatmate_seeker_posts where id = ?", postId);
@@ -75,8 +67,6 @@ class FlatmateDuplicateInterestRaceTest {
         }
         for (User user : new User[] { requester, host }) {
             if (user != null) {
-                // Both sides are notified — the host gets the pitch, the requester gets the notice
-                // that their number went with it — so both need sweeping ahead of the FK.
                 jdbc.update("delete from notifications where user_id = ?", user.getId());
                 jdbc.update("delete from users where id = ?", user.getId());
             }
@@ -102,8 +92,6 @@ class FlatmateDuplicateInterestRaceTest {
         return n == null ? 0 : n;
     }
 
-    /** Nothing may come back that is not success or the business refusal; exactly one racer is
-     *  refused, and exactly one row survives. */
     private void assertOneWinnerAndOneRefusal(List<Throwable> outcomes, String kind, UUID target) {
         for (Throwable outcome : outcomes) {
             if (outcome != null && !(outcome instanceof ConflictException)) {
@@ -137,8 +125,6 @@ class FlatmateDuplicateInterestRaceTest {
         assertOneWinnerAndOneRefusal(outcomes, "flatmate", postId);
     }
 
-    /** {@code FlatmateSupplyService.record} writes the same table against the same index and carries
-     *  its own copy of the catch, so it is covered separately. */
     @Test
     @DisplayName("a room: the loser is refused with a 409 rather than a 500")
     void concurrentInterestsInOneRoomLeaveOneRow() {

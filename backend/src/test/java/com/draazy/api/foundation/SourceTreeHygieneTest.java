@@ -20,24 +20,19 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Scans the whole tree, not just Java: the generator that writes empty specs is not Java. */
 @DisplayName("Source tree — no empty source files (tech-debt D39, D75)")
 class SourceTreeHygieneTest {
-
     private static final Path MODULE = Path.of("").toAbsolutePath();
 
-    /** An allowlist: a blocklist would have to anticipate every marker file meant to be empty, like .gitkeep. */
     private static final Set<String> SOURCE_EXTENSIONS = Set.of(
             ".java", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs",
             ".sql", ".py", ".css", ".scss", ".html", ".json", ".yaml", ".yml", ".md");
 
-    /** persist is the frontend's gitignored runtime store: nobody wrote it by hand and nobody can fix it. */
     private static final Set<String> PRUNED = Set.of(
             "node_modules", "target", "bin", "dist", "build", "coverage",
             ".git", ".idea", ".vscode", ".gradle", ".venv", "__pycache__",
-            "test-results", "playwright-report", ".shards", ".copilot", ".claude", "persist");
+            "test-results", "playwright-report", ".shards", ".copilot", ".claude", "persist", "brag-output");
 
-    /** An exempt file is one this guard has stopped protecting, so the list stays short. */
     private static final Set<String> MOJIBAKE_EXEMPT = Set.of(
             "e2e/scripts/fix-mojibake.mjs");
 
@@ -71,7 +66,6 @@ class SourceTreeHygieneTest {
                 .isEmpty();
     }
 
-    /** Round-trip detection, since a pattern list only catches known damage. */
     @Test
     @DisplayName("no mojibake or UTF-8 BOM in any source file (tech-debt D19)")
     void noMojibakeOrBom() {
@@ -100,8 +94,6 @@ class SourceTreeHygieneTest {
                 .isEmpty();
     }
 
-    /** Runs stop at every ASCII character: a UTF-8 sequence never contains a byte below 0x80,
-     * so an absorbing run would let one bad character mask all. */
     private static boolean hasMojibake(String text) {
         int i = 0;
         while (i < text.length()) {
@@ -125,11 +117,9 @@ class SourceTreeHygieneTest {
             }
             int runLength = i - start;
             if (runLength == 0) {
-                i += 1; // Not CP1252-representable at all, so it cannot be mojibake.
+                i += 1;
                 continue;
             }
-            // `new String(bytes, UTF_8)` substitutes U+FFFD rather than throwing, which is the
-            // signal wanted: a run that does not decode cleanly is not mojibake and is left alone.
             String decoded = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
             if (decoded.indexOf('\uFFFD') < 0 && decoded.length() < runLength) {
                 return true;
@@ -138,8 +128,6 @@ class SourceTreeHygieneTest {
         return false;
     }
 
-    /** CP1252 differs from Latin-1 only in 0x80-0x9F, the typographic characters that make mojibake
-     * recognisable. */
     private static int cp1252Byte(char c) {
         if (c < 0x80 || (c >= 0xA0 && c <= 0xFF)) {
             return c;
@@ -148,17 +136,12 @@ class SourceTreeHygieneTest {
         return idx < 0 ? -1 : 0x80 + idx;
     }
 
-    /** {@code 0x80}–{@code 0x9F} in CP1252 order; {@code '\0'} marks the five undefined slots. */
     private static final String CP1252_HIGH =
             "\u20AC\0\u201A\u0192\u201E\u2026\u2020\u2021\u02C6\u2030\u0160\u2039\u0152\0\u017D\0"
             + "\0\u2018\u2019\u201C\u201D\u2022\u2013\u2014\u02DC\u2122\u0161\u203A\u0153\0\u017E\u0178";
 
-    /** Only .java is checked for "declares nothing": no portable way to tell a comment-only script
-     * from a deliberate one. */
     private static boolean isEmpty(Path file, String text) {
         if (text == null) {
-            // A file that cannot be read as UTF-8 is not a source file this guard has an opinion
-            // about, so passing silently is correct here.
             return false;
         }
         if (text.isEmpty()) {
@@ -180,7 +163,6 @@ class SourceTreeHygieneTest {
         return stripped.isEmpty();
     }
 
-    /** Found via the .git directory rather than counting ".." hops, so it survives deeper module nesting. */
     private static Path repoRoot() {
         for (Path p = MODULE; p != null; p = p.getParent()) {
             if (Files.isDirectory(p.resolve(".git"))) {
@@ -190,7 +172,6 @@ class SourceTreeHygieneTest {
         return MODULE;
     }
 
-    /** Each source file's text, or {@code null} when it cannot be read as UTF-8. */
     private static Map<Path, String> sourceFilesUnder(Path root) {
         List<Path> found = new ArrayList<>();
         try {
@@ -215,7 +196,6 @@ class SourceTreeHygieneTest {
 
                 @Override
                 public FileVisitResult visitFileFailed(Path file, IOException e) {
-                    // An unreadable entry (a lock file, a permission quirk) must not fail the build.
                     return FileVisitResult.CONTINUE;
                 }
             });

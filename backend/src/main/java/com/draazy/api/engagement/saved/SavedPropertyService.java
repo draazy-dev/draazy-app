@@ -15,10 +15,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Shortlists are user preferences, not auditable business records, and can grow unbounded. */
 @Service
 public class SavedPropertyService {
-
     private final SavedPropertyRepository savedPropertyRepo;
     private final PropertyRepository propertyRepo;
     private final PropertyMapper propertyMapper;
@@ -30,7 +28,6 @@ public class SavedPropertyService {
         this.propertyMapper = propertyMapper;
     }
 
-    /** Saved-order is restored after {@code findAllById}, which does not guarantee it. */
     @Transactional(readOnly = true)
     public Page<SavedCard> listSaved(UUID userId, Pageable pageable) {
         Page<SavedPropertyRepository.SavedRow> rows = savedPropertyRepo.findSavedRows(userId, pageable);
@@ -48,7 +45,6 @@ public class SavedPropertyService {
         return new PageImpl<>(content, rows.getPageable(), rows.getTotalElements());
     }
 
-    /** The whole shortlist as keys: the shell needs every heart, so this is unpaged. */
     @Transactional(readOnly = true)
     public List<SavedKey> listKeys(UUID userId) {
         return savedPropertyRepo.findSavedKeys(userId).stream()
@@ -56,7 +52,6 @@ public class SavedPropertyService {
                 .toList();
     }
 
-    /** Validates existence first so we never write a dangling FK (which would 500 on the constraint). */
     @Transactional
     public void save(UUID userId, UUID propertyId) {
         if (!propertyRepo.existsById(propertyId)) {
@@ -65,7 +60,6 @@ public class SavedPropertyService {
         savedPropertyRepo.insertIfAbsent(userId, propertyId);
     }
 
-    /** Idempotently remove a property from the caller's shortlist. 204 whether or not a row existed. */
     @Transactional
     public void unsave(UUID userId, UUID propertyId) {
         savedPropertyRepo.deleteByUserAndProperty(userId, propertyId);

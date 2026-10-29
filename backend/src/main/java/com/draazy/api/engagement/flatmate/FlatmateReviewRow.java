@@ -4,8 +4,6 @@ import com.draazy.api.identity.user.User;
 import java.time.Instant;
 import java.util.UUID;
 
-/** What a card on the verification desk shows. The agreement file is the popup's: a list of them
- * would carry up to 3 MB of base64 per row for cards that never render it. */
 public record FlatmateReviewRow(
         UUID id,
         String kind,
@@ -20,7 +18,6 @@ public record FlatmateReviewRow(
         boolean flagForReview,
         boolean ownerConsent,
         Instant createdAt) {
-
     static FlatmateReviewRow of(FlatmateReviewRepository.QueueRow r, User host) {
         return new FlatmateReviewRow(r.getId(), r.getKind(), r.getRoomId(), r.getGroupId(),
                 host == null ? null : host.getName(), host == null ? null : host.getMobile(),

@@ -8,10 +8,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Anonymous: the owner has no account, and the link token in the header is the whole credential. */
 @RestController
 public class FlatmateOwnerNoticeController {
-
     public static final String HEADER = "X-Owner-Notice-Token";
 
     private final FlatmateOwnerNoticeService service;

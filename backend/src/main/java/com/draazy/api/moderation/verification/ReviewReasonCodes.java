@@ -8,7 +8,6 @@ public final class ReviewReasonCodes {
             "wrong_details", "locality_unclear", "document_unreadable", "name_mismatch",
             "rera_not_found", "rera_mismatch", "other");
 
-    /** Rejections the owner can fix and resubmit; every other reason is a final verdict. */
     public static final Set<String> RESUBMITTABLE = Set.of("photos_not_real", "wrong_details",
             "locality_unclear", "document_unreadable", "name_mismatch");
 
@@ -68,7 +67,6 @@ public final class ReviewReasonCodes {
                 : "\nThis decision is final. The listing cannot be resubmitted.");
     }
 
-    /** The thread entry for a final rejection, shared by every route that can reject. */
     public static String rejectionThread(String reasonCode, String note) {
         return "\u26D4 Your property could not be approved.\nReason: " + rejectionMessage(reasonCode, note);
     }

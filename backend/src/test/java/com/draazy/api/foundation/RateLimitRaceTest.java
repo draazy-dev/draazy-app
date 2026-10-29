@@ -24,17 +24,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-// Cannot be @Transactional: the bug is that one writer's *committed* row is missed by another's
-// count, which a rolling-back harness cannot express. cleanUp() is load-bearing.
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("Rate limits under concurrency — real threads, real commits (D73)")
 class RateLimitRaceTest {
-
     private static final String OTP_MOBILE = "9876000173";
     private static final String CALLER_MOBILE = "9876000273";
 
-    /** Outside {@link #CALLER_MOBILE}'s own value, so the caller never appears in its own count. */
     private static final String RECIPIENT_PREFIX = "987600037";
 
     @Autowired OtpCodeRepository otpCodes;
@@ -56,8 +52,6 @@ class RateLimitRaceTest {
     void cleanUp() {
         jdbc.update("delete from otp_codes where mobile = ?", OTP_MOBILE);
 
-        // Before the user: these rows charge their sends to it, and that reference is
-        // ON DELETE RESTRICT, so the other order is an FK violation rather than a silent null.
         jdbc.update("delete from otp_codes where mobile like ?", RECIPIENT_PREFIX + "%");
         jdbc.update("delete from users where mobile = ?", CALLER_MOBILE);
     }
@@ -70,9 +64,6 @@ class RateLimitRaceTest {
     private static long refusals(List<Throwable> outcomes) {
         for (Throwable outcome : outcomes) {
             if (outcome != null && !(outcome instanceof RateLimitedException)) {
-
-                // A unique-index collision or lock timeout is a 500 in production; counting it as
-                // "refused" would let this pass while the endpoint answered with an internal error.
                 throw new AssertionError(
                         "a racer failed with something other than the business refusal", outcome);
             }
@@ -80,11 +71,9 @@ class RateLimitRaceTest {
         return outcomes.stream().filter(RateLimitedException.class::isInstance).count();
     }
 
-    /** Two are committed first so exactly one slot remains; serially only one racer can win it. */
     @Test
     @DisplayName("three simultaneous OTP sends to one number spend one slot, not three")
     void otpSendsCannotOverspendTheWindowBudget() {
-
         OtpService tightBudget = new OtpService(otpCodes, otpSender,
                 new OtpSendBudget(otpCodes, locks, 0, 2, 500, 500, 500, 500),
                 environment, "", "", 3);
@@ -110,8 +99,6 @@ class RateLimitRaceTest {
         return count("select count(*) from otp_codes where mobile = ?", OTP_MOBILE);
     }
 
-    // Hand-built with a cap of two so the race is reachable, and driven by a TransactionTemplate
-    // because an unproxied bean gets no transaction for the lock.
     @Test
     @DisplayName("one account's three simultaneous consent sends buy one code, not three")
     void oneCallerCannotSendConcurrentlyToThreeDifferentFlats() {

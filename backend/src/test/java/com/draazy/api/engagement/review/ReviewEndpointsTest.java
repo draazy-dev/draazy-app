@@ -28,11 +28,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** Runs on the live Flyway'd Postgres so V16's UNIQUE index is real. The risk here is unearned writes, so the key
- * assertions are the eligibility refusals, the derived (not supplied) badge, and one review per author. */
 @DisplayName("Engagement — reviews")
 class ReviewEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -59,7 +56,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** A completed visit — the weaker of the two eligibility proofs. */
     private void completedVisit(User visitor, Property p) {
         Visit v = new Visit(p.getId(), visitor.getId(),
                 Instant.now().minus(2, ChronoUnit.DAYS), "in-person", null);
@@ -77,8 +73,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
         return "{\"rating\":" + rating + ",\"body\":\"Clean building, responsive owner.\"}";
     }
 
-    // ------------------------------------------------------------ public read
-
     @Test
     @DisplayName("entity reviews are public and paged, clamp page size, and ignore a hostile sort")
     void entityReviewsArePagedAndPublic() throws Exception {
@@ -94,8 +88,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size").value(100));
 
-        // Spring binds ?sort= even though this endpoint offers none; an unknown property would
-        // otherwise reach the query and 500 for any anonymous caller who guesses a query string.
         mvc.perform(get("/reviews/society/" + slug + "?sort=nosuchfield,desc"))
                 .andExpect(status().isOk());
     }
@@ -111,8 +103,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
         mvc.perform(get(path))
                 .andExpect(status().isNotFound());
     }
-
-    // ------------------------------------------------------------ eligibility
 
     @ParameterizedTest(name = "{0}")
     @DisplayName("without a completed visit or a tenancy, or as the owner, a listing cannot be reviewed")
@@ -153,8 +143,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ------------------------------------------------------- the derived badge
-
     @ParameterizedTest(name = "{0}")
     @DisplayName("the badge is derived server-side: tenancy outranks a visit and a supplied context is ignored")
     @CsvSource(delimiter = '|', value = {
@@ -187,8 +175,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.targetType").value("property"));
     }
 
-    // --------------------------------------------------------- one per author
-
     @ParameterizedTest(name = "{0}")
     @DisplayName("a second review of the same target by the same author is refused")
     @ValueSource(strings = {"property", "society"})
@@ -215,8 +201,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.error").value("already_reviewed"));
     }
 
-    // -------------------------------------------------------- categories JSONB
-
     @Test
     @DisplayName("valid sub-ratings round-trip; unknown keys and out-of-range values are refused")
     void categoriesAreValidatedAgainstAClosedKeySet() throws Exception {
@@ -238,7 +222,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
         User other = user("9820000013", "Meera Kulkarni");
         completedVisit(other, p);
 
-        // A junk key would turn the column into a junk drawer nothing can aggregate.
         mvc.perform(post("/properties/" + p.getId() + "/reviews")
                         .header(HttpHeaders.AUTHORIZATION, bearer(other))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -286,8 +269,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    // ------------------------------------------------------------- moderation
-
     @Test
     @DisplayName("unpublished reviews never reach the public read")
     void onlyPublishedReviewsAreListed() throws Exception {
@@ -309,8 +290,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.summary.reviewCount").value(1));
     }
 
-    // ---------------------------------------------------- entity review writes
-
     @Test
     @DisplayName("a society review keys on the immutable id, whether addressed by slug or id")
     void societyReviewsKeyOnTheImmutableId() throws Exception {
@@ -324,12 +303,9 @@ class ReviewEndpointsTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON).content(body(4)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.targetType").value("society"))
-                // Stored against the id, so a future rename cannot orphan it.
                 .andExpect(jsonPath("$.targetId").value(id))
-                // No visit or tenancy concept for a society, so no badge.
                 .andExpect(jsonPath("$.context").doesNotExist());
 
-        // Addressing the same society by id must find the review written via the slug.
         mvc.perform(get("/reviews/society/" + id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1));
@@ -342,15 +318,11 @@ class ReviewEndpointsTest extends AbstractApiTest {
         String slug = anySocietySlug();
         String id = jdbc.queryForObject(
                 "select id::text from societies where slug = ?", String.class, slug);
-        // `q` searches name and builder, not the slug — searching by slug here would silently match
-        // nothing and the assertions would run against an empty page.
         String name = jdbc.queryForObject(
                 "select name from societies where slug = ?", String.class, slug);
         boolean hub = "hub".equals(surface);
         String root = hub ? "$" : "$.content[0]";
 
-        // Unrated: absent, not zero. A card that renders 0.0 for an unreviewed society is stating
-        // something false about it, so the aggregate has to be able to say "no opinion yet".
         mvc.perform(hub ? get("/societies/" + slug + "/brief") : get("/societies").param("q", name))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(root + ".reviewCount").value(0))
@@ -360,7 +332,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
                 + "values ('society', ?, 5, 'published')", id);
         jdbc.update("insert into reviews (target_type, target_id, rating, status) "
                 + "values ('society', ?, 4, 'published')", id);
-        // A rejected review must not move the average.
         jdbc.update("insert into reviews (target_type, target_id, rating, status) "
                 + "values ('society', ?, 1, 'rejected')", id);
 
@@ -383,12 +354,9 @@ class ReviewEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.categories.Safety").value(5))
                 .andExpect(jsonPath("$.categories.Connectivity").value(3))
-                // Sparse: three aspects unanswered is a different review from five answered, and
-                // the response has to keep them distinguishable.
                 .andExpect(jsonPath("$.categories.Maintenance").doesNotExist())
                 .andExpect(jsonPath("$.categories.length()").value(2));
 
-        // `accuracy` is a property key: refused, not dropped, since a 201 with the aspect gone misleads.
         User other = user("9820000031", "Meera Kulkarni");
         mvc.perform(post("/reviews/society/" + slug)
                         .header(HttpHeaders.AUTHORIZATION, bearer(other))
@@ -396,8 +364,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
                         .content("{\"rating\":4,\"categories\":{\"accuracy\":5}}"))
                 .andExpect(status().isBadRequest());
 
-        // And the value range still applies to the new vocabulary — a second key set is a second
-        // place for the bound to go missing.
         mvc.perform(post("/reviews/society/" + slug)
                         .header(HttpHeaders.AUTHORIZATION, bearer(other))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -413,8 +379,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
         Property p = listing(owner);
         completedVisit(visitor, p);
 
-        // The mirror of the assertion above, and the reason both are needed: a `forTarget` that
-        // returned the union would pass the society test and this one would catch it.
         mvc.perform(post("/properties/" + p.getId() + "/reviews")
                         .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -426,12 +390,9 @@ class ReviewEndpointsTest extends AbstractApiTest {
     @DisplayName("a locality review keys on the slug and keeps the property vocabulary it has always accepted")
     void localityReviewsKeepTheirVocabulary() throws Exception {
         User author = user("9820000033", "Rahul Joshi");
-        // Own locality, not a seeded one: an exact stored value must not depend on data the test doesn't own.
         String slug = "vocab-fixture-baner";
         jdbc.update("insert into localities (slug, name) values (?, ?)", slug, "Fixture Baner");
 
-        // Nothing in the product names a vocabulary for a locality, so nothing here changed. This
-        // is the regression guard on that non-decision.
         mvc.perform(post("/reviews/locality/" + slug)
                         .header(HttpHeaders.AUTHORIZATION, bearer(author))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -441,9 +402,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.categories.locality").value(5));
     }
 
-    // ----------------------------------------------------------------- helpers
-
-    /** Any seeded society; the reference data ships 28 of them. */
     private String anySocietySlug() {
         return jdbc.queryForObject("select slug from societies order by slug limit 1", String.class);
     }

@@ -16,7 +16,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 @DisplayName("Flatmate board — people/teams tabs and living-style matches")
 class FlatmateBoardTabsAndStyleTest extends FlatmateStyleFixtures {
-
     private static final String VIEWER = "{\"tidy\":0,\"food\":1,\"sleep\":2,\"wfh\":2}";
 
     private MockHttpServletRequestBuilder feed(String tab) {
@@ -57,7 +56,6 @@ class FlatmateBoardTabsAndStyleTest extends FlatmateStyleFixtures {
         }
     }
 
-    /** A group that already shares a flat, with no Draazy listing behind it. */
     private String settledGroup(User host) throws Exception {
         return approved("flatmate_groups", create(Routes.Flatmates.GROUPS, host, """
                 {"title":"Seat in our flat","locality":"%s","policy":"any","rent":40000,"deposit":10000,

@@ -12,10 +12,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-// Centralises what staff may see of another person.
 @Component
 class BackOfficeUserView {
-
     static final String BADGE_FROM_IDENTITY = "identity";
     static final String BADGE_BY_HAND = "manual";
 
@@ -29,7 +27,6 @@ class BackOfficeUserView {
         this.identity = identity;
     }
 
-    /** Resolve an opaque id, or 404. Tolerates a malformed id rather than 500-ing on it. */
     User load(String id) {
         return Ids.parseUuid(id)
                 .flatMap(users::findById)
@@ -45,8 +42,6 @@ class BackOfficeUserView {
                 base.listingsCount(), base.joinedAt(), base.lastActive(),
                 base.createdAt(), base.permissions(), base.desks(),
 
-                // Boxed, and only on the back-office routes: see UserResponse#flagged for why a
-                // plain false would be the wrong answer on GET /auth/me.
                 user.isFlagged(), user.getFlagReason(), badgeSource(user));
     }
 
@@ -54,7 +49,6 @@ class BackOfficeUserView {
         return rows(List.of(user)).get(0);
     }
 
-    /** One identity query for the whole page, not one per row. */
     List<AdminUserRow> rows(List<User> page) {
         Set<UUID> identityBacked = identity.verifiedAmong(
                 page.stream().filter(User::isVerified).map(User::getId).toList());

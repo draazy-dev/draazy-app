@@ -21,10 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Managed records are owner-scoped private supply; only publish may create
-// the linked pending marketplace listing.
 class ManagedPropertyFlowTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -61,7 +58,6 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
         mvc.perform(post(Routes.MeManagedProperties.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
 
-                        // visibility/status in the body must be ignored, not honoured.
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"deal\":\"rent\",\"propertyType\":\"Flat\",\"bhk\":2,"
                                 + "\"price\":25000,\"locality\":\"Baner\","
@@ -187,7 +183,6 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
                 "{\"rented\":true,\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003992\",\"monthlyRent\":0}",
                 "{\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003992\",\"monthlyRent\":10000001}",
                 "{\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003992\",\"dueDay\":29}"}) {
-            // A fresh record per case: the test's transaction keeps a refused patch's changes in the session.
             String id = register(owner, flat("Baner", 25000));
             mvc.perform(patch(Routes.MeManagedProperties.BASE + "/" + id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -196,7 +191,6 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
                     .andExpect(status().isUnprocessableEntity());
         }
 
-        // A rent deal's rent defaults to its price, which has no ceiling of its own.
         mvc.perform(post(Routes.MeManagedProperties.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -369,7 +363,6 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
         mvc.perform(post(publish).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk());
 
-        // The window now holds three posts, so a second creation would be paced; an idempotent return must not.
         mvc.perform(post(publish).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("published"));
@@ -379,8 +372,6 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
     void publish_rejectsARecordThatCannotLegallyBecomeAListing() throws Exception {
         User owner = user("9831003021");
 
-        // Private drafts may have zero price; marketplace listings may not.
-        // Publish is the boundary, so it must 422 rather than slip a ?0 listing into the catalogue.
         String id = register(owner, "{\"deal\":\"rent\",\"propertyType\":\"Flat\",\"bhk\":2,"
                 + "\"price\":0,\"locality\":\"Baner\"}");
 
@@ -388,7 +379,6 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isUnprocessableEntity());
 
-        // ...and the record stayed private — no half-published state.
         mvc.perform(get(Routes.MeManagedProperties.BASE + "/" + id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
@@ -396,8 +386,6 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.publishedListingId").doesNotExist());
     }
 
-    // Adoption must merge an existing live ad into one managed record;
-    // the server links by `publishedListingId` because the client would guess.
     private String listing(User owner, String title) throws Exception {
         String json = mvc.perform(post(Routes.MeListings.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -424,8 +412,6 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
                                 + "\"publishedListingId\":\"" + listingId + "\"}"))
                 .andExpect(status().isCreated())
 
-                // This is the one exception to "born private/managed": the record is describing
-                // something the world can already see, so claiming otherwise would be a lie.
                 .andExpect(jsonPath("$.visibility").value("public"))
                 .andExpect(jsonPath("$.status").value("published"))
                 .andExpect(jsonPath("$.publishedListingId").value(listingId));

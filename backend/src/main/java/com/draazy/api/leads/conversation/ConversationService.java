@@ -32,7 +32,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
 public class ConversationService {
-
     private static final int PREVIEW_CHARS = 140;
 
     private final ConversationRepository conversations;
@@ -66,7 +65,7 @@ public class ConversationService {
         this.push = push;
     }
 
-    // They are bound after `#mine` has answered, so a stranger never gets as far as touching an attachment row.
+    // Bound only after #mine has answered, so a stranger never touches an attachment row.
     @Transactional
     public Page<ConversationDto> inbox(AuthPrincipal caller, Pageable pageable) {
         events.delivered(caller.userId(), messages.markInboxDelivered(caller.userId()));
@@ -78,7 +77,6 @@ public class ConversationService {
         return new PageImpl<>(content, page.getPageable(), page.getTotalElements());
     }
 
-    // Moderation reads do not grant posting rights.
     @Transactional
     public ConversationDto openGroup(AuthPrincipal caller, String groupId) {
         UUID group = Ids.parseUuid(groupId)
@@ -204,7 +202,6 @@ public class ConversationService {
         conversations.unblock(caller.userId(), conversation.other(caller.userId()));
     }
 
-    // The one place a message is written, so the preview and `updatedAt` cannot fall behind.
     ConversationMessage send(Conversation conversation, AuthPrincipal author, String body) {
         return send(conversation, author, body, null, null);
     }
@@ -231,7 +228,6 @@ public class ConversationService {
                 return new Written(message, false);
             }
         }
-        // The stream hands it over, so the badge's unread-count read need not write delivery.
         if (!conversation.isGroup() && events.isOnline(conversation.other(author.userId()))) {
             message.markDelivered();
         }
@@ -256,7 +252,6 @@ public class ConversationService {
         if (recipient == null || recipient.equals(author.userId())) {
             return;
         }
-        // One bell row per unread run, as notifyGroup does; reading the chat clears it via markRead.
         if (unreadFor(conversation, recipient) == 1) {
             notifier.notify(recipient, "message.received",
                     senderName + " sent you a message", preview(body), link(conversation));
@@ -310,7 +305,6 @@ public class ConversationService {
                 : firstLine.substring(0, PREVIEW_CHARS - 1).strip() + "…";
     }
 
-    // Private buyer-owner chat is not an ops surface unless the contract adds one.
     private Conversation mine(AuthPrincipal caller, String id) {
         return Ids.parseUuid(id)
                 .flatMap(conversations::findById)

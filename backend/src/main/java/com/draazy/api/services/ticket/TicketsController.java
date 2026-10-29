@@ -25,11 +25,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** {@code POST} is unguarded by design, as on {@code /reports}; team scoping lives in {@link TicketService}
- * as {@code @PreAuthorize} cannot say "on the desk that owns row X". */
 @RestController
 public class TicketsController {
-
     private static final String OPS = "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
     private static final String OPS_MAY_READ_TICKETS =
             OPS + " and " + BackOfficePermissions.REQUIRE_TICKETS_READ;
@@ -43,8 +40,6 @@ public class TicketsController {
         this.service = service;
     }
 
-    /** Sort is stripped via {@link Pageables#unsorted(Pageable)}: newest-first is fixed and index-backed (V21),
-     * so a client {@code ?sort=} would be an unmapped-property 500. */
     @GetMapping(Routes.Tickets.BASE)
     @PreAuthorize(OPS_MAY_READ_TICKETS)
     public PageResponse<TicketRow> list(@CurrentUser AuthPrincipal principal,
@@ -58,7 +53,6 @@ public class TicketsController {
                 service.rows(principal, team, status, priority, q, days, Pageables.unsorted(pageable)), row -> row);
     }
 
-    /** Counts per status for the same scope as {@code GET /tickets}, so the tabs never depend on a page. */
     @GetMapping(Routes.Tickets.SUMMARY)
     @PreAuthorize(OPS_MAY_READ_TICKETS)
     public TicketSummary summary(@CurrentUser AuthPrincipal principal,
@@ -66,15 +60,12 @@ public class TicketsController {
         return service.summary(principal, team);
     }
 
-    /** One ticket in full, with its internal notes, value and quoted value. */
     @GetMapping(Routes.Tickets.BY_ID)
     @PreAuthorize(OPS_MAY_READ_TICKETS)
     public TicketDto get(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         return service.get(principal, id);
     }
 
-    /** The only response a non-staff caller sees, so it must not be the staff {@code Ticket},
-     * which carries internal notes. */
     @PostMapping(Routes.Tickets.BASE)
     @ResponseStatus(HttpStatus.CREATED)
     public CustomerTicketDto create(@CurrentUser AuthPrincipal principal,
@@ -89,8 +80,6 @@ public class TicketsController {
         return service.update(principal, id, body);
     }
 
-    /** {@code attachments} is accepted and dropped: {@code ticket_notes} has no column for it
-     * and the note schema has no field to render one. */
     @PostMapping(Routes.Tickets.NOTES)
     @PreAuthorize(OPS_MAY_WORK_TICKETS)
     @ResponseStatus(HttpStatus.CREATED)
@@ -99,7 +88,6 @@ public class TicketsController {
         return service.addNote(principal, id, body.body());
     }
 
-    /** Body of {@code addTicketNote} (schema {@code MessageCreate}). */
     public record NoteRequest(@NotBlank @Size(max = 4000) String body, List<String> attachments) {
     }
 }

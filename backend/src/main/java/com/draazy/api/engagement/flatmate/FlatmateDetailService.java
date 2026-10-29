@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FlatmateDetailService {
-
     private final FlatmateGroupRepository groups;
     private final FlatmateRoomRepository rooms;
     private final FlatmateSeekerPostRepository posts;
@@ -116,8 +115,6 @@ public class FlatmateDetailService {
                 review.map(FlatmateReview::isOwnerConsent).orElse(null));
     }
 
-    /** A spare room never stores the flat it claimed, so the edit form gets it back from wherever the claim
-     * was kept — the address fingerprint for an owner, the review for a tenant — or a re-save drops the tier. */
     private static UUID attachedFlat(FlatmateRoom room, Optional<FlatmateReview> review) {
         String fingerprint = room.getAddressFingerprint();
         if (fingerprint != null && fingerprint.startsWith(FlatmateGuardrails.PROPERTY_PREFIX)) {

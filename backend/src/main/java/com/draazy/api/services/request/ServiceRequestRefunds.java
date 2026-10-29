@@ -25,11 +25,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Refunds are open until GRAS duty is paid.
-// After duty, only service fee and lower-amendment overpay remain refundable.
 @Service
 public class ServiceRequestRefunds {
-
     private static final Logger log = LoggerFactory.getLogger(ServiceRequestRefunds.class);
 
     private static final int TEXT_MAX = 300;
@@ -71,14 +68,12 @@ public class ServiceRequestRefunds {
 
     public record RefundSummaryDto(long paid, long refunded, long refundableBeforeDuty,
             long refundableAfterDuty, boolean dutyPaidOnRecord, List<Item> refunds) {
-
         public record Item(String id, long amount, String status, boolean dutyPaid, String grn,
                 String reason, String requestedBy, String decidedBy, String decisionNote,
                 String gatewayRefundId, Instant requestedAt, Instant decidedAt, boolean mine) {
         }
     }
 
-    // A gateway order and what it took; a refund draws on one order only.
     private record Leg(String orderId, long amount) {
     }
 
@@ -145,7 +140,6 @@ public class ServiceRequestRefunds {
         return summaryOf(caller, request);
     }
 
-    /** Applies the gateway's refund status callback; false when the refund id is not one of ours. */
     @Transactional
     public boolean applyWebhookOutcome(String merchantRefundId, String providerStatus) {
         UUID refundId = refundIdOf(merchantRefundId);
@@ -158,7 +152,6 @@ public class ServiceRequestRefunds {
             return true;
         }
         if (GATEWAY_SETTLED.equals(providerStatus)) {
-            // Only the platform fee is Draazy's; stamp duty and registration are passed through.
             creditNotes.issue(request.getRequesterId(), CreditNotes.SERVICE_REQUEST_REFUND, refund.getId(),
                     refund.getOrderId(), refund.getAmount(), Instant.now());
             return true;
@@ -181,8 +174,6 @@ public class ServiceRequestRefunds {
         return true;
     }
 
-    /** A refund made on the gateway dashboard, entered in the ledger as approved so the refundable balance, the
-     * credit note and a full-refund cancellation follow. False when the order is not one of ours. */
     @Transactional
     public boolean applyOutsideRefund(String orderId, String gatewayRefund, long amount) {
         UUID requestId = orderId == null ? null : requestRows.findByPaymentRef(orderId).map(ServiceRequest::getId)
@@ -223,7 +214,6 @@ public class ServiceRequestRefunds {
         return summaryOf(caller, request);
     }
 
-    // The refund that took everything back leaves nothing to deliver, so the request ends with it.
     private void cancelWhenFullyRefunded(ServiceRequest request, UUID actor, String actorName) {
         if (refunds.approvedTotal(request.getId()) < paid(request)
                 || !request.getStatus().canTransitionTo(ServiceRequestStatus.CANCELLED)) {
@@ -284,7 +274,6 @@ public class ServiceRequestRefunds {
         return Math.max(0, paid(request) - refunded(history) - spent);
     }
 
-    // The first checkout, then each paid top-up; amount is their sum, so the first is the rest.
     private List<Leg> legs(ServiceRequest request) {
         List<Leg> topUps = amendments.findByServiceRequestIdAndPaymentRefNotNull(request.getId()).stream()
                 .filter(a -> a.delta() > 0 && (ServiceRequestAmendment.APPLIED.equals(a.getStatus()) || a.getPaidAt() != null))

@@ -8,13 +8,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-// The desk's verdict on one filed document.
-// A re-upload is a new document, so it starts unreviewed.
 @Entity
 @Table(name = "service_request_document_reviews")
 @Getter
 public class ServiceRequestDocumentReview extends BaseEntity {
-
     static final String VERIFIED = "verified";
     static final String REJECTED = "rejected";
 

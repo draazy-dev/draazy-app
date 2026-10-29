@@ -27,15 +27,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Back-office sign-in: email + password, then an authenticator code (or a one-time recovery code).
- * Every refusal before the password is proven is the same 401, so the route sorts no email into
- * staff and not-staff. Flow and threat model: docs/flows/consumer/auth.md § Staff login.
- */
 @Service
 public class StaffSignInService {
-
-    // BCrypt hash for a dummy secret used only to equalize unknown-email work in staff login.
+    // BCrypt hash of a dummy secret, to equalize unknown-email timing in staff login.
     private static final String DUMMY_BCRYPT =
             "$2a$10$7EqJtq98hPqEX7fNZaFWoOeR6Y4u5M4YB9Gf4bm/FvGV8eK3oprm.";
     private static final Pattern TOTP_CODE = Pattern.compile("\\d{6}");
@@ -52,7 +46,6 @@ public class StaffSignInService {
     private final AuthService auth;
     private final Environment environment;
 
-    /** Local/e2e only, like {@code draazy.otp.fixed-code}: a code every account accepts. */
     private final String fixedCode;
 
     public StaffSignInService(UserRepository users, StaffCredentialRepository credentials,
@@ -81,10 +74,6 @@ public class StaffSignInService {
         }
     }
 
-    /**
-     * Step one. While locked every known staff email answers 429 whatever the password, so the lock
-     * cannot be used as an oracle for guessing it.
-     */
     @Transactional(noRollbackFor = {UnauthorizedException.class, RateLimitedException.class})
     public AuthResponse checkPassword(StaffLoginRequest request) {
         User user = users.findByEmailIgnoreCaseAndArchivedFalse(request.email()).orElse(null);
@@ -111,7 +100,6 @@ public class StaffSignInService {
                 challenges.issue(user.getId(), now));
     }
 
-    /** Step two for an enrolled account: an authenticator code or one unused recovery code. */
     @Transactional(noRollbackFor = {UnauthorizedException.class, RateLimitedException.class})
     public AuthResponse verify(StaffCodeRequest request) {
         Instant now = Instant.now();
@@ -134,7 +122,6 @@ public class StaffSignInService {
         return auth.issueFor(user);
     }
 
-    /** Step two for an account with no authenticator: mint a secret to scan. */
     @Transactional(noRollbackFor = {UnauthorizedException.class, RateLimitedException.class})
     public StaffTotpEnrolment startEnrolment(StaffEnrolRequest request) {
         Instant now = Instant.now();
@@ -155,7 +142,6 @@ public class StaffSignInService {
                 + "&issuer=" + URLEncoder.encode(issuer, StandardCharsets.UTF_8).replace("+", "%20"));
     }
 
-    // One phone holds an entry per environment, so the app label must say which one.
     private String issuer() {
         String profile = LocalProfileGuard.activeDeploymentProfile(environment);
         if (LocalProfileGuard.PROD_PROFILE.equals(profile)) {
@@ -164,7 +150,6 @@ public class StaffSignInService {
         return LocalProfileGuard.SANDBOX_PROFILE.equals(profile) ? "Draazy Sandbox" : "Draazy Local";
     }
 
-    /** Prove the app holds the new secret, then sign in and hand back the recovery codes once. */
     @Transactional(noRollbackFor = {UnauthorizedException.class, RateLimitedException.class})
     public AuthResponse confirmEnrolment(StaffCodeRequest request) {
         Instant now = Instant.now();
@@ -193,7 +178,6 @@ public class StaffSignInService {
         return auth.issueFor(user).withRecoveryCodes(codes);
     }
 
-    /** Administrator reset after a lost phone; the holder enrols again at next sign-in. */
     @Transactional
     public void resetSecondFactor(UUID userId) {
         credentialOf(userId).resetSecondFactor();

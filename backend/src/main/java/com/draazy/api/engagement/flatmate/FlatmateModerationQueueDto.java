@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** One shape for three tables. */
 public record FlatmateModerationQueueDto(
         UUID id,
         String kind,
@@ -20,14 +19,11 @@ public record FlatmateModerationQueueDto(
         String recheckReason,
         Instant recheckRequestedAt,
         Instant createdAt) {
-
     public static final String KIND_POST = "post";
     public static final String KIND_ROOM = "room";
     public static final String KIND_GROUP = "group";
 
     static FlatmateModerationQueueDto of(FlatmateSeekerPost post, User author) {
-        // Joined rather than truncated to the first: "Kothrud" and "Kothrud, Baner, Wakad" are
-        // different posts to a moderator judging whether somebody is spraying the whole city.
         String where = post.getLocalities() == null ? null : String.join(", ", post.getLocalities());
         return new FlatmateModerationQueueDto(post.getId(), KIND_POST, post.getModStatus(),
                 nameOf(author), mobileOf(author), post.getName(), where, post.getNote(),
@@ -36,8 +32,6 @@ public record FlatmateModerationQueueDto(
     }
 
     static FlatmateModerationQueueDto of(FlatmateRoom room, User author) {
-        // Society and flat number are what a moderator recognises a duplicate listing by, so they
-        // are the headline even though the consumer card leads with the room type.
         String headline = room.getSociety() == null ? room.getFlatType()
                 : room.getSociety() + (room.getFlatNumber() == null ? "" : " " + room.getFlatNumber());
         return new FlatmateModerationQueueDto(room.getId(), KIND_ROOM, room.getModStatus(),

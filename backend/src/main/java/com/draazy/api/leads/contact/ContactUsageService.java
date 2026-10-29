@@ -13,11 +13,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The {@code leads} side of the contact quota; a separate bean so billing reaches one short read and nothing else. */
 @Service
 public class ContactUsageService implements ContactUsageLookup, ContactEnquiryLookup {
-
-    // One owner contact per listing, spent by a contact request, a visit, or both; the earliest use is the spend.
     record Uses(Map<UUID, Instant> spentAt, Set<UUID> awaitingReply) {
     }
 
@@ -38,7 +35,6 @@ public class ContactUsageService implements ContactUsageLookup, ContactEnquiryLo
                 : uses(userId, window.cutoff(Instant.now())).spentAt().values().stream().sorted().toList();
     }
 
-    // first_requested_at, not created_at: a renewal after a return restarts it, nothing else moves it.
     Uses uses(UUID userId, Instant replyCutoff) {
         Map<UUID, Instant> spentAt = new HashMap<>();
         Set<UUID> awaitingReply = new HashSet<>();

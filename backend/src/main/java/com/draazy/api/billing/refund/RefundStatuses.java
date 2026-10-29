@@ -3,7 +3,6 @@ package com.draazy.api.billing.refund;
 import java.util.Set;
 
 public final class RefundStatuses {
-
     private RefundStatuses() {
     }
 
@@ -11,7 +10,6 @@ public final class RefundStatuses {
     public static final String APPROVED = "approved";
     public static final String REJECTED = "rejected";
 
-    /** Desk filters that are not request states: system refunds, and orders the gateway is disputing. */
     public static final String AUTO = "auto";
     public static final String DISPUTED = "disputed";
 

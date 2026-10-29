@@ -9,15 +9,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Implements the notification port so lower layers announce without importing engagement. */
 @Component
 public class NotificationPublisher implements Notifier {
-
     private final NotificationRepository notifications;
     private final NotificationPreferenceService preferences;
     private final LiveUpdates live;
 
-    /** Clock is a test seam for quiet-hours decisions, not an application-wide knob. */
     private Clock clock = Clock.systemUTC();
 
     public NotificationPublisher(NotificationRepository notifications,

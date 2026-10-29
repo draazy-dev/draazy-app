@@ -18,10 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// The flag block gates what a logged-out visitor sees while its document is admin-only, so the two
-// load-bearing claims are: anonymous callers get the flags, and get only the flags.
 class AppFlagsEndpointTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
 
     @PersistenceContext EntityManager em;
@@ -56,20 +53,14 @@ class AppFlagsEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.flags.maintenanceMode").value(true))
                 .andExpect(jsonPath("$.flags.mapSearch").value(false))
 
-                // The merge is deep: a regression would blank untouched features in the response
-                // the client renders from, without failing any admin-side assertion.
                 .andExpect(jsonPath("$.flags.kycBadgeEnabled").value(true));
     }
 
-    // A string {@code "false"} reads as enabled on the client, so forwarding it buys no behaviour.
-    // Seeded with raw SQL because the 422 gate means it cannot arrive through the API.
     @Test
     void nonBooleanValuesAreOmitted() throws Exception {
         jdbc.update("update settings set value = jsonb_set(value, '{emiCalculator}', '\"false\"') "
                 + "where key = 'flags'");
 
-        // The whole test runs in one transaction, so a settings row already loaded through JPA
-        // would hide the UPDATE underneath it from the endpoint's own read.
         em.flush();
         em.clear();
 

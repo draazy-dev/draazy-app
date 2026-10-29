@@ -25,11 +25,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** One notification per recipient, rule, level and queue per run, so a backlog never floods a bell. Routing and
- * thresholds: docs/system/notifications.md#queue-alerts-sla-reminders-and-escalations. */
 @Service
 public class StaffSlaSweep {
-
     private static final Logger log = LoggerFactory.getLogger(StaffSlaSweep.class);
 
     enum Level {
@@ -44,13 +41,10 @@ public class StaffSlaSweep {
         }
     }
 
-    /** Wider than one 15-minute tick, so a missed run still announces; narrow enough that a first deploy does not
-     * announce the whole backlog. */
     static final Duration ARRIVAL_WINDOW = Duration.ofHours(1);
 
     static final Duration LOG_RETENTION = Duration.ofDays(90);
 
-    /** Per-stage deadlines (rent agreements) escalate at one and a half times the deadline. */
     private static final double STAGE_ESCALATION_FACTOR = 1.5;
 
     private final JdbcTemplate jdbc;
@@ -76,7 +70,6 @@ public class StaffSlaSweep {
         return sweep(clock.instant());
     }
 
-    /** Returns the notifications sent. Each rule commits alone, so one failing queue cannot silence the others. */
     public long sweep(Instant now) {
         Audience audience = transactions.execute(status -> audience());
         long sent = 0;
@@ -109,7 +102,6 @@ public class StaffSlaSweep {
         return batches.size();
     }
 
-    /** Only rows for items that have left the queue expire; a row still in use would re-fire its alert. */
     private void forgetResolved(StaffSlaRule rule, List<StaffSlaRule.Item> items, Instant now) {
         String[] open = items.stream().map(StaffSlaRule.Item::id).toArray(String[]::new);
         jdbc.update("delete from staff_alert_log where rule = ? and sent_at < ? and not (item_id = any(?))", ps -> {
@@ -155,7 +147,6 @@ public class StaffSlaSweep {
         return env.getProperty("draazy.staff-sla." + rule.name() + "." + kind, Duration.class, fallback);
     }
 
-    /** Lower levels are logged too, so an item first seen already overdue is never announced afterwards. */
     private boolean firstTime(StaffSlaRule rule, StaffSlaRule.Item item, Level level, Instant now, Set<LogKey> logged) {
         if (logged.contains(new LogKey(item.id(), level.wire, item.anchor()))) {
             return false;
@@ -242,7 +233,6 @@ public class StaffSlaSweep {
     }
 
     private record Audience(Map<UUID, Set<String>> staff, List<UUID> managers, List<UUID> admins, Set<UUID> live) {
-
         List<UUID> staffHolding(String function) {
             return staff.entrySet().stream().filter(e -> e.getValue().contains(function)).map(Map.Entry::getKey)
                     .toList();

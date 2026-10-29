@@ -15,7 +15,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class IdentityFilePurgeService {
-
     private static final Logger log = LoggerFactory.getLogger(IdentityFilePurgeService.class);
 
     private final IdentityVerificationFileRepository files;
@@ -48,7 +47,6 @@ public class IdentityFilePurgeService {
         afterCommit(() -> keys.forEach(this::deleteStoredFile));
     }
 
-    /** Tries each due row once and returns how many files were really deleted. */
     public int retryQueuedDeletes(Instant now, int batchSize) {
         int deleted = 0;
         for (IdentityStorageDelete row : deletes.findDue(now, PageRequest.of(0, batchSize))) {

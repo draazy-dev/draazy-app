@@ -28,7 +28,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 @DisplayName("Moderation — staff check the RERA ID on MahaRERA")
 class PropertyReraCheckTest extends AbstractApiTest {
-
     private static final String RERA_ITEM = "RERA ID checked on MahaRERA";
     private static final String[] BASE_ITEMS = {
             "Photos are real and match the listing",
@@ -38,7 +37,6 @@ class PropertyReraCheckTest extends AbstractApiTest {
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
 
-    // Audit rows commit through REQUIRES_NEW, so a rollback does not take them with it.
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
         jdbc.update("delete from audit_log where action like 'property.rera.%'");

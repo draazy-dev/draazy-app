@@ -15,10 +15,8 @@ import com.draazy.api.engagement.flatmate.FlatmatePulseService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Every section must answer every caller identically, because PublicReadCacheFilter shares one cached copy. */
 @RestController
 public class BootstrapController {
-
     private final AppFlagsController flags;
     private final GeoPolicyController geo;
     private final CityService cities;

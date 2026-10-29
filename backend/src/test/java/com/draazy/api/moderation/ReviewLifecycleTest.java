@@ -106,8 +106,6 @@ class ReviewLifecycleTest extends AbstractApiTest {
         properties.saveAndFlush(property);
     }
 
-    // Verification approval also publishes; the old two-step path left
-    // verified listings invisible with no owner.
     private void hardBrokerSignal(Property property, User reporter) {
         jdbc.update("""
                 insert into reports (target_type, target_id, reporter_id, reason, details, status)

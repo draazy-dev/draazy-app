@@ -8,9 +8,7 @@ import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ErrorReportValve;
 
-/** Replaces Tomcat's HTML error page for requests it refuses before the servlet runs (encoded slash, bad escapes). */
 public class JsonErrorReportValve extends ErrorReportValve {
-
     @Override
     protected void report(Request request, Response response, Throwable throwable) {
         int status = response.getStatus();
@@ -29,7 +27,6 @@ public class JsonErrorReportValve extends ErrorReportValve {
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
             response.getOutputStream().write(body.getBytes(StandardCharsets.UTF_8));
         } catch (IOException ignored) {
-            // the client has gone; there is nobody to tell
         }
     }
 

@@ -18,7 +18,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("Two referees of one referrer qualifying at once cannot both fit under the cap")
 class ReferralQualificationRaceTest extends AbstractCommittedApiTest {
-
     @Autowired ReferralQualification qualification;
     @Autowired TransactionTemplate tx;
     @Autowired SettingsCache settingsCache;
@@ -70,7 +69,6 @@ class ReferralQualificationRaceTest extends AbstractCommittedApiTest {
                 String.class, referrer.getId())).containsExactly("cap_reached", "qualified");
     }
 
-    // Keeps the first transaction open long enough that an unserialised second one would count before its commit.
     private static void pause() {
         try {
             Thread.sleep(300);

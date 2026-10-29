@@ -8,10 +8,8 @@ import java.time.ZonedDateTime;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** What invoices and credit notes share: the financial-year number series and the fee/pass-through split. */
 @Component
 class TaxDocuments {
-
     private static final String NEXT_INVOICE = "insert into invoice_sequences (fy, last_value) values (:fy, 1)"
             + " on conflict (fy) do update set last_value = invoice_sequences.last_value + 1 returning last_value";
 
@@ -26,14 +24,12 @@ class TaxDocuments {
         this.entityManager = entityManager;
     }
 
-    /** April to March in India, as the two-digit years it spans: 2627 for 1 April 2026 to 31 March 2027. */
     static String financialYear(Instant instant) {
         ZonedDateTime local = instant.atZone(INDIA);
         int start = local.getMonthValue() >= 4 ? local.getYear() : local.getYear() - 1;
         return String.format("%02d%02d", start % 100, (start + 1) % 100);
     }
 
-    /** The next number in the series, e.g. {@code INV-FY2627-000001}; rolls back with the caller. */
     String nextInvoiceNumber(Instant at) {
         return number("INV", entityManager.createNativeQuery(NEXT_INVOICE), at);
     }
@@ -48,7 +44,7 @@ class TaxDocuments {
         return prefix + "-FY" + fy + "-" + String.format("%06d", ((Number) next).longValue());
     }
 
-    /** Serialises issuing for one source, so a replayed or concurrent callback cannot number it twice. */
+    // Serialises issuing per source so a replayed or concurrent callback cannot number it twice.
     void lockSource(String sourceType, UUID sourceId) {
         entityManager.createNativeQuery("select count(*) from (select pg_advisory_xact_lock(hashtextextended(:key, 0))) l")
                 .setParameter("key", "tax-doc:" + sourceType + ":" + sourceId)

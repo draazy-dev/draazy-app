@@ -19,15 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserModerationService {
-
-    // A cap, not a page size: the modal is a quick review while deciding what to do.
     private static final int TIMELINE_CAP = 50;
 
     private final BackOfficeUserView view;
     private final AuditService audit;
     private final AdministratorGuard administrators;
 
-    /** Session kill on suspension — see {@link #suspend} for why writing the column is not enough. */
     private final RefreshTokenService sessions;
 
     private final UserTimelineRepository timelines;
@@ -52,7 +49,6 @@ public class UserModerationService {
         this.referralTriggers = referralTriggers;
     }
 
-    // Ends sign-in; Property#isOwnerSuspended hides an owner's listings until reactivation.
     @Transactional
     public void suspend(AuthPrincipal actor, String id, String reason) {
         User user = view.load(id);
@@ -71,7 +67,6 @@ public class UserModerationService {
         adminNotifications.managerAction(actor, "Suspended staff account", user);
     }
 
-    // Archived accounts must go through restore, which holds the email guard.
     @Transactional
     public void reactivate(AuthPrincipal actor, String id) {
         User user = view.load(id);
@@ -88,7 +83,6 @@ public class UserModerationService {
         adminNotifications.managerAction(actor, "Reactivated staff account", user);
     }
 
-    // Manual badge path exists for people the document flow cannot reach.
     @Transactional
     public AdminUserRow setBadge(AuthPrincipal actor, String id, boolean granted, String reason) {
         User user = view.load(id);
@@ -120,7 +114,6 @@ public class UserModerationService {
         return view.row(user);
     }
 
-    // No self or last-admin guard: a flag takes nothing away.
     @Transactional
     public AdminUserRow setFlag(AuthPrincipal actor, String id, boolean flagged, String reason) {
         User user = view.load(id);
@@ -139,7 +132,6 @@ public class UserModerationService {
         return view.row(user);
     }
 
-    // Load user first so an unknown id returns 404, not an empty timeline.
     @Transactional(readOnly = true)
     public List<UserTimelineEntry> timeline(String id) {
         User user = view.load(id);

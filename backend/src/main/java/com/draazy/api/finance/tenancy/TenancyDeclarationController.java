@@ -17,11 +17,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-// No @PreAuthorize: authorisation is a relationship, not a role. The service compares the caller to the owner and
-// answers 404 on every refusal so no declaration id is confirmed to exist to a stranger.
 @RestController
 public class TenancyDeclarationController {
-
     private final TenancyDeclarationService service;
 
     public TenancyDeclarationController(TenancyDeclarationService service) {
@@ -36,7 +33,6 @@ public class TenancyDeclarationController {
                 .body(service.declare(principal.userId(), propId, body));
     }
 
-    // Paged: the owner's list grows with strangers' claims. A claimant's own view is one row on page 0.
     @GetMapping(Routes.Tenancies.DECLARATIONS)
     public PageResponse<TenancyDeclarationDto> forProperty(@CurrentUser AuthPrincipal principal,
             @PathVariable("propId") UUID propId,

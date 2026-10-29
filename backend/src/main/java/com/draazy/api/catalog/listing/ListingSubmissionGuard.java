@@ -9,10 +9,8 @@ import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** Refuses a create that replays a posting the owner made moments ago (double-tap, retried request). */
 @Component
 class ListingSubmissionGuard {
-
     private static final Duration WINDOW = Duration.ofMinutes(10);
 
     private final PropertyRepository properties;

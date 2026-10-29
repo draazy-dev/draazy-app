@@ -18,8 +18,6 @@ import com.draazy.api.moderation.verification.ReviewBadge;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 
-/** List sections match their own endpoints, or are null when that read failed. Tenancies and invites are flags
- * deciding whether My Rental shows; entitlements only on request. */
 public record MeDashboardResponse(
         PageResponse<OwnerListingCard> listings,
         PageResponse<FlatmateSeekerPostDto> flatmatePosts,

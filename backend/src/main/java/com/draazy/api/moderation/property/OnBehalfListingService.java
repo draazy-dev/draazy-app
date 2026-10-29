@@ -16,11 +16,8 @@ import com.draazy.api.security.AuthPrincipal;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Posting a listing on an owner's behalf. Attribution is the whole feature, which is why it is a
- * separate route rather than a flag. */
 @Service
 public class OnBehalfListingService {
-
     private final ListingService listings;
     private final ListingQuota quota;
     private final UserRepository users;
@@ -39,8 +36,6 @@ public class OnBehalfListingService {
         this.audit = audit;
     }
 
-    /** Two audit rows, since "operator X created a listing owned by Y" is a statement neither row
-     * makes on its own. */
     @Transactional
     public Property create(AuthPrincipal caller, OnBehalfListingRequest body) {
         if (DealIntent.RENT.equals(body.listing().deal()) && body.listing().deposit() == null) {
@@ -56,8 +51,6 @@ public class OnBehalfListingService {
 
         Property created = listings.createOnBehalf(owner.getId(), body.listing(), owner.getId(), caller.userId());
 
-        // The one creation path producing a listing its owner has never seen, so the only one that
-        // owes anybody a hand-over.
         created.markPostedOnBehalf(caller.userId().toString());
 
         audit.record(caller, "property.create_on_behalf", "property", created.getId().toString(),
@@ -67,8 +60,6 @@ public class OnBehalfListingService {
         return created;
     }
 
-    /** The desk is exempt from the ceiling, not blind to it, so the numbers are published and the
-     * upgrade conversation is left with the operator. */
     @Transactional(readOnly = true)
     public OwnerListingStanding standingFor(String mobile) {
         String digits = mobile == null ? "" : mobile.replaceAll("\\D", "");

@@ -17,10 +17,8 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Source-level proof that request values reach SQL only as bind parameters, never as statement text. */
 @DisplayName("Architecture — SQL is built from constants; LIKE input is escaped")
 class SqlConstructionGuardTest {
-
     private static final Path MAIN = Path.of("src", "main", "java");
 
     private static final Pattern QUERY_CALL = Pattern.compile(
@@ -37,8 +35,8 @@ class SqlConstructionGuardTest {
 
     private static final Pattern ESCAPED = Pattern.compile("LikePatterns|(?i:escape)|replace\\(\"%\"");
 
-    /** Reviewed: each builds its statement only from constants or literals it chooses itself, and binds every value. */
     private static final Map<String, String> REVIEWED_DYNAMIC_SQL = Map.ofEntries(
+            Map.entry("admin/AdminFlatmateAnalyticsService.java", "window() callers pass EVENTS/REPLIES/WEEKLY_REPLIES constants"),
             Map.entry("admin/AdminHelpFeedbackService.java", "optional ' AND slug = ?' literal"),
             Map.entry("admin/AdminIntegrationsService.java", "WHERE clause of fixed ' AND col = ?' literals"),
             Map.entry("admin/AdminMetricsRepository.java", "filters are literals; IST is a constant"),
@@ -57,7 +55,6 @@ class SqlConstructionGuardTest {
             Map.entry("moderation/property/PendingQueue.java", "ROWS formatted with literal asc/desc"),
             Map.entry("moderation/verification/NeedsInfoReviewRepository.java", "every caller passes a text block"));
 
-    /** Reviewed: the input cannot carry a wildcard. */
     private static final Map<String, String> REVIEWED_UNESCAPED_LIKE = Map.of(
             "catalog/locality/LocalityRepository.java", "LocalityPlaceService.search strips % _ and \\ first",
             "identity/verification/IdentityReviewQueueService.java", "the mobile term is digits only");

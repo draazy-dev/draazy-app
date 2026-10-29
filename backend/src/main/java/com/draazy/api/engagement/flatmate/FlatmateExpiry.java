@@ -9,7 +9,6 @@ import lombok.Getter;
 @Embeddable
 @Getter
 class FlatmateExpiry {
-
     static final int LIFETIME_DAYS = 30;
     static final int REMIND_DAYS_BEFORE = 3;
 
@@ -39,7 +38,6 @@ class FlatmateExpiry {
         return FlatmateVocabulary.MOD_EXPIRED;
     }
 
-    /** True when a post that lapsed while live will now renew into review instead. */
     boolean holdForReview() {
         if (!FlatmateVocabulary.MOD_LIVE.equals(expiredFrom)) {
             return false;

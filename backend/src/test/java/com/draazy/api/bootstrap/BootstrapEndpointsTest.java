@@ -17,7 +17,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 class BootstrapEndpointsTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
 
     @Autowired ObjectMapper objectMapper;
@@ -46,8 +45,6 @@ class BootstrapEndpointsTest extends AbstractApiTest {
         mvc.perform(get(Routes.Bootstrap.ME)).andExpect(status().isUnauthorized());
     }
 
-    // The client primes each section into the cache slot of the endpoint it replaces, so a section
-    // that differs from that endpoint's own answer would be served as if the endpoint had said it.
     @Test
     void everyShellSectionIsExactlyWhatItsOwnEndpointAnswers() throws Exception {
         User u = new User("9877730001", "buyer");

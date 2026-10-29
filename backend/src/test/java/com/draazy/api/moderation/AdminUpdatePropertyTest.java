@@ -26,11 +26,8 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** {@code PATCH /properties/{id}/admin}: a moderator's fix must not revert the listing to pending (it would queue
- * their own change) and must be audited, as the owner is never told. */
 @DisplayName("Moderation — admin listing correction")
 class AdminUpdatePropertyTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired JwtService jwtService;
     @Autowired UserRepository users;
@@ -98,8 +95,6 @@ class AdminUpdatePropertyTest extends AbstractApiTest {
         assertThat(pinned.getLng()).isEqualTo(73.78);
     }
 
-    /** Foundation fields {@code price} and {@code bhk} cost an owner a re-review; here they must cost nothing, or
-     * fixing a typo would take the listing off the site or queue a re-check of the moderator's own correction. */
     @Test
     @DisplayName("a moderator's edit does NOT push an approved listing back into the queue")
     void moderatorEditDoesNotRevertToPending() throws Exception {
@@ -119,7 +114,6 @@ class AdminUpdatePropertyTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.recheckPending").value(false));
     }
 
-    /** The contrast: the owner's path still charges for the same body; the {@code bhk} revert wins. */
     @Test
     @DisplayName("the owner's own edit of the same fields still costs a re-review")
     void ownerEditStillReverts() throws Exception {
@@ -170,7 +164,6 @@ class AdminUpdatePropertyTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.description").value("Only this changed."));
     }
 
-    /** The desk that corrects a listing is the desk that then rings the owner about it. */
     @Test
     @DisplayName("the response carries the owner's mobile, because the corrector is the caller")
     void ownerContactIsRevealed() throws Exception {

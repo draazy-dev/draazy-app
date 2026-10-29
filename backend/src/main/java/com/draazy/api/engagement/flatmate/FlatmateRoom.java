@@ -19,12 +19,9 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "flatmate_rooms")
 @Getter
 public class FlatmateRoom extends AuditedEntity implements FlatmateSupplyPost {
-
     @Column(name = "host_id", nullable = false, updatable = false)
     private UUID hostId;
 
-    /** The parent rent listing when this room came from a split; null for a standalone spare room.
-     * This key ties sibling rooms into one occupancy ledger and one joint agreement. */
     @Column(name = "property_id")
     @Setter
     private UUID propertyId;
@@ -53,7 +50,6 @@ public class FlatmateRoom extends AuditedEntity implements FlatmateSupplyPost {
     @Setter
     private Long deposit;
 
-    /** Null means the host did not state it, which is not the same as a term of zero. */
     @Column(name = "notice_period_days")
     @Setter
     private Integer noticePeriodDays;
@@ -70,12 +66,10 @@ public class FlatmateRoom extends AuditedEntity implements FlatmateSupplyPost {
     @Setter
     private String electricityBilling;
 
-    /** People living in THIS room. Emergent — the tenants decide, the host only records it. */
     @Column(name = "occupants", nullable = false)
     @Setter
     private int occupants = 0;
 
-    /** People allowed in the whole FLAT (the society's rule) — the only ceiling the host declares. */
     @Column(name = "max_occupants", nullable = false)
     @Setter
     private int maxOccupants = 3;
@@ -100,7 +94,6 @@ public class FlatmateRoom extends AuditedEntity implements FlatmateSupplyPost {
     @Setter
     private boolean agreementDeclared = false;
 
-    /** True only once the flat's owner confirmed by OTP — the twin of {@link FlatmateGroup}'s. */
     @Column(name = "owner_consent", nullable = false)
     @Setter
     private boolean ownerConsent = false;
@@ -251,7 +244,6 @@ public class FlatmateRoom extends AuditedEntity implements FlatmateSupplyPost {
         return !archived && FlatmateVocabulary.isPublic(modStatus);
     }
 
-    /** Hibernate materialises an all-null {@code @Embedded} as null, which is every unedited row. */
     public ModerationRecheck getRecheck() {
         if (recheck == null) {
             recheck = new ModerationRecheck();
@@ -259,12 +251,10 @@ public class FlatmateRoom extends AuditedEntity implements FlatmateSupplyPost {
         return recheck;
     }
 
-    /** True when this room came from splitting a parent listing, and so uses the occupancy ledger. */
     public boolean isSplitRoom() {
         return propertyId != null;
     }
 
-    /** True when this room tracks abstract seats rather than real occupants. */
     public boolean isSeatBased() {
         return seatsTotal != null;
     }

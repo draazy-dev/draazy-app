@@ -11,9 +11,6 @@ public record ConversationCreate(
         @Size(max = 64) String propertyId,
         @NotBlank @Size(max = 4000) String body,
         @Size(max = 120) String clientId) {
-
-    // Blank mobiles still fail validation; callers should omit the field instead.
-    // "You addressed nobody" is request shape, not a trust decision.
     @AssertTrue(message = "counterpartyMobile is required unless propertyId names a listing")
     public boolean isAddressed() {
         return !blank(counterpartyMobile) || !blank(propertyId);

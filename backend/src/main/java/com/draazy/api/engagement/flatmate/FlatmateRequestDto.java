@@ -4,7 +4,6 @@ import com.draazy.api.common.trust.MobileMask;
 import java.time.Instant;
 import java.util.UUID;
 
-/** The requester volunteers their number, but it stays masked ({@link #forHost()}) until the host accepts. */
 public record FlatmateRequestDto(
         UUID id,
         String kind,
@@ -19,7 +18,6 @@ public record FlatmateRequestDto(
         String status,
         Instant requestedAt,
         Instant decidedAt) {
-
     FlatmateRequestDto forHost() {
         if (FlatmateVocabulary.STATUS_ACCEPTED.equals(status)) {
             return this;

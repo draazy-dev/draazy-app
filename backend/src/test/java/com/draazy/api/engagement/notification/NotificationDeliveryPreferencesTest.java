@@ -25,19 +25,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.util.AopTestUtils;
 
-/** Written against the {@link Notifier} port because every server-side writer injects it, so one assertion
- * covers all of them and future writers; the pinned clock is restored so later tests do not inherit it. */
 @DisplayName("Notification delivery — quiet hours defer, the master switch drops (D94)")
 class NotificationDeliveryPreferencesTest extends AbstractApiTest {
-
-    /** A future quiet window: whatever it defers to is still in the future at real "now". */
     private static final ZonedDateTime FUTURE_NIGHT =
             ZonedDateTime.of(2027, 1, 10, 23, 0, 0, 0, PlatformTime.IST);
 
     private static final ZonedDateTime FUTURE_MIDDAY =
             ZonedDateTime.of(2027, 1, 10, 12, 0, 0, 0, PlatformTime.IST);
 
-    /** A quiet window that has already closed, for proving a deferred row is released. */
     private static final ZonedDateTime PAST_NIGHT =
             ZonedDateTime.of(2025, 1, 10, 23, 0, 0, 0, PlatformTime.IST);
 
@@ -58,7 +53,6 @@ class NotificationDeliveryPreferencesTest extends AbstractApiTest {
         target().useClock(Clock.systemUTC());
     }
 
-    /** The bean behind the transactional proxy — the instance whose field the clock lives on. */
     private NotificationPublisher target() {
         return AopTestUtils.getTargetObject(publisher);
     }
@@ -75,7 +69,6 @@ class NotificationDeliveryPreferencesTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    /** Quiet hours on, with the given window. Every other preference stays at its default. */
     private void quietHours(User u, String start, String end) {
         preferences.saveAndFlush(withPreferences(u, true, start, end, true));
     }
@@ -88,7 +81,6 @@ class NotificationDeliveryPreferencesTest extends AbstractApiTest {
         return row;
     }
 
-    /** The stored {@code deliver_after}, or null when the notification is deliverable now. */
     private Instant deferredUntil(User u) {
         Timestamp stamp = jdbc.queryForObject(
                 "select deliver_after from notifications where user_id = ?", Timestamp.class, u.getId());
@@ -101,7 +93,6 @@ class NotificationDeliveryPreferencesTest extends AbstractApiTest {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        // `content` is the PageResponse envelope's array field.
         return com.jayway.jsonpath.JsonPath.parse(json).read("$.content.length()");
     }
 

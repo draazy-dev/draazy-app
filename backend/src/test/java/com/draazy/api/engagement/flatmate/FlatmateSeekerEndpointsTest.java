@@ -28,11 +28,9 @@ import org.springframework.http.MediaType;
 
 @DisplayName("Flatmates — seeker posts, and the contact that moves across them")
 class FlatmateSeekerEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
-    /** Audit writes run {@code REQUIRES_NEW} and escape this test's rollback. */
     private final List<String> createdActors = new ArrayList<>();
 
     @AfterEach
@@ -74,8 +72,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
         return publish(id);
     }
 
-    // A seeker post is born pending and invisible; no test below is about moderation, so they seed
-    // published supply rather than inherit it. The default is pinned in FlatmateModerationGateTest.
     private String publish(String id) {
         jdbc.update("update flatmate_seeker_posts set mod_status = 'approved' where id = ?::uuid", id);
         return id;
@@ -84,7 +80,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the feed")
     class Feed {
-
         @Test
         @DisplayName("is public, and publishes no phone number for anyone")
         void feedIsAnonymousAndCarriesNoContact() throws Exception {
@@ -151,7 +146,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("posting")
     class Posting {
-
         @Test
         @DisplayName("names the post from the profile, never from the body")
         void nameComesFromTheProfile() throws Exception {
@@ -286,7 +280,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("expressing interest")
     class Interest {
-
         @Test
         @DisplayName("notifies the host without putting mobile numbers in notification copy")
         void interestNotificationDoesNotLeakMobileNumbers() throws Exception {
@@ -313,8 +306,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                     .contains("request inbox")
                     .doesNotContainPattern("\\b\\d{10}\\b");
 
-            // Asserted as "the host's digits are absent" rather than "no row exists": the release
-            // is the thing under test, not the count.
             List<String> toRequester = jdbc.queryForList(
                     "select body from notifications where user_id = ?::uuid",
                     String.class, requester.getId().toString());
@@ -338,8 +329,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                             .content("{\"message\":\"First try.\"}"))
                     .andExpect(status().isCreated());
 
-            // Answering 201 here while the simultaneous version of the same press answers 409
-            // would be two contract-visible answers to one action.
             mvc.perform(post(Routes.Flatmates.POST_INTEREST, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(requester))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -426,7 +415,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the host inbox")
     class Inbox {
-
         @Test
         @DisplayName("shows who answered, with their number masked until the host accepts")
         void inboxCarriesTheRequesterContact() throws Exception {
@@ -448,8 +436,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[0].status").value("pending"));
         }
 
-        // Guards the three silent paging faults: a lost @PageableDefault 400ing on a bare request,
-        // a PageImpl without the total, and a filter in the mapper reporting an unfiltered count.
         @Test
         @DisplayName("is paged, counts the whole inbox, and filters by status before the page")
         void inboxIsPagedAndFiltersBeforePaging() throws Exception {
@@ -464,7 +450,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                         .andExpect(status().isCreated());
             }
 
-            // No page asked for: the whole inbox.
             mvc.perform(get(Routes.Flatmates.MY_REQUESTS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host)))
                     .andExpect(status().isOk())
@@ -473,7 +458,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.size").value(20))
                     .andExpect(jsonPath("$.page").value(0));
 
-            // A page of two: the second page holds the remaining row, and the count is still three.
             mvc.perform(get(Routes.Flatmates.MY_REQUESTS)
                             .param("page", "1").param("size", "2")
                             .header(HttpHeaders.AUTHORIZATION, bearer(host)))
@@ -515,8 +499,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.status").value("accepted"))
                     .andExpect(jsonPath("$.decidedAt").isNotEmpty());
 
-            // Two rows by now — the notice sent when the interest went out, and the verdict.
-            // The verdict is the one this test is about, so it is named rather than counted.
             List<String> told = jdbc.queryForList(
                     "select type from notifications where user_id = ?::uuid",
                     String.class, requester.getId().toString());
@@ -552,7 +534,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("server-side facets (D116)")
     class Facets {
-
         private String facetBody(String name, String locality, String gender, long budget) {
             return """
                     {"name":"%s","gender":"%s","age":26,"occupation":"Designer","budget":%d,
@@ -571,8 +552,6 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
             publish(json.replaceAll(".*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
         }
 
-            // A request of 'any' states no preference and filters nothing.
-            // Exact, unlike the room feed: only the female seeker, not the no-preference one.
         @Test
         @DisplayName("budget range filters posts server-side")
         void budgetRange() throws Exception {

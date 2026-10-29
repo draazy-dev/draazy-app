@@ -18,10 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Overlaps flag double-letting and owner conflicts for the desk without blocking early renewals.
 @DisplayName("Rent agreement overlaps — other deeds on the same flat, same months")
 class RentAgreementOverlapTest extends ServiceFixtures {
-
     private String raise(User caller, Property property, String licensor, String flatNo, String society,
             String startDate, boolean paid) throws Exception {
         String propertyId = property == null ? "" : "\"propertyId\":\"" + property.getId() + "\",";

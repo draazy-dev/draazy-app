@@ -14,12 +14,9 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-// Finder shapes mirror the idempotency and owner-inbox indexes.
 public interface PhotoRequestRepository extends JpaRepository<PhotoRequest, UUID> {
-
     Optional<PhotoRequest> findByRequesterIdAndPropertyId(UUID requesterId, UUID propertyId);
 
-    // Takes property ids because photo requests do not store owner ids.
     Page<PhotoRequest> findByPropertyIdInAndStatusNotOrderByCreatedAtDesc(Collection<UUID> propertyIds, String status,
             Pageable pageable);
 
@@ -45,7 +42,6 @@ public interface PhotoRequestRepository extends JpaRepository<PhotoRequest, UUID
             + "where pr.id = :id and pr.requesterId = :requesterId and pr.status = 'pending'")
     int withdrawIfPending(@Param("id") UUID id, @Param("requesterId") UUID requesterId);
 
-    // created_at restarts so the reminder clock counts from the new ask, as contact's renewIfLapsed does.
     @Modifying(flushAutomatically = true)
     @Query(value = "update photo_requests set created_at = now() where id = :id", nativeQuery = true)
     void restartClock(@Param("id") UUID id);

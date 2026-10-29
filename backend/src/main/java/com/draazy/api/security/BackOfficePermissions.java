@@ -6,10 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-// Per-account permissions subtract from the compiled-in role baseline.
-// Rationale: docs/system/cross-cutting.md#back-office-permissions.
 public final class BackOfficePermissions {
-
     private BackOfficePermissions() {
     }
 
@@ -17,7 +14,6 @@ public final class BackOfficePermissions {
 
     public static final String WRITE = "write";
 
-    // Must match the bean name used by the SpEL fragments below.
     public static final String BEAN = "accountPermissions";
 
     public static final String DASHBOARD_READ = "dashboard:read";
@@ -38,7 +34,6 @@ public final class BackOfficePermissions {
 
     public static final String IDENTITY_WRITE = "identity:write";
 
-    /** Staff activity for managers/admins; the full audit log stays route-guarded admin-only. */
     public static final String AUDIT_READ = "audit:read";
 
     public static final String CONTENT_READ = "content:read";
@@ -55,7 +50,6 @@ public final class BackOfficePermissions {
 
     public static final String NOTES_READ = "notes:read";
 
-    // Separate from `#NOTES_READ`: more people read a case than add to it.
     public static final String NOTES_WRITE = "notes:write";
 
     public static final String FLATMATES_READ = "flatmates:read";
@@ -94,12 +88,10 @@ public final class BackOfficePermissions {
 
     public static final String SOCIETIES_WRITE = "societies:write";
 
-    // Rationale: docs/system/cross-cutting.md#back-office-permissions.
     public static final String ENQUIRIES_READ = "enquiries:read";
 
     public static final String POSTONBEHALF_WRITE = "postOnBehalf:write";
 
-    // `adminOnly` is both advisory to the UI and authoritative in `#baselineFor(String)`, so the two cannot disagree.
     public record Permission(String name, String module, String action, boolean adminOnly) {
     }
 
@@ -111,8 +103,6 @@ public final class BackOfficePermissions {
         return new Permission(module + ":" + action, module, action, true);
     }
 
-    // Every atom the server enforces, in the order a console should render them.
-    // A `List` because the order is part of what is served: modules as they appear, read before write.
     public static final List<Permission> CATALOGUE = List.of(
             ops("dashboard", READ),
             ops("analytics", READ),
@@ -190,8 +180,6 @@ public final class BackOfficePermissions {
         return name != null && BY_NAME.containsKey(name);
     }
 
-    // Everything an unscoped account of this role holds — the ceiling a stored document is intersected with.
-    // Keyed by wire role; anything but staff, manager or admin resolves to the empty set.
     public static Set<String> baselineFor(String wireRole) {
         if (Roles.Wire.ADMIN.equals(wireRole)) {
             return ADMIN_BASELINE;
@@ -205,11 +193,8 @@ public final class BackOfficePermissions {
         return Set.of();
     }
 
-    /** Everything before the atom in a {@code @PreAuthorize} fragment. */
     private static final String CALL = "@" + BEAN + ".granted(authentication, '";
 
-    // Annotation arguments must be constants, so each permission atom is spelled out.
-    // Always combine these with a role guard; never use them alone.
     public static final String REQUIRE_DASHBOARD_READ = CALL + DASHBOARD_READ + "')";
 
     public static final String REQUIRE_ANALYTICS_READ = CALL + ANALYTICS_READ + "')";

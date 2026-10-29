@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** Shortlist row: the tile plus {@code available}, so a sold or rented save greys out without exposing status. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record SavedCard(
         String id,

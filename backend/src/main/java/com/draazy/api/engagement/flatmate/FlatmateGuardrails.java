@@ -7,17 +7,10 @@ import java.util.Locale;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** A <em>different</em> host on one address only flags for Ops, never blocks, because
- * {@link #fingerprint} is a fuzzy match over free text and refusing an honest post is the worse error. */
 @Component
 public class FlatmateGuardrails {
-
-    /** A count rather than a rate: a dozen rooms is a brokerage whether posted in an hour or a month.
-     * Owner-tier posts are exempt from the count, never from the address dedupe. */
     public static final int MAX_ACTIVE_HOST_POSTS = 3;
 
-    /** Public because it is the only surviving link from an owner-tier post back to the listing that
-     * earned it — a spare room cannot store {@code property_id}. */
     public static final String PROPERTY_PREFIX = "prop:";
 
     private final FlatmateRoomRepository rooms;
@@ -28,8 +21,6 @@ public class FlatmateGuardrails {
         this.groups = groups;
     }
 
-    /** The single decision point every supply-side create runs through. Returns what was decided and
-     * why, so the caller can refuse with a message that names the actual reason. */
     public HostEligibility evaluate(UUID hostId, String tier, Address address) {
         String fingerprint = fingerprint(address);
         boolean ownerTier = FlatmateVocabulary.TIER_OWNER.equals(tier);
@@ -55,8 +46,6 @@ public class FlatmateGuardrails {
                 fingerprint, reason);
     }
 
-    /** Full posts drop out of the cap, so reopening one must pass it like a new post. Ask before
-     * changing the post: a dirty entity is auto-flushed into the count. */
     public boolean capBlocksReopen(UUID hostId, String tier) {
         return evaluate(hostId, tier, null).overCap();
     }
@@ -67,8 +56,6 @@ public class FlatmateGuardrails {
                         + " live flatmate posts. Close one before reopening this."));
     }
 
-    /** Ordered by how much the identifier is worth: listing id, then society+locality, then
-     * title+locality. Normalised hard because these are strings people typed. */
     public String fingerprint(Address address) {
         if (address == null) {
             return null;
@@ -79,8 +66,6 @@ public class FlatmateGuardrails {
         String locality = normalise(address.locality());
         String society = normalise(address.society());
         String title = normalise(address.title());
-        // Both remaining branches suffix the locality unconditionally, so a society with no locality
-        // yields "addr:sai radha|", which can never match and would be silently unusable forever.
         if (locality.isEmpty()) {
             return null;
         }
@@ -93,7 +78,6 @@ public class FlatmateGuardrails {
         return null;
     }
 
-    /** Live host-claims (rooms and groups alike) on one address. */
     private List<Claim> claims(String fingerprint) {
         List<Claim> found = new ArrayList<>();
         if (fingerprint == null) {
@@ -106,8 +90,6 @@ public class FlatmateGuardrails {
         return found;
     }
 
-    /** Deliberately aggressive: over-normalising costs a false flag a human clears, while
-     * under-normalising lets a broker in by typing a hyphen. */
     private static String normalise(String value) {
         if (value == null || value.isBlank()) {
             return "";
@@ -120,12 +102,9 @@ public class FlatmateGuardrails {
                 .strip();
     }
 
-    /** What the caller knows about where the post is. Any field may be absent. */
     public record Address(UUID propertyId, String society, String locality, String title) {
     }
 
-    /** Contract schema {@code HostEligibility}. Returned on a 409 so the client can explain the
-     * refusal rather than guessing at it. */
     public record HostEligibility(boolean blocked, boolean overCap, boolean duplicate,
             boolean flagForReview, String fingerprint, String reason) {
     }

@@ -7,12 +7,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-/** A ledger, not a queue: {@code sent} is a staff attestation, not a provider ack. */
 @Entity
 @Table(name = "outbound_message")
 @Getter
 public class OutboundMessage {
-
     public static final String PREPARED = "prepared";
     public static final String SENT = "sent";
 
@@ -36,11 +34,9 @@ public class OutboundMessage {
     @Column(name = "recipient_id", nullable = false)
     private UUID recipientId;
 
-    /** Captured at send time so a later mobile change doesn't rewrite the log's "where". */
     @Column(name = "recipient_mobile", nullable = false)
     private String recipientMobile;
 
-    /** Fully rendered text stored, not reconstructed: templates are editable and rows outlive them. */
     @Column(name = "body", nullable = false)
     private String body;
 

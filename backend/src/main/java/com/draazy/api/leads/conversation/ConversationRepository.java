@@ -12,10 +12,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-// Canonical party ordering keeps lookups as index seeks instead of OR scans.
-// Every finder relies on the the migration canonical pair ordering (`user_a_id < user_b_id`).
 public interface ConversationRepository extends JpaRepository<Conversation, UUID> {
-
     @Query("""
             select c from Conversation c
             where c.userAId = :userId or c.userBId = :userId

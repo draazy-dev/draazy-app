@@ -13,21 +13,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class BotDefenceFilter extends OncePerRequestFilter {
-
-    // The header the Turnstile widget's token is expected in.
     static final String TOKEN_HEADER = "CF-Turnstile-Response";
 
-    // Longest token this will forward to the provider.
-    // Turnstile tokens are a few hundred characters.
     private static final int MAX_TOKEN_LENGTH = 4096;
 
-    // One refusal for every reason, deliberately: missing token, rejected token and unreachable provider
-    // must read the same.
     public static final String REFUSAL =
             "This request could not be verified as human. Please reload the page and try again.";
 
-    // Every entry is an unauthenticated `permitAll` write in `SecurityConfig`. `POST /auth/login` checks its
-    // send step in `AuthController`: only the body names the step, and verify must not re-spend the token.
     private static final Set<String> CHALLENGED = Set.of(
             Routes.Cities.WAITLIST,
             Routes.ServiceWaitlist.BASE);
@@ -43,8 +35,6 @@ public class BotDefenceFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain chain) throws ServletException, IOException {
-
-        // Check enforcement first so dev and tests pay only one boolean read.
         if (!defence.enforced() || !isChallenged(request) || verified(defence, request)) {
             chain.doFilter(request, response);
             return;
@@ -53,7 +43,6 @@ public class BotDefenceFilter extends OncePerRequestFilter {
         SecurityErrors.write(response, 403, ErrorCodes.FORBIDDEN, REFUSAL);
     }
 
-    /** Whether the request carries a token the provider confirms; always {@code true} when not enforced. */
     public static boolean verified(BotDefence defence, HttpServletRequest request) {
         if (!defence.enforced()) {
             return true;
@@ -64,8 +53,6 @@ public class BotDefenceFilter extends OncePerRequestFilter {
                 && defence.verify(token, request.getRemoteAddr());
     }
 
-    // Share the path normaliser with rate limits so route matching cannot drift.
-    // Method-check too: some challenged paths also serve safe methods.
     private static boolean isChallenged(HttpServletRequest request) {
         return "POST".equals(request.getMethod())
                 && CHALLENGED.contains(

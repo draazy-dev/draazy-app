@@ -21,17 +21,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Buyer proposes to finalize a deal, the owner accepts or declines; scoping by party is the gate, not a role. */
 @RestController
 public class FinalizationController {
-
     private final FinalizationService finalizationService;
 
     public FinalizationController(FinalizationService finalizationService) {
         this.finalizationService = finalizationService;
     }
 
-    /** Buyer requests finalization for a listing. */
     @PostMapping(Routes.Finalization.REQUEST)
     public FinalizationRequestDto requestFinalization(
             @CurrentUser AuthPrincipal principal,
@@ -40,7 +37,6 @@ public class FinalizationController {
         return finalizationService.request(principal.userId(), parseUuid(propId), body);
     }
 
-    /** The caller's request for this property; 204 when there is none. */
     @GetMapping(Routes.Finalization.STATUS)
     public ResponseEntity<FinalizationRequestDto> finalizationStatus(
             @CurrentUser AuthPrincipal principal,
@@ -50,7 +46,6 @@ public class FinalizationController {
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
-    /** The initiator soft-cancels their own request. */
     @DeleteMapping(Routes.Finalization.STATUS)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancelFinalization(
@@ -59,7 +54,6 @@ public class FinalizationController {
         finalizationService.cancel(principal.userId(), parseUuid(propId));
     }
 
-    /** Requests awaiting the caller's decision, newest first, paged; the sort is fixed server-side. */
     @GetMapping(Routes.Finalization.ME_REQUESTS)
     public PageResponse<FinalizationRequestDto> myFinalizationRequests(
             @CurrentUser AuthPrincipal principal,
@@ -69,7 +63,6 @@ public class FinalizationController {
                 r -> r);
     }
 
-    /** The counterparty accepts; sibling requests are declined and the deal closes. */
     @PostMapping(Routes.Finalization.ACCEPT)
     public void acceptFinalization(
             @CurrentUser AuthPrincipal principal,
@@ -77,7 +70,6 @@ public class FinalizationController {
         finalizationService.accept(principal.userId(), parseUuid(reqId));
     }
 
-    /** The counterparty declines. */
     @PostMapping(Routes.Finalization.DECLINE)
     public void declineFinalization(
             @CurrentUser AuthPrincipal principal,

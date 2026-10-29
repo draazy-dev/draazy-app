@@ -19,16 +19,12 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
-/** Partial listing update, PATCH semantics: {@code null} means "leave unchanged". Cross-field coherence sees
- * only what this body states, so a pair split across two PATCHes is caught only when submitted together. */
 @CoherentDimensions
 @ListingSanityLimits
 public record ListingUpdate(
         @Size(max = 200) @NoContactDetails String title,
         @Pattern(regexp = DealIntent.PATTERN, message = DealIntent.PATTERN_MESSAGE) String deal,
 
-        // Guarded as on the POST: an unreadable label is not rejected, it is unfindable, and re-labelling
-        // is exactly where that happens. Null still means "leave unchanged" — @Pattern does not fire on it.
         @Size(max = 80) @Pattern(regexp = PropertyTypeLabel.PATTERN,
                 message = PropertyTypeLabel.PATTERN_MESSAGE) String propertyType,
         BigDecimal bhk,
@@ -52,7 +48,6 @@ public record ListingUpdate(
                 message = PropertyPossession.PATTERN_MESSAGE) String possession,
         @Size(max = 5) List<@NotNull @Pattern(regexp = "family|bachelors|bachelor-male|bachelor-female|company|anyone", message = "must be family, bachelors, bachelor-male, bachelor-female, company or anyone") String> tenants,
 
-        // Bounded, contact-guarded and null-free to match ListingCreate; see the notes there.
         @Size(max = 40) List<@NotNull @Size(max = 60) @NoContactDetails String> amenities,
 
         @Size(max = 20, message = "cannot carry more than 20 photos") List<@NotNull @Size(max = 512) String> images,
@@ -66,8 +61,6 @@ public record ListingUpdate(
         @Pattern(regexp = "^$|^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$", message = "must be a valid society id") String societyId,
         @Size(max = 64) String electricityMeterNo,
 
-        // Match ListingCreate's bounds to preserve legacy values rather than enforce picker options.
-        // These details are non-foundation fields, so edits do not trigger server re-review.
         @Min(0) Integer bathrooms,
         @Min(0) Integer parking,
         @Min(0) Integer balconies,
@@ -84,7 +77,6 @@ public record ListingUpdate(
         @Pattern(regexp = AvailableOn.PATTERN, message = AvailableOn.PATTERN_MESSAGE) String availableOn,
         Boolean pets,
 
-        // Absent `pets` cannot mean "withdraw", so returning to unstated needs its own word.
         Boolean clearPets,
         @ListingFormDetails Map<String, Object> formDetails,
 
@@ -92,7 +84,6 @@ public record ListingUpdate(
         String landUse,
 
         Boolean clearLandUse) implements CoherentDimensions.Dimensions, ListingSanityLimits.Input {
-
     public ListingUpdate {
         images = images == null ? null : images.stream().distinct().toList();
     }

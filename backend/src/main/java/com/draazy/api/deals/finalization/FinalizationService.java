@@ -33,10 +33,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Maker/checker finalization: accepting auto-declines siblings and closes the deal in one transaction. */
 @Service
 public class FinalizationService {
-
     private static final Logger LOG = LoggerFactory.getLogger(FinalizationService.class);
 
     private final FinalizationRequestRepository finalizationRequests;
@@ -60,11 +58,9 @@ public class FinalizationService {
         this.offers = offers;
     }
 
-    // 404 for a missing or non-live listing; the counterparty must be a registered user (422).
     @Transactional
     public FinalizationRequestDto request(UUID callerId, UUID propertyId,
                                            FinalizationCreateRequest body) {
-        // S4: if body carries a propertyId, it must equal the path.
         if (body.propertyId() != null && !body.propertyId().isBlank()) {
             UUID bodyPropId = Ids.parseUuid(body.propertyId()).orElse(null);
             if (bodyPropId == null || !bodyPropId.equals(propertyId)) {
@@ -73,20 +69,17 @@ public class FinalizationService {
             }
         }
 
-        // Property must exist. The owner is the only legitimate counterparty, so resolve them here.
         Property property = properties.findById(propertyId)
                 .filter(Property::isPubliclyVisible)
                 .orElseThrow(() -> NotFoundException.of("Property"));
         User counterparty = property.getOwner();
 
-        // The counterparty comes from the listing; the body mobile is only validated, so it is no enumeration oracle.
         String normalised = MobileMask.normalise(body.counterpartyMobile());
         if (normalised == null || !normalised.equals(MobileMask.normalise(counterparty.getMobile()))) {
             throw new BadRequestException(
                     "counterpartyMobile must be the listing owner's mobile number");
         }
 
-        // Duplicate prevention: service pre-check for a clean message.
         if (finalizationRequests.findLiveByInitiatorAndProperty(callerId, propertyId).isPresent()) {
             throw new ConflictException(
                     "You already have a pending finalization request on this property");
@@ -98,8 +91,6 @@ public class FinalizationService {
                     propertyId, callerId, counterparty.getId(), agreedPrice(callerId, propertyId, body));
             request = finalizationRequests.saveAndFlush(request);
         } catch (DataIntegrityViolationException constraintViolation) {
-            // The partial unique index uq_finalization_live_per_user_property caught a concurrent
-            // double-tap that slipped past the service-level check.
             LOG.debug("Concurrent duplicate finalization request for user {} on property {}",
                     callerId, propertyId);
             throw new ConflictException(
@@ -111,8 +102,6 @@ public class FinalizationService {
                 verifiedAmong(request));
     }
 
-    // Terminal rows are returned too, so a turned-down buyer can be told apart from one who never asked.
-    // Empty for the ordinary "nothing proposed yet" case, so the page's status probe is not an error.
     @Transactional(readOnly = true)
     public Optional<FinalizationRequestDto> status(UUID callerId, UUID propertyId) {
         return finalizationRequests
@@ -129,14 +118,12 @@ public class FinalizationService {
                 });
     }
 
-    // Initiator only; the counterparty declines instead (403), a stranger gets 404.
     @Transactional
     public void cancel(UUID callerId, UUID propertyId) {
         FinalizationRequest request = finalizationRequests
                 .findLiveByPropertyAndParticipant(propertyId, callerId)
                 .orElseThrow(() -> NotFoundException.of("Finalization request"));
 
-        // Only the initiator may cancel.
         if (!callerId.equals(request.getInitiatorId())) {
             throw new ForbiddenException("Only the initiator may cancel a finalization request");
         }
@@ -149,7 +136,6 @@ public class FinalizationService {
         finalizationRequests.saveAndFlush(request);
     }
 
-    // Pending requests aimed at the caller, newest first, paged because inbound demand is unbounded.
     @Transactional(readOnly = true)
     public Page<FinalizationRequestDto> myRequests(UUID callerId, Pageable pageable) {
         Page<FinalizationRequest> rows =
@@ -158,7 +144,6 @@ public class FinalizationService {
             return new PageImpl<>(List.of(), rows.getPageable(), rows.getTotalElements());
         }
 
-        // Batch load all participant users.
         List<UUID> userIds = rows.getContent().stream()
                 .flatMap(r -> Stream.of(r.getInitiatorId(), r.getCounterpartyId()))
                 .distinct()
@@ -166,7 +151,6 @@ public class FinalizationService {
         Map<UUID, User> userMap = users.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
 
-        // Keyed by user id: counterparty mobiles are masked, so a badge cannot be looked up by number.
         Set<UUID> verified = tenantProfiles.verifiedAmong(userIds);
 
         List<FinalizationRequestDto> content = rows.getContent().stream()
@@ -179,19 +163,16 @@ public class FinalizationService {
         return new PageImpl<>(content, rows.getPageable(), rows.getTotalElements());
     }
 
-    // One transaction: accept this request, decline its siblings, close the deal; any failure rolls back all.
     @Transactional
     public void accept(UUID callerId, UUID requestId) {
         FinalizationRequest request = finalizationRequests.findByIdForUpdate(requestId)
                 .orElseThrow(() -> NotFoundException.of("Finalization request"));
 
-        // Scoping: caller must be a participant.
         if (!callerId.equals(request.getInitiatorId())
                 && !callerId.equals(request.getCounterpartyId())) {
             throw NotFoundException.of("Finalization request");
         }
 
-        // The initiator must NOT be able to accept their own request.
         if (callerId.equals(request.getInitiatorId())) {
             throw new ForbiddenException(
                     "The initiator cannot accept their own finalization request");
@@ -201,7 +182,6 @@ public class FinalizationService {
             throw new ConflictException("This request has already been " + request.getStatus() + ".");
         }
 
-        // Closing first means a failure leaves the request statuses untouched.
         User initiator = users.findById(request.getInitiatorId()).orElse(null);
         String initiatorMobile = initiator != null ? initiator.getMobile() : null;
         dealService.closeForFinalization(
@@ -211,11 +191,9 @@ public class FinalizationService {
                 initiatorMobile,
                 request.getInitiatorId());
 
-        // 2. Accept this request.
         request.setStatus(FinalizationStatuses.ACCEPTED);
         finalizationRequests.saveAndFlush(request);
 
-        // 3. Auto-decline all other pending requests on the same property.
         finalizationRequests.declineSiblings(request.getPropertyId(), request.getId());
     }
 
@@ -224,13 +202,11 @@ public class FinalizationService {
         FinalizationRequest request = finalizationRequests.findByIdForUpdate(requestId)
                 .orElseThrow(() -> NotFoundException.of("Finalization request"));
 
-        // Scoping: caller must be a participant.
         if (!callerId.equals(request.getInitiatorId())
                 && !callerId.equals(request.getCounterpartyId())) {
             throw NotFoundException.of("Finalization request");
         }
 
-        // The initiator must NOT be able to decline (they should cancel instead).
         if (callerId.equals(request.getInitiatorId())) {
             throw new ForbiddenException(
                     "The initiator cannot decline their own request; use cancel instead");
@@ -245,9 +221,6 @@ public class FinalizationService {
         finalizationRequests.save(request);
     }
 
-    // ---- internal helpers ----
-
-    // The accepted offer is the agreed price; a client-typed figure only applies when no offer was accepted.
     private long agreedPrice(UUID buyerId, UUID propertyId, FinalizationCreateRequest body) {
         return offers.findFirstByFromUserIdAndPropertyIdAndStatusOrderByCreatedAtDesc(
                         buyerId, propertyId, OfferStatuses.ACCEPTED)
@@ -260,7 +233,6 @@ public class FinalizationService {
                 .collect(Collectors.toMap(User::getId, Function.identity()));
     }
 
-    // By user id: the party mobile is masked, so matching it against the verified list can never hit.
     private Set<UUID> verifiedAmong(FinalizationRequest request) {
         return tenantProfiles.verifiedAmong(
                 List.of(request.getInitiatorId(), request.getCounterpartyId()));

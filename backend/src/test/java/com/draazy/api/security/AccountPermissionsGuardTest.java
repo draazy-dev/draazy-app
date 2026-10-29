@@ -21,11 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/** A stored per-account document may only narrow, never add. Denials are 403 not 404: {@code @PreAuthorize} runs
- * before any row is read. Rows roll back so they can't narrow accounts other suites expect to be unscoped. */
 @DisplayName("D192/D13 — a per-account permission document governs, and can only narrow")
 class AccountPermissionsGuardTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -40,7 +37,6 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
         return users.saveAndFlush(user);
     }
 
-    /** Raw JSON, bypassing {@code BackOfficeAccessService}, whose validation can't produce hostile documents. */
     private void scope(UUID userId, String json) {
         jdbc.update("INSERT INTO back_office_permissions (user_id, permissions) "
                 + "VALUES (?::uuid, ?::jsonb)", userId.toString(), json);
@@ -51,8 +47,6 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
                 .andReturn().getResponse().getStatus();
     }
 
-
-    /** Absence must be a no-op: otherwise a guard refusing everybody would satisfy every refusal below. */
     @Test
     @DisplayName("a staff account with no document keeps only the landing atom")
     void noDocumentMeansRoleDefault() throws Exception {
@@ -67,11 +61,8 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
         assertThat(status(Routes.Moderation.REPORTS, staff)).isEqualTo(403);
         assertThat(status(Routes.Users.BASE, staff)).isEqualTo(403);
         assertThat(status(Routes.Admin.SETTINGS, admin)).isEqualTo(200);
-        // Not 200: unfiltered GET /admin/audit-log 500s on PostgreSQL 13 (untyped `? is null` timestamp
-        // parameter), so assert only that the new guard doesn't turn an unscoped administrator away.
         assertThat(status(Routes.Admin.AUDIT_LOG, admin)).isNotEqualTo(403);
     }
-
 
     @Test
     @DisplayName("a document removes exactly what it omits, and only for the account it names")
@@ -106,7 +97,6 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
         assertThat(status(Routes.Admin.ANALYTICS_TRAFFIC, bearer(admin))).isEqualTo(200);
     }
 
-    /** An empty array is deliberate: it must differ from no document, or "may do nothing" is inexpressible. */
     @Test
     @DisplayName("an empty document leaves only the landing atom")
     void anEmptyDocumentLeavesOnlyDashboard() throws Exception {
@@ -131,9 +121,6 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
         assertThat(status(Routes.Admin.FINANCE, bearer(admin))).isEqualTo(200);
     }
 
-
-    /** The load-bearing half: five admin-only atoms on a staff account must all be dropped by the intersection in
-     * {@link AccountPermissions#effectiveFor}; the kept atom proves the resolver isn't just denying everything. */
     @Test
     @DisplayName("a document cannot widen: granting a staff account admin-only atoms grants nothing")
     void aDocumentCannotWidenTheRoleBaseline() throws Exception {
@@ -149,7 +136,6 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
                 .as("the document was honoured at all").isEqualTo(200);
     }
 
-    /** Against the resolver, so it holds for later atoms whose routes this suite doesn't probe. */
     @Test
     @DisplayName("the resolved set is always a subset of the compiled-in role baseline")
     void theResolvedSetIsAlwaysASubsetOfTheBaseline() {
@@ -172,7 +158,6 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
                         BackOfficePermissions.SERVICES_WRITE);
     }
 
-    /** A buyer has no back-office baseline, so there is nothing for an intersection to produce. */
     @Test
     @DisplayName("a role outside the back office resolves to nothing whatever is stored")
     void aNonOpsRoleResolvesToNothing() {
@@ -185,8 +170,6 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
                 BackOfficePermissions.TICKETS_READ)).isFalse();
     }
 
-
-    /** The console's own keys ({@code kycReview}, {@code properties:verify}) are unmapped and grant nothing. */
     @Test
     @DisplayName("names the server does not enforce grant nothing, including the console's own")
     void unknownNamesGrantNothing() throws Exception {
@@ -200,8 +183,6 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
         assertThat(status(Routes.Users.BASE, bearer(scoped))).isEqualTo(403);
     }
 
-    /** Fail closed on an unreadable document: denies that one account, unlike platform-wide {@link PermissionMap},
-     * where a typo must not take the back office down. */
     @Test
     @DisplayName("a document the resolver cannot read denies, rather than falling back")
     void anUnreadableDocumentDenies() throws Exception {
@@ -214,7 +195,6 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
                 .containsExactly(BackOfficePermissions.DASHBOARD_READ);
     }
 
-    /** Nothing that is not one of our own principals is waved through. */
     @Test
     @DisplayName("a null principal and a null atom are refused")
     void nullsAreRefused() {
@@ -225,9 +205,6 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
                 .isFalse();
     }
 
-
-    /** A catalogue name must be added in the same change that annotates its route; this text-scans main sources
-     * for each {@code REQUIRE_} fragment, as {@code @PreAuthorize} leaves nothing to reflect on. */
     @Test
     @DisplayName("every catalogued permission is referenced by at least one route guard")
     void everyCataloguedPermissionGuardsARoute() {
@@ -251,7 +228,6 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
                 .isEmpty();
     }
 
-    /** Every catalogued name is unique and well-formed, since the string is the stored key. */
     @Test
     @DisplayName("the catalogue is well-formed: unique module:action names")
     void theCatalogueIsWellFormed() {

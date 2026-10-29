@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AdminBellService {
-
     private static final int ROWS = 5;
 
     private final AccountPermissions permissions;
@@ -29,7 +28,6 @@ public class AdminBellService {
         this.tickets = tickets;
     }
 
-    // Each section is read under the same atom, and the same desk scoping, as the list it replaces.
     public AdminBell bell(AuthPrincipal caller) {
         boolean properties = permissions.granted(caller, BackOfficePermissions.PROPERTIES_READ);
         boolean ticketDesk = permissions.granted(caller, BackOfficePermissions.TICKETS_READ);
@@ -54,7 +52,6 @@ public class AdminBellService {
                 .toList());
     }
 
-    // A staffer on no desk has no queue; the section is left out, as the board's 403 left it dark.
     private AdminBell.Tickets openTickets(AuthPrincipal caller) {
         try {
             var page = tickets.list(caller, null, TicketStatuses.OPEN, PageRequest.of(0, ROWS));

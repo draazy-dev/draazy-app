@@ -28,10 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-// Contract + behaviour proof for the visits slice, driven through the real filter chain against the live
-// Flyway'd Postgres under {@code ddl-auto=validate}.
 class VisitEndpointsTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired JwtService jwtService;
     @Autowired UserRepository users;
@@ -99,7 +96,6 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.visitor.id").value(visitor.getId().toString()));
     }
 
-    // The anti-fake-review guard: a visitor can never mark their own visit completed.
     @Test
     void visitorCannotSetCompleted_antiFakeReviewGuard() throws Exception {
         User owner = user("9820200005", "owner");
@@ -234,8 +230,6 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].note").value("Will come with family"));
     }
 
-    // The harvest guard. A visit nobody has agreed to yet must not hand out a phone number, or "book a visit" becomes
-    // a way to read any stranger's mobile off their own listing.
     @Test
     void visitorMobile_isMaskedToOwnerWhileMerelyScheduled() throws Exception {
         User owner = user("9820200024", "owner");
@@ -250,8 +244,6 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].visitor.mobile").value("98XXXXX543"));
     }
 
-    // Asserts the masked value BEFORE as well as the raw value after: without the before-half a server that revealed
-    // the mobile to everyone from the moment of booking would satisfy this test completely.
     @Test
     void visitorMobile_isRevealedToOwnerOnceConfirmed() throws Exception {
         User owner = user("9820200124", "owner");
@@ -308,8 +300,6 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].visitor.mobile").value("98XXXXX545"));
     }
 
-    // Cancelling from {@code scheduled} leaves the number masked: a booking that was never agreed to must not leak a
-    // mobile on its way out either.
     @Test
     void cancellingAScheduledVisitLeavesTheMobileMasked() throws Exception {
         User owner = user("9820200126", "owner");
@@ -330,8 +320,6 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].visitor.mobile").value("98XXXXX546"));
     }
 
-    // Asserted at `scheduled` — the status at which the owner is masked — so the two halves cannot both be satisfied
-    // by a single blanket answer.
     @Test
     void visitorAlwaysSeesTheirOwnMobileInFull() throws Exception {
         User owner = user("9820200127", "owner");
@@ -497,7 +485,6 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-    // Rescheduling a cancelled visit must not resurrect it.
     @Test
     void reschedule_terminalVisit_returns409() throws Exception {
         User owner = user("9820200047", "owner");

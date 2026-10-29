@@ -17,9 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** The {@code ids} facet on {@code GET /properties}: one search instead of a detail read per card. */
 class ListingIdsFacetTest extends AbstractApiTest {
-
     private static final String LOCALITY = "ids-facet-fixture";
 
     @Autowired
@@ -50,7 +48,6 @@ class ListingIdsFacetTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** Both forms the browser holds — slug and UUID — and nothing that was not asked for. */
     @Test
     void returnsExactlyTheListingsNamedBySlugOrUuid() throws Exception {
         User u = owner("9811200001");
@@ -63,7 +60,6 @@ class ListingIdsFacetTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[*].title", containsInAnyOrder("Ids A", "Ids B")));
     }
 
-    /** Naming an id must not reach past the public floor. */
     @Test
     void aNamedListingThatIsNotLiveStillDropsOut() throws Exception {
         User u = owner("9811200002");
@@ -76,7 +72,6 @@ class ListingIdsFacetTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].title").value("Ids live"));
     }
 
-    /** An unsafe token is a filter that matches nothing, never one silently dropped to "everything". */
     @Test
     void anUnusableIdMatchesNothing() throws Exception {
         mvc.perform(get("/properties").param("ids", "'; drop table properties; --"))

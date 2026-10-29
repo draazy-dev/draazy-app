@@ -6,9 +6,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Place ids that failed verification, remembered so a repeated bad pick never costs another Google call. */
 final class RejectedPlaces {
-
     private final Duration ttl;
     private final Clock clock;
     private final Map<String, Instant> rejectedAt;

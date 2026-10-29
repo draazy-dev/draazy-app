@@ -14,11 +14,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-// No `@PreAuthorize` role guard — the spec carries no `x-roles` on these operations.
-// Authentication plus strict owner-scoping is the gate.
 @RestController
 public class MeDealsController {
-
     private final DealService dealService;
 
     public MeDealsController(DealService dealService) {

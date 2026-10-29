@@ -49,8 +49,6 @@ public class PropertyLifecycle {
         }
     }
 
-    /** Every locality-keyed read skips a null slug, so a listing published without one is unreachable. Called
-     * by both approve routes before either writes, so a rollback cannot cost a reviewer their verdict. */
     public void requireFiled(Property property) {
         if (property.getLocalitySlug() == null || property.getLocalitySlug().isBlank()) {
             throw new ConflictException("This listing has no locality, so approving it would"
@@ -83,7 +81,6 @@ public class PropertyLifecycle {
         }
     }
 
-    // Deals listens so visits booked against a withdrawn listing are cancelled with it.
     public void announceArchived(Property property) {
         events.publishEvent(new PropertyArchived(property.getId()));
     }
@@ -92,7 +89,6 @@ public class PropertyLifecycle {
         events.publishEvent(new PropertyClosed(property.getId()));
     }
 
-    /** Tells the owner their listing was approved, or that the free tier held it back. */
     public void announceApproval(Property property) {
         UUID ownerId = property.getOwner().getId();
         if (PropertyStatus.PAUSED.equals(property.getStatus())) {
@@ -105,7 +101,6 @@ public class PropertyLifecycle {
                 label(property) + " is now live and visible to buyers.", "/property/" + property.getId());
     }
 
-    /** The thread line for an approval, worded for where the listing actually landed. */
     public String approvalMessage(Property property) {
         return PropertyStatus.PAUSED.equals(property.getStatus())
                 ? "\u2705 Your property has been verified and approved. " + freeTierHold()

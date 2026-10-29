@@ -8,25 +8,19 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-// The number is transient, and that is the whole of the privacy argument.
-// A claimed row is byte-for-byte the row and holds no personal data.
 @Entity
 @Table(name = "service_request_parties")
 @Getter
 public class ServiceRequestParty extends AuditedEntity {
-
     @Column(name = "request_id", nullable = false, updatable = false)
     private UUID requestId;
 
-    // user_id appears only after claim; pending invitations are addressed to mobile.
     @Column(name = "user_id")
     private UUID userId;
 
-    // The invited number, held only until it becomes a #userId.
     @Column(name = "mobile")
     private String mobile;
 
-    // Pending rows need an expiry so numbers are not retained forever.
     @Column(name = "invite_expires_at")
     private Instant inviteExpiresAt;
 
@@ -39,12 +33,10 @@ public class ServiceRequestParty extends AuditedEntity {
     @Column(name = "status", nullable = false)
     private String status = CoFillParties.INVITED;
 
-    // Store inviter explicitly; invitation audit should not depend on reconstructing joins.
     @Column(name = "invited_by", nullable = false, updatable = false)
     private UUID invitedBy;
 
     protected ServiceRequestParty() {
-
     }
 
     ServiceRequestParty(UUID requestId, UUID userId, String role, int partyIndex, UUID invitedBy) {
@@ -69,7 +61,6 @@ public class ServiceRequestParty extends AuditedEntity {
         return userId == null;
     }
 
-    // Claim is one-way; DB CHECK rejects rows holding both user id and mobile.
     void claim(UUID claimant) {
         this.userId = claimant;
         this.mobile = null;

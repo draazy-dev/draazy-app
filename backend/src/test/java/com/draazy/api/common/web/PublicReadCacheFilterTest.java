@@ -10,13 +10,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-/** The Java suite and e2e run with the cache off, so this is where its behaviour is proved. */
 class PublicReadCacheFilterTest {
-
     private final AtomicInteger calls = new AtomicInteger();
     private int status = 200;
 
-    /** Answers a body that changes on every call, so a replay is distinguishable from a recompute. */
     private final FilterChain controller = (req, res) -> {
         int n = calls.incrementAndGet();
         var http = (HttpServletResponse) res;

@@ -18,30 +18,8 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
-/**
- * Live round-trip against the real Cloudflare R2 sandbox buckets. Runs only when {@code
- * STORAGE_ENABLED=true} and the {@code R2_*} credentials are present in the environment, so a normal
- * offline suite skips it. No {@code @SpringBootTest} and no database: it constructs {@link
- * R2FileStorage} directly from the environment.
- *
- * <p>Exercises <strong>both</strong> halves of the public/private boundary (ADR-013):
- * <ul>
- *   <li>private — {@code store} then a short-lived signed GET reads the bytes back;</li>
- *   <li>public — {@code storePublic} then a read back <em>from the public bucket</em> (via the S3
- *       API) confirms the bytes landed in the public bucket, not the private one, and that the
- *       returned URL is the public CDN URL.</li>
- * </ul>
- *
- * <p>The public leg deliberately reads back through the S3 API rather than fetching the returned
- * {@code r2.dev} URL directly: that dev domain is TLS-blocked by the corporate proxy here, and in
- * production photos are served from a custom domain rather than {@code r2.dev} anyway. Whether the
- * object is <em>world-readable</em> is a Cloudflare bucket setting, not something this code decides;
- * what the code owns — putting the bytes in the public bucket and returning the CDN URL — is what
- * this asserts.
- */
 @EnabledIfEnvironmentVariable(named = "STORAGE_ENABLED", matches = "true")
 class R2FileStorageLiveTest {
-
     @Test
     void privateBucketStoresAndReadsBackViaSignedUrl() throws Exception {
         R2Properties props = props();
@@ -72,13 +50,8 @@ class R2FileStorageLiveTest {
         try {
             String url = storage.storePublic(key, body, "text/plain");
 
-            // The returned URL must be the public CDN URL for this key.
             assertThat(url).isEqualTo(stripTrailingSlash(props.publicBaseUrl()) + "/" + key);
 
-            // Read the bytes back from the PUBLIC bucket (via the S3 API, which is reachable) to
-            // prove the object landed in the public bucket specifically — not the private one, and
-            // not merely that putObject did not throw. The unsigned r2.dev serving is a Cloudflare
-            // bucket setting exercised in prod via a custom domain, and r2.dev is proxy-blocked here.
             byte[] readBack = readFromBucket(props, props.publicBucket(), key);
             assertThat(readBack).isEqualTo(body);
         } finally {
@@ -115,7 +88,6 @@ class R2FileStorageLiveTest {
         try (S3Client s3 = s3(props)) {
             s3.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
         } catch (RuntimeException ignored) {
-            // best-effort cleanup; a leaked sandbox test object is harmless
         }
     }
 

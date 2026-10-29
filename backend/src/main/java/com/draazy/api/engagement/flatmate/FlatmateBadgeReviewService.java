@@ -24,10 +24,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The badge desk: a reviewer's verdict on a host's tenancy evidence, separate from whether the post is shown. */
 @Service
 public class FlatmateBadgeReviewService {
-
     private final FlatmateReviewRepository reviews;
     private final UserRepository users;
     private final FlatmateBadges badges;
@@ -46,8 +44,6 @@ public class FlatmateBadgeReviewService {
         this.personalDocuments = personalDocuments;
     }
 
-    /** Both filters run in the query rather than being re-applied in Java, which paging would turn
-     * into short pages and a wrong {@code totalElements}. */
     @Transactional(readOnly = true)
     public Page<FlatmateReviewRow> queue(String status, Boolean flagged, Pageable pageable) {
         String filter = FlatmateVocabulary.optional(
@@ -62,8 +58,6 @@ public class FlatmateBadgeReviewService {
         return page.map(r -> FlatmateReviewRow.of(r, hosts.get(r.getHostId())));
     }
 
-    /** The only path to a tenant-tier badge, so it also needs owner consent, an ID-verified host and
-     * the reviewer's document checks ({@link #requireConsentToApprove}). */
     @Transactional
     public FlatmateReviewDto decideReview(AuthPrincipal caller, UUID reviewId, String status,
             String reason, FlatmateReviewChecks checks) {
@@ -109,8 +103,6 @@ public class FlatmateBadgeReviewService {
         return reviewDto(review);
     }
 
-    /** Rejected rather than a new status, so every reader of the badge already understands it; the host
-     * is told why and can file fresh evidence. */
     @Transactional
     public FlatmateReviewDto revokeReview(AuthPrincipal caller, UUID reviewId, String reason) {
         String why = FlatmateVocabulary.blankToNull(reason);
@@ -135,8 +127,6 @@ public class FlatmateBadgeReviewService {
         return reviewDto(review);
     }
 
-    /** Open while the review awaits a verdict and for 30 days after it, the window property
-     * verification gives its own documents: a decision may be questioned, a closed case may not be browsed. */
     @Transactional
     public FlatmateReviewDocumentUrl documentUrl(AuthPrincipal caller, UUID reviewId) {
         FlatmateReview review = reviews.findById(reviewId)
@@ -165,8 +155,6 @@ public class FlatmateBadgeReviewService {
                 ownerMobile, ownerMobile == null ? null : users.findByMobileAndArchivedFalse(ownerMobile).orElse(null));
     }
 
-    /** A sub-let without the owner's written consent is a ground for eviction under the Maharashtra
-     * Rent Control Act 1999, so the badge is withheld — 422, because nothing about the caller fixes it. */
     private static void requireConsentToApprove(FlatmateReview review, String verdict) {
         if (!grantsBadge(review, verdict) || review.badgeable()) {
             return;
@@ -182,7 +170,6 @@ public class FlatmateBadgeReviewService {
                 && FlatmateVocabulary.TIER_TENANT.equals(review.getTier());
     }
 
-    /** The host may have been un-verified since requesting; ID verification is judged at the moment of approval. */
     private void requireVerifiedHost(FlatmateReview review) {
         if (users.findById(review.getHostId()).filter(User::isVerified).isEmpty()) {
             throw new ValidationException(

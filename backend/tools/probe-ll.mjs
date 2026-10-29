@@ -1,20 +1,10 @@
-/**
- * Live probe of the paid Leave & Licence (rent-agreement) service-request path.
- *
- * Everything the browser does in `VITE_API_MODE=http` *except* the Cashfree webhook — sign in for
- * real, POST a rent-agreement exactly as `toCreate()` shapes it, and assert the create response
- * carries the price and a payment session id with the request parked at `awaiting-payment`.
- *
- *   node backend/tools/probe-ll.mjs [base] [otp-log]
- *
- * The base must include `/api` — this talks to the backend directly, no Vite proxy.
- */
+// Usage: node backend/tools/probe-ll.mjs [base, including /api] [otp-log]
 import fs from 'node:fs';
 
 const BASE = process.argv[2] || 'http://localhost:8098/api';
 const LOG = process.argv[3] || `${process.env.TEMP}\\dz-probe.log`;
 const MOBILE = '9876500123';
-const STAFF_MOBILE = '9711827190'; // seeded `staff` on the rental team
+const STAFF_MOBILE = '9711827190';
 
 let pass = 0;
 let fail = 0;
@@ -32,7 +22,7 @@ async function call(method, path, { token, body } = {}) {
   const res = await fetch(BASE + path, { method, headers, body });
   const text = await res.text();
   let parsed = null;
-  try { parsed = JSON.parse(text); } catch { /* not json */ }
+  try { parsed = JSON.parse(text); } catch { }
   return { status: res.status, text, json: parsed };
 }
 
@@ -56,16 +46,11 @@ async function login(mobile) {
   return res.json?.accessToken ?? res.json?.token ?? null;
 }
 
-// ---------------------------------------------------------------- auth
 const token = await login(MOBILE);
 check('POST /auth/login sends and verifies an OTP', Boolean(token),
   token ? 'token received' : 'no token');
 if (!token) process.exit(1);
 
-// -------------------------------------------- unstick anything a previous run left unpaid
-// Also the answer to "can an abandoned payment be recovered?" — the customer cannot change
-// status (PATCH /{id}/status is staff-only), so this is the only way out of `awaiting-payment`
-// short of the webhook.
 const staffToken = await login(STAFF_MOBILE);
 if (staffToken) {
   const mine = await call('GET', '/service-requests?type=rent-agreement', { token });
@@ -81,7 +66,6 @@ if (staffToken) {
 }
 
 
-// ------------------------------------------------- create: exactly what toCreate() sends
 const created = await call('POST', '/service-requests', {
   token,
   body: JSON.stringify({
@@ -93,7 +77,6 @@ check('POST /service-requests {type:rent-agreement} → 201', created.status ===
   `${created.status} ${created.text.slice(0, 200)}`);
 
 const sr = created.json || {};
-// Whole rupees, not paise — PaymentGateway.createOrder(amountInr) puts this straight into
 // Cashfree's `order_amount`, which is an INR decimal. A paise value here would charge ₹235,900.
 check('create response carries amount = 2359 (whole rupees)', sr.amount === 2359,
   `amount=${JSON.stringify(sr.amount)}`);
@@ -106,7 +89,6 @@ check('create response type = rent-agreement', sr.type === 'rent-agreement',
 check('create response echoes details (D119)', sr.details?.ownerName === 'Probe Owner',
   `details=${JSON.stringify(sr.details)}`);
 
-// ------------------------------------------------- re-read (the hook's settle check)
 const read = await call('GET', `/service-requests/${sr.id}`, { token });
 check('GET /service-requests/{id} → 200 for the requester', read.status === 200,
   `${read.status} ${read.text.slice(0, 160)}`);
@@ -115,7 +97,6 @@ check('re-read still awaiting-payment (unpaid, so no success screen)',
 check('re-read does NOT leak paymentSessionId', read.json?.paymentSessionId == null,
   `paymentSessionId=${JSON.stringify(read.json?.paymentSessionId)}`);
 
-// ------------------------------------------------- list: the wizard's re-submission lock
 const list = await call('GET', '/service-requests?type=rent-agreement', { token });
 const rows = list.json?.content ?? (Array.isArray(list.json) ? list.json : []);
 check('GET /service-requests?type=rent-agreement → 200', list.status === 200,
@@ -123,21 +104,18 @@ check('GET /service-requests?type=rent-agreement → 200', list.status === 200,
 check('the awaiting-payment request IS visible to its requester (lock works)',
   rows.some((r) => r.id === sr.id), `${rows.length} row(s): ${rows.map((r) => r.status).join(',')}`);
 
-// ------------------------------------------------- the type allowlist is the real gate
 const unaliased = await call('POST', '/service-requests', {
   token, body: JSON.stringify({ type: 'rental', details: {} }),
 });
 check("POST {type:'rental'} → 400 (the un-aliased spelling cannot file a free agreement)",
   unaliased.status === 400, `${unaliased.status} ${unaliased.text.slice(0, 140)}`);
 
-// ------------------------------------------------- one open unpaid request per desk
 const second = await call('POST', '/service-requests', {
   token, body: JSON.stringify({ type: 'rent-agreement', details: {} }),
 });
 check('a second rent-agreement while one is unpaid → 409 (no unbounded gateway orders)',
   second.status === 409, `${second.status} ${second.text.slice(0, 160)}`);
 
-// ------------------------------------------------- a free desk is still free
 const free = await call('POST', '/service-requests', {
   token, body: JSON.stringify({ type: 'legal', details: { q: 'probe' } }),
 });
@@ -145,7 +123,6 @@ check('POST /service-requests {type:legal} → 201 unpriced', free.status === 20
   && free.json?.amount == null && free.json?.status === 'new',
   `${free.status} amount=${JSON.stringify(free.json?.amount)} status=${JSON.stringify(free.json?.status)}`);
 
-// ------------------------------------------------- ops queue hides the unpaid one
 const queue = await call('GET', '/ops/service-requests', { token });
 if (queue.status === 403 || queue.status === 401) {
   console.log('SKIP  ops queue — this account is not staff');

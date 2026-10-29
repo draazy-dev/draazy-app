@@ -16,21 +16,16 @@ import java.util.TreeMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The flatmate figures behind {@code GET /admin/analytics/flatmates} and the dashboard's flatmate tiles. */
 @Service
 public class AdminFlatmateAnalyticsService {
-
     static final int DEFAULT_DAYS = 90;
     static final int MAX_DAYS = 365;
-    /** A request unanswered for two days has, for the seeker waiting on it, gone unanswered. */
     static final int REPLY_HOURS = 48;
     private static final int GLANCE_DAYS = 30;
     private static final int LOCALITY_LIMIT = 20;
     private static final String IST = PlatformTime.IST.getId();
     private static final String PUBLIC = "('live', 'approved')";
 
-    /* Every post counts in the week it was made, withdrawn or rejected later or not: the posting happened.
-       A `join` is an open-policy group's instant accept, so it is a match but never a request. */
     private static final String EVENTS = """
             with events(kind, at) as (
                 select 'rooms', created_at from flatmate_rooms
@@ -54,7 +49,6 @@ public class AdminFlatmateAnalyticsService {
                and (requested_at at time zone '%1$s') <  cast(:to as date)
             """.formatted(IST);
 
-    // A pending request younger than the reply window has not had its chance yet, so it is not judged.
     private static final String JUDGED =
             "decided_at is not null or requested_at < now() - make_interval(hours => :reply)";
     private static final String REPLIED =
@@ -99,8 +93,6 @@ public class AdminFlatmateAnalyticsService {
                      where status = 'accepted' and decided_at >= now() - make_interval(days => :days))
             """.formatted(PUBLIC);
 
-    /* Keyed case-insensitively because seekers type localities while hosts pick them. A hunting group
-       has no flat, so it is demand for the localities it names rather than supply in its own. */
     private static final String LOCALITIES = """
             with supply as (
                 select lower(trim(locality)) as k, min(trim(locality)) as label, count(*) as n from (
@@ -157,7 +149,6 @@ public class AdminFlatmateAnalyticsService {
         return new AdminAnalyticsFlatmates(days, from, to, weeks(from, to), replies(from, to), localities());
     }
 
-    /** Zero-filled so a quiet week is drawn as zero rather than skipped by the chart. */
     private List<AdminAnalyticsFlatmates.Week> weeks(LocalDate from, LocalDate to) {
         List<String> kinds = List.of("rooms", "groups", "seekers", "requests", "matches");
         Map<LocalDate, long[]> weekly = new TreeMap<>();
@@ -202,7 +193,6 @@ public class AdminFlatmateAnalyticsService {
         return query.getResultList();
     }
 
-    /** Null, not 0 or 100, when there was nothing to measure. */
     private static Integer pct(long part, long whole) {
         return whole == 0 ? null : (int) Math.round(part * 100.0 / whole);
     }

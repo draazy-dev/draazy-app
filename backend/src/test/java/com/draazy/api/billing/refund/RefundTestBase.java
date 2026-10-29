@@ -31,9 +31,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.ResultActions;
 
-/** Fixtures for the refund-policy tests: paid passes and packs backdated to any age, staff on the refunds desk. */
 abstract class RefundTestBase extends AbstractApiTest {
-
     static final int FREE_CONTACTS = 15;
 
     @Autowired UserRepository users;
@@ -78,13 +76,11 @@ abstract class RefundTestBase extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** A contact pack paid {@code paidDaysAgo} days ago, with a gateway order id. */
     Subscription pack(User buyer, int paidDaysAgo) {
         Instant start = Instant.now().minus(paidDaysAgo, ChronoUnit.DAYS);
         return paid(grants.grantPack(buyer.getId(), start, start.plus(30, ChronoUnit.DAYS)), start, 30);
     }
 
-    /** A listing pass whose listing has been live on it for {@code liveDays} days. */
     Subscription pass(User owner, Property listing, int liveDays) {
         Instant start = Instant.now().minus(liveDays, ChronoUnit.DAYS);
         return paid(grants.grantPass(owner.getId(), listing.getId(), start.plus(60, ChronoUnit.DAYS)), start, 60);
@@ -111,7 +107,6 @@ abstract class RefundTestBase extends AbstractApiTest {
         return jdbc.queryForObject("select status from subscriptions where id = ?", String.class, id);
     }
 
-    /** One contact request on {@code listing}, as if made {@code daysAfter} days after {@code since}. */
     void enquiry(Property listing, Instant since, int daysAfter) {
         User seeker = user("buyer");
         ContactRequest request = contactRequests.saveAndFlush(new ContactRequest(listing.getId(), seeker.getId(), null));
@@ -120,7 +115,6 @@ abstract class RefundTestBase extends AbstractApiTest {
                 Timestamp.from(Instant.now()), request.getId());
     }
 
-    /** Uses up the buyer's free allowance, so the next contact is drawn from a pack. */
     void exhaustFreeContacts(User buyer) {
         User owner = user("owner");
         for (int i = 0; i < FREE_CONTACTS; i++) {

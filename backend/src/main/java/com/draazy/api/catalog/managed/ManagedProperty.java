@@ -14,18 +14,14 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** An owner's private Owner Hub record: never moderated or searched, freely edited and hard-deleted, unlike a listing.
- * {@code visibility}/{@code status} are server-owned and move only through {@link #markPublished}. */
 @Entity
 @Table(name = "managed_properties")
 @Getter
 public class ManagedProperty extends AuditedEntity {
-
     public static final String VISIBILITY_PRIVATE = "private";
     public static final String VISIBILITY_PUBLIC = "public";
     public static final String STATUS_MANAGED = "managed";
     public static final String STATUS_PUBLISHED = "published";
-    /** ₹1 crore a month: the same ceiling a tenant's own rental record accepts. */
     public static final long MAX_MONTHLY_RENT = 10_000_000L;
 
     @Column(name = "owner_id", nullable = false, updatable = false)
@@ -118,7 +114,6 @@ public class ManagedProperty extends AuditedEntity {
     private String addressFingerprint;
 
     protected ManagedProperty() {
-        // JPA
     }
 
     public ManagedProperty(UUID ownerId, String title, String deal, String propertyType,
@@ -138,7 +133,6 @@ public class ManagedProperty extends AuditedEntity {
         this.furnishing = furnishing;
     }
 
-    /** @return true when this names a different tenant, who is then due a heads-up */
     public boolean setTenantMobile(String mobile) {
         if (Objects.equals(mobile, tenantMobile)) {
             return false;
@@ -148,7 +142,6 @@ public class ManagedProperty extends AuditedEntity {
         return mobile != null;
     }
 
-    /** Idempotent at the caller: publish returns early once {@link #publishedListingId} is set. */
     public void markPublished(UUID listingId) {
         this.publishedListingId = listingId;
         this.visibility = VISIBILITY_PUBLIC;

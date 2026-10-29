@@ -26,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DealService {
-
     private static final Logger LOG = LoggerFactory.getLogger(DealService.class);
 
     private final DealRepository deals;
@@ -35,7 +34,6 @@ public class DealService {
     private final UserRepository users;
     private final PropertyLifecycle lifecycle;
 
-    // Deal state owns tenancy side effects, so the transaction crosses into finance.
     private final TenancyService tenancyService;
 
     public DealService(DealRepository deals, DealPartyRepository parties,
@@ -138,7 +136,6 @@ public class DealService {
             property.setAvailableOn(availableOn);
         }
 
-        // Otherwise the active-tenancy unique index stays occupied and the next tenant can never be let in.
         if (DealIntent.RENT.equals(property.getDeal())) {
             LocalDate today = AvailableOn.today();
             tenancyService.endActiveTenancy(propertyId,
@@ -220,7 +217,6 @@ public class DealService {
         }
     }
 
-    // A closed deal's listing is sold/rented, so reopening must still reach it.
     private static void requireReopenable(Property property) {
         boolean closedOut = PropertyStatus.SOLD.equals(property.getStatus())
                 || PropertyStatus.RENTED.equals(property.getStatus());

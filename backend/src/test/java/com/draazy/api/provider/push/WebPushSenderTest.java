@@ -29,8 +29,6 @@ import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("Web Push sender")
 class WebPushSenderTest {
-
-    // RFC 8291 appendix A.
     private static final String RFC_AS_PUBLIC =
             "BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8";
     private static final String RFC_AS_PRIVATE = "yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw";

@@ -18,18 +18,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Separate from {@link PropertyReviewController} because the contract splits these resources;
- * paged since locality reviews are unbounded (api-standards.md §5.1). */
 @RestController
 public class EntityReviewController {
-
     private final ReviewService reviewService;
 
     public EntityReviewController(ReviewService reviewService) {
         this.reviewService = reviewService;
     }
 
-    /** Sort stripped via {@link Pageables#unsorted(Pageable)}: {@code ?sort=} on a public route would 500. */
     @GetMapping(Routes.Reviews.FOR_ENTITY)
     public ReviewListResponse list(@CurrentUser AuthPrincipal viewer,
             @PathVariable String entityType,
@@ -48,7 +44,6 @@ public class EntityReviewController {
         return reviewService.createForEntity(principal.userId(), entityType, entityId, body);
     }
 
-    /** Any target kind, so it sits beside the generic route rather than the property one. */
     @PutMapping(Routes.Reviews.BY_ID)
     public ReviewResponse update(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @Valid @RequestBody ReviewCreateRequest body) {

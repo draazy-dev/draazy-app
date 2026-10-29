@@ -22,9 +22,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
-/** The admin Fees tab is the only price source: the catalogue, the fee schedule and the charge follow it. */
 class AdminFeesPriceEverySurfaceTest extends AbstractApiTest {
-
     private static final String LISTING_PASS = "b1000000-0000-4000-8000-000000000005";
     private static final String CONTACT_PACK = "b1000000-0000-4000-8000-000000000006";
     private static final String OWNER_PLUS = "b1000000-0000-4000-8000-000000000002";
@@ -33,7 +31,6 @@ class AdminFeesPriceEverySurfaceTest extends AbstractApiTest {
     @Autowired PropertyRepository properties;
     @Autowired SubscriptionRepository subscriptions;
 
-    /** Mobile block 98691200xx — used by no other test class. */
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
         u.setName("Fees User " + mobile.substring(6));
@@ -126,7 +123,6 @@ class AdminFeesPriceEverySurfaceTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[?(@.deal=='rent')].platformFee").value(hasItem(499)));
     }
 
-    // Stored but unreadable, it would sit in the admin panel while the site charged the default.
     @Test
     void aPriceTheSiteWouldIgnoreIsRefused() throws Exception {
         saveFees("{\"contactPack\":150000}")

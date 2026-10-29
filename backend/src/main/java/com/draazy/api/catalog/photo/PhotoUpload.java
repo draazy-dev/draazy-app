@@ -8,12 +8,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-/** One public-bucket upload, kept until the sweep has settled whether anything shows it. */
 @Entity
 @Table(name = "photo_uploads")
 @Getter
 class PhotoUpload {
-
     @Id
     @Column(name = "storage_key", nullable = false, updatable = false)
     private String storageKey;
@@ -25,7 +23,6 @@ class PhotoUpload {
     private Instant createdAt;
 
     protected PhotoUpload() {
-        // JPA
     }
 
     PhotoUpload(String storageKey, UUID uploaderId, Instant createdAt) {

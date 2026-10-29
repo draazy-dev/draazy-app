@@ -10,8 +10,6 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.List;
 
-/** A moderator's correction to a post's core fields. A null field is left as it is; {@code rent}
- * is a room's share, a group's rent and a seeker's budget. */
 public record FlatmateModeratorEdit(
         @Size(max = 120) @NoContactDetails(message = NO_CONTACT) String title,
         @Size(max = 600) @NoContactDetails(message = NO_CONTACT) String note,

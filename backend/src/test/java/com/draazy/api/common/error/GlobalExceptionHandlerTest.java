@@ -16,7 +16,6 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 class GlobalExceptionHandlerTest {
-
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
     @Test
@@ -57,8 +56,6 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().message()).doesNotContain("invariant");
     }
 
-    /** The 409 is shared with constraint violations, so the message is what tells a lost race apart;
-     * Hibernate's text names the entity and row id and must not reach the body. */
     @Test
     void lostConcurrentUpdateIs409AdvisingReloadAndLeaksNoEntityDetail() {
         var response = handler.handleOptimisticLock(new OptimisticLockingFailureException(
@@ -72,8 +69,6 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().message()).doesNotContain("a1b2");
     }
 
-    /** Jackson's message names the target class, the JSON pointer and a payload fragment; a realistic
-     * one is used because the assertion is that none of the three survives. */
     @Test
     void unreadableBodyIs400AndLeaksNoJacksonDetail() {
         var response = handler.handleUnreadableBody(new HttpMessageNotReadableException(
@@ -89,7 +84,6 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().message()).doesNotContain("line: 1");
     }
 
-    /** The parameter name is published contract; the Java type it failed to bind to is our signature. */
     @Test
     void badParameterIs400NamingTheParamButNotItsJavaType() {
         var missing = handler.handleBadParameter(
@@ -107,7 +101,6 @@ class GlobalExceptionHandlerTest {
         assertThat(mismatch.getBody().message()).doesNotContain("Integer");
     }
 
-    /** 405 without an {@code Allow} header makes the client guess which verb to use instead. */
     @Test
     void wrongVerbIs405WithAnAllowHeader() {
         var response = handler.handleMethodNotSupported(
@@ -119,7 +112,6 @@ class GlobalExceptionHandlerTest {
                 .containsExactlyInAnyOrder(HttpMethod.GET, HttpMethod.POST);
     }
 
-    /** Must render the same code as the vault's own byte-sniffing refusal, or one outcome has two names. */
     @Test
     void unsupportedContentTypeIs415WithTheSameCodeAsTheVaultsOwnRefusal() {
         var response = handler.handleMediaTypeNotSupported(

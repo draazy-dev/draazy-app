@@ -20,16 +20,13 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
-// Documents and photos go to separate buckets, making the seam's boundary real.
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.storage", name = "enabled", havingValue = "true")
 class R2FileStorage implements FileStorage, DisposableBean {
-
     private static final Logger log = LoggerFactory.getLogger(R2FileStorage.class);
 
     private static final Duration URL_TTL = Duration.ofMinutes(15);
 
-    // Every public key is written once under a fresh UUID, so its bytes can never change.
     private static final String PUBLIC_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
     private final S3Client s3;
@@ -94,8 +91,6 @@ class R2FileStorage implements FileStorage, DisposableBean {
 
     @Override
     public void delete(String key) {
-
-        // S3 DeleteObject is a no-op on a missing key, which gives the sweep its idempotency.
         s3.deleteObject(DeleteObjectRequest.builder().bucket(privateBucket).key(key).build());
     }
 

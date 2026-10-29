@@ -10,26 +10,22 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 
-/** One user's subscription to a {@link Plan}; a pending row exists from checkout open, active only once paid. */
 @Entity
 @Table(name = "subscriptions")
 @Getter
 public class Subscription extends VersionedEntity {
-
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
     @Column(name = "plan_id", nullable = false, updatable = false)
     private UUID planId;
 
-    /** The listing a listing pass covers; null for every other kind. */
     @Column(name = "property_id", updatable = false)
     private UUID propertyId;
 
     @Column(name = "status", nullable = false)
     private String status;
 
-    /** Copied from the plan at purchase so a later repricing cannot restate what this purchase cost. */
     @Column(name = "amount", nullable = false, updatable = false)
     private long amount;
 
@@ -39,11 +35,9 @@ public class Subscription extends VersionedEntity {
     @Column(name = "renews_at")
     private Instant renewsAt;
 
-    /** The gateway order id, the webhook's key; written after the insert so the row survives a gateway failure. */
     @Column(name = "payment_ref")
     private String paymentRef;
 
-    /** The client's {@code Idempotency-Key}; released on every unpaid ending so a plan-derived key cannot replay it. */
     @Column(name = "idempotency_key")
     @Getter(AccessLevel.NONE)
     private String idempotencyKey;
@@ -73,12 +67,10 @@ public class Subscription extends VersionedEntity {
     @Column(name = "frozen_at")
     private Instant frozenAt;
 
-    /** Salted digest of the card or UPI id the gateway reported; only equality across accounts is ever asked. */
     @Column(name = "payment_instrument_hash")
     private String paymentInstrumentHash;
 
     protected Subscription() {
-        // JPA
     }
 
     Subscription(UUID userId, UUID planId, UUID propertyId, String status, long amount,
@@ -94,7 +86,6 @@ public class Subscription extends VersionedEntity {
         this.idempotencyKey = idempotencyKey;
     }
 
-    /** False, not an error, when the row is not pending: a provider may redeliver the webhook. */
     boolean activate(Instant paidAt, Instant renewal) {
         if (!SubscriptionStatuses.PENDING.equals(status)) {
             return false;
@@ -105,7 +96,6 @@ public class Subscription extends VersionedEntity {
         return true;
     }
 
-    /** Never overwrites a ref: the displaced order would stay live at the gateway with no row to credit. */
     boolean attachOrder(String orderId) {
         if (!SubscriptionStatuses.PENDING.equals(status) || paymentRef != null) {
             return false;
@@ -114,7 +104,6 @@ public class Subscription extends VersionedEntity {
         return true;
     }
 
-    /** The gateway refused the order, so no payment can follow; the key goes with the status. */
     boolean abandonUnopened() {
         if (!SubscriptionStatuses.PENDING.equals(status) || paymentRef != null) {
             return false;
@@ -124,7 +113,6 @@ public class Subscription extends VersionedEntity {
         return true;
     }
 
-    /** The payment ref is no guard: closing the modal sends no webhook, so pending alone proves nothing was paid. */
     boolean abandonCheckout() {
         if (!SubscriptionStatuses.PENDING.equals(status)) {
             return false;
@@ -134,8 +122,6 @@ public class Subscription extends VersionedEntity {
         return true;
     }
 
-    /** True the first time only, so the owner is told once however often the gateway repeats itself.
-     * {@code amount} is what to send back when the provider took a different sum than the order was for. */
     boolean markRefundDue(Instant now, Long amount, String reason) {
         if (refundDueAt != null) {
             return false;
@@ -160,19 +146,16 @@ public class Subscription extends VersionedEntity {
         }
     }
 
-    /** Derived from the id so a resend is the same refund; a failed one needs the next attempt's id. */
     String gatewayRefundId() {
         String base = "lp_" + getId().toString().replace("-", "");
         return refundAttempts == 0 ? base : base + "_" + refundAttempts;
     }
 
-    /** The gateway reported the refund failed: the money is due again, under a fresh refund id. */
     void refundFailed() {
         this.refundRef = null;
         this.refundAttempts++;
     }
 
-    /** A null {@code renewsAt} never lapses: a pending order has no term yet. The boundary is inclusive. */
     boolean hasLapsed(Instant now) {
         return SubscriptionStatuses.ACTIVE.equals(status)
                 && renewsAt != null
@@ -185,7 +168,6 @@ public class Subscription extends VersionedEntity {
         }
     }
 
-    /** Active to refund-review; false for any other status, so only a benefit that is live can be frozen. */
     public boolean freezeForRefund(Instant now) {
         if (!moveStatus(SubscriptionStatuses.ACTIVE, SubscriptionStatuses.REFUND_REVIEW)) {
             return false;
@@ -194,12 +176,10 @@ public class Subscription extends VersionedEntity {
         return true;
     }
 
-    /** Back to active with the term pushed out by the time it was frozen; it expires if that still leaves it ended. */
     public boolean restoreAfterRefundRejected(Instant now) {
         return moveStatus(SubscriptionStatuses.REFUND_REVIEW, SubscriptionStatuses.ACTIVE) && thaw(now);
     }
 
-    /** Ends the benefit for good and queues the money; the sweep sends it through the gateway. */
     public boolean approveRefund(Instant now, long refundAmount) {
         if (!moveStatus(SubscriptionStatuses.REFUND_REVIEW, SubscriptionStatuses.REFUNDED)) {
             return false;
@@ -208,7 +188,6 @@ public class Subscription extends VersionedEntity {
         return true;
     }
 
-    /** The status the dispute froze, or null when this order was not entitling (nothing to freeze). */
     public String freezeForDispute(Instant now) {
         String before = status;
         if (!SubscriptionStatuses.isEntitling(before) || !moveStatus(before, SubscriptionStatuses.DISPUTED)) {
@@ -222,8 +201,6 @@ public class Subscription extends VersionedEntity {
         return frozenFrom != null && moveStatus(SubscriptionStatuses.DISPUTED, frozenFrom) && thaw(now);
     }
 
-    /** A refund made on the gateway dashboard. Recorded so no sweep resends it; only a refund of the whole price
-     * ends the benefit. False when a refund is already on record. */
     public boolean recordOutsideRefund(String gatewayRefund, long refunded, Instant now) {
         if (refundRef != null) {
             return false;
@@ -244,7 +221,6 @@ public class Subscription extends VersionedEntity {
         return true;
     }
 
-    /** A lost or accepted dispute ends the benefit from any status that still held it. */
     public boolean revokeAfterDisputeLost() {
         boolean held = SubscriptionStatuses.isEntitling(status) || SubscriptionStatuses.DISPUTED.equals(status)
                 || SubscriptionStatuses.REFUND_REVIEW.equals(status);
@@ -273,7 +249,6 @@ public class Subscription extends VersionedEntity {
         return true;
     }
 
-    /** Only active rows expire; a cancelled row already says why it ended. */
     boolean expire(Instant now) {
         if (!hasLapsed(now)) {
             return false;

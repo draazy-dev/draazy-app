@@ -44,10 +44,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Every read and mutation is keyed by the server-resolved principal, so cross-owner access is a {@code 404}. */
 @Service
 public class ListingService {
-
     private static final Set<String> NOT_EDITABLE =
             Set.of(PropertyStatus.REJECTED, PropertyStatus.SOLD, PropertyStatus.RENTED);
 
@@ -103,7 +101,6 @@ public class ListingService {
                 .orElseThrow(() -> NotFoundException.of("Listing"));
     }
 
-    /** No audit row by design: docs/flows/consumer/list-property-wizard.md section 9.5. */
     @Transactional
     public Property confirmAvailable(UUID userId, String idOrSlug) {
         Property p = resolveOwned(userId, idOrSlug)
@@ -140,7 +137,6 @@ public class ListingService {
         return properties.save(p);
     }
 
-    /** Trust-critical fields are server-set, so a listing cannot be born approved or attributed to someone else. */
     @Transactional
     public Property create(UUID userId, ListingCreate in) {
         requirePace(userId, in);
@@ -148,7 +144,6 @@ public class ListingService {
         return announced(createOnBehalf(userId, in, userId));
     }
 
-    /** An owner's own posting, held to the daily pace; {@link #createOnBehalf} is not. */
     @Transactional
     public Property createWithinAllowance(UUID userId, ListingCreate in, String existingLocalitySlug) {
         requirePace(userId, in);
@@ -171,7 +166,6 @@ public class ListingService {
         return createOnBehalf(userId, in, null, uploadOwnerIds);
     }
 
-    /** {@code existingLocalitySlug} is a binding the record already holds, kept even if it is not live. */
     @Transactional
     public Property createOnBehalf(UUID userId, ListingCreate in, String existingLocalitySlug, UUID... uploadOwnerIds) {
         photoLimit.require("A listing", in.images());
@@ -185,21 +179,15 @@ public class ListingService {
         Property p = new Property(owner, in.title(), in.deal(), in.propertyType(),
                 in.price(), locality.name(), in.city());
 
-        // PropertyMapper's allowlist decides what the client may say, so ListingCreate's
-        // "deliberately absent" set is enforced rather than described.
         propertyMapper.applyTo(in, p);
         ListingShape.clearUnaskedAnswers(p);
         p.setAvailableOn(AvailableOn.resolve(in.availableOn(), in.availableFrom(), false, p.getDeal()));
         ListingEditRules.clearReadyToMoveSaleAvailableDate(p);
         editRules.stampSociety(p, in.societyId(), true);
 
-        // The poster type records who was on the other end of the call, so it is the caller's to
-        // state and never the request body's.
         p.setStatus(PropertyStatus.PENDING);
         p.setPriceUnit(DealIntent.priceUnitFor(in.deal()));
 
-        // Inherited from the owner, never claimed by the client: approval back-fills existing
-        // listings and this stamps new ones. See list-property-wizard.md section 9.1.
         p.setOwnerVerified(owner.isVerified());
 
         p.setLocalitySlug(locality.slug());
@@ -209,8 +197,7 @@ public class ListingService {
         duplicates.reindexPhotos(p, PhotoHash.fromGallery(in.images()));
         duplicates.flag(p);
 
-        // Counted at create, not approval, and it must stay on a *managed* owner - a detaching
-        // @Modifying above this line drops it silently. See list-property-wizard.md section 9.1.
+        // Must stay on a managed owner: a detaching @Modifying above this line silently drops the count.
         owner.recordListingPosted();
         return p;
     }
@@ -221,15 +208,12 @@ public class ListingService {
         return new ListingSlots(standing.allowance(), standing.held());
     }
 
-    /** The key is derived on the same path a create takes, so the pre-check and the write cannot disagree. */
     @Transactional(readOnly = true)
     public ListingDuplicateVerdict duplicateCheck(UUID userId, ListingDuplicateCheck in) {
         String localitySlug = localities.slugOrNull(in.localitySlug(), in.locality());
         String addressKey = AddressKey.of(in.address(), in.city(), in.locality());
         return duplicates.ownDuplicate(userId,
 
-                // Through the same normaliser the write path runs, which also subsumes the
-                // blank-to-null guard: `= ''` matches in SQL where `= null` does not.
                 MeterKey.of(in.electricityMeterNo()),
                 addressKey, localitySlug);
     }
@@ -272,7 +256,6 @@ public class ListingService {
             if (!PropertyStatus.PENDING.equals(statusBefore)) {
                 p.recordResubmission();
             }
-            // An owner completing a staff-posted draft is filling it in, not changing it.
             if (!p.awaitsOwnerConfirmation()) {
                 caseNotes.post(p.getId(), p.getDeal(),
                         "You changed something fundamental about this listing, so it has gone back "
@@ -280,7 +263,6 @@ public class ListingService {
                         + "these within a day.");
             }
         } else if (impact.remoderationRequired() && PropertyStatus.FLAGGED.equals(p.getStatus())) {
-            // A flag is a moderator's hold, so an owner edit raises a re-check and never lifts it.
             List<String> held = impact.rechecked().isEmpty() ? List.of("listing basics") : impact.rechecked();
             String deskItemBefore = p.getRecheckReason();
             p.requestRecheck(held);
@@ -293,16 +275,12 @@ public class ListingService {
             p.requestRecheck(impact.rechecked());
             p.recordRecheckChanges(impact.changes());
 
-            // Branch on the work item the domain actually raised, and post only when it moved: an
-            // owner looping a price edit would otherwise flood the desk queue's sort key.
             if (p.getRecheckRequestedAt() != null
                     && !Objects.equals(deskItemBefore, p.getRecheckReason())) {
                 caseNotes.post(p.getId(), p.getDeal(), recheckNote(p, impact.rechecked()));
             }
         }
 
-        // Re-probe only when a signal moved, and last, after the status has settled because the
-        // note quotes it. Photographs count as a signal: list-property-wizard.md section 9.3.
         if (photosMoved || !duplicates.signalOf(p).equals(signalBefore)) {
             duplicates.flag(p);
         }

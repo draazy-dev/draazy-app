@@ -31,7 +31,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class PropertyController {
-
     private final PropertyService propertyService;
     private final ListingArchiveService archiveService;
     private final PropertyMapper propertyMapper;
@@ -50,7 +49,6 @@ public class PropertyController {
         this.permissions = permissions;
     }
 
-    /** Facet binding and why {@code rank} is not a {@code sort}: search-listings.md section 9.7. */
     @GetMapping(Routes.Properties.BASE)
     public PropertySearchResponse<PropertySummary> search(
             @RequestParam(required = false) String deal,
@@ -82,7 +80,6 @@ public class PropertyController {
         return propertyService.featured().stream().map(propertyMapper::toCard).toList();
     }
 
-    /** Cards for the recently-viewed rails; ids that are not publicly live drop out. */
     @GetMapping(Routes.Properties.CARDS)
     public List<PropertyCard> cards(
             @RequestParam @Size(max = PropertyService.CARDS_CAP) List<String> ids) {
@@ -113,7 +110,6 @@ public class PropertyController {
                 .map(r -> propertyMapper.toSimilar(r.property(), r.km())).toList();
     }
 
-    /** {@code 404} unless publicly visible (owner and checker excepted); a {@code null} viewer masks contact. */
     @GetMapping(Routes.Properties.BY_ID)
     public PropertyResponse get(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         UUID viewerId = principal != null ? principal.userId() : null;
@@ -125,7 +121,6 @@ public class PropertyController {
                 mayPreview(principal) ? FlagReasonVisibility.VISIBLE : FlagReasonVisibility.HIDDEN);
     }
 
-    /** The grant and not the bare role: a moderator whose {@code properties:read} was revoked loses this door too. */
     private boolean mayPreview(AuthPrincipal principal) {
         return principal != null
                 && Roles.isBackOffice(principal.role())

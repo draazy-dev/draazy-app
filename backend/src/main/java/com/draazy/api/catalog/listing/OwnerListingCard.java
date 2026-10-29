@@ -6,8 +6,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 
-/** The owner's My Listings row: what the card, its chips and the quality score read, and nothing else.
- * The full record is {@code GET /me/listings/{id}}. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record OwnerListingCard(
         String id,

@@ -9,9 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Consumer finders return live localities only; archived rows must not receive new listings. */
 public interface LocalityRepository extends JpaRepository<Locality, String> {
-
     Optional<Locality> findByPlaceId(String placeId);
 
     List<Locality> findByNameIgnoreCaseAndArchivedAtIsNull(String name);
@@ -25,7 +23,6 @@ public interface LocalityRepository extends JpaRepository<Locality, String> {
             """)
     List<Locality> searchLive(@Param("q") String q, Pageable page);
 
-    // pg_trgm word_similarity; the same 0.5 floor as the listing text search.
     @Query(value = """
             select * from localities l
             where l.archived_at is null and word_similarity(lower(:q), lower(l.name)) >= 0.5
@@ -33,7 +30,6 @@ public interface LocalityRepository extends JpaRepository<Locality, String> {
             limit :size""", nativeQuery = true)
     List<Locality> searchLiveClose(@Param("q") String q, @Param("size") int size);
 
-    /** Inserts a live row; 0 means the slug or the place is already taken, and nothing was written. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             insert into localities (slug, name, city, lat, lng, place_id, active)
@@ -42,7 +38,6 @@ public interface LocalityRepository extends JpaRepository<Locality, String> {
     int mint(@Param("slug") String slug, @Param("name") String name, @Param("city") String city,
             @Param("placeId") String placeId, @Param("lat") double lat, @Param("lng") double lng);
 
-    /** Gives a dormant seed row (inactive, no place) the one just picked; 0 means somebody else got there first. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             update localities
@@ -51,7 +46,6 @@ public interface LocalityRepository extends JpaRepository<Locality, String> {
     int adopt(@Param("slug") String slug, @Param("placeId") String placeId, @Param("name") String name,
             @Param("lat") double lat, @Param("lng") double lng);
 
-    /** The directory: live rows, plus non-live ones that still have approved listings bound to them. */
     @Query("""
             select l from Locality l
             where l.archivedAt is null

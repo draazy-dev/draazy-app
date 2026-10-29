@@ -21,10 +21,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// Read and decide are split into distinct identity:* atoms for maker-checker permissions.
 @RestController
 public class IdentityReviewController {
-
     private static final String STAFF_OR_ADMIN =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
     private static final String IDENTITY_READ =
@@ -43,7 +41,6 @@ public class IdentityReviewController {
         this.claims = claims;
     }
 
-    /** {@code GET /moderation/identity-reviews} (contract {@code listIdentityReviews}). */
     @GetMapping(Routes.Moderation.IDENTITY_REVIEWS)
     @PreAuthorize(IDENTITY_READ)
     public PageResponse<IdentityReviewRow> queue(
@@ -73,7 +70,6 @@ public class IdentityReviewController {
         return service.detail(principal, id);
     }
 
-    /** {@code POST /moderation/identity-reviews/{id}/approve} (contract {@code approveIdentityReview}). */
     @PostMapping(Routes.Moderation.IDENTITY_REVIEW_APPROVE)
     @PreAuthorize(IDENTITY_WRITE)
     public IdentityReviewResponse approve(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
@@ -81,7 +77,6 @@ public class IdentityReviewController {
         return service.approve(principal, id, body);
     }
 
-    /** {@code POST /moderation/identity-reviews/{id}/reject} (contract {@code rejectIdentityReview}). */
     @PostMapping(Routes.Moderation.IDENTITY_REVIEW_REJECT)
     @PreAuthorize(IDENTITY_WRITE)
     public IdentityReviewResponse reject(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,

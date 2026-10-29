@@ -10,11 +10,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/** Shared by the staff board and the owner inbox so the batched joins live once. A missing listing or group
- * hydrates as nulls, not an error: moderators must still see an orphaned row to clear it. */
 @Component
 class GroupApplicationHydrator {
-
     private final PropertyRepository properties;
     private final FlatmateGroupRepository groups;
     private final UserRepository users;
@@ -26,7 +23,6 @@ class GroupApplicationHydrator {
         this.users = users;
     }
 
-    /** Join the listing and group facts each row renders, batched rather than per row. */
     List<GroupApplicationDto> hydrate(List<FlatmateGroupApplication> rows) {
         return hydrate(rows, false);
     }
@@ -65,7 +61,6 @@ class GroupApplicationHydrator {
         }).toList();
     }
 
-    /** One row, for the two write paths that return the thing they just changed. */
     GroupApplicationDto hydrateOne(FlatmateGroupApplication row) {
         return hydrate(List.of(row)).getFirst();
     }

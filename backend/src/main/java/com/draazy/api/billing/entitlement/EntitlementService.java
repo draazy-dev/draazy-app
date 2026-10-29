@@ -20,11 +20,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Owner contacts and listing slots from the free tier, passes, packs and referrals. */
 @Service
 public class EntitlementService implements ContactAllowanceLookup, ListingAllowanceLookup {
-
-    // Free-tier floor, also what a null listing_limit resolves to.
     private static final int DEFAULT_FREE_LISTING_LIMIT = 1;
 
     private final SubscriptionService subscriptions;
@@ -45,7 +42,6 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         this.agreementCredits = agreementCredits;
     }
 
-    /** Computes everything together to avoid running the same queries twice. */
     @Transactional(readOnly = true)
     public EntitlementsDto forUser(UUID userId) {
         Optional<Plan> plan = subscriptions.entitlingPlan(userId);
@@ -56,7 +52,6 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
 
         ContactEntitlementDto contacts;
         if (plan.map(Plan::isUnlimitedContacts).orElse(false)) {
-            // Still reports the bonuses so an unlimited subscriber sees them honoured on downgrade.
             contacts = new ContactEntitlementDto(true, used, null, null, contactBonus, friendBonus, null, null);
         } else {
             ContactAllocator.Standing standing = standingOf(userId, contacted, contactBonus, friendBonus);
@@ -74,7 +69,6 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         return new EntitlementsDto(contacts, listings, agreementsOf(userId));
     }
 
-    /** Contacts the history replays onto this pack, for the refund rule; the pack is replayed even while frozen. */
     @Transactional(readOnly = true)
     public int contactsSpentFromPack(UUID userId, ContactPackTerm pack, Instant asOf) {
         List<ContactPackTerm> terms = new ArrayList<>(subscriptions.contactPacks(userId));
@@ -101,7 +95,6 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         return Objects.toString(at, null);
     }
 
-    // Granted rows are summed per track; rows with no track predate the tracks and earn owner contacts.
     private int referralContacts(UUID userId) {
         return Math.toIntExact(((Number) referrals.grantedByTrack(userId).getFirst()[1]).longValue()
                 * settings.referralContactBonus());
@@ -111,7 +104,6 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         return referrals.friendContactBonusStands(userId) ? Math.toIntExact(settings.referralSeekerBonusContacts()) : 0;
     }
 
-    /** Spendable at rent-agreement checkout; zero when every earned credit is already held by a request. */
     @Transactional(readOnly = true)
     public int freeAgreementsRemaining(UUID userId) {
         return agreementsOf(userId).remaining();
@@ -124,14 +116,12 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         return new AgreementEntitlementDto(earned, used, Math.max(0, earned - used));
     }
 
-    /** Ceiling-only path for the listing gate; skips the contact and agreement halves. */
     @Override
     @Transactional(readOnly = true)
     public int listingAllowance(UUID userId) {
         return freeListingSlots(subscriptions.entitlingPlan(userId));
     }
 
-    /** Remaining-only path for the contact gate; skips the listing and agreement halves. */
     @Override
     @Transactional(readOnly = true)
     public OptionalInt contactsRemaining(UUID userId) {

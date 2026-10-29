@@ -9,8 +9,6 @@ public record ZeptoMailProperties(
         String apiKey,
         String fromAddress,
         String fromName) {
-
-    // Redact the send token; accidental logging would require rotation.
     @Override
     public String toString() {
         return "ZeptoMailProperties[enabled=" + enabled

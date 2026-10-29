@@ -9,12 +9,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-// Only service requests hold raw Aadhaar; owner KYC stores masks because masks suffice.
 @Entity
 @Table(name = "service_request_identities")
 @Getter
 public class ServiceRequestIdentity extends BaseEntity {
-
     public static final String OWNER = "owner";
 
     public static final String TENANT = "tenant";
@@ -24,14 +22,12 @@ public class ServiceRequestIdentity extends BaseEntity {
     @Column(name = "service_request_id", nullable = false, updatable = false)
     private UUID serviceRequestId;
 
-    // #OWNER, #TENANT or #WITNESS; the CHECK rejects anything else.
     @Column(name = "party_role", nullable = false, updatable = false)
     private String partyRole;
 
     @Column(name = "party_index", nullable = false, updatable = false)
     private int partyIndex;
 
-    // Keep the name after purge so a retained row still tells the desk who it was.
     @Column(name = "party_name", updatable = false)
     private String partyName;
 
@@ -47,7 +43,6 @@ public class ServiceRequestIdentity extends BaseEntity {
     private Instant purgedAt;
 
     protected ServiceRequestIdentity() {
-
     }
 
     public ServiceRequestIdentity(UUID serviceRequestId, String partyRole, int partyIndex,
@@ -60,7 +55,6 @@ public class ServiceRequestIdentity extends BaseEntity {
         this.aadhaar = aadhaar;
     }
 
-    // Idempotent purge preserves the first timestamp: when numbers stopped being held.
     boolean purge() {
         if (purgedAt != null) {
             return false;

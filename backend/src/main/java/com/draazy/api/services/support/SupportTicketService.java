@@ -20,11 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Two audiences, one resource.
-// The raiser owns the ticket; staff and admin may read and answer any of them, because that is the job.
 @Service
 public class SupportTicketService {
-
     private final SupportTicketRepository tickets;
     private final SupportTicketMessageRepository messages;
     private final SupportTicketMapper mapper;
@@ -69,7 +66,6 @@ public class SupportTicketService {
         return Map.of("awaiting", awaiting, "answered", answered, "all", awaiting + answered);
     }
 
-    // Opening messages are unread for the desk; otherwise new tickets vanish from the queue.
     @Transactional
     public SupportTicketDto create(AuthPrincipal caller, SupportTicketCreate body) {
         SupportTicket raised = new SupportTicket(caller.userId(), body.subject(), body.category());
@@ -124,7 +120,6 @@ public class SupportTicketService {
         return mapper.toDto(ticket);
     }
 
-    // Clears only the caller's side; staff reads remove tickets from the ops queue.
     @Transactional
     public void markRead(AuthPrincipal caller, String id) {
         SupportTicket ticket = readable(caller, id, BackOfficePermissions.TICKETS_WRITE);

@@ -12,10 +12,9 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.RequestBodyAdviceAdapter;
 
-/** Caps the anonymous crash report by bytes actually read, so a chunked body with no length cannot bypass it. */
+// Caps the anonymous report by bytes actually read, so a chunked body with no length cannot bypass it.
 @ControllerAdvice(assignableTypes = ClientErrorController.class)
 public class ClientErrorBodyLimit extends RequestBodyAdviceAdapter {
-
     static final int MAX_BODY_BYTES = 16 * 1024;
 
     @Override

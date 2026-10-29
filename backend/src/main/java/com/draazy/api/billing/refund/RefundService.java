@@ -19,10 +19,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** A customer asks for a refund: the facts are re-read, the order is frozen, and staff are told. */
 @Service
 public class RefundService {
-
     private static final int REASON_MAX = 500;
 
     private static final int KEY_MAX = 128;
@@ -51,7 +49,6 @@ public class RefundService {
         this.signals = signals;
     }
 
-    /** Lock order: the listing row, then the order row, then the caller's contact-spend lock. */
     @Transactional
     public RefundRequest request(AuthPrincipal caller, UUID orderId, String reason, String idempotencyKey,
             String deviceHeader) {
