@@ -1,12 +1,12 @@
-import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   APIProvider, Map, AdvancedMarker, useMap, MapControl, ControlPosition, useApiLoadingStatus, APILoadingStatus,
 } from '@vis.gl/react-google-maps';
 import { useTranslation } from 'react-i18next';
 import { MapPinOff } from 'lucide-react';
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme } from '../../../lib/mapsConfig.js';
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme, subscribeMapsRefusal, isMapsRefused } from '../../../lib/mapsConfig.js';
 import MapUnavailable from '../../../components/property/MapUnavailable.jsx';
-import ErrorBoundary from '../../../components/ErrorBoundary.jsx';
+import MapBoundary from '../../../components/property/MapBoundary.jsx';
 import '../../../styles/components/location-picker.css';
 
 function readLatLng(e) {
@@ -64,7 +64,9 @@ function ReportFailure({ onUnavailable }) {
 
 export function PinMapBox({ invalid = false, hint = null, ...props }) {
   const { t } = useTranslation();
-  const [down, setDown] = useState(false);
+  const [markedDown, setDown] = useState(false);
+  const refused = useSyncExternalStore(subscribeMapsRefusal, isMapsRefused);
+  const down = markedDown || refused;
   const markDown = useCallback(() => setDown(true), []);
   const note = (
     <p className="flex items-start gap-1.5 text-xs text-amber-300" role="status" data-testid="map-down-note">
@@ -86,9 +88,9 @@ export function PinMapBox({ invalid = false, hint = null, ...props }) {
 export default function LocationPicker(props) {
   const { t } = useTranslation();
   return (
-    <ErrorBoundary scope="location-picker" fallback={<MapUnavailable style={{ height: '100%' }} note={t('listProperty.locationPicker.unavailable')} />}>
+    <MapBoundary scope="location-picker" fallback={<MapUnavailable style={{ height: '100%' }} note={t('listProperty.locationPicker.unavailable')} />}>
       <GoogleLocationPicker {...props} />
-    </ErrorBoundary>
+    </MapBoundary>
   );
 }
 

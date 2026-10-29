@@ -7,7 +7,7 @@ import { inr, seekerBudget, initials, avatarGrad, perHead, seatsLeft, allVerifie
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme } from '../../../lib/mapsConfig.js';
 import { getActiveCityGeo } from '../../../lib/geoConfig.js';
 import MapUnavailable from '../../../components/property/MapUnavailable.jsx';
-import ErrorBoundary from '../../../components/ErrorBoundary.jsx';
+import MapBoundary from '../../../components/property/MapBoundary.jsx';
 
 const MAX_ROWS = 3;
 const IW_OFFSET = [0, -22];
@@ -142,7 +142,7 @@ function FlatmateMap({ items, kindWord, onInterest, onRoomInterest, onJoin, onSa
   const frame = useMemo(() => framing(spots), [spots]);
   if (!GOOGLE_MAPS_API_KEY) return <MapUnavailable style={{ height: 460 }} />;
   return (
-    <ErrorBoundary scope="flatmate-map" fallback={<MapUnavailable style={{ height: 460 }} />}>
+    <MapBoundary scope="flatmate-map" fallback={<MapUnavailable style={{ height: 460 }} />}>
     <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
       <div className="sf-map w-full rounded-2xl overflow-hidden border border-white/10 isolate relative" style={{ height: 460 }}>
         <Map
@@ -193,7 +193,7 @@ function FlatmateMap({ items, kindWord, onInterest, onRoomInterest, onJoin, onSa
         </Map>
       </div>
     </APIProvider>
-    </ErrorBoundary>
+    </MapBoundary>
   );
 }
 

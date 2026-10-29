@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
@@ -8,10 +8,10 @@ import { fmtArea, fmtINR } from '../../lib/format.js';
 import { FURN_LBL } from '../../pages/consumer/listings/constants.js';
 import { propLatLng } from '../../pages/consumer/listings/geo.js';
 import { POSSESSION, AMEN_ICON, amenLabel } from './tileMeta.js';
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme, subscribeMapsRefusal, isMapsRefused } from '../../lib/mapsConfig.js';
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme } from '../../lib/mapsConfig.js';
 import { getActiveCityGeo, cityLabelFor } from '../../lib/geoConfig.js';
 import MapUnavailable from './MapUnavailable.jsx';
-import ErrorBoundary from '../ErrorBoundary.jsx';
+import MapBoundary from './MapBoundary.jsx';
 
 const mapLabel = (m) => (m.deal === 'rent' ? '₹' + Math.round(m.price / 1000) + 'k' : m.price >= 1e7 ? '₹' + (m.price / 1e7).toFixed(2) + 'Cr' : '₹' + Math.round(m.price / 1e5) + 'L');
 const MAX_AMEN_CHIPS = 5;
@@ -137,7 +137,6 @@ function PropertyPopup({ p, locName }) {
 export default function PropertyMap({ properties, locName, focus = [], activeId, onSelect, wrapStyle: wrapStyleProp, gestureHandling = 'cooperative', unavailableAction }) {
   const [openId, setOpenId] = useState(null);
   const { t } = useTranslation();
-  const refused = useSyncExternalStore(subscribeMapsRefusal, isMapsRefused);
   const [loadFailed, setLoadFailed] = useState(false);
   const single = !onSelect && properties.length === 1;
   const activeIdx = properties.findIndex((p) => p.id === activeId);
@@ -150,10 +149,10 @@ export default function PropertyMap({ properties, locName, focus = [], activeId,
   const initialZoom = single ? 15 : (focusCenter ? 14 : 12);
   const wrapStyle = wrapStyleProp || (single ? { height: '100%' } : { height: '72dvh', minHeight: 'min(520px, 70dvh)' });
   if (!GOOGLE_MAPS_API_KEY) return <MapUnavailable style={wrapStyle} action={unavailableAction} />;
-  if (refused || loadFailed) return <MapUnavailable style={wrapStyle} detail={t('pmap.mapLoadFailed')} action={unavailableAction} />;
+  const unavailable = <MapUnavailable style={wrapStyle} detail={t('pmap.mapLoadFailed')} action={unavailableAction} />;
   return (
-    <ErrorBoundary scope="property-map" fallback={<MapUnavailable style={wrapStyle} action={unavailableAction} />}>
-    <APIProvider apiKey={GOOGLE_MAPS_API_KEY} onError={() => setLoadFailed(true)}>
+    <MapBoundary scope="property-map" fallback={<MapUnavailable style={wrapStyle} action={unavailableAction} />} refusedFallback={unavailable}>
+    {loadFailed ? unavailable : <APIProvider apiKey={GOOGLE_MAPS_API_KEY} onError={() => setLoadFailed(true)}>
       <div className="w-full rounded-2xl overflow-hidden border border-white/10 isolate relative" style={wrapStyle}>
         <Map
           mapId={GOOGLE_MAPS_MAP_ID}
@@ -202,7 +201,7 @@ export default function PropertyMap({ properties, locName, focus = [], activeId,
           ) : null}
         </Map>
       </div>
-    </APIProvider>
-    </ErrorBoundary>
+    </APIProvider>}
+    </MapBoundary>
   );
 }

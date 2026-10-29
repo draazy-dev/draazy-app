@@ -2,7 +2,7 @@ import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { useTranslation } from 'react-i18next';
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme } from '../../lib/mapsConfig.js';
 import MapUnavailable from '../property/MapUnavailable.jsx';
-import ErrorBoundary from '../ErrorBoundary.jsx';
+import MapBoundary from '../property/MapBoundary.jsx';
 import '../../styles/components/location-picker.css';
 
 export default function SocietyMap({ lat, lng, name, height = 220 }) {
@@ -12,7 +12,7 @@ export default function SocietyMap({ lat, lng, name, height = 220 }) {
   if (!GOOGLE_MAPS_API_KEY) return <MapUnavailable style={wrapStyle} />;
   const position = { lat, lng };
   return (
-    <ErrorBoundary scope="society-map" fallback={<MapUnavailable style={wrapStyle} />}>
+    <MapBoundary scope="society-map" fallback={<MapUnavailable style={wrapStyle} />}>
     <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
       <div className="w-full rounded-2xl overflow-hidden border border-white/10 isolate relative" style={wrapStyle}>
         <Map
@@ -38,6 +38,6 @@ export default function SocietyMap({ lat, lng, name, height = 220 }) {
         </Map>
       </div>
     </APIProvider>
-    </ErrorBoundary>
+    </MapBoundary>
   );
 }
