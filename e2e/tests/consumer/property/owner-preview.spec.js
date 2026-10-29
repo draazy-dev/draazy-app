@@ -1,7 +1,7 @@
 // Isolated owners prevent shared account state from affecting visibility assertions.
 // Reject fixtures after each test so pending rows do not remain in the moderation queue.
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, uniqueMobile, signedInAs, storedPhotoUrl, ownerIdOf } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, uniqueMobile, signedInAs, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { approveListing, rejectListing } from '../../../helpers/moderation.js';
 
 const created = new Set();
@@ -17,11 +17,7 @@ const BASE_LISTING = {
   locality: 'Baner',
 };
 
-// Relative storage URLs match the local provider and satisfy the image CSP.
-const photos = (headers) => {
-  const ownerId = ownerIdOf(headers);
-  return [storedPhotoUrl('', ownerId), storedPhotoUrl('', ownerId)];
-};
+const photos = (headers) => uploadedListingPhotos(headers, 2);
 
 async function api(method, path, headers, body) {
   const res = await fetch(`${API}${path}`, {
@@ -42,7 +38,7 @@ async function postListing(headers, fields) {
   const res = await api('POST', '/me/listings', headers, {
     title: `Zztest owner-preview ${Date.now().toString(36)}`,
     ...BASE_LISTING,
-    images: photos(headers),
+    images: await photos(headers),
     ...fields,
   });
   expect(res.status, 'POST /me/listings').toBe(201);
@@ -64,7 +60,7 @@ test.afterEach(async ({ request }) => {
 test.describe('LIVE — an owner\'s listing before it is approved', () => {
   test('the cover is the first photo when no cover was ever chosen', async () => {
     const me = await owner();
-    const images = photos(me.headers);
+    const images = await photos(me.headers);
     const posted = await postListing(me.headers, { images });
     // No cover field is posted: this must be derived, not echoed from the fixture.
     expect(posted.coverImage).toBe(images[0]);
@@ -88,7 +84,7 @@ test.describe('LIVE — an owner\'s listing before it is approved', () => {
 
   test('the dashboard card shows the photo the owner uploaded, not the placeholder', async ({ page }) => {
     const me = await owner();
-    const images = photos(me.headers);
+    const images = await photos(me.headers);
     const posted = await postListing(me.headers, { images, title: `Zztest card ${Date.now().toString(36)}` });
 
     await signedInAs(page, me.mobile);
@@ -136,7 +132,7 @@ test.describe('LIVE — an owner\'s listing before it is approved', () => {
 
   test('the owner can open their own pending listing, and is told only they can see it', async ({ page }) => {
     const me = await owner();
-    const posted = await postListing(me.headers, { images: photos(me.headers) });
+    const posted = await postListing(me.headers, { images: await photos(me.headers) });
     expect(posted.status, 'a new listing starts in moderation').toBe('pending');
 
     await signedInAs(page, me.mobile);

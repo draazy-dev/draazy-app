@@ -4,7 +4,8 @@ import { API, apiLogin, signedInAs, uploadedListingPhotos, uniqueMobile } from '
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
 // A meter number unique to this test run, so a cluster here can only contain this test's rows.
-const meterNo = () => `MSEDCL-DUP-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6)}`;
+// MeterKey keeps only digits and needs six, so the unique part must be digits.
+const meterNo = () => `MSEDCL-DUP-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
 async function api(method, path, token, body) {
   const res = await fetch(`${API}${path}`, {

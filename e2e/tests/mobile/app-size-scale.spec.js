@@ -51,7 +51,9 @@ test('home FAQ questions are compact rows, not tall padded cards', async ({ page
   await page.goto('/');
   const rows = page.locator('section[aria-labelledby="faqHeading"] details:not([open])');
   await expect(rows.first()).toBeVisible();
-  const heights = await rows.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
-  expect(Math.min(...heights), 'a one-line question keeps the 44px tap floor').toBeGreaterThanOrEqual(44);
-  expect(heights.filter((h) => h > 76), 'only a two-line question grows past a single row').toEqual([]);
+  // Polled: a late lazy chunk can briefly re-suspend the page, and Suspense hides the shown rows with display:none.
+  const heights = () => rows.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
+  await expect.poll(async () => Math.min(...await heights()), { message: 'a one-line question keeps the 44px tap floor' })
+    .toBeGreaterThanOrEqual(44);
+  expect((await heights()).filter((h) => h > 76), 'only a two-line question grows past a single row').toEqual([]);
 });

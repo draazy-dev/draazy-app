@@ -42,13 +42,13 @@ const LISTING_PNG = Buffer.from(
   'base64',
 );
 
-export async function uploadedListingPhotos(auth, count = 1, { api = API } = {}) {
+export async function uploadedListingPhotos(auth, count = 1, { api = API, image = LISTING_PNG } = {}) {
   const raw = typeof auth === 'string' ? auth : auth?.accessToken ?? auth?.authorization ?? auth?.Authorization ?? '';
   const authorization = /^Bearer\s/i.test(raw) ? raw : `Bearer ${raw}`;
   const urls = [];
   for (let i = 0; i < count; i += 1) {
     const form = new FormData();
-    form.set('file', new Blob([LISTING_PNG], { type: 'image/png' }), `listing-${i}.png`);
+    form.set('file', new Blob([image], { type: 'image/png' }), `listing-${i}.png`);
     const res = await fetch(`${api}/me/photos`, { method: 'POST', headers: { authorization }, body: form });
     if (res.status !== 201) throw new Error(`POST /me/photos failed: ${res.status} ${await res.text()}`);
     urls.push((await res.json()).url);
@@ -173,9 +173,11 @@ export async function signedInAs(page, mobile) {
     await page.context().addCookies(saved.cookies);
     // Init scripts re-run on every navigation; seed once, or a later sign-in on this page is overwritten.
     await page.addInitScript((snapshot) => {
+      if (window !== window.top || sessionStorage.getItem(snapshot.flag)) return;
       for (const [k, v] of Object.entries(snapshot.local)) localStorage.setItem(k, v);
       for (const [k, v] of Object.entries(snapshot.session)) sessionStorage.setItem(k, v);
-    }, { local: saved.local, session: saved.session });
+      sessionStorage.setItem(snapshot.flag, '1');
+    }, { local: saved.local, session: saved.session, flag: `e2e-seeded:${mobile}:${Date.now()}:${Math.random()}` });
     await page.goto('/');
     return;
   }

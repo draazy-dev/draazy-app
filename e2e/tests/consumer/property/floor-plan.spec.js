@@ -1,15 +1,10 @@
 /* The Floor Plan section shows the plan the owner tagged, or none: a type-and-BHK schematic makes two 2 BHKs
  * look like the same home. Each case posts its own listing, since seeded rows legitimately store an SVG. */
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { authHeaders, API, uniqueMobile, storedPhotoUrl, ownerIdOf } from '../../../helpers/liveAuth.js';
+import { authHeaders, API, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 const created = new Set();
-
-const photosFor = (headers) => {
-  const ownerId = ownerIdOf(headers);
-  return [storedPhotoUrl('', ownerId), storedPhotoUrl('', ownerId), storedPhotoUrl('', ownerId)];
-};
 
 async function api(method, path, headers, body) {
   const res = await fetch(`${API}${path}`, {
@@ -36,8 +31,7 @@ test.afterEach(async () => {
 
 async function publish(fields) {
   const headers = await authHeaders(uniqueMobile());
-  const images = photosFor(headers);
-  const neverReviewed = storedPhotoUrl('', ownerIdOf(headers));
+  const [neverReviewed, ...images] = await uploadedListingPhotos(headers, 4);
   const resolvedFields = typeof fields === 'function' ? fields(images) : fields;
   const res = await api('POST', '/me/listings', headers, {
     title: `Zztest floor-plan ${Date.now()}`,

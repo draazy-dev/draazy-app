@@ -78,12 +78,14 @@ class SuspendedOwnerListingsTest extends AbstractApiTest {
                         .content("{\"propertyId\":\"" + p.getId() + "\"}"))
                 .andExpect(status().isNotFound());
         mvc.perform(get(Routes.Engagement.SAVED).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
-                .andExpect(jsonPath("$.content[0].available").value(false));
+                .andExpect(jsonPath("$.content").isEmpty());
 
         owner.setStatus(UserStatuses.ACTIVE);
         users.saveAndFlush(owner);
 
         assertThat(search()).contains(p.getId().toString());
         mvc.perform(get(byId)).andExpect(status().isOk());
+        mvc.perform(get(Routes.Engagement.SAVED).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.content.length()").value(1));
     }
 }

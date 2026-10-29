@@ -82,7 +82,8 @@ test.describe('LIVE: conversations against the real API', () => {
     expect(body.totalElements).toBeGreaterThan(0);
 
     // Establish a real thread before making negative assertions about the inbox fixture.
-    const thread = page.locator('.pc-conv').first();
+    // Request rows (flatmate/contact asks) share the list but never read /messages/<id>.
+    const thread = page.locator('.pc-conv[data-staged="false"]').first();
     await expect(thread).toBeVisible({ timeout: 15000 });
 
     const seededIds = await page.evaluate(() => {

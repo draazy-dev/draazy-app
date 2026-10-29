@@ -110,9 +110,17 @@ test('the tab count is the server\u2019s own count of the queue', async ({ page,
   expect(queue.status).toBe(200);
   expect(queue.body.totalElements, 'the seeded row is not in the server queue').toBeGreaterThanOrEqual(1);
 
+  // Parallel workers move the shared queue mid-load, so compare against the summary this page itself read.
+  let served;
+  page.on('response', async (r) => {
+    if (/\/api\/admin\/properties\/summary(\?|$)/.test(r.url()) && r.ok()) served = (await r.json().catch(() => ({}))).recheck ?? served;
+  });
   await openQueue(page, login, seeded.title);
 
-  await expect(page.getByTestId('tab-count-recheck')).toHaveText(String(queue.body.totalElements));
+  const countText = page.getByTestId('tab-count-recheck');
+  await expect(countText).toHaveText(/^\d+$/);
+  await expect.poll(async () => Number(await countText.textContent()) - served).toBe(0);
+  expect(served).toBeGreaterThanOrEqual(1);
 });
 
 test('the listing really is still live while it waits', async ({ page, login, request }) => {

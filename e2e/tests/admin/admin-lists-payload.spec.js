@@ -119,8 +119,11 @@ test('the bell does not refetch on a route change, and the palette looks listing
   expect(gets.withPath('/api/admin/properties')).toEqual([]);
 
   const lookup = await getJson('/admin/properties/lookup?q=Baner&size=6');
+  const SLIM = ['id', 'locality', 'owner', 'ownerMobile', 'slug', 'status', 'title'];
   for (const row of lookup.content) {
-    expect(Object.keys(row).sort()).toEqual(['id', 'locality', 'owner', 'ownerMobile', 'slug', 'status', 'title']);
+    // NON_NULL row: a nameless owner or a listing not yet given a slug drops that key.
+    expect(Object.keys(row).filter((k) => !SLIM.includes(k)), 'only slim keys').toEqual([]);
+    expect(row.id).toBeTruthy();
     expect(row.ownerMobile).toMatch(/^\d{10}$/);
   }
   expect(consoleErrors).toHaveLength(0);

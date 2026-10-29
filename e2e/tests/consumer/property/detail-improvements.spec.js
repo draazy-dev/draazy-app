@@ -94,10 +94,12 @@ test('a sale plot shows a neutral note, never a fabricated residential benchmark
 
 test('a rent flat shows the locality average rent only when the server has one, and the flatmate-split card', async ({ page }) => {
   const errors = await collectErrors(page);
+  // The page's own locality read: parallel workers can push Wakad over the average threshold between two reads.
+  const pageStats = page.waitForResponse((r) => /\/api\/localities\/wakad(\?|$)/.test(r.url()) && r.request().method() === 'GET');
   const txt = await gotoProp(page, RENT_2BHK_KNOWN);
 
   await test.step('the locality average rent tile follows the server stats', async () => {
-    const { avgRent } = await statsOf('wakad');
+    const { avgRent } = await (await pageStats).json();
     if (avgRent != null) {
       await expect(page.getByTestId('rent-locality-avg')).toBeVisible();
       expect(txt).toContain('avg rent in wakad');

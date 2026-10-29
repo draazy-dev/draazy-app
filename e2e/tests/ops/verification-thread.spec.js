@@ -5,7 +5,8 @@ import { tickChecklistWithFetch } from '../../helpers/moderation.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
-const meterNo = () => `MSEDCL-E2E-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
+// MeterKey keeps only digits and needs six, so the unique part must be digits.
+const meterNo = () => `MSEDCL-E2E-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
 
 async function api(method, path, token, body) {
   const res = await fetch(`${API}${path}`, {

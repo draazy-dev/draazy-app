@@ -12,9 +12,15 @@ const ref = (p) => p.slug || p.id;
 
 const cards = (page) => page.locator('a[href^="/property/"]');
 
+// A slug-less listing links as `/property/<bhk-type-deal-locality>-<uuid>`; its key is the trailing UUID.
+const TRAILING_UUID = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
 const slugs = async (page) => {
   const hrefs = await cards(page).evaluateAll((els) => els.map((e) => e.getAttribute('href')));
-  return hrefs.map((h) => h.split('/').pop());
+  return hrefs.map((h) => {
+    const seg = h.split('/').pop();
+    return seg.match(TRAILING_UUID)?.[1] ?? seg;
+  });
 };
 
 /* The count line is rendered twice (a mobile `sm:hidden` copy and a desktop one), and it holds the

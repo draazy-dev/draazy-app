@@ -162,7 +162,9 @@ test.describe('Scheduled visits (live)', () => {
       await page.getByRole('button', { name: /^Cancel$/ }).first().click();
       await expect(badges(page, 'Awaiting confirmation')).toHaveCount(1);
       // A cancelled visit leaves Upcoming entirely, so the DOM alone cannot say which row was cancelled.
-      expect((await rowOf(rohit)).status, 'the cancelled row is the one whose button was clicked').toBe('cancelled');
+      // The row drops optimistically, so poll until the write lands.
+      await expect.poll(async () => (await rowOf(rohit)).status, { message: 'the cancelled row is the one whose button was clicked' })
+        .toBe('cancelled');
       expect((await rowOf(asha)).status, 'the other booking is untouched').toBe('scheduled');
     });
 

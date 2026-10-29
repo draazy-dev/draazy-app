@@ -94,7 +94,7 @@ test('supplemental edits retain other saved answers without writing missing defa
 const details = {
   flatNumber: 'C-901', tower: 'North', society: 'Edit Homes', street: 'Baner Road',
   landmark: 'Near library', ownership: 'Freehold', loanAvailable: false,
-  agreementDuration: '24', lockIn: '0', noticePeriod: '2', availableFrom: '2027-01-20',
+  agreementDuration: '24', lockIn: '0', noticePeriod: '2', availableFrom: '2099-01-20',
   preferredTenants: ['family', 'bachelors'], petsPolicy: 'no', foodPref: 'veg',
   rentMaintMode: 'extra', possession: 'available', fixtures: [],
 };
@@ -104,7 +104,7 @@ const wire = {
   lat: 18.56, lng: 73.77, societyId: 'society-id', locality: 'Baner',
   pincode: '411045', address: 'C-901, North, Edit Homes, Baner Road',
   electricityMeterNo: '00123456789', reraId: 'P52100000001',
-  formDetails: details, floor: 0, bathrooms: 2, balconies: 0, parking: 0,
+  formDetails: details, availableOn: '2099-01-20', floor: 0, bathrooms: 2, balconies: 0, parking: 0,
 };
 
 test('owner read restores each address, pricing and verification answer without losing false or zero', () => {
@@ -213,18 +213,19 @@ test('display types and commercial subtypes invert to wizard keys', () => {
 
 test('legacy missing answers stay blank and search availability is not a calendar date', () => {
   const vm = toViewModel({ address: '  Unit 9, Some building\nPune  ', deposit: null,
-    maintenance: null, negotiable: null, availableFrom: 'within-month', availableDate: '2027-03-15',
+    maintenance: null, negotiable: null, availableFrom: 'within-month', availableDate: '2099-03-15',
     possession: 'ready-to-move' });
   for (const key of ['deposit', 'maintenance', 'negotiable']) assert.equal(vm[key], null, key);
-  assert.equal(vm.availableDate, '2027-03-15');
+  assert.equal(vm.availableDate, '2099-03-15');
   const form = toEditForm(vm);
   assert.equal(form.existingAddress, vm.address);
   for (const key of ['flatNumber', 'tower', 'society', 'street', 'ownership', 'agreementDuration',
-    'lockIn', 'noticePeriod', 'foodPref', 'petsPolicy', 'availableFrom',
+    'lockIn', 'noticePeriod', 'foodPref', 'petsPolicy',
     'deposit', 'monthlyMaintenance', 'rentMaintMode', 'furnishing', 'age']) {
     assert.equal(form[key], '', key);
   }
-  // Possession is asked and answered through `construction`; the wizard has no separate box for it.
+  assert.equal(form.availableFrom, '2099-03-15');
+  assert.equal(toEditForm(toViewModel({ availableFrom: 'within-month' })).availableFrom, '');
   assert.equal(form.construction, 'ready');
   assert.equal(toEditForm(toViewModel({})).construction, '');
   assert.equal(toEditForm({ area: 950, carpetArea: null }).carpetArea, '950');
@@ -279,7 +280,7 @@ test('form-details helper matches the backend allowlist and preserves exact empt
   const answers = Object.fromEntries(groups.flatMap(([, group, contents]) =>
     [...contents.matchAll(/"([^"]+)"/g)].map(([, key]) => [key, group === 'FLAGS' ? false : group === 'ARRAYS' ? [] : ''])));
   assert.deepEqual(pickListingFormDetails({ ...answers, status: 'approved' }), answers);
-  const form = toEditForm(toViewModel({ ...wire, formDetails: answers }));
+  const form = toEditForm(toViewModel({ ...wire, availableOn: null, formDetails: answers }));
   for (const [key, value] of Object.entries(answers)) assert.deepEqual(form[key], value, key);
   assert.deepEqual(pickListingFormDetails({ flatNumber: 0, tower: null, society: undefined }), { flatNumber: 0 });
   assert.deepEqual(pickListingFormDetails(null), {});
