@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { computeStampDuty, leaveLicenceStamp, monthLabel, monthOptions, monthsBetween, rentalYield } from './toolCalc.js';
+import { computeStampDuty, leaveLicenceStamp, monthLabel, monthOptions, monthsBetween, rentalYield, rentForTerm } from './toolCalc.js';
 
 const opts = monthOptions(new Date(2025, 5, 15));
 assert.equal(opts.length, 49);
@@ -12,9 +12,13 @@ assert.deepEqual(computeStampDuty(7500000, 7), { stamp: 525000, reg: 30000, tota
 assert.equal(computeStampDuty(1000000, 7).reg, 10000);
 assert.equal(computeStampDuty(-5, 7).total, 0);
 
-// ₹25,000 x 11 months + ₹1,00,000 deposit for 1 year: 0.25% of 2,85,000 = 712.5, rounded up to ₹800
-assert.equal(leaveLicenceStamp(275000, 0, 100000, 1), 800);
-assert.equal(leaveLicenceStamp(0, 0, 0, 1), 100);
+assert.deepEqual(leaveLicenceStamp(275000, 0, 100000, 1), { exactPaise: 71250, stamp: 713 });
+assert.deepEqual(leaveLicenceStamp(352000, 0, 150000, 1), { exactPaise: 91750, stamp: 918 });
+assert.equal(leaveLicenceStamp(33000, 0, 70040, 1).stamp, 100);
+assert.equal(leaveLicenceStamp(33000, 0, 72000, 1).stamp, 101);
+assert.deepEqual(leaveLicenceStamp(0, 0, 0, 1), { exactPaise: 0, stamp: 100 });
+assert.equal(rentForTerm(11130, 24, 5, 12), 11130 * 12 + 11686 * 12);
+assert.equal(rentForTerm(10000, 36, 10, 12), 10000 * 12 + 11000 * 12 + 12100 * 12);
 
 assert.deepEqual(monthsBetween('2026-03', '2026-05'), ['2026-03', '2026-04', '2026-05']);
 assert.deepEqual(monthsBetween('2025-11', '2026-02'), ['2025-11', '2025-12', '2026-01', '2026-02']);

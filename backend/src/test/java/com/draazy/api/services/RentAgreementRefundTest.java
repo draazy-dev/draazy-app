@@ -25,7 +25,7 @@ class RentAgreementRefundTest extends ServiceFixtures {
             + "\"deposit\":60000,\"months\":11,\"_state\":{\"prop\":{\"gramPanchayat\":false},\"terms\":{\"rent\":\"20000\",\"deposit\":\"60000\","
             + "\"months\":\"11\"}}}}";
 
-    private static final long STATUTORY = 600 + 1000 + 300;
+    private static final long STATUTORY = 565 + 1000 + 300;
 
     private static final String GRN = "MH012345678901234567E";
 

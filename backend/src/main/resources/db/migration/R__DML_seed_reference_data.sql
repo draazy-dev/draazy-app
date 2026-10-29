@@ -1,7 +1,7 @@
 -- Repeatable reference/config seed; keep statements idempotent and never add user data. A statutory
 -- charge is seeded only where it is a flat published figure, so a percentage stays NULL.
 INSERT INTO platform_fees (deal, brokerage, platform_fee, stamp_duty, registration, notes) VALUES
-    ('rent', 0, 499, NULL,  NULL,  'Zero brokerage; flat Rs 499 platform fee. Maharashtra stamp duty (0.25% of rent for the term + non-refundable deposit + 10% of the refundable deposit per year, rounded up to the next Rs 100, minimum Rs 100), registration (Rs 1,000 municipal / Rs 500 rural) and the Rs 300 document handling charge are statutory, computed per agreement from your terms, and     collected on top.')
+    ('rent', 0, 499, NULL,  NULL,  'Zero brokerage; flat Rs 499 platform fee. Maharashtra stamp duty (0.25% of rent for the term + non-refundable deposit + 10% of the refundable deposit per year, rounded to the nearest rupee, minimum Rs 100), registration (Rs 1,000 municipal / Rs 500 rural) and the Rs 300 document handling charge are statutory, computed per agreement from your terms, and     collected on top.')
     ON CONFLICT (deal) DO UPDATE SET
     brokerage    = EXCLUDED.brokerage,
     platform_fee = EXCLUDED.platform_fee,

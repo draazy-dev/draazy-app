@@ -20,11 +20,11 @@ class LeaveAndLicenceChargesTest {
             Charges charges = LeaveAndLicenceCharges.on(
                     new Terms(32_000L, 150_000L, 0L, 11, true));
 
-            assertThat(charges.exactDuty()).isEqualTo(918L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(91_750L);
             assertThat(charges.registration()).isEqualTo(1_000L);
-            assertThat(charges.stampDuty()).isEqualTo(1_000L);
+            assertThat(charges.stampDuty()).isEqualTo(918L);
             assertThat(charges.handling()).isEqualTo(300L);
-            assertThat(charges.total()).isEqualTo(2_300L);
+            assertThat(charges.total()).isEqualTo(2_218L);
         }
 
         @Test
@@ -33,7 +33,7 @@ class LeaveAndLicenceChargesTest {
             Charges charges = LeaveAndLicenceCharges.on(
                     new Terms(32_000L, 150_000L, 50_000L, 11, true));
 
-            assertThat(charges.exactDuty()).isEqualTo(1_043L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(104_250L);
         }
 
         @Test
@@ -42,7 +42,7 @@ class LeaveAndLicenceChargesTest {
             Charges charges = LeaveAndLicenceCharges.on(
                     new Terms(20_000L, 100_000L, 0L, 24, true));
 
-            assertThat(charges.exactDuty()).isEqualTo(1_250L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(125_000L);
         }
 
         @Test
@@ -51,7 +51,7 @@ class LeaveAndLicenceChargesTest {
             Charges charges = LeaveAndLicenceCharges.on(
                     new Terms(10_000L, 60_000L, 0L, 13, true));
 
-            assertThat(charges.exactDuty()).isEqualTo(355L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(35_500L);
         }
 
         @Test
@@ -59,7 +59,7 @@ class LeaveAndLicenceChargesTest {
         void zeroDepositIsPriced() {
             Charges charges = LeaveAndLicenceCharges.on(new Terms(25_000L, 0L, 0L, 11, true));
 
-            assertThat(charges.exactDuty()).isEqualTo(688L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(68_750L);
         }
 
         @Test
@@ -68,7 +68,8 @@ class LeaveAndLicenceChargesTest {
             Charges charges = LeaveAndLicenceCharges.on(
                     new Terms(32_000L, 150_005L, 0L, 11, true));
 
-            assertThat(charges.exactDuty()).isEqualTo(918L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(91_750L);
+            assertThat(charges.stampDuty()).isEqualTo(918L);
         }
     }
 
@@ -81,7 +82,7 @@ class LeaveAndLicenceChargesTest {
             Charges charges = LeaveAndLicenceCharges.on(
                     new Terms(20_000L, 100_000L, 0L, 22, true, 500, 11));
 
-            assertThat(charges.exactDuty()).isEqualTo(1_178L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(117_750L);
         }
 
         @Test
@@ -90,7 +91,7 @@ class LeaveAndLicenceChargesTest {
             Charges charges = LeaveAndLicenceCharges.on(
                     new Terms(20_000L, 100_000L, 0L, 24, true, 500, 12));
 
-            assertThat(charges.exactDuty()).isEqualTo(1_280L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(128_000L);
         }
 
         @Test
@@ -99,7 +100,7 @@ class LeaveAndLicenceChargesTest {
             Charges charges = LeaveAndLicenceCharges.on(
                     new Terms(32_000L, 150_000L, 0L, 12, true, 500, 11));
 
-            assertThat(charges.exactDuty()).isEqualTo(1_002L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(100_150L);
         }
 
         @Test
@@ -108,16 +109,17 @@ class LeaveAndLicenceChargesTest {
             Charges charges = LeaveAndLicenceCharges.on(
                     new Terms(10_000L, 0L, 0L, 36, true, 1_000, 12));
 
-            assertThat(charges.exactDuty()).isEqualTo(993L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(99_300L);
         }
 
         @Test
-        @DisplayName("the escalated rent is the whole-rupee figure the deed states, rounded half-up")
+        @DisplayName("the escalated rent drops its paise as IGR's parseInt does: ₹11,686.50 taxes as ₹11,686")
         void escalatedRentIsWholeRupees() {
             Charges charges = LeaveAndLicenceCharges.on(
                     new Terms(11_130L, 0L, 0L, 24, true, 500, 12));
 
-            assertThat(charges.exactDuty()).isEqualTo(685L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(68_448L);
+            assertThat(charges.stampDuty()).isEqualTo(684L);
         }
 
         @Test
@@ -126,17 +128,17 @@ class LeaveAndLicenceChargesTest {
             Charges charges = LeaveAndLicenceCharges.on(
                     new Terms(20_000L, 0L, 0L, 24, true, 250, 12));
 
-            assertThat(charges.exactDuty()).isEqualTo(1_215L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(121_500L);
         }
 
         @Test
         @DisplayName("a term that ends before the first increase is taxed on the flat rent")
         void termWithinFirstBlockIsFlat() {
             assertThat(LeaveAndLicenceCharges.on(new Terms(32_000L, 150_000L, 0L, 11, true, 500, 11))
-                    .exactDuty()).isEqualTo(918L);
+                    .exactDutyInPaise()).isEqualTo(91_750L);
             assertThat(LeaveAndLicenceCharges.on(new Terms(32_000L, 150_000L, 0L, 12, true, 500, 12))
-                    .exactDuty()).isEqualTo(LeaveAndLicenceCharges.on(
-                            new Terms(32_000L, 150_000L, 0L, 12, true)).exactDuty());
+                    .exactDutyInPaise()).isEqualTo(LeaveAndLicenceCharges.on(
+                            new Terms(32_000L, 150_000L, 0L, 12, true)).exactDutyInPaise());
         }
 
         @Test
@@ -165,24 +167,24 @@ class LeaveAndLicenceChargesTest {
     }
 
     @Nested
-    @DisplayName("the duty GRAS collects (D-a)")
+    @DisplayName("the duty GRAS collects — the IGR calculator's rounding")
     class IgrRounding {
         @Test
-        @DisplayName("a duty already in whole hundreds is billed as it is")
-        void wholeHundredStays() {
-            Charges charges = LeaveAndLicenceCharges.on(new Terms(3_000L, 70_000L, 0L, 11, true));
+        @DisplayName("a paisa past a whole rupee rounds down, not up to the next hundred")
+        void aPaisaPastRoundsDown() {
+            Charges charges = LeaveAndLicenceCharges.on(new Terms(3_000L, 70_040L, 0L, 11, true));
 
-            assertThat(charges.exactDuty()).isEqualTo(100L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(10_001L);
             assertThat(charges.stampDuty()).isEqualTo(100L);
         }
 
         @Test
-        @DisplayName("a paisa past a hundred bills the next hundred")
-        void aPaisaPastRoundsUp() {
-            Charges charges = LeaveAndLicenceCharges.on(new Terms(3_000L, 70_040L, 0L, 11, true));
+        @DisplayName("fifty paise rounds up to the next rupee")
+        void halfARupeeRoundsUp() {
+            Charges charges = LeaveAndLicenceCharges.on(new Terms(3_000L, 72_000L, 0L, 11, true));
 
-            assertThat(charges.exactDuty()).isEqualTo(100L);
-            assertThat(charges.stampDuty()).isEqualTo(200L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(10_050L);
+            assertThat(charges.stampDuty()).isEqualTo(101L);
         }
 
         @Test
@@ -190,7 +192,7 @@ class LeaveAndLicenceChargesTest {
         void floorIsAHundred() {
             Charges charges = LeaveAndLicenceCharges.on(new Terms(1_000L, 0L, 0L, 11, true));
 
-            assertThat(charges.exactDuty()).isEqualTo(28L);
+            assertThat(charges.exactDutyInPaise()).isEqualTo(2_750L);
             assertThat(charges.stampDuty()).isEqualTo(100L);
         }
 
@@ -200,7 +202,7 @@ class LeaveAndLicenceChargesTest {
             Charges rural = LeaveAndLicenceCharges.on(new Terms(32_000L, 150_000L, 0L, 11, false));
 
             assertThat(rural.handling()).isEqualTo(300L);
-            assertThat(rural.total()).isEqualTo(1_000L + 500L + 300L);
+            assertThat(rural.total()).isEqualTo(918L + 500L + 300L);
         }
     }
 

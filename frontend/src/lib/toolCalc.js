@@ -15,15 +15,16 @@ export const rentForTerm = (rent, months, incrementPct, every) => {
   const step = parseInt(every, 10) === 12 ? 12 : 11;
   let monthly = rent, total = 0;
   for (let paid = 0; paid < months; paid += step) {
-    if (paid > 0) monthly = Math.floor((monthly * (10000 + bps) + 5000) / 10000);
+    if (paid > 0) monthly = Math.floor(Math.floor((monthly * (10000 + bps) + 50) / 100) / 100);
     total += monthly * Math.min(step, months - paid);
   }
   return total;
 };
 
-/* Art. 36A: 0.25% of rent + non-refundable money + 10% a year on the deposit, rounded up to ₹100 (min ₹100). */
-export const leaveLicenceStamp = (rentTotal, nonRefundable, deposit, years) =>
-  Math.max(100, Math.ceil(((rentTotal + nonRefundable) * 10 + deposit * years) / 400000) * 100);
+export const leaveLicenceStamp = (rentTotal, nonRefundable, deposit, years) => {
+  const tenths = (rentTotal + nonRefundable) * 10 + deposit * years;
+  return { exactPaise: Math.floor((tenths + 20) / 40), stamp: Math.max(100, Math.floor((tenths + 2000) / 4000)) };
+};
 
 export function rentalYield({ price, rent, maintenance, propertyTax, vacancyMonths }) {
   const vacant = Math.min(Math.max(vacancyMonths, 0), 12);

@@ -3,6 +3,7 @@ import ToolShell, { NumField, Panel, ResultCard, rupees, toNum } from './ToolShe
 import { usePricing } from '../../../context/PricingContext.jsx';
 import { rentForTerm, leaveLicenceStamp } from '../../../lib/toolCalc.js';
 import { MAX_MONTHS } from '../services/rent-agreement/constants.js';
+import { fmtPaise } from '../services/rent-agreement/helpers.js';
 
 const REGISTRATION_FEE = 1000;
 const DOCUMENT_HANDLING = 300;
@@ -17,7 +18,7 @@ export default function RentAgreementCost() {
   const term = Math.min(Math.max(toNum(months), 1), MAX_MONTHS);
   const years = Math.ceil(term / 12);
   const rentTotal = rentForTerm(toNum(rent), term, increase, 12);
-  const stamp = leaveLicenceStamp(rentTotal, 0, toNum(deposit), years);
+  const { stamp, exactPaise } = leaveLicenceStamp(rentTotal, 0, toNum(deposit), years);
   const govt = stamp + REGISTRATION_FEE + DOCUMENT_HANDLING;
   const service = prices.rentAgreementPlatform;
 
@@ -37,6 +38,7 @@ export default function RentAgreementCost() {
             value={rupees(govt)}
             rows={[
               ['Rent for the term', rupees(rentTotal)],
+              ['0.25% before IGR rounds to the rupee', fmtPaise(exactPaise / 100)],
               ['Stamp duty (0.25%)', rupees(stamp)],
               ['Registration fee', rupees(REGISTRATION_FEE)],
               ['Document handling', rupees(DOCUMENT_HANDLING)],

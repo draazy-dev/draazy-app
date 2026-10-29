@@ -3,15 +3,15 @@ package com.draazy.api.catalog.fee;
 public final class LeaveAndLicenceCharges {
     private static final long BPS = 10_000L;
 
-    private static final long STAMP_DUTY_BPS = 25L;
+    private static final long TENTHS_PER_RUPEE_OF_DUTY = 4_000L;
 
-    private static final long DEPOSIT_WEIGHT_BPS = 1_000L;
+    private static final long TENTHS_PER_PAISA_OF_DUTY = 40L;
 
     private static final long REGISTRATION_URBAN = 1_000L;
 
     private static final long REGISTRATION_RURAL = 500L;
 
-    private static final long DUTY_STEP = 100L;
+    private static final long MIN_DUTY = 100L;
 
     public static final long HANDLING_CHARGE = 300L;
 
@@ -54,30 +54,20 @@ public final class LeaveAndLicenceCharges {
         }
     }
 
-    public record Charges(long exactDuty, long stampDuty, long registration, long handling) {
-
+    public record Charges(long exactDutyInPaise, long stampDuty, long registration, long handling) {
         public long total() {
             return stampDuty + registration + handling;
         }
     }
 
     public static Charges on(Terms terms) {
-        long rentForTerm = rentForTerm(terms);
-
-        // Carried × BPS so 10% of the deposit stays an exact integer rather than a binary fraction.
-        long considerationScaled = Math.addExact(
-                Math.multiplyExact(
-                        Math.addExact(rentForTerm, terms.nonRefundableDepositInRupees()), BPS),
-                Math.multiplyExact(
-                        Math.multiplyExact(terms.refundableDepositInRupees(), years(terms.months())),
-                        DEPOSIT_WEIGHT_BPS));
-        long denominator = BPS * BPS;
-        long numerator = Math.multiplyExact(considerationScaled, STAMP_DUTY_BPS);
-        long exactDuty = (numerator + denominator / 2) / denominator;
-
-        long stampDuty = Math.max(DUTY_STEP,
-                Math.ceilDiv(numerator, Math.multiplyExact(denominator, DUTY_STEP)) * DUTY_STEP);
-        return new Charges(exactDuty, stampDuty,
+        long tenths = Math.addExact(
+                Math.multiplyExact(Math.addExact(rentForTerm(terms), terms.nonRefundableDepositInRupees()), 10L),
+                Math.multiplyExact(terms.refundableDepositInRupees(), years(terms.months())));
+        long exactDutyInPaise = (tenths + TENTHS_PER_PAISA_OF_DUTY / 2) / TENTHS_PER_PAISA_OF_DUTY;
+        long stampDuty = Math.max(MIN_DUTY,
+                (tenths + TENTHS_PER_RUPEE_OF_DUTY / 2) / TENTHS_PER_RUPEE_OF_DUTY);
+        return new Charges(exactDutyInPaise, stampDuty,
                 terms.urban() ? REGISTRATION_URBAN : REGISTRATION_RURAL, HANDLING_CHARGE);
     }
 
@@ -86,7 +76,8 @@ public final class LeaveAndLicenceCharges {
         long total = 0L;
         for (int paid = 0; paid < terms.months(); paid += terms.incrementEveryMonths()) {
             if (paid > 0) {
-                rent = (Math.multiplyExact(rent, BPS + terms.incrementBps()) + BPS / 2) / BPS;
+                long paise = (Math.multiplyExact(rent, BPS + terms.incrementBps()) + 50L) / 100L;
+                rent = paise / 100L;
             }
             int block = Math.min(terms.incrementEveryMonths(), terms.months() - paid);
             total = Math.addExact(total, Math.multiplyExact(rent, (long) block));

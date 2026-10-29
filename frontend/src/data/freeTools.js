@@ -72,14 +72,14 @@ export const FREE_TOOLS = [
     accent: 'in Pune',
     subtitle: 'Stamp duty and registration fee for a leave and licence agreement in Pune, worked out from the rent, deposit and term.',
     how: [
-      'Stamp duty = 0.25% of (rent for the whole term, including any yearly increase, + 10% a year of the refundable deposit), rounded up to the next ₹100, with a minimum of ₹100. This is Article 36A of the Maharashtra Stamp Act, for agreements of up to 60 months.',
+      'Stamp duty = 0.25% of (rent for the whole term, including any yearly increase, + 10% a year of the refundable deposit), rounded to the nearest rupee as the IGR calculator does, with a minimum of ₹100. This is Article 36A of the Maharashtra Stamp Act, for agreements of up to 60 months.',
       'The 10% on the deposit is counted for each year or part of a year of the term, so an 11-month agreement counts as one year. A non-refundable deposit or premium is added to the total in the same way. This tool leaves it out.',
       'Registration fee: ₹1,000 for urban areas such as Pune, plus ₹300 document handling for e-registration, as in Draazy\'s rent agreement service. If you book through Draazy there is also our service fee, shown separately below.',
     ],
     sources: ['igrSchedule', 'igr'],
     faq: [
       { q: 'Is it compulsory to register a rent agreement in Maharashtra?', a: 'Yes. Section 55 of the Maharashtra Rent Control Act, 1999 makes registration compulsory for every leave and licence agreement, whatever its term.' },
-      { q: 'How is stamp duty on a rent agreement calculated?', a: '0.25% of the rent for the whole term plus 10% a year of the refundable deposit, rounded up to the next ₹100. The calculator above does the sum.' },
+      { q: 'How is stamp duty on a rent agreement calculated?', a: '0.25% of the rent for the whole term plus 10% a year of the refundable deposit, rounded to the nearest rupee (minimum ₹100). The calculator above does the sum.' },
       { q: 'Does an 11-month agreement avoid registration?', a: 'No. A shorter term means less stamp duty, but every leave and licence agreement in Maharashtra must be registered, whether it runs 11 months or 60.' },
       { q: 'Does this work for a shop or office?', a: 'No. It is for homes. Commercial agreements involve different tax rules and are quoted by Draazy\'s legal desk.' },
     ],

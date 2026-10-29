@@ -444,12 +444,15 @@ export function useRentAgreement() {
     const months = parseInt(terms.months, 10) || 11;
     const answers = { rent, dep, months, status: feeStatus, retry: retryFees };
     if (feeStatus !== 'ready' || !feeRow) {
-      return { ...answers, stamp: null, reg: null, dhc: null, service: null, total: null, computed: [], notes: null };
+      return { ...answers, stamp: null, exactPaise: null, reg: null, dhc: null, service: null, total: null, computed: [], notes: null };
     }
     const years = Math.ceil(months / 12);
     const computed = [];
-    let stamp = feeRow.stampDuty;
-    if (stamp == null) { stamp = leaveLicenceStamp(rentForTerm(rent, months, terms.increment, terms.incrementEvery), nr, dep, years); computed.push('stamp'); }
+    let stamp = feeRow.stampDuty, exactPaise = null;
+    if (stamp == null) {
+      ({ stamp, exactPaise } = leaveLicenceStamp(rentForTerm(rent, months, terms.increment, terms.incrementEvery), nr, dep, years));
+      computed.push('stamp');
+    }
     let reg = feeRow.registration;
     if (reg == null) { reg = regArea === 'rural' ? 500 : 1000; computed.push('reg'); }
     const dhc = 300;
@@ -457,7 +460,7 @@ export function useRentAgreement() {
     const waived = referralCredit ? service : 0;
     return {
       ...answers,
-      stamp, reg, dhc, service, waived,
+      stamp, exactPaise, reg, dhc, service, waived,
       total: service + stamp + reg + dhc - waived,
       computed,
       notes: feeRow.notes || null,

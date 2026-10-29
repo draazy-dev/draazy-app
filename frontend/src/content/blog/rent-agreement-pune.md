@@ -57,7 +57,7 @@ An 11-month agreement for a 2 BHK in Wakad:
 | **Total value** | **₹2,85,000** |
 | **Stamp duty at 0.25%** | **₹712.50 before rounding** |
 
-The amount payable is rounded up, so use the stamp duty calculator on the IGR Maharashtra website, or our [rent agreement cost calculator](/tools/rent-agreement-cost-pune), for the exact figure.
+The amount payable is rounded to the nearest rupee, so use the stamp duty calculator on the IGR Maharashtra website, or our [rent agreement cost calculator](/tools/rent-agreement-cost-pune), for the exact figure.
 
 On top of stamp duty there is a **registration fee**: ₹1,000 for property within municipal limits (PMC and PCMC) and ₹500 in rural areas. A doorstep or online service provider will charge a separate service fee.
 
@@ -70,17 +70,19 @@ Keep these ready before you start. Scans or clear photos are enough for online r
 
 **Owner (licensor)**
 
-- Aadhaar card and PAN card
+- PAN number
 - Proof of ownership — the Index II, sale deed or a recent property tax bill
+- Aadhaar and its registered mobile, for the OTP at the doorstep visit
 
 **Tenant (licensee)**
 
-- Aadhaar card and PAN card
+- PAN number
 - Current address proof if it differs from Aadhaar
+- Aadhaar and its registered mobile, for the OTP at the doorstep visit
 
 **Two witnesses**
 
-- Aadhaar card for each. Witnesses also go through Aadhaar verification.
+- Name, age and mobile number for each. Witnesses also go through Aadhaar verification at the visit.
 
 ## Registering online, step by step
 

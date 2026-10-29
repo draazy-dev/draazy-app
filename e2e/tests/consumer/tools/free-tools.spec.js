@@ -65,10 +65,11 @@ test('rent agreement cost follows the leave and licence formula', async ({ page,
   await page.goto('/tools/rent-agreement-cost-pune', { waitUntil: 'domcontentloaded' });
   const result = page.getByTestId('tool-result');
   await expect(result).toContainText('₹2,75,000');
-  await expect(result).toContainText('₹800');
+  await expect(result).toContainText('₹712.50');
+  await expect(result).toContainText('₹713');
   await expect(result).toContainText('₹1,000');
   await expect(result).toContainText('₹300');
-  await expect(result).toContainText('₹2,100');
+  await expect(result).toContainText('₹2,013');
 
   await page.getByLabel(/Term in months/).fill('61');
   await expect(page.getByRole('alert')).toContainText('60');
