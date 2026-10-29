@@ -239,3 +239,14 @@ hunks with `git apply --cached <partial.patch>`, commit, drop the variable, then
 - Flatmates Rooms tab lists room posts only (photos, flat info); a group never appears there, and Teams lists only teams still hunting.
 - A chip that is true of every card on a tab (e.g. "Looking for a flat" on Teams) is noise; cards show only facts that differ between items.
 - Reels: keep the whole phone in frame (zoom <= 1.274 at base 1.35), logo animation only in the outro, every voice line a complete impactful sentence, and <= 30 s (shorten the weakest line).
+- The top-nav Saved heart shows no count badge; a permanent count is noise. Counts live on the Saved page tabs.
+- An interest on a flatmate seeker post comes from someone offering a room: copy says "{name} has a room for you", never "teaming up" (that is the Teams tab).
+- Every chat composer sends on Enter (Shift+Enter = new line), on touch too; its scrollbar appears only once the text outgrows the box.
+- Home "Needs your attention": a one-line header (title + N pending) over one glass-card tile per request type (icon, label, who, count + wait, chevron); no outer card, no hint line.
+- Rent agreement desk: staff can correct every customer-provided value, PAN/Aadhaar included; send back to the customer only for a fresh paper or an answer staff cannot give.
+- Dashboard KYC nudge is a compact one-row tile ("Get your KYC badge" + one benefit line + Verify); never label it "Optional" - badge-not-gate is shown by not gating, not by a tag.
+- Rent agreement: once a party files a paper it is never asked for again; every reopen path (requester "Add what's missing" and the invitee ?party=&request= link) restores filed docs from the server, replace-only. Tenant rows carry no "Relation to Tenant 1" field (nothing consumed it).
+- Rent agreement stamp duty must match the IGR Leave & License calculator (leaveandlicense.igrmaharashtra.gov.in/Fees/calculator_sd): 0.25% rounded to the nearest rupee (min ₹100), escalated rent rounded to paise then truncated - never 'up to the next ₹100'. Charges display with paise (₹918.00) plus the exact duty line.
+- Rent agreement form asks only what the IGR L&L 2.0 portal requires (PAN, DOB, mobile, ownership proof, terms); Aadhaar, its OTP, address, gender and biometrics are collected by staff at the doorstep visit, and the portal keeps mother's name, alias, occupation and email optional.
+- Rent agreement: trim only what the IGR portal fetches itself (Aadhaar OTP data, biometrics); every field it requires on any tab through police records must be collected in the wizard.
+- Rent agreement: never ask the customer for property data staff can read off the Index II (village, road, CTS/survey no., zone, construction, age, gallery area); the Index II upload is mandatory instead. Police station is plain text, no suggestion list.

@@ -1,0 +1,75 @@
+REEL 06 / CLIP 2 of 3 - THE QUEUE
+=================================
+JOB ID ............. r06-c2
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+CHARACTER CHIPS .... @Ishaan   (each [@Name] token in the prompt becomes a chip)
+EXTRA INGREDIENTS .. none
+START FRAME ........ none
+USE IN EDIT ........ 0.0-7.0 s
+
+PROMPT START
+Vertical 9:16 selfie video, shot on the front camera of a smartphone held close at chest height by
+Ishaan, who sits on a plastic chair in a crowded waiting area. A close-up of his face, slightly from
+below, with the packed room behind him.
+
+Subject: [@Ishaan] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
+jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
+neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears his signature teal (#14B8A6) oversized heavyweight cotton hoodie over a
+plain white crew-neck t-shirt, and holds a plastic document folder and a small paper token slip.
+
+Action: Ishaan glances left and right to make sure nobody is watching, then leans into the phone and
+whispers, holding up the paper token slip next to his face (its print unreadable). On "Teen ghante" he
+taps his watch. On "gyarah mahine baad" he lets his head drop forward in despair, then lifts it and
+stares into the lens with hollow eyes on "phir se yahi". From 6 to 8 seconds an older man next to him
+yawns loudly and Ishaan's eyes slide sideways to him, deadpan.
+
+Dialogue, lip-synced, whispered, spoken once with no extra words:
+Ishaan, whispering: "Teen ghante se line mein hoon. Aur gyarah mahine baad... phir se yahi."
+
+Voice: every on-screen character uses their saved Flow character voice, which matches this description. Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
+mid-pitched, slightly husky, here a hushed whisper close to the phone's microphone, tired and funny.
+
+Setting: a crowded, generic, private documentation and agreement office waiting area in Pune. Rows of
+blue plastic chairs full of waiting people of all ages holding files, beige walls with old fan
+regulators, a slow ceiling fan, a wooden counter in the background with a clerk behind a glass
+partition, piles of paper files, a wall clock. Nothing official: no government emblems, seals, flags,
+portraits, posters or readable signs anywhere.
+
+Lighting and colour: flat, slightly greenish fluorescent tube lighting, a bit stuffy and dull, with
+daylight from a far window. Slightly desaturated. True skin tones; his teal hoodie is the only vivid
+colour in the frame.
+
+Camera feel: authentic Instagram UGC front-camera selfie, discreet handheld shake, phone autofocus, slight
+wide-angle look, no beauty filter, 30 fps.
+
+Audio: Ambient noise: a crowded waiting room murmur, a ceiling fan whirring and ticking, papers
+shuffling, a stamp thudding on paper in the distance, a token-number beep, someone coughing. SFX: a loud
+yawn at about 6 seconds. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no readable signs, tokens or documents, no
+government emblems or logos, no watermark.
+PROMPT END
+
+ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
+  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
+  [ ] Ishaan matches @Ishaan: teal hoodie, taper fade, light stubble, clear skin with no moles
+  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
+  [ ] the action in the prompt happens, in order, and nothing extra happens
+
+ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
+  [ ] every line spoken once, in order, with no added words
+  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
+  [ ] the voice matches the character's saved voice; no music
+
+IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
+  - words dropped, added or swapped: regenerate unchanged once
+  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
+  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
+  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
+  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)

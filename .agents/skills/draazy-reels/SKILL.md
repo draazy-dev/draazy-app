@@ -98,6 +98,11 @@ If only the audio changes, re-use the existing frames folder — no re-render ne
 - Edge quirks already handled in `voice.py`: phrase-by-phrase synthesis (whole-script reads sound robotic),
   MP3-only output decoded by `mp3wav.cjs` via Chromium, `tighten()` trims Edge's long full-stop gaps to
   0.16 s, script pauses ×0.6, clips cached in `vo\edge-cache\`.
+- **Mispronounced words / heteronyms:** Edge ignores SSML phonemes, so respell the spoken text and keep the
+  caption correct with `cues.json` `"display": { "<spoken phrase>": "<caption text>" }`. Known case: Neerja
+  says "live closer" as "lyve"; speak "Liv closer…" (`reels\commute-v2\cues.json`).
+- **Real maps:** draw them from OpenStreetMap via Overpass (send a User-Agent, retry on 502), show
+  "© OpenStreetMap contributors" on screen, never use Google tiles or logos. Builder: `reels\commute-v2\build-map.cjs`.
 - Local fallback: Indic Parler-TTS (`parler-venv`, `parler-model`, `parler_samples.py`) — good accent but
   ~90 s per clip on CPU. Kokoro (`hf_beta`) is the 16:9 film's voice.
 - Captions come from `subs.js` (exact phrase times written by `voice.py`); highlight the key word.

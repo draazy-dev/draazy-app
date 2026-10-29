@@ -1,0 +1,72 @@
+REEL 05 / CLIP 2 of 3 - STILL STUCK
+===================================
+JOB ID ............. r05-c2
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token in the prompt becomes a chip)
+EXTRA INGREDIENTS .. none
+START FRAME ........ none
+USE IN EDIT ........ 0.0-6.0 s
+
+PROMPT START
+Vertical 9:16 selfie video, shot on the front camera of a smartphone held loosely at arm's length by
+Ishaan, slumped low in the back seat of the same cab. A close-up of his face from slightly below, with
+the dark window and traffic lights behind him.
+
+Subject: [@IshaanOutdoor] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
+jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
+neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears a teal (#14B8A6) cotton overshirt open over a plain white crew-neck
+t-shirt, with wired white earphones around his neck. His hair is now a little more messed up, and he
+looks exhausted.
+
+Action: Ishaan is slumped sideways against the window, totally drained, the phone held lazily. He talks
+to the lens in a slow, flat, exhausted voice, counting on his fingers on "jaana" and "aana". On "Bachat
+sab cab mein chali gayi" he lifts his hand weakly and lets it flop down. From 5 to 8 seconds he closes
+his eyes and lets his head rest on the window glass while the cab inches forward.
+
+Dialogue, lip-synced, spoken once with no extra words:
+Ishaan, exhausted: "Roz dedh ghanta jaana, dedh ghanta aana. Bachat sab cab mein chali gayi."
+
+Voice: every on-screen character uses their saved Flow character voice, which matches this description. Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
+mid-pitched, slightly husky, here slow, flat and drained, close to the phone's microphone.
+
+Setting: the back seat of a white hatchback cab, now after dark, crawling through traffic on a Pune
+arterial road. Through the window: a blur of red tail lights, white headlights, orange street lights
+and the glow of shop fronts. No readable signs, number plates or logos.
+
+Lighting and colour: dark cab interior, his face lit by passing orange street lights and red brake-light
+glow sweeping across it, plus the faint cool glow of the phone. Tired, moody night. Subtle cool teal tint
+in the shadows, true warm skin tones.
+
+Camera feel: authentic Instagram UGC front-camera selfie, lazy handheld shake, phone autofocus,
+low-light grain, no beauty filter, 30 fps.
+
+Audio: Ambient noise: a night traffic jam, horns, the cab's indicator ticking, an engine idling and
+creeping forward. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no readable signs, number plates or logos, no
+watermark.
+PROMPT END
+
+ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
+  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
+  [ ] Ishaan matches @IshaanOutdoor: open teal overshirt on a white tee, taper fade, stubble, no moles
+  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
+  [ ] the action in the prompt happens, in order, and nothing extra happens
+
+ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
+  [ ] every line spoken once, in order, with no added words
+  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
+  [ ] the voice matches the character's saved voice; no music
+
+IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
+  - words dropped, added or swapped: regenerate unchanged once
+  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
+  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
+  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
+  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)

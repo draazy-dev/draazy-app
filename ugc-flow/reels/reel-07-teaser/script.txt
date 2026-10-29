@@ -1,0 +1,51 @@
+REEL 07 - TEASER RECAP  ("Renting in Pune is broken.")
+======================================================
+
+PURPOSE       Close the series: every pain in one reel, both characters, the strongest Draazy name drop.
+              Post it last (or the week before launch). It reuses hook shots from reels 1-6.
+CAST          Ishaan, Sana
+LENGTH        about 21 s  =  clip 1 (8 s, intercut with a montage) + clip 2 (8 s) + end card (4-5 s)
+SET           A residential rooftop terrace in Pune at dusk.
+
+HOOK
+  On screen (0.0-2.5 s):   Renting in Pune is broken.             ("broken" in Coral #FB923C)
+  Spoken:                  "Broker ke calls... brokerage... fake photos..."
+
+SCRIPT
+  TIME        SHOT                                         DIALOGUE (Hinglish)                              OVERLAY
+  0.0-8.0     CLIP 1, intercut. The terrace two-shot is     ISHAAN: "Broker ke calls... brokerage...          Hook card, then each pain word
+              the base. On each pain word, cut away for     fake photos..."                                   flashes in Coral as its shot plays
+              0.6-0.8 s to that reel's hook shot (use      SANA: "...random flatmates... do ghante ka
+              the audio from clip 1 underneath):            commute... agreement ki line."
+                calls       > reel 1, clip 1 (phone buzzing)
+                brokerage   > reel 2, clip 2 (light switch)
+                fake photos > reel 3, clip 2 (damp wall)
+                flatmates   > reel 4, clip 1 (scrolling)
+                commute     > reel 5, clip 1 (jam)
+                agreement   > reel 6, clip 2 (queue)
+  8.0-16.0    CLIP 2. Both turn to the camera, closer.     ISHAAN: "Hum sab ne jhela hai."                  12.0: "Draazy is coming."
+                                                           SANA: "Ab ek app yeh sab aasaan karega."         ("Draazy" in Teal light)
+                                                           ISHAAN (half-smile): "Draazy aa raha hai,        14.5: pill "Draazy · Pune ka rental app"
+                                                           Pune."
+  16.0-21.0   END CARD, held longer (4-5 s)                (latch click + whoosh)                           Logo + "Draazy" + "Pune ka rental app"
+                                                                                                            + "Coming soon"
+                                                                                                            + "Follow for launch"
+
+CAPTION
+  Broker calls. Brokerage. Fake photos. Random flatmates. 2 ghante ka commute. Agreement ki line.
+  Pune mein ghar dhoondhna basically ek boss level hai. 🎮
+  Ab ek app yeh sab aasaan karega. Draazy aa raha hai, Pune.
+  Follow karo, launch pe sabse pehle pata chalega. 🚪✨
+  In 6 mein se tumhara sabse bada dard kaunsa hai? Number comment karo 👇
+
+HASHTAGS
+  #Pune #PuneRent #FlatHuntingPune #PuneLife #RentInPune #BrokerFree #Flatmates #Hinjawadi #Draazy #ComingSoon
+
+EDIT NOTES
+  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
+    holds into the end card. "Draazy" in captions is always Teal light.
+  - Build this reel only after reels 1-6 exist (it needs their clips).
+  - Montage cuts land exactly on each spoken pain word. Use a short whoosh SFX on every cut.
+  - The end card is held longer here: add a gentle 0.3 s zoom on the logo.
+
+QA  hook is a statement | the recap counts as one beat, the tease as the second | no stats | about 21 s

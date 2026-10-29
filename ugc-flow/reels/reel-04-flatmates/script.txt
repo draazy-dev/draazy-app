@@ -1,0 +1,45 @@
+REEL 04 - FLATMATES  ("Flatmate search = 400 strangers")
+=========================================================
+
+PAIN          Finding a flatmate means a 400-person WhatsApp group full of "DM me", and deposits sent to
+              people you've never met.
+DRAAZY TRUTH  Flatmate profiles show a living-style match, and people can carry a Verified badge.
+              (Verification is optional, so we say "kaun verified hai", not "sab verified".)
+CAST          Ishaan, Sana
+LENGTH        about 25 s  =  clip 1 (7 s) + clip 2 (7 s) + clip 3 (8 s) + end card (3 s)
+SETS          Clip 1: Ishaan's PG room. Clip 2: Sana's room. Clip 3: a café table on FC Road, afternoon.
+
+HOOK
+  On screen (0.0-2.5 s):   Flatmate search = 400 strangers         ("strangers" in Coral #FB923C)
+  Spoken:                  "'Pune Flatmates' group. Chaar sau log."
+
+SCRIPT
+  TIME        SHOT                                         DIALOGUE (Hinglish)                              OVERLAY
+  0.0-7.0     CLIP 1. Ishaan on his bed, thumb-scrolling   ISHAAN: "'Pune Flatmates' group. Chaar sau        Hook card
+              endlessly, deadpan to camera.                 log. Sabka message ek hi... 'DM me.'"
+  7.0-14.0    CLIP 2. Sana in her room, selfie, like a      SANA: "Pichli baar maine bina mile deposit        9.0: "Deposit sent. Flatmate: gone 👻"
+              reply to his video.                           bhej diya tha. Banda aaj tak offline hai."
+  14.0-22.0   CLIP 3. Caf? two-shot, both to camera.       SANA: "Socho, ek app jo pehle dikha de ki        17.0: "Lifestyle match. Verified badge."
+                                                           lifestyle match hoti hai ya nahi..."             ("match" in Teal light)
+                                                           ISHAAN: "...aur kaun verified hai. Draazy aa     20.0: pill "Draazy · Pune ka rental app"
+                                                           raha hai, Pune."
+  22.0-25.0   END CARD                                     (latch click + whoosh)                           Logo + "Draazy" + "Pune ka rental app"
+                                                                                                            + "Coming soon"
+
+CAPTION
+  400 log. 400 "DM me". Zero info. 😵‍💫
+  Aur kabhi kabhi deposit bhi gayab, flatmate bhi.
+  Draazy aa raha hai, Pune ka apna rental app. Follow karo, launch pe sabse pehle pata chalega.
+  Apne flatmate ko tag karo jo "vibe match" test pass karta 👇
+
+HASHTAGS
+  #Pune #FlatmatesPune #FlatmateWanted #PuneRent #RoommateLife #PG #PuneLife #Baner #Draazy #ComingSoon
+
+EDIT NOTES
+  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
+    holds into the end card. "Draazy" in captions is always Teal light.
+  - Clip 2 works best styled like a stitch/reply: put a small rounded 20% opacity card of clip 1's last
+    frame in the top-left for the first 1 s.
+  - Clip 3 has two speakers. If Flow swaps who speaks, regenerate rather than fix it in the edit.
+
+QA  hook opens with a fact | 2 beats (strangers, the fix) | no overclaim on verification | about 25 s

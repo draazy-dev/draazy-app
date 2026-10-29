@@ -36,6 +36,8 @@
 - [ ] **TEAM-TAB** (358) Migrate tenant groups that already have a flat into rooms (one-off migration), then refuse new ones in the API (~70 backend fixtures need updating). `owner_lists_rooms` copy is en-only.
 - [ ] **ROOMS-ONLY** Rooms lists rooms only, Teams only hunting teams; a settled group is off-board but readable by link (closes the board side of TEAM-TAB). Demo groups converted to hunting teams, Aundh room added, consent row moved to the villa; the redundant "Looking for a flat" chip is gone from team cards and detail. Pre-existing reds: `FlatmateModerationSlimTest.reviewRowIsACard`, 4 `FlatmateStaleWriteTest`; `discovery` split-budget test flaked once.
 - [ ] **SAVED-SORT** Saved drops its sort dropdown; All is one newest-saved-first list, merged on the `savedAt` both saved APIs now return.
+- [x] **RA-QA-BATCH** (uncommitted; all `rent-agreement*`, drafting-desk and service specs green, 122/122) Society autofill and address/unit/payer/invite UI (was RA-SOCIETY-FILL), pay breakdown, co-fill top-up keeping data and own ID numbers (masked other side), case-modal tabs, tracker chat, send-back for papers + a question only, staff edit of every field incl. list rows and PAN/Aadhaar. Decided out of scope: adding/removing parties from the desk. Operational, not code: WhatsApp template `WHATSAPP_SERVICE_TEMPLATE_NAME` needs Meta approval (DEPLOY.md).
+- [ ] **AFTER-COMMIT-HELPER** (tech debt) ~12 hand-rolled `TransactionSynchronization` after-commit blocks across modules; one shared helper.
 
 ## Open: test infrastructure
 

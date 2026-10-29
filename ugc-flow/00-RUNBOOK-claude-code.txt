@@ -1,0 +1,144 @@
+RUNBOOK FOR CLAUDE CODE: GENERATING THE DRAAZY UGC REELS IN GOOGLE FLOW
+=========================================================================
+You (Claude Code) drive Google Flow in the user's browser. Credits are paid and limited, so the goal is
+the fewest generations that produce usable clips. Follow this file exactly. Do not "improve" any
+prompt: the only prompt edits allowed are the fixes listed under IF REJECTED in each job file.
+
+Folder: <repo root>\ugc-flow\   (start with 00-HANDOFF-state.txt: what is already done in Flow)
+  characters\*.txt            image prompts + Flow Character setup (name, images, voice)
+  reels\00-test-voice-and-name.txt   4 s test, run before any reel clip
+  reels\00-end-card-door.txt  shared end card
+  reels\reel-NN-*\clip-N.txt  one job per file: settings header, PROMPT START/END, checks, retry fixes
+  reels\reel-NN-*\script.txt  for the human editor; you don't need it
+  flow-ledger.csv             append one row per generation (you create nothing else in this folder
+                              except renders\)
+  renders\                    downloaded approved takes
+
+
+HARD RULES
+  1. Never buy credits, upgrade the plan, accept new terms, share, publish to YouTube, or delete assets.
+  2. Never turn on Flow's Agent toggle (it can spend credits on variations). Keep it off.
+  3. Outputs = 1 on every video generation. Images may use 2 (they are no-charge on Nano Banana 2 Lite).
+  4. Click Generate once per job, then wait. Never double-click, refresh or navigate away while a
+     generation is running.
+  5. Before every Generate, read the credit cost Flow shows and write it in the ledger. If a single
+     generation would cost more than the per-job cap, or the session budget would drop below 20%, stop
+     and ask the user. Ask the user for the session budget before the first generation.
+  6. Max one automatic retry per job. After a second failure, stop and ask the user.
+  7. Audio is the user's call: you cannot hear. Never mark a clip "approved" without the user's OK.
+  8. Never upscale or download a take the user hasn't approved. Upscale only if Flow shows 0 credits for it.
+  9. If the UI differs from this file (a model or option is missing, or a dialog you don't understand
+     appears), take a screenshot, stop, and ask. Don't guess with credits.
+ 10. Prompts are English with Hinglish dialogue on purpose. Never translate the dialogue.
+
+
+REAL FLOW UI (learned the hard way, Oct 2026; trust this over the phase notes below)
+  - NETWORK: Flow serves audio (and probably video) from https://flow-content.google/... A corporate
+    URL filter blocks that domain: voice previews show "Preview generation failed" and images sometimes
+    show "Failed to load image" even though the generation succeeded. Before spending ANY video credit,
+    confirm that domain loads (a voice preview plays, or open the URL of a failed request in a new tab).
+  - Characters live in a separate builder: Project > Characters > character page. Left panel: name,
+    "Select a voice", Character info. Centre: image + Reroll/Try again/Portrait/Create body and a
+    "What do you want to change?" edit box. Right: history (click a tile to make it the main image).
+    Top: Done saves the character. Image generations and edits in the builder cost 0 credits.
+  - Voice dialog: clicking a preset with EMPTY sample text attaches it to the character and closes the
+    dialog (so does Tab). To audition: type the sample dialogue FIRST, then click the preset (the dialog
+    stays open but clears the sample), type the sample again, then Play preview. Previews cost 0 credits.
+    Typing in "Customize performance" turns it into a custom voice (Voice name, Reset, Save new voice).
+    Sample dialogue max 120 chars.
+  - Credits: account menu ("Google Account: ...") > "Google Flow credits". It also has an Upgrade
+    link: never click it.
+
+
+ONE-TIME SETUP
+  1. Open https://labs.google/fx/tools/flow in a NEW tab. The user is already signed in (Google AI Pro).
+  2. + New project. Name it "Draazy UGC reels".
+  3. Project Settings (top right):
+       Clear prompt on submit ..... ON   (stops leftover text, chips or ingredients leaking into the next job)
+       Return silent videos ....... OFF  (we need the dialogue)
+       Show tile details .......... ON
+       View mode .................. Batch (easier to match a tile to its job)
+  4. Create collections: characters, test, reel-01 ... reel-07, end-card.
+  5. Note the remaining credits (shown in Flow, or one.google.com/ai/activity) in the ledger as a
+     "setup" row. Ask the user for the session budget and the per-job cap.
+
+
+HOW TO ENTER A PROMPT (applies to every job)
+  a. Confirm the prompt box is empty: no text, no chips, no ingredients, no start/end frames.
+  b. Set every line of FLOW SETTINGS from the job header: Type, Model, Resolution, Aspect ratio, Length,
+     Outputs. Open the model menu and read the options; don't assume defaults (the default is an image model).
+  c. Add EXTRA INGREDIENTS with the + button under the prompt (search by the image's saved name).
+  d. Copy only the text between "PROMPT START" and "PROMPT END". It contains tokens like [@Ishaan].
+     Split the text at each token. Enter the first chunk, then type @ plus the name (e.g. "@Ishaan"),
+     wait for the suggestion list, and click the matching CHARACTER so it becomes a chip. Then enter the
+     next chunk. The literal text "[@Ishaan]" must not remain in the box.
+     Note: @Ishaan and @IshaanOutdoor are different characters; pick the exact one in the header.
+  e. Read back what's in the box (snapshot): check the chips are chips, the dialogue lines and their
+     quotes are intact (including any Devanagari), and the last line is the "No subtitles..." sentence.
+  f. Screenshot the whole prompt area. Compare it, line by line, with FLOW SETTINGS, CHARACTER CHIPS
+     and EXTRA INGREDIENTS. Read the credit cost shown. Only then click Generate, once.
+
+
+PHASE 1: CHARACTER IMAGES (cheap, do carefully: every clip depends on them)
+  Order: ishaan-hero > ishaan-sheet > ishaan-outdoor-hero > ishaan-room > sana-hero > sana-sheet >
+         broker-hero. Prompts are in characters\*.txt (ishaan-room is in 01-ishaan.txt).
+  For each: set Type Image, the model named in the file, the aspect listed, Outputs 2; attach the
+  ingredient the file names (e.g. ishaan-hero for the sheet); enter the prompt; generate.
+  Check: photoreal, correct colours (teal hoodie #14B8A6, coral overshirt #FB923C), plain light
+  background, no text, normal hands, one person (except the sheet's five views of the same person).
+  Show the user the two options side by side and let them choose. Rename the chosen image to the exact
+  [name] and move it to the "characters" collection.
+
+PHASE 2: FLOW CHARACTERS + VOICES
+  Create Ishaan, IshaanOutdoor, Sana and BrokerBhaiya exactly as each character file's
+  "FLOW CHARACTER(S)" section says. For each voice: list the preset voice names on screen for the user,
+  let them pick, enter the voice performance text and sample dialogue, click Sync, and WAIT for the
+  user to listen and approve before Save New Voice. IshaanOutdoor reuses "Ishaan Voice".
+  Region note: if custom voices are unavailable, tell the user and let them pick a preset.
+
+PHASE 3: TEST CLIP (reels\00-test-voice-and-name.txt)
+  Generate it, run the visual check, then ask the user to listen. Don't continue to Phase 4 until the
+  user passes it. Every spoken "Draazy" is already written as ड्राज़ी (it won the voice audition), so
+  if the test still says it wrong, stop and ask the user rather than editing the clips.
+
+PHASE 4: END CARD (reels\00-end-card-door.txt)
+
+PHASE 5: REELS, in order
+  r01-c1 r01-c2 r01-c3 | r02-c1 r02-c2 r02-c3 | r03-c1 r03-c2 r03-c3 | r04-c1 r04-c2 r04-c3 |
+  r05-c1 r05-c2 r05-c3 | r06-c1 r06-c2 r06-c3 | r07-c1 r07-c2
+  Pause for the user to listen after the FIRST clip of each reel (a voice problem there would repeat in
+  the next two). The other clips of the reel can be batched: generate, check visually, then ask the
+  user to listen to the batch.
+
+  For every job:
+    1. Enter the prompt (HOW TO ENTER A PROMPT). Generate once.
+    2. Wait. Check every 20 s; give up after 8 minutes and report.
+    3. If Flow returns an error or a policy block: screenshot, ledger row, stop and ask. Don't resubmit
+       the same text blindly.
+    4. Rename the output "<JOB ID>-t<take>" (e.g. r01-c3-t1) if Flow allows; move it to its collection.
+    5. VISUAL CHECK: play it, pause and screenshot at the times in ACCEPT CHECK, VISUAL. Tick each box
+       with a one-line reason.
+    6. Visual fail: apply the matching IF REJECTED fix (one retry). Visual pass: status "audio pending".
+    7. Write the ledger row.
+
+PHASE 6: UPSCALE + DOWNLOAD (only user-approved takes)
+  Hover the take > More > Upscale to 720p. Confirm the dialog shows 0 credits, then upscale.
+  Download the 720p MP4. Move it from the Downloads folder to
+  renders\reel-NN\<JOB ID>-t<take>-720p.mp4 (end card: renders\end-card-720p.mp4). Ledger row.
+
+
+FALLBACK (only with the user's OK, it costs more)
+  If Omni Flash's lip-sync or Hinglish fails twice on the same job: Veo 3.1 Fast, Video > Ingredients,
+  720p, 8 s, Outputs 1, same prompt. Veo can't use saved voices; the voice description in the prompt
+  steers it. If Veo won't accept character chips, add the character's hero image as an ingredient
+  instead and remove the [@Name] tokens. Never use Veo 3.1 Quality for character clips: it doesn't
+  support ingredients.
+
+
+LEDGER (flow-ledger.csv, one row per generation, upscale or download)
+  timestamp,job_id,take,model,resolution,length_s,outputs,credits_shown,credits_left,visual,audio,action,file,notes
+  visual / audio: pass, fail:<reason>, or pending.  action: keep, retry, upscaled, downloaded, stopped.
+
+
+WHAT TO REPORT TO THE USER AFTER EACH PHASE
+  Credits used and left, jobs passed or pending audio, anything retried and why, and the next step.

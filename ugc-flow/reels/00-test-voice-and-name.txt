@@ -1,0 +1,53 @@
+TEST CLIP: VOICE + BRAND NAME (run this BEFORE any reel clip)
+=============================================================
+JOB ID ............. test-voice
+WHY ................ The cheapest possible check that @Ishaan looks right, sounds right in Hinglish and
+                     says "Draazy" as DRAA-zee. If this fails, every reel clip would fail the same way,
+                     so fix it here for the price of one short clip.
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 4 s
+  Outputs .......... 1
+CHARACTER CHIPS .... @Ishaan
+EXTRA INGREDIENTS .. ishaan-room
+START FRAME ........ none
+USE IN EDIT ........ not used in any reel (test only)
+
+PROMPT START
+Vertical 9:16 smartphone selfie video, a close-up from a phone held at arm's length, framing [@Ishaan]
+Ishaan from mid-chest up in his small rented PG room in Wakad, Pune, in the evening, with a white shelf
+lit by a thin indigo (#4F46E5) LED strip softly out of focus behind him. He looks into the lens, gives a
+confident half-smile, raises his eyebrows once and says one line, slowly and clearly.
+
+Dialogue, lip-synced, spoken once with no extra words:
+Ishaan: "ड्राज़ी aa raha hai, Pune."
+Pronunciation: "ड्राज़ी" is the brand name Draazy, said DRAA-zee: two syllables, a long open "aa" as in "drama", stress on
+the first syllable, then a soft "zee".
+
+Voice: Ishaan uses his saved Flow character voice: casual Hinglish with a natural North-Indian Hindi
+accent, a young male voice, mid-pitched, slightly husky, relaxed and conversational.
+
+Lighting and colour: a warm ceiling bulb from above-left, a soft indigo glow behind him, a subtle cool
+teal tint in the shadows, true warm skin tones. Authentic Instagram UGC, natural skin texture, no beauty
+filter.
+
+Audio: quiet room tone. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
+PROMPT END
+
+ACCEPT CHECK, VISUAL (Claude)
+  [ ] Ishaan matches @Ishaan: teal hoodie, taper fade, light stubble, clear skin with no moles
+  [ ] no burned-in text
+ACCEPT CHECK, AUDIO (the user listens)
+  [ ] "Draazy" is clearly DRAA-zee
+  [ ] Hinglish accent sounds Indian and natural; the voice suits a 23-year-old
+
+IF REJECTED (each retry is another 4 s clip; max 2 retries, then stop and ask the user)
+  - "Draazy" wrong: regenerate unchanged once (the prompt already uses ड्राज़ी, the audition winner), then
+    ask the user.
+  - accent wrong: edit the character's voice (Characters > Ishaan > voice) rather than the prompt.
+  - face wrong: fix the character images first; don't spend on reel clips until this passes.

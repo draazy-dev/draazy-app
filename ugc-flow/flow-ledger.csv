@@ -1,0 +1,5 @@
+timestamp,job_id,take,model,resolution,length_s,outputs,credits_shown,credits_left,visual,audio,action,file,notes
+2026-10-29T06:40:55,ishaan-hero,1,Nano Banana 2.1 (character builder),n/a,0,1,not shown,605,teal hoodie portrait ok,n/a,pending user approval,,0 credits charged (605 before and after); clicked without asking first
+2026-10-29T06:45:59,ishaan-hero,2,Nano Banana 2.1 (character edit),n/a,0,1,not shown,605,moles removed; rest unchanged,n/a,pending user approval,,user asked to remove moles; 0 credits; prompt files updated to 'clear skin no moles'
+2026-10-29T07:30:00,ishaan-voice,1-5,voice preview (Puck/Achird),n/a,0,1,not shown,605,n/a,blocked,stopped,,previews generated but audio CDN flow-content.google blocked by office URL filter; voice not chosen; 0 credits
+2026-10-29T07:35:00,draazy-name,1,voice preview (Algieba),n/a,0,1,not shown,605,n/a,user picked Devanagari,adopted,,5 spellings in one preview; only the Devanagari spelling said DRAA-zee; all spoken lines switched to it; 0 credits

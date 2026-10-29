@@ -1,0 +1,46 @@
+HANDOFF: DRAAZY UGC REELS IN GOOGLE FLOW (state at end of the first session)
+=============================================================================
+Read this first, then 00-RUNBOOK-claude-code.txt ("REAL FLOW UI" section).
+
+WHY WE MOVED MACHINES
+  The office network blocks https://flow-content.google (Flow's media CDN). Voice previews and probably
+  videos can't play or download there. Continue on a machine/network where that domain loads.
+
+ACCOUNT
+  Flow at https://flow.google.com/u/2/ (Google account index 2, Yatish Patil; on another machine the
+  index may differ).
+  Credits: 605, resets Oct 30, 4:14 PM. All 7 reels must fit in this budget.
+  Nothing has been spent yet: character images, edits and voice previews were all 0 credits.
+
+USER RULES (non-negotiable)
+  - Ask the user BEFORE every generate click: show model, resolution, length, outputs and the credit
+    cost Flow displays.
+  - Never buy credits, upgrade, or delete anything. One retry per job max, then ask.
+  - The user judges audio. Never approve a clip yourself.
+
+DONE IN FLOW
+  [x] Project "Draazy UGC reels"
+      (id 3057f966-7ac3-4bea-8e8c-884522505a0d)
+  [x] Character "Ishaan" (char id d52d7b35-501a-4541-942a-70c94b9973c6)
+      - Main image: the clear-skin portrait (teal hoodie, white tee, black watch). Approved by the user.
+        The user chose to keep his natural, relatable look; don't make him fairer or "model" handsome.
+      - Character info is filled in (23, software engineer in Hinjawadi, from Indore, deadpan, Hinglish).
+  [ ] Ishaan's VOICE: not decided. Achernar (female) got attached by accident and the character was
+      NOT saved with Done, so check what's attached and replace it.
+      The user's shortlist: Achird, Puck, Fenrir, Zubenelgenubi, Algieba.
+      To audition each, use the sample dialogue:
+        Ek flat pe enquiry ki thi. Bas ek. Aur ab din bhar broker ke calls. ड्राज़ी aa raha hai, Pune.
+      Optional performance text is in characters\01-ishaan.txt (VOICE / Voice performance).
+      Brand name: in the audition, only the Devanagari ड्राज़ी came out as DRAA-zee. Every clip prompt
+      uses it.
+      Then save it as "Ishaan Voice", Add to character, and click Done.
+
+NEXT, IN ORDER
+  1. Finish Ishaan's voice (the user listens and picks), then click Done.
+  2. Project settings: Clear prompt on submit ON, Return silent videos OFF, Show tile details ON.
+  3. ishaan-room image (characters\01-ishaan.txt). Free, but ask first.
+  4. IshaanOutdoor, Sana, BrokerBhaiya characters (characters\*.txt).
+  5. reels\00-test-voice-and-name.txt: the cheap 4 s test. Read the credit cost and ask.
+  6. Reel 1 (reels\reel-01-broker-spam\clip-1..3). The user approves the first clip before the rest.
+  7. Once real video costs are known, give the user a credit plan for all 7 reels.
+  Log every generation in flow-ledger.csv.

@@ -1,0 +1,139 @@
+CHARACTER 1 (LEAD): ISHAAN
+=========================
+
+WHO HE IS
+  Ishaan, 23. Software engineer at an IT park in Hinjawadi, Pune. Moved from Indore 8 months ago.
+  Lives in a small rented room in Wakad. Has hunted for a flat three times and has a story for every
+  broker. Dry, deadpan humour, never loud. Talks to the camera like texting a close friend.
+  Relatable, a little tired, always fair. Never mocks anyone personally; he laughs at the situation.
+
+LOOK - LOCKED (paste this block, word for word, into every prompt he appears in)
+  Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined jawline,
+  short black hair that is textured and slightly messy on top with a low taper fade on the sides,
+  neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build, about 175 cm tall. He wears his signature teal (#14B8A6) oversized
+  heavyweight cotton hoodie over a plain white crew-neck t-shirt, black joggers, and a thin black
+  digital watch on his left wrist. His phone has a matte teal case.
+
+  Outdoor variant (reels 2, 3, 5): same face and hair, a teal (#14B8A6) cotton overshirt worn open
+  over the same white t-shirt, black joggers, white sneakers, black backpack. Swap only the clothing
+  sentence; never change the face description.
+
+VOICE - LOCKED (paste into every prompt where he speaks)
+  Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
+  mid-pitched, slightly husky, relaxed and conversational, a quick pace with small deadpan pauses,
+  close to the microphone like a phone's front-camera recording.
+
+PERSONALITY ON CAMERA
+  Deadpan stare at the lens after a punchline. Small eye-roll. Leans in and lowers his voice for the
+  "socho..." line, as if sharing a secret. A half-smile on "Draazy aa raha hai, Pune".
+
+
+IMAGE PROMPTS FOR FLOW (create these first; rename each saved image to its [name])
+----------------------------------------------------------------------------------
+IMAGE SETTINGS: Type Image | Model Nano Banana 2 Lite (no charge) first; only if the face looks plastic
+or the hoodie isn't teal, retry once on Nano Banana Pro | Outputs 2 | aspect as listed.
+Hero first. Every other image uses the approved hero as an ingredient so the face never changes.
+
+[ishaan-hero]   Aspect 9:16   ingredient: none
+PROMPT START
+Photorealistic portrait photo of Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval
+face with a defined jawline, short black hair that is textured and slightly messy on top with a low
+taper fade on the sides, neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears an oversized heavyweight teal (#14B8A6) cotton
+hoodie over a plain white crew-neck t-shirt. Chest-up, facing the camera straight on, relaxed shoulders,
+a subtle friendly half-smile, eyes looking into the lens. Plain, seamless, very light grey-green
+background (#F3F7F6). Soft, even daylight from a large window on the left, a gentle fill on the right,
+natural skin texture with visible pores, no retouching, no makeup look. Shot on a 50 mm lens at f/2.8,
+sharp focus on the eyes, true-to-life colour. No text, no logos, no watermark, no jewellery except a
+thin black digital watch.
+PROMPT END
+
+[ishaan-sheet]   Aspect 16:9   ingredient: ishaan-hero
+PROMPT START
+Use the attached image as the identity reference: keep exactly the same face, skin tone, hair, stubble,
+eyebrows and clear skin. Photorealistic character reference sheet of the same young man, Ishaan: a 23-year-old Indian man with
+warm medium-brown skin, an oval face with a defined jawline, short black textured hair with a low taper
+fade, neat light stubble, thick dark eyebrows, dark brown eyes, clear even skin with no moles or spots,
+lean build, about 175 cm tall. Outfit: an oversized teal (#14B8A6) heavyweight hoodie over a white
+crew-neck t-shirt, black joggers, white sneakers, a thin black digital watch on his left wrist. Five
+views of the same person side by side, evenly spaced, full body, standing in a relaxed neutral pose:
+front view, three-quarter left, left profile, three-quarter right, back view. Identical face, hair,
+build and outfit in every view. Plain seamless light grey-green background (#F3F7F6), soft studio
+daylight, no shadows on the background, consistent scale. No text, no labels, no numbers, no watermark.
+PROMPT END
+
+[ishaan-outdoor-hero]   Aspect 9:16   ingredient: ishaan-hero
+PROMPT START
+Use the attached image as the identity reference: the exact same young man, same face, skin tone, hair,
+light stubble, eyebrows and clear, mole-free skin. Change only his clothes: he now
+wears a teal (#14B8A6) cotton overshirt worn open over a plain white crew-neck t-shirt, with a black
+backpack strap over his right shoulder and a thin black digital watch on his left wrist. Chest-up,
+facing the camera straight on, relaxed shoulders, a subtle friendly half-smile, eyes into the lens.
+Plain, seamless, very light grey-green background (#F3F7F6). Soft, even daylight from the left, natural
+skin texture with visible pores, no retouching. 50 mm lens at f/2.8, sharp eyes, true-to-life colour.
+No text, no logos, no watermark.
+PROMPT END
+
+[ishaan-expressions]   Aspect 16:9   SKIP: not needed now that Flow Characters lock the face. Keep for reference.
+PROMPT START
+Photorealistic expression sheet of Ishaan, a 23-year-old Indian man with warm medium-brown skin, short
+black textured hair with a low taper fade, light stubble, thick dark expressive eyebrows, clear even skin with no moles or spots, wearing a teal (#14B8A6) hoodie over a white t-shirt. A 3 by 2 grid of
+chest-up close-ups of the same person, same lighting, same framing: 1) deadpan stare into the lens,
+2) exasperated, eyes closed, pinching the bridge of his nose, 3) shocked, eyebrows raised, mouth
+slightly open, 4) leaning in and whispering a secret to the camera, 5) relieved warm smile, 6) a slow
+sarcastic eye-roll. Plain light grey-green background (#F3F7F6), soft daylight. No text, no labels,
+no borders between cells other than thin white gaps.
+PROMPT END
+
+[ishaan-room]   Aspect 9:16   (set ingredient, no person)
+PROMPT START
+Photorealistic interior of a small rented single room in a paying-guest building in Wakad, Pune, in the
+evening, shot from a phone propped at chest height near the door. A single bed against a pale cream wall,
+with grey sheets, a crumpled teal throw, and one coral (#FB923C) cushion. Beside the bed, a small
+wooden study desk with an open laptop, a steel water bottle, a half-finished cup of cutting chai and a
+tangle of charging cables. Above the desk, a thin indigo (#4F46E5) LED strip glows softly along a white
+floating shelf with a few books and a small plant. A grey steel almirah in the corner, a backpack on
+a hook. A window on the right shows the blue-hour sky and the lit windows of neighbouring buildings.
+Lighting: one warm ceiling bulb plus the indigo LED glow, slightly mixed and lived-in. Realistic,
+slightly cluttered, middle-class Indian PG vibe, no people. No readable text, no posters with words,
+no brand logos.
+PROMPT END
+
+
+FLOW CHARACTERS (left panel > Characters > New Character)
+----------------------------------------------------------
+Two characters share one face and one voice; only the clothes differ, because a Flow character locks
+its outfit too.
+
+  Name ........... Ishaan
+  Images ......... ishaan-hero, ishaan-sheet
+  Voice .......... "Ishaan Voice" (create once, below)
+  Character info . 23, software engineer in Hinjawadi, from Indore. Dry, deadpan humour; talks to the
+                   camera like texting a close friend. Speaks casual Hinglish.
+
+  Name ........... IshaanOutdoor
+  Images ......... ishaan-outdoor-hero
+  Voice .......... "Ishaan Voice" (the same saved voice)
+  Character info . same as Ishaan.
+
+  Create the voice: Select a voice > Create New Voice (an Omni Flash feature)
+    Base voice ......... the user picks: a young adult male preset that sounds Indian or neutral, not
+                         American. Claude lists the preset names on screen and asks; it cannot hear them.
+    Name ............... Ishaan Voice
+    Voice performance .. A 23-year-old man from Indore, India, speaking casual Hinglish (a natural mix of
+                         Hindi and English) with a natural North-Indian accent. Mid-pitched, slightly
+                         husky, relaxed and conversational, a quick pace with small deadpan pauses, close
+                         to the microphone like a front-camera phone video. Never an American or British
+                         accent. He says the brand name Draazy as DRAA-zee, with a long "aa" as in "drama".
+    Sample dialogue .... Ek flat pe enquiry ki thi. Bas ek. ड्राज़ी aa raha hai, Pune.
+                         (Write the brand name in Devanagari: Flow's voice says "Draazy" wrong in Latin.)
+    Then Sync (preview). The USER listens and approves before Save New Voice > Add to Character.
+  If Flow says custom voices aren't available in this region: pick the closest preset voice instead. The
+  voice description inside every clip prompt still steers the delivery.
+
+
+CONSISTENCY CHECKLIST (before accepting any take)
+  [ ] Clear skin, no moles or spots on the face
+  [ ] Teal hoodie (or teal overshirt outdoors), never another colour
+  [ ] Taper fade and messy top, no beard growth or shave change
+  [ ] Phone case teal
+  [ ] Voice matches the previous clip (young, husky, relaxed, North-Indian Hinglish)

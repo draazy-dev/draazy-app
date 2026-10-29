@@ -1,0 +1,57 @@
+CHARACTER 3 (COMIC ANTAGONIST): BROKER BHAIYA
+=============================================
+
+WHO HE IS
+  An unnamed Pune broker, "Broker Bhaiya". Mid-40s, always on two phones, always has "ek mast option".
+  He is a caricature of the SYSTEM, not of a community or a person: charming, pushy and harmless.
+  No regional, caste or religious markers. Never shown cheating anyone on camera; the joke is the
+  situation (surprise fees, calls from nowhere, the "already gone" flat).
+  Mostly heard as a voice on speakerphone (reels 1 and 3); seen on camera only in reel 2.
+
+LOOK - LOCKED (paste into every prompt where he is seen)
+  Broker Bhaiya, an Indian man in his mid-40s with a medium-brown skin tone, a round friendly face, a
+  thick neatly trimmed black moustache, short black hair combed back with a receding hairline and grey
+  at the temples, a slightly heavy build. He wears a half-sleeve blue-and-white checked cotton shirt
+  tucked into dark grey formal trousers, a black belt, brown leather sandals, and a black Bluetooth
+  earpiece in his right ear. He carries a large ring of jangling keys in one hand and holds a
+  smartphone in the other.
+
+VOICE - LOCKED
+  Broker Bhaiya speaks fast, overly sweet salesman Hinglish with a Marathi-tinged Pune Hindi accent:
+  a deep, slightly raspy male voice in his mid-40s, saying "sir" in every sentence, always smiling
+  through the voice, confident and unbothered.
+  On speakerphone: the same voice, with a thin, slightly compressed phone-speaker quality.
+
+
+IMAGE PROMPT FOR FLOW (rename the saved image to [broker-hero])
+---------------------------------------------------------------
+IMAGE SETTINGS: same as Ishaan (Nano Banana 2 Lite first, Pro only on a retry, Outputs 2).
+
+[broker-hero]   Aspect 9:16   ingredient: none
+PROMPT START
+Photorealistic portrait of Broker Bhaiya, an Indian man in his mid-40s with a medium-brown skin tone, a
+round friendly face, a thick neatly trimmed black moustache, short black hair combed back with a
+receding hairline and grey at the temples, a slightly heavy build. He wears a half-sleeve blue-and-white
+checked cotton shirt tucked into dark grey trousers, and a black Bluetooth earpiece in his right ear.
+He holds up a large ring of keys in his right hand at chest height and smiles a wide, salesy, confident
+smile at the camera, smartphone in his left hand. Waist-up, against a plain, seamless, very light
+grey-green background (#F3F7F6), so Flow can reuse him in any location. Soft, even daylight from the
+left, natural skin texture, 50 mm lens. No text, no name plates, no logos, no watermark.
+PROMPT END
+
+
+FLOW CHARACTER (left panel > Characters > New Character)
+  Name ........... BrokerBhaiya
+  Images ......... broker-hero
+  Character info . Mid-40s Pune property broker. Charming, pushy, harmless; says "sir" in every sentence.
+  Voice: Create New Voice
+    Base voice ......... the user picks a deep, middle-aged male preset.
+    Name ............... Broker Voice
+    Voice performance .. A man in his mid-40s from Pune, India, speaking fast, overly sweet salesman
+                         Hinglish with a Marathi-tinged Hindi accent. Deep, slightly raspy, always smiling
+                         through the voice, confident and unbothered. Never an American or British accent.
+    Sample dialogue .... Sir, ekdum mast option hai sir. Bas aaj hi dekh lo, kal nahi milega.
+    Sync, the USER approves, Save New Voice > Add to Character.
+  The chip is used only where he is on camera (reel 2). In reels 1 and 3 he is only a voice on
+  speakerphone, so those prompts describe his voice in text and do NOT use the chip (a chip could put
+  him in the frame).

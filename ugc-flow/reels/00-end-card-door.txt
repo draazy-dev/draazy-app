@@ -1,0 +1,47 @@
+REUSABLE END CARD: "THE DOOR OPENS" (generate once, use as the last 3 s of every reel)
+=====================================================================================
+JOB ID ............. end-card
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Text to Video (no ingredients, no characters)
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 4 s
+  Outputs .......... 1
+USE IN EDIT ........ 0.5-3.5 s
+
+WHY
+The Draazy logo is a "D" with an open door inside it. This shot makes that idea physical: a closed door
+in the dark swings open into teal light. The real logo and text go on top in the edit (see the
+brand kit). The video model must not draw any logo or text.
+Zero-credit alternative: this card can also be rendered locally with the brag-output HTML pipeline
+(real logo, real Outfit font). Ask Copilot for "end card via HTML" if credits run low.
+
+PROMPT START
+Static, locked-off camera on a tripod, perfectly centred, eye level, vertical 9:16 frame. A plain wooden
+door, painted matte deep ink (#0F0D1A), stands closed in the centre of a completely dark, minimal room
+with smooth dark walls. A thin, glowing line of teal light (#14B8A6) shows under the door and around its
+edges. At one second, the door clicks and swings slowly open, away from the camera, on its left hinge.
+Soft, luminous teal (#14B8A6) light pours through the doorway and floods towards the camera, with a
+gentle warm coral (#FB923C) rim glow at the very edges of the door frame. Fine dust particles float and
+sparkle in the beam. By two seconds the light fills most of the frame, bright and hopeful but not
+blown out, leaving a clean, glowing teal space in the centre of the frame for a logo to be added
+later. The camera does not move. Premium, minimal, cinematic brand-film look, smooth motion, a shallow
+haze, 24 fps.
+Audio: SFX: a crisp door-latch click at one second, then a soft rising airy whoosh as the light pours in,
+ending in a gentle low warm swell. No dialogue, no voice, no music.
+No text, no letters, no logo, no symbols, no subtitles, no watermark, no people.
+PROMPT END
+
+ACCEPT CHECK, VISUAL (Claude: screenshot at 0.5 s, 1.5 s, 3 s)
+  [ ] the door opens and the teal light fills most of the frame by about 2 s
+  [ ] no letters, symbols or logo shapes appear anywhere; no people
+  [ ] the centre stays clean enough for the logo overlay
+IF REJECTED: regenerate unchanged once, then stop and ask the user.
+
+EDIT OVERLAY (CapCut)
+  0.6 s after the door opens: the teal Draazy logo fades and scales in at centre (y around 820).
+  "Draazy" in Outfit Bold 700, white, 96 pt, at y around 1050.
+  "Pune ka rental app" in Outfit Medium 500, white, 44 pt, at y around 1135.
+  "Coming soon" in Outfit SemiBold 600, Teal light #2DD4BF, 44 pt, at y around 1200.
+  Optional: "Follow for launch" in Outfit Medium, white at 70%, 34 pt, at y around 1450.

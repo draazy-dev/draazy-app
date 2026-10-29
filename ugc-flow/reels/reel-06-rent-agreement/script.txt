@@ -1,0 +1,46 @@
+REEL 06 - RENT AGREEMENT  ("Chhutti li... rent agreement ke liye?")
+===================================================================
+
+PAIN          Taking leave to queue for hours to sign a rent agreement, and knowing you'll do it all again
+              in 11 months.
+DRAAZY TRUTH  The agreement is drafted and registered at your doorstep, and both sides get a renewal
+              reminder before it ends. (Renewal is NOT automatic: we say "reminder khud aa jaaye",
+              never "auto-renew".)
+CAST          Ishaan
+LENGTH        about 25 s  =  clip 1 (7 s) + clip 2 (7 s) + clip 3 (8 s) + end card (3 s)
+SETS          Clip 1: Ishaan's PG room desk, morning. Clip 2: a crowded, generic documentation-office
+              waiting area. Clip 3: Ishaan's PG room, night.
+
+HOOK
+  On screen (0.0-2.5 s):   Chhutti li... rent agreement ke liye?   ("Chhutti" in Coral #FB923C)
+  Spoken:                  "Office se chhutti li hai. Kyun?"
+
+SCRIPT
+  TIME        SHOT                                         DIALOGUE (Hinglish)                              OVERLAY
+  0.0-7.0     CLIP 1. At his desk, laptop open (screen      ISHAAN: "Office se chhutti li hai. Kyun?"         Hook card
+              unreadable), he hits send, then turns.        (beat) "Rent agreement sign karne ke liye."
+  7.0-14.0    CLIP 2. Whisper-selfie in a crowded waiting   ISHAAN (whispering): "Teen ghante se line mein    9.5: "Repeat every 11 months 🔁"
+              room, a token in his hand.                    hoon. Aur gyarah mahine baad... phir se yahi."
+  14.0-22.0   CLIP 3. Home at night, relaxed, to camera.   ISHAAN: "Socho, ek app jahan agreement ghar      17.0: "Doorstep agreement. Renewal reminders."
+                                                           baithe ban jaaye, aur renewal ka reminder        ("Doorstep" in Teal light)
+                                                           time pe aaye." (half-smile) "Draazy aa raha      20.0: pill "Draazy · Pune ka rental app"
+                                                           hai, Pune."
+  22.0-25.0   END CARD                                     (latch click + whoosh)                           Logo + "Draazy" + "Pune ka rental app"
+                                                                                                            + "Coming soon"
+
+CAPTION
+  Ek chhutti. Teen ghante ki line. Aur 11 mahine baad, same scene repeat. 🔁
+  Adulting ka sabse boring level: rent agreement.
+  Draazy aa raha hai, Pune ka apna rental app. Follow karo, launch pe sabse pehle pata chalega.
+  Agreement ke liye tumne kitni chhutti li hai? Comment karo 👇
+
+HASHTAGS
+  #Pune #RentAgreement #PuneRent #Adulting #PuneLife #FlatHuntingPune #RentInPune #Draazy #ComingSoon
+
+EDIT NOTES
+  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
+    holds into the end card. "Draazy" in captions is always Teal light.
+  - Clip 2 must not show any real government office, emblem, seal or signage. The prompt keeps it generic.
+  - "Teen ghante" is the skit's number, not a statistic.
+
+QA  hook opens with a fact | 2 beats | renewal worded as a reminder, not auto-renew | about 25 s

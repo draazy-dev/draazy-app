@@ -1,0 +1,51 @@
+REEL 01 - BROKER SPAM  ("1 enquiry. 12 broker calls.")
+=======================================================
+
+PAIN          You enquire about one flat. Within hours your number is with a dozen brokers, and you're in
+              WhatsApp groups you never joined.
+DRAAZY TRUTH  Your number stays masked. You reach the owner directly. The owner's number shows only once
+              they approve. Draazy doesn't sell numbers to brokers. (Teased, not shown.)
+CAST          Ishaan (on camera), Broker Bhaiya (voice only, on speakerphone)
+LENGTH        about 25 s  =  clip 1 (6 s) + clip 2 (8 s) + clip 3 (8 s) + end card (3 s)
+SET           Ishaan's PG room in Wakad, evening (ingredient: ishaan-room)
+
+HOOK
+  On screen (0.0-2.5 s):   1 enquiry. 12 broker calls.          ("calls" in Coral #FB923C)
+  Spoken (first words):    "Ek flat pe enquiry ki thi. Bas ek."
+
+SCRIPT
+  TIME        SHOT                                        DIALOGUE (Hinglish)                              OVERLAY
+  0.0-6.0     CLIP 1. Ishaan on the bed edge, phone       ISHAAN: "Ek flat pe enquiry ki thi. Bas ek."      Hook card
+              buzzing in his hand; he lifts it towards    (phone buzzes)
+              the lens, screen facing away, deadpan.      ISHAAN: "Yeh barahwa broker hai."
+  6.0-14.0    CLIP 2. He answers on speaker, holding       BROKER (speaker): "Hello sir! Wakad mein ek       14.0: "Kaunsa group?? 😶"
+              the phone flat under his chin.               ekdum mast 1BHK hai sir..."
+                                                          ISHAAN: "Bhaiya, mera number mila kahan se?"
+                                                          BROKER: "Sir, woh group mein aaya tha."
+                                                          (Ishaan turns slowly to the lens, deadpan)
+  14.0-22.0   CLIP 3. Phone face-down on the bed, still   ISHAAN (leaning in, lower voice): "Socho, ek     17.0: "Owner direct. Number private."
+              buzzing. He ignores it and leans in.        app jahan owner se seedha baat ho, aur           ("private" in Teal light)
+                                                          number broker tak pahunche hi na."               20.0: pill "Draazy · Pune ka rental app"
+                                                          (half-smile) "Draazy aa raha hai, Pune."         ("Draazy" in Teal light)
+  22.0-25.0   END CARD (reels\00-end-card-door.txt)       (no voice; latch click + whoosh)                 Logo + "Draazy" + "Pune ka rental app"
+                                                                                                           + "Coming soon"
+
+CAPTION
+  Ek enquiry. Barah calls. Aur ek WhatsApp group jo tumne join hi nahi kiya. 🫠
+  Pune mein flat dhoondhne ka yeh "free bonus" kab band hoga?
+  Draazy aa raha hai, Pune ka apna rental app. Follow karo, launch pe sabse pehle pata chalega.
+  Comment mein batao: ek enquiry ke baad tumhe kitne calls aaye the? 👇
+
+HASHTAGS
+  #Pune #PuneRent #FlatHuntingPune #RentInPune #Wakad #Hinjawadi #PuneLife #BrokerFree #Draazy #ComingSoon
+
+EDIT NOTES
+  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
+    holds into the end card. "Draazy" in captions is always Teal light.
+  - Cut clip 1 so "Ek" lands within 0.3 s. Add a phone-vibrate SFX under clip 1 if the clip's buzz is weak.
+  - Clip 2: keep the beat of silence after "group mein aaya tha" (0.6-0.8 s) before cutting. That's the joke.
+  - Clip 3: let "Draazy aa raha hai, Pune" finish, hold 0.3 s on the half-smile, then hard-cut to the end card.
+  - Turn on the AI label when posting.
+
+QA (reels-scripting rules)  hook doesn't open with "I"/"Main" | 2 beats only (spam, the fix) | no stated
+  conclusion | no invented stats on screen | CTA makes no delivery promise | about 25 s

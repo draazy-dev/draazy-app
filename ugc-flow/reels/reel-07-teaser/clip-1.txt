@@ -1,0 +1,86 @@
+REEL 07 / CLIP 1 of 2 - THE LIST (BASE SHOT FOR THE MONTAGE)
+============================================================
+JOB ID ............. r07-c1
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+CHARACTER CHIPS .... @Ishaan, @Sana   (each [@Name] token in the prompt becomes a chip)
+EXTRA INGREDIENTS .. none
+START FRAME ........ none
+USE IN EDIT ........ 0.0-8.0 s
+
+PROMPT START
+Vertical 9:16 smartphone video from a phone propped on the terrace parapet, a medium two-shot of Ishaan
+on the left and Sana on the right, standing side by side and leaning on the parapet wall of a rooftop
+terrace at dusk, framed from the waist up. Behind them, the Pune skyline stretches to low hills.
+
+Composition: keep the top fifth of the frame as calm, uncluttered background (a text card is added
+there later) and keep the faces in the middle third of the frame.
+
+Subjects:
+[@Ishaan] Ishaan (left), a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined jawline,
+short black hair that is textured and slightly messy on top with a low taper fade on the sides, neat
+light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build, wearing his signature teal (#14B8A6) oversized heavyweight cotton hoodie over a
+white t-shirt.
+[@Sana] Sana (right), a 22-year-old Indian woman with a light-medium wheatish skin tone, a heart-shaped face,
+shoulder-length dark brown curly hair worn loose and moving in the breeze, round thin gold-wire glasses,
+expressive dark eyes, a tiny silver nose stud on the left side, slim build, wearing her coral (#FB923C)
+relaxed linen overshirt open over a cream ribbed tank top.
+
+Action: Both hold small glasses of cutting chai. Ishaan, looking at the lens, counts the problems on his
+fingers in a slow, weary rhythm, leaving a clear pause after each item. Sana picks up the list without
+missing a beat, also counting on her fingers, and rolls her eyes on "agreement ki line". They exchange
+a tired look and both sip their chai at about 7 seconds.
+
+Dialogue, lip-synced to the correct speaker, spoken once with no extra words, with clear pauses between
+items:
+Ishaan (left), slow and weary: "Broker ke calls... brokerage... fake photos..."
+Sana (right), continuing the list: "...random flatmates... do ghante ka commute... agreement ki line."
+
+Voices: every on-screen character uses their saved Flow character voice, which matches this description.
+Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
+mid-pitched, slightly husky, relaxed and conversational.
+Sana speaks in casual Hinglish with a soft Lucknowi Hindi accent: a young female voice, bright and
+clear, a medium-high pitch, confident and witty.
+
+Setting: the rooftop terrace of a mid-rise residential building in Pune at dusk. A cream parapet wall,
+a black water tank and a few potted plants, laundry lines in the far corner, and behind them the
+sprawling Pune skyline of apartment towers with the first lit windows, construction cranes and the
+outline of low green-brown hills on the horizon. No readable signs or landmarks.
+
+Lighting and colour: blue-hour sky fading from soft coral (#FB923C) at the horizon to deep indigo
+(#4F46E5) above, warm light on their faces from a terrace bulb. Cinematic but natural. Subtle cool teal
+tint in the shadows, true warm skin tones, a gentle breeze.
+
+Camera feel: authentic Instagram UGC, a propped phone with a tiny natural wobble, phone autofocus,
+natural skin texture with no beauty filter, 30 fps.
+
+Audio: Ambient noise: a light evening breeze, distant city traffic hum, birds returning home, a faraway
+temple bell. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no readable signs, no logos, no watermark.
+PROMPT END
+
+ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
+  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
+  [ ] Ishaan matches @Ishaan: teal hoodie, taper fade, light stubble, clear skin with no moles
+  [ ] Sana matches @Sana: coral overshirt, curly shoulder-length hair, thin gold glasses, nose stud
+  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
+  [ ] the action in the prompt happens, in order, and nothing extra happens
+
+ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
+  [ ] every line spoken once, in order, with no added words
+  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
+  [ ] each line comes from the right person (speakers not swapped)
+  [ ] the voice matches the character's saved voice; no music
+
+IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
+  - words dropped, added or swapped: regenerate unchanged once
+  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
+  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
+  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
+  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)

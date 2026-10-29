@@ -1,0 +1,85 @@
+REEL 01 / CLIP 2 of 3 - THE CALL
+================================
+JOB ID ............. r01-c2
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+CHARACTER CHIPS .... @Ishaan   (each [@Name] token in the prompt becomes a chip)
+EXTRA INGREDIENTS .. ishaan-room
+START FRAME ........ none
+USE IN EDIT ........ the full 8 s
+CONTINUITY OPTION .. for perfect continuity, use Frames to Video with the last frame of clip 1 as the start frame. Only on a retry, and only if Flow
+                     allows a start frame together with the character chips.
+
+PROMPT START
+Vertical 9:16 smartphone video, medium close-up, eye level, from a phone propped on a desk about one metre
+away, framing Ishaan from mid-chest up, slightly off-centre to the left. The same framing as the previous
+shot.
+
+Subject: [@Ishaan] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
+jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
+neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears his signature teal (#14B8A6) oversized heavyweight cotton hoodie over a
+plain white crew-neck t-shirt, black joggers, and a thin black digital watch on his left wrist. His phone
+has a matte teal case.
+
+Action: Ishaan, sitting on the edge of his bed, taps to answer the call on speakerphone and holds the
+phone flat just below his chin, the screen facing up and away from the lens. A cheerful male voice
+blasts out of the phone speaker. At about 3 seconds Ishaan cuts in, irritated but polite, leaning
+towards the phone. The voice on the phone answers casually. From 6.5 to 8 seconds Ishaan slowly turns
+his head from the phone to stare straight into the lens, completely deadpan, eyebrows slightly raised,
+saying nothing.
+
+Dialogue, lip-synced for Ishaan; the broker is heard only through the phone speaker; spoken once, no
+extra words:
+The broker, from the phone speaker, overly sweet and fast: "Hello sir! Wakad mein ek ekdum mast 1BHK hai sir..."
+Ishaan, cutting in: "Bhaiya, mera number mila kahan se?"
+The broker, from the phone speaker, unbothered: "Sir, woh group mein aaya tha."
+Then silence while Ishaan stares at the camera.
+
+Voices: every on-screen character uses their saved Flow character voice, which matches this description.
+Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
+mid-pitched, slightly husky, relaxed and conversational, close to the microphone.
+The broker speaks fast, overly sweet salesman Hinglish with a Marathi-tinged Pune Hindi accent: a deep,
+slightly raspy male voice in his mid-40s, smiling through the voice, with a thin, slightly compressed
+phone-speaker sound quality.
+
+Setting: a small rented PG room in Wakad, Pune, in the evening. Behind him, a cream wall, a grey
+steel almirah, a white floating shelf lit by a thin indigo (#4F46E5) LED strip, a small plant, and a
+coral (#FB923C) cushion on the bed beside him. A window shows the blue-hour sky.
+
+Lighting and colour: a warm ceiling bulb as the key light from above-left, the soft indigo LED glow as a
+rim on his right shoulder, and the phone screen's faint cool light on his chin. Subtle cool teal tint in
+the shadows, true warm skin tones.
+
+Camera feel: authentic Instagram UGC, a static phone on a desk with a tiny natural wobble, phone
+autofocus, natural skin texture with no beauty filter, 30 fps.
+
+Audio: the broker's voice clearly from a small phone speaker, a soft call-connect beep at the start.
+Ambient noise: a quiet room tone, a distant ceiling fan. No music.
+
+No subtitles, no captions, no on-screen text or graphics. The phone screen is never readable. No
+readable signs, no brand logos, no watermark. The broker is never seen, only heard.
+PROMPT END
+
+ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
+  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
+  [ ] Ishaan matches @Ishaan: teal hoodie, taper fade, light stubble, clear skin with no moles
+  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
+  [ ] the action in the prompt happens, in order, and nothing extra happens
+
+ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
+  [ ] every line spoken once, in order, with no added words
+  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
+  [ ] each line comes from the right person (speakers not swapped)
+  [ ] the voice matches the character's saved voice; no music
+
+IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
+  - words dropped, added or swapped: regenerate unchanged once
+  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
+  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
+  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
+  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)

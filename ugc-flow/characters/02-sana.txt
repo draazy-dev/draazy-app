@@ -1,0 +1,78 @@
+CHARACTER 2 (SUPPORTING): SANA
+==============================
+
+WHO SHE IS
+  Sana, 22. Final-year design student who also interns as a junior UX designer in Baner, Pune.
+  Moved from Lucknow. Ishaan's friend from a hackathon. Sharp, witty and quick, with a big
+  expressive laugh. She brings the safety and trust angle: random flatmates, deposits sent to strangers.
+  Appears in reel 4 (flatmates) and reel 7 (teaser).
+
+LOOK - LOCKED (paste this block, word for word, into every prompt she appears in)
+  Sana, a 22-year-old Indian woman with a light-medium wheatish skin tone, a heart-shaped face,
+  shoulder-length dark brown curly hair worn loose, round thin gold-wire glasses, expressive dark eyes,
+  a tiny silver nose stud on the left side, and a slim build, about 162 cm tall. She wears her
+  signature coral (#FB923C) relaxed linen overshirt, sleeves rolled to the elbows, open over a cream
+  ribbed tank top, with high-waisted light-blue denim jeans and a canvas tote bag over one shoulder.
+
+VOICE - LOCKED (paste into every prompt where she speaks)
+  Sana speaks in casual Hinglish with a soft Lucknowi Hindi accent: a young female voice,
+  bright and clear, a medium-high pitch, confident and witty, a quick pace that slows down for the punchline,
+  close to the microphone like a phone's front-camera recording.
+
+PERSONALITY ON CAMERA
+  Raises one eyebrow before a punchline. Points at the camera on "socho". Laughs easily with Ishaan.
+
+
+IMAGE PROMPTS FOR FLOW (rename each saved image to its [name])
+--------------------------------------------------------------
+IMAGE SETTINGS: same as Ishaan (Nano Banana 2 Lite first, Pro only on a retry, Outputs 2).
+
+[sana-hero]   Aspect 9:16   ingredient: none
+PROMPT START
+Photorealistic portrait photo of Sana, a 22-year-old Indian woman with a light-medium wheatish skin
+tone, a heart-shaped face, shoulder-length dark brown curly hair worn loose, round thin gold-wire
+glasses, expressive dark eyes, a tiny silver nose stud on the left side. She wears a coral (#FB923C)
+relaxed linen overshirt with the sleeves rolled to the elbows, open over a cream ribbed tank top.
+Chest-up, facing the camera, head tilted slightly, a confident half-smile, eyes into the lens.
+Plain seamless light grey-green background (#F3F7F6). Soft daylight from the left, natural skin
+texture, minimal makeup, no retouching. 50 mm lens at f/2.8, sharp eyes, true-to-life colour. No text,
+no logos, no watermark.
+PROMPT END
+
+[sana-sheet]   Aspect 16:9   ingredient: sana-hero
+PROMPT START
+Use the attached image as the identity reference: keep exactly the same face, skin tone, curly hair,
+glasses and nose stud. Photorealistic character reference sheet of the same young woman, Sana: a 22-year-old Indian woman with
+a light-medium wheatish skin tone, a heart-shaped face, shoulder-length dark brown curly hair, round thin
+gold-wire glasses, a tiny silver nose stud on the left, a slim build, about 162 cm tall. Outfit: a
+coral (#FB923C) relaxed linen overshirt with rolled sleeves, open over a cream ribbed tank top,
+high-waisted light-blue denim jeans, white sneakers, a beige canvas tote bag on her right shoulder.
+Five full-body views side by side, evenly spaced, relaxed neutral standing pose: front, three-quarter
+left, left profile, three-quarter right, back. Identical face, hair, glasses and outfit in every view.
+Plain seamless light grey-green background (#F3F7F6), soft studio daylight, consistent scale. No text,
+no labels, no watermark.
+PROMPT END
+
+
+FLOW CHARACTER (left panel > Characters > New Character)
+  Name ........... Sana
+  Images ......... sana-hero, sana-sheet
+  Character info . 22, design student and UX intern in Baner, from Lucknow. Sharp, witty, quick,
+                   laughs easily. Speaks casual Hinglish.
+  Voice: Create New Voice
+    Base voice ......... the user picks a young adult female preset that sounds Indian or neutral.
+    Name ............... Sana Voice
+    Voice performance .. A 22-year-old woman from Lucknow, India, speaking casual Hinglish with a soft
+                         Lucknowi Hindi accent. Bright and clear, a medium-high pitch, confident and
+                         witty, a quick pace that slows down for the punchline, close to the microphone
+                         like a front-camera phone video. Never an American or British accent.
+    Sample dialogue .... Maine bhi random flatmate ke saath rehke dekha hai. Kabhi mat karna.
+    Sync, the USER approves, Save New Voice > Add to Character.
+
+
+CONSISTENCY CHECKLIST
+  [ ] Round gold-wire glasses in every shot
+  [ ] Curly, shoulder-length hair (never straightened, never tied up)
+  [ ] Coral overshirt, never another colour
+  [ ] Nose stud on the left
+  [ ] Voice bright and clear, with a Lucknowi Hinglish accent

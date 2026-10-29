@@ -1,0 +1,75 @@
+REEL 04 / CLIP 1 of 3 - HOOK
+============================
+JOB ID ............. r04-c1
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+CHARACTER CHIPS .... @Ishaan   (each [@Name] token in the prompt becomes a chip)
+EXTRA INGREDIENTS .. ishaan-room
+START FRAME ........ none
+USE IN EDIT ........ 0.0-7.0 s
+
+PROMPT START
+Vertical 9:16 smartphone video, a medium close-up from a phone propped on a desk about one metre away,
+framing Ishaan from mid-chest up as he lies propped against pillows on his bed, slightly off-centre.
+
+Composition: keep the top fifth of the frame as calm, uncluttered background (a text card is added
+there later) and keep the faces in the middle third of the frame.
+
+Subject: [@Ishaan] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
+jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
+neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears his signature teal (#14B8A6) oversized heavyweight cotton hoodie over a
+plain white crew-neck t-shirt and a thin black digital watch. His phone has a matte teal case.
+
+Action: Ishaan holds his phone above his face with one hand, its screen facing him and away from the
+lens, thumb-scrolling endlessly and fast, his face lit by the screen. He looks from the phone to the
+lens with a dead, tired expression and speaks. On "Chaar sau log" he holds up four fingers of his free
+hand. On "'DM me'" he does slow, sarcastic air quotes with two fingers and lets his head drop back onto
+the pillow. From 6 to 8 seconds he stares at the ceiling, still scrolling, completely defeated.
+
+Dialogue, lip-synced, spoken once with no extra words:
+Ishaan, flat and tired: "'Pune Flatmates' group. Chaar sau log. Sabka message ek hi... 'DM me.'"
+
+Voice: every on-screen character uses their saved Flow character voice, which matches this description. Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
+mid-pitched, slightly husky, relaxed and conversational, with small deadpan pauses, close to the
+microphone like a phone recording.
+
+Setting: a small rented PG room in Wakad, Pune, at night. A cream wall, a white floating shelf lit by a
+thin indigo (#4F46E5) LED strip, a small plant, grey sheets, a crumpled teal throw, and a coral (#FB923C)
+cushion behind his head. A dark window shows the lit windows of neighbouring buildings.
+
+Lighting and colour: low, cosy night light. The indigo LED glow behind him, a warm bedside lamp, and the
+cool white glow of his phone screen lighting his face from below. Subtle cool teal tint in the shadows,
+true warm skin tones.
+
+Camera feel: authentic Instagram UGC, a static propped phone with a tiny natural wobble, phone
+autofocus, natural skin texture with no beauty filter, 30 fps.
+
+Audio: SFX: a stream of rapid phone notification pings and WhatsApp-style message pops, about one every
+half second, quiet but relentless. Ambient noise: a quiet room tone, a ceiling fan. No music.
+
+No subtitles, no captions, no on-screen text or graphics. The phone screen is never visible to the
+lens. No readable signs, no app logos, no watermark.
+PROMPT END
+
+ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
+  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
+  [ ] Ishaan matches @Ishaan: teal hoodie, taper fade, light stubble, clear skin with no moles
+  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
+  [ ] the action in the prompt happens, in order, and nothing extra happens
+
+ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
+  [ ] every line spoken once, in order, with no added words
+  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
+  [ ] the voice matches the character's saved voice; no music
+
+IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
+  - words dropped, added or swapped: regenerate unchanged once
+  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
+  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
+  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
+  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)

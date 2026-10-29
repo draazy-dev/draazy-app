@@ -1,0 +1,76 @@
+REEL 03 / CLIP 3 of 3 - THE TEASE
+=================================
+JOB ID ............. r03-c3
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token in the prompt becomes a chip)
+EXTRA INGREDIENTS .. none
+START FRAME ........ none
+USE IN EDIT ........ 0.0-8.0 s
+
+PROMPT START
+Vertical 9:16 selfie walk-and-talk video, shot on the front camera of a smartphone held at arm's length
+by Ishaan as he walks slowly along a Pune street at dusk. A medium close-up, with the street receding
+behind him.
+
+Subject: [@IshaanOutdoor] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
+jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
+neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears a teal (#14B8A6) cotton overshirt worn open over a plain white crew-neck
+t-shirt, with a black backpack on both shoulders and a thin black digital watch.
+
+Action: Ishaan walks at an easy pace, calm now after a frustrating day. He looks into the lens, speaks
+sincerely and slows his walk on "asli owner" and "papers checked", giving a small nod on each. At about
+6 seconds he stops walking, gives a confident half-smile, raises his eyebrows once and says the final
+line. He holds the half-smile until 8 seconds, with the street lights glowing behind him.
+
+Dialogue, lip-synced, spoken once with no extra words:
+Ishaan, calm and sincere: "Socho, ek app jahan har listing ke peeche KYC wala asli owner ho, aur papers checked."
+Then, with a half-smile, slowly and clearly: "ड्राज़ी aa raha hai, Pune."
+Pronunciation: "ड्राज़ी" is the brand name Draazy, said DRAA-zee: two syllables, a long open "aa" as in "drama", stress on
+the first syllable, then a soft "zee". It is the clearest, most deliberate word in the clip.
+
+Voice: every on-screen character uses their saved Flow character voice, which matches this description. Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
+mid-pitched, slightly husky, relaxed and conversational, close to the phone's microphone, with soft
+street noise around.
+
+Setting: a tree-lined residential street in Pune at dusk. Footpath paving, parked two-wheelers, a
+small chai stall glowing warmly in the background, mid-rise apartment buildings with lit windows, and
+street lights just turning on. No readable signs or number plates.
+
+Lighting and colour: blue-hour sky with warm street lights and warm window glow; a soft teal-blue
+ambient tone on his face from the sky and a warm practical light catching one side. Hopeful and calm.
+Subtle cool teal tint in the shadows, true warm skin tones, shallow depth of field.
+
+Camera feel: authentic Instagram UGC walking selfie, natural gentle walking bob, phone autofocus,
+slight wide-angle look, no beauty filter, 30 fps.
+
+Audio: Ambient noise: an evening street, distant scooters, a pressure horn far off, birds settling in
+the trees, faint chai-stall chatter. His footsteps. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no readable signs, no logos, no watermark.
+PROMPT END
+
+ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
+  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
+  [ ] Ishaan matches @IshaanOutdoor: open teal overshirt on a white tee, taper fade, stubble, no moles
+  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
+  [ ] the action in the prompt happens, in order, and nothing extra happens
+
+ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
+  [ ] every line spoken once, in order, with no added words
+  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
+  [ ] "Draazy" is clearly DRAA-zee (long "aa", two syllables), not "Dray-zee" or "Drazzy"
+  [ ] the voice matches the character's saved voice; no music
+
+IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
+  - "Draazy" mispronounced: regenerate unchanged once (ड्राज़ी already won the voice audition), then ask the user
+  - words dropped, added or swapped: regenerate unchanged once
+  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
+  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
+  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
+  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)

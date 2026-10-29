@@ -1,0 +1,44 @@
+REEL 05 - COMMUTE  ("Cheap rent. 90-minute commute.")
+=====================================================
+
+PAIN          You save on rent by living far away, then lose 3 hours a day and the savings to traffic and cabs.
+DRAAZY TRUTH  You see your travel time to your office alongside each flat, not just a map pin.
+              (Teased, not shown.)
+CAST          Ishaan (outdoor variant in clips 1-2, hoodie in clip 3)
+LENGTH        about 24 s  =  clip 1 (7 s) + clip 2 (6 s) + clip 3 (8 s) + end card (3 s)
+SETS          Clips 1-2: back seat of a cab stuck in evening traffic on the road to Hinjawadi.
+              Clip 3: Ishaan's PG room, night.
+
+HOOK
+  On screen (0.0-2.5 s):   Cheap rent. 90-minute commute.         ("90-minute" in Coral #FB923C)
+  Spoken:                  "Rent bachane ke liye flat Wagholi mein liya."
+
+SCRIPT
+  TIME        SHOT                                         DIALOGUE (Hinglish)                              OVERLAY
+  0.0-7.0     CLIP 1. Selfie in a cab stuck in a jam,       ISHAAN: "Rent bachane ke liye flat Wagholi        Hook card
+              horns everywhere.                             mein liya." (beat) "Office? Hinjawadi."
+  7.0-13.0    CLIP 2. Same cab, now dark outside, him       ISHAAN: "Roz dedh ghanta jaana, dedh ghanta       9.0: "3 hrs/day in traffic 🫠"
+              slumped, the meter ticking.                   aana. Bachat sab cab mein chali gayi."
+  13.0-21.0   CLIP 3. Home. He collapses on the bed, then  ISHAAN: "Socho, ek app jo har flat ke saath      16.0: "Pick flats by commute time."
+              rolls over to the camera.                    office tak ka asli time dikhaye."                ("commute time" in Teal light)
+                                                           (half-smile) "Draazy aa raha hai, Pune."         19.0: pill "Draazy · Pune ka rental app"
+  21.0-24.0   END CARD                                     (latch click + whoosh)                           Logo + "Draazy" + "Pune ka rental app"
+                                                                                                            + "Coming soon"
+
+CAPTION
+  Rent pe ₹4k bachaye. Roz 3 ghante traffic mein gaye. 🚕
+  Maths kisi ne nahi sikhaya tha yeh wala.
+  Draazy aa raha hai, Pune ka apna rental app. Follow karo, launch pe sabse pehle pata chalega.
+  Tumhara daily commute kitna lamba hai? Comment karo 👇
+
+HASHTAGS
+  #Pune #Hinjawadi #Wagholi #PuneTraffic #PuneRent #ITLife #CommuteLife #PuneLife #Draazy #ComingSoon
+
+EDIT NOTES
+  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
+    holds into the end card. "Draazy" in captions is always Teal light.
+  - Wagholi to Hinjawadi is across the city (about 35-40 km), so a 90-minute peak-hour ride is the
+    skit's realistic case, not a statistic. "₹4k" in the caption is Ishaan's own number in the skit.
+  - Clip 1 to clip 2 needs a time jump. Add a quick "1 ghanta baad..." text flash (Outfit, 0.6 s) at the cut.
+
+QA  hook opens with a fact | 2 beats | no stated conclusion | about 24 s

@@ -1,0 +1,81 @@
+REEL 03 / CLIP 2 of 3 - THE REALITY
+===================================
+JOB ID ............. r03-c2
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token in the prompt becomes a chip)
+EXTRA INGREDIENTS .. none
+START FRAME ........ none
+USE IN EDIT ........ 0.0-6.0 s
+
+PROMPT START
+Vertical 9:16 selfie video, shot on the front camera of a smartphone held at arm's length by Ishaan,
+inside a dim, empty flat. It starts as a close-up of his unimpressed face; at about 3 seconds he swings
+the phone round to show the room's damp wall for 1.5 seconds, then swings back to his face.
+
+Subject: [@IshaanOutdoor] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
+jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
+neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears a teal (#14B8A6) cotton overshirt worn open over a plain white crew-neck
+t-shirt, with a black backpack strap on his shoulder.
+
+Action: At 0 seconds Ishaan stands in the dim room with a completely flat, unimpressed face, holding his
+other phone, in a matte teal case, flat near his chin on speakerphone. A cheerful male voice speaks from
+the phone speaker. At about 3 seconds Ishaan swings his selfie camera across to show a large patch of
+grey-green damp and peeling paint on the wall beside a small barred window, then swings back to his
+face. At about 5 seconds he says one word, totally deadpan, eyebrows raised, then stares into the lens
+without blinking.
+
+Dialogue; the broker is heard only from the phone speaker; Ishaan's line is lip-synced; spoken once with
+no extra words:
+The broker, from the phone speaker, sweet and casual: "Sir, woh wala toh kal hi chala gaya. Yeh bhi same hai sir."
+Ishaan, deadpan: "Same?"
+
+Voices: every on-screen character uses their saved Flow character voice, which matches this description.
+The broker speaks fast, overly sweet salesman Hinglish with a Marathi-tinged Pune Hindi accent: a deep,
+slightly raspy male voice in his mid-40s, smiling through the voice, with a thin, slightly compressed
+phone-speaker sound quality.
+Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
+mid-pitched, slightly husky, flat and deadpan here.
+
+Setting: a small, dim, unfurnished flat in an old Pune building. Patchy off-white walls with a large
+grey-green damp stain and peeling paint near the ceiling corner, a cracked tile floor, a small window
+with a rusty grille facing a wall a metre away, a bare bulb holder hanging from a wire. Tired and
+gloomy, no furniture.
+
+Lighting and colour: dim, flat, greyish daylight from the small window, slightly underexposed.
+Desaturated, cool and gloomy, in deliberate contrast to a bright previous shot. True skin tones, no teal
+glow here.
+
+Camera feel: authentic Instagram UGC front-camera selfie, natural handheld shake with a quick, slightly
+clumsy swing to the wall and back, phone autofocus hunting briefly, no beauty filter, 30 fps.
+
+Audio: the broker's voice clearly from a small phone speaker. Ambient noise: a hollow, echoey empty
+room, a dripping tap somewhere, faint traffic outside. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no readable phone screen, no readable signs,
+no logos, no watermark. The broker is never seen, only heard.
+PROMPT END
+
+ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
+  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
+  [ ] Ishaan matches @IshaanOutdoor: open teal overshirt on a white tee, taper fade, stubble, no moles
+  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
+  [ ] the action in the prompt happens, in order, and nothing extra happens
+
+ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
+  [ ] every line spoken once, in order, with no added words
+  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
+  [ ] each line comes from the right person (speakers not swapped)
+  [ ] the voice matches the character's saved voice; no music
+
+IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
+  - words dropped, added or swapped: regenerate unchanged once
+  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
+  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
+  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
+  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)

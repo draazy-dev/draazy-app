@@ -1,0 +1,48 @@
+REEL 03 - FAKE LISTING  ("Photo vs reality: Pune edition")
+==========================================================
+
+PAIN          The bright flat in the photos "just got rented". You travelled an hour to be shown a damp one.
+DRAAZY TRUTH  Owners are KYC-checked, and their ownership papers are checked before a listing goes live.
+              (Teased, not shown.)
+CAST          Ishaan (outdoor variant), Broker Bhaiya (voice only, on speakerphone)
+LENGTH        about 24 s  =  clip 1 (7 s) + clip 2 (6 s) + clip 3 (8 s) + end card (3 s)
+SETS          Clip 1: back seat of an auto-rickshaw in Pune traffic, daytime. Clip 2: a dim, damp, bare
+              flat. Clip 3: a Pune street at dusk.
+
+HOOK
+  On screen (0.0-2.5 s):   Photo vs reality: Pune edition         ("reality" in Coral #FB923C)
+  Spoken:                  "Yeh flat dekho. Balcony, sunlight, ekdum mast."
+
+SCRIPT
+  TIME        SHOT                                         DIALOGUE (Hinglish)                              OVERLAY
+  0.0-7.0     CLIP 1. Selfie in an auto, excited. He       ISHAAN: "Yeh flat dekho. Balcony, sunlight,       Hook card
+              shows his phone to the lens (screen just      ekdum mast. Ek ghanta auto mein, dekhne ja
+              a bright blur).                               raha hoon."
+  7.0-13.0    CLIP 2. Inside a damp, dim flat. Phone on     BROKER (speaker): "Sir, woh wala toh kal hi       9.0: "Expectation: balcony. Reality: seelan."
+              speaker. He pans to a damp wall and back.     chala gaya. Yeh bhi same hai sir."
+                                                           ISHAAN (deadpan): "Same?"
+  13.0-21.0   CLIP 3. Walking on the street at dusk,       ISHAAN: "Socho, ek app jahan har listing ke      16.0: "Verified owners. Real papers."
+              to camera.                                   peeche KYC wala asli owner ho, aur papers        ("Verified" in Teal light)
+                                                           checked." (half-smile) "Draazy aa raha hai,      19.0: pill "Draazy · Pune ka rental app"
+                                                           Pune."
+  21.0-24.0   END CARD                                     (latch click + whoosh)                           Logo + "Draazy" + "Pune ka rental app"
+                                                                                                            + "Coming soon"
+
+CAPTION
+  Photo mein balcony, sunlight, sab kuch. 🌤️
+  Reality mein "sir woh toh kal chala gaya, yeh dekh lo". 🫥
+  Ek ghanta auto ka, aur ek aur weekend gaya.
+  Draazy aa raha hai, Pune ka apna rental app. Follow karo, launch pe pata chalega.
+  Tumhara worst "photo vs reality" kya tha? Comment karo 👇
+
+HASHTAGS
+  #Pune #PuneRent #FakeListing #FlatHuntingPune #PhotoVsReality #PuneLife #RentInPune #Draazy #ComingSoon
+
+EDIT NOTES
+  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
+    holds into the end card. "Draazy" in captions is always Teal light.
+  - Clip 1 is bright and saturated; clip 2 is dim and desaturated. Let the colour change sell the joke.
+  - Optional: a 0.3 s record-scratch SFX at the cut from clip 1 to clip 2.
+  - Hold 0.5 s on "Same?" before cutting.
+
+QA  hook opens with "Yeh", not "I" | 2 beats | no stated conclusion | no invented stats | about 24 s

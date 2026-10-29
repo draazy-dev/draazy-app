@@ -1,0 +1,47 @@
+REEL 02 - BROKERAGE  ("5-minute visit. ₹25,000 fee.")
+=====================================================
+
+PAIN          A broker opens a door, switches a light on and asks for a month's rent as brokerage.
+DRAAZY TRUTH  Broker-free: you deal with the owner directly, with no brokerage. (Teased, not shown.)
+CAST          Ishaan (outdoor variant: teal overshirt), Broker Bhaiya (on camera)
+LENGTH        about 24 s  =  clip 1 (6 s) + clip 2 (7 s) + clip 3 (8 s) + end card (3 s)
+SETS          Clip 1-2: corridor and doorway of a residential society flat in Wakad, daytime.
+              Clip 3: the building's front steps and parking area.
+
+HOOK
+  On screen (0.0-2.5 s):   5-minute visit. ₹25,000 fee.        ("₹25,000" in Coral #FB923C)
+  Spoken:                  "Paanch minute ka visit. Aur fees? Pachees hazaar."
+
+SCRIPT
+  TIME        SHOT                                         DIALOGUE (Hinglish)                              OVERLAY
+  0.0-6.0     CLIP 1. Selfie in the society corridor,       ISHAAN (whispering): "Paanch minute ka visit.     Hook card
+              whispering. Behind him, Broker Bhaiya         Aur fees? Pachees hazaar."
+              unlocks a flat door, keys jangling.
+  6.0-13.0    CLIP 2. Inside the empty flat's doorway.      BROKER (smiling, flicking the light on):          11.0: "Light on = ₹25k 💡"
+              Broker flicks on the light, turns to          "Sir, dekh liya na? Brokerage ek mahine ka
+              Ishaan's camera.                              rent. Standard hai sir."
+                                                           (Ishaan's frozen half-smile at the lens)
+  13.0-21.0   CLIP 3. Ishaan sitting on the building's     ISHAAN: "Light on karne ke pachees hazaar?"      16.0: "Owner direct. Zero brokerage."
+              front steps, to camera.                      (beat) "Socho, ek app jahan owner se seedha      ("Zero" in Teal light)
+                                                           deal ho, beech mein koi nahi."                   19.0: pill "Draazy · Pune ka rental app"
+                                                           (half-smile) "Draazy aa raha hai, Pune."
+  21.0-24.0   END CARD                                     (latch click + whoosh)                           Logo + "Draazy" + "Pune ka rental app"
+                                                                                                            + "Coming soon"
+
+CAPTION
+  Darwaza khola. Light on ki. ₹25,000. 💸
+  Broker ka sabse mehenga 5 minute, tumhare paise se.
+  Draazy aa raha hai, Pune ka apna rental app. Follow karo, launch pe sabse pehle pata chalega.
+  Tumne sabse zyada brokerage kitni di hai? Comment karo 👇
+
+HASHTAGS
+  #Pune #PuneRent #Brokerage #NoBrokerage #FlatHuntingPune #Wakad #PuneLife #RentInPune #Draazy #ComingSoon
+
+EDIT NOTES
+  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
+    holds into the end card. "Draazy" in captions is always Teal light.
+  - The ₹25,000 figure is the skit's number (one month's rent on a typical Wakad 2BHK), not a statistic.
+  - Clip 2: cut on Ishaan's frozen half-smile and hold it 0.5 s. It's the laugh beat.
+  - Keep the broker likeable. The joke is the fee, not the man.
+
+QA  hook opens with a fact, not "I" | 2 beats | no stated conclusion | no invented stats | about 24 s
