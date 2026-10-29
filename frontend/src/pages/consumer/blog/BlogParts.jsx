@@ -1,7 +1,6 @@
 import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 
-// Literal class strings so Tailwind's scanner keeps them; keys match TOPICS in scripts/vite-plugin-blog.mjs.
 const TONES = {
   renting: { icon: 'key-round', text: 'text-teal-400', cover: 'from-teal-400/25 via-teal-400/[0.08]' },
   buying: { icon: 'building', text: 'text-sky-400', cover: 'from-sky-400/25 via-sky-400/[0.08]' },

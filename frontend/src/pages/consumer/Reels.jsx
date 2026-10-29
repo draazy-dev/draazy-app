@@ -10,15 +10,11 @@ import { propertyReels } from '../../services/propertyService.js';
 import { RESIDENTIAL_KEYS } from '../../data/propertyTypes.js';
 import { useSaved } from '../../context/SavedContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
-/* The feed is the live catalogue, not a curated list — a hardcoded set means a newly posted home can never appear
-   here and its caption can drift from the listing it links to. */
 
 const MIN_PHOTOS = 3;
-/* `flatmates` keeps shared rooms in the feed: the server's building keys alone exclude any share-type listing. */
 const REEL_QUERY = { types: [...RESIDENTIAL_KEYS, 'flatmates'], minPhotos: MIN_PHOTOS };
 
 const toReel = (p) => ({
-  /* Carried alongside `id` because they are different strings and the save needs the other one. */
   id: p.slug || p.id,
   uuid: p.id,
   photos: p.photos || [],
@@ -62,8 +58,6 @@ export default function Reels() {
     propertyReels(REEL_QUERY).then((rows) => {
       if (!alive) return;
       setFeed(rows.map(toReel));
-      // `feed` stays null forever on a rejection, and null is the loading state — so a failed catalogue read renders
-      // "loading" indefinitely.
     }).catch(() => {
       if (alive) setFeed([]);
     });
@@ -74,10 +68,8 @@ export default function Reels() {
     const list = feed || [];
     return filter === 'all' ? list : list.filter((r) => r.deal === filter);
   }, [feed, filter]);
-  /* Liked is session-only and intentionally uncounted. */
 
   const [liked, setLiked] = useState(() => new Set());
-  // The context exposes the same `has(id)` the local Set did, so the markup below is unchanged.
   const saved = useSaved();
   const [active, setActive] = useState(0);
   const [playing, setPlaying] = useState(!prefersReducedMotion());
@@ -94,7 +86,6 @@ export default function Reels() {
   const setReelRef = useCallback((id) => (el) => {
     if (el) reelRefs.current[id] = el; else delete reelRefs.current[id];
   }, []);
-  // React to OS "reduce motion" changes mid-session.
 
   useEffect(() => {
     const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -103,10 +94,8 @@ export default function Reels() {
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
-  // Clear any pending single-tap timer on unmount.
 
   useEffect(() => () => { if (tapRef.current.t) clearTimeout(tapRef.current.t); }, []);
-  // Track which reel is in view via IntersectionObserver.
 
   useEffect(() => {
     const root = wrapRef.current;
@@ -126,7 +115,6 @@ export default function Reels() {
     reels.forEach((r) => { const el = reelRefs.current[r.id]; if (el) { io.observe(el); observed.push(el); } });
     return () => { observed.forEach((el) => io.unobserve(el)); io.disconnect(); };
   }, [reels]);
-  // Reset to top when the intent filter changes.
 
   useEffect(() => { wrapRef.current?.scrollTo({ top: 0 }); setActive(0); }, [filter]);
 
@@ -135,8 +123,6 @@ export default function Reels() {
     const el = reelRefs.current[reels[clamped]?.id];
     el?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
   }, [reels, reduced]);
-  // Story-style auto-advance. With no segmented progress bar there is nothing to paint per frame,
-  // so one timer does the job of a rAF loop.
 
   useEffect(() => {
     if (!playing || reduced || reels.length === 0) return undefined;
@@ -152,7 +138,6 @@ export default function Reels() {
     }, TOUR_MS);
     return () => clearTimeout(timer);
   }, [playing, reduced, active, reels]);
-  // Keyboard navigation (reads active via ref to avoid re-binding each change).
 
   useEffect(() => {
     const onKey = (e) => {
@@ -174,8 +159,6 @@ export default function Reels() {
   const doBurst = (id) => { like(id, true); setBurst({ id, key: ++burstSeq.current }); };
 
   const save = async (r) => {
-    // Toast on the settled state, not the intent: if the write failed the context rolls back, and
-    // "Saved" over a property that was not saved is worse than no toast at all.
     if (saved.busyIds?.has(r.id)) return;
     const wasSaved = saved.has(r.id);
     const ok = wasSaved ? await saved.unsave(r.id, r.uuid) : await saved.save(r.id, r.uuid);
@@ -194,7 +177,6 @@ export default function Reels() {
     }
     window.open('https://wa.me/?text=' + encodeURIComponent(`${text} — ${url}`), '_blank', 'noopener');
   };
-  // Media tap: double-tap → like burst, single tap → play/pause.
 
   const onMediaTap = (id) => {
     const now = Date.now();
@@ -208,7 +190,6 @@ export default function Reels() {
     const t = setTimeout(() => setPlaying((p) => !p), 280);
     tapRef.current = { time: now, id, t };
   };
-  // Horizontal photo swipe: derive the active photo index from scroll position.
 
   const onGalleryScroll = (id, el) => {
     const idx = Math.round(el.scrollLeft / el.clientWidth);
@@ -216,7 +197,6 @@ export default function Reels() {
   };
 
   return (
-      /* Top overlay: brand + intent filters */
     <div className="reels-page">
       <header className="reels-top">
         <div className="reels-topbar">
@@ -241,7 +221,6 @@ export default function Reels() {
         </div>
       </header>
 
-        {/* Two distinct nothing-states. */}
       <div className="reel-wrap" ref={wrapRef}>
         {feed === null && (
           <div className="reel-note" role="status">
@@ -258,7 +237,6 @@ export default function Reels() {
           </div>
         )}
         {reels.map((r, i) => (
-            /* Horizontal photo carousel for this property */
           <section key={r.id} data-idx={i} ref={setReelRef(r.id)} className="reel">
             <div
               className="reel-gallery"
@@ -279,8 +257,6 @@ export default function Reels() {
               ))}
             </div>
             <div className="reel-scrim" aria-hidden="true" />
-            {/* Center play/pause badge */}
-
             <div className={`play-badge${playing && i === active ? ' is-playing' : ''}`} aria-hidden="true">
               <Icon name={playing && i === active ? 'timer' : 'play'} weight="fill" className="w-7 h-7 text-white" />
             </div>

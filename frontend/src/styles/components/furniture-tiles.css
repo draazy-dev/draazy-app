@@ -16,15 +16,12 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  /* Hover is gated so touch does not leave one tile looking selected after a tap. */
   .furn-tile:hover {
     border-color: rgb(var(--dz-c-teal-500) / 0.4);
     background: rgb(var(--dz-c-teal-500) / 0.06);
     transform: translateY(-1px);
   }
 }
-
-/* The tiles are keyboard-reachable, and the UA outline ignores the 14px radius. */
 .furn-tile:focus-visible {
   outline: none;
   border-color: var(--teal-2);
@@ -86,8 +83,6 @@
   opacity: 1;
   transform: scale(1);
 }
-
-/* Text-only variant (vibe answers): no icon, so the badge sits on the corner to keep the label's full width. */
 .furn-tile.furn-tile--text {
   min-height: 52px;
   padding: 8px 6px;

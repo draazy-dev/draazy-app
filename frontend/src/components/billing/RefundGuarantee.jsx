@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import { usePricing } from '../../context/PricingContext.jsx';
 
-/** One reassurance line at the point of purchase; renders nothing when the admin set the window to 0. */
 export default function RefundGuarantee({ kind, className = 'text-xs text-emerald-300' }) {
   const { t } = useTranslation();
   const { refunds, loaded } = usePricing();

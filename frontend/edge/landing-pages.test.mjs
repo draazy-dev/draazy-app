@@ -1,4 +1,3 @@
-// node edge/landing-pages.test.mjs
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { flatmateApiPath, flatmatePage, flatmateRoute, landingApiPath, landingPage, landingRoute, landingSitemapRows } from './landing-pages.mjs';
@@ -16,7 +15,6 @@ const row = (n, over = {}) => ({
 const rows = (n, over) => Array.from({ length: n }, (_, i) => row(i + 1, over));
 const baner = (deal, bhk) => parseLanding(deal, bhk ? ['baner', `${bhk}-bhk`] : ['baner']);
 
-// Guides stay the single source for the place list and taglines.
 const guideDir = new URL('../src/content/localities/', import.meta.url);
 const guides = readdirSync(guideDir).filter((f) => f.endsWith('.md')).map((f) => f.slice(0, -3)).sort();
 assert.deepEqual(LANDING_PLACES.map((p) => p.slug).sort(), guides);
@@ -26,7 +24,6 @@ for (const p of LANDING_PLACES) {
   assert.equal(md.match(/^tagline:\s*["']?(.+?)["']?\s*$/m)?.[1], TAGLINES[p.slug], `${p.slug} tagline`);
 }
 
-// Parsing
 assert.deepEqual(parseLanding('rent', ['pune']), { deal: 'rent', place: PUNE, bhk: null });
 assert.equal(parseLanding('buy', ['baner', '2-bhk']).bhk, 2);
 for (const bad of [[], ['nowhere'], ['baner', '5-bhk'], ['baner', '0-bhk'], ['baner', '2'], ['baner', '2-bhk', 'x'], ['pune', '2-bhk']]) {
@@ -39,7 +36,6 @@ assert.deepEqual(parseFlatmateLanding('women-only-pune'), { women: true, place: 
 assert.equal(parseFlatmateLanding('baner').place.name, 'Baner');
 assert.equal(parseFlatmateLanding('nowhere'), null);
 
-// Copy, queries, thresholds
 assert.equal(landingCopy(baner('rent')).h1, 'Flats and homes for rent in Baner, Pune');
 assert.equal(landingCopy(baner('buy', 3)).h1, '3 BHK flats for sale in Baner, Pune');
 assert.equal(landingCopy(parseLanding('rent', ['pune'])).h1, 'Flats and homes for rent in Pune');
@@ -52,7 +48,6 @@ assert.equal(landingApiPath(baner('rent', 2)), '/properties?deal=rent&localities
 assert.ok(!isIndexable(baner('rent'), 4) && isIndexable(baner('rent'), 5));
 assert.ok(!isIndexable(baner('rent', 2), 2) && isIndexable(baner('rent', 2), 3));
 
-// Landing page render
 const lived = landingPage(SHELL, baner('rent'), { content: rows(6), totalElements: 6 });
 assert.equal(lived.status, 200);
 assert.ok(lived.html.includes('<link data-shell="" rel="canonical" href="https://draazy.com/rent/baner" />'));
@@ -81,7 +76,6 @@ assert.ok(many.html.includes('See all 25 homes'));
 const xss = landingPage(SHELL, baner('rent'), { content: [row(1, { locality: '</script><script>alert(1)</script>' })], totalElements: 1 });
 assert.ok(!xss.html.includes('<script>alert(1)'));
 
-// Flatmate page render
 const room = (n, over = {}) => ({ id: `r${n}`, title: `Room ${n}`, roomType: 'Private room', budget: 9000, locality: 'Baner', gender: 'any', owner: 'Secret Name', ownerMobile: '9999999999', ...over });
 const group = (n, over = {}) => ({ id: `g${n}`, title: `Group ${n}`, locality: 'Baner', policy: 'any', perHead: 8000, seatsOpen: 1, seatsTotal: 3, members: [], ...over });
 const baFm = parseFlatmateLanding('baner');
@@ -100,7 +94,6 @@ assert.ok(!womenFm.html.includes('noindex'), 'three strictly women-only posts');
 assert.equal(ldOf(womenFm.html)['@graph'][0].itemListElement.length, 3);
 assert.ok(flatmatePage(SHELL, women, { content: [room(1, { gender: 'female' }), room(2), room(3)], totalElements: 3 }).html.includes('noindex'), 'hosts open to anyone do not count');
 
-// Sitemap rows
 const getter = (over = () => null) => async (path) => {
   const forced = over(path);
   if (forced) return forced;
@@ -117,7 +110,6 @@ assert.equal(calls.length, 39, 'API calls stay bounded');
 assert.ok(sitemapXml(siteRows).includes('<loc>https://draazy.com/rent/baner/2-bhk</loc>'));
 assert.equal(await landingSitemapRows(getter((p) => (p.includes('localities=wakad') ? { status: 500, data: null } : null))), null, 'an API failure is not a partial sitemap');
 
-// Route handlers: 404, redirect, API 404, API down, ok
 const env = { API_ORIGIN: 'https://api.example.com', ORIGIN_SHARED_SECRET: 's', ASSETS: { fetch: async () => new Response(SHELL) } };
 const req = (path) => new Request(`https://draazy.com${path}`, { headers: { 'CF-Connecting-IP': '1.2.3.4' } });
 const realFetch = globalThis.fetch;

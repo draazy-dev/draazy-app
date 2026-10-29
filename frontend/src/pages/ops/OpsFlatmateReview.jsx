@@ -42,7 +42,6 @@ function filterQueue(items, { type, q, days }) {
   return items
     .filter((e) => (type === 'all' || typeOf(e) === type)
       && (!needle || haystack(e).includes(needle))
-      // An entry with no timestamp survives every cutoff rather than vanishing from the queue.
       && (!cutoff || !e.since || e.since >= cutoff));
 }
 

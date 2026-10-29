@@ -13,9 +13,6 @@ import { isVisitHost } from '../../pages/consumer/dashboard/dashboardData.js';
 
 const isPastSlot = (date, time) => new Date(slotFromParts(date, time)) <= new Date();
 
-/* Intl ships month and weekday names for hi and mr, so the calendar chrome reads in the visitor's language without a
-   hand-maintained table to drift. */
-
 const calMonths = (locale) => {
   const f = new Intl.DateTimeFormat(locale, { month: 'long' });
   return Array.from({ length: 12 }, (_, i) => f.format(new Date(2024, i, 1)));
@@ -57,8 +54,6 @@ const StatusBadge = ({ status, t }) => (
 const btnConfirm = 'px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/25 flex items-center gap-1';
 const btnCancel = 'px-2.5 py-1.5 rounded-lg bg-rose-500/15 text-rose-300 text-xs font-semibold hover:bg-rose-500/25 flex items-center gap-1';
 const btnGhost = 'px-2.5 py-1.5 rounded-lg bg-white/5 text-gray-300 text-xs font-semibold hover:bg-white/10 flex items-center gap-1';
-// Status → calendar colours (chip background + legend/dot). Scheduled uses amber (matching the "Awaiting
-// confirmation" badge) so it reads clearly apart from the emerald "Confirmed / visited" family.
 
 const visitChip = (status) =>
   status === 'completed' ? { chip: 'bg-emerald-500/15 text-emerald-200', dot: 'bg-emerald-400' }
@@ -75,8 +70,6 @@ const btnChat = 'px-2.5 py-1.5 rounded-lg bg-teal-500/15 text-teal-300 text-xs f
 
 function visitChatMessage(v, dateStr, timeLabel, t) {
   const listing = (v.listing || t('visits.propertyFallback')).split(' in ')[0];
-  // Built as whole sentences per status: word order differs across languages, so
-  // stitching fragments would read as broken Hindi/Marathi.
   const when = [dateStr && t('visits.whenOn', { date: dateStr }), timeLabel && t('visits.whenAt', { time: timeLabel })].filter(Boolean).join(' ');
   const name = v.visitorName || t('visits.thereFallback');
   if (v.status === 'confirmed') return t('visits.chatConfirmed', { name, listing, when });
@@ -93,8 +86,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
   const locale = i18n.language;
   const CAL_MONTHS = useMemo(() => calMonths(locale), [locale]);
   const CAL_DAYS = useMemo(() => calDays(locale), [locale]);
-  // Render straight from the `visits` prop (the single source in Dashboard) so confirm/cancel/reschedule/visited
-  // persist and stay in sync with the leads badge + Action Center.
   const visitList = useMemo(() => visits || [], [visits]);
 
   const updateVisit = async (id, status) => {
@@ -103,8 +94,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
     const msg = status === 'confirmed' ? t('visits.confirmedToast') : status === 'cancelled' ? t('visits.cancelledToast') : status === 'completed' ? t('visits.visitedToast') : status === 'no-show' ? t('visits.noShowToast') : t('visits.updatedToast');
     toast(msg, 'success');
   };
-  // Reschedule uses the shared Modal + a date field, then rewrites the visit's
-  // date and returns it to "scheduled" so the other party re-confirms the slot.
 
   const [reschedule, setReschedule] = useState(null);
   const [reDate, setReDate] = useState('');
@@ -122,8 +111,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
   const saveReschedule = async () => {
     if (!reschedule || !reDate || !reTime || isPastSlot(reDate, reTime)) return;
     const id = reschedule.id;
-    // Keep the visit's mode and fold date + time back
-    // into one `when` string that parseWhen can read, so the chosen slot persists.
     const mode = parseWhen(reschedule.when).mode || 'in-person';
     const ok = await onUpdate?.(id, { when: formatWhen(reDate, reTime, mode), status: 'scheduled' });
     if (!ok) return;
@@ -275,7 +262,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
       </Card>
     ) : null
   );
-  /* A JSX value, not a nested `const RescheduleModal = () => (…)` component. */
 
   const rescheduleModal = (
     <Modal

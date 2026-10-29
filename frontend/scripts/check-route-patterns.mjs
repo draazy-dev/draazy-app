@@ -1,4 +1,3 @@
-/* Telemetry sends route patterns, not concrete URLs, so page views cannot become browsing history. */
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,8 +8,6 @@ const PATTERNS = join(ROOT, 'src', 'lib', 'telemetry', 'routePatterns.js');
 
 const app = readFileSync(APP, 'utf8');
 
-/* Any `path={...}` expression is a hard failure rather than a skip: silently seeing less of the
-   route table while still reporting "no drift" is worse than the drift this was written to catch. */
 const computed = (app.match(/path=\{/g) || []).length;
 if (computed > 0) {
   console.error(
@@ -23,14 +20,12 @@ if (computed > 0) {
   process.exit(1);
 }
 
-/** Every route path App.jsx declares, minus the `*` catch-all, which `UNMATCHED` stands for. */
 const declared = new Set(
   [...app.matchAll(/path="([^"]+)"/g)]
     .map((m) => m[1])
     .filter((p) => p !== '*'),
 );
 
-/* Read the source directly; importing it would drag React Router into a string-literal check. */
 const source = readFileSync(PATTERNS, 'utf8');
 const block = source.match(/export const ROUTE_PATTERNS\s*=\s*\[([\s\S]*?)\];/);
 if (!block) {
@@ -41,7 +36,6 @@ if (!block) {
   );
   process.exit(1);
 }
-/* Strip comments before parsing; a comment quote must not desynchronise route pairs. */
 const body = block[1]
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/\/\/.*$/gm, '');

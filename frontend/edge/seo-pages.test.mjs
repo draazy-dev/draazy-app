@@ -1,4 +1,3 @@
-// node edge/seo-pages.test.mjs
 import assert from 'node:assert/strict';
 import { edgePage, propertyPage, propertySitemapRow, sitemapXml, societyPage, SECURITY_HEADERS } from './seo-pages.mjs';
 import { listingHead, propertyHref, propertyKey, propertyPath } from '../src/lib/listingSeo.js';
@@ -15,7 +14,6 @@ const P = {
 const PATH = `/property/2-bhk-apartment-for-rent-baner-${ID}`;
 const ldOf = (html) => JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
 
-// URLs
 assert.equal(propertyPath({ id: ID, bhk: 2, type: 'Apartment', deal: 'rent', locality: 'Baner' }), PATH);
 assert.equal(propertyPath({ id: ID.toUpperCase(), bhk: 0, type: 'Independent House', deal: 'buy', locality: 'Viman Nagar' }), `/property/1-rk-independent-house-for-sale-viman-nagar-${ID}`);
 assert.equal(propertyPath({ id: ID, bhk: null, type: 'Open Plot', deal: 'buy', locality: 'Wagholi' }), `/property/open-plot-for-sale-wagholi-${ID}`);
@@ -29,7 +27,6 @@ assert.equal(propertyKey('2bhk-baner-legacy'), '2bhk-baner-legacy');
 assert.equal(listingHead({ ...P, type: P.propertyType }).title, '2 BHK Apartment for Rent in Baner, Pune: ₹32,000/month | Draazy');
 assert.equal(listingHead({ ...P, type: P.propertyType }).description, '2 BHK Apartment for Rent in Baner, Pune: 950 sq.ft. at ₹32,000/month. Contact the owner directly on Draazy, with no brokerage.');
 
-// Property page
 assert.deepEqual(propertyPage(SHELL, P, { pathname: `/property/${ID}`, search: '?tab=amenities' }), { status: 301, location: `${PATH}?tab=amenities` });
 const live = propertyPage(SHELL, P, { pathname: PATH });
 assert.equal(live.status, 200);
@@ -56,7 +53,6 @@ assert.ok(rented.html.includes('<meta data-shell="" name="robots" content="noind
 assert.equal(ldOf(rented.html)['@graph'][0].offers.availability, 'https://schema.org/SoldOut');
 assert.ok(rented.html.includes('no longer available'));
 
-// Society page
 const S = { slug: 'green-acres-baner', name: 'Green Acres', builder: 'Kolte Patil', localitySlug: 'baner', year: 2015, towers: 4, units: 320, amenities: ['pool'], listingCount: 3, forRent: 2, forSale: 1, homes: [{ id: ID, title: '2 BHK for rent' }] };
 assert.deepEqual(societyPage(SHELL, S, { slug: 'old-name' }), { status: 301, location: '/society/green-acres-baner' });
 const soc = societyPage(SHELL, S, { slug: S.slug });
@@ -68,12 +64,10 @@ const thin = societyPage(SHELL, { slug: 'x', name: 'X', localitySlug: 'baner', l
 assert.ok(thin.html.includes('<meta data-shell="" name="robots" content="noindex" />'));
 assert.ok(thin.html.includes('Facts, amenities and resident reviews on Draazy.'));
 
-// Sitemaps
 assert.deepEqual(propertySitemapRow({ ...P, propertyType: 'Apartment' }), [PATH, '2026-10-01']);
 assert.equal(propertySitemapRow({ ...P, dealStatus: 'closed' }), null);
 assert.ok(sitemapXml([[PATH, '2026-10-01'], ['/society/a&b', null]]).includes(`<url><loc>https://draazy.com${PATH}</loc><lastmod>2026-10-01</lastmod></url>\n  <url><loc>https://draazy.com/society/a&amp;b</loc></url>`));
 
-// Handler flow: API 404 → real 404, API down → bare shell 200, both with the security headers.
 const env = { API_ORIGIN: 'https://api.example.com', ORIGIN_SHARED_SECRET: 's', INDEX_LISTINGS: 'true', ASSETS: { fetch: async () => new Response(SHELL) } };
 const request = new Request(`https://draazy.com${PATH}`, { headers: { 'CF-Connecting-IP': '1.2.3.4' } });
 const realFetch = globalThis.fetch;

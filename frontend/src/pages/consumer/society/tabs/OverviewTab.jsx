@@ -8,13 +8,11 @@ export default function OverviewTab({ ctx }) {
   const { soc, locName, living } = ctx;
   return (
             <>
-            {/* About */}
             <section className="glass rounded-2xl p-6 reveal">
               <h2 className="text-lg font-bold mb-2 flex items-center gap-2"><Icon name="info" className="w-5 h-5 text-teal-400" /> {t('society.aboutTitle')}</h2>
               <p className="text-gray-400 text-sm leading-relaxed">{buildAbout(soc, locName, t)}</p>
             </section>
 
-            {/* Living reality */}
             {living.length ? (
               <section className="reveal">
                 <h2 className="text-lg font-bold mb-3 flex items-center gap-2"><Icon name="clipboard-list" className="w-5 h-5 text-teal-400" /> {t('society.livingAt', { name: soc.name })}</h2>
@@ -29,14 +27,11 @@ export default function OverviewTab({ ctx }) {
               </section>
             ) : null}
 
-            {/* Amenities */}
             {soc.amenities?.length ? (
               <section className="reveal">
                 <h2 className="text-lg font-bold mb-3 flex items-center gap-2"><Icon name="sparkles" className="w-5 h-5 text-teal-400" /> {t('society.amenities')}</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
                   {soc.amenities.map((a) => {
-                    // An amenity not in SOC_AMEN came from a community submission, so
-                    // it has no key to translate — show the raw slug, title-cased.
                     const known = SOC_AMEN[a];
                     const label = known ? t(known[0]) : titleCase(a);
                     const icon = known ? known[1] : 'sparkles';

@@ -18,8 +18,6 @@ export default function ListPropertyModals({ ctx }) {
 
   return (
     <>
-      {/* Duplicate-property guard — this owner already has this exact unit (same electricity meter /
-         society+unit+pincode) listed, so we stop the second post and point them to the one they already have. */}
       <Modal
         open={showResetConfirm}
         onClose={() => setShowResetConfirm(false)}

@@ -1,7 +1,6 @@
 import { History } from 'lucide-react';
 import { fmtAgo } from '../constants.js';
 
-/** `entry.by` is optional, so the separator is rendered with it instead of leaving stray punctuation. */
 export default function CommunicationLog({ commsOpen, setCommsOpen, commsLog, loaded = true, onMarkSent }) {
   return (
     <div className="px-4 py-3">

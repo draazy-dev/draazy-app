@@ -23,8 +23,6 @@ const set = (k, v) => {
 const PENDING_REQ_KEY = 'dzPendingRequests';
 const currentUserId = () => readUser()?.id ?? null;
 
-/* Failures are logged rather than swallowed: the caller shows a success toast, so a silently
-   lost write tells the user their message was sent when it wasn't. */
 export const pushPendingRequest = (req) => {
   try {
     set(PENDING_REQ_KEY, [...get(PENDING_REQ_KEY, []), { ...req, userId: currentUserId() }]);
@@ -37,8 +35,6 @@ const hasLocalThread = (propertyId) => {
   return Array.isArray(queued) && queued.some((r) => r?.propertyId === propertyId);
 };
 
-/* Both the accepted and the duplicate-409 paths must call this, so either leaves the device in
-   the same state. Idempotent on `request.propertyId`. */
 export const recordAskLocally = ({ request }) => {
   const propertyId = request?.propertyId;
   if (propertyId == null || hasLocalThread(propertyId)) return false;
@@ -67,7 +63,6 @@ export const deleteFlatmatePost = (id) => {
   set(STORE_KEY, arr);
 };
 
-// Seed groups are rendered from constants and stay out of storage; only user-created ones live here.
 export const getFlatmateGroups = () => get(GROUPS_KEY, []);
 export const saveFlatmateGroup = (group) => {
   const arr = getFlatmateGroups();
@@ -89,26 +84,18 @@ export const deleteFlatmateGroup = (id) => {
   set(GROUPS_KEY, arr);
 };
 
-/* Must stay a mirror of `FlatmateVocabulary.MOD_PUBLIC` on the backend. A whitelist, not a
-   blacklist, so a new state such as `pending` is invisible by default. */
 export const MOD_PUBLIC = ['live', 'approved'];
 
-/** True when a post may appear on a public board. Absent `modStatus` = live, as on the server. */
 export const isPubliclyVisible = (item) => MOD_PUBLIC.includes(item?.modStatus || 'live');
 
-/* Rooms live in store.js's `draazyRoomListings`; that key is read directly here to avoid a
-   store.js <-> flatmates.js import cycle. */
 const ROOMS_KEY = 'draazyRoomListings';
 const getRoomsRaw = () => {
   const v = get(ROOMS_KEY, []);
   return Array.isArray(v) ? v : [];
 };
 
-// Counts NON-owner-tier posts only: a verified owner listing a whole flat room-by-room can
-// legitimately exceed this. Owner-tier posts are exempt from the count but still deduped.
 export const MAX_ACTIVE_HOST_SHARES = 3;
 
-// Groups carry members; rooms don't, so each is read on its own terms.
 const groupSeatsOpen = (g) =>
   g && g.seatsOpen != null
     ? Math.max(0, Math.min(g.seatsTotal || 0, g.seatsOpen))
@@ -116,7 +103,6 @@ const groupSeatsOpen = (g) =>
 const roomSeatsOpen = (r) => (r && r.seatsOpen != null ? Math.max(0, r.seatsOpen) : 1);
 const roomActive = (r) => r && r.status !== 'filled' && r.status !== 'closed' && roomSeatsOpen(r) > 0;
 
-// Live non-owner-tier shares hosted by this identity — the number the cap limits.
 export const countCappedActiveFlatmatePosts = (mobile) => {
   const d = digitsOf(mobile);
   if (!d) return 0;
@@ -129,8 +115,6 @@ export const countCappedActiveFlatmatePosts = (mobile) => {
   return g + r;
 };
 
-// A stable key for one physical flat so two hosts can't both silently "own" it. propertyId (an
-// Ops-verified listing) is strongest; society/title + locality is a best-effort fallback.
 export const addressFingerprint = ({ propertyId, society, locality, title } = {}) => {
   if (propertyId) return 'prop:' + String(propertyId);
   const loc = norm(locality);
@@ -141,7 +125,6 @@ export const addressFingerprint = ({ propertyId, society, locality, title } = {}
   return '';
 };
 
-// Existing live host-claims (groups + rooms) on the same physical address.
 export const findAddressClaims = (fingerprint) => {
   if (!fingerprint) return [];
   const claims = [];
@@ -158,8 +141,6 @@ export const findAddressClaims = (fingerprint) => {
   return claims;
 };
 
-// A DIFFERENT host already claiming this address is flagged, not blocked: the match is fuzzy,
-// so blocking would produce false positives.
 export const evaluateHostEligibility = ({ mobile, tier, address } = {}) => {
   const d = digitsOf(mobile);
   const capped = countCappedActiveFlatmatePosts(mobile);
@@ -176,7 +157,6 @@ export const evaluateHostEligibility = ({ mobile, tier, address } = {}) => {
   return { fingerprint, overCap, duplicate, flagForReview, blocked: overCap || duplicate, reason };
 };
 
-/* Keyed by the OWNER's mobile, so the same consent is remembered if the tenant reopens the form. */
 const CONSENT_KEY = 'draazyOwnerConsent';
 export const getOwnerConsents = () => get(CONSENT_KEY, {});
 export const setOwnerConsent = (ownerMobile, byMobile) => {
@@ -185,11 +165,7 @@ export const setOwnerConsent = (ownerMobile, byMobile) => {
   return set(CONSENT_KEY, map);
 };
 
-/* Ops agreement-review queue. A tenant's "I have a registered rent agreement" is self-declared,
-   so tenant-tier posts land here for Ops to verify. One review per group/room. */
 const REVIEW_KEY = 'draazyFlatmateReviews';
-// An oversized agreement is recorded as present-but-not-stored (no inline data URL), so Ops can
-// still ask for it rather than the whole review failing localStorage.
 const AGREEMENT_DOC_CAP = 3 * 1024 * 1024;
 const normalizeAgreementDoc = (doc) => {
   if (!doc) return null;
@@ -213,8 +189,6 @@ export const enqueueFlatmateReview = (rec) => {
   try {
     return set(REVIEW_KEY, arr);
   } catch {
-    // localStorage quota (a large inline agreement) — retry without the data URL
-    // so the review still enqueues; Ops sees the file as recorded-not-stored.
     if (arr[0] && arr[0].agreementDoc && arr[0].agreementDoc.dataUrl) {
       arr[0] = { ...arr[0], agreementDoc: { ...arr[0].agreementDoc, dataUrl: null, tooLarge: true } };
     }
@@ -229,7 +203,6 @@ export const decideFlatmateReview = (id, status, reason) => {
   set(REVIEW_KEY, arr);
   return arr[idx];
 };
-// Map of targetId -> review status, for cards to render their moderation state.
 export const getFlatmateReviewStatusMap = () => {
   const m = {};
   getFlatmateReviews().forEach((r) => { m[r.groupId || r.roomId] = r.status; });
@@ -244,10 +217,7 @@ export const getMyRequest = (userMobile, userName) => {
   });
 };
 
-/* Scope asks by requester so the next browser user does not inherit "Interest sent" state. */
-/** The asks `mobile` has made from this browser, as the `interests` map the page keys on. */
 export const getAskedInterests = (mobile) => (digitsOf(mobile) ? get(INTERESTS_KEY, {})[digitsOf(mobile)] || {} : {});
-/** Remember an ask that the provider confirmed — either accepted, or 409'd as a duplicate. */
 export const rememberAsk = (mobile, key) => {
   const who = digitsOf(mobile);
   if (!who) return;

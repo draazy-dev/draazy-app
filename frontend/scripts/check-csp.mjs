@@ -1,5 +1,3 @@
-/** The CSP is written twice — a <meta> in index.html and a header in public/_headers — and only the dev-server copy
- * is exercised locally, so this compares them directive by directive. */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -7,15 +5,11 @@ import { pathToFileURL } from 'node:url';
 
 const root = process.cwd();
 
-/** Directives that legitimately differ, each with the reason, so the list cannot grow silently. */
 const ALLOWED_DELTAS = {
-  // Vite's HMR client opens a websocket; production has no dev server to talk to.
   'connect-src': { meta: ['ws:', 'wss:'], header: [] },
-  // A <meta> CSP cannot express frame-ancestors, and `data:` iframes are a dev-tooling artefact.
   'frame-src': { meta: ['data:'], header: [] },
 };
 
-/** Directives the header carries alone, because a <meta> tag cannot express them at all. */
 const HEADER_ONLY = new Set(['form-action', 'frame-ancestors']);
 
 function parse(policy) {
@@ -46,8 +40,6 @@ const header = extract('public/_headers', /^\s*Content-Security-Policy:\s*(.+)$/
 
 const problems = [];
 
-// 'wasm-unsafe-eval' is the one source this feature cannot lose quietly, so it is named outright
-// rather than left to the comparison — a policy missing it from BOTH copies would compare equal.
 for (const [label, directives] of [['index.html', meta], ['public/_headers', header]]) {
   if (!(directives.get('script-src') || []).includes("'wasm-unsafe-eval'")) {
     problems.push(
@@ -57,7 +49,6 @@ for (const [label, directives] of [['index.html', meta], ['public/_headers', hea
   }
 }
 
-// Hashes cover the inline scripts as the deploy build emits them: API base '/api', the default every env uses.
 const inlineHashes = [...readFileSync(join(root, 'index.html'), 'utf8')
   .matchAll(/<script(?![^>]*\b(?:src|type)=)[^>]*>([\s\S]*?)<\/script>/g)]
   .map((m) => `'sha256-${createHash('sha256').update(m[1].replaceAll('__API_BASE__', '/api')).digest('base64')}'`);
@@ -99,9 +90,8 @@ if (problems.length) {
   process.exit(1);
 }
 
-// Pages Functions bypass public/_headers, so the edge-rendered pages carry their own copy of the `/*` block.
 const { SECURITY_HEADERS } = await import(pathToFileURL(join(root, 'edge/seo-pages.mjs')).href);
-const block = readFileSync(join(root, 'public/_headers'), 'utf8').split(/\r?\n\/\*\r?\n/)[1].split(/\r?\n(?=\S)/)[0];
+const block = readFileSync(join(root, 'public/_headers'), 'utf8').split(/(?:^|\r?\n)\/\*\r?\n/)[1].split(/\r?\n(?=\S)/)[0];
 const fileHeaders = Object.fromEntries(block.split(/\r?\n/).map((l) => l.trim())
   .filter((l) => l && !l.startsWith('#') && !l.startsWith('!')).map((l) => [l.slice(0, l.indexOf(':')), l.slice(l.indexOf(':') + 1).trim()]));
 const edgeDrift = [...new Set([...Object.keys(fileHeaders), ...Object.keys(SECURITY_HEADERS)])]

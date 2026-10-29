@@ -1,10 +1,7 @@
-/** Rows pass through untouched (the server's `ContentItem` is the console's shape); `undefined` is stripped from
- * write bodies because absent means "leave alone" and explicit null means "clear" in a PATCH. */
 import { get, post, patch } from '../../http.js';
 
 const BASE = '/admin/content';
 
-/** Drop keys whose value is `undefined`; keep explicit nulls, which mean "clear this field". */
 const defined = (body) => Object.fromEntries(
   Object.entries(body || {}).filter(([, v]) => v !== undefined),
 );

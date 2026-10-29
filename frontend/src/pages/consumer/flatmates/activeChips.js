@@ -2,8 +2,6 @@ import { budgetIsAny, isDateVal, BUDGET_MIN, BUDGET_MAX } from './helpers.js';
 import { TAB_MOVE_IN, TAB_PEOPLE, TAB_TEAMS } from './model.js';
 import { fmtDate } from './alertCriteria.js';
 
-/** One removable chip per filter narrowing the board. Gated by tab exactly as `FilterControls` is,
- *  so a chip never names a filter whose control the tab hides. */
 export default function flatmateActiveChips(filters, tab, t, budgetLbl, setF) {
   const place = tab === TAB_MOVE_IN;
   const genderText = filters.genderOnly && tab !== TAB_PEOPLE

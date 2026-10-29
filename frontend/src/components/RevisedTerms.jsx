@@ -5,7 +5,6 @@ import { acceptServiceRequestAmendment } from '../services/serviceRequestService
 import { openCashfreeCheckout } from '../lib/cashfree.js';
 import { fmtINR } from '../lib/format.js';
 import { amendmentRows } from '../lib/amendmentTerms.js';
-/** Terms our desk revised on a paid rent agreement; drafting waits for the customer to accept them. */
 
 export default function RevisedTerms({ request, onChanged }) {
   const { toast } = useToast();

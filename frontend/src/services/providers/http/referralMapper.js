@@ -1,10 +1,5 @@
-/** `clawed-back` is distinct from `rejected` because money left the building; risk is separate from status. */
-
-/** Wire timestamps are ISO; the desk formats dates and sorts on epoch millis (0 when absent). */
 const epoch = (iso) => (iso ? Date.parse(iso) || 0 : 0);
 
-/** `rewardAmount` rides beside the server-composed `reward` label because CSV totals need the number;
- * it counts owner contacts, so never format it as currency. */
 export function toViewModel(dto) {
   if (!dto) return null;
   return {
@@ -30,11 +25,8 @@ export function toViewModel(dto) {
   };
 }
 
-/** The single row a decision returns, so the desk can replace it in place rather than refetch. */
 export const toDecision = (dto) => toViewModel(dto);
 
-/** `total` is the envelope's, not `items.length`: stat tiles must be true on page 1 of 3.
- * `counts` is present only when the read asked for it. */
 export function toViewModelPage(res, fallback = {}) {
   const rows = Array.isArray(res?.content) ? res.content : [];
   return {

@@ -1,14 +1,10 @@
-/* A pin's drive times are a fixed fact, so compute once per rounded coordinate and cache; deterministic, no RNG,
-   so results are stable across reloads and tests. */
 import { IT_HUBS } from './commuteHubs.js';
 
 const KEY = 'dz_commute_v1';
-const ROAD_FACTOR = 1.35;     // crow-flight → by-road
-const FREE_SPEED_KMH = 24;    // free-flow city speed
+const ROAD_FACTOR = 1.35;
+const FREE_SPEED_KMH = 24;
 const mem = new Map();
 
-// FNV-1a, the same algorithm as lib/hash.js, so the congestion factor is identical wherever it is
-// computed.
 function fnv1a(str) {
   let h = 2166136261;
   for (let i = 0; i < str.length; i += 1) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -23,10 +19,9 @@ function haversineKm(aLat, aLng, bLat, bLng) {
   return 2 * R * Math.asin(Math.sqrt(s));
 }
 
-const round3 = (n) => Math.round(n * 1000) / 1000;   // ~110 m cache-key precision
+const round3 = (n) => Math.round(n * 1000) / 1000;
 const pinKey = (lat, lng) => `${round3(lat)},${round3(lng)}`;
 
-// Deterministic per-(pin, hub) congestion multiplier in [1.05, 1.55].
 function congestion(pin, hubName) {
   return 1.05 + ((fnv1a(`${pin}|${hubName}`) % 1000) / 1000) * 0.5;
 }
@@ -45,24 +40,20 @@ function read(pin) {
   try {
     const raw = localStorage.getItem(`${KEY}:${pin}`);
     if (raw) { const v = JSON.parse(raw); mem.set(pin, v); return v; }
-  } catch { /* localStorage unavailable — fall through to compute */ }
+  } catch { }
   return null;
 }
 
 function write(pin, entry) {
   mem.set(pin, entry);
-  try { localStorage.setItem(`${KEY}:${pin}`, JSON.stringify(entry)); } catch { /* ignore quota/SSR */ }
+  try { localStorage.setItem(`${KEY}:${pin}`, JSON.stringify(entry)); } catch { }
 }
 
-// Read-through: cached commute for a pin, computing + persisting on first miss.
-// Returns { hubs:[{name,min,km}], source:'live', fetchedAt } or null (no coords).
 export function getCommute(lat, lng) {
   if (lat == null || lng == null) return null;
   const pin = pinKey(lat, lng);
   const hit = read(pin);
   if (hit) return hit;
-  // Backdate fetchedAt deterministically (1–6 h) so the "updated Xh ago" pill reads
-  // like a real cached feed rather than always "just now".
   const agoH = (fnv1a(pin) % 6) + 1;
   const entry = { hubs: computeLegs(lat, lng), source: 'live', fetchedAt: Date.now() - agoH * 3600e3 };
   write(pin, entry);

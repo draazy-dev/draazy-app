@@ -11,23 +11,15 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
   const { t } = useTranslation();
   const count = gallery.length;
   const go = (dir) => setActive((i) => (i + dir + count) % count);
-  /* The photo-request ask is the last SLIDE on mobile: a buyer who swiped to the end is the one
-   * who wants more photos. */
   const [ask, setAsk] = useState(false);
   const trackRef = useRef(null);
   const settle = useRef(0);
   const dragging = useRef(false);
-  /* The slide under the finger, display-only: the dots and counter follow it every frame, while `active`
-     waits for the scroll to settle. `null` once settled. */
   const [live, setLive] = useState(null);
 
-  /* The browser's own scroller carries the photo, rather than a handler measuring a drag and swapping the src on
-     release. */
   const onScroll = () => {
     const track = trackRef.current;
     if (track && track.clientWidth) setLive(Math.round(track.scrollLeft / track.clientWidth));
-    /* `scroll` fires every frame, and committing `active` mid-drag re-enters the effect below,
-     * which would yank the track out from under the finger. */
     clearTimeout(settle.current);
     settle.current = setTimeout(() => {
       if (dragging.current) return;
@@ -40,13 +32,9 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
     }, 120);
   };
 
-  /* Touch, not pointer: iOS fires `pointercancel` the instant a scroll takes over the gesture,
-   * so a pointerup-based flag is already false for every drag this needs to see. */
   const onTouchStart = () => { dragging.current = true; };
   const onTouchEnd = () => { dragging.current = false; onScroll(); };
 
-  /* Lightbox/arrows/dots move `active` without the scroller, so the track follows instantly (a smooth scroll
-     gets cancelled by the next change); a resize re-snaps at the old offset, hence the width dependency. */
   const [trackWidth, setTrackWidth] = useState(0);
   const hasPhotos = count > 0;
   useEffect(() => {
@@ -66,8 +54,6 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
 
   useEffect(() => () => clearTimeout(settle.current), []);
 
-  /* The ask slide stops existing at `sm` (640px), and a phone turned to landscape crosses it; left set,
-     `ask` would park the track past the last photo. */
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 640px)');
     const sync = () => { if (mq.matches) setAsk(false); };
@@ -87,7 +73,6 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
     return (
       <>
       <section className="fade-in mb-6 sm:mb-10">
-        {/* Full-bleed 4:3 on a phone: a short letterbox reads as a thumbnail. */}
         <div className="relative main-image-wrapper -mx-4 sm:mx-0 rounded-none sm:rounded-2xl overflow-hidden bg-white/[0.04] border border-white/10 flex flex-col items-center justify-center gap-2.5 px-8 text-center w-full aspect-[4/3] sm:aspect-auto sm:h-[320px] lg:h-[360px]" style={{ maxHeight: 400 }}>
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-400">
             <Icon name="image-off" className="h-5 w-5" aria-hidden="true" />
@@ -120,8 +105,6 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
 
       <div className="relative main-image-wrapper -mx-4 sm:mx-0 rounded-none sm:rounded-2xl overflow-hidden" style={{ maxHeight: 400 }}>
 
-        {/* Above sm: it stops being user-scrollable (`sm:overflow-hidden`) and the arrows drive it instead.
-            `overflow-y-hidden`: x `auto` alone computes y to `auto`, so an overhang drags the photo vertically. */}
         <div
           ref={trackRef}
           onScroll={onScroll}
@@ -137,12 +120,8 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
               src={g}
               srcSet={srcSetFor(g)}
               sizes="(max-width: 639px) 100vw, 60vw"
-              /* Only the slide on screen at load is worth the priority; the rest are one swipe away at best and a
-                 full listing would otherwise fetch all ten before first paint. */
               fetchPriority={i === 0 ? 'high' : undefined}
               loading={i === 0 ? undefined : 'lazy'}
-              /* Every slide is in the accessibility tree — a scroll container does not hide the children the viewport
-                 has scrolled past. */
               alt={t('property.photoAlt', { title, n: i + 1, total: count })}
               onClick={() => setLightbox(true)}
               className="snap-start snap-always shrink-0 w-full h-full object-cover cursor-zoom-in"
@@ -151,7 +130,6 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
           ))}
 
           {requestPhotos ? (
-          /* The ask slide, last and phone-only. */
           <div data-photo-ask="" className="sm:hidden relative z-20 snap-start snap-always shrink-0 w-full h-full flex flex-col items-center justify-center gap-3 px-8 text-center bg-ink-2">
             <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-brand-teal-1/10 border border-brand-teal-2/30">
               <Icon name="image-plus" className="w-7 h-7 text-brand-teal-3" />
@@ -178,13 +156,10 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
         ) : null}
 
         {actions}
-        {/* The photo itself opens the lightbox on tap; this counter is the keyboard way in. */}
         <button type="button" onClick={() => setLightbox(true)}         aria-label={t('property.fullscreen') + ' ' + (shown + 1) + '/' + count} className="tap-extend absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-white text-sm font-semibold cursor-pointer hover:bg-white/15 transition-smooth">
                   <Icon name="camera" className="w-4 h-4" aria-hidden="true" /> <span>{shown + 1}/{count}</span>
         </button>
 
-        {/* Rendered here rather than duplicated-and-hidden: the parent decides which of the two positions gets the
-           price, so exactly one lives in the DOM. */}
         {priceStr ? (
           <>
             <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/85 via-black/45 to-transparent" />
@@ -199,7 +174,6 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
       </div>
 
       {count > 1 || requestPhotos ? (<>
-      {/* Centred: the dots answer "where am I?" and stay tappable; the counter over the photo answers "how many". */}
       <div data-gallery-dots="" className="sm:hidden flex items-center justify-center -mb-6 sm:mb-0" role="group" aria-label={t('property.photoDotsAria')}>
         {Array.from({ length: dotCount }, (_, d) => (
           <button
@@ -208,8 +182,6 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
             aria-current={d === litDot ? 'true' : undefined}
             aria-label={t('property.goToPhoto', { n: d + 1 })}
             onClick={() => showPhoto(d)}
-            /* min-width, not padding: the dot width changes with state, so only a floor pins
-             * every state at the 24px WCAG 2.5.8 target. */
             data-tap-exempt
             className="shrink-0 inline-flex min-w-[24px] items-center justify-center h-11 px-2"
           >

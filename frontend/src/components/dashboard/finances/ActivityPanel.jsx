@@ -14,7 +14,6 @@ export default function ActivityPanel({ finType, setFinType, typeOpts, hasAny, f
         </div>
         <div className="min-w-0">
           <p className="text-white text-sm truncate">{t(CAT_KEYS[tx.category] || tx.category, { defaultValue: tx.category })}{tx.note ? ` — ${tx.note}` : ''}</p>
-          {/* The wire spells "not recurring" as 'none'; the mapper's fallback is ''. */}
           <p className="text-gray-400 text-xs">{fmtDate(tx.date) || tx.date}{tx.recurring && tx.recurring !== 'none' ? ` · ${t('fin.recurringTag')}` : ''}</p>
         </div>
       </div>

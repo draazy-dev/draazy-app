@@ -1,10 +1,7 @@
 const DARK_BELOW = 55;
-// Judged on the strongest 1% of edges, not the mean: interiors are mostly plain wall, so a mean
-// flags sharp rooms, while a blurred photo has softened even its door frames and furniture edges.
 const BLURRY_BELOW = 28;
 const EDGE_PERCENTILE = 0.99;
 
-/** A soft hint for the owner, never a refusal: a night shot can read as dark. */
 export function photoLook(rgba, width) {
   const pixels = rgba.length / 4;
   if (!pixels || !width) return null;

@@ -18,7 +18,6 @@ const loadCard = (kind, id) => (kind === 'property'
   ? getProperty(id).then(toListingCard)
   : getFlatmateDetail(kind, id).then((d) => toFlatmateCard(d?.item)));
 
-/** The PropChip card for a listing (`property`) or a flatmate `room` / `group` / `post`; null for anything else. */
 export function useTargetCard(kind, id, title) {
   const known = kind === 'property' || FLATMATE_KINDS.has(kind);
   const key = known && id ? `${kind}:${id}` : null;
@@ -26,7 +25,7 @@ export function useTargetCard(kind, id, title) {
   useEffect(() => {
     if (!key) return undefined;
     let live = true;
-    loadCard(kind, id).then((c) => { if (live) setCard({ key, ...c }); }, () => {}); // a failed read keeps the title-only chip
+    loadCard(kind, id).then((c) => { if (live) setCard({ key, ...c }); }, () => {});
     return () => { live = false; };
   }, [key, kind, id]);
   if (!key) return null;

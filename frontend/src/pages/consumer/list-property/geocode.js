@@ -1,17 +1,3 @@
-/* Geocoding for the List-Property map picker — powered by the Google Maps JS SDK
-   the picker (LocationPicker) already loads via APIProvider, using the same
-   VITE_GOOGLE_MAPS_API_KEY. Replaces the old free Nominatim/OpenStreetMap service,
-   which was unreliable and couldn't resolve society/building names.
-
-   The project's key currently has the Places API (New) enabled but NOT the classic
-   Geocoding API (billing), so we prefer Places for both directions and keep the
-   Geocoder only as a fallback for when the Geocoding API is enabled later:
-   - `forwardGeocode`  → Places text-search (finds named societies/projects), then Geocoder.
-   - `reverseGeocode`  → Places nearby-search on the pin (nearest place's address
-                          components), then Geocoder reverse.
-   Everything fails soft: if the SDK isn't ready, a lookup fails, or a field is
-   missing, we return nothing for it and the owner fills it in by hand. */
-
 import {
   getPlacesLib,
   normalizeComponents,
@@ -24,11 +10,8 @@ import {
 } from '../../../lib/places.js';
 import { getActiveCityGeo } from '../../../lib/geoConfig.js';
 
-// Re-export the shared autocomplete primitives so existing importers of this module
-// (AreaSearch, tests) keep working unchanged.
 export { newAutocompleteSession, fetchSuggestions, fetchLocalitySuggestions, fetchPlaceDetails };
 
-// Grab a classic Geocoder (fallback path). Returns null if maps isn't up / not enabled.
 async function getGeocoder() {
   const g = typeof window !== 'undefined' ? window.google : null;
   if (!g || !g.maps) return null;
@@ -44,7 +27,6 @@ async function getGeocoder() {
   return null;
 }
 
-// Promisify the classic geocode via the callback form — works across every SDK version.
 function runGeocode(geocoder, request) {
   return new Promise((resolve, reject) => {
     geocoder.geocode(request, (results, status) => {
@@ -54,12 +36,6 @@ function runGeocode(geocoder, request) {
   });
 }
 
-// Normalise address components from either source into a common { types, name } shape.
-// Places (New) uses { types, longText }; the classic Geocoder uses { types, long_name }.
-// (normalizeComponents + pickAddress live in ../../../lib/places.js and are imported above.)
-
-// Merge several nearby results — take the first non-empty value for each field so a
-// nearest place missing a route can still contribute its pincode/locality, etc.
 function mergeAddress(componentLists) {
   let pincode = '';
   let street = '';
@@ -74,15 +50,11 @@ function mergeAddress(componentLists) {
   return { pincode, street, localityRaw };
 }
 
-// Reverse-geocode a pin to { pincode, street, localityRaw }. Any field we can't
-// determine comes back as ''. Never throws.
 export async function reverseGeocode(lat, lng) {
   const empty = { pincode: '', street: '', localityRaw: '' };
   if (lat == null || lng == null) return empty;
   const center = { lat: Number(lat), lng: Number(lng) };
 
-  // 1) Places nearby-search — works without the classic Geocoding API. The nearest
-  //    place(s) carry address_components for the pinned vicinity.
   const places = await getPlacesLib();
   if (places && places.Place && typeof places.Place.searchNearby === 'function') {
     try {
@@ -98,11 +70,9 @@ export async function reverseGeocode(lat, lng) {
         if (res.pincode || res.street || res.localityRaw) return res;
       }
     } catch {
-      /* fall through to the Geocoder */
     }
   }
 
-  // 2) Classic Geocoder reverse (used when the Geocoding API is enabled).
   const geocoder = await getGeocoder();
   if (geocoder) {
     try {
@@ -112,24 +82,16 @@ export async function reverseGeocode(lat, lng) {
       ) || results[0];
       return pickAddress(normalizeComponents(best.address_components));
     } catch {
-      /* fall through to empty */
     }
   }
   return empty;
 }
 
-// Forward-geocode a typed area/society to full details, or null. Never throws.
-// Returns { lat, lng, pincode, street, localityRaw, name, isNamedPlace } so the
-// Search button can pre-fill the address (incl. society name for a named place)
-// exactly like picking an autocomplete suggestion does. Legacy callers that only
-// read .lat/.lng keep working.
 export async function forwardGeocode(query) {
   const q = String(query || '').trim();
   if (!q) return null;
   const { name: cityName, bounds: cityBounds } = getActiveCityGeo();
 
-  // 1) Places text-search — resolves named societies/projects/POIs (e.g. "Aspiria")
-  //    and carries the address components + type so we can fill the whole address.
   const places = await getPlacesLib();
   if (places && places.Place && typeof places.Place.searchByText === 'function') {
     try {
@@ -153,11 +115,9 @@ export async function forwardGeocode(query) {
         };
       }
     } catch {
-      /* fall through to the Geocoder */
     }
   }
 
-  // 2) Classic Geocoder forward (used when the Geocoding API is enabled).
   const geocoder = await getGeocoder();
   if (geocoder) {
     try {
@@ -181,14 +141,8 @@ export async function forwardGeocode(query) {
         };
       }
     } catch {
-      /* ignore — caller shows "couldn't find that area" */
     }
   }
   return null;
 }
 
-/* ---------------- Autocomplete (Places New) ----------------
-   Live "as you type" predictions like google.com/maps, plus precise details on
-   select, now live in ../../../lib/places.js and are re-exported at the top of this
-   module (newAutocompleteSession, fetchSuggestions, fetchLocalitySuggestions,
-   fetchPlaceDetails) so existing importers keep working unchanged. */

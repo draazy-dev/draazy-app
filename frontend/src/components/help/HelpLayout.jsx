@@ -9,8 +9,6 @@ import { useHelpTree } from '../../lib/useHelp.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Modal from '../ui/Modal.jsx';
 import usePageHead from '../../lib/usePageHead.js';
-/* `prefixed: false` marks a destination outside the help centre: /support has no language prefix, so passing it
-   through the help path helper would produce /mr/support, which does not exist. */
 
 const UTILITY_LINKS = [
   ['help.faq', '/help/faq', 'help-circle'],
@@ -18,8 +16,6 @@ const UTILITY_LINKS = [
   ['help.contactSupport', '/support', 'life-buoy'],
 ];
 
-/* `title`, `description`, `path` and `noindex` must match the prerendered head in
-   scripts/vite-plugin-help-content.mjs. */
 export default function HelpLayout({ children, wide = false, title, description, path, noindex = false }) {
   const { t } = useTranslation();
   const centre = t('help.centre');

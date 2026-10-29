@@ -23,7 +23,6 @@ export function ContactBox({ p, isIn, toast }) {
   const { referral } = usePricing();
   const ownerMobile = String(p.ownerMobile || '');
   const propId = p.id || '';
-  // The route param, not `p.id`: useProperty already reads the gate under it, so the two share one request.
   const routeId = propertyKey(useParams().id);
   const { gate, loading, setGate } = useContactGate(routeId || propId);
   const [verifyOpen, setVerifyOpen] = useState(false);
@@ -33,8 +32,6 @@ export function ContactBox({ p, isIn, toast }) {
   const left = contactsLeft(entitlements);
   const freeTill = freeContactsTill(entitlements);
   const status = gate.status;
-  // An owner can approve a request yet still keep their number masked (Settings ▸
-  // Owner phone privacy) — approved buyers are routed to in-app chat instead.
   const ownerHides = status === 'approved' && gate.ownerHidesNumber;
   const revealed = status === 'owner' || (status === 'approved' && !ownerHides);
   const ownerDialable = dialableMobile(ownerMobile);
@@ -47,23 +44,17 @@ export function ContactBox({ p, isIn, toast }) {
     track('contact_click', { action: 'request_number', id: propId });
     captureLead({ context: 'request_number', property: String(propId) });
 
-    // Captured before the await, so a 401 after the visitor navigated away still resumes on this listing.
     const back = window.location.pathname + window.location.search + window.location.hash;
     setBusy(true);
     try {
       const next = await requestContact(propId);
       setGate(next);
-      // The quota belongs to the server, so the only honest way to know what is left is to ask
-      // again once it has moved; a local counter cannot see contacts spent in another tab.
       if (next.status === 'pending' && status !== 'pending') refreshEntitlements();
       if (next.status === 'pending') toast(t('property.requestSentNumber'), 'success');
       else if (next.status === 'approved') toast(t('property.ownerSharedNumber'), 'success');
       else if (next.status === 'declined') toast(t('property.ownerDeclinedRequest'), 'info');
     } catch (err) {
-      // Owner accepts verified contacts only, so offer the opt-in badge flow rather than a request.
       if (err?.code === 'verification_required') setVerifyOpen(true);
-      // Free contacts spent. This arrives as a refusal from the server rather than being decided
-      // here, so the modal opens on the same press that was refused — one round trip, not zero.
       else if (err?.code === 'contact_quota_exhausted') setQuotaOpen(true);
       else if (err?.code === 'contact_pending_limit') toast(t('property.contactPendingLimit'), 'info');
       else if (err?.code === 'recently_withdrawn') toast(err.message || t('property.recentlyWithdrawn'), 'info');
@@ -104,8 +95,6 @@ export function ContactBox({ p, isIn, toast }) {
             <span className="tracking-wider">{maskPhone(ownerMobile)}</span>
           </div>
           {loading ? (
-            /* `NO_CONTACT_GATE` is also the state that shows the request button, so rendering the action row before
-               the network answer lands flashes "Request number" at a buyer who was already approved. */
             <div className="mt-2 h-9 rounded-lg bg-white/5 animate-pulse" aria-hidden="true" />
           ) : ownerHides ? (
             <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-emerald-300 font-medium px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">

@@ -4,24 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { displayTime } from '../../lib/timeOfDay.js';
 import TimePickerDialog from './TimePickerDialog.jsx';
 
-/**
- * TimeField — a time input that opens the app's custom time picker
- * (TimePickerDialog) instead of the unstylable OS-native time popup, mirroring
- * DateField. Shows the selected time as text and stores it in the requested
- * `format` ('12h' → "10:30 AM", '24h' → "22:00") so call sites stay unchanged.
- *
- * @param {object} props
- * @param {string} props.value - Time string ("10:30 AM" or "22:00") or ''.
- * @param {(value: string) => void} props.onChange
- * @param {'12h'|'24h'} [props.format='12h']
- * @param {number} [props.minuteStep=5]
- * @param {string} [props.className]
- * @param {boolean} [props.invalid]
- * @param {string} [props.dataErr]
- * @param {boolean} [props.disabled]
- * @param {string} [props.ariaLabel]
- * @param {string} [props.placeholder] - Defaults to the translated "Select time".
- */
 export default function TimeField({
   value = '',
   onChange,
@@ -38,8 +20,6 @@ export default function TimeField({
   const [open, setOpen] = useState(false);
   const anchorRef = useRef(null);
   const display = displayTime(value, format);
-  // Resolved at render, not in the default parameter: a module-level default
-  // would be captured once and never follow a language switch.
   const ph = placeholder || t('ui.selectTime');
   const label = ariaLabel || ph;
 

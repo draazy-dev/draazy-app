@@ -16,7 +16,6 @@ export default function MessageThread({ messages, onSend }) {
       await onSend(body);
       setText('');
     } catch {
-      // The desk has already toasted the reason; keep the text for a retry.
     } finally {
       setSending(false);
     }

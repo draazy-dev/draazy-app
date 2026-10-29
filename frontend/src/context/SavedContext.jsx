@@ -3,8 +3,6 @@ import { listSaved, listSavedKeys, saveProperty, unsaveProperty } from '../servi
 import { useAuth } from './AuthContext.jsx';
 import { FLATMATE_SAVES_CHANGED, listFlatmateSaveKeys } from '../services/flatmateService.js';
 
-/* Saved membership is held as keys, so result cards answer from memory and the shell never
-   downloads the cards themselves; the pages that draw them read `useSavedItems`. */
 const SavedContext = createContext(null);
 
 const ITEMS_PAGE_SIZE = 100;
@@ -65,7 +63,6 @@ export function SavedProvider({ children }) {
 
   useEffect(() => { keysRef.current = keys; }, [keys]);
 
-  // A read that overlapped a write may predate it (a heart resumed right after sign-in); re-read once.
   const readKeys = useCallback(async () => {
     const seen = writes.current;
     const rows = await listSavedKeys();
@@ -158,7 +155,6 @@ export function SavedProvider({ children }) {
     try {
       if (next) await saveProperty(address); else await unsaveProperty(address);
       writes.current += 1;
-      // Re-assert: a key read that landed mid-write replaced the map without this row.
       flip(next);
       return true;
     } catch (err) {
@@ -173,7 +169,6 @@ export function SavedProvider({ children }) {
   const save = useCallback((id, uuid) => write(id, uuid, true), [write]);
   const unsave = useCallback((id, uuid) => write(id, uuid, false), [write]);
 
-  /** Two identifiers, deliberately: `id` is the routing token this context keys on, `uuid` the row's primary key. */
   const toggle = useCallback(async (id, uuid) => {
     const next = !keysRef.current.has(id);
     const ok = await write(id, uuid, next);
@@ -198,14 +193,10 @@ export function SavedProvider({ children }) {
   return <SavedContext.Provider value={value}>{children}</SavedContext.Provider>;
 }
 
-/* Null-safe stub outside the provider so a component rendered in isolation degrades to "nothing
-   saved" instead of throwing on `.has`. */
 export function useSaved() {
   return useContext(SavedContext) ?? EMPTY;
 }
 
-/** The shortlist's cards, for the pages that draw them. Re-read only when the key set gains an id
- * (or, for a short `size`, loses one that may have hidden others); removals filter locally. */
 export function useSavedItems({ size = ITEMS_PAGE_SIZE } = {}) {
   const saved = useSaved();
   const { isIn } = useAuth();
@@ -238,7 +229,6 @@ export function useSavedItems({ size = ITEMS_PAGE_SIZE } = {}) {
       setStatus('ready');
       return;
     }
-    // A heart mid-write is in `ids` before the server has the row; read once the write settles.
     if (keysStatus !== 'ready' || busyIds.size) return;
     const prev = loadedFor.current;
     const stale = !prev

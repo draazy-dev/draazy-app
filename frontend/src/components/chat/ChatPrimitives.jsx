@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import { formatTime } from '../../lib/chatFormat.js';
 
-/* Shared presentational pieces for the buyer↔owner chat thread. */
 export function MessageBubble({ m, author = null, grouped = false, onAction, onRetry }) {
   const timer = useRef(null);
   const [lightbox, setLightbox] = useState(null);

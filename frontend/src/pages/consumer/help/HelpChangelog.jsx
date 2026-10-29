@@ -5,7 +5,6 @@ import HelpLayout from '../../../components/help/HelpLayout.jsx';
 import ArticleProse from '../../../components/help/ArticleProse.jsx';
 import { Breadcrumbs, EmptyState } from '../../../components/help/HelpCards.jsx';
 import { changelog } from '../../../lib/help.js';
-/* Product changelog. */
 
 export default function HelpChangelog() {
   const { t } = useTranslation();

@@ -9,7 +9,6 @@ const cache = path.join(root, 'node_modules/.cache/upload-sources');
 await mkdir(output, { recursive: true });
 await mkdir(cache, { recursive: true });
 
-// Ship matching source archives, not only a link whose host could disappear after deployment.
 const sources = [
   ['heic-to-1.5.2.tar.gz', 'https://codeload.github.com/hoppergee/heic-to/tar.gz/refs/tags/v1.5.2'],
   ['libheif-1.22.2.tar.gz', 'https://codeload.github.com/strukturag/libheif/tar.gz/refs/tags/v1.22.2'],

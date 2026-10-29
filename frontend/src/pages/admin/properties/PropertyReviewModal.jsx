@@ -34,10 +34,8 @@ import { SubmittedPhotos, SubmittedDescription, SubmittedLocation } from './revi
 import ReraCheckRow, { RERA_REVIEW_ITEM } from './review-modal/ReraCheckRow.jsx';
 import { hasPermission } from '../../../lib/adminModules.js';
 
-// Verification routes require UUIDs; the display id may be a public slug.
 const pid = (listing) => listing?.uuid || listing?.id;
 
-// `recheckChanges` carries before/after per field; without it only the edited field names are known.
 const editedFields = (listing) => (listing.recheckPending
   ? String(listing.recheckReason || '').split(/,\s*/).filter((f) => f && f !== OWNERSHIP_REVIEW_ITEM)
   : []);
@@ -57,7 +55,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
   const [thread, setThread] = useState(null);
   const [threadError, setThreadError] = useState(null);
   const [threadReload, setThreadReload] = useState(0);
-  // Derive timeline labels at render because templates and ledger rows load independently.
   const [outreach, setOutreach] = useState([]);
   const [notes, setNotes] = useState([]);
   const [commsOpen, setCommsOpen] = useState(false);
@@ -72,9 +69,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
   const [reasonNote, setReasonNote] = useState('');
   const [msg, setMsg] = useState('');
   const [internalNote, setInternalNote] = useState('');
-  // Decisions stay disabled while their server write is pending.
   const [busy, setBusy] = useState(false);
-  // The live answer from the badge panel, which outruns the `review` snapshot after a grant or decline.
   const [badgeCase, setBadgeCase] = useState(null);
   const [section, setSection] = useState('overview');
   const [sectionFor, setSectionFor] = useState(null);
@@ -88,7 +83,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     setBadgeSeenFor(reviewKey);
   }
 
-  // Opening a pending listing as its checker starts the review; a refusal there must not hide the case file.
   const openCase = async (listing) => {
     const caseFile = await startPropertyReview(pid(listing), { markRead: true });
     if (listing.status !== 'pending' || isMadeBy(listing, user?.id) || ['approved', 'rejected'].includes(caseFile?.status)) return caseFile;
@@ -102,8 +96,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     }
   };
 
-  // `openCall` shares one open write across StrictMode's second effect pass; per-run cancellation covers
-  // listing switches. Idempotent open avoids a get-then-create race; `markRead` folds the read receipt in.
   useEffect(() => {
     if (!review) {
       openCall.current = null;
@@ -141,7 +133,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     setWaOpen(false);
     setWaPreview(null);
     setBusy(false);
-    // Under review is derived from pending status; opening a case must not rewrite pipeline stages.
     return () => {
       cancelled = true;
       setThread(null);
@@ -149,7 +140,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewKey, threadReload]);
 
-  // The timeline fetches only once opened; notes and chasers load independently so one failure cannot erase both.
   useEffect(() => {
     if (!reviewKey || !commsOpen || commsLoadedFor === reviewKey) return undefined;
     let cancelled = false;
@@ -162,7 +152,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewKey, commsOpen, commsLoadedFor]);
 
-  // The server fills `{market_rate}` from the same locality figure; an unknown one blocks the template here.
   const localitySlug = review?.localitySlug;
   const [marketRate, setMarketRate] = useState({ slug: null, value: null });
   useEffect(() => {
@@ -175,7 +164,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     return () => { cancelled = true; };
   }, [waOpen, localitySlug]);
 
-  // The shared template library is listing-independent; it is needed only by the template picker and the log's labels.
   useEffect(() => {
     if (!(waOpen || commsOpen) || templatesRequested.current) return;
     templatesRequested.current = true;
@@ -200,8 +188,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     if (match) setWaPreview(match);
   }, [waOpen, waPreview, reasonCode, waTemplates]);
 
-  // Only timestamped server records belong here; a chaser reads "sent" only once staff attest it.
-  // Outreach actor UUIDs stay absent: resolving them requires an admin-only audit surface.
   const commsLog = useMemo(() => {
     const chasers = outreach.map((row) => ({
       id: row.id,
@@ -225,7 +211,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       .sort((a, b) => String(b.at).localeCompare(String(a.at)));
   }, [outreach, waTemplates, notes]);
 
-  // Checklist text is the server key; refusal reasons belong in the owner's thread, not a third state.
   const setChecklistItem = async (item, pass) => {
     try {
       setThread(await setPropertyReviewChecklistItem(pid(review), item, pass));
@@ -289,8 +274,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     }
   };
 
-  // A decision atomically updates the case, listing status and owner message, so do not pair it with a
-  // separate status write. The server refuses an approval while any checklist line is still open.
   const reviewApprove = async () => {
     if (busy) return;
     if (!checklistComplete) {
@@ -343,7 +326,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     }
   };
 
-  // The status route reopens the case and tells the owner in one step, so no separate case write follows.
   const reopenCase = async () => {
     if (busy) return;
     setBusy(true);
@@ -361,14 +343,11 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
 
   const handleClose = () => { setReview(null); setThread(null); setThreadError(null); };
 
-  // Re-approval clears the re-check and notifies the owner atomically without taking the listing down.
   const approveEdits = async () => {
     if (busy) return;
     setBusy(true);
     try {
       await setListingStatus(review.id, 'approved', { reason: 'Owner edits reviewed', expectedStatus: review.status });
-      /* Close rather than refetch: the re-review panel renders from `review`, the parent's row, so refreshing
-         only the case file left the modal announcing an edit it had cleared, over a button that now 409s. */
       handleClose();
       toast('Owner edits approved \u2014 re-review cleared', 'success');
       onRefresh();
@@ -379,8 +358,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     }
   };
 
-  // Match the server's template vocabulary without inventing unavailable locality rates.
-  // The server's prepared message is authoritative; this listing-based preview is only guidance.
   const rateKnown = marketRate.slug === localitySlug && marketRate.value != null;
   const previewVariables = (listing) => ({
     owner_name: listing.owner || 'there',
@@ -396,8 +373,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
   });
   const unresolvedKeys = (body) => [...interpolateOutreachTemplate(body, previewVariables(review)).matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
 
-  /* `window.open` runs first and synchronously so the tab stays inside the authorising gesture, then is
-     navigated only once the server accepts — a refusal leaves an empty tab, not an unrecorded message. */
   const handleSendWaTemplate = async () => {
     if (busy || !waPreview) return;
     setBusy(true);
@@ -408,12 +383,9 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       toast('Chaser written \u2014 send it in WhatsApp, then mark it sent in the log', 'success');
       setWaOpen(false);
       setWaPreview(null);
-      // Re-read the server ledger rather than manufacturing a local history entry.
       try {
         setOutreach(await listOwnerOutreach(pid(review)));
       } catch {
-        /* The chaser was written; a failed refresh of the panel below it is not worth a second
-           toast contradicting the first. */
       }
       onRefresh();
     } catch (err) {
@@ -608,7 +580,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
               </div>
             ) : null}
 
-            {/* Mounted on first visit and kept, so a half-filled evidence form survives a look at another tab. */}
             {activeSection === 'badge' || badgeSeenFor === reviewKey ? (
               <div hidden={activeSection !== 'badge'}>
                 <OwnershipEvidencePanel propertyId={pid(review)} listing={review} onRefresh={onRefresh} onVerification={trackBadgeCase} />
@@ -621,8 +592,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
                   <div className="flex max-h-72 min-h-[96px] flex-col gap-2 overflow-y-auto bg-black/20 p-3">
                     {thread.messages.length ? (
                       thread.messages.map((m) => {
-                        /* An internal message must not be laid out as part of a conversation the owner is party to:
-                           read as an ordinary bubble, a moderator assumes the owner was told. */
                         if (m.internal) {
                           return (
                             <div key={m.id} className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">

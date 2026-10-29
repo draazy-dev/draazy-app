@@ -63,7 +63,7 @@ test.describe('PWA installability', () => {
     await page.goto('/');
     const touch = await page.locator('link[rel="apple-touch-icon"]').getAttribute('href');
     const { icons } = await (await page.request.get('/manifest.webmanifest')).json();
-    // Top-centre is tile on every icon; the corner is tile only on the iOS one, which must not be transparent.
+    // Top/bottom-centre is tile on every icon; the corner is tile only on the iOS one, which must not be transparent.
     const probe = (src) => page.evaluate(async (url) => {
       const img = new Image();
       img.src = url;

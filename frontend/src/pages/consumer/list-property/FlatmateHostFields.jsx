@@ -15,8 +15,6 @@ const bhkOf = (raw) => {
   return n > 0 ? String(n) : '';
 };
 
-// Links the room to the host's own approved listing (owner tier) or Draazy tenancy (agreement match), and fills
-// what that row already knows. The locality is re-read so an archived name is never written back.
 function ClaimPicker({ rows, status, retry, value, label, hint, onPick }) {
   const { t } = useTranslation();
   const hintId = useId();
@@ -55,7 +53,6 @@ export default function FlatmateHostFields({ form, set, errors, onLocalityChange
   const listings = (pickers.myApprovedListings || []).map((l) => ({ ...l, claimId: l.uuid || l.id, label: l.title || l.society || l.locality }));
   const tenancies = (pickers.myTenancies || []).filter((x) => x.propId).map((x) => ({ ...x, claimId: x.propId, label: x.title || x.address }));
 
-  // Bumped on every pick, role switch and unmount so a slow locality lookup never lands on a newer choice.
   const pickSeq = useRef(0);
   useEffect(() => () => { pickSeq.current += 1; }, []);
 

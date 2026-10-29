@@ -11,7 +11,6 @@ import {
 } from './notificationModel.js';
 
 const LONG_PRESS_MS = 520;
-// `.list-reveal` holds a row hidden until its delay ends, so a long inbox must not leave its tail blank for seconds.
 const MAX_STAGGER_S = 0.3;
 
 export default function NotificationRow({

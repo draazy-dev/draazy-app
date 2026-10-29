@@ -1,7 +1,6 @@
 import { MessageCircle } from 'lucide-react';
 import { classNames } from '../../../../lib/format.js';
 
-/** Takes rendered preview text so interpolation rules do not grow a second copy in this component. */
 export default function WhatsappTemplates({ review, waOpen, setWaOpen, waTemplates, waPreview, setWaPreview, waPreviewText, unresolvedKeys, busy, handleSendWaTemplate }) {
   const missingFor = (tpl) => unresolvedKeys(tpl.body || '');
   const previewMissing = waPreview ? missingFor(waPreview) : [];
@@ -15,7 +14,6 @@ export default function WhatsappTemplates({ review, waOpen, setWaOpen, waTemplat
       {waOpen && (
         <div className="mt-3 space-y-2">
           {waTemplates.length === 0 ? (
-            /* The library is fetched per account, so an empty list is a real state. */
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-sm text-gray-500">
               No WhatsApp templates available.
             </div>

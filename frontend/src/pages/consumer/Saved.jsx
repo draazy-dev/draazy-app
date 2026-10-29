@@ -25,7 +25,6 @@ const CATEGORIES = [
   { key: 'flatmates', label: 'Flatmates', labelKey: 'catFlatmatesShort', icon: 'users-round' },
 ];
 
-/* How long a swiped-away card stays undoable before the removal commits. */
 const UNDO_WINDOW_MS = 8000;
 
 async function readFlatmateSaves() {
@@ -59,8 +58,6 @@ export default function Saved() {
     const locality = p.locality || 'Pune';
     return {
       id: p.id,
-      // `remove()` below addresses `DELETE /me/saved/{propId}` with the row's primary key, not the
-      // routing token.
       uuid: p.uuid,
       cat: isRent ? 'rent' : 'buy',
       title: p.title || p.type || 'Property',
@@ -89,8 +86,6 @@ export default function Saved() {
   );
   useEffect(() => { loadFlatmateSaves(); }, [loadFlatmateSaves, isIn]);
 
-  /* Re-reads both halves: refreshing only one would leave the gesture looking like it half worked on a page that
-     shows the two interleaved. */
   const refreshShortlist = savedList.reload || savedList.refresh;
   const ptr = usePullToRefresh(useCallback(
     () => Promise.resolve(refreshShortlist()).catch(() => {}).then(loadFlatmateSaves),
@@ -173,7 +168,6 @@ export default function Saved() {
     pendingRef.current = next;
     setPendingRemoval(next);
   };
-  // A pending commit timer would remove a card the user cannot see, let alone undo.
 
   useEffect(() => {
     const timers = undoTimers.current;
@@ -185,8 +179,6 @@ export default function Saved() {
     };
   }, []);
 
-  // Turn a saved property into an opt-in alert for similar listings (same intent,
-  // locality and configuration, within a ±15% price band). Surfaces in Dashboard → Alerts.
   const createAlert = async (c) => {
     if (alerting.has(c.id)) return;
     setAlerting((s) => new Set(s).add(c.id));
@@ -219,7 +211,6 @@ export default function Saved() {
   const allCards = useMemo(() => {
     const existingIds = new Set(cards.map((c) => c.id));
     const at = (c) => Date.parse(c.savedAt) || 0;
-    // Newest save first across both sources; the page offers no other order.
     return [...cards, ...dynamicSaved.filter((d) => !existingIds.has(d.id))].sort((a, b) => at(b) - at(a));
   }, [cards, dynamicSaved]);
 
@@ -264,9 +255,6 @@ export default function Saved() {
             <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">{tr('saved.title')}</h1>
             {summaryParts && <p className="text-gray-400 text-sm"><span className="text-teal-400 font-semibold">{summaryParts}</span></p>}
           </div>
-          {/* Signed-out shortlists are real — Reels, Compare and the map detail panel all write dzSavedProps while
-             logged out. */}
-
           {!isIn && (
             <div className={'mb-5 flex flex-col gap-3 rounded-2xl border border-teal-400/20 bg-teal-500/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between fade-in' + (mounted ? ' visible' : '')}>
               <div className="flex items-start gap-3 min-w-0">

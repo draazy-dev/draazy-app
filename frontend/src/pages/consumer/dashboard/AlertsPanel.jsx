@@ -71,7 +71,6 @@ function AlertRow({ alert: a, freqOptions, onFrequency, onEdit, onDelete }) {
 
 export default function AlertsPanel() {
   const { t } = useTranslation();
-  // Shared with the Overview stat card, so a change here never leaves the count above it stale.
   const { searches: alerts, status, setFrequency, create, edit, remove, reload } = useSavedSearches();
   const [editor, setEditor] = useState(null);
   const [deleting, setDeleting] = useState(null);

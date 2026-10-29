@@ -26,8 +26,6 @@ const toTwoDecimal = (value) => {
   return fraction == null ? whole.slice(0, 9) : `${whole.slice(0, 9)}.${fraction.slice(0, 2)}`;
 };
 
-/* Three lease vocabularies, because the three are let on different cycles: a flat on the 11-month tenancy, a shop or
-   shed on year-scale terms, a plot or farm by the year or the crop. */
 const LEASE_TERMS = {
   residential: [agreementOptions, lockinOptions, noticeOptions],
   commercial: [commercialAgreementOptions, commercialLockinOptions, commercialNoticeOptions],
@@ -53,8 +51,6 @@ const PricingStep = ({
   const commercial = isCommercial();
   const plotSale = isPlotSale(form);
   const residentialPricing = !land && !commercial;
-  /* Land is excluded to match the validator: a plot keeps whatever `construction` a flat left behind, and without the
-     guard the RERA field would claim a requirement the step never enforces. */
   const preCompletion = !land && (form.construction === 'new' || form.construction === 'under');
   const leaseKind = leaseKindOf(form.propertyType);
   const [agreementOpts, lockinOpts, noticeOpts] = LEASE_TERMS[leaseKind];
@@ -101,8 +97,6 @@ const PricingStep = ({
             </div>
           </div>
 
-          {/* A commercial unit states the same recurring cost as CAM, per sq.ft., so the two share one slot — either
-             box alone, never both, or they'd be two answers to one question. */}
           <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {!land && !commercial && (
               <div>
@@ -186,7 +180,6 @@ const PricingStep = ({
             </div>
           )}
 
-          {/* MahaRERA sits with the answer that decides whether it is owed, not at the bottom of the document step. */}
           {form.propertyType !== 'farmland' && (
             <div className="mb-6">
               <label htmlFor="lp-rera" className={lbl3}>
@@ -306,8 +299,6 @@ const PricingStep = ({
                 {!showTerms && <p className="text-sm text-gray-300 mt-1">{t('listProperty.terms.standard')}</p>}
               </div>
 
-              {/* Only offered while the terms are still standard, because that is the only state with a summary to
-                 return to. */}
               {standardTerms && (
                 <button type="button" onClick={() => setTermsOpen(!termsOpen)} aria-expanded={termsOpen} aria-controls="lp-rental-terms-fields" aria-label={t('listProperty.terms.changeAria')} className="shrink-0 min-h-[44px] px-3 text-sm font-semibold text-teal-300 hover:text-teal-200 transition-colors">
                   {t('listProperty.terms.change')}
@@ -315,7 +306,6 @@ const PricingStep = ({
               )}
             </div>
 
-            {/* Two columns on a phone: lock-in and notice are read against each other. */}
             <div id="lp-rental-terms-fields" className={`mt-3 grid-cols-2 sm:grid-cols-3 gap-4 ${showTerms ? 'grid' : 'hidden'}`}>
               <div className="col-span-2 sm:col-span-1">
                 <label className={lbl}>{t('listProperty.fields.agreementDuration')}</label>
@@ -331,8 +321,6 @@ const PricingStep = ({
               </div>
             </div>
 
-            {/* Rent alone does not describe a commercial tenancy: the fit-out months are rent the tenant never
-               pays, and the escalation is what they will pay in year four. */}
             {commercial && (
               <div className="mt-4 grid grid-cols-2 gap-4">
                 <div>
@@ -357,8 +345,6 @@ const PricingStep = ({
               <label className={lbl3}>{t('listProperty.fields.petsAllowed')}</label>
               <div className="flex flex-wrap gap-3" data-err="petsPolicy">
                 {[['yes', t('listProperty.opt.allowed')], ['no', t('listProperty.opt.notAllowed')]].map(([v, l]) => (
-                  // Re-clicking clears it: an owner who answered by accident, or who no
-                  // longer wants to commit, needs a way back to having said nothing.
                   <Pill key={v} selected={form.petsPolicy === v} onClick={() => set('petsPolicy', form.petsPolicy === v ? '' : v)} className="px-5 h-btn inline-flex items-center justify-center">{l}</Pill>
                 ))}
               </div>

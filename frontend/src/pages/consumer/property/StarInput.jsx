@@ -1,8 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 
-// Any caller mounting more than one strip must pass `aspect`: e2e and screen readers match "3 star" as a
-// substring, so without it every row answers to the same name.
 export function StarInput({ value, onChange, size = 24, aspect }) {
   const { t } = useTranslation();
   return (

@@ -1,7 +1,5 @@
 import Icon from '../../../../components/Icon.jsx';
 import { CHIP_ACCENT } from './helpers.js';
-// One uniform stat chip used across the whole performance strip. Optional onClick
-// turns it into a focusable button (e.g. Leads → jump to the leads tab).
 
 export default function StatChip({ icon, value, label, tone = 'muted', onClick, title, ariaLabel }) {
   const accent = CHIP_ACCENT[tone] || CHIP_ACCENT.muted;

@@ -33,10 +33,7 @@ const sortKeys = (v) => (Array.isArray(v) ? v.map(sortKeys)
   : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v);
 export const filingKey = (filing) => JSON.stringify(sortKeys(filing));
 
-/* This number must track the server's; otherwise the UI discovers the limit by failed submits. */
-
 export const DETAILS_MAX_CHARS = 16000;
-/* Serialized size of the `details` payload, in the characters the server counts. */
 
 export const detailsChars = (details) => {
   try {
@@ -45,7 +42,6 @@ export const detailsChars = (details) => {
     return 0;
   }
 };
-/* Where the free text lives, and what to call it when it is the one that has to be shortened. */
 
 const FREE_TEXT_FIELDS = [
   { get: (s) => s.clauses, label: 'services.ra.terms.specialClauses', step: 3 },
@@ -54,7 +50,6 @@ const FREE_TEXT_FIELDS = [
   { get: (s) => (s.wit?.w1Addr || '') + (s.wit?.w2Addr || ''), label: 'services.ra.witnesses.address', step: 4 },
   { get: (s) => (s.furnItems || []).map((f) => f.name).join(''), label: 'services.ra.terms.furniture', step: 3 },
 ];
-/* The field carrying the most text, so an over-length warning can name it. */
 
 export const largestFreeTextField = (state) => {
   let worst = null;
@@ -64,8 +59,6 @@ export const largestFreeTextField = (state) => {
   });
   return worst && worst.len > 0 ? worst : { len: 0, label: FREE_TEXT_FIELDS[0].label, step: FREE_TEXT_FIELDS[0].step };
 };
-// Factories, not constants, so the useState initialiser and the new-agreement reset can never alias
-// or drift from each other.
 
 const POA_BLANK = { poaPrincipal: '', poaRegNo: '', poaDate: '', poaSro: '' };
 const PARTY_BLANK = { type: 'individual', residency: 'resident', mother: '', dob: '', alias: '', passport: '', visaOci: '', frro: '' };
@@ -141,8 +134,6 @@ const VERHOEFF_P = [
   [8, 9, 1, 6, 0, 4, 3, 5, 2, 7], [9, 4, 5, 3, 1, 2, 6, 8, 7, 0], [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
   [2, 7, 9, 3, 8, 0, 6, 4, 1, 5], [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
 ];
-// UIDAI issues 12 digits, never starting 0 or 1, the last being a Verhoeff check digit.
-// Must agree with the server's `common.validation.AadhaarValidator`.
 
 export const isAadhaar = (s) => {
   const d = digits(s);
@@ -175,7 +166,6 @@ export const hasIdentityNumbers = (state) => {
     .some((r) => r?.pan || r?.aadhaar);
 };
 
-/* The one payload built from the unredacted state. */
 const marker = (role, index, field, step, value) => (value ? { role, index, field, step } : null);
 
 export const identityReminderFields = (state) => {

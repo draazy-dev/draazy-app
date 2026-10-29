@@ -14,8 +14,6 @@ import { ROUTE_HEADS } from './src/data/routeHeads.js';
 
 const PROXY_TARGET = process.env.VITE_PROXY_TARGET || 'http://localhost:8080';
 
-/* Vite's HTML %ENV% replacement has no fallback and leaves an unset name as literal text, but the deploy build
-   leaves VITE_API_BASE unset and relies on config.js's '/api' default — so the preload applies the same default. */
 function apiBaseHtmlPlugin() {
   let base = '/api';
   return {
@@ -24,7 +22,6 @@ function apiBaseHtmlPlugin() {
     transformIndexHtml: (html) => html.replaceAll('__API_BASE__', base),
   };
 }
-/* The dev server injects an inline React Refresh preamble the production CSP has no hash for. */
 function devInlineScriptHashesPlugin() {
   return {
     name: 'draazy-dev-inline-script-hashes',
@@ -40,8 +37,6 @@ function devInlineScriptHashesPlugin() {
     },
   };
 }
-/* Each Phosphor icon ships six weights; the app renders only regular and fill (Icon `weight` prop), so the
-   other four are cut at build — two thirds of the icon bytes in the entry chunk. */
 function phosphorWeightsPlugin(keep = ['regular', 'fill']) {
   return {
     name: 'draazy-phosphor-weights',
@@ -60,8 +55,6 @@ function phosphorWeightsPlugin(keep = ['regular', 'fill']) {
     },
   };
 }
-/* Only draazy.com may be indexed: the sandbox host's page copies would compete with production. Google and
-   Bing may still crawl, or they never see the noindex on pages indexed earlier; other bots are kept out. */
 function noindexOffProductionPlugin() {
   let outDir;
   return {
@@ -81,29 +74,20 @@ function noindexOffProductionPlugin() {
    or private state never ships from a service worker. */
 function pwaPlugin(mode) {
   return VitePWA({
-    // pwa.spec.js asserts no worker on the dev server, which the e2e build stands in for.
     disable: mode === 'e2e',
-    // The shell must never be a version behind the deployed API contract, and a page reload has no
-    // half-finished work to protect, so update silently rather than prompting.
     registerType: 'autoUpdate',
     injectRegister: 'auto',
     manifest: false,
-    // A service worker on the dev server would make Playwright and local edits nondeterministic.
     devOptions: { enabled: false },
     workbox: {
-      // Precache only the initial load graph: dist is ~7 MB. Home is bundled into index-*, so an
-      // installed app launched offline still has its landing page.
       globPatterns: [
-        // NOT woff2: self-hosting put 22 subset files (~857 KB) in dist, including Devanagari
-        // subsets an English visitor never renders. The runtime rule below caches them on use.
         '**/*.{css,html}',
         'assets/index-*.js',
         'assets/vendor-react-*.js',
       ],
       globIgnores: ['**/floorplans/**', 'blog.html', 'blog/**', 'help.html', 'help/**', 'locality.html', 'locality/**', ...Object.keys(ROUTE_HEADS).filter((p) => p !== '/').map((p) => `${p.slice(1)}.html`)],
       importScripts: ['push-sw.js'],
-      // SPA deep links resolve to the shell: 404.html, because index.html carries the home page's content and
-      // canonical. The denylist is the important half: without it, a navigation to /api/* would get the shell.
+      // Without the denylist a navigation to /api/* would get the SPA shell.
       navigateFallback: '404.html',
       navigateFallbackDenylist: [/^\/api\//],
       cleanupOutdatedCaches: true,
@@ -111,14 +95,11 @@ function pwaPlugin(mode) {
       skipWaiting: true,
       runtimeCaching: [
         {
-          // First rule wins, so the data exclusion is stated first. Matching on pathname, not a
-          // regex over the whole URL — a bare /^\/api\// would never match an absolute URL.
+          // First rule wins, so the API exclusion must stay first.
           urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
           handler: 'NetworkOnly',
         },
         {
-          // Hashed filenames are content-addressed — a given URL can never point at different
-          // bytes — so CacheFirst is safe. The lazy route chunks land here on first visit.
           urlPattern: ({ url, sameOrigin }) => sameOrigin && /\/assets\/.*-[\w-]{8,}\.(js|css|mjs)$/.test(url.pathname),
           handler: 'CacheFirst',
           options: {
@@ -127,8 +108,6 @@ function pwaPlugin(mode) {
           },
         },
         {
-          // Immutable per URL (the filename encodes family, weight and subset index). Runtime, not
-          // precached: each visitor caches only the subsets their language renders.
           urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/fonts/'),
           handler: 'CacheFirst',
           options: {
@@ -138,7 +117,6 @@ function pwaPlugin(mode) {
           },
         },
         {
-          // Card copies only: originals are CORS-fetched for the canvas hash, which caching would break.
           urlPattern: ({ url }) => url.origin === 'https://images.unsplash.com'
             || /\/photos\/[0-9a-f-]{36}\/[0-9a-f-]{36}(?:-[0-9a-f]{16})?\.w\d+\.jpg$/.test(url.pathname),
           handler: 'CacheFirst',
@@ -154,20 +132,16 @@ function pwaPlugin(mode) {
 }
 
 export default defineConfig(({ mode }) => ({
-  // Unset VITE_DEPLOY_ENV in a production build counts as prod, so the safe default strips console output.
   esbuild: mode === 'production' && loadEnv(mode, __dirname, 'VITE_').VITE_DEPLOY_ENV !== 'sandbox'
     ? { drop: ['console', 'debugger'] }
     : {},
-  // spaFallbackPlugin reads files the blog, locality and route-head plugins write, so it runs after them.
   plugins: [react(), phosphorWeightsPlugin(), helpContentPlugin({ root: __dirname }), blogPlugin({ root: __dirname }), localityGuidesPlugin({ root: __dirname }), contentIndexPlugin({ root: __dirname }), routeHeadsPlugin(), spaFallbackPlugin({ root: __dirname }), pwaPlugin(mode), apiBaseHtmlPlugin(), devInlineScriptHashesPlugin(), noindexOffProductionPlugin()],
   build: {
     rollupOptions: {
       output: {
-        // Peel heavy, self-contained vendor libraries into their own long-lived cacheable chunks.
         manualChunks(id) {
           const n = id.replace(/\\/g, '/');
-          // Shared runtime helpers MUST be pinned to the eager vendor chunk. Left unassigned,
-          // Rollup folds them into a vendor chunk and drags that whole chunk into the entry.
+          // Pin the preload helper to the eager chunk, or Rollup drags a whole vendor chunk into the entry.
           if (n.includes('vite/preload-helper')) return 'vendor-react';
           if (!n.includes('node_modules')) return;
           if (n.includes('jspdf')) return 'vendor-jspdf';
@@ -187,20 +161,14 @@ export default defineConfig(({ mode }) => ({
     host: true,
     port: 5173,
     open: false,
-    // `Origin` is rewritten because the browser sends the dev-server origin even on same-origin
-    // POSTs, and the backend's CORS filter allows only 5173. (`changeOrigin` only rewrites `Host`.)
     proxy: {
       '/api': {
         target: PROXY_TARGET,
         changeOrigin: true,
         headers: { origin: PROXY_TARGET },
-        // No rewrite: the backend sets `server.servlet.context-path=/api`, so it genuinely serves
-        // `/api/auth/login`. Stripping the prefix 404s the moment VITE_API_BASE names a real host.
       },
     },
     watch: {
-      // OneDrive-synced folders on Windows lock files mid-sync, which makes Chokidar's native
-      // watcher throw `EBUSY` and crash the dev server. Polling avoids the native lock.
       usePolling: true,
       interval: 300,
       ignored: [

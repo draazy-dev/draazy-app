@@ -17,7 +17,6 @@
 }
 
 @media (hover: hover) {
-  /* One gated hover block keeps touch from leaving cards lifted after a tap. */
   .svc-card:hover {
     transform: translateY(-8px);
     border-color: rgb(var(--dz-c-teal-500) / .35);
@@ -88,10 +87,6 @@
 .step-ic {
   transition: transform .3s ease;
 }
-
-/* ===== Rent Agreement emphasis: the platform's primary paid service ===== */
-
-/* Spotlight card under the hero. */
 .ra-spot {
   border-color: rgb(var(--dz-c-teal-500) / .35) !important;
   background:
@@ -100,9 +95,6 @@
   box-shadow: 0 18px 44px rgb(var(--dz-c-teal-600) / .18);
   transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
 }
-
-/* Ungated, a tap leaves the tile lifted and brighter than every other card on the page —
-   reading as selected on the app's most prominent conversion target. */
 @media (hover: hover) {
   .ra-spot:hover {
     transform: translateY(-3px);
@@ -110,16 +102,11 @@
     box-shadow: 0 24px 56px rgb(var(--dz-c-teal-600) / .28);
   }
 }
-
-/* Desktop: icon column beside the copy. `display` lives here because the mobile block below
-   overrides it, and route CSS ties with utility CSS on specificity — load order would decide. */
 .ra-spot-row {
   display: flex;
   align-items: flex-start;
   gap: 1.25rem;
 }
-
-/* Featured tile in the services grid. */
 .svc-featured {
   border-color: rgb(var(--dz-c-teal-500) / .45) !important;
   box-shadow: 0 0 0 1px rgb(var(--dz-c-teal-500) / .25), 0 14px 34px rgb(var(--dz-c-teal-600) / .2);
@@ -128,12 +115,7 @@
 .svc-ribbon {
   background: var(--brand-gradient, linear-gradient(135deg, rgb(var(--dz-c-teal-600)), rgb(var(--dz-c-teal-500))));
 }
-
-/* ===== Mobile refinements ===== */
 @media (max-width: 639px) {
-
-  /* Hero CTAs share one row: let them flex and drop the desktop padding so both
-     labels (incl. the longer hi/mr strings) fit on a 360px screen. */
   .hero-cta-row .btn-lg {
     flex: 1 1 0;
     min-width: 0;
@@ -141,14 +123,9 @@
     font-size: .8125rem;
     gap: .375rem;
   }
-
-  /* Rent Agreement spotlight: two columns for the icon + badge header line only. `display:contents`
-     dissolves the copy wrapper so the title and paragraph reclaim the icon indent. */
   .ra-spot-row {
     display: grid;
     grid-template-columns: auto 1fr;
-    /* Row gap must be reset, not just the column set: the desktop shorthand would keep
-       adding 20px between every stacked row. */
     gap: 0 .625rem;
     align-items: center;
   }
@@ -160,16 +137,10 @@
   .ra-spot-body> :not(.ra-spot-badge) {
     grid-column: 1 / -1;
   }
-
-  /* Grid items stretch by default, which would blow the badge pill and the CTA out to the
-     full card width. Only these two must hug their content. */
   .ra-spot-badge,
   .ra-spot-cta {
     justify-self: start;
   }
-
-  /* Proof points read as a light check-list, not three boxes: dropping the pill chrome fits
-     them on one line and removes ~22px of bulk. */
   .ra-spot-chips {
     gap: .125rem .75rem;
   }
@@ -179,8 +150,6 @@
     background: none;
     border: 0;
   }
-
-  /* The whole tile is the link, so the CTA is an affordance rather than the only target. */
   .ra-spot-cta {
     height: 38px;
     padding-inline: .9rem;

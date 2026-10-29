@@ -4,7 +4,6 @@ import Icon from '../../../components/Icon.jsx';
 import LocalitySearchInput from '../../../components/search/LocalitySearchInput.jsx';
 import NearPlaceField from './NearPlaceField.jsx';
 
-/* The map only appears after focusing on 1–maxAreas localities: a whole city of bubbles is expensive. */
 export default function FlatmateMapGate({ areas, maxAreas, onShow, onSwitchList, kindWord, filters, setF, filtersActive, onClearFilters }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState([]);

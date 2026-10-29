@@ -30,7 +30,6 @@ function approvalPayload(payload) {
     : { ...base, dob: payload?.dob };
 }
 
-/** `page` is zero-based on the wire; filters are server predicates, never applied to a loaded page. */
 export async function listIdentityReviews({ status = 'pending', page = 0, size = 10, ...filters } = {}) {
   const res = await get('/moderation/identity-reviews', { status, page, size, ...filters });
   const unwrapped = unwrapPage(res, { page, size });

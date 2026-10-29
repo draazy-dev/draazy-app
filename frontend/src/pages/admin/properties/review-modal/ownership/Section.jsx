@@ -1,4 +1,3 @@
-/** A flat, divider-separated block of the badge case: a heading, an optional count, the content. */
 export default function Section({ title, meta, children }) {
   return (
     <div className="py-4">

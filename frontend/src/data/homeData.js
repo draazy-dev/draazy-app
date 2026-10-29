@@ -1,10 +1,4 @@
-/* Static data for the Home page — extracted for separation of concerns. */
-
-/* Hero types mirror the browse taxonomy so a search maps 1:1 to the listings filter, sub-filters included. */
 export { HOME_TYPE_OPTS as TYPE_OPTS, COMMERCIAL_TYPES, LAND_USE } from './propertyTypes.js';
-
-/* CITY_POPULAR and NEARBY are curated names, never a locality registry:
-   a name becomes a search token only through its slug. */
 
 export const NEARBY = {
   Baner: ['Balewadi', 'Aundh', 'Pashan', 'Sus', 'Wakad'],
@@ -22,23 +16,18 @@ export const NEARBY = {
   Magarpatta: ['Hadapsar', 'Amanora', 'Mundhwa'],
 };
 
-/* Only Pune has a curated registry; other cities resolve to [] and use city-biased Google Places suggestions. */
 export const CITY_POPULAR = {
   Pune: [['Baner', 'buy'], ['Wakad', 'buy'], ['Hinjawadi', 'buy'], ['Kothrud', 'buy'], ['Koregaon Park', 'buy'], ['Viman Nagar', 'rent']],
 };
 
-/* Popular locality NAMES for a city (search empty-state). */
 export function popularFor(city) {
   return (CITY_POPULAR[city] || []).map(([name]) => name);
 }
 
-// Popular [name, deal] chip tuples for a city (home hero chips).
 export function popularChipsFor(city) {
   return CITY_POPULAR[city] || [];
 }
 
-/* Launch-honest proof points, each true today, so the hero, "Why Draazy" and sign-in never disagree.
-   localityGuides is checked against content/localities by scripts/vite-plugin-locality-guides.test.mjs. */
 export const STATS = {
   brokerage: '₹0',
   localityGuides: '12',

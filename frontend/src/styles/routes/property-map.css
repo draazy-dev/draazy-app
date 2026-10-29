@@ -1,6 +1,3 @@
-
-/* Listings map — dark popup content (rendered inside Google InfoWindow). */
-/* Property tile popup: a full-bleed compact clone of the standard Card tile. */
 .dz-mp-card {
   display: flex;
   flex-direction: column;

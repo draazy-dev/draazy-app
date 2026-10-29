@@ -28,7 +28,6 @@ const ageBand = (years) => {
   return y >= 15 ? '15+' : y >= 10 ? '10-15' : y >= 5 ? '5-10' : y >= 1 ? '1-5' : 'new';
 };
 
-// `bhkNum`, not the rendered `bhk`: the label is "3 BHK", and the contract wants an integer.
 export const basicsOf = (l) => ({
   id: l.id, title: l.title || '', price: l.price ?? '', area: l.area ?? '',
   bhk: l.bhkNum == null ? '' : String(l.bhkNum), type: l.type || '', locality: l.locality || '',
@@ -80,7 +79,6 @@ function basicsPatch(e, ref) {
 }
 
 const NUMBER_FIELDS = [
-  // [form key, patch key, label, minimum]
   ['carpetArea', 'carpetArea', 'Carpet area', 1],
   ['builtUpArea', 'builtUpArea', 'Built-up area', 1],
   ['superBuiltUpArea', 'superBuiltUpArea', 'Super built-up area', 1],
@@ -96,7 +94,6 @@ function detailsPatch(e, was) {
   for (const [key, out, label, min] of NUMBER_FIELDS) {
     if (e[key] === was[key]) continue;
     const n = num(e[key]);
-    // These have no PATCH word for "clear", so a blanked box leaves the stored value alone.
     if (n === undefined) continue;
     if (!Number.isFinite(n) || n < min) return { error: `${label} must be ${min ? 'above zero' : 'zero or more'}` };
     patch[out] = n;
@@ -135,7 +132,6 @@ function detailsPatch(e, was) {
   return { patch };
 }
 
-/** The changed fields only, so an untouched field can never be rewritten from a stale or partial read. */
 export function editPatch(edit) {
   const ref = edit._ref || {};
   const basics = basicsPatch(edit, ref);
@@ -144,8 +140,6 @@ export function editPatch(edit) {
   const details = full ? detailsPatch(edit, detailsOf(full)) : { patch: {} };
   if (details.error) return details;
   const patch = { ...basics.patch, ...details.patch };
-  /* Sent without form details, an address edit makes the server drop the stored address boxes and the
-     landmark with them; sending the rest back keeps the landmark and lets the owner's wizard re-split the line. */
   if (patch.address !== undefined && full?.formDetails && Object.keys(full.formDetails).length) {
     patch.formDetails = Object.fromEntries(Object.entries(full.formDetails).filter(([k]) => !ADDRESS_PARTS.includes(k)));
   }

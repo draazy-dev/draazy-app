@@ -15,11 +15,9 @@ export default function HomeLoans() {
   const [searchParams] = useSearchParams();
   const [prefillType, setPrefillType] = useState('');
 
-  // Prefill loan type from URL (?type=balance)
   useEffect(() => {
     const typeParam = searchParams.get('type');
     if (typeParam) {
-      // Match option value from HTML: search for partial match (case-insensitive)
       const options = ['Home Purchase Loan', 'Plot / Land Loan', 'Home Construction Loan', 'Balance Transfer', 'Top-up Loan', 'Loan Against Property'];
       const match = options.find(opt => opt.toLowerCase().includes(typeParam.toLowerCase()));
       if (match) setPrefillType(match);

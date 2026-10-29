@@ -1,7 +1,3 @@
-/* Compact controls; sizes come from the --dz-* scale in index.css :root.
-   Pill = tappable (.dz-chip, .dz-segmented). 6px corner = display-only (.dz-tag). */
-
-/* Zero specificity so layout utilities (hidden, sm:flex, absolute) still place a converted control. */
 :where(.dz-chip, .dz-segmented > button, .dz-tag, .dz-count) { display: inline-flex; }
 :where(.dz-chip, .dz-segmented > button) { position: relative; }
 
@@ -43,9 +39,6 @@
   font-size: .8125rem;
   font-weight: 500;
 }
-
-/* Surfaces are element-specific (0,0,1): above preflight's button reset, below tone utilities (bg-*, text-*),
-   so a utility can recolour a chip while the geometry above stays fixed. */
 :is(button, a, span, label):where(.dz-chip) {
   border-color: rgb(var(--dz-c-white) / calc(.12 * var(--dz-line-boost)));
   background: var(--control-bg);
@@ -63,9 +56,6 @@
   background: rgb(var(--dz-c-teal-500) / .12);
   color: rgb(var(--dz-c-teal-200));
 }
-
-/* Removable selections (picked areas, active filters, "Clear all").
-   Must follow .dz-chip to win on equal specificity. */
 .dz-chip--sm {
   gap: .25rem;
   height: var(--dz-chip-sm-h);
@@ -86,9 +76,6 @@
     color: rgb(var(--dz-c-white));
   }
 }
-
-/* Icon-only segmented toggle, the same shape as listings DealToggle: a --control-h pill whose
-   segments land on --dz-icon-btn on a phone, so it lines up with the select and search beside it. */
 .dz-segmented {
   display: inline-flex;
   flex: none;
@@ -119,8 +106,6 @@
 @media (hover: hover) {
   .dz-segmented > button:not([aria-pressed="true"]):hover { color: rgb(var(--dz-c-white)); }
 }
-
-/* Colour only through tone utilities; --muted is an element-specificity default they can override. */
 .dz-tag {
   flex: none;
   align-items: center;

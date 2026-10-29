@@ -24,8 +24,6 @@ export default function PropertyPassport() {
   const [docCount, setDocCount] = useState(0);
   const [confirmDel, setConfirmDel] = useState(false);
 
-  /* `undefined` is "not asked yet" (spinner); `null` is "no such property of yours" (empty state). A rejection
-     is treated as not-found: the seam already maps 404 to null, so the rest is a fault the page cannot act on. */
   const refresh = useCallback(async () => {
     try {
       setProp((await getManaged(id)) || null);
@@ -50,8 +48,6 @@ export default function PropertyPassport() {
   const checklist = passportChecklist(prop, docCount);
   const val = prop.valuation;
 
-  // Publishing can be refused: the marketplace contract is stricter than the owner's private file,
-  // and the server re-runs the listing's own validation at this boundary.
   const publish = async () => {
     let res;
     try {
@@ -120,8 +116,6 @@ export default function PropertyPassport() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 mt-6">
           <div className="space-y-6">
-            {/* The vault reports its own count rather than the passport re-reading it: it has just
-                fetched the list to render it, and a second request would only race the first. */}
             <DocVault mobile={mobile} propId={prop.id} onChange={setDocCount} />
           </div>
 

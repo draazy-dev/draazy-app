@@ -18,8 +18,6 @@ const DEFAULTS = { amt: 8000000, rate: 8.5, ten: 20 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const pctOf = (v, { min, max }) => (clamp(+v || 0, min, max) - min) / (max - min) * 100;
-/* Only the fill percentage crosses to CSS: an inline `background:` shorthand resets size/position/repeat and
-   outranks stylesheet rules, which the touch-target rule needs to override. */
 const trackPct = (p) => ({ '--emi-pct': `${p}%` });
 
 export default function EmiCalculator() {
@@ -48,7 +46,6 @@ export default function EmiCalculator() {
     return { P, emi, total, interest };
   }, [amt, rate, ten]);
 
-  // Year-wise amortization: how principal vs interest is repaid over the loan.
   const schedule = useMemo(() => {
     const { P, emi } = out;
     const r = Math.max(0, +rate || 0) / 12 / 100;
@@ -80,7 +77,6 @@ export default function EmiCalculator() {
             <p className="text-gray-400 text-sm mt-2">{t('misc1.emiSubtitle')}</p>
           </div>
 
-          {/* Mobile-only sticky result: keeps the primary answer in view while sliders change. */}
           <div className="dz-docks-under-nav lg:hidden sticky top-[var(--dz-nav-h)] z-30 -mx-4 sm:-mx-6 mb-6 border-b border-white/10 bg-ink/95 backdrop-blur-xl">
             <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
               <div className="min-w-0">
@@ -102,12 +98,9 @@ export default function EmiCalculator() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6">
-            {/* Inputs */}
             <div className="glass-card rounded-2xl p-5 sm:p-8 reveal">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-sm font-semibold text-gray-200">{t('misc1.emiAdjust')}</h2>
-                {/* .tap-extend, not a 44px box: growing Reset would push the heading and sliders down 20px on the
-                    smallest screens; `relative` anchors the pseudo. */}
                 <button type="button" onClick={reset} className="tap-extend relative inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-teal-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40 rounded-md px-1.5 py-1">
                   <Icon name="rotate-ccw" className="w-3.5 h-3.5" /> {t('misc1.emiReset')}
                 </button>
@@ -153,7 +146,6 @@ export default function EmiCalculator() {
               </div>
             </div>
 
-            {/* Result */}
             <div className="glass-card rounded-2xl p-5 sm:p-8 flex flex-col reveal">
               <p className="text-sm text-gray-400 text-center mb-1 hidden lg:block">{t('misc1.emiMonthlyEmi')}</p>
               <p className="text-4xl font-extrabold gradient-text text-center mb-6 hidden lg:block" aria-live="polite" aria-atomic="true">{fmt(out.emi)} {t('misc1.emiPerMo')}</p>
@@ -168,7 +160,6 @@ export default function EmiCalculator() {
             </div>
           </div>
 
-          {/* Year-wise breakup */}
           {schedule.length > 0 && (
             <div className="mt-8 reveal">
               <button type="button" onClick={() => setShowSchedule((s) => !s)} aria-expanded={showSchedule} className="w-full flex items-center justify-between glass-card rounded-xl px-5 py-4 hover:border-teal-400/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40">
@@ -204,7 +195,6 @@ export default function EmiCalculator() {
             </div>
           )}
 
-          {/* Lenders */}
           <div className="mt-10 reveal">
             <h2 className="text-lg font-bold text-white mb-1">{t('misc1.emiCompareRates')}</h2>
             <p className="text-gray-400 text-xs mb-4">{t('misc1.emiTapToApply')}</p>

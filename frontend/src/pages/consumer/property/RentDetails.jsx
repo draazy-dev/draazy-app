@@ -21,7 +21,6 @@ export function RentDetails({ p }) {
   const isLand = propertyKind(p) === 'land';
   const isCommercial = propertyKind(p) === 'commercial';
 
-  // "None" is a term the owner agreed to; silence is not.
   const monthsLabel = (m) => {
     if (m == null || m === '') return tr('property.notSpecified');
     const n = Number(m) || 0;
@@ -31,7 +30,6 @@ export function RentDetails({ p }) {
   const rent = toNum(p.price);
   const hasDeposit = p.deposit != null && p.deposit !== '' && toNum(p.deposit) > 0;
   const deposit = hasDeposit ? toNum(p.deposit) : null;
-  /* Only charge extra when the owner said so. */
   const maintExtra = p.rentMaintMode === 'extra' ? toNum(p.rentMaintenance) : 0;
   const camPerSqft = toNum(p.camCharges);
   const maintLabel = isCommercial
@@ -45,7 +43,6 @@ export function RentDetails({ p }) {
 
   const available = availableLabel(tr, p);
   const furnishing = tr('property.rentFurnishing.' + (['furnished', 'semi', 'unfurnished'].includes(p.furnishing) ? p.furnishing : 'semi'));
-  /* Filtered to the profile's valid options so a stale cross-profile pick never shows. */
   const commercialFitOut = () => {
     const opts = fixturesFor(commercialProfileFromType(p.commercialType || p.type));
     const declared = [
@@ -79,8 +76,6 @@ export function RentDetails({ p }) {
     ? tr('property.notSpecified')
     : p.agreementDuration === 'long' ? tr('property.longTerm') : monthsLabel(p.agreementDuration);
 
-  // Residential listings only: the locality figure is the average rent of its live listings (null below 3),
-  // shown as context, not a verdict, because homes of different sizes are mixed in it.
   const loc = useLocalityStats(p);
   const avgRent = isResidential ? loc?.avgRent : null;
 

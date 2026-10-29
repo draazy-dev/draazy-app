@@ -58,7 +58,6 @@ const DETAIL_FIELDS = [
   ['homeSize', 'Home size'],
 ];
 
-/** Named, scalar, non-empty `details` entries only — see `DETAIL_FIELDS`. */
 function detailRows(details) {
   const d = details || {};
   return DETAIL_FIELDS
@@ -71,8 +70,6 @@ function detailRows(details) {
 
 const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 
-/** One service desk's queue (legal, interior, packers, valuation). Rent agreements have their own
- *  case view in `rent-agreement/`; home loans are tickets on `AdminServices`. */
 export default function OpsDraftingDesk({ desk }) {
   const { toast } = useToast();
   const [tab, setTab] = useTabParam(TAB_KEYS, 'pickup');
@@ -86,7 +83,6 @@ export default function OpsDraftingDesk({ desk }) {
     setPage(1);
   }
 
-  // `null` on failure, so a tab count is omitted rather than reading "0".
   const [summary, setSummary] = useState(null);
   const tickets = useDeskTickets(summary?.openTickets);
   const summarySeq = useRef(0);
@@ -137,8 +133,6 @@ export default function OpsDraftingDesk({ desk }) {
     setChecklistStatus('loading');
     readServiceRequestChecklist(detailId)
       .then((res) => { if (live) { setChecklist(res); setChecklistStatus('ready'); } })
-      /* Not `{ items: [] }`. A failed read rendered as an empty checklist tells a desk the customer
-         has sent nothing, which is how somebody ends up chasing documents that are already filed. */
       .catch(() => { if (live) { setChecklist(null); setChecklistStatus('error'); } });
     return () => { live = false; };
   }, [detailId]);
@@ -154,7 +148,6 @@ export default function OpsDraftingDesk({ desk }) {
     setTarget(row);
   };
 
-  // The open request is held as an object, so a change that moves it to another tab leaves the modal put.
   const applyUpdate = (updated) => {
     if (!updated) return;
     setDetail((d) => (d?.id === updated.id ? updated : d));
@@ -176,7 +169,6 @@ export default function OpsDraftingDesk({ desk }) {
       applyUpdate(updated);
       toast('This request is now yours. The customer can see the change.', 'success');
     } catch (err) {
-      // A 409 names either the colleague holding the matter or the move the transition table needs.
       toast(err?.message || 'That request could not be taken.', 'error');
     } finally {
       busy.current = false;
@@ -336,7 +328,6 @@ export default function OpsDraftingDesk({ desk }) {
               )}
             </dl>
 
-            {/* Read-only by design: the server folds this checklist from service metadata. */}
             <DocumentChecklist
               request={detail}
               checklist={checklist}

@@ -1,6 +1,3 @@
-/* Centralized status enums — prevents typos and enables IDE autocomplete.
-   Use these constants instead of raw strings when comparing statuses. */
-
 export const VISIT_STATUS = {
   SCHEDULED: 'scheduled',
   CONFIRMED: 'confirmed',

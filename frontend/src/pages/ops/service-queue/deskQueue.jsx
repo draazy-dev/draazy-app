@@ -3,7 +3,6 @@ import { Clock } from 'lucide-react';
 import { listServiceRequestQueue } from '../../../services/serviceRequestService.js';
 import { classNames, fmtNum } from '../../../lib/format.js';
 
-// Mirrors the server's IN_PROGRESS_STATUSES, so a tab lists exactly what its queue-summary count tallies.
 const DESK_TURN = 'assigned,in-progress,changes-requested,approved';
 
 export const stageTabs = (noun) => [
@@ -14,7 +13,6 @@ export const stageTabs = (noun) => [
   { key: 'closed', label: 'Closed', query: { status: 'completed,cancelled' }, count: (s) => s.closed, empty: `No closed ${noun}s yet.` },
 ];
 
-// `stale` keeps the last page on screen but inert until the newer query answers.
 export function useQueue(query, reloadToken) {
   const key = JSON.stringify(query);
   const [state, setState] = useState({ page: null, failed: false, key: null });

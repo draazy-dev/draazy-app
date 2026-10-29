@@ -14,7 +14,6 @@ import { CaptureScreen, PhoneHandoffScreen, ReviewScreen, StartScreen, VerifyShe
 import StatusScreen from '../../components/verify-identity/StatusScreen.jsx';
 import usePreviewStore from '../../components/verify-identity/usePreviewStore.js';
 
-/* Measured from the last sign of progress, so somebody simply taking their time is never waved through. */
 const SELFIE_POSES = ['smile', 'left', 'right'];
 
 const LIVENESS_STALL_MS = 8000;
@@ -22,8 +21,6 @@ const STEP_INDEX = { start: 0, capture: 1, review: 2, status: 3 };
 
 const randomSelfiePose = () => SELFIE_POSES[Math.floor(Math.random() * SELFIE_POSES.length)];
 
-  /* `healStaleShell` normally reloads out from under this sentence; it is written for the case where that is refused
-     — an offline device, or a tab that already reloaded once and still failed. */
 function submitFailureMessage(error, t) {
   const code = String(error?.code || '').toLowerCase();
   if (error?.code === PROVIDER_LOAD_FAILED) {
@@ -40,8 +37,6 @@ function submitFailureMessage(error, t) {
   if (error.status >= 500) {
     return t('verifyIdentity.errors.server', { reference: error.traceId ? t('verifyIdentity.errors.reference', { traceId: error.traceId }) : '' });
   }
-/* What the badge ACTUALLY does here, taken from the code that implements it rather than from a competitor's
-   marketing. */
   const codeKey = {
     identity_already_registered: 'alreadyRegistered',
     identity_dispute_open: 'disputeOpen',
@@ -75,8 +70,6 @@ export default function VerifyIdentity() {
   const [selfieNoticeKey, setSelfieNoticeKey] = useState('');
   const [selfieChallenge, setSelfieChallenge] = useState({ pose: 'smile', token: null, expiresAt: null });
   const [selfieStage, setSelfieStage] = useState(0);
-  // Two separate reasons the stages may be unenforceable, kept apart because they say different
-  // things to the user: the model never loaded, or it loaded and cannot read this face in time.
   const [guidanceOff, setGuidanceOff] = useState(false);
   const [stagesBypassed, setStagesBypassed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -124,8 +117,6 @@ export default function VerifyIdentity() {
   useEffect(() => () => {
     stopCameraStream(streamRef.current);
   }, []);
-  // The liveness loop reads the stage through a ref: keeping it in the camera effect's deps
-  // would tear the stream down and restart it every time a stage completed.
 
   useEffect(() => {
     selfieStageRef.current = selfieStage;
@@ -150,8 +141,6 @@ export default function VerifyIdentity() {
     async function boot() {
       try {
         setCameraError('');
-        // A document keeps only the guide rectangle, so ask for the largest frame available; a
-        // selfie is judged on geometry, and a smaller frame keeps the landmarker loop responsive.
         const isSelfie = activeFrame === 'selfie';
         const stream = await startCameraStream(isSelfie
           ? { facingMode: 'user' }
@@ -167,8 +156,6 @@ export default function VerifyIdentity() {
           await videoRef.current.play();
           if (cancelled) return;
         }
-              // Past the last stage there is nothing left to ask for, and re-reading would let a
-              // dropped pose walk the counter back below the gate the user already cleared.
         if (isSelfie) {
           await bootSelfieGuidance();
           return;
@@ -321,7 +308,6 @@ export default function VerifyIdentity() {
       clearCaptures();
       setStep('status');
     } catch (error) {
-      // Set the message FIRST: if a reload starts, it is never read; if the heal is refused, it is.
       const code = String(error?.code || '').toLowerCase();
       if (code === 'identity_challenge_invalid') {
         resetCapture('selfie');
@@ -393,8 +379,6 @@ export default function VerifyIdentity() {
     setStep('start');
   }
 
-    // Leaving is all that remains once a case is pending or verified. A rejected retry restarts at
-    // consent: `consented` is component state and the server refuses a submission without it.
   function retake(frame) {
     retakeReviewRef.current = step === 'review';
     resetCapture(frame);
@@ -417,8 +401,6 @@ export default function VerifyIdentity() {
 
   const clearedStages = Math.min(selfieStage, selfieStages.length);
   const livenessDone = clearedStages >= selfieStages.length;
-  // The stages are a precondition only while they can be cleared: if the model never loaded or has
-  // had its grace period, holding the button hostage strands the user rather than protecting anyone.
   const livenessUnenforceable = guidanceOff || stagesBypassed;
   const liveness = {
     done: livenessDone,
@@ -452,7 +434,6 @@ export default function VerifyIdentity() {
     );
   }
 
-  // After the status card: reading a decision or appealing it needs no camera, only a new capture does.
   if (needsPhone) {
     return (
       <VerifyShell title={t('verifyIdentity.shell.verifyTitle')} stepIndex={STEP_INDEX.start} onClose={leave}>
@@ -485,8 +466,6 @@ export default function VerifyIdentity() {
     );
   }
 
-/* Square rather than a gradient circle: the thing being earned is a stamp on a record, and a glowing orb is the shape
-   every onboarding screen already uses. */
   if (step === 'capture') {
     return (
       <VerifyShell title={activeFrame === 'selfie' ? t('verifyIdentity.capture.selfieTitle') : t(`verifyIdentity.documents.${currentDoc.key}.label`)} stepIndex={STEP_INDEX.capture} onBack={() => setStep('start')} onClose={leave}>

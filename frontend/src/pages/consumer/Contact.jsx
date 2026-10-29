@@ -32,14 +32,10 @@ export default function Contact() {
   const [params] = useSearchParams();
   const subj = params.get('subject');
   const ref = params.get('ref');
-  // `?ref=<id>` names the listing the enquiry is about, so look it up to label the form and prefill
-  // it. `refListing` is null on the first pass, which downstream copes with — `?ref=` is optional.
 
   const [refListing, setRefListing] = useState(null);
   useEffect(() => {
     if (!ref) { setRefListing(null); return undefined; }
-    // A `?ref=` that has been changed while a lookup is in flight must not be overwritten by the
-    // answer to the old one.
     let current = true;
     getProperty(ref)
       .then((p) => { if (current) setRefListing(p || null); })
@@ -60,8 +56,6 @@ export default function Contact() {
           : ''
       }${refListing.id ? ` (Ref: ${refListing.id})` : ''}.`
     : '';
-  // Direct-contact owner is only meaningful when an actual listing is referenced.
-  // Otherwise this is a general support page and we must not invent a phantom owner.
 
   const owner = refListing
     ? {
@@ -83,8 +77,6 @@ export default function Contact() {
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
   const formRef = useRef(null);
   const err = useFieldErrors(formRef);
-  /* The lookup lands after the user may already be typing, so the prefill only writes a field it would not be
-     overwriting, and keys on the derived strings rather than on `refListing`. */
 
   useEffect(() => {
     setForm((prev) => {
@@ -174,8 +166,6 @@ export default function Contact() {
                   <textarea id="ct-msg" value={form.msg} onChange={(e) => { set('msg', e.target.value); err.clear('msg'); }} rows={4} placeholder={t('misc1.contactMsgPlaceholder')} className={fld + ' resize-none' + err.cx('msg')} data-err="msg" />
                   <FieldError show={err.has('msg')}>{err.msg('msg')}</FieldError>
                 </div>
-              {/* The tap target is the label, not the box: a single line of text-xs is an ~18px hit area on a consent
-                 control. */}
               </div>
               <label className="tap-target sm:min-h-0 sm:min-w-0 flex items-center gap-2.5 mt-4 cursor-pointer">
                 <input type="checkbox" defaultChecked className="accent-teal-500 w-4 h-4" />
@@ -187,9 +177,6 @@ export default function Contact() {
                 <button onClick={send} disabled={sending} className="btn-teal w-full mt-5 py-3.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">{sending ? <><Icon name="loader-2" className="w-4 h-4 animate-spin" /> {t('misc1.contactSending')}</> : <><Icon name="send" className="w-4 h-4" /> {t('misc1.contactSendBtn')}</>}</button>
               )}
             </div>
-            {/* On mobile the rail sits above the form so the fast paths are the first thing a thumb reaches; desktop
-               keeps it on the right. */}
-
             <div className="space-y-4 reveal order-1 lg:order-2">
               {owner ? (
                 <div className="glass-card rounded-2xl p-6">
@@ -246,8 +233,6 @@ export default function Contact() {
           </div>
         </div>
       </div>
-      {/* Sticky mobile quick-contact bar — Draazy support (not the gated owner number). */}
-
       <div className="dz-sticky-cta lg:hidden" role="navigation" aria-label="Quick contact support">
         <a href={SUPPORT_TEL} className="btn-teal flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold py-3 px-4 focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink"><Icon name="phone" className="w-4 h-4" /> {t('misc1.contactCall')}</a>
         <a href={WA_SUPPORT} target="_blank" rel="noopener noreferrer" className="h-btn flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold px-4 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-ink"><Icon name="message-circle" className="w-4 h-4" /> {t('misc1.contactWhatsappShort')}</a>

@@ -9,8 +9,6 @@ import { propertyKind } from './derivations.js';
 import { valueBenchmark } from './locationIntel.js';
 import { useLocalityStats } from './useLocalityStats.js';
 
-/* Answers the two questions a serious buyer has on a sale: is this price fair (benchmark
- * ₹/sq.ft against the locality's live listings), and what will it actually cost (EMI plus the stamp duty. */
 export function PriceInsights({ p }) {
   const { t } = useTranslation();
   const [dp, setDp] = useState(20);
@@ -157,7 +155,6 @@ export function PriceInsights({ p }) {
           {costTile('tag', t('property.priceNegotiability'), negotiable)}
         </div>
 
-        {/* Without the rent in place and the date the lease runs to, an investor can compute neither. */}
         {isCommercial ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2.5">
             {costTile('key-round', t('property.tenancyStatus'), tenancyLabel)}
@@ -167,8 +164,6 @@ export function PriceInsights({ p }) {
         ) : null}
       </div>
 
-      {/* Collapsed on phones: the all-in figure already sits in the header, so the cost tiles stay one tap away. */}
-      {/* Collapsed on phones with the EMI itself as the summary, so the answer is visible without the sliders. */}
       <MobileCollapse
         className="glass rounded-2xl p-6 sm:p-8 mt-6"
         header={(

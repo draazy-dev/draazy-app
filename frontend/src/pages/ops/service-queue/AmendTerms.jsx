@@ -15,7 +15,6 @@ function Owed({ delta }) {
   return <>The fee does not change.</>;
 }
 
-/** The desk re-prices a paid rent agreement; the customer accepts (and pays any difference) before drafting goes on. */
 export default function AmendTerms({ request, onUpdated }) {
   const titleId = useId();
   const { toast } = useToast();

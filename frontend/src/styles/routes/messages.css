@@ -779,8 +779,6 @@
   border-color: var(--teal-2);
   box-shadow: 0 0 0 3px rgb(var(--dz-c-teal-500) / .12);
 }
-
-/* Under 16px, iOS Safari zooms the page on focus. */
 @media (pointer: coarse), (max-width: 767px) {
   .pc-input { font-size: 16px; }
 }

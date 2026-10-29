@@ -1,10 +1,6 @@
-/* Locality insights page and its EmergingPanel; every rule is .loc-page-scoped. */
 .loc-page .field {
   transition: all .25s ease;
 }
-
-/* Tab-panel content is user-triggered, not scroll-triggered: keep it visible
-   immediately (scroll-reveal never fires for panels swapped in below the fold). */
 .loc-page [role="tabpanel"] .reveal {
   opacity: 1;
   transform: none;

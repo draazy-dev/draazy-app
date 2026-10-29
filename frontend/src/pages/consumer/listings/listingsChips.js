@@ -18,12 +18,9 @@ import { COMMERCIAL_TYPES } from '../../../data/propertyTypes.js';
 import { sectionVisible, VERIF_SECTIONS } from '../../../lib/listings/filterRelevance.js';
 import { areaProfileForTypes, defaultAreaRangeSqft, formatAreaRange, isDefaultAreaRange } from '../../../lib/listings/areaUnits.js';
 
-// Removable "active filter" chips, each carrying a `remove()` that unsets exactly its own filter.
-// Pure over `(f, helpers)`, so the same filter state always produces the same chips.
 export function buildActiveChips(f, { tr, locNameBySlug, socNameBySlug, setF, set, freeText, clearFreeText }) {
   const rent = f.deal === 'rent';
   const relc = (s) => sectionVisible(s, f.types);
-  // A range's ceiling is sent open-ended (facetQuery `bounds`), so its label must read "and above".
   const upTo = (label, v, max) => label + (v === max ? '+' : '');
   const TYPE_LBL = Object.fromEntries(rent ? RENT_TYPES : BUY_TYPES);
   const BHK_LBL = Object.fromEntries(rent ? BHK_RENT : BHK_BUY);
@@ -47,7 +44,6 @@ export function buildActiveChips(f, { tr, locNameBySlug, socNameBySlug, setF, se
   });
   const setVerif = (k) => setF((prev) => ({ ...prev, verified: { ...prev.verified, [k]: false } }));
   const chips = [];
-  /* First, because it is the coarsest cut. */
   if (freeText) chips.push({ id: 'q', label: tr('listings.chipFreeText', { text: freeText }), remove: clearFreeText });
   [...f.types].forEach((v) => chips.push({ id: 'type-' + v, label: TYPE_LBL[v] || v, remove: () => delType(v) }));
   if (f.types.has('commercial')) [...f.commercialTypes].forEach((v) => chips.push({ id: 'ctype-' + v, label: CTYPE_LBL[v] || v, remove: () => delFrom('commercialTypes', v) }));

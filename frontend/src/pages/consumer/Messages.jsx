@@ -27,12 +27,10 @@ import { useRequestThreads } from './messages/useRequestThreads.js';
 import { targetSlug } from './requests/requestMeta.js';
 import { useRequestActions } from './requests/useRequestActions.js';
 
-// Canned openers keep a cold thread moving — the questions buyers actually ask.
 const INBOX_POLL_MS = 60000;
 const THREAD_FALLBACK_POLL_MS = 4000;
 const INBOX_FALLBACK_POLL_MS = 30000;
 const clientId = () => `c${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
-// Staged chats and request threads exist only in this browser, so the conversation endpoints don't know them.
 const isLocalId = (id) => /^(staged|request):/.test(String(id || ''));
 const mergeMessages = (serverMessages = [], localMessages = []) => {
   const serverClientIds = new Set(serverMessages.map((m) => m.clientId).filter(Boolean));
@@ -43,8 +41,6 @@ const mergeMessages = (serverMessages = [], localMessages = []) => {
 export default function Messages() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  /* No canned auto-reply or typing dots: the other end is a real person, so fabricating a reply from them would put
-     words in their mouth, and the message would not exist on their device. */
   const { user } = useAuth();
   const { refresh: refreshChatBadge, streamConnected, subscribe } = useConversationUnread();
   const [convs, setConvs] = useState([]);
@@ -79,12 +75,10 @@ export default function Messages() {
   activeIdRef.current = activeId;
   const typingUntil = active ? typing[active.id] || 0 : 0;
 
-  /* Optimistic local update. */
   const patchConv = useCallback((id, fn) => {
     setConvs((cur) => cur.map((c) => (c.id === id ? fn(c) : c)));
   }, []);
 
-  /** Re-read from whichever provider is active, and keep the navbar badge in step. */
   const reload = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) { setLoading(true); setError(null); }
     try {
@@ -93,7 +87,6 @@ export default function Messages() {
       setConvs((cur) => list.map((next) => {
         const old = cur.find((c) => c.id === next.id);
         if (!old) return next;
-        // The inbox row carries no number or presence; keep what the thread read last brought.
         return {
           ...old,
           ...next,
@@ -108,7 +101,6 @@ export default function Messages() {
       setOffline(false);
       flushQueueRef.current();
       const unreadTotal = list.reduce((sum, c) => sum + (c.unread || 0), 0);
-      // The badge was read at sign-in and the stream keeps it current; only a changed inbox can find it stale.
       if (!firstLoad && unreadTotal !== inboxUnread.current) refreshChatBadge();
       inboxUnread.current = unreadTotal;
       return list;
@@ -137,7 +129,6 @@ export default function Messages() {
       .catch(() => {});
   }, [patchConv, refreshChatBadge]);
 
-  /* Load the inbox, having first tried to send anything staged. */
   useEffect(() => { reload().catch(() => {}); }, [reload]);
 
   const requestActions = useRequestActions({ inbox: requestInbox, toast, onChanged: () => reload({ quiet: true }).catch(() => {}) });
@@ -154,7 +145,6 @@ export default function Messages() {
     return () => window.removeEventListener('resize', resize);
   }, []);
 
-  // Mobile: opening a thread pushes a history entry so the back button collapses to the list.
   useEffect(() => {
     const onPop = (event) => {
       if (!event.state?.pcThread) setShowThread(false);
@@ -163,8 +153,6 @@ export default function Messages() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  // With the stream up, the inbox poll is a backstop for events published on another instance; it
-  // re-reads the open thread only when its row moved.
   useEffect(() => {
     const timer = setInterval(() => {
       if (document.hidden) return;
@@ -203,14 +191,11 @@ export default function Messages() {
     return () => window.clearTimeout(timer);
   }, [activeId, typingUntil]);
 
-  // A link to `?c=` can land while this page is already mounted, e.g. right after accepting a request.
   useEffect(() => {
     autoOpened.current = false;
     if (wantId && loadedRef.current && !isLocalId(wantId)) reload({ quiet: true }).catch(() => {});
   }, [openProp, reload, wantId]);
 
-  // A request thread goes away once it is decided or cleared; don't leave a blank pane open. Declared before the
-  // auto-open below so that, when an accepted request turns into its chat, the chat open wins.
   useEffect(() => {
     if (!String(activeId || '').startsWith('request:') || threads.some((c) => c.id === activeId)) return;
     setActiveId(null);
@@ -218,8 +203,6 @@ export default function Messages() {
     if (window.history.state?.pcThread) window.history.back();
   }, [activeId, threads]);
 
-  // Desktop auto-opens the first thread once; `?c=<id>` or `?openProp=<propertyId>` opens that one on any width.
-  // Waits for both lists, or an accepted request could open before the chat that replaces it has loaded.
   const sentStatus = requestInbox.boxes.sent.status;
   useEffect(() => {
     if (loading || sentStatus === 'loading' || (!convs.length && !threads.length)) return;
@@ -245,7 +228,6 @@ export default function Messages() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-open only follows list and link changes
   }, [convs.length, threads.length, wantId, openProp, loading, sentStatus]);
 
-  // Optimistic: the badge clears on tap; `hydrate` posts the read only when the thread had unread.
   const openConv = (id, opts = {}) => {
     if (opts.report) setReportOpen(true);
     patchConv(id, (c) => ({ ...c, unread: 0 }));
@@ -299,7 +281,6 @@ export default function Messages() {
   useEffect(() => {
     const onOnline = () => { setOffline(false); flushQueue(); reload({ quiet: true }).catch(() => {}); };
     const onOffline = () => setOffline(true);
-    // Returning to the tab fires both focus and visibilitychange; one re-read answers both.
     const onVisible = () => {
       if (document.hidden || Date.now() - lastWake.current < 1000) return;
       lastWake.current = Date.now();
@@ -325,8 +306,6 @@ export default function Messages() {
     if (!body) return;
     const id = retryId || clientId();
     const at = Date.now();
-    // Paint the bubble first; the request follows. A failed send re-reads the thread, so the
-    // message disappears rather than sitting there looking delivered.
     if (!retryId) {
       const optimistic = { id: `client:${id}`, clientId: id, from: 'me', text: body, at, read: false, pending: true, replyTo: replyTo ? { id: replyTo.id, body: replyTo.text, author: replyTo.author } : null };
       patchConv(active.id, (c) => ({ ...c, at, lastMessage: body, messages: [...c.messages, optimistic] }));
@@ -365,8 +344,6 @@ export default function Messages() {
       markFailed(active.id, id, message);
     });
   };
-    // "Propose a visit" routes into the real scheduling flow when it's enabled,
-    // instead of posting a fake fixed-time card.
 
   const sendPhoto = ({ file, caption = '', previewUrl, retry } = {}) => {
     if (!active || active.staged || active.blocked || active.listingDeleted || !file) return;
@@ -375,8 +352,6 @@ export default function Messages() {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       return;
     }
-    // The wire has no attachment or card type — `MessageCreate` carries `body` alone — so a share chip sends its text
-    // and the icon is a local decoration. The recipient sees the sentence.
     setSendError('');
     const id = retry?.clientId || clientId();
     const url = previewUrl || retry?.photoPreviewUrl || URL.createObjectURL(file);
@@ -439,8 +414,6 @@ export default function Messages() {
     photoUrls.current.clear();
   }, []);
 
-  // The reveal is a gate read, so it lands after render. It starts closed and only ever opens, which is the safe
-  // direction: a thread briefly showing a masked number is a cosmetic delay.
   const wrapCls = 'pc-wrap' + (narrow ? ' is-narrow' : '') + (showThread ? ' show-thread' : '');
   const closeThread = () => { setShowThread(false); if (window.history.state?.pcThread) window.history.back(); };
 

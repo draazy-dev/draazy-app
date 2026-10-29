@@ -6,7 +6,6 @@ import { fmt } from './helpers.js';
 
 export default function ReadyToPayPanel({ request, onPay, busy, unconfirmed }) {
   const { t } = useTranslation();
-  // Asked again here: a co-filled deed carries the other side's answers, which the review-step tick never covered.
   const coFilled = (request.parties || []).find((p) => p.status === 'accepted');
   const [declare, setDeclare] = useState(false);
   return (

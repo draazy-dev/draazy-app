@@ -38,8 +38,6 @@ function initialApproval(detail) {
   };
 }
 
-/* Every decision for the open case lives here, in the order a reviewer meets them. The server is the
-   gate for claim and own-case checks; these checks only stop a request that would be refused. */
 export default function KycActionRail({ detail, kase, user, canWrite, checklistLeft, poseConfirmed, onSettled }) {
   const [mode, setMode] = useState('approve');
   const [approval, setApproval] = useState(() => initialApproval(detail));

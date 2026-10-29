@@ -1,18 +1,9 @@
-/* `propertyIdentity.js` and `flatmates.js` must derive their dedup fingerprints from these exact
-   primitives. Kept dependency-free so it unit-tests in pure Node. */
-
-/* Strip everything but digits — used for phone/meter/pincode comparisons. */
 export const digits = (m) => String(m || '').replace(/\D/g, '');
 
-/* Trim, lowercase, and collapse internal whitespace so "  Skyline   Heights "
-   and "skyline heights" normalise to one token. */
 export const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-/* A pincode is only meaningful when it is a full 6-digit Indian PIN. */
 export const pin = (p) => (digits(p).length === 6 ? digits(p) : '');
 
-/* Stable, non-reversible token (FNV-1a), so a dedup key derived from a private identifier
-   (electricity meter / tax number) can be stored without persisting the raw value. */
 export const hashToken = (s) => {
   const str = String(s);
   let h = 0x811c9dc5;

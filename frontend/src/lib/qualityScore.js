@@ -1,8 +1,6 @@
 
-/* A list row carries counts instead of the gallery, description and amenity list. */
 const photosOf = (l) => l.photoCount ?? ((l.gallery && l.gallery.length) || (l.image ? 1 : 0));
 
-/* `label` is the English band name for untranslated chips; `labelKey` is the i18n key for the same band. */
 export function qualityColor(score) {
   if (score >= 80) return { ring: 'text-emerald-400', bg: 'bg-emerald-500/15', text: 'text-emerald-300', label: 'Excellent', labelKey: 'ui.qualityExcellent' };
   if (score >= 50) return { ring: 'text-amber-400', bg: 'bg-amber-500/15', text: 'text-amber-300', label: 'Good', labelKey: 'ui.qualityGood' };

@@ -15,8 +15,6 @@ import { normalizeVibe } from '../../../lib/flatmates/filterState.js';
 import { inr, BUDGET_MIN, BUDGET_MAX, budgetIsAny, isDateVal, todayIso } from './helpers.js';
 import { TAB_MOVE_IN, TAB_PEOPLE, TAB_TEAMS } from './model.js';
 
-// One labelled cell. `className` lets a cell claim explicit grid placement (Near-a-place owns the
-// tall right column).
 function Field({ label, children, className = '' }) {
   return (
     <div className={'min-w-0 ' + className}>
@@ -26,19 +24,14 @@ function Field({ label, children, className = '' }) {
   );
 }
 
-/* Mobile gets the collapsible `FilterGroup`, desktop plain cells. */
 function Section({ sheet, icon, label, summary, className, children }) {
   if (!sheet) return <Field label={label} className={className}>{children}</Field>;
   return <FilterGroup icon={icon} title={label} summary={summary}>{children}</FilterGroup>;
 }
 
-// Only the filters that affect the active tab are rendered: a control that silently does nothing
-// erodes trust. Layout (grid vs sheet) is owned by the parent.
 function FilterControls({ filters, setF, seg, budgetLbl, genderLabel, tab, variant = 'grid' }) {
   const { t } = useTranslation();
   const sheet = variant === 'sheet';
-  // Move-in applies to both feeds (a room has a date, so does a seeker), while flat size is a
-  // "people" question and an attached bathroom is a "place" one.
   const showMoveIn = true;
   const showSharing = tab === TAB_TEAMS;
   const showBath = tab === TAB_MOVE_IN;
@@ -52,12 +45,8 @@ function FilterControls({ filters, setF, seg, budgetLbl, genderLabel, tab, varia
   const summaries = {
     budget: budgetIsAny(filters.budget) ? '' : budgetLbl,
     locality: filters.locality,
-    // `nearMode` is '' until the user picks one and NearPlaceField reads that as 'km',
-    // so test for 'min' — testing for 'km' would label an untouched radius in minutes.
     near: filters.near ? `${filters.nearLabel || t('flatmates.fNearPlace')} · ${filters.nearRadius} ${filters.nearMode === 'min' ? t('flatmates.unitMin') : t('flatmates.unitKm')}` : '',
     moveIn: filters.moveIn === 'now' ? t('flatmates.immediate') : isDateVal(filters.moveIn) ? filters.moveIn : '',
-    /* Empty at the default, NOT the label of the default button: "Everyone" is right on a pill you choose from, but
-       as a read-out it claims a filter is set and lights the narrowing tint. */
     gender: !filters.gender ? '' : showHomeOnly && filters.genderOnly ? homeOnlyLabel : labelOf(genderOptions, filters.gender),
     roomType: labelOf(roomTypes, filters.roomType),
     furnishing: labelOf(furnishings, filters.furnishing),
@@ -118,7 +107,6 @@ function FilterControls({ filters, setF, seg, budgetLbl, genderLabel, tab, varia
       )}
       <Section sheet={sheet} icon="users-round" label={genderLabel} summary={summaries.gender}>
 
-        {/* `aria-pressed` so the selected option is announced, not just tinted by `seg()`. */}
         <div className="flex flex-wrap gap-2">
           {genderOptions.map(([g, label]) => <button key={label} onClick={() => setF(g ? { gender: g } : { gender: g, genderOnly: false })} aria-pressed={filters.gender === g} className={seg(filters.gender === g)}>{label}</button>)}
           {showHomeOnly && <button type="button" onClick={() => setF({ genderOnly: !filters.genderOnly })} aria-pressed={filters.genderOnly} className={seg(filters.genderOnly) + ' inline-flex items-center gap-1.5'}><Icon name={filters.gender === 'male' ? 'mars' : 'venus'} className="w-3.5 h-3.5" /> {homeOnlyLabel}</button>}
@@ -223,8 +211,6 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
     return Array.isArray(def) ? filters[k].length > 0 : filters[k] !== def;
   }).length;
   const fieldProps = { filters, setF, seg, budgetLbl, genderLabel, tab };
-  /* Collapsed so inventory clears the fold, but opened when a filter is already set — hiding
-   * the cause of a narrowed list is worse than the scroll. */
   const [showFilters, setShowFilters] = useState(() => activeCount > 0);
   return (
     <>
@@ -238,8 +224,6 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
               <Icon name="sparkles" className="w-4 h-4 text-teal-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input ref={qInputRef} value={qDraft} onChange={(e) => { sawSmartLoadingRef.current = false; setSmartClearPending(false); setQDraft(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) submitSmartSearch(); }} type="text" enterKeyHint="search" aria-label={t('flatmates.smartSearch')} className="sf-search-field field w-full rounded-full pl-9 pr-12 lg:pr-4 h-11 lg:h-10 text-sm" placeholder={t('flatmates.searchPlaceholder')} />
 
-              {/* Size comes from INSET, never a height: on a 44px bar that is a 36px circle and it stays circular by
-                 construction. */}
               <button type="button" onClick={submitSmartSearch} aria-label={t('flatmates.smartSearch')} className="sf-search-go tap-extend lg:hidden absolute top-1 bottom-1 right-1 w-9 rounded-full btn-primary flex items-center justify-center"><Icon name="search" className="w-4 h-4" /></button>
             </div>
             <div className="hidden lg:flex shrink-0">
@@ -248,7 +232,6 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
           </div>
           <div className="flex items-center gap-2 shrink-0 lg:contents">
 
-            {/* Mobile's Filters trigger is not here — it is the floating capsule below. */}
             <div className="sf-seg ml-auto">
               <button type="button" onClick={() => setViewMode('list')} className={'sf-seg__btn' + (viewMode === 'list' ? ' is-active' : '')} aria-pressed={viewMode === 'list'}><Icon name="list" className="w-4 h-4" /> <span className="max-sm:sr-only">{t('flatmates.viewList')}</span></button>
               <button type="button" onClick={() => setViewMode('map')} className={'sf-seg__btn' + (viewMode === 'map' ? ' is-active' : '')} aria-pressed={viewMode === 'map'}><Icon name="map" className="w-4 h-4" /> <span className="max-sm:sr-only">{t('flatmates.viewMap')}</span></button>
@@ -276,7 +259,6 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
         </div>
       </div>
 
-      {/* `aria-expanded`: the drawer leaves it focusable. */}
       <button
         type="button"
         onClick={() => setDrawer(true)}

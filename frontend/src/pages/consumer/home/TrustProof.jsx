@@ -3,9 +3,6 @@ import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 import { STATS } from '../../../data/homeData.js';
 
-/* One component for both surfaces because no CSS `order` moves a block across a section boundary, and these
-   sit in the hero on desktop but below the Featured rail on mobile. Only one instance shows at any width. */
-
 const CHIPS = [
   { icon: 'phone-off', key: 'trustNoSpam', tone: 'bg-teal-500/10 border-teal-500/25 text-teal-300', ink: 'text-teal-300', dot: 'bg-teal-400/15 text-teal-300' },
   { icon: 'user-check', key: 'trustOwners', tone: 'bg-teal-500/10 border-teal-500/25 text-teal-300', ink: 'text-teal-300', dot: 'bg-teal-400/15 text-teal-300' },
@@ -13,7 +10,6 @@ const CHIPS = [
   { icon: 'badge-check', key: 'trustAssured', to: '/how-verification-works', tone: 'bg-amber-500/10 border-amber-500/25 text-amber-300', ink: 'text-amber-300', dot: 'bg-amber-400/15 text-amber-300' },
 ];
 
-/* The extension keeps the link's 44px target without growing the chip row, which is budgeted to the fold. */
 function Label({ to, children }) {
   const cls = 'text-[12px] font-semibold leading-tight text-gray-200';
   return to
@@ -21,8 +17,6 @@ function Label({ to, children }) {
     : <span className={cls}>{children}</span>;
 }
 
-/* `compact` is the mobile hero layout: a checklist, not boxes, because pills read as scatter and a ruled
-   2x2 as a heavy table. Colour lives only in the icon discs so the four labels read as one list. */
 export function TrustChips({ className = '', compact = false }) {
   const { t } = useTranslation();
   if (compact) {
@@ -72,8 +66,6 @@ export function HeroStats({ className = '' }) {
   );
 }
 
-/* The stats stay under the Featured rail because on a phone "how big is this?" only lands once real stock
-   has been seen. The trust chips are excluded: the hero carries them, and a second copy duplicates the a11y tree. */
 export default function MobileTrustProof() {
   return (
     <section className="lg:hidden relative section-pb">

@@ -1,5 +1,3 @@
-/* Shared across routes; index.css's radius-hierarchy override uses !important, so it still wins over these. */
-/* Legacy .btn-teal/.btn-outline/.dz-btn* are folded in so existing buttons inherit this system unedited. */
 .btn,
 .btn-teal,
 .btn-outline,
@@ -169,8 +167,6 @@
     background: rgb(var(--dz-c-rose-500) / .25);
   }
 }
-
-/* The OTP "send" step: the /signin card and the inline sign-in sheet share it. */
 .send-otp-btn {
   background: linear-gradient(135deg, rgb(var(--dz-c-teal-500) / .15), rgb(var(--dz-c-indigo-600) / .15));
   border: 1px solid rgb(var(--dz-c-teal-500) / .3);

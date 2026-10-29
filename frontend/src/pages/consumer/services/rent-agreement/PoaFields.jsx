@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import DateField from '../../../../components/ui/DateField.jsx';
 import Field from '../../../../components/ui/Field.jsx';
 
-// `prefix` is '' for the primary owner and `c{i}` for co-owner i, matching the validation keys.
 export default function PoaFields({ prefix, row, set, errors, clearErr, fc, today }) {
   const { t } = useTranslation();
   const text = (k, label, placeholder) => (

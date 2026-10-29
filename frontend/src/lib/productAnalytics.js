@@ -1,6 +1,5 @@
 import { CONSENT_CHANGE, hasAnalyticsConsent } from '../components/CookieConsent.jsx';
 
-// Deployed builds only: a dev server or a `VITE_DEPLOY_ENV=local` build would spend the free quota.
 const DEPLOYED = import.meta.env.PROD
   ? import.meta.env.VITE_DEPLOY_ENV !== 'local'
   : import.meta.env.VITE_POSTHOG_IN_DEV === 'on';
@@ -12,8 +11,6 @@ let replayPaused = false;
 
 const backOffice = (pathname) => /^\/(admin|ops|staff)\b/.test(pathname || '');
 
-/* Replay ignores paths and admin modals portal outside `ph-no-capture`, so entering the back office (real people's
-   records) pauses the recorder. PostHog's history patch fires this before React mounts. */
 const keepOutOfBackOffice = (posthog) => (event) => {
   const inBackOffice = backOffice(window.location.pathname);
   if (inBackOffice !== replayPaused) {
@@ -39,17 +36,13 @@ function load() {
           session_recording: {
             maskAllInputs: true,
             maskTextSelector: '*',
-            // Replay ignores the top-level flag; tel:/wa.me hrefs and titles carry owners' and leads' numbers.
             maskAllElementAttributes: true,
-            // Text masking leaves images and file inputs readable: ID documents and selfies would replay as-is.
             blockSelector: 'img, video, canvas, picture, input[type="file"]',
           },
           disable_surveys: true,
-          // /shared-documents#<token> carries a bearer credential in the fragment.
           disable_capture_url_hashes: true,
           before_send: keepOutOfBackOffice(posthog),
         });
-        // A withdrawal persists PostHog's own opt-out, which outlives a later re-grant.
         if (posthog.has_opted_out_capturing()) posthog.opt_in_capturing();
         return posthog;
       })

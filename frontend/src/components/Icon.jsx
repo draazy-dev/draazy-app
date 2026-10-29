@@ -30,7 +30,6 @@ import {
   ThumbsUp, ThumbsDown, Archive, Prohibit, DotsThreeVertical, ArrowBendUpLeft,
   WarningCircle, CloudSlash, Moon, ArrowDownLeft, ArrowUpRight, ChartPie,
 } from '@phosphor-icons/react';
-// Lucide only where Phosphor has no equivalent.
 
 import {
   WashingMachine, Microwave, AirVent, Refrigerator, ChevronDown, ChevronLeft,

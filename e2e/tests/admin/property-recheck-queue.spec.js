@@ -106,7 +106,6 @@ test('the queue holds the row the product put there, and names what changed', as
 test('the tab count is the server\u2019s own count of the queue', async ({ page, login, request }) => {
   const seeded = await queuedRecheck(request, 'counted');
 
-  // Read the queue's size from the endpoint the tab is derived from, rather than pinning a number.
   const queue = await api('GET', '/admin/properties?recheck=true&size=1', await admin());
   expect(queue.status).toBe(200);
   expect(queue.body.totalElements, 'the seeded row is not in the server queue').toBeGreaterThanOrEqual(1);

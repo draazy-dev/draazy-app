@@ -37,7 +37,6 @@ export function entrySummary(e) {
 
 export const MOD_LABEL = { flagged: 'Hidden for review', live: 'Published', approved: 'Published' };
 
-/* Same clock as the Properties desk: a pending item nobody opens escalates by colour and by a text token. */
 function Age({ since, pending }) {
   if (!since) return <span>—</span>;
   if (!pending) return <span className="tabular-nums">{fmtAgo(since)}</span>;
@@ -76,7 +75,6 @@ export default function FlatmateQueueCard({ entry, pending, onReview }) {
               <MapPin className="h-3.5 w-3.5 shrink-0 text-teal-400" aria-hidden="true" />
               <span className="min-w-0 truncate">{[s.locality, 'Pune'].filter(Boolean).join(', ')}</span>
             </p>
-            {/* A scanning aid only; the popup renders the whole text, which is what gets reviewed. */}
             {entry.post?.snippet ? <p className="mt-1.5 line-clamp-2 break-words text-xs text-gray-400">{entry.post.snippet}</p> : null}
             <dl className={classNames(GROUP, 'space-y-1.5')}>
               <FactRow label="Posted by">

@@ -66,7 +66,7 @@ test.describe('Rent Agreement — revenue flow', () => {
   });
 
   test('a draft written before the fix has its identity numbers purged on the next visit', async ({ page }) => {
-    // Every browser that used the wizard earlier still holds a PAN and an Aadhaar, and nothing else
+    // Every browser that used the wizard earlier still holds a PAN and retired fields, and nothing else
     // revisits this key — so opening the wizard must clean them off disk, not just off screen.
     await login(page, BUYER);
     await page.addInitScript(() => {

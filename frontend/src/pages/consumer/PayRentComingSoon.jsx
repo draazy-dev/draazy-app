@@ -3,9 +3,6 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
-/* Deliberately static: it calls nothing. Rent entered in Finances is a record of payments made elsewhere, never
-   claimed as collected by the platform. */
-
 const STEPS = [
   { icon: 'wallet', key: 'prCsStep1' },
   { icon: 'badge-indian-rupee', key: 'prCsStep2' },
@@ -38,8 +35,6 @@ export default function PayRentComingSoon() {
         <p className="text-gray-400 text-sm mt-2 max-w-2xl">{tr('misc.prCsSubtitle')}</p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          {/* No request, by design — so this cannot be a "notify me" button. Nothing would be
-              recorded and nobody would ever be told. It says what is coming instead. */}
           <button
             type="button"
             onClick={() => toast(tr('misc.prCsNotified'), 'success')}

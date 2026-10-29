@@ -6,8 +6,6 @@ import { SESSION_ENDED_EVENT } from '../services/http.js';
 const ToastContext = createContext(null);
 let nextId = 0;
 
-// Long enough to read a sentence, short enough that a toast raised just before a redirect has
-// faded by the time the destination is being read rather than competing with it.
 const AUTO_DISMISS_MS = 3000;
 
 const TOAST_CONFIG = {
@@ -90,7 +88,6 @@ export function ToastProvider({ children }) {
   }, []);
   const toast = useCallback(
     (message, type = 'info') => {
-      // A repeat of a message still on screen re-arms that toast instead of stacking a copy.
       const key = typeof message === 'string' ? `${type}:${message}` : null;
       const live = key && shown.current.get(key);
       const id = live || ++nextId;
@@ -110,7 +107,6 @@ export function ToastProvider({ children }) {
     return () => window.removeEventListener(SESSION_ENDED_EVENT, onEnded);
   }, [toast, t]);
 
-  // Clear any pending auto-dismiss timers on unmount so they don't fire after teardown.
   useEffect(() => {
     const map = timers.current;
     return () => {
@@ -124,8 +120,6 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {/* Top z-band, above the Draaz FAB (z-1300) and the lightbox (z-1500), and lifted clear of
-          the bottom-right Ask-Draaz button so confirmations are never hidden. */}
       <div data-testid="toasts" className="fixed bottom-24 right-5 z-[1600] flex flex-col-reverse gap-2.5 pointer-events-none">
         {toasts.map((t) => (
           <div key={t.id} className="pointer-events-auto">

@@ -1,9 +1,5 @@
-/** Route patterns, and the reducer from a real URL to one of them: telemetry stores the page class, never the
- * pathname, so `page_views` cannot become a browsing history. */
 import { matchRoutes } from 'react-router';
 
-/** Recorded when a URL matches no route. Kept as a real bucket rather than dropped: a spike here is a broken link,
- * which a traffic report could not otherwise tell you. */
 export const UNMATCHED = '/*';
 
 export const ROUTE_PATTERNS = [
@@ -97,18 +93,14 @@ export const ROUTE_PATTERNS = [
   '/view-documents/:requestId',
 ];
 
-/** Shaped for `matchRoutes`, which wants route objects rather than bare strings. */
 const ROUTE_OBJECTS = ROUTE_PATTERNS.map((path) => ({ path }));
 
-/** True for the back-office surfaces, whose page views are never collected: staff would top the visitor chart, and
- * storing then filtering would leave a staff activity log in an open table. */
 export const isBackOffice = (pattern) =>
   pattern === '/admin' || pattern === '/ops'
   || pattern.startsWith('/admin/') || pattern.startsWith('/ops/') || pattern.startsWith('/staff/');
 
 export function toRoutePattern(pathname) {
   const matches = matchRoutes(ROUTE_OBJECTS, { pathname: pathname || '/' });
-  // `matchRoutes` returns the branch root-first; the last entry is the leaf that actually rendered.
   const leaf = matches?.[matches.length - 1];
   return leaf?.route?.path || UNMATCHED;
 }

@@ -1,8 +1,6 @@
 import { Zap, ShieldCheck, ArrowRight, Clock, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-/* Counts come from `changes.instant` / `changes.recheck`, not tierA/tierB: the server re-moderates across both
-   tiers, and only `changes.remoderation` takes the listing off search. */
 export default function EditPolicyBanner({ approved, changes }) {
   const { t } = useTranslation();
   const recheck = changes?.recheck || [];
@@ -54,8 +52,6 @@ export default function EditPolicyBanner({ approved, changes }) {
               {staysLive && (
                 <p className="text-[11px] text-emerald-300/90 mt-1.5">{t('listProperty.editPolicy.staysLiveNote')}</p>
               )}
-              {/* The middle state is offline whenever re-moderation is touched, but don't imply a blackout
-                  when the listing stays in search. */}
               <div className="flex items-center gap-2 mt-3 text-[10px] font-semibold">
                 <span className="dz-tag bg-emerald-500/15 text-emerald-300"><CheckCircle2 className="w-3 h-3" /> {t('listProperty.editPolicy.live')}</span>
                 <ArrowRight className="w-3 h-3 text-gray-600" />

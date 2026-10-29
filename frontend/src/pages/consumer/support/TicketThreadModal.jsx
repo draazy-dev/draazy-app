@@ -27,7 +27,6 @@ export default function TicketThreadModal({
               <Icon name={getCatIcon(curTicket.category)} className="w-3 h-3" />
               {getCatLabel(curTicket.category)}
             </span>
-            {/* No priority chip: `SupportTicket` has no priority field. */}
             {curTicket.assignedTo && (
               <span className="dz-tag bg-white/6 text-gray-300">
                 <Icon name="user-check" className="w-3 h-3" />
@@ -69,7 +68,6 @@ export default function TicketThreadModal({
           {(curTicket.status === 'resolved' || curTicket.status === 'closed') && (
             <p className="text-[11px] text-gray-500 text-center mb-2">{t('misc.ttmResolvedNote')}</p>
           )}
-          {/* No attachment tray: `MessageCreate` is `{ body }` (see TicketForm.jsx). */}
           <div className="flex items-end gap-2">
             <textarea
               value={replyText}

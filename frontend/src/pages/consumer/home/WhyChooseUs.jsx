@@ -8,18 +8,14 @@ export default function WhyChooseUs({ navigate, hasData }) {
     <section className="relative section-pb">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        {/* heading — left-aligned, not centered */}
         <div className="section-head sm:mb-10 reveal">
           <p className="text-teal-400 text-xs font-semibold tracking-widest uppercase mb-2">{t('home.why.eyebrow')}</p>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3">{t('home.why.headingLine1')}<br className="hidden sm:block" /> {t('home.why.headingLine2')}</h2>
         </div>
 
-        {/* bento grid: hero card left + feature rows right */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
-          {/* ── Hero card (spans 2/5 on desktop, full width on mobile) ── */}
           <div className="feature-card reveal glass rounded-2xl p-8 relative overflow-hidden group lg:col-span-2 flex flex-col justify-between min-h-[320px]">
-            {/* ambient glow */}
             <div className="absolute -top-10 -left-10 w-56 h-56 rounded-full blur-3xl bg-teal-500/10 pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-40 h-40 rounded-full blur-3xl bg-teal-400/8 pointer-events-none" />
 
@@ -51,10 +47,8 @@ export default function WhyChooseUs({ navigate, hasData }) {
             ) : null}
           </div>
 
-          {/* ── Feature rows (3/5 on desktop) ── */}
           <div className="lg:col-span-3 flex flex-col gap-5">
 
-            {/* Row 1 — No Spam Calls */}
             <div className="feature-card reveal glass rounded-2xl p-6 relative overflow-hidden group flex items-start gap-5">
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl bg-teal-500/8 pointer-events-none" />
               <div className="relative w-12 h-12 shrink-0 rounded-xl bg-teal-500/15 flex items-center justify-center mt-0.5">
@@ -66,7 +60,6 @@ export default function WhyChooseUs({ navigate, hasData }) {
               </div>
             </div>
 
-            {/* Row 2 — Zero Brokerage */}
             <div className="feature-card reveal glass rounded-2xl p-6 relative overflow-hidden group flex items-start gap-5">
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl bg-teal-500/8 pointer-events-none" />
               <div className="relative w-12 h-12 shrink-0 rounded-xl bg-teal-500/15 flex items-center justify-center mt-0.5">
@@ -78,7 +71,6 @@ export default function WhyChooseUs({ navigate, hasData }) {
               </div>
             </div>
 
-            {/* Row 3 — End-to-End Services (CTA row) */}
             <button
               onClick={() => navigate('/services')}
               className="feature-card reveal glass rounded-2xl p-6 relative overflow-hidden group flex items-start gap-5 text-left w-full hover:border-orange-400/30 transition-colors duration-300"

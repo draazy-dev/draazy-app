@@ -44,8 +44,6 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
     return claimed;
   }, []);
 
-  /* A case someone else holds is not claimed on open: the server would refuse it, and the detail
-     already names the holder. `claimedByName` is only set while their hold is fresh. */
   const canTryClaim = useCallback(
     (row) => canWrite && row?.status === 'pending' && !sameId(row?.userId, userId) && !row?.claimedByMe && !row?.claimedByName,
     [canWrite, userId],
@@ -56,8 +54,6 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
     setClaimNotice(next?.status === 'pending' && next?.claimedByName && !next?.claimedByMe ? claimedMessage(next) : '');
   }, []);
 
-  /* Shared by open, refresh and decide: claim if allowed, and on a lost race show who holds it. The claim
-     answers only who holds the case, so it is laid over the record already read. */
   const claimOrShowHolder = useCallback(async (id, gen, fallback, isCurrent) => {
     try {
       const claimed = await claimForRun(id, gen);
@@ -120,7 +116,6 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
 
   const stillOpen = (id) => () => openIdRef.current === id;
 
-  /* Signed image links are short-lived; this re-reads the case and, if the hold lapsed, re-claims it. */
   async function refresh() {
     const id = openIdRef.current;
     if (!id) return;
@@ -138,7 +133,6 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
     }
   }
 
-  /* Returns `identity_number_mismatch` instead of showing it, so the approve form can offer the override. */
   async function decide(submit, failureMessage, { requireClaim = false } = {}) {
     if (!detail || deciding) return null;
     const id = detail.id;

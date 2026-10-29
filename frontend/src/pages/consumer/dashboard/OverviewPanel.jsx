@@ -10,8 +10,6 @@ import ActionCenter from './ActionCenter.jsx';
 import VerifyIdentityRedirect from '../../../components/auth/VerifyIdentityRedirect.jsx';
 import { useVerification } from '../../../context/VerificationContext.jsx';
 
-/* Three, because the tiles are 2-up below `sm`: four cost two full rows at the densest part of the Account tab, while
-   three plus "See all" fills the same two rows with the fourth cell doing useful work. */
 const statTile = ({ trend: _trend, ...stat }) => stat;
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 
@@ -45,8 +43,6 @@ function ResumeSearchCard({ searches, t }) {
             <p className="truncate text-xl font-bold text-white sm:text-2xl">{first.label}</p>
             <p className="mt-1 text-xs text-gray-400">{t('dashboard.resumeSubtitle', 'Your most recent search')}{first.at ? ' · ' + fmtAgo(first.at) : ''}</p>
           </div>
-                {/* `fmtAgo`, not `timeAgo`: the rail's `at` is epoch ms, and a search run twenty minutes ago
-                should not read "Today" on a card whose point is that you were just here. */}
           <Link to={first.url} className="btn-teal inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-5 py-2.5 text-sm font-semibold">
             {t('dashboard.resumeCta', 'Resume search')} <Icon name="arrow-right" className="h-4 w-4" />
           </Link>
@@ -61,7 +57,6 @@ function ResumeSearchCard({ searches, t }) {
             ))}
           </div>
         ) : null}
-        {/* On phones only the first three metrics render; the rest move into a sheet. */}
       </div>
     </Card>
   );
@@ -145,8 +140,6 @@ function VerifyNudge({ onStart, t }) {
   );
 }
 
-              /* Tapping a tile navigates; the sheet must close with it or the user lands on the target page with an
-                 overlay still up. */
 function ProfileNudge({ profile, go }) {
   return (
     <Card className="p-5 sm:p-6" data-testid="profile-meter">
@@ -166,8 +159,6 @@ function ProfileNudge({ profile, go }) {
   );
 }
 
-      {/* Retention loop — real, personalised nudges that give the user a reason to come back: fresh matches for their
-         saved searches and a profile-completion meter. */}
 function SeekerFeed({ recent, recommended, go }) {
   const hasRecent = recent.length > 0;
   const feed = hasRecent ? recent : recommended;
@@ -203,13 +194,10 @@ function SeekerFeed({ recent, recommended, go }) {
   );
 }
 
-              /* One DOM list, two layouts: a swipeable rail on phones (3 homes = one screen, not three stacked
-                 blocks) that becomes a 3-up grid from sm+. */
 export default function OverviewPanel({ isOwner, go, recent, recommended = [], stats = [], alertMatches = [], profile = null, actionItems = [], recentSearches = [] }) {
   const { t } = useTranslation();
   const [badgeOpen, setBadgeOpen] = useState(false);
   const { verified, status: verifyStatus, submittedAt, loading: verifying, refresh: refreshVerification } = useVerification();
-  // The badge is read once per session, so a decision made since then must be re-read here.
   useEffect(() => {
     if (verifyStatus === 'pending') refreshVerification().catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once per dashboard visit, not on every status change
@@ -229,7 +217,6 @@ export default function OverviewPanel({ isOwner, go, recent, recommended = [], s
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      {/* Pinned so waiting requests do not go stale in a sub-tab. */}
       <ActionCenter items={actionItems} onOpen={go} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-4" data-testid="dashboard-stats-grid">

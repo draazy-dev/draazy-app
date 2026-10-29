@@ -1,5 +1,3 @@
-/* Each post is also written to dist/blog/<slug>.html with its head tags and article in the shell, so crawlers
-   and link-preview bots get real content without JavaScript; Pages serves it ahead of the SPA fallback. */
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createRenderer, parseFrontmatter, toPlainText } from './vite-plugin-help-content.mjs';
@@ -46,7 +44,6 @@ function compilePosts(dir, { includeDrafts = false } = {}) {
 
       const title = String(data.title);
       const description = String(data.description);
-      // Google cuts titles near 60 characters and descriptions near 160.
       if (title.length > 60) console.warn(`[blog] ${file}: title is ${title.length} chars; search results show about 60`);
       if (description.length > 160) console.warn(`[blog] ${file}: description is ${description.length} chars; search results show about 160`);
 
@@ -188,7 +185,6 @@ function indexPage(shell, posts, siteUrl) {
   return renderPage(shell, head, body);
 }
 
-/** @param {{ root?: string, siteUrl?: string }} [options] */
 export default function blogPlugin(options = {}) {
   const root = options.root || process.cwd();
   const siteUrl = (options.siteUrl || 'https://draazy.com').replace(/\/$/, '');

@@ -40,8 +40,6 @@ const moneyWords = (v) => {
 
 const WIDE = 'grid-cols-1 sm:grid-cols-2';
 
-/* Short option sets as one-tap boxes instead of a dropdown, so the desk can file a call quickly.
-   Re-tapping the chosen box is a no-op: a repeat `propertyType` would cascade-reset its answers. */
 function ChoiceBoxes({ value, onChange, options, ariaLabel, invalid = false, cols = 'grid-cols-2 sm:grid-cols-3' }) {
   return (
     <div role="group" aria-label={ariaLabel} className={classNames('grid gap-2', cols)}>
@@ -63,11 +61,7 @@ function ChoiceBoxes({ value, onChange, options, ariaLabel, invalid = false, col
 
 export function OwnerStep({ form, set, errors, standing }) {
   const mobileValid = /^[6-9]\d{9}$/.test(form.ownerMobile);
-  /* The tally arrives as a prop from one read of the pending queue when the wizard opens. Defaulted
-     so the step still renders if it is mounted without one. */
   const dupCount = mobileValid ? (standing?.pending || 0) : 0;
-  /* Shown, never enforced: the desk is exempt from the owner's plan ceiling, so this is information
-     for the call and reads as a sales prompt rather than a warning. */
   const overage = standing?.known && standing.overAllowance ? standing : null;
   return (
     <div className="space-y-5">
@@ -119,7 +113,6 @@ export function LocationStep({ form, set, errors, onLocalityBusy }) {
   const pickSeq = useRef(0);
   const handPickedAt = useRef(-1);
   const pickLocality = (name, slug) => { handPickedAt.current = pickSeq.current; set('locality', name); set('localitySlug', slug); };
-  // A pick binds the society record, its Google pin and its locality; typing unbinds them.
   const onSocietyChange = async (s) => {
     set('society', s?.name || '');
     set('societyId', s?.id || '');

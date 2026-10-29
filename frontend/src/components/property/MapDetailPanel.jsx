@@ -86,8 +86,6 @@ export default function MapDetailPanel({ property: p, list, locName, activeIndex
   const [inlineOtpReason, setInlineOtpReason] = useState(null);
   const [resumeAction, setResumeAction] = useState(null);
   const [resumeAfterVerify, setResumeAfterVerify] = useState(0);
-  /* Below 768px this is a bottom sheet with a grabber, and a grabber that cannot be grabbed is the loudest non-native
-     tell on the map. */
   const signedIn = Boolean(isIn || authIn);
   const swipe = useSwipeDismiss(onClose, { axis: 'y', query: '(max-width: 767px)' });
 
@@ -169,8 +167,6 @@ export default function MapDetailPanel({ property: p, list, locName, activeIndex
     setResumeAction(action);
     setInlineOtpReason(reason);
   };
-  // Mirrors the property-detail page: L1 contact (badge-not-gate), so queue a pending in-app chat
-  // request and open the thread, falling back to the enquiry popup when messaging is disabled.
   const contact = async () => {
     if (!signedIn) { openInlineOtp('contact', 'contact'); return; }
     if (!chatEnabled) { setContactOpen(true); return; }

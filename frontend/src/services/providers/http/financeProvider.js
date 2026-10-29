@@ -1,6 +1,5 @@
 import { get, unwrapPage } from '../../http.js';
 
-/** Coerce to a whole-rupee number. An absent figure is zero, never `NaN` and never a string. */
 const rupees = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 
 const count = (value) => Math.max(0, Math.round(rupees(value)));
@@ -51,7 +50,6 @@ export async function getFinanceSeries(months = 12) {
   }));
 }
 
-/** Empty filters are omitted: `?kind=` reaches the server as an empty string, which it answers with 400. */
 export async function listFinanceTransactions({
   kind, days, q, page = 0, size = 20,
 } = {}) {

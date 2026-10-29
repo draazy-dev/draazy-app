@@ -17,7 +17,6 @@ export const firstOfNextMonthIso = (iso) => {
   return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
 };
 
-/** Epoch ms where a "last N days" filter starts: IST midnight N-1 days back, so 1 is today, not the last 24h. */
 export const istWindowStart = (days) => Date.parse(`${addDaysIso(istToday(), 1 - Number(days))}T00:00:00+05:30`);
 
 export const MAX_AVAILABLE_DAYS = 365;
@@ -26,7 +25,6 @@ export const MAX_POSSESSION_DAYS = 5 * 365;
 export const shortDate = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const BUCKET_KEY = { now: 'availability.now', 15: 'availability.in15', 30: 'availability.in30' };
 
-/** "Available now" / "Available from 27 Oct" for a listing; old cached rows carry only the bucket. */
 export function availabilityLabel(t, listing, { detail = false } = {}) {
   const on = listing?.availableOn || listing?.availableDate;
   if (ISO.test(on || '')) {

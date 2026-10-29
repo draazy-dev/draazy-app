@@ -1,11 +1,7 @@
-/* Sizes mirror Flatmates.jsx, Hero.jsx, FilterBar.jsx and Results.jsx so the real list
-   replaces this without a reflow. Global classes only: `styles/routes/flatmates.css`
-   ships inside the very chunk this placeholder is waiting for. */
 export default function FlatmatesSkeleton() {
   return (
     <div
       className="pt-6 pb-20 min-h-[100dvh]"
-      /* One live region for the whole route, announced once. */
       role="status"
       aria-live="polite"
       aria-label="Loading flatmates"
@@ -19,14 +15,12 @@ export default function FlatmatesSkeleton() {
               <div className="h-8 sm:h-9 w-3/4 skeleton rounded" />
               <div className="h-4 w-full skeleton rounded mt-2" />
               <div className="h-4 w-2/3 skeleton rounded mt-1.5" />
-              {/* The three trust pills — same count, so the hero keeps its height. */}
               <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
                 <div className="h-4 w-28 skeleton rounded" />
                 <div className="h-4 w-24 skeleton rounded" />
                 <div className="h-4 w-32 skeleton rounded" />
               </div>
             </div>
-            {/* Post + verify buttons: a row on a phone, a column from sm up, matching Hero. */}
             <div className="flex flex-row sm:flex-col items-stretch gap-2 flex-shrink-0 w-full sm:w-auto">
               <div className="h-10 flex-1 sm:flex-none sm:w-44 skeleton rounded-xl" />
               <div className="h-10 flex-1 sm:flex-none sm:w-44 skeleton rounded-xl" />
@@ -34,7 +28,6 @@ export default function FlatmatesSkeleton() {
           </div>
         </div>
 
-        {/* Filter deck — category tabs sit flush above the control row, sharing one card. */}
         <div className="glass rounded-2xl p-4 sm:p-5 mb-5">
           <div className="mb-3 pb-3 border-b border-white/10 flex gap-2">
             <div className="h-9 w-28 skeleton rounded-full" />
@@ -50,8 +43,6 @@ export default function FlatmatesSkeleton() {
           </div>
         </div>
 
-        {/* Six cards: the first screenful on every breakpoint, so the grid never
-            reflows when the real list replaces it. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {[0, 1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="glass rounded-2xl p-5">

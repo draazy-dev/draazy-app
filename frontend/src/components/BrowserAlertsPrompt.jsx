@@ -6,7 +6,6 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { alertPermission, alertsAskPending, enableBrowserAlerts, snoozeAlertsAsk } from '../lib/browserAlerts.js';
 
-// The back office has no cookie bar to wait for, and its alerts are queue work rather than chat replies.
 export default function BrowserAlertsPrompt({ staff = false }) {
   const { t } = useTranslation();
   const { isIn } = useAuth();
@@ -14,7 +13,6 @@ export default function BrowserAlertsPrompt({ staff = false }) {
   const [pending, setPending] = useState(alertsAskPending);
   const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
-  // The consent bar owns the bottom edge while it is up, as it does for the install prompt.
   const [cookieBar, setCookieBar] = useState(() => !staff && !getCookieConsent());
 
   useEffect(() => {
@@ -33,7 +31,6 @@ export default function BrowserAlertsPrompt({ staff = false }) {
       setPending(false);
       toast(t('browserAlerts.enabled'), 'success');
     } catch {
-      // A refusal turns the card into the how-to-unblock note rather than vanishing without a word.
       if (alertPermission() === 'denied') setBlocked(true);
       else if (alertPermission() === 'granted') { setPending(false); toast(t('browserAlerts.pushFailed'), 'error'); }
       else dismiss();

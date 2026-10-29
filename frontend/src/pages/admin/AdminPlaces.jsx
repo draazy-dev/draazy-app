@@ -20,7 +20,6 @@ import CandidatesTab from './societies/CandidatesTab.jsx';
 import DirectoryTab from './societies/DirectoryTab.jsx';
 import AdminLocalities from './AdminLocalities.jsx';
 
-// 20, matching `GET /admin/societies`'s own `@PageableDefault`.
 const DIR_PAGE_SIZE = 20;
 const CAND_PAGE_SIZE = 10;
 
@@ -44,14 +43,12 @@ export default function AdminPlaces() {
   const [candidates, setCandidates] = useState({ items: [], total: 0 });
   const [merges, setMerges] = useState([]);
   const [counts, setCounts] = useState(null);
-  // A failed fetch and a drained queue are indistinguishable on an empty table without this.
   const [queueErrors, setQueueErrors] = useState([]);
   const [bump, setBump] = useState(0);
-  const [edit, setEdit] = useState(null); // { slug, ...form }
-  const [merge, setMerge] = useState(null); // { cand, target, query }
+  const [edit, setEdit] = useState(null);
+  const [merge, setMerge] = useState(null);
   const [merging, setMerging] = useState(false);
 
-  // Server-paged: `candQuery` is debounced into `candSearch`, and a new search resets to page 0.
   const [candQuery, setCandQuery] = useState('');
   const [candSearch, setCandSearch] = useState('');
   const [candPage, setCandPage] = useState(0);
@@ -60,7 +57,6 @@ export default function AdminPlaces() {
     return () => clearTimeout(t);
   }, [candQuery]);
 
-  // Only transport failures are absorbed: a mapper TypeError must not render as an empty queue.
   const safe = (p, label, empty, broke) => p.catch((err) => {
     if (!(err instanceof ApiError || err instanceof NetworkError)) throw err;
     console.warn(`[societies] The ${label} queue could not be loaded.`, err);
@@ -68,7 +64,6 @@ export default function AdminPlaces() {
     return empty;
   });
 
-  // Tab badges: on arrival and after a decision, not on every tab or page change.
   useEffect(() => {
     if (!canSocieties) return undefined;
     let alive = true;
@@ -90,7 +85,6 @@ export default function AdminPlaces() {
       .then((res) => {
         if (!alive) return;
         setQueueErrors((prev) => [...prev.filter((l) => l !== 'society candidates'), ...broke]);
-        // A merge can drain the last row of a page; step back rather than show an empty one.
         if (!res.items.length && candPage > 0 && !broke.length) { setCandPage(candPage - 1); return; }
         setCandidates({ items: res.items, total: res.total });
       });
@@ -108,7 +102,6 @@ export default function AdminPlaces() {
     });
     return () => { alive = false; };
   }, [tab, bump]); // eslint-disable-line react-hooks/exhaustive-deps -- as above.
-  // Server-paged: `dirQuery` is debounced into `dirSearch`, and a new search resets to page 0.
   const [dirQuery, setDirQuery] = useState('');
   const [dirSearch, setDirSearch] = useState('');
   const [dirPage, setDirPage] = useState(0);
@@ -125,12 +118,10 @@ export default function AdminPlaces() {
     setDir((d) => ({ ...d, status: 'loading' }));
     listSocietyDirectory({ q: dirSearch, page: dirPage, size: DIR_PAGE_SIZE })
       .then((res) => { if (alive) setDir({ status: 'ready', items: res.items, total: res.total }); })
-      // Never an empty list on failure: "No societies" and "could not read" are different sentences.
       .catch(() => { if (alive) setDir({ status: 'error', items: [], total: 0 }); });
     return () => { alive = false; };
   }, [tab, dirSearch, dirPage, bump]);
 
-  // The duplicate hint is a request per row: four at a time, only for the page on screen, and cached until a decision.
   const [dupes, setDupes] = useState({});
   const dupesAsked = useRef(new Set());
   const dupesGen = useRef(0);
@@ -160,7 +151,6 @@ export default function AdminPlaces() {
     };
 
     Promise.all([worker(), worker(), worker(), worker()]);
-    // Hand unstarted slugs back now so the next run (same slugs, new page) scans them.
     return () => { queue.splice(0).forEach((s) => dupesAsked.current.delete(s)); };
   }, [tab, candidates]);
 
@@ -168,7 +158,6 @@ export default function AdminPlaces() {
 
   const failed = (err, fallback) => toast(err?.message || fallback, 'error');
 
-  // Ids with a decision in flight. The ref closes the double-click window the state Set cannot.
   const [deciding, setDeciding] = useState(() => new Set());
   const decidingRef = useRef(new Set());
   const withDeciding = async (id, run) => {
@@ -191,7 +180,6 @@ export default function AdminPlaces() {
     try {
       await mergeSocieties(merge.cand.slug, merge.target);
     } catch (err) {
-      // Verbatim: every refusal names the merge that has to be undone first.
       failed(err, 'Could not merge those two societies.');
       return;
     } finally {
@@ -200,7 +188,6 @@ export default function AdminPlaces() {
     setMerge(null); setBump((n) => n + 1);
     toast('Duplicate merged — its listings, follows and reviews now read on the survivor', 'success');
   };
-  // Undo is keyed by the society that was merged away: a survivor can have absorbed several.
   const undoMerge = (m) => withDeciding(m.slug, async () => {
     try {
       await undoSocietyMerge(m.slug);
@@ -218,7 +205,6 @@ export default function AdminPlaces() {
     return mergeCandidates.filter((r) => r.slug !== merge.cand.slug).slice(0, 8);
   }, [merge, mergeCandidates]);
 
-  // Opens from the server's copy: `adminNote` is deliberately absent from the public payload.
   const openEdit = async (s) => {
     let row;
     try {
@@ -237,7 +223,6 @@ export default function AdminPlaces() {
       maintenancePerSqft: Number(edit.maintenancePerSqft) || 0,
       adminNote: edit.adminNote.trim(),
     };
-    // `adminNote` is sent even when empty: '' clears the note, absent leaves it.
     try {
       await editSociety(edit.slug, patch);
     } catch (err) { failed(err, 'Could not save that society.'); return; }

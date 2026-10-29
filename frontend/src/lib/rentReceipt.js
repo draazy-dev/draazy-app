@@ -1,5 +1,3 @@
-/* HRA rent-receipt PDF engine for the Pay Rent flow and the owner bulk generator; jsPDF loads on first use. */
-
 const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export function numToWordsIndian(n) {
@@ -72,7 +70,6 @@ export function monthMeta(ym) {
   return { label: MN[m] + ' ' + y, startStr: dd(start), endStr: dd(end), receiptDate: dd(end) };
 }
 
-/* Generate + save a single-month receipt PDF. Returns filename. */
 export async function generateSingle(d, filename) {
   const meta = monthMeta(d.month);
   const { jsPDF } = await import('jspdf');

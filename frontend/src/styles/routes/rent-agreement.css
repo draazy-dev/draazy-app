@@ -1,7 +1,3 @@
-/* rent-agreement — split out of index.css so it ships with the /services/rent-agreement
-   route chunk. All rules scoped to .ra-page. */
-
-/* ===== Rent Agreement wizard (scoped to .ra-page) ===== */
 .ra-page .field {
   background: rgb(var(--dz-c-white) / .05);
   border: 1px solid rgb(var(--dz-c-white) / calc(.1 * var(--dz-line-boost)));
@@ -47,9 +43,6 @@
   background: rgb(var(--dz-c-amber-500) / .14);
   color: rgb(var(--dz-c-amber-400));
 }
-
-/* Signed out — this step is behind the sign-in line (see LAST_PUBLIC_STEP). Deliberately the
-   quietest variant: an accent colour would read as something owed rather than as "not yet". */
 .ra-page .step-dot.locked {
   border-color: rgb(var(--dz-c-white) / calc(.08 * var(--dz-line-boost)));
   background: rgb(var(--dz-c-white) / .03);
@@ -239,8 +232,6 @@
 }
 
 @media (hover: hover) {
-  /* Gated so touch does not leave the last tapped option highlighted. */
-
   .ra-page .opt-pill:hover,
   .ra-page .ra-mode:hover { border-color: rgb(var(--dz-c-teal-500) / .4); }
 
@@ -259,9 +250,6 @@
     background: rgb(var(--dz-c-teal-500) / .05);
   }
 }
-
-/* 28px drawn squares against the 44px floor. `.tap-extend` cannot carry it here — `.qty-step`
-   clips its overflow — so the box itself grows and the glyph stays the size it was designed. */
 @media (pointer: coarse) {
 
   .ra-page .qty-btn {

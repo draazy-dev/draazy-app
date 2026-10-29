@@ -70,7 +70,7 @@ test.describe('LIVE — the cross-owner duplicate probe', () => {
     expect(opsView.body.messages[0].body).toContain('matches an active listing by another owner');
     expect(opsView.body.messages[0].body).toContain(firstId);
 
-    // Same route with the owner's token must 404, not return an empty visible case, and the owner's review inbox stays silent too.
+    // The owner's token must 404 rather than see an empty case, and their review inbox stays silent.
     expect((await caseFile(second.headers, secondId)).status).toBe(404);
     const inbox = await api('GET', '/me/property-reviews', second.headers);
     expect(inbox.status).toBe(200);

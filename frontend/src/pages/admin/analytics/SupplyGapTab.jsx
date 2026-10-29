@@ -1,18 +1,13 @@
 import { classNames } from '../../../lib/format.js';
 import { LoadFailedNotice } from './constants.jsx';
 
-/** A slug with no matching locality prints the slug (unserved demand
- * is the actionable row); a missing slug is named, not blank. */
 const rowLabel = (r) => {
   if (r.localitySlug == null) return 'No locality given';
   return r.localityName || r.localitySlug;
 };
 
-/** Stable across renders and unique per row, including the single null-slug row. */
 const rowKey = (r) => r.localitySlug ?? '__unplaced__';
 
-/* Weighted demand points per listing. Judgements, named so they can be argued with. The no-locality
-   row has no place to source supply for, so it gets no verdict. */
 const HIGH_PER_LISTING = 5;
 const MEDIUM_PER_LISTING = 1;
 const priorityOf = (r) => {
@@ -21,10 +16,7 @@ const priorityOf = (r) => {
   return r.demandPerListing >= MEDIUM_PER_LISTING ? 'medium' : 'ok';
 };
 
-/** Date only: the hour someone typed a city is not actionable and would imply false precision. */
 const askedOn = (iso) => {
-  /* `new Date(null)` is a *valid* Date at the epoch, so the NaN guard below does not catch it and
-     a missing timestamp would print a confident "1 Jan 1970". */
   if (!iso) return '\u2014';
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
@@ -32,8 +24,6 @@ const askedOn = (iso) => {
     : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-/** `cityWaitlist` is null until it arrives, with `failed` separate:
- * [] reads 'no city requests yet', which a 500 must not claim. */
 export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, cityWaitlistFailed, onRetryCityWaitlist }) {
   const rows = supplyGap || [];
   const underServed = rows.filter((r) => priorityOf(r) === 'high' || priorityOf(r) === 'medium');
@@ -45,8 +35,6 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
   const localityAlerts = rows.filter((r) => r.alerts > 0).sort((a, b) => b.alerts - a.alerts);
   const totalLocalityAlerts = localityAlerts.reduce((s, a) => s + a.alerts, 0);
   const maxAlertCount = Math.max(...localityAlerts.map((a) => a.alerts), 1);
-  // Server-ordered (most requested first) -- not re-sorted here, so the console cannot disagree
-  // with the report about which city is top.
   const cityRows = cityWaitlist || [];
   const totalCityRequests = cityRows.reduce((s, c) => s + c.requests, 0);
   const maxCityRequests = Math.max(...cityRows.map((c) => c.requests), 1);

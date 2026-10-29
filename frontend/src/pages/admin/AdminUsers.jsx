@@ -38,8 +38,6 @@ const STATUS_TABS = [
 const PAGE_SIZE = 20;
 const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 
-/* `requiresReason` mirrors a server 422 and a database check constraint, so a Confirm button that
-   stayed enabled would submit a request that could only fail. */
 const ACTION_COPY = {
   verifyGrant: { title: 'Grant Verified badge', requiresReason: true, minReason: 10, hint: 'Say what you checked. The badge is a claim the platform makes on this person\u2019s behalf.' },
   verifyRemove: { title: 'Remove Verified badge', requiresReason: true, minReason: 10, hint: 'Say what changed. Removing a badge is visible to everyone browsing their listings.' },
@@ -52,7 +50,6 @@ const ACTION_COPY = {
 };
 const reasonMissing = (copy, text) => !!copy?.requiresReason && text.trim().length < (copy.minReason || 1);
 
-/** Icon, dot and text colour per timeline `kind`. */
 const TIMELINE_STYLES = {
   account: { icon: UserPlus, dot: 'bg-emerald-400', color: 'text-emerald-300', title: 'Joined Draazy' },
   enquiry: { icon: Mail, dot: 'bg-teal-400', color: 'text-teal-300', title: 'Sent an enquiry' },
@@ -81,27 +78,22 @@ export default function AdminUsers() {
   const [pageState, setPageState] = useState({ page: 1, key: resetKey });
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(pageState.key === resetKey ? pageState.page : 1, lastPage);
-  const [actionModal, setActionModal] = useState(null); // { user, action, copy }
+  const [actionModal, setActionModal] = useState(null);
   const [actionError, setActionError] = useState('');
   const [noteText, setNoteText] = useState('');
   const [busy, setBusy] = useState(false);
   const [timelineUser, setTimelineUser] = useState(null);
-  const [timeline, setTimeline] = useState(null); // null = still loading
-  /* Separate from `timeline`: a separate route with a separate audience, since the timeline is
-     admin-only and has no `note` kind. null = still loading. */
+  const [timeline, setTimeline] = useState(null);
   const [userNotes, setUserNotes] = useState(null);
   const [userNoteDraft, setUserNoteDraft] = useState('');
   const [savingNote, setSavingNote] = useState(false);
 
-  // Guards every post-await setState. Re-armed in the effect body rather than only cleared in
-  // cleanup, or StrictMode's mount/unmount/re-mount leaves it false forever.
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
     return () => { alive.current = false; };
   }, []);
 
-  /* Counts ignore status and paging, so fetch them only when role or search changed, or after an action. */
   const countsKey = useRef(null);
   const load = useCallback(async (recount = false) => {
     const key = `${role}|${q.trim()}`;
@@ -116,7 +108,6 @@ export default function AdminUsers() {
     }
   }, [role, status, q, days, page]);
 
-  // Debounced, because `q` changes on every keystroke and each change is a request.
   useEffect(() => {
     const id = setTimeout(() => { load(); }, 250);
     return () => clearTimeout(id);
@@ -130,8 +121,6 @@ export default function AdminUsers() {
     setTimeline(null);
     setUserNotes(null);
     setUserNoteDraft('');
-    /* Two reads, deliberately not awaited together: a timeline that fails must not blank the notes,
-       and vice versa. They answer different questions about the same person. */
     listNotes('user', targetUser.id)
       .then((rows) => { if (alive.current) setUserNotes(rows); })
       .catch(() => { if (alive.current) setUserNotes([]); });
@@ -144,8 +133,6 @@ export default function AdminUsers() {
   }, [toast]);
   const closeTimeline = () => { setTimelineUser(null); setTimeline(null); setUserNotes(null); setUserNoteDraft(''); };
 
-  /* Refetched rather than optimistically prepended: the server decides the id, the timestamp and
-     the byline, and the byline is the point of the panel. */
   const submitUserNote = async () => {
     const text = userNoteDraft.trim();
     if (!text || !timelineUser || savingNote) return;
@@ -161,8 +148,6 @@ export default function AdminUsers() {
     }
   };
 
-  /* Every action ends in a reload rather than a local patch: the four routes return nothing or the
-     whole account, and a reload stays correct when the server refuses the change. */
   const confirmAction = async () => {
     if (busy || !actionModal) return;
     const { user: u, action, copy } = actionModal;

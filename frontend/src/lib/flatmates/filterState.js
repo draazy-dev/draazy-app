@@ -48,7 +48,6 @@ const budgetChanged = (value, defaults) => !budgetsEqual(value, defaults.budget)
 const splitCsv = (value) => (value ? value.split(',').map((item) => item.trim()).filter(Boolean) : []);
 const findLocality = (value) => value.trim();
 
-/** Valid, de-duplicated `key:answer` tokens in a stable order, so the URL and the saved alert never churn. */
 export function normalizeVibe(tokens) {
   const valid = new Set((tokens || []).filter((token) => typeof token === 'string' && VIBE_TOKEN_RE.test(token)));
   return [...valid].sort((a, b) => VIBE_FILTER_KEYS.indexOf(a.split(':')[0]) - VIBE_FILTER_KEYS.indexOf(b.split(':')[0]) || a.localeCompare(b));
@@ -235,7 +234,6 @@ export function saveRememberedFlatmateSearch(filters, defaults) {
       savedAt: Date.now(),
     }));
   } catch {
-    /* ignore */
   }
 }
 
@@ -243,6 +241,5 @@ export function clearRememberedFlatmateSearch() {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
-    /* ignore */
   }
 }

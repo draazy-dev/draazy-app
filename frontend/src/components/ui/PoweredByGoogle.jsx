@@ -1,18 +1,3 @@
-/**
- * "Powered by Google" attribution mark.
- *
- * Google's Places (New) API Terms of Service require a visible "Powered by
- * Google" attribution whenever autocomplete predictions are shown OUTSIDE a
- * Google map (which is exactly how every locality/society/landmark picker in the
- * app surfaces them). This renders the Google wordmark as a compact logo instead
- * of a loud text headline, and is reused everywhere predictions appear (the hero
- * search and every LocalitySelect-backed Select / MultiSelect).
- *
- * Design-consistency note: the per-letter hex values below are Google's fixed
- * brand colours. They are deliberately kept outside the app theme — the mark must
- * render in Google's own palette to be a valid attribution.
- */
-
 const GOOGLE = [
   ['G', '#4285F4'],
   ['o', '#EA4335'],

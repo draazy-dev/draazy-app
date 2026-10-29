@@ -90,7 +90,6 @@ function hostOf({ room, group, post }) {
   return { name: '', mobile: '' };
 }
 
-/** The half of a post a reviewer judges by eye: its photos and the free text nobody validated. */
 export function PostOverview({ item }) {
   const { photos } = item;
   return (
@@ -99,7 +98,6 @@ export function PostOverview({ item }) {
         <Block icon={ImageIcon} title={<>Photos <span className="text-xs font-normal text-gray-400">{photos.length}</span></>}>
           {photos.length ? (
             <div className="flatmate-mod-photos grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {/* Index key: nothing de-duplicates the list, and a swapped photo is as likely last as first. */}
               {photos.map((src, i) => (
                 <a key={i} href={src} target="_blank" rel="noreferrer noopener" className="block overflow-hidden rounded-xl border border-white/10">
                   <img
@@ -118,7 +116,6 @@ export function PostOverview({ item }) {
         </Block>
       ) : null}
 
-      {/* Never truncated: a broker blocked from the contact field types the number in here. */}
       <Block icon={FileText} title="What they wrote">
         {item.freeText ? (
           <p className="flatmate-mod-text whitespace-pre-wrap break-words text-sm text-gray-200">{item.freeText}</p>

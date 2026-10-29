@@ -68,8 +68,6 @@ function PlatformDashboard({ user }) {
   const { tabEnabled } = useAdminFlags();
   const canOpen = (href) => canOpenPath(user, href);
 
-  /* One read. Every figure is counted by the server over the whole set, and a section the caller
-     may not read is absent, so its tiles are dropped rather than shown as zero. */
   useEffect(() => {
     let alive = true;
     adminDashboard()
@@ -102,8 +100,6 @@ function PlatformDashboard({ user }) {
     { lbl: 'Flatmate Reports', val: fm?.openReports, icon: Flag, tint: 'rose', href: '/admin/reports?tab=posts', cta: 'Review reports', show: Boolean(fm) },
     { lbl: 'Unanswered Flatmate Requests', val: fm?.unansweredRequests, icon: Hourglass, tint: 'indigo', href: '/admin/analytics?tab=flatmates', cta: 'Waiting over 48h', show: Boolean(fm) },
   ].filter((t) => t.show && canOpen(t.href)).map((t) => ({ ...t, attention: true, display: fmtNum(t.val) }));
-  /* `revenue30d` is null for a `staff` caller by design — the server redacts that one figure rather
-     than refusing the read. `fmtINR(null)` would print ₹0, so null hides the tile instead. */
   const glanceTilesAll = [
     { lbl: 'Total Users', val: kpis?.totalUsers, display: fmtNum(kpis?.totalUsers), icon: Users, tint: 'indigo', href: '/admin/users', sub: owners == null ? 'buyers & owners' : `${fmtNum(owners)} owners`, show: Boolean(kpis) },
     { lbl: 'Active Listings', val: kpis?.activeListings, display: fmtNum(kpis?.activeListings), icon: Building2, tint: 'teal', href: '/admin/properties?tab=all', sub: `${fmtNum(kpis?.totalListings)} total`, show: Boolean(kpis) },
@@ -120,8 +116,6 @@ function PlatformDashboard({ user }) {
     { lbl: 'Host Reply Rate (30d)', val: fm.replyRatePct, display: fm.replyRatePct == null ? '—' : `${fm.replyRatePct}%`, icon: Reply, tint: 'coral', href: '/admin/analytics?tab=flatmates', sub: fm.medianReplyHours == null ? 'not measured yet' : `median reply ${fm.medianReplyHours}h` },
   ].filter((t) => canOpen(t.href)).map((t) => ({ ...t, attention: false })) : [];
 
-  /* Oldest first, because this card is a queue and not a feed: the listing that has waited longest
-     is the one a moderator should open next. */
   const pend = listings?.oldestPending || [];
   const latestTickets = tickets?.latest || [];
 
@@ -165,8 +159,6 @@ function PlatformDashboard({ user }) {
         <h2 className={SECTIONS}>Latest activity</h2>
         <span className="text-sm text-gray-500">Most recent items needing a look</span>
       </div>
-      {/* min-w-0 on both cards: a grid item defaults to `min-width: auto`, so the track refuses to
-          shrink and the rows' existing truncation never gets a chance to run. */}
       <div className="grid gap-4 lg:grid-cols-2">
         {listings && canOpen('/admin/properties') ? (
         <div className="dz-card min-w-0 p-5">

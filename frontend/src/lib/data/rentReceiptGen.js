@@ -1,6 +1,3 @@
-/* Draazy — HRA Rent Receipt generator for Dashboard Documents tab.
-   Port of the static app's rent-receipt.js using jsPDF ESM. */
-
 const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export function numToWordsIndian(n) {
@@ -46,14 +43,12 @@ function drawReceipt(doc, x, y, w, h, d) {
   const lines = doc.splitTextToSize(body, w - 16);
   doc.text(lines, x + 8, y + 48);
   doc.text('Mode of payment: ' + d.mode, x + 8, y + 48 + lines.length * 5 + 3);
-  // Revenue stamp box
   doc.setDrawColor(190); doc.setLineWidth(0.3); doc.rect(x + 8, y + h - 30, 24, 18);
   doc.setFontSize(6.5); doc.setTextColor(130);
   doc.text('Affix Rs.1', x + 20, y + h - 23, { align: 'center' });
   doc.text('Revenue', x + 20, y + h - 20, { align: 'center' });
   doc.text('Stamp', x + 20, y + h - 17, { align: 'center' });
   doc.setTextColor(0);
-  // Signature
   doc.setLineWidth(0.3); doc.line(x + w - 70, y + h - 20, x + w - 8, y + h - 20);
   doc.setFontSize(9); doc.text('Signature of Landlord / Owner', x + w - 8, y + h - 16, { align: 'right' });
   doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
@@ -93,7 +88,6 @@ function monthRange(fromStr, toStr) {
   return out;
 }
 
-/* Generate & download HRA rent receipts PDF for a range of months. */
 export async function generateRentReceipts({ tenant, landlord, address, rent, pan, fromMonth, toMonth, mode }) {
   const months = monthRange(fromMonth, toMonth);
   if (!months.length) return { ok: false, error: 'Invalid month range' };
@@ -126,14 +120,12 @@ export async function generateRentReceipts({ tenant, landlord, address, rent, pa
   return { ok: true, count: months.length, filename };
 }
 
-/* Get current FY start (April-March) as a YYYY-MM string */
 export function fyStart() {
   const now = new Date();
   const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
   return `${y}-04`;
 }
 
-/* Get current month as YYYY-MM string */
 export function thisMonth() {
   const now = new Date();
   return now.toISOString().slice(0, 7);

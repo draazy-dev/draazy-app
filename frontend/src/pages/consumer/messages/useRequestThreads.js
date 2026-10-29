@@ -10,7 +10,6 @@ const STATE_LINE = {
   countered: (name, box) => (box === 'sent' ? `${name} sent a counter-offer` : 'Waiting for their answer to your counter'),
 };
 
-// Once accepted, the live chat replaces the request thread; it only stays as a way in when no chat exists yet.
 const hasChat = (convs, item) => convs.some((c) => !c.staged && !c.group && c.party?.id === item.party?.id
   && (item.kind === 'flatmate' ? !c.propertyId || c.propertyId === item.target?.id : c.propertyId === item.target?.id));
 const awaitingChat = (convs, item) => item.state === 'accepted' && item.kind !== 'group' && !hasChat(convs, item);
@@ -34,7 +33,6 @@ function toThread(item, box) {
   };
 }
 
-/** Connection requests (see CONNECTION_KINDS) shown as locked chat threads, built from the requests feed. */
 export function useRequestThreads(convs) {
   const inbox = useRequestsInbox();
   const { received, sent } = inbox.boxes;

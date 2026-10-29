@@ -6,7 +6,6 @@ export default function InfoSections({ openFaq, setOpenFaq }) {
   const { t: tr } = useTranslation();
   return (
     <>
-      {/* Services */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
         <h2 className="text-2xl font-bold text-white mb-6">{tr('services.ra.assist.title')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -20,7 +19,6 @@ export default function InfoSections({ openFaq, setOpenFaq }) {
         </div>
       </section>
 
-      {/* FAQ */}
       <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
         <h2 className="text-2xl font-bold text-white mb-6 text-center">{tr('services.ra.assist.faqTitle')}</h2>
         <div className="space-y-3">

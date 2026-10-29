@@ -41,8 +41,6 @@ const SectionHead = ({ icon, iconCls = 'text-teal-400', title, sub, action }) =>
     {action}
   </div>
 );
-/* Persist the tenant's basic-salary input so the HRA saver stays populated across visits (a small stickiness touch;
-   no PII leaves the device). */
 
 const basisSalaryKey = (mob) => 'dzHraBasic:' + (mob || 'anon');
 
@@ -54,7 +52,6 @@ export default function TenantFinancesTab({ user, toast }) {
   const [rentals, setRentals] = useState([]);
   const [status, setStatus] = useState('loading');
   const [editing, setEditing] = useState(null);
-  /* A read token, bumped on every request and on unmount. */
 
   const gen = useRef(0);
   const reload = useCallback(async () => {
@@ -63,8 +60,6 @@ export default function TenantFinancesTab({ user, toast }) {
       const rows = await myRentals();
       if (gen.current !== mine) return;
       setRentals(rows);
-      // Keep the selection inside the list rather than letting a shorter list silently fall back
-      // to row 0, which would leave Remove pointed at a rental the user did not choose.
       setIdx((i) => Math.min(i, Math.max(0, rows.length - 1)));
       setStatus('ready');
     } catch {
@@ -75,8 +70,6 @@ export default function TenantFinancesTab({ user, toast }) {
   useEffect(() => {
     setStatus('loading');
     setIdx(0);
-    // Bumping the token on the way out cancels anything still in flight for the previous account. Aliased because the
-    // lint rule assumes a ref holds a DOM node whose identity goes stale; this one holds a counter.
     reload();
     const token = gen;
     return () => { token.current++; };
@@ -85,7 +78,6 @@ export default function TenantFinancesTab({ user, toast }) {
   const loaded = status !== 'loading';
   const rental = rentals[idx] || null;
   const deposit = useMemo(() => depositInfo(rental), [rental]);
-  // HRA saver inputs (basic salary annual + tax slab). Pune is a non-metro (40%).
 
   const [basic, setBasic] = useState(() => { try { return localStorage.getItem(basisSalaryKey(mob)) || ''; } catch { return ''; } });
   const [slab, setSlab] = useState('0.2');
@@ -172,7 +164,6 @@ export default function TenantFinancesTab({ user, toast }) {
   if (!rental) return <div className="space-y-6"><Hero /></div>;
 
   const monthlyRent = Number(rental.monthlyRent) || 0;
-  // Reverse an EMI (₹868/lakh at 8.5% for 20y) to the home price whose EMI ≈ your rent.
   const buyPrice = monthlyRent ? Math.round((monthlyRent / 868) * 100000) : 0;
 
   return (
@@ -245,8 +236,6 @@ export default function TenantFinancesTab({ user, toast }) {
           <div className="grid grid-cols-2 gap-3 mb-4">
             <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('wallet.annualBasic')}</span>
               <input type="number" inputMode="numeric" value={basic} onChange={(e) => setBasic(e.target.value)} placeholder="₹" className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" />
-            {/* A div, not a label: Select renders a <button>, and a wrapping label does not give a button its
-               accessible name. */}
             </label>
             <div className="text-sm"><span className="mb-1.5 block text-gray-400">{t('wallet.taxSlab')}</span>
               <Select ariaLabel={t('wallet.taxSlab')} value={slab} onChange={setSlab} options={[{ value: '0.05', label: '5%' }, { value: '0.1', label: '10%' }, { value: '0.2', label: '20%' }, { value: '0.3', label: '30%' }]} className="w-full" />

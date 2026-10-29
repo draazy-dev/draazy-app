@@ -8,8 +8,6 @@ import { BHK_BUY, BHK_RENT, FURN_LBL, AMEN_LBL } from './constants.js';
 const TYPE_LBL = Object.fromEntries([...BUY_TYPES, ...RENT_TYPES]);
 const COMM_LBL = Object.fromEntries(COMMERCIAL_TYPES);
 
-// Default range bounds (mirroring INITIAL() in Listings.jsx), so an "any price" range can be told
-// apart from a real one and not shown as a noise chip.
 const BUY_MAX = 50000000;
 const RENT_MAX = 100000;
 
@@ -46,8 +44,6 @@ export function alertLabel(rec, locNameBySlug = {}) {
   return parts.filter(Boolean).join(' · ') || `All ${rec.deal === 'rent' ? 'rentals' : 'homes'}`;
 }
 
-// The server matches every facet it is sent, so one the chosen types hide (a plot's BHK)
-// would stop the alert from ever firing.
 export function dropHiddenFacets(rec) {
   const types = new Set(asArr(rec.types));
   const out = { ...rec };

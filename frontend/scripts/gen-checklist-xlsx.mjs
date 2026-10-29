@@ -128,7 +128,6 @@ function buildPageSheet(name, rows) {
       cell.alignment = { vertical: 'top', wrapText: true, horizontal: col >= 4 && col <= 6 ? 'center' : 'left' };
     });
   });
-  // Data validation dropdown for status columns
   const statusList = '"To do,In progress,Done,Bug"';
   for (let r = 2; r <= rows.length + 1; r++) {
     ['D', 'E', 'F'].forEach((c) => {
@@ -140,7 +139,6 @@ function buildPageSheet(name, rows) {
   return ws;
 }
 
-// Global sheet
 const gws = wb.addWorksheet('Global', { views: [{ state: 'frozen', ySplit: 1 }] });
 gws.columns = [
   { header: 'Item', key: 'item', width: 24 },
@@ -166,7 +164,6 @@ buildPageSheet('Consumer', consumer);
 buildPageSheet('Admin', admin);
 buildPageSheet('Ops', ops);
 
-// Bug log sheet
 const bws = wb.addWorksheet('Bug Log');
 bws.columns = [
   { header: '#', key: 'n', width: 6 },

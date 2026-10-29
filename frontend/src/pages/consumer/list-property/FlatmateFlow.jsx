@@ -24,8 +24,6 @@ const StepActions = ({ prevStep, nextStep, t, disabled }) => (
   </div>
 );
 
-// A room share needs the property's address and map, but owner-only sale and lease terms
-// do not apply to a sitting tenant or room host.
 const FlatmateFlow = ({
   form, set, errors,
   photos, handlePhotoUpload, removePhoto, setPhotoCategory,
@@ -55,7 +53,6 @@ const FlatmateFlow = ({
       <div className="lp-step">
         <StepHeader title={t('listProperty.steps.flatmateLocationTitle')} subtitle={t('listProperty.steps.flatmateLocationSubtitle')} onReset={onReset} />
 
-        {/* The society pick fills the pin, locality and pincode, so it leads the step. */}
         <div className="mb-4" data-err="society">
           <label className={`${lbl} mb-1`}>{isHouse ? L('house') : L('society')}<RequiredMark /></label>
           <div className="flex items-start gap-2">

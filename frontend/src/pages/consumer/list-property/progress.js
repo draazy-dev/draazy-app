@@ -1,5 +1,4 @@
 
-/* Never a submission gate — validation governs publishing. */
 import {
   isLandType, isCommercialType, isResidentialType, isHouseType, commercialSpecsFor,
   amenitiesFor, STRONG_PHOTO_COUNT,
@@ -11,7 +10,6 @@ const filled= (v) => v != null && String(v).trim() !== '';
 const nonEmptyArr = (v) => Array.isArray(v) && v.length > 0;
 const validPin = (v) => /^[1-9]\d{5}$/.test(String(v || ''));
 
-// Grouped fields earn partial credit so one supporting document need not complete the group.
 const fracOf = (it) => (it.frac != null ? Math.max(0, Math.min(1, it.frac)) : (it.done ? 1 : 0));
 
 const wholePlaceItems = (form, photos) => {
@@ -55,7 +53,6 @@ const wholePlaceItems = (form, photos) => {
     profiled && { done: nonEmptyArr(form.fixtures) },
     ...(commercial ? commercialSpecsFor(form.commercialType).map((s) => ({ done: filled(form[s.key]) })) : []),
 
-    // The farm form never renders the pair, so scoring it would dock a blank nobody can fill.
     land && !isFarm && { done: filled(form.plotLength) },
     land && !isFarm && { done: filled(form.plotWidth) },
     land && { done: filled(form.roadWidth) },
@@ -83,8 +80,6 @@ const wholePlaceItems = (form, photos) => {
     isBuy && commercial && form.tenancyStatus === 'leased' && { done: filled(form.leaseExpiry) },
     isBuy && !land && { done: filled(form.construction) },
     isBuy && !land && (form.construction === 'new' || form.construction === 'under') && { done: filled(form.availableFrom) },
-    /* MahaRERA registers the layout, not the NA plot being resold, so the plot keeps the input
-     * but the meter must not dock a seller who has no number to give. */
     isBuy && !land && { done: filled(form.reraId) },
 
     isRent && { done: filled(form.monthlyRent) },

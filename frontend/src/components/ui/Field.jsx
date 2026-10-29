@@ -1,7 +1,6 @@
 import { Children, cloneElement, isValidElement, useId } from 'react';
 import FieldError from './FieldError.jsx';
 
-// Errors are not role=alert here; the form announces its failure count once, in a single polite region.
 export default function Field({ label, required, error, className, children }) {
   const id = useId();
   const errorId = `${id}-err`;

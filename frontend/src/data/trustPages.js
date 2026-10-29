@@ -1,7 +1,5 @@
 import { SITE_DESCRIPTION } from './routeHeads.js';
 
-/* Read by both the page and the build-time prerender (scripts/vite-plugin-route-heads.mjs),
-   so the HTML never says more than the screen; change claims with the code and help centre. */
 export const TRUST_PAGES = {
   '/about': {
     top: 'About',

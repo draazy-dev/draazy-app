@@ -92,7 +92,6 @@ const ListPropertyForm = () => {
                       : t('listProperty.success.editReviewBody'))
               : t('listProperty.success.newBody')}
           </p>
-            {/* Verification is optional and offered only after a new property is posted. */}
           {!isFlatmateMode && (
             <ListingStatusCard
               listing={successListing}
@@ -130,8 +129,6 @@ const ListPropertyForm = () => {
               </button>
             )}
           </div>
-          {/* A rent listing can also be let one room at a time. */}
-
           {postedListing && <PostSuccessSplitNudge listing={postedListing} />}
         </div>
       </div>
@@ -141,8 +138,6 @@ const ListPropertyForm = () => {
   return (
     <div className="lp-page min-h-[100dvh] pb-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
-        {/* Keep the first form field above the fold on small phones. */}
-
         <div className="text-center mb-5 sm:mb-10">
           <div className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-sm font-medium mb-5">
             <Sparkles className="w-4 h-4" /> {t('listProperty.page.badge')}
@@ -175,8 +170,6 @@ const ListPropertyForm = () => {
         ) : editId && <EditPolicyBanner approved={editApproved} changes={editChanges} />}
 
             <StepNav current={currentStep} steps={LISTING_STEPS} onJump={jumpTo} />
-            {/* Narrow mobile gutters leave room for paired fields. */}
-
             <div className="glass-card rounded-2xl px-3 py-6 sm:p-8 lg:p-10" data-testid="listing-wizard">
 
               {(currentStep === 1) && (
@@ -317,7 +310,6 @@ const ListPropertyForm = () => {
     </div>
   );
 };
-// Remount per owner/listing so pending uploads, geocodes and draft timers cannot cross editors.
 const ListProperty = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();

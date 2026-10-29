@@ -21,7 +21,6 @@ export default function NotificationBell() {
   const panelRef = useRef(null);
 
   const label = `Notifications, ${unread} unread`;
-  // Re-opening an unchanged bell re-shows the rows already held instead of asking again.
   const unreadRef = useRef(unread);
   unreadRef.current = unread;
   const loadedAt = useRef({ unread: -1, at: 0 });

@@ -4,7 +4,6 @@ import { BTN } from '../../../components/admin/WorkQueue.jsx';
 export const titleCase = (slug) => String(slug || '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 export const fmtDate = (ts) => { try { return new Date(ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); } catch { return ''; } };
 
-/* The fourth duplicate-hint state: the check itself did not answer, which must not render "No obvious match". */
 export const DUPES_FAILED = 'failed';
 export const Chip = ({ tone, icon, children }) => (
   <span className={classNames('dz-tag', tone)}>{icon}{children}</span>

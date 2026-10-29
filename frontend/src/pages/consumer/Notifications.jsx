@@ -30,7 +30,6 @@ const PAGE_SIZE = 50;
 const UNDO_MS = 5000;
 const IDLE = { status: 'idle', cursor: 0, total: 0 };
 
-// Whether a loaded row still sits in its section's server list (`read=false` or `read=true`).
 const inServerList = (n) => (n.section === 'read') === Boolean(n.read);
 
 const restoreRows = (cur, rows) => {
@@ -67,7 +66,6 @@ function ShowOlder({ onClick }) {
   );
 }
 
-// Staff have no Profile switch, so the inbox itself offers browser alerts until they are on.
 function StaffAlertsButton() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -108,8 +106,6 @@ export default function Notifications({ staff = false }) {
   const latest = useRef({ unread: 0, read: 0 });
   const rootRef = useScrollReveal([filter, notifs.length, showRead]);
 
-  // Rows keep their fetched section, so one read here stays put. Reads and dismissals shift the server list, so
-  // paging re-reads from the page at-or-before offset `from` plus the next one, and de-dupes.
   const loadSection = useCallback(async (section, from = null) => {
     const req = ++latest.current[section];
     const first = from === null ? 0 : Math.floor(from / PAGE_SIZE);
@@ -148,7 +144,6 @@ export default function Notifications({ staff = false }) {
     }
     await loadSection('unread');
     if (showReadRef.current) await loadSection('read');
-    // The bell was read at sign-in and the stream keeps it current; only a re-read can find it stale.
     if (loadedOnce.current) refreshBadge();
     loadedOnce.current = true;
   }, [loadSection, refreshBadge]);
@@ -162,7 +157,6 @@ export default function Notifications({ staff = false }) {
     setShowRead((v) => !v);
   };
 
-  // Shrinks a section's server-side list by the rows that just left it, keeping the paging offset honest.
   const leave = useCallback((rows) => setSections((s) => {
     const next = { ...s };
     for (const n of rows.filter(inServerList)) {
@@ -196,7 +190,6 @@ export default function Notifications({ staff = false }) {
     return [['today', today], ['earlier', earlier]].filter(([, rows]) => rows.length);
   }, [unreadRows]);
 
-  // A failed write re-reads the server rather than restoring a snapshot that later loads may have outdated.
   const mutate = async (apply, request, leaving) => {
     setNotifs(apply);
     leave(leaving);

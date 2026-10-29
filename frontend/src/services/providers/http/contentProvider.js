@@ -1,8 +1,5 @@
-/* FAQs are public, but feedback still goes through `post` for the shared API envelope. */
 import { PUBLIC_READ_TTL, get, post, unwrapPage } from '../../http.js';
 
-/** `String(... || '')` rather than a trusting spread because these strings are rendered directly into the help page
- * and fed to the assistant's tokenizer. */
 const toFaq = (row) => ({
   id: String(row?.id || ''),
   question: String(row?.question || ''),
@@ -11,7 +8,6 @@ const toFaq = (row) => ({
   translations: row?.translations && typeof row.translations === 'object' ? row.translations : {},
 });
 
-/** Every published FAQ. Public — no token, no session short-circuit. */
 export async function listFaqs() {
   const rows = await get('/faqs', undefined, { ttl: PUBLIC_READ_TTL });
   return (Array.isArray(rows) ? rows : []).map(toFaq);

@@ -26,11 +26,8 @@ import BasisModal from './finances/BasisModal.jsx';
 
 export default function FinancesTab({ user, listings, toast, isOwner = true, showRental = false }) {
   const { t } = useTranslation();
-  /* Role-aware (mirrors Documents): owners get the property P&L, tenants get the Rent Wallet. */
   const canOwner = isOwner;
   const canTenant = showRental;
-  // `ctx` is only the user's explicit choice in the both-available case. When just
-  // one context exists we early-return it below, so no effect is needed to "fix" ctx.
   const [ctx, setCtx] = useState(canOwner ? 'owner' : 'tenant');
 
   if (!canOwner && canTenant) return <TenantFinancesTab user={user} toast={toast} />;
@@ -53,11 +50,7 @@ export default function FinancesTab({ user, listings, toast, isOwner = true, sho
 
 function OwnerFinances({ listings, toast }) {
   const { t } = useTranslation();
-  /* The finance routes parse `{propId}` as a UUID and 404 on anything else, so the selector must
-     carry the uuid — `l.id` is the listing's slug. The fallback is a safety net, not a live path. */
   const propKey = (l) => String(l?.uuid || l?.id || '');
-  /* "My Listings" is heterogeneous — flatmate posts are concatenated first and their ids are not
-     properties, so every `/me/finances/{propId}/…` read 404s. Narrow once, here. */
   const propOpts = useMemo(() => (listings || []).filter((l) => !l.flatmate), [listings]);
   const [finProp, setFinProp] = useState(propKey(propOpts[0]));
   const [finPeriod, setFinPeriod] = useState('all');
@@ -68,8 +61,6 @@ function OwnerFinances({ listings, toast }) {
   const [showAllTx, setShowAllTx] = useState(false);
   const [showBasisModal, setShowBasisModal] = useState(false);
 
-  /* Server endpoints, not client reductions over txs: the ledger is paged, so reducing what the client holds
-     summarises page one; only a recurring row changes what is due, and the server owns that date rule. */
   const EMPTY = { basis: null, txs: [], duesRaw: [], cf: [] };
   const [fin, setFin] = useState(EMPTY);
   useEffect(() => {
@@ -93,8 +84,6 @@ function OwnerFinances({ listings, toast }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finProp]);
 
-  /* Its own read because it is the only one of the five scoped to the period selector; fetching it
-     period-less makes the KPI strip answer all-time while the table answers the chosen window. */
   const EMPTY_SUMMARY = { income: 0, expense: 0, net: 0 };
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   useEffect(() => {
@@ -117,8 +106,6 @@ function OwnerFinances({ listings, toast }) {
 
   const { basis, txs, duesRaw } = fin;
   const dues = useMemo(() => ({ overdue: duesRaw.filter((d) => d.daysUntil < 0), upcoming: duesRaw.filter((d) => d.daysUntil >= 0) }), [duesRaw]);
-  // Derived from the fetched rows rather than a browser-local key, or a second device shows a
-  // correct headline summary beside an empty expense chart.
   const expBreak = useMemo(() => {
     const totals = new Map();
     for (const transaction of filterByPeriod(txs, finPeriod)) {
@@ -127,15 +114,12 @@ function OwnerFinances({ listings, toast }) {
     }
     return [...totals].map(([category, amount]) => ({ category, amount }));
   }, [txs, finPeriod]);
-  /* The chart wants three parallel arrays; the wire sends a list of points. Reshaped here rather
-     than in the mapper, because the shape is this chart's, not the domain's. */
   const cf = useMemo(() => ({
     labels: fin.cf.map((p) => p.month),
     incomeData: fin.cf.map((p) => p.income),
     expenseData: fin.cf.map((p) => p.expense),
   }), [fin.cf]);
 
-  // Only surfaced where "up = good" holds — Collected and Net — so the emerald/rose trend stays truthful.
   const kpiTrend = useMemo(() => {
     const inc = cf.incomeData || [];
     const exp = cf.expenseData || [];
@@ -151,7 +135,6 @@ function OwnerFinances({ listings, toast }) {
     return { income: trend(inc[n - 1], inc[n - 2]), net: trend(net(n - 1), net(n - 2)) };
   }, [cf, t]);
 
-  // Priority: overdue > due-soon/negative > healthy.
   const health = useMemo(() => {
     if (dues.overdue.length > 0) return { label: t('fin.healthOverdue', { count: dues.overdue.length }), cls: 'bg-rose-500/15 text-rose-300', dot: 'bg-rose-400' };
     if (dues.upcoming.length > 0) return { label: t('fin.healthDueSoon', { count: dues.upcoming.length }), cls: 'bg-amber-500/15 text-amber-300', dot: 'bg-amber-400' };
@@ -162,8 +145,6 @@ function OwnerFinances({ listings, toast }) {
   const remindDue = (d) => toast(t('fin.remindSent', { category: t(CAT_KEYS[d.category] || d.category, { defaultValue: d.category }), amount: fmtINR(d.amount) }), 'success');
   const openBasisModal = () => setShowBasisModal(true);
 
-  // Listings load asynchronously, so a direct visit to #finances starts with nothing selected and
-  // saves land in an orphan bucket. Select the first property once they arrive, and recover.
   useEffect(() => {
     const opts = propOpts;
     if (opts.length === 0) return;
@@ -182,13 +163,10 @@ function OwnerFinances({ listings, toast }) {
     { value: 'income', label: t('fin.typeIncome') },
     { value: 'expense', label: t('fin.typeExpense') },
   ];
-  // The stored value stays the English category id; only the visible label is translated.
   const catOpts = txForm.type === 'income'
     ? (INCOME_CATS || []).map((c) => ({ value: c, label: t(CAT_KEYS[c] || c, { defaultValue: c }) }))
     : (EXPENSE_CATS || []).map((c) => ({ value: c, label: t(CAT_KEYS[c] || c, { defaultValue: c }) }));
 
-  /* The window is `filterByPeriod`'s, mirroring the server's `SummaryPeriods.startOf`, so these
-     rows are the rows the KPI strip already counted — including `year` meaning 1 April. */
   const filteredTxs = useMemo(() => {
     const typed = finType === 'all' ? txs : txs.filter((t) => t.type === finType);
     return filterByPeriod(typed, finPeriod).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -205,8 +183,6 @@ function OwnerFinances({ listings, toast }) {
     if (Object.keys(errors).length) return;
     let saved;
     try {
-      // The store called the repeat interval `repeat`; the wire calls it `recurring`. One name wins
-      // at the seam, and it is the wire's.
       saved = await addTransaction(finProp, {
         type: txForm.type,
         category: txForm.category,
@@ -265,8 +241,6 @@ function OwnerFinances({ listings, toast }) {
     setFin((f) => ({ ...f, basis: saved }));
     toast(t('fin.basisSaved'), 'success');
   };
-  // The basis form mirrors whatever the load resolved, rather than re-fetching. `basis` is already
-  // the answer for this property; asking again would be a second request for a value in hand.
   useEffect(() => {
     setBasisForm({
       type: basis?.type || 'owned',

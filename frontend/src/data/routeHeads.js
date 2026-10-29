@@ -1,5 +1,3 @@
-/* Prerendered by scripts/vite-plugin-route-heads.mjs, which fails the build past 60 characters of title or 160 of
-   description; StaticRouteHead in App.jsx applies the same values after in-app navigation. */
 export const SITE_DESCRIPTION = "Pune's broker-free property marketplace. Rent or buy homes, plots and commercial spaces from owners, with phone numbers private until the owner approves.";
 
 export const ROUTE_HEADS = {

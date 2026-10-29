@@ -30,12 +30,10 @@ import VerifyListingsBanner from './myListings/VerifyListingsBanner.jsx';
 import SplitFlatModal from '../flatmates/SplitFlatModal.jsx';
 import { useFlatmateEditing } from './myListings/useFlatmateEditing.jsx';
 
-/* Posts, groups, rooms and properties can share an id, so the kind is part of a row's identity. */
 const rowKey = (l) => `${l.flatmateGroup ? 'group' : l.flatmatePost ? 'post' : l.flatmate ? 'room' : 'property'}:${l.uuid || l.id}`;
 
 const NO_HOMES = { byManaged: new Map(), byListing: new Map() };
 
-/* Read only for an owner with a home saved from a tenant's room post, so other owners pay no request. */
 function useOwnerHomes(managed) {
   const [homes, setHomes] = useState(NO_HOMES);
   const homeKey = managed.filter((m) => m.sourceRoomId).map((m) => `${m.id}:${m.publishedListingId}`).join(',');
@@ -69,12 +67,9 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   const [ask, setAsk] = useState(null);
   const confirmAction = (opts) => new Promise((resolve) => setAsk({ ...opts, resolve }));
   const settleAsk = (ok) => { ask.resolve(ok); setAsk(null); };
-  // The rent listing the owner is carving into rooms, if any.
   const [splitTarget, setSplitTarget] = useState(null);
   const singleFlight = useSingleFlight();
   const navigate = useNavigate();
-  /* Lead counts, deal state and room splits all ride on the dashboard's own rows, so mounting this panel reads
-     nothing and an action re-reads only the row it moved. */
   const splitByProp = useMemo(() => {
     const map = {};
     listings.forEach((room) => {
@@ -97,7 +92,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   const dropRow = useCallback((l) => {
     setListings((rows) => rows.filter((r) => rowKey(r) !== rowKey(l)));
   }, [setListings]);
-  // A failed row read falls back to the dashboard's full refresh rather than leaving the row stale.
   const reloadRow = useCallback(async (l) => {
     try {
       patchRow(await myListingCard(l.uuid || l.id));
@@ -119,7 +113,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   const [quota, setQuota] = useState({ used: 0, allowance: null, passes: {} });
   const [resumeBlock, setResumeBlock] = useState(null);
   const [quotaTick, setQuotaTick] = useState(0);
-  // Slots held change only when a posted property is added, taken down, paused or resumed, not on every row patch.
   const postedCount = listingsState.filter((l) => !l.flatmate && !l.private).length;
   useEffect(() => {
     let live = true;
@@ -135,8 +128,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     listingsState.forEach((l) => c[catOf(l)]++);
     return c;
   }, [listingsState]);
-  // Total across live properties so the verify nudge can attach to real interest
-  // rather than a generic pitch.
 
   const totalEnquiries = useMemo(
     () => listingsState.reduce((s, l) => (catOf(l) === 'property' ? s + (Number(l.enquiries) || 0) : s), 0),
@@ -144,7 +135,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   );
 
   const [typeFilter, setTypeFilter] = useState('all');
-  // Only surface filter options the user actually has something in.
   const filterOptions = useMemo(() => {
     const defs = [
       { value: 'all', label: 'All types', icon: 'layout-grid', badge: counts.all },
@@ -155,7 +145,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     ];
     return defs.filter((o) => o.value === 'all' || o.n > 0);
   }, [counts]);
-  // Reset to "all" when the active filter has no items left, e.g. after a delete.
 
   useEffect(() => {
     if (typeFilter !== 'all' && !filterOptions.some((o) => o.value === typeFilter)) setTypeFilter('all');
@@ -165,7 +154,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     () => (typeFilter === 'all' ? listingsState : listingsState.filter((l) => catOf(l) === typeFilter)),
     [listingsState, typeFilter],
   );
-  /* The deal routes take the property's UUID; `l.id` in the seam is its slug. */
 
   const dealIdOf = (l) => String(l.uuid || l.id);
 
@@ -184,8 +172,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     const l = showDealModal;
     const isSale = l.deal === 'buy' || l.deal === 'sale';
     try {
-      // The server requires a positive agreed price and the counterparty's real ten-digit mobile,
-      // refusing a masked number; this modal is the only place that collects both.
       await closeDeal(dealIdOf(l), {
         agreedPrice: dealForm.finalPrice,
         counterpartyMobile: dealForm.buyerMobile,
@@ -214,7 +200,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     return true;
   });
 
-  // `?relist=<id>&from=<date>` comes from the agreement-renewal strip; it is acted on once, then dropped from the URL.
   const location = useLocation();
   const relistRef = useRef(null);
   const [relist, setRelist] = useState(null);
@@ -242,8 +227,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     const { listing } = relist;
     if (await handleReopen(listing, date)) setRelist(null);
   };
-  /* Carve a live rent listing into per-room supply through the seam, so the rooms reach seekers rather than one
-     browser's localStorage. */
 
   const handleSplitConfirm = async ({ maxOccupants, rooms }) => {
     let created;
@@ -264,8 +247,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     );
     await reloadRooms();
   };
-  /* Undoing a split is one decision about a flat, not a stack of per-room deletes — the per-room withdraw answers 409
-     `split_room` for exactly that reason. */
 
   const handleUnsplit = async (l) => {
     try {
@@ -282,8 +263,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     toast(`${l.title} is no longer let room by room`, 'info');
     await reloadRooms();
   };
-  // The confirmation is stamped server-side and freshness is derived from that instant on read, so
-  // the row the call answers with is all there is to draw.
 
   const handleConfirmFresh = async (l) => {
     patchRow(await confirmListingFresh(l.id));
@@ -359,16 +338,12 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       toast(err?.message || 'Could not open property tools. Please try again.', 'error');
     }
   };
-  // Sequential rather than `Promise.all`: a burst of writes from one owner is exactly the shape
-  // that trips a rate limiter on the action the platform most wants owners to perform.
 
   const handleConfirmAll = async () => {
     const stale = listingsState.filter((l) => !l.flatmate && !l.archived && listingFreshness(l).owner.cta);
     for (const l of stale) patchRow(await confirmListingFresh(l.id));
     toast(`${stale.length} listing${stale.length === 1 ? '' : 's'} confirmed as available`, 'success');
   };
-  /* No WhatsApp chaser here: `POST /properties/{id}/outreach` 403s for an owner deliberately, since outreach is the
-     platform speaking *to* an owner — handing owners a message from us, to them, to send to themselves. */
 
   const attentionListings = useMemo(
     () => listingsState.filter((l) => !l.flatmate && !l.archived && listingFreshness(l).owner.cta),
@@ -378,8 +353,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     () => listingsState.filter((l) => !l.flatmate && !l.archived && listingFreshness(l).state === 'dormant').length,
     [listingsState],
   );
-  /* The branches are not interchangeable: a room is withdrawn through its own endpoint, which can 409 when its flat
-     shares one occupancy ledger — a refusal that has to reach the owner as words. */
 
   const handleDelete = async (l) => {
     const kind = l.flatmate || l.flatmatePost || l.flatmateGroup ? 'delete' : l.status === 'approved' ? 'takeDown' : 'withdraw';
@@ -406,7 +379,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     if (l.private) await onManagedChanged?.();
     else dropRow(l);
   };
-  /* Publish a managed-only property into the pending-review flow. */
 
   const handlePublish = async (l) => {
     let res;

@@ -22,7 +22,6 @@ const same = (a, b) => (Array.isArray(a) && Array.isArray(b)
   ? a.length === b.length && JSON.stringify([...a].sort()) === JSON.stringify([...b].sort())
   : JSON.stringify(a) === JSON.stringify(b));
 
-// Patch only edited answers: age bands and legacy headline areas cannot roundtrip losslessly.
 export function editPayload(payload, form, original) {
   const before = original.form;
   if (before.builtUp && !form.builtUp) {
@@ -33,8 +32,6 @@ export function editPayload(payload, form, original) {
     .map(([key]) => [key, payload[key]]));
   const clearsMaintenance = 'maintenance' in fields
     && fields.maintenance === undefined && original.maintenance != null;
-  /* A plot re-typed to a flat has no zoning to send, and an omitted key means "leave it alone",
-   * so without this the old zoning survives and keeps answering zoning filters. */
   const clearsLandUse = 'landUse' in fields
     && fields.landUse === undefined && original.landUse != null;
   const currentDetails = pickListingFormDetails(payload.formDetails ?? form);
@@ -49,8 +46,6 @@ export function editPayload(payload, form, original) {
   const propertyTypeChanged = !same(form.propertyType, before.propertyType);
   const changedDetails = Object.fromEntries(Object.entries(currentDetails)
     .filter(([key, value]) => !same(value, before[key]) || (key === 'furniture' && 'amenities' in fields)));
-  /* A rewritten line must stay fully decomposed, or the next edit recomposes the address out of
-   * the one box that happened to change and drops the rest. */
   const details = 'address' in fields
     ? { ...changedDetails, ...Object.fromEntries(ADDRESS_PARTS.map((key) => [key, form[key] ?? ''])) }
     : changedDetails;

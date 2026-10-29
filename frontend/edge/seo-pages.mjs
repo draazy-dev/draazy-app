@@ -1,5 +1,3 @@
-/* Edge rendering for the API-backed public pages (functions/property, functions/society, functions/sitemaps).
-   Pure string work so it runs in Node tests and Pages Functions alike; the handlers only do the I/O. */
 import { esc, headTags, jsonLd, renderPage } from '../scripts/seo-html.mjs';
 import { crumbs, listingHead, listingJsonLd, listingPrice, listingTitle, propertyPath, societyHead } from '../src/lib/listingSeo.js';
 import { fmtArea } from '../src/lib/format.js';
@@ -7,8 +5,6 @@ import { GUIDE_LOCALITIES, guideSlugFor } from '../src/lib/guideLocalities.js';
 
 export const SITE = 'https://draazy.com';
 
-/* Pages does not apply public/_headers to a Function's response. Kept identical to its `/*` block by
-   scripts/check-csp.mjs. */
 export const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
   'X-Content-Type-Options': 'nosniff',
@@ -19,7 +15,6 @@ export const SECURITY_HEADERS = {
   'Content-Security-Policy': "default-src 'self'; script-src 'self' 'sha256-ZXdSxc/Anc08bj274JFX2HAdiHdWoQmZxe3rCLP4Fvk=' 'sha256-fmzqcwzg8Fu+3I6J6TQN6xFPxlE8VlpY+1cYig0HEAY=' 'wasm-unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com https://www.googletagmanager.com https://us-assets.i.posthog.com https://sdk.cashfree.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https: https://i.ytimg.com; connect-src 'self' https://images.unsplash.com https://maps.googleapis.com https://maps.gstatic.com https://places.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://us.i.posthog.com https://us-assets.i.posthog.com https://sandbox.cashfree.com https://payments-test.cashfree.com https://api.cashfree.com https://payments.cashfree.com; frame-src 'self' blob: https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com https://www.youtube-nocookie.com https://www.google.com https://challenges.cloudflare.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' https://sandbox.cashfree.com https://api.cashfree.com; frame-ancestors 'none'",
 };
 
-// `data-shell=""` lets src/lib/usePageHead.js drop it when the reader navigates in-app to another page.
 export const NOINDEX = '<meta data-shell="" name="robots" content="noindex" />';
 const HTTPS = /^https:\/\//;
 const sentence = (s) => (s ? String(s)[0].toUpperCase() + String(s).slice(1) : '');
@@ -33,23 +28,19 @@ const facts = (rows) => {
 const listSection = (title, items) => (items?.length
   ? `<section class="mt-8"><h2 class="text-xl font-bold text-white">${esc(title)}</h2><ul class="mt-3 list-disc pl-5 text-sm text-gray-300">${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>`
   : '');
-// The trail's last entry is the page itself, so the visible breadcrumb links stop before it.
 export const page = (trail, ...parts) => `<main class="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
 <nav aria-label="Breadcrumb" class="text-sm text-gray-400">${trail.slice(0, -1).map(([name, path]) => `<a href="${esc(path)}">${esc(name)}</a>`).join(' › ')}</nav>
 <h1 class="mt-4 text-3xl font-extrabold leading-tight text-white sm:text-4xl">${esc(trail.at(-1)[0])}</h1>
 ${parts.filter(Boolean).join('\n')}
 </main>`;
 
-/** Unknown or not public: the app draws its own "not found" over this shell. */
 export const notFoundPage = (shell) => ({ status: 404, html: shell.replace('</head>', () => `    ${NOINDEX}\n  </head>`) });
 
 
 
-/** `p` is the anonymous `GET /properties/{id}` body (PropertyResponse.java). */
 export function propertyPage(shell, p, { pathname, search = '', site = SITE }) {
   const l = { bhk: p.bhk, type: p.propertyType, deal: p.deal, locality: p.locality, price: p.price, area: p.area, areaUnit: p.areaUnit };
   const path = propertyPath({ id: p.id, slug: p.slug, ...l });
-  // `path` is plain ASCII, so the raw pathname compares without decoding (a malformed escape cannot throw).
   if (pathname !== path) return { status: 301, location: `${path}${search}` };
 
   const url = `${site}${path}`;
@@ -91,9 +82,7 @@ export function propertyPage(shell, p, { pathname, search = '', site = SITE }) {
   return { status: 200, html: renderPage(shell, head, body) };
 }
 
-/** `s` is the anonymous `GET /societies/{slug}` body (SocietyDetailResponse.java). */
 export function societyPage(shell, s, { slug, search = '', site = SITE }) {
-  // A merged-away slug answers with its survivor.
   if (s.slug && s.slug !== slug) return { status: 301, location: `/society/${s.slug}${search}` };
 
   const path = `/society/${s.slug}`;
@@ -127,24 +116,20 @@ export function societyPage(shell, s, { slug, search = '', site = SITE }) {
 
 const xmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** `rows` are `[path, lastmod]` pairs; a null lastmod is left out. */
 export const sitemapXml = (rows, site = SITE) => `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${rows.map(([path, lastmod]) => `  <url><loc>${xmlEsc(`${site}${path}`)}</loc>${lastmod ? `<lastmod>${xmlEsc(lastmod)}</lastmod>` : ''}</url>`).join('\n')}
 </urlset>
 `;
 
-/** A `GET /properties` row (PropertySummary.java) as a sitemap row; null when it should not be listed. */
 export const propertySitemapRow = (r) => (r.status === 'approved' && r.dealStatus !== 'closed'
   ? [propertyPath({ id: r.id, slug: r.slug, bhk: r.bhk, type: r.propertyType, deal: r.deal, locality: r.locality }), day(r.createdAt)]
   : null);
 
-/** A `GET /societies?hasListings=true` row (SocietyResponse.java). */
 export const societySitemapRow = (r) => (r.slug ? [`/society/${r.slug}`, null] : null);
 
 const ORIGIN = /^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/;
 
-/** Anonymous `GET /api${path}` through the origin gate, like functions/api/[[path]].js. `{ status: 0 }` = unusable. */
 export async function apiGet(env, request, path) {
   const origin = (env.API_ORIGIN || '').trim().replace(/\/+$/, '');
   const secret = (env.ORIGIN_SHARED_SECRET || '').trim();
@@ -153,7 +138,6 @@ export async function apiGet(env, request, path) {
   const ip = request.headers.get('CF-Connecting-IP');
   if (ip) headers['X-Forwarded-For'] = ip;
   try {
-    // The backend's servlet context path is /api (application.properties).
     const res = await fetch(`${origin}/api${path}`, { headers, redirect: 'manual', signal: AbortSignal.timeout(5000) });
     return { status: res.status, data: res.ok ? await res.json() : null };
   } catch {
@@ -161,16 +145,12 @@ export async function apiGet(env, request, path) {
   }
 }
 
-/** The SPA shell, the same file `_redirects` serves for these routes. */
 export const fetchShell = async (env, request) => (await env.ASSETS.fetch(new URL('/404', request.url))).text();
 
-/* public/_headers noindexes the non-production hosts, which Functions never get, so the same rule is
-   applied here by host. */
 export const headersFor = (request) => (new URL(request.url).host === new URL(SITE).host
   ? SECURITY_HEADERS
   : { ...SECURITY_HEADERS, 'X-Robots-Tag': 'noindex' });
 
-/** Listing-backed pages stay out of the index until the Pages env var `INDEX_LISTINGS` is `true` (real listings). */
 export const listingsIndexable = (env) => env.INDEX_LISTINGS === 'true';
 
 export function htmlResponse({ status, html, location }, headers = SECURITY_HEADERS) {
@@ -181,12 +161,10 @@ export function htmlResponse({ status, html, location }, headers = SECURITY_HEAD
   });
 }
 
-/** Shared by the property and society handlers: render from the API, or fall back to the bare shell. */
 export async function edgePage({ request, env, apiPath, render }) {
   const [shell, api] = await Promise.all([fetchShell(env, request), apiGet(env, request, apiPath)]);
   const headers = listingsIndexable(env) ? headersFor(request) : { ...SECURITY_HEADERS, 'X-Robots-Tag': 'noindex' };
   if (api.status === 404) return htmlResponse(notFoundPage(shell), headers);
-  // Origin down or misconfigured: the app still works from the bare shell, so never fail the page.
   if (api.status !== 200 || !api.data) return htmlResponse({ status: 200, html: shell }, headers);
   return htmlResponse(render(shell, api.data, new URL(request.url)), headers);
 }

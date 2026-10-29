@@ -28,8 +28,6 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
   const { t } = useTranslation();
   const sendToSignIn = useSignInGate();
   const { user } = useAuth();
-  /* Three states per read: `null` is "not read yet", a value is "read", and the `*Failed` flag is "asked and got no
-     answer" — a different fact from "the answer was none". */
   const [reviews, setReviews] = useState(null);
   const [reviewsFailed, setReviewsFailed] = useState(false);
   const [summary, setSummary] = useState(null);
@@ -37,15 +35,9 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
   const [filter, setFilter] = useState('all');
   const [modal, setModal] = useState(false);
 
-  /* The review routes bind `{propId}` as a UUID; the seam's `p.id` is the listing's *slug* (`p5015`), because the
-     property routes accept slug-or-id and a slug makes a prettier URL. */
   const propId = String(p.uuid || p.id || '');
 
-  /* Two reads: the headline numbers come from `.../reviews/summary`, computed in SQL over every published review, so
-     paging the list can never make the stars describe page one. */
   useEffect(() => {
-    // Settle both states rather than returning early: leaving them null keeps `loading` true, and
-    // skeletons that never resolve look like a hung request. Settled as a failure, not as empty.
     if (!propId) { setReviews(null); setSummary(null); setReviewsFailed(true); setSummaryFailed(true); return undefined; }
     let alive = true;
     setReviews(null);
@@ -54,35 +46,23 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
     setSummaryFailed(false);
     listPropertyReviews(propId)
       .then((res) => { if (alive) setReviews(res.items); })
-      // Not `[]`: an empty list and an unreachable one render as different sentences below, and a
-      // retry loop on a page being read costs more than the missing cards.
       .catch(() => { if (alive) setReviewsFailed(true); });
     getPropertyReviewSummary(propId)
       .then((s) => { if (alive) setSummary(s); })
-      // Not recomputed from the list as a fallback: a broken summary endpoint must show as a failure.
       .catch(() => { if (alive) setSummaryFailed(true); });
     return () => { alive = false; };
   }, [propId]);
 
   const list = reviews || [];
   const myReview = list.find((r) => r.mine) || null;
-  /* Loading is "still outstanding", so a settled failure ends it — otherwise a 404 leaves three
-   * skeletons spinning forever, which is its own kind of lie. */
   const loading = (reviews === null && !reviewsFailed) || (summary === null && !summaryFailed);
 
-  /* "Are there reviews to show" and "is there an aggregate to draw" are split, so a failed
-   * summary read cannot hide a list that loaded perfectly well. */
   const hasAggregate = !loading && !!summary && summary.count > 0 && Number.isFinite(summary.avg);
 
-  /* "No reviews yet" is a claim about the listing, and it may only be made when both reads
-   * actually answered. */
   const readFailed = reviewsFailed || summaryFailed;
   const isEmpty = !loading && !readFailed && !hasAggregate && !list.length;
-  /* Nothing to show and a reason why: the section says the reviews could not be loaded rather than describing the
-     property. */
   const isUnreadable = !loading && readFailed && !hasAggregate && !list.length;
 
-  /* Stays client-side: "% would recommend" has no server aggregate, and the list it needs is already on screen. */
   const recommend = useMemo(() => {
     const answered = (reviews || []).filter((r) => r.recommend != null);
     if (!answered.length) return null;
@@ -92,33 +72,23 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
   const shown = list.filter((r) => filter === 'all' || r.context === filter);
 
   const owner = String(p.ownerMobile || '');
-  /* Compared on ids, which are not masked and are what the server joins on: a digits comparison on the masked
-     `ownerMobile` makes `isOwner` false for everybody. */
   const mine = digits(user?.mobile);
   const idsKnown = !!user?.id && !!p.ownerId;
   const isOwner = isIn && (idsKnown
     ? String(user.id) === String(p.ownerId)
     : (!!mine && mine === digits(owner)));
 
-  /* A stay is proved two ways, matching the server: a brokered tenancy from `/me/tenancies`, or
-   * an owner-confirmed declaration — most Indian leases are signed off-platform. */
   const [brokeredTenancy, setBrokeredTenancy] = useState(false);
   useEffect(() => {
-    // Cleared on every id change: the `alive` guard stops a late response landing on the wrong
-    // listing but cannot clear state, so standing on one property would grant the composer on the next.
     setBrokeredTenancy(false);
     if (!isIn || !propId) return undefined;
     let alive = true;
     myTenancies()
-      // Fails closed: an unreadable tenancy list means "not proven", which shows the prompt to ask
-      // the owner. Failing open would let an unreachable endpoint hand out reviewer standing.
       .then((all) => { if (alive) setBrokeredTenancy(all.some((tn) => tn.confirmed && String(tn.propId) === propId)); })
       .catch(() => { if (alive) setBrokeredTenancy(false); });
     return () => { alive = false; };
   }, [isIn, propId]);
 
-  /* The server decides the row set — every claim for an owner, their own otherwise — so this holds two different
-     things depending on who asks, and the branches below say which. */
   const [declarations, setDeclarations] = useState([]);
   useEffect(() => {
     setDeclarations([]);
@@ -130,12 +100,9 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
     return () => { alive = false; };
   }, [isIn, propId]);
 
-  /* A non-owner's list is their own row and only ever their own, so the first entry is theirs. */
   const myDeclaration = isOwner ? null : (declarations[0] || null);
-  /* `status`, never the row's existence. */
   const hasTenancy = brokeredTenancy || myDeclaration?.status === 'confirmed';
 
-  // The anti-fake-review gate: a completed visit or a declared tenancy is what earns a review.
   const myVisit = myVisits?.completed ? 'completed' : myVisits?.booked ? 'scheduled' : null;
 
   const eligible = isIn && !isOwner && (myVisit === 'completed' || hasTenancy);
@@ -146,7 +113,6 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
     if (isOwner) { toast(t('property.cantReviewOwn'), 'info'); return; }
     if (!eligible) {
       if (myVisit === 'scheduled') toast(t('property.visitBookedReview'), 'info');
-      // A resident who never booked a visit is not told to go and book one.
       else if (myDeclaration) toast(t('property.declarationPending'), 'info');
       else toast(t('property.bookVisitFirst'), 'info');
       return;
@@ -155,24 +121,18 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
   };
 
   const [deciding, setDeciding] = useState(false);
-  /* Both actions unmount the button the user activated, which drops focus to `<body>` a long way up the page. */
   const outcomeRef = useRef(null);
   const restoreFocus = () => { requestAnimationFrame(() => outcomeRef.current?.focus()); };
 
   const declare = () => {
-    // Guarded twice: the flag only turns true after a re-render, so a double-tap inside that gap
-    // sends a second POST the server refuses as a duplicate, toasting a failure for work that landed.
     if (deciding) return;
     setDeciding(true);
     declareTenancy(propId)
-      // Replaces rather than prepends: a non-owner's list is exactly their own row, and the server
-      // permits only one, so anything else here would be a second copy of the same claim.
       .then((row) => { setDeclarations([row]); toast(t('property.declarationSent'), 'success'); restoreFocus(); })
       .catch(() => toast(t('property.declarationFailed'), 'error'))
       .finally(() => setDeciding(false));
   };
 
-  /* The owner's answer. */
   const decide = (id, action) => {
     if (deciding) return;
     setDeciding(true);
@@ -182,13 +142,9 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
       .finally(() => setDeciding(false));
   };
 
-  /* A completed visit already makes them eligible, and a brokered tenancy is already on record — asking either of
-     them to make a claim the owner then has to answer is work for both parties that changes nothing. */
   const canDeclare = isIn && !!propId && !isOwner && !eligible && myVisit !== 'completed' && !myDeclaration;
 
   const [busy, setBusy] = useState(false);
-  // Re-read rather than patch locally: the server owns the id, timestamp and `context` badge, and the
-  // summary is independent of this list so it has to be refreshed alongside it.
   const reload = () => Promise.all([listPropertyReviews(propId), getPropertyReviewSummary(propId)])
     .then(([res, s]) => {
       setReviews(res.items);
@@ -237,8 +193,6 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
       ) : null}
 
       {myDeclaration && myDeclaration.status !== 'confirmed' ? (
-        /* "Waiting" and "the owner did not agree" are different facts, and collapsing them would leave a rejected
-           claimant waiting forever for an answer that has already been given. */
         <div ref={outcomeRef} tabIndex={-1} role="status" className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 mb-6 flex items-center gap-3" data-testid={'tenancy-declaration-' + myDeclaration.status}>
           <Icon name={myDeclaration.status === 'revoked' ? 'alert-triangle' : 'clock'} className="w-5 h-5 text-slate-400 flex-shrink-0" />
           <p className="text-slate-300 text-sm">{t(myDeclaration.status === 'revoked' ? 'property.declarationRevoked' : 'property.declarationPending')}</p>
@@ -251,8 +205,6 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
 
           <p className="text-slate-400 text-xs mb-3">{t('property.tenancyClaimsHint')}</p>
           {declarations.map((d) => {
-            // Every row's buttons read "Confirm" / "Reject", so a screen-reader owner hears the same
-            // word repeated; the name lives in a sibling span, which is not part of any accessible name.
             const who = d.declarantName || t('property.someone');
             return (
               <div key={d.id} className="flex items-center gap-3 flex-wrap py-2 border-t border-white/8 first:border-t-0">
@@ -278,15 +230,12 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
       ) : null}
 
       {loading ? (
-        /* "No reviews yet" is a claim about the listing, and rendering it while the read is still out states it about
-           every property for as long as the request takes — then swaps it for four stars. */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6" aria-hidden="true" data-testid="reviews-summary-skeleton">
           <div className="h-44 skeleton rounded-2xl" />
           <div className="h-44 skeleton rounded-2xl" />
           <div className="h-44 skeleton rounded-2xl" />
         </div>
       ) : isUnreadable ? (
-        /* The failure sentence, and never the empty one. */
         <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 flex items-center gap-3" data-testid="property-reviews-unavailable">
           <Icon name="alert-triangle" className="w-5 h-5 text-amber-400 flex-shrink-0" />
           <p className="text-amber-200/90 text-sm">{t('property.reviewsUnavailable')}</p>
@@ -297,7 +246,6 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
           <p className="text-slate-300 text-sm">{t('property.noReviewsYet')}</p>
         </div>
       ) : (
-        /* Collapse it behind its own rating summary; the header row is `lg:hidden`, so desktop is unchanged. */
         <MobileCollapse
 
           label={t('property.ratingsReviews')}
@@ -310,10 +258,7 @@ export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
           )}
         >
 
-          {/* The aggregate grid is the part that needs the summary read; the cards below need only the list. */}
           {!hasAggregate && summaryFailed ? (
-            /* Saying so is the point: silently dropping the grid would read as "this property has reviews but no
-               rating", which is not a state the server can produce. */
             <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 mb-4 flex items-center gap-3" data-testid="property-rating-unavailable">
               <Icon name="alert-triangle" className="w-4 h-4 text-amber-400 flex-shrink-0" />
               <p className="text-amber-200/90 text-sm">{t('property.ratingUnavailable')}</p>

@@ -20,7 +20,6 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
   const areaLabel = isLand() ? (isFarm ? tr('listProperty.fields.landArea') : tr('listProperty.fields.plotAreaLabel')) : tr('listProperty.fields.carpetArea');
   const unitOptions = landUnitOptionsFor(form.propertyType);
   const unitLabel = isLand() ? unitOptions.find(([v]) => v === form.areaUnit)?.[1] : 'sq.ft.';
-  // Null until a subtype is chosen — everything keyed on it stays off screen until then.
   const commercialProfile = commercialProfileOf(form.commercialType);
   const parkingOptions = parkingChoices(tr);
 
@@ -52,8 +51,6 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                           </div>
                         )}
 
-                        {/* Commercial sub-type — required second choice so a shop and a warehouse never share one
-                           bucket. */}
                         {isCommercial() && (
                           <div>
                             <label className={lbl3}>{tr('listProperty.fields.commercialType')}</label>
@@ -146,7 +143,6 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                         )}
                       </div>
 
-                      {/* Optional, because only a builder-sold flat has one. */}
                       {!isLand() && !isCommercial() && (
                         <div className="mb-6">
                           <label htmlFor="lp-super-built-up" className={lbl3}>{tr('listProperty.fields.superBuiltUpArea')}</label>
@@ -199,7 +195,6 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                         <div>
                           <label className={lbl3}>{tr('listProperty.fields.facing')}</label>
 
-                          {/* Disable auto-search so more options cannot summon a mobile keyboard. */}
                           <Select value={form.facing} onChange={(v) => set('facing', v)} ariaLabel={tr('listProperty.fields.facing')} placeholder={tr('listProperty.ph.selectFacing')} searchable={false} options={facingOptions} />
                         </div>
                         {!isLand() && (

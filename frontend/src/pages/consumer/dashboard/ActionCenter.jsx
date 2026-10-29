@@ -24,7 +24,6 @@ function AgePill({ at }) {
   return <span className="flex-shrink-0 whitespace-nowrap text-[11px] text-gray-500">{timeAgo(at)}</span>;
 }
 
-// Grouped so Home says what is waiting and where; every decision happens on the page that shows the full request.
 const GROUPS = [
   { key: 'numbers', kinds: ['contact'], label: 'Number requests', icon: 'lock-keyhole', tone: 'rose', to: 'leads-numbers' },
   { key: 'flatmate', kinds: ['flatmate', 'app'], label: 'Flatmate requests', icon: 'users-round', tone: 'teal', to: 'leads-flatmate' },
@@ -34,7 +33,6 @@ const GROUPS = [
   { key: 'listings', kinds: ['clarify', 'message'], label: 'Listings need you', icon: 'alert-circle', tone: 'rose', to: 'properties' },
 ];
 
-// Items arrive oldest-first, so each group's first item is the one waiting longest.
 function groupItems(items) {
   const groups = new Map();
   for (const it of items) {

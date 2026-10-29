@@ -3,8 +3,6 @@ import { ChevronRight, Globe, Shield, CreditCard, Search, Building2 } from 'luci
 import { classNames } from '../../../lib/format.js';
 import Switch from '../../../components/ui/Switch.jsx';
 
-/* Only runtime kill switches and launch gates: each one must switch a live feature off when it
-   misbehaves, costs too much or is abused. `off: true` marks the one flag whose absence means off. */
 const APP_FLAG_SECTIONS = [
   {
     section: 'engagement',
@@ -53,7 +51,6 @@ const APP_FLAG_SECTIONS = [
 
 const OFF_BY_DEFAULT = new Set(APP_FLAG_SECTIONS.flatMap((s) => s.flags.filter((f) => f.off).map((f) => f.key)));
 
-/** What the site actually does with a stored flag: consumers read a missing flag as on. */
 export const appFlagOn = (flags, key) => (OFF_BY_DEFAULT.has(key) ? flags?.[key] === true : flags?.[key] !== false);
 
 export default function AppFlagsPanel({ flags, onToggle }) {

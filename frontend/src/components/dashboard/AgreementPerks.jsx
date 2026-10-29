@@ -10,7 +10,6 @@ import { usePrefetchReferralCode } from '../../lib/usePrefetchReferralCode.js';
 const LIVE = new Set(['registered', 'active']);
 const DAY = 86400000;
 
-/** Registered agreements get a renewal strip from 60 days before the end date until 30 days after it. */
 function renewalState(ra, now = Date.now()) {
   if (!LIVE.has(ra?.status) || !ra.endDate) return null;
   const end = Date.parse(`${ra.endDate}T00:00:00Z`);

@@ -53,7 +53,6 @@ export function propertyKind(p) {
   return 'residential';
 }
 
-/* No id-derived fallback: it makes an unstated attribute indistinguishable from a stated one. */
 import { ageOptions } from '../list-property/constants.js';
 function ordinal(n) {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -69,8 +68,6 @@ export function deriveFloor(p) {
   const raw = p.form?.floor || (p.floor ? String(p.floor) : '');
   if (!raw) return '';
   const total = p.form?.totalFloors || p.totalFloors;
-  // `ordinal(NaN)` renders the literal "NaNth", and admin post-on-behalf emits non-numeric floor
-  // strings, so anything unparseable passes through as typed.
   const n = Number(raw);
   const label = raw === 'Ground' ? 'Ground' : (Number.isFinite(n) ? ordinal(n) : String(raw));
   return total ? `${label} of ${total}` : label;
@@ -89,8 +86,6 @@ export function deriveAge(p) {
   const key = p.age || p.form?.age;
   if (key) return SHORT_AGE[key] || (ageOptions.find((o) => o.value === key)?.label) || key;
   if (p.construction === 'new') return 'New';
-  // `ageYears` is the server's stated age in whole years (V95, nullable — null means the owner
-  // never said, which is not the same as new).
   if (p.ageYears != null) return p.ageYears + (p.ageYears === 1 ? ' Year' : ' Years');
   return '';
 }

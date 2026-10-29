@@ -27,7 +27,6 @@ export default function Home() {
   const { t } = useTranslation();
   const rootRef = useScrollReveal();
   const navigate = useNavigate();
-  // Cities without inventory (all but Pune) get city-aware copy and an honest empty state instead of Pune content.
   const { city } = useCity();
   const hasData = cityHasData(city);
   const [wide, setWide] = useState(() => window.matchMedia(LG).matches);
@@ -40,7 +39,6 @@ export default function Home() {
 
   return (
     <div ref={rootRef}>
-      {/* HERO: `min-h-[100dvh]` applies only at lg. Home is selfPadded, so it reserves the navbar itself. */}
       <section className="hero-bg relative lg:min-h-[100dvh] flex items-center justify-center pt-[calc(var(--dz-nav-h)+28px)] sm:pt-[calc(var(--dz-nav-h)+37px)] pb-7 sm:pb-16">
         <div className="absolute inset-0 overflow-hidden rounded-[inherit] pointer-events-none">
           <div className="shape shape-1" />
@@ -62,8 +60,6 @@ export default function Home() {
             <span className="hero-word hero-city bg-gradient-to-r from-orange-400 to-orange-500 bg-clip-text text-transparent">{city}</span>
           </h1>
 
-          {/* On mobile the four proof chips replace this sentence; a city with no stock has no chips,
-              so it keeps this one at every width. */}
           <p className={'hero-sub text-base sm:text-lg md:text-xl text-gray-300 max-w-4xl lg:whitespace-nowrap mx-auto mb-6 leading-relaxed ' + (hasData ? 'hidden lg:block' : '')}>
             {hasData ? (
               <>{t('home.hero.discoverLead', { city })} {t('home.hero.discoverTail')}</>
@@ -76,8 +72,6 @@ export default function Home() {
 
           <TrustChips className="hidden lg:flex mb-[30px]" />
 
-          {/* Desktop-only: on a phone the bottom nav's Search tab goes straight to /listings.
-              Not mounted below lg, so a phone never fetches the panel's recent-searches rail. */}
           <div className="hidden lg:block">
             {wide ? <HeroSearchPanel /> : null}
           </div>
@@ -87,39 +81,29 @@ export default function Home() {
           {hasData ? <ActivityTicker /> : null}
         </div>
 
-        {/* Overhangs 1px because at fractional zoom/DPR this scrim and the section round to different pixels,
-            leaving a teal hairline. */}
         <div className="hero-scrim absolute -bottom-px left-0 w-full h-[calc(8rem+1px)] bg-gradient-to-t from-page to-transparent" />
       </section>
 
       {hasData ? (
         <>
-          {/* Mobile reorders these by CSS so real stock comes first; DOM
-              order stays so the desktop tree and its assertions hold. */}
           <div className="flex flex-col">
-            {/* CATEGORIES */}
             <div className="order-2 lg:order-none">
               <Categories navigate={navigate} />
             </div>
 
-            {/* FEATURED */}
             <div className="order-1 lg:order-none">
               <Featured navigate={navigate} />
             </div>
 
-            {/* Trust chips + stats, relocated out of the mobile hero. */}
             <div className="order-3 lg:order-none">
               <MobileTrustProof />
             </div>
           </div>
 
-          {/* EXPLORE SOCIETIES — society-first discovery entry point */}
           <SocietiesSection />
 
-          {/* RECENTLY VIEWED — return-visitor rail (renders only if history exists) */}
           <RecentlyViewed />
 
-          {/* FLATMATES */}
           <FlatmatesSection navigate={navigate} />
         </>
       ) : (
@@ -128,16 +112,12 @@ export default function Home() {
         </section>
       )}
 
-      {/* WHY CHOOSE US — asymmetric bento */}
       <WhyChooseUs navigate={navigate} hasData={hasData} />
 
-      {/* CTA */}
       <CtaSection navigate={navigate} />
 
-      {/* PMF early-access capture (renders only when VITE_PMF_MODE=on) */}
       <NotifyMe />
 
-      {/* FAQ */}
       <FaqSection />
 
       {hasData ? <Suspense fallback={null}><ExploreStrips /></Suspense> : null}

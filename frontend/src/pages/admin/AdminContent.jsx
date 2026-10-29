@@ -15,7 +15,6 @@ const BLANK_FAQ = { question: '', answer: '', category: 'general' };
 export default function AdminContent() {
   const { toast } = useToast();
   const { optionEnabled, loading: flagsLoading } = useAdminFlags();
-  // Live rows load on first open, archived rows on request.
   const [loaded, setLoaded] = useState({});
   const asked = useRef(new Set());
   const [faqs, setFaqs] = useState([]);
@@ -55,8 +54,6 @@ export default function AdminContent() {
   const openEdit = (item) => { setEditModal({ isNew: false, id: item.id }); setEditData({ ...item }); };
   const closeMod = () => { setEditModal(null); setEditData({}); };
 
-  // Writes replace the row with the server's response; the audit
-  // row is written server-side from the authenticated principal.
   const saveItem = async () => {
     if (saving) return;
     if (!editData.question?.trim()) { toast('Enter the question.', 'error'); return; }
@@ -73,7 +70,6 @@ export default function AdminContent() {
       toast('Saved');
       closeMod();
     } catch (err) {
-      // The server names the offending field ("A faqs item needs 'question'"), which beats "Could not save".
       toast(err?.message || 'Could not save. Please try again.', 'error');
     } finally {
       setSaving(false);

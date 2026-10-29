@@ -18,7 +18,6 @@ const POLL_MAX_MS = 30_000;
 const newAttemptId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const isSafePath = (p) => typeof p === 'string' && /^\/(?![/\\])/.test(p);
 
-/** When THIS purchase's entitlement ends, or null while it has not landed: the webhook, not the modal, grants it. */
 async function purchaseExpiry({ needsProperty, propertyId, before }) {
   const e = await getEntitlements().catch(() => null);
   if (needsProperty) return e?.listings?.passes?.find((p) => String(p.propertyId) === String(propertyId))?.expiresAt ?? null;
@@ -39,25 +38,18 @@ export default function Checkout() {
   const [params] = useSearchParams();
   const planId = params.get('plan');
   const propertyId = params.get('property');
-  // The configured price list, from `GET /bootstrap` (`pricing`). Only the fallback — `serverPlan` below is the
-  // plan catalogue's own row and wins when it resolves.
   const { prices } = usePricing();
   const CO = checkoutPlans(t);
   const base = CO[planId];
   const needsProperty = planId === 'listing-pass';
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
-  // Cashfree's return_url lands here with the order, for a payer a bank page bounced out of the modal.
   const returnedOrder = useRef(params.get('order_id'));
-  /** `null` until Pay: then `verifying` (polling entitlements), `timeout` (still unconfirmed) or `paid`. */
   const [phase, setPhase] = useState(returnedOrder.current ? 'verifying' : null);
   const [orderRef, setOrderRef] = useState(returnedOrder.current ?? '');
   const gatewayOrder = useRef(returnedOrder.current);
-  /** The open gateway order, kept so a retry after the SDK failed reopens it instead of POSTing again. */
   const [session, setSession] = useState(null);
-  /** Server catalogue row for this plan, once it resolves. See the note in `Plans.jsx`. */
   const [serverPlan, setServerPlan] = useState(null);
-  /** The listing a pass is bought for; `false` once the lookup fails. */
   const [listing, setListing] = useState(null);
   const [expiresAt, setExpiresAt] = useState(null);
   const packExpiryBefore = useRef(null);
@@ -67,11 +59,9 @@ export default function Checkout() {
       const saved = sessionStorage.getItem(attemptKey);
       if (saved) return saved;
     } catch {
-      // ignore storage access errors
     }
     const id = newAttemptId();
     try { sessionStorage.setItem(attemptKey, id); } catch {
-      // ignore storage access errors
     }
     return id;
   });
@@ -83,8 +73,6 @@ export default function Checkout() {
         const row = rows.find((r) => r.slug === planId);
         if (alive && row) setServerPlan(row);
       })
-      // Falls back to the configured fee. The charge is the server's either way — this only
-      // affects which number is shown while the catalogue is unreachable.
       .catch(() => {});
     return () => { alive = false; };
   }, [planId]);
@@ -98,7 +86,6 @@ export default function Checkout() {
     return () => { alive = false; };
   }, [needsProperty, propertyId, isIn]);
 
-  // The charged amount is the server's plan row, so display that rather than the back-office fee.
   const price = base && (serverPlan?.price ?? prices[base.priceKey]);
   const termDays = serverPlan?.termDays ?? base?.termDays;
   const P = base && { ...base, price };
@@ -111,23 +98,20 @@ export default function Checkout() {
     let timer;
     const started = Date.now();
     const tick = async () => {
-      // Without the pre-purchase expiry an older live pack would read as this order's success.
       const at = returnedOrder.current ? null : await purchaseExpiry({ needsProperty, propertyId, before: packExpiryBefore.current });
       if (!alive) return;
       if (at) {
         setExpiresAt(at);
         setPhase('paid');
-        try { sessionStorage.removeItem(attemptKey); } catch { /* ignore */ }
+        try { sessionStorage.removeItem(attemptKey); } catch { }
         return;
       }
       const status = gatewayOrder.current ? await orderStatus(gatewayOrder.current).catch(() => null) : null;
       if (!alive) return;
-      // A stacked pack leaves packExpiresAt (the earliest live pack) unchanged, so the order is the only proof.
       if (status === 'paid') {
         setPhase('paid');
-        try { sessionStorage.removeItem(attemptKey); } catch { /* ignore */ }
+        try { sessionStorage.removeItem(attemptKey); } catch { }
       } else if (status === 'failed') {
-        // The kept attempt key lets Pay replay and reopen this same order instead of hitting the one-open-order 409.
         setSession(null);
         setError(t('misc.coPaymentDeclined'));
         setPhase(null);
@@ -146,7 +130,7 @@ export default function Checkout() {
   const rotateAttempt = () => {
     const fresh = newAttemptId();
     setAttemptId(fresh);
-    try { sessionStorage.setItem(attemptKey, fresh); } catch { /* ignore */ }
+    try { sessionStorage.setItem(attemptKey, fresh); } catch { }
   };
   const cancelOpenOrder = async () => {
     setCancelling(true);
@@ -174,7 +158,6 @@ export default function Checkout() {
       if (!order) {
         if (!needsProperty) packExpiryBefore.current = (await getEntitlements().catch(() => null))?.contacts?.packExpiresAt ?? null;
         const sub = await subscribeToPlan(planId, undefined, { propertyId: needsProperty ? propertyId : undefined, attemptId });
-        // No session means the key replayed a settled order, so the next Pay must be a new purchase.
         if (!sub?.paymentSessionId) rotateAttempt();
         setOrderRef(sub?.paymentRef || sub?.subscriptionId || '');
         gatewayOrder.current = sub?.paymentRef ?? null;
@@ -183,7 +166,6 @@ export default function Checkout() {
       }
       const outcome = order.sessionId ? await openCashfreeCheckout(order.sessionId) : null;
       if (outcome?.error) {
-        // The SDK reports a closed modal as an error too, so the order says whether money moved.
         setSession(null);
         const status = gatewayOrder.current ? await orderStatus(gatewayOrder.current).catch(() => null) : null;
         if (status === 'paid') setPhase('verifying');
@@ -298,8 +280,6 @@ export default function Checkout() {
           </div>
         </div>
 
-        {/* Mobile sticky pay bar — keeps the total and pay action reachable without
-            scrolling. In-flow (sticky, not fixed) so it releases naturally at the footer. */}
         <div className="md:hidden sticky bottom-0 z-30 -mx-4 sm:-mx-6 mt-6 border-t border-white/10 bg-ink/95 backdrop-blur-xl px-4 sm:px-6 py-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}>
           <div className="flex items-center gap-4">
             <div className="shrink-0">

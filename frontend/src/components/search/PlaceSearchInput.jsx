@@ -12,8 +12,6 @@ async function resolvePoint(s) {
   return { near: `${d.lat.toFixed(4)},${d.lng.toFixed(4)}`, label: d.name || s.mainText };
 }
 
-/* Inline suggestions under the field. Searches Google Places by default; `search` / `resolve` swap the source,
-   and an Error thrown by `resolve` has its message shown to the user. */
 export default function PlaceSearchInput({ label = '', onPick, onClear, bias = null, search, resolve = resolvePoint, clearOnPick = false, placeholder, ariaLabel }) {
   const { t } = useTranslation();
   const listId = useId();
@@ -30,7 +28,6 @@ export default function PlaceSearchInput({ label = '', onPick, onClear, bias = n
   const pickedTextRef = useRef(label);
   const boxRef = useRef(null);
 
-  // A value set elsewhere (URL, home search, Clear) replaces whatever was typed.
   if (shownLabel !== label) {
     setShownLabel(label);
     setQuery(label);

@@ -48,8 +48,6 @@ export default function MobileField({
         id={id}
         aria-invalid={ariaInvalid}
         aria-describedby={ariaDescribedBy}
-        // A phone number is almost never the last field in these forms, so the
-        // keyboard's action key should move the user on rather than say "return".
         enterKeyHint={enterKeyHint}
         // eslint-disable-next-line jsx-a11y/no-autofocus
         autoFocus={autoFocus}

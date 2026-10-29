@@ -11,7 +11,6 @@ function basisOf(review) {
   return `Tenant host: ${evidence} as evidence. ${consent}`;
 }
 
-/* The Properties desk's banner, minus its decline: the decision itself sits in the badge section below. */
 export default function BadgeRequestBanner({ review }) {
   const basis = basisOf(review);
   return (

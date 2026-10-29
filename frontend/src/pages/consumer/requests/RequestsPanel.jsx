@@ -36,7 +36,6 @@ function Empty({ tab }) {
 
 function useLeadNotes(toast) {
   const [notes, setNotes] = useState({});
-  // Read synchronously so a follow-up saved right after a note blur merges onto that note, not the older one.
   const latest = useRef(notes);
   latest.current = notes;
   useEffect(() => {
@@ -47,7 +46,6 @@ function useLeadNotes(toast) {
     return () => { live = false; };
   }, []);
 
-  // The endpoint takes the whole annotation, so the sheet's one-field patch is merged here.
   const save = async (key, patch) => {
     const merged = { note: null, followUpAt: null, ...latest.current[key], ...patch };
     latest.current = { ...latest.current, [key]: merged };

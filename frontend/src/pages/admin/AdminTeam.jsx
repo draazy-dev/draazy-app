@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Ban, Check, Copy, Info, KeyRound, Pencil, Plus, RotateCcw, Smartphone } from 'lucide-react';
-/* Team members come through the services seam. Permissions do not go through the seam at
-   all — see `services/permissionsService.js` for why. */
 import {
   listTeamMembers, saveTeamMember, setTeamMemberStatus,
   resetTeamMemberTwoFactor, reissueTeamMemberInvite,
@@ -11,8 +9,6 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import {
   getFunctionCatalogue, getMemberPermissions, saveMemberFunctions,
 } from '../../services/permissionsService.js';
-// No client-side audit write: every write on this page is a server call that records its own audit
-// row from the authenticated actor, which the browser cannot read back anyway.
 import { roleLabel } from '../../lib/auth.js';
 import { classNames } from '../../lib/format.js';
 import { useTabParam } from '../../lib/useTabParam.js';
@@ -119,11 +115,9 @@ export default function AdminTeam() {
   const { user: me } = useAuth();
   const [members, setMembers] = useState(null);
   const [signingIn, setSigningIn] = useState(null);
-  /* A compile-time constant of the server, not per-caller: load
-     once so opening a member's record is one round trip. */
   const [catalogue, setCatalogue] = useState([]);
 
-  const [memberModal, setMemberModal] = useState(null); // form object or null
+  const [memberModal, setMemberModal] = useState(null);
   const [inviteDialog, setInviteDialog] = useState(null);
   const [inviteCopied, setInviteCopied] = useState('');
   const [tab, setTab] = useTabParam(TEAM_TABS.map((x) => x.key), 'all');
@@ -170,7 +164,6 @@ export default function AdminTeam() {
       id: m.id, name: m.name || '', mobile: m.mobile || '', email: m.email || '',
       role: m.role || 'staff', functions: null, loadedFunctions: null, functionsError: null,
     });
-    // An empty roster entry is ambiguous (none granted, or the roster withheld them), so only that case re-reads.
     if (m.role !== 'staff' || m.functions?.length) {
       setMemberModal((prev) => (prev && prev.id === m.id ? { ...prev, functions: [...(m.functions || [])], loadedFunctions: [...(m.functions || [])] } : prev));
       return;
@@ -190,7 +183,6 @@ export default function AdminTeam() {
 
   const grantable = useMemo(
     () => catalogue.filter((fn) => isAdmin || myFunctions.includes(fn.name)
-      // A manager may keep or remove what the administrator granted, even if it cannot grant it.
       || memberModal?.loadedFunctions?.includes(fn.name)),
     [catalogue, isAdmin, myFunctions, memberModal?.loadedFunctions],
   );
@@ -212,11 +204,9 @@ export default function AdminTeam() {
     const mobile = digits10(f.mobile);
     const email = f.email.trim();
     if (!name) return toast('Name is required', 'error');
-    // Only a new account carries a mobile: `PATCH /users/{id}` does not accept the field.
     if (!f.id) {
       if (mobile.length !== 10) return toast('Enter a valid 10-digit mobile number', 'error');
       if (!email) return toast('Email is required', 'error');
-      // A courtesy, not the rule: the server's 409 is what actually refuses a duplicate.
       if (members.some((m) => digits10(m.mobile) === mobile)) return toast('Another member already uses this mobile', 'error');
     }
     const current = f.id ? members.find((m) => m.id === f.id) : null;
@@ -321,8 +311,6 @@ export default function AdminTeam() {
       primary={canManageMember(m) ? (
         <button type="button" onClick={() => openEditMember(m)} className={BTN.ghost}><Pencil className="h-3.5 w-3.5" /> Edit</button>
       ) : null}
-      /* No Remove action. There is no `DELETE /users/{id}` in the contract — this platform is
-         soft-delete only, and Suspend is the way to cut an account off. */
       icons={canManageMember(m) ? (
         <>
           {signInButtons(m)}
@@ -378,7 +366,6 @@ export default function AdminTeam() {
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-300">Mobile{memberModal.id ? null : <span className="text-rose-400"> *</span>}</span>
-                {/* Read-only on an existing record: it is the sign-in credential, and no route changes it. */}
                 {memberModal.id ? (
                   <input value={memberModal.mobile} readOnly className="dz-input w-full cursor-not-allowed opacity-60" />
                 ) : (

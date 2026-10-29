@@ -133,7 +133,6 @@ const PhotoUploader = ({
                       <Loader2 className="w-4 h-4 animate-spin" /> {t('listProperty.photoUx.uploading')}
                     </div>
                   )}
-                  {/* The button keeps its 44px touch target; only the disc inside it is drawn. */}
                   <button
                     type="button"
                     disabled={isMediaBusy}

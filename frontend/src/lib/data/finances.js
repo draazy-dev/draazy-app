@@ -1,11 +1,7 @@
-/* localStorage keys match the HTML prototype's, for data interop. */
-
 const INCOME_CATS= ['Rent received', 'Deposit received', 'Other income'];
 const EXPENSE_CATS = ['Society maintenance', 'Property tax', 'Home loan EMI', 'Repairs', 'Insurance', 'Utilities', 'Commission / fees', 'Other expense'];
 export { INCOME_CATS, EXPENSE_CATS };
 
-/* Category ids are stored on every saved transaction and due, so they stay English — renaming
-   the visible copy can never orphan a ledger. Look the id up here for a translated label. */
 export const CAT_KEYS = {
   'Rent received': 'fin.catRentReceived',
   'Deposit received': 'fin.catDepositReceived',
@@ -30,7 +26,7 @@ function get(k, def) {
   try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch { return def; }
 }
 function set(k, v) {
-  try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* quota */ }
+  try { localStorage.setItem(k, JSON.stringify(v)); } catch { }
   return v;
 }
 
@@ -113,11 +109,8 @@ export function calculateEMI(principal, annualRate, tenureYears) {
   return { emi: Math.round(emi), total: Math.round(total), interest: Math.round(total - P) };
 }
 
-/** Mirrors `SummaryPeriods` on the server. */
 export const FIN_PERIODS = ['all', 'month', 'quarter', 'year'];
 
-/* The only copy of this arithmetic in the frontend; must stay a mirror of `SummaryPeriods.startOf`
-   on the server. `year` is the Indian financial year, 1 April – 31 March. */
 export function periodStart(period, now = new Date()) {
   switch (period) {
     case 'month':
@@ -125,7 +118,6 @@ export function periodStart(period, now = new Date()) {
     case 'quarter':
       return new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
     case 'year':
-      // Month index 3 is April. Before April we are still in the FY that began last April.
       return now.getMonth() >= 3
         ? new Date(now.getFullYear(), 3, 1)
         : new Date(now.getFullYear() - 1, 3, 1);
@@ -134,15 +126,12 @@ export function periodStart(period, now = new Date()) {
   }
 }
 
-/** Rows on or after the window's start. `all` (a null start) keeps everything. */
 export function filterByPeriod(txns, period, now = new Date()) {
   const start = periodStart(period, now);
   if (!start) return [...(txns || [])];
   return (txns || []).filter((t) => new Date(t.date) >= start);
 }
 
-/** Adjusts the server's summary and cashflow for one confirmed ledger row (`sign` 1 added, -1 removed): both are
- * additive sums by the row's date, so the held figures move by exactly that row. */
 const moves = (tx, sign) => {
   const key = tx.type === 'income' ? 'income' : 'expense';
   const moved = (Number(tx.amount) || 0) * sign;
@@ -192,8 +181,6 @@ export function cashflowByMonth(mobile, propId, months = 12) {
 
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    // Year-month key from LOCAL parts: toISOString() would shift local midnight into the
-    // previous month for UTC+ zones (e.g. IST), emptying the current month's bucket.
     const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     labels.push(d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }));
     const monthTxns = txns.filter((t) => (t.date || '').startsWith(ym));
@@ -245,8 +232,6 @@ export function exportTransactionsCSV(txns, propId) {
   URL.revokeObjectURL(url);
 }
 
-// jsPDF (~382 KB) is loaded on demand: a static import here would put the whole PDF library in
-// front of first paint for every visitor.
 export async function exportStatementPDF(txns, propId, title) {
   const summary = totals(txns);
   const { jsPDF } = await import('jspdf');

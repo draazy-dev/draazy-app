@@ -42,7 +42,6 @@ function draftFrom(src, frequencies) {
   };
 }
 
-// Facets this form has no control for still narrow the alert, so they ride along untouched.
 function hiddenFacets(src, deal, types) {
   const out = {};
   if (types.includes('commercial') && asArr(src.commercialTypes).length) out.commercialTypes = asArr(src.commercialTypes);
@@ -71,7 +70,6 @@ function ChipGroup({ icon, label, options, selected, onToggle }) {
   );
 }
 
-// Mount only while open: the draft is seeded once from `initial` (filter state or saved alert record).
 export default function AlertSetupModal({ initial, locNameBySlug = {}, editing = false, onSubmit, onClose }) {
   const { t } = useTranslation();
   const { toast } = useToast();

@@ -1,6 +1,4 @@
-/* Tiny client-side CSV exporter shared by admin modules. */
 export function exportCsv(filename, headers, rows) {
-  // A leading = + - @ makes spreadsheets run the cell as a formula; customer-typed text must stay text.
   const esc = (v) => {
     const text = String(v ?? '');
     const safe = typeof v !== 'number' && /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;

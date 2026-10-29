@@ -25,7 +25,6 @@ const OUTCOME_CHIPS = [{ value: '', label: 'Any outcome' }, { value: 'verified',
 const GRID = 'grid grid-cols-[minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.2fr)_4.5rem] items-center gap-3';
 const AGE_TONE = { ok: 'text-gray-400', warn: 'font-semibold text-amber-300', breach: 'font-semibold text-rose-300' };
 
-/* Only the filters the tab's server query understands go on the wire. */
 function queryFor(tab, f, page) {
   const base = { status: TABS.find((t) => t.key === tab).status, q: f.q.trim() || undefined, docType: f.docType || undefined, days: f.days || undefined, sort: 'newest', page: page - 1, size: PAGE_SIZE };
   if (tab === 'needs') return { ...base, claim: f.claim || undefined, overdue: f.overdue || undefined };
@@ -33,7 +32,6 @@ function queryFor(tab, f, page) {
   return base;
 }
 
-// `stale` keeps the last page on screen but inert until the newer query answers.
 function useKycQueue(query, reloadToken) {
   const key = JSON.stringify(query);
   const [state, setState] = useState({ page: null, failed: false, key: null });
@@ -58,7 +56,6 @@ export default function OpsIdentityReview() {
   const [tab, setTab] = useTabParam(TAB_KEYS, 'needs');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
-  // Reset during render, not in an effect: the tab also changes from outside (back button).
   const [filtersTab, setFiltersTab] = useState(tab);
   if (filtersTab !== tab) {
     setFiltersTab(tab);
@@ -68,7 +65,6 @@ export default function OpsIdentityReview() {
   const filtered = Object.keys(EMPTY_FILTERS).some((k) => filters[k] !== EMPTY_FILTERS[k]);
   const changeFilters = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
 
-  // `null` on failure, so a tab count is omitted rather than reading "0" — an all-clear nobody issued.
   const [summary, setSummary] = useState(null);
   const loadSummary = useCallback(() => identityReviewSummary().then(setSummary).catch((err) => {
     console.error('[OpsIdentityReview] summary unavailable', err);
@@ -83,12 +79,10 @@ export default function OpsIdentityReview() {
   const total = queue.page?.total ?? 0;
   const pageCount = queue.page?.totalPages ?? 0;
 
-  // A decision can empty the last page; step back rather than showing "nothing here" over a backlog.
   useEffect(() => {
     if (queue.page && !queue.stale && rows.length === 0 && page > 1 && pageCount > 0) setPage(pageCount);
   }, [queue.page, queue.stale, rows.length, page, pageCount]);
 
-  // Without a tick a desk left open never escalates a row to overdue.
   const [, setAgeTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setAgeTick((n) => n + 1), 60_000);

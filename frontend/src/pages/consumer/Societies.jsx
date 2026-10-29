@@ -18,8 +18,6 @@ const titleCase = (slug) => String(slug || '').replace(/-/g, ' ').replace(/\b\w/
 const PAGE_SIZE = 24;
 const SEARCH_DEBOUNCE_MS = 250;
 
-/* Sort options carry i18n keys, not English labels — the <Select> is fed
-   translated copy at render time so the list follows the reader's language. */
 const SORTS = [
   { value: 'relevance', labelKey: 'societies.sortRelevance' },
   { value: 'rating', labelKey: 'societies.sortRating' },
@@ -27,14 +25,11 @@ const SORTS = [
   { value: 'name', labelKey: 'societies.sortName' },
 ];
 
-/* The rating is the server's aggregate on the row: no reviews means unrated, not a failed read. */
 function SocietyCard({ s, followed, onFollow, t }) {
   return (
     <div className="glass rounded-2xl p-5 flex flex-col gap-3 hover:border-teal-400/30 transition-all reveal">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          {/* Stays small on purpose: the two-line clamped title can't be padded without shifting the card rows;
-              'View hub' on the same card clears 44px, which is the WCAG exemption. */}
           <Link to={`/society/${s.slug}`} data-tap-exempt className="font-bold text-white text-[15px] leading-snug hover:text-teal-300 transition-colors line-clamp-2">
             {s.name}
           </Link>
@@ -87,8 +82,6 @@ export default function Societies() {
   const [loc, setLoc] = useState(params.get('loc') || '');
   const [sort, setSort] = useState('relevance');
   const [q, setQ] = useState(query.trim());
-  /* `rows` keeps the previous answer while the next one is in flight, so a filter tap does not
-     collapse the grid under the reader's thumb; `key` says which request the rows answer. */
   const [feed, setFeed] = useState({ rows: [], ratings: {}, total: 0, page: 0, key: '', status: 'loading' });
   const [more, setMore] = useState('idle');
   const readId = useRef(0);
@@ -114,7 +107,6 @@ export default function Societies() {
         console.warn('[societies] directory unavailable', err);
         if (id === readId.current) setFeed({ rows: [], ratings: {}, total: 0, page: 0, key, status: 'failed' });
       });
-    // `key` is derived from the same inputs as `read`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [read]);
 
@@ -138,8 +130,6 @@ export default function Societies() {
     }
   };
 
-  // Keep the locality (and query) in the URL so a filtered view is shareable and
-  // deep-linkable (e.g. the Locality page can link "Societies in Baner").
   useEffect(() => {
     const next = {};
     if (query.trim()) next.q = query.trim();
@@ -158,13 +148,10 @@ export default function Societies() {
     slug: soc.slug, name: soc.name, builder: soc.builder || '',
     localitySlug: soc.localitySlug || '',
     localityName: soc.localitySlug ? nameOf(soc.localitySlug) : '',
-    /* A slug the index lacks is unrated, which is the honest thing to say about a building with no
-       reviews anywhere. */
     rating: feed.ratings[soc.slug] || { avg: null, count: 0 },
     homes: soc.listingCount,
   })), [feed.rows, feed.ratings, nameOf]);
 
-  // Localities are created on demand, so the filter searches the server instead of listing them all.
   const localities = useMemo(
     () => [{ value: '', label: t('societies.allLocalities') }, ...(loc ? [{ value: loc, label: nameOf(loc) }] : [])],
     [loc, nameOf, t],
@@ -178,8 +165,6 @@ export default function Societies() {
 
   const onFollow = async (slug) => {
     const follow = async () => {
-      /* The context returns the state it settled on after any rollback, so
-         a refused write toasts 'unfollowed', not a false confirmation. */
       const now = await follows.toggle(slug);
       toast(now ? t('societies.followToast') : t('societies.unfollowToast'), now ? 'success' : 'info');
     };
@@ -187,8 +172,6 @@ export default function Societies() {
     follow();
   };
 
-  /* The picker resolves or mints by Google Place ID; `source` is 'create' only when the row is new,
-     and claiming we added a society we merely found sends the member looking for a row that is not new. */
   const addSociety = async (picked) => {
     if (!picked?.slug) return;
     if (isIn && !follows.has(picked.slug)) await follows.toggle(picked.slug);
@@ -199,7 +182,6 @@ export default function Societies() {
   return (
     <div ref={rootRef} className="soc-page">
       <div className="pt-8 sm:pt-10 pb-24 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <header className="reveal mb-6">
           <p className="text-teal-400 text-xs font-semibold tracking-widest uppercase mb-1.5">{t('societies.eyebrow')}</p>
           <h1 className="text-3xl sm:text-4xl font-extrabold">{t('societies.title')}</h1>
@@ -208,7 +190,6 @@ export default function Societies() {
           </p>
         </header>
 
-        {/* Toolbar */}
         <div className="glass rounded-2xl p-3 sm:p-4 mb-6 reveal flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 flex-1 focus-within:border-teal-400/50">
             <Icon name="search" className="w-4 h-4 text-gray-500 flex-shrink-0" />
@@ -230,7 +211,6 @@ export default function Societies() {
           </div>
         </div>
 
-        {/* Count + add-society funnel */}
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4 reveal">
           <p className="text-sm text-gray-400">
             <span className="font-semibold text-white">{feed.total}</span> {feed.total === 1 ? t('societies.countOne') : t('societies.countOther')}{loc ? ` ${t('societies.inLocality', { locality: nameOf(loc) })}` : ''}
@@ -242,8 +222,6 @@ export default function Societies() {
           <SocietySelect allowNotOnMaps={false} mintOrigin="demand" authReason="community" onChange={addSociety} placeholder={t('societies.addPlaceholder')} />
         </div>
 
-        {/* Loading and failed are not "no match": printing that would blame the reader's filters for a read
-            not yet made or not completed. */}
         {!cards.length && !failed && !fresh ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" aria-busy="true">
             {Array.from({ length: 6 }, (_, i) => (

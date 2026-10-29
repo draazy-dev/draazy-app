@@ -4,8 +4,6 @@ import { declineOwnershipVerification } from '../../../../services/propertyRevie
 import { useToast } from '../../../../context/ToastContext.jsx';
 import { fmtAgo } from '../constants.js';
 
-/* Granting in the badge section below answers the request; this is the other answer. The listing's
-   status is untouched, so it works the same on a live, paused or pending listing. */
 export default function BadgeRequestBanner({ propertyId, requestedAt, onDeclined, disabledReason }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);

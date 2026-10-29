@@ -1,15 +1,10 @@
-/** Matches `PlatformSettings.DEFAULT_MAX_LISTING_PHOTOS`: the limit before an admin configures one. */
 export const DEFAULT_MAX_PHOTOS = 10;
-/** Matches `PlatformSettings.MAX_LISTING_PHOTOS`: the most any configuration, or any stored gallery, can hold. */
 export const MAX_PHOTOS_CEILING = 20;
-/** Matches the server floor; lower caps would cut every wizard gallery short. */
 export const MIN_PHOTOS_CAP = 3;
 export const MAX_UPLOAD_BYTES = 1_000_000;
 export const MAX_INPUT_BYTES = 25_000_000;
 export const PHOTO_ACCEPT = '.heif,.heic,.jpeg,.jpg,.png,image/heif,image/heic,image/jpeg,image/png';
 export const DOCUMENT_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf';
-// Keys, not prose: this module is imported for its constants by pages that render none of the guidance,
-// so the sentences live in the eager misc1 namespace rather than dragging a lazy one onto them.
 export const PHOTO_GUIDANCE_KEY = 'misc1.uploads.photoGuidance';
 export const CAMERA_GUIDANCE_KEY = 'misc1.uploads.cameraGuidance';
 export const DOCUMENT_GUIDANCE_KEY = 'misc1.uploads.documentGuidance';
@@ -18,7 +13,6 @@ export const PDF_GUIDANCE_KEY = 'misc1.uploads.pdfGuidance';
 const EXTENSIONS = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', heif: 'image/heic', pdf: 'application/pdf' };
 const normalizedType = (type) => type.toLowerCase().split(';')[0].replace('image/jpg', 'image/jpeg').replace('image/heif', 'image/heic');
 
-/** Filename and MIME are hints; the bytes must independently agree. */
 export async function uploadType(file, isDocument) {
   if (!(file instanceof Blob) || !file.size) throw new Error('Choose a non-empty photo or document.');
   if (file.size > MAX_INPUT_BYTES) throw new Error('Choose an original file no larger than 25 MB.');

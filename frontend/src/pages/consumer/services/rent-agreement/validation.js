@@ -62,8 +62,6 @@ const blank = (v) => !String(v ?? '').trim();
 const wholeIn = (v, lo, hi) => /^\d+$/.test(String(v).trim()) && Number(v) >= lo && Number(v) <= hi;
 const passportOk = (v) => /^[A-Za-z0-9]{6,20}$/.test(String(v || '').trim());
 
-/* Mobiles, Aadhaars and PANs of everyone on the agreement, as [errorKey, value] pairs in form order, so a duplicate
-   is pinned on the later field — the one the customer just typed. */
 const licensorIds = ({ owner, coOwners = [], ownerMode, invite }) => (ownerMode === 'invite'
   ? [{ m: ['invMobile', invite?.invMobile], a: ['invAadhaar', ''], pan: ['invPan', ''] }]
   : [
@@ -185,7 +183,6 @@ function licensorErrors(e, f, today) {
     if (isForeignParty(owner) && blank(owner.visaOci)) e.visaOci = 'required';
   } else if (!isAadhaar(owner.oAadhaar)) e.oAadhaar = 'format';
   if (!isMobile(owner.oMobile)) e.oMobile = 'format';
-  // Mirrors the server: without one of the requester's own listings, only a licensor fills the owner's part.
   else if (!f.listed && f.selfMobile && ![owner.oMobile, ...coOwners.map((c) => c.mobile)].some((m) => digits(m).slice(-10) === digits(f.selfMobile).slice(-10))) e.oMobile = 'notOwner';
   checkEmail(e, 'oEmail', owner.oEmail);
   if (blank(owner.oAddr)) e.oAddr = 'required';
@@ -282,7 +279,6 @@ function witnessErrors(e, f) {
   const tenantSide = tenantIds(f);
   distinctParties(e, [...licensorIds(f), ...tenantSide], witnessIds(f));
 }
-/* Errors for one wizard step, keyed by field. */
 
 export function stepErrors(step, form, now = new Date()) {
   const e = {};
@@ -296,7 +292,6 @@ export function stepErrors(step, form, now = new Date()) {
     if (!blank(prop.taluka) && !PUNE_TALUKAS.includes(prop.taluka)) e.taluka = 'format';
     if (!/^\d{6}$/.test(prop.pincode)) e.pincode = 'format';
     else if (!MH_PINCODE.test(prop.pincode)) e.pincode = 'state';
-    // A draft saved when shops and offices were offered here; those go to the legal desk now.
     if (!RESIDENTIAL_PROPERTY_TYPES.includes(prop.propType)) e.propType = 'commercial';
     const area = Number(String(prop.area ?? '').trim());
     if (!/^\d+(\.\d{1,2})?$/.test(String(prop.area ?? '').trim()) || !(area >= 1 && area <= MAX_AREA)) e.area = 'required';

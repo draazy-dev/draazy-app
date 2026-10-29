@@ -41,21 +41,15 @@ export default function Dashboard() {
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
-  // Resolve the active tab from either the hash (#listings) or a ?tab= query
-  // param, so deep-links from anywhere in the app land on the right tab.
   const tabFromLocation = () => {
     const h = location.hash.replace('#', '');
     const q = new URLSearchParams(location.search).get('tab') || '';
     return h || q;
   };
-  // Map a raw candidate (real tab id OR legacy alias) to { tab, sub }. Aliases keep
-  // every historical deep-link working.
   const resolveTarget = (candidate) => {
     if (candidate && TAB_ALIAS[candidate]) return TAB_ALIAS[candidate];
     return { tab: candidate || 'overview' };
   };
-  // During render, so the seeds exist before any panel's effect makes its own read. A landing on My Listings
-  // also takes that panel's quota and deal book.
   const [dashboardDoc] = useState(() => primeMeDashboard({ listingTools: resolveTarget(tabFromLocation()).tab === 'properties' }));
   const [caps, setCaps] = useState({});
   useEffect(() => {
@@ -64,8 +58,6 @@ export default function Dashboard() {
     return () => { live = false; };
   }, [dashboardDoc]);
   const { verified } = useVerification();
-  // Management tabs unlock on actual inventory, not on role, so a brand-new owner is not handed
-  // empty "My Listings / Enquiries / Finances" dead-ends.
   const [managedProps, setManagedProps] = useState([]);
   useEffect(() => {
     let live = true;
@@ -78,7 +70,7 @@ export default function Dashboard() {
     try {
       const rows = await listManaged();
       setManagedProps(Array.isArray(rows) ? rows : []);
-    } catch { /* the rows on screen stay */ }
+    } catch { }
   }, []);
 
   const {
@@ -89,8 +81,6 @@ export default function Dashboard() {
     dataStatus, dataError, retryData,
     refreshData, refreshRequests, setListings,
   } = useDashboardData({ user, toast, ownsProperty: caps.ownsProperty });
-  /* "My Rental" shows for buyers/tenants and anyone with a finalised tenancy, not a pure owner; a pending co-fill
-     invite also belongs there so an invited tenant always has a place to act. */
   const isOwner = (listings || []).length > 0 || managedProps.length > 0;
   const { hasTenancy = false, hasRentalInvite = false } = caps;
   const showRental = hasTenancy || !isOwner || hasRentalInvite;
@@ -138,11 +128,7 @@ export default function Dashboard() {
   const pendingDocGroups = docGroups.filter((g) => g.pendingIds.length > 0);
   const savedCount = saved.count;
   const alertCount = savedSearches.count;
-  // From the context, so the tile agrees with the same user's count on another device and with the
-  // follower count the society hub computes server-side.
   const followCount = follows.count;
-  // Rendered for owners too (Resume search). Starts empty, the same shape as "no history yet", so nothing flashes
-  // before the read.
   const [recentSearches, setRecentSearches] = useState([]);
   useEffect(() => {
     let alive = true;
@@ -153,20 +139,14 @@ export default function Dashboard() {
     return () => { alive = false; };
   }, [user?.mobile]);
   const profile = useMemo(() => profileCompletion(user, verified), [user, verified]);
-  // Action Center: what is waiting on this user. Computed per render (small arrays) so the
-  // inline handlers below are never stale, and sorted stale-first.
 
   const scheduledVisits = useMemo(() => visits.filter((v) => v.status === 'scheduled'), [visits]);
   const actionItems = buildActionItems({
     isOwner, contactReqs, apps, photoReqs, pendingDocGroups, listings, reviewsByProp,
     scheduledVisits, flatmateReqs, userId: user?.id, openReview, go,
   });
-  // Badge counts only items genuinely waiting on the owner, matching the Requests panel's
-  // "Waiting on you"; an already-contactable enquiry needs no accept/decline decision.
   const attentionCounts = attentionFromItems(actionItems);
 
-  // Total open leads, computed exactly as the Leads panel computes its own total, so the Overview
-  // tile and the panel can never show two different numbers for the same inbox.
   const upcomingVisits = countUpcomingVisits(visits, user?.id);
   const ownerStats = buildOwnerStats({ listings, items: actionItems, go });
   const seekerStats = buildSeekerStats({ savedCount, alertCount, followCount, upcomingVisits, go });
@@ -174,8 +154,6 @@ export default function Dashboard() {
     listings, visits, recent, recommended, alertMatches, contactReqs, photoReqs, flatmateReqs, docReqs, apps,
   ].some((rows) => (rows || []).length > 0);
   const personaPending = dataStatus === 'loading' && !hasAnyCoreData;
-  /* Panel components are imported so their identity is stable across Dashboard re-renders: a state change here would
-     otherwise remount the active panel and wipe its internal state. */
 
   const renderPanel = () => {
     if (tab === 'overview' && personaPending) return <DashboardOverviewSkeleton />;

@@ -8,7 +8,6 @@ import TurnstileWidget from './security/TurnstileWidget.jsx';
 import { useTurnstile } from './security/useTurnstile.js';
 import Modal from './ui/Modal.jsx';
 
-/* The +91 prefix only comes off a number longer than ten digits: a real mobile can begin 91. */
 const digits = (s) => String(s || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
 
 export default function CityChrome() {
@@ -33,7 +32,6 @@ export default function CityChrome() {
     try {
       sessionStorage.setItem('pncBarX', city);
     } catch {
-      /* ignore */
     }
     setDismissed(city);
   };
@@ -42,8 +40,6 @@ export default function CityChrome() {
     <>
       {showBar ? (
         <div className="fixed left-1/2 -translate-x-1/2 bottom-[calc(var(--dz-bottom-inset)+18px)] z-[1200] w-[min(680px,calc(100%-24px))]">
-          {/* Phones stack (copy row, then a full-width button row) because the copy
-              collapsed to a 1-word column when everything shared one flex line. */}
           <div className="relative flex flex-col gap-2.5 rounded-2xl border border-white/12 bg-ink-card/95 px-4 py-3 pr-10 shadow-2xl shadow-black/50 backdrop-blur sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:pr-4">
             <div className="flex items-start gap-2.5 sm:flex-1 sm:min-w-0 sm:items-center">
               <span className="text-lg leading-none">🚧</span>
@@ -77,13 +73,9 @@ export default function CityChrome() {
           modal={modal}
           user={user}
           onClose={closeModal}
-          /* The ask is a `POST /cities/waitlist`, so the success toast has to wait for it.
-             Rejecting leaves the modal open with the form still filled. */
           onSubmit={async (payload, msg) => {
             await requestCity(payload);
             closeModal();
-            // Only relocate when they're stranded on a city that isn't live. Liveness is re-read
-            // here: a `draazy-settings-change` arriving mid-POST can launch this very city.
             if (!isLive(city)) setCity('Pune');
             toast(msg, 'success');
           }}
@@ -96,15 +88,12 @@ export default function CityChrome() {
 function CityModal({ modal, user, onClose, onSubmit }) {
   const isWaitlist = modal.type === 'waitlist';
   const cityName = modal.city;
-  /* No `name` field: `CityWaitlistCreateRequest` has no such property and `city_waitlist` has no column. */
   const [form, setForm] = useState({ city: '', mobile: digits(user?.mobile), email: user?.email || '' });
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const turnstile = useTurnstile();
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
-  /* Every way out is sealed while the POST is in flight: `onSubmit` closes over `CityChrome`,
-     which does not unmount with the modal, so a mid-flight close still ran the continuation. */
   const requestClose = useCallback(() => { if (!busy) onClose(); }, [busy, onClose]);
 
   const submit = async () => {
@@ -113,11 +102,7 @@ function CityModal({ modal, user, onClose, onSubmit }) {
     if (!isWaitlist && !target) { setErr('Enter a city name'); return; }
     const mob = digits(form.mobile);
     if (!/^[6-9]\d{9}$/.test(mob)) { setErr('Enter a valid 10-digit mobile number'); return; }
-    /* Scoped to the waitlist branch, the only branch with an email field: unscoped, the request
-       modal would send a seeded address the shopper was never shown, and could refuse on it. */
     const email = isWaitlist ? form.email.trim() : '';
-    /* Checked here because the server's `@Email` refuses the whole request and the only message
-       this modal can render for a 400 is a generic "try again", which would loop. */
     if (email && !/^\S+@\S+\.\S+$/.test(email)) { setErr('Enter a valid email address, or leave it blank'); return; }
     setErr('');
     setBusy(true);
@@ -127,8 +112,6 @@ function CityModal({ modal, user, onClose, onSubmit }) {
         isWaitlist ? `You're on the ${target} waitlist 🎉` : `Thanks! We've noted your request for ${target}`,
       );
     } catch {
-      /* The modal stays open on the same form. `setBusy(false)` runs on both paths; on the
-         success path this component is unmounting, where React 19 drops the update silently. */
       setErr("We couldn't record that just now. Please try again.");
     } finally {
       setBusy(false);
@@ -160,8 +143,6 @@ function CityModal({ modal, user, onClose, onSubmit }) {
       </p>
       {!isWaitlist ? (
         <label className="mb-3 block text-[12.5px] font-semibold text-gray-300">Which city?
-          {/* `maxLength` mirrors `CityWaitlistCreateRequest`'s `@Size(max = 120)` — free text
-            against a server bound is an unwinnable retry the error message can't name. */}
         <input value={form.city} onChange={(e) => set('city', e.target.value)} maxLength={120} className={fld + ' mt-1.5'} placeholder="City name" />
         </label>
       ) : null}
@@ -174,8 +155,6 @@ function CityModal({ modal, user, onClose, onSubmit }) {
         </label>
       ) : null}
       <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="mt-2 flex justify-center" />
-      {/* `role="alert"` because this message arrives *after* an await, with focus parked on a
-         button that has gone quiet, so it would otherwise never be announced. */}
       {err ? <p role="alert" className="mt-1 text-xs text-rose-300">{err}</p> : null}
     </Modal>
   );

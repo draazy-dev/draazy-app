@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router';
 
-// Equirectangular at Pune's latitude (cos 18.5° ≈ 0.948), so a kilometre is the same length both ways.
 const W = 400;
 const H = 250;
 const x = (lng) => (lng - 73.71) * 1600;
@@ -8,7 +7,6 @@ const y = (lat) => (18.62 - lat) * 1688;
 
 const CENTRE = { x: x(73.85), y: y(18.525) };
 
-// Hand-traced from the river courses; good to a few hundred metres at this scale.
 const RIVERS = [
   'M 0 82 C 30 74, 70 54, 100 56 S 140 80, 160 92 S 190 80, 205 86 S 228 128, 240 143',
   'M 150 250 C 165 222, 178 205, 190 196 S 222 165, 240 143',

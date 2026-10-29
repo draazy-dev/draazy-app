@@ -1,5 +1,3 @@
-/* Every colour the app paints lives in src/styles/theme.css, so light mode can swap it. A literal
-   anywhere else is a colour the theme cannot reach. */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'src');
 
-/* Paths relative to src/, with the reason the literal cannot come from the theme. */
 const ALLOWED = {
   'styles/theme.css': 'the palette itself',
   'components/ui/PoweredByGoogle.jsx': "Google's attribution mark must keep Google's brand colours",

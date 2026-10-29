@@ -20,8 +20,6 @@ export default function Results({ tab, myPost, myRooms = [], myGroups = [], acti
   const isMoveIn = tab === TAB_MOVE_IN;
   const showLoadError = feedFailed && activeList.length === 0;
 
-  // Never on a failed read and never before the first answer: "get alerted when one appears" is a
-  // claim that there are none, and neither state knows that.
   const showAlert = loaded && !showLoadError && (total === 0 || activeFilterCount >= 2);
 
   const chips = flatmateActiveChips(filters, tab, t, budgetLbl, setF);
@@ -80,8 +78,6 @@ export default function Results({ tab, myPost, myRooms = [], myGroups = [], acti
           <Pager page={page + 1} pageCount={pageCount} onGoTo={(n) => onGoToPage(n - 1)} />
         </>
       ) : !loaded ? (
-        /* Nothing to say yet: the empty state below is an ASSERTION, and "no homes match, clear
-         * your filters" names a cause for a search the server has not answered. */
         <div className="py-16 text-center text-sm text-gray-500">{t('flatmates.countLoading')}</div>
       ) : (
         <Empty

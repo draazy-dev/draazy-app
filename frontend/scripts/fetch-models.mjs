@@ -1,5 +1,3 @@
-/** Why a script instead of committing them: together they are 6.5 MB of binary that every clone and every `git fetch`
- * would carry forever, for files no build step reads and no diff can ever show meaningfully. */
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -7,13 +5,9 @@ import path from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
-/* Provenance, licence and upstream project are recorded in public/third-party/models.txt, which
- * ships to users. Keep the two in step. */
 const MODELS = [
   {
     target: 'public/models/face_landmarker.task',
-    // Pinned to float16 revision 1, never '/latest/': the model deciding whether a selfie shows a
-    // live face must not be able to change without a commit.
     url: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
     sha256: '64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff',
   },
@@ -37,8 +31,6 @@ async function download(url, sha256) {
   const bytes = Buffer.from(await response.arrayBuffer());
   const actual = digest(bytes);
   if (actual !== sha256) {
-    // Refuse to write it. A wrong file on disk would be picked up by the next run's hash check,
-    // but it would also be served by a `vite dev` started in between.
     throw new Error(`Digest mismatch for ${url}\n  expected ${sha256}\n  received ${actual}`);
   }
   return bytes;
@@ -53,8 +45,6 @@ for (const { target, url, sha256 } of MODELS) {
     continue;
   }
 
-  // A shared cache across working copies and between a cleaned public/ and the next build, so a
-  // re-run after `git clean` costs nothing.
   const cached = path.join(root, 'node_modules/.cache/models', name);
   let bytes = await readIfMatching(cached, sha256);
 

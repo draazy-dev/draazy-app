@@ -4,7 +4,6 @@ import { TRUST_PAGES } from '../../data/trustPages.js';
 
 const BADGE = { '/about': ['house', 'About us'], '/how-verification-works': ['badge-check', 'Trust & safety'] };
 
-/* `path` comes from the route, not the URL: routes match case-insensitively, the page keys don't. */
 export default function TrustPage({ path }) {
   const page = TRUST_PAGES[path];
   const [icon, label] = BADGE[path];

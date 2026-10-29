@@ -28,11 +28,9 @@ import { useIsLightTheme } from '../../lib/themeColour';
 
 const POSTHOG_APP_URL = import.meta.env.VITE_POSTHOG_APP_URL || '';
 
-// Pricing is a snapshot of the live catalogue, so it has no window to pick.
 const WINDOWED_TABS = new Set(['funnel', 'flatmates', 'traffic', 'engagement', 'supply-gap', 'sla']);
 const TAB_KEYS = ['traffic', 'engagement', 'funnel', 'flatmates', 'supply-gap', 'pricing', 'sla'];
 
-/* Three-state, because a `[]` default would render an all-clear from a 500. */
 function useTabReport(load, shown, key) {
   const [state, setState] = useState({ data: null, failed: false, key: undefined });
   const current = state.key === key;
@@ -43,14 +41,12 @@ function useTabReport(load, shown, key) {
       .then((data) => { if (alive) setState({ data, failed: false, key }); })
       .catch(() => { if (alive) setState({ data: null, failed: true, key }); });
     return () => { alive = false; };
-    // `key` stands for everything `load` closes over; `load` itself is a fresh closure every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shown, current, key]);
   return state;
 }
 
 export default function AdminAnalytics() {
-  /* Chart options below read cssColour at render, so a theme flip must re-render them. */
   useIsLightTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
@@ -58,12 +54,10 @@ export default function AdminAnalytics() {
   const flatmatesOn = useAdminFlags().tabEnabled('flatmates');
   const tabKeys = flatmatesOn ? TAB_KEYS : TAB_KEYS.filter((k) => k !== 'flatmates');
 
-  // An unknown `?tab=` falls back to the first tab, never to an empty page.
   const activeTab = tabKeys.includes(requestedTab) ? requestedTab : tabKeys[0];
   const on = (key) => activeTab === key;
 
   const supplyGap = useTabReport(() => fetchSupplyGap({ days }), on('supply-gap'), days);
-  /* A separate read from its own table, so one failing report empties one panel. */
   const [cityWaitlistAttempt, setCityWaitlistAttempt] = useState(0);
   const retryCityWaitlist = () => setCityWaitlistAttempt((n) => n + 1);
   const cityWaitlist = useTabReport(listCityWaitlist, on('supply-gap'), cityWaitlistAttempt);

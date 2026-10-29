@@ -6,8 +6,6 @@ import { OwnReviewBar } from '../property/OwnReviewBar.jsx';
 
 export default function ReviewsBlock({ activeName, locReviews, summary, summaryFailed, onSubmit, revText, setRevText, pick, setPick, editing, busy, onEdit, onDelete, onCancel }) {
   const { t } = useTranslation();
-  /** The headline is the server aggregate, not an average of the cards (page one only). A failed read
-   * must not reuse the "no reviews yet" copy: that claims nobody reviewed the area. */
   const loading = !summary && !summaryFailed;
   const rated = !!summary && summary.count > 0 && Number.isFinite(summary.avg);
   const showForm = editing || !locReviews.some((rv) => rv.mine);

@@ -6,8 +6,6 @@ import { browserAlertsOn } from '../lib/browserAlerts.js';
 import { CONNECTION_KINDS, isPending } from '../pages/consumer/requests/requestMeta.js';
 import { useAuth } from './AuthContext.jsx';
 
-/* The chat badge count, held once for the whole app because the answer is a network call and a
-   network call cannot happen during render. Signed out holds zero: the inbox 401s without a session. */
 const ConversationContext = createContext(null);
 
 export function ConversationProvider({ children }) {
@@ -28,14 +26,11 @@ export function ConversationProvider({ children }) {
       setUnread(n);
       return n;
     } catch {
-      // An unreachable inbox shows no badge rather than a stale one: a badge the user cannot clear
-      // by reading anything is worse than no badge.
       setUnread(0);
       return 0;
     }
   }, [isIn]);
 
-  // Only the request kinds the Messages inbox lists, so the badge never counts something it cannot show.
   const refreshRequests = useCallback(async () => {
     if (!isIn) {
       setPendingRequests(0);
@@ -65,8 +60,6 @@ export function ConversationProvider({ children }) {
     return () => { alive = false; };
   }, [isIn]);
 
-  /* Re-reads when another tab writes, focus returns, or the network comes back. Focus and
-     visibilitychange fire together on a tab switch, so one read answers both. */
   useEffect(() => {
     if (!isIn) return undefined;
     let last = 0;
@@ -118,7 +111,6 @@ export function ConversationProvider({ children }) {
     let controller = null;
     let timer = null;
     const start = () => {
-      // A background tab with browser alerts on keeps listening: the server skips push while this stream is up.
       if (stopped || (document.hidden && !browserAlertsOn())) return;
       controller = new AbortController();
       openMessageStream({
@@ -129,7 +121,6 @@ export function ConversationProvider({ children }) {
         },
         onEvent: (event) => {
           if (event.type === 'message') refresh();
-          // A new request reaches the host as a notification; there is no request event on this stream.
           if (event.type === 'notification') refreshRequests();
           subscribers.current.forEach((fn) => fn(event));
         },

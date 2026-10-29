@@ -3,8 +3,6 @@ import { ChevronDown, ChevronUp, MessageSquareText } from 'lucide-react';
 import { addNote, listNotes } from '../../services/noteService.js';
 import { classNames } from '../../lib/format.js';
 
-/* The history count is withheld until the read lands: "0 previous notes" is a claim about the case, and showing it
-   while still loading would be a false one. */
 export default function InternalNote({ entityType, entityId, value, onChange, showHistory = false, className }) {
   const [expanded, setExpanded] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -19,8 +17,6 @@ export default function InternalNote({ entityType, entityId, value, onChange, sh
     setNotes(null);
     listNotes(entityType, entityId)
       .then((rows) => { if (alive) setNotes(rows); })
-      // A history that cannot be read is not a case with no history. Staying at null keeps the
-      // toggle hidden rather than asserting a count this component does not have.
       .catch(() => { if (alive) setNotes(null); });
     return () => { alive = false; };
   }, [showHistory, entityType, entityId]);
@@ -78,11 +74,8 @@ export default function InternalNote({ entityType, entityId, value, onChange, sh
   );
 }
 
-// Rejects on a blank note, so callers check the text first; acting without a note is the ordinary case.
 export { addNote as submitNote };
 
-/* The decision has already landed when this runs, so a failed note is reported, not thrown: throwing would make the
-   caller say the decision failed. */
 export async function saveNoteIfAny(entityType, entityId, text, action) {
   const clean = String(text ?? '').trim();
   if (!clean) return { written: false, error: null };

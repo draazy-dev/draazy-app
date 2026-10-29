@@ -29,7 +29,6 @@ export const DATE_CHIPS = [
   { value: '30', label: '30d' },
 ];
 
-/** `tabs`: [{ key, label, count }]; a null count hides the pill, a string (e.g. "100+") shows as is. */
 export function QueueTabs({ tabs, active, onChange, label, idPrefix = 'queue', countTestId = 'tab-count' }) {
   return (
     <HScroll role="tablist" aria-label={label} wrapClassName="mb-4" fadeColor="var(--brand-dark)" className="flex gap-1 border-b border-white/10">
@@ -63,7 +62,6 @@ export function QueueTabs({ tabs, active, onChange, label, idPrefix = 'queue', c
   );
 }
 
-/** The card a tab renders into: a one-line note, then the toolbar, then the rows. */
 export function QueuePanel({ idPrefix = 'queue', active, note, noteTestId, toolbar, footer, children }) {
   return (
     <section id={`${idPrefix}-panel`} role="tabpanel" aria-labelledby={active ? `${idPrefix}-tab-${active}` : undefined} className="dz-card overflow-hidden p-0">
@@ -139,7 +137,6 @@ export function IconAction({ label, title, onClick, icon: Icon, className, testI
   );
 }
 
-// Fixed columns so a value sits in the same place on every tile; a missing one shows a dash.
 export function FactRow({ label, className, children }) {
   return (
     <div className={classNames('flex items-baseline gap-3', className)}>
@@ -187,7 +184,6 @@ export function RowList({ children, empty, isEmpty }) {
   return <ul className="space-y-3 p-3">{children}</ul>;
 }
 
-/** Pages an in-memory list; going back to page 1 whenever `resetKey` (the filters) changes. */
 export function useClientPaging(items, size, resetKey) {
   const [state, setState] = useState({ page: 1, key: resetKey });
   const total = items.length;

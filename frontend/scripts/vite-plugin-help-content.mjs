@@ -7,7 +7,6 @@ import { esc, headTags, jsonLd, renderPage } from './seo-html.mjs';
 const VIRTUAL_ID = 'virtual:help-content';
 const RESOLVED_ID = '\0' + VIRTUAL_ID;
 
-/* GitHub-style callouts: > [!NOTE] / [!TIP] / [!WARNING] / [!IMPORTANT] */
 const CALLOUTS = {
   NOTE: { icon: 'info', label: 'Note' },
   TIP: { icon: 'lightbulb', label: 'Tip' },
@@ -21,8 +20,6 @@ function slugify(s) {
   return String(s)
     .toLowerCase()
     .trim()
-    // Drop apostrophes rather than turning them into separators, so "owner's"
-    // becomes `owners` and not `owner-s`.
     .replace(/['’‘]/g, '')
     .replace(SLUG_KEEP, '-')
     .replace(/(^-|-$)/g, '');
@@ -34,8 +31,6 @@ const NAMED_ENTITIES = {
   lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
 };
 
-/* Marked escapes text for HTML output, so the derived plain text has to be decoded again —
-   otherwise a heading reads "I&#39;m" and anchors to `i-39-m`. */
 function decodeEntities(s) {
   return s
     .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
@@ -43,8 +38,6 @@ function decodeEntities(s) {
     .replace(/&([a-z]+);/gi, (m, name) => NAMED_ENTITIES[name.toLowerCase()] ?? m);
 }
 
-/* Supports only the frontmatter subset the help content uses; a full YAML parser would be
-   another dependency for no gain. */
 export function parseFrontmatter(raw) {
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { data: {}, body: raw };
@@ -73,7 +66,6 @@ export function parseFrontmatter(raw) {
   return { data, body: match[2] };
 }
 
-/** Strip HTML tags, decode entities and collapse whitespace — the search haystack. */
 export function toPlainText(html) {
   return decodeEntities(
     html
@@ -84,7 +76,6 @@ export function toPlainText(html) {
     .trim();
 }
 
-/* A fresh Marked instance per file keeps the heading collector isolated. */
 export function createRenderer(headings) {
   const marked = new Marked({ gfm: true, breaks: false });
   const seen = new Map();
@@ -98,7 +89,6 @@ export function createRenderer(headings) {
         const count = seen.get(id) || 0;
         seen.set(id, count + 1);
         if (count) id = `${id}-${count + 1}`;
-        // Only h2/h3 land in the table of contents — deeper levels are detail.
         if (depth === 2 || depth === 3) headings.push({ id, text: plain, level: depth });
         return `<h${depth} id="${id}">${text}</h${depth}>\n`;
       },
@@ -115,7 +105,6 @@ export function createRenderer(headings) {
       // Raw HTML in Markdown is dropped so pasted untrusted text can never introduce a script tag.
       html() { return ''; },
       // marked v15 removed its built-in sanitizer, so an unguarded `[x](javascript:…)` would render
-      // a live script-executing anchor. Anything outside the allowlist becomes an inert '#'.
       link({ href, title, tokens }) {
         const text = this.parser.parseInline(tokens);
         const safe = /^(https?:|mailto:|tel:|\/|#)/i.test(href || '') ? href : '#';
@@ -177,8 +166,6 @@ function compileArticles(contentDir) {
   return articles;
 }
 
-/* Access is inherited downwards — a staff category makes its articles staff, a staff section its
-   categories — because this flag decides whether the text ships in the public bundle at all. */
 function splitByAccess({ sections, categories, articles }) {
   const staffSections = new Set(sections.filter((s) => s.access === 'staff').map((s) => s.id));
   const categoryIsStaff = (c) => c.access === 'staff' || staffSections.has(c.section);
@@ -198,7 +185,6 @@ function splitByAccess({ sections, categories, articles }) {
 function compileChangelog(file) {
   if (!existsSync(file)) return [];
   const raw = readFileSync(file, 'utf-8');
-  // Entries are separated by `## <version> — <date>` headings.
   const chunks = raw.split(/^##\s+/m).slice(1);
   return chunks.map((chunk) => {
     const [headingLine, ...rest] = chunk.split(/\r?\n/);
@@ -227,8 +213,6 @@ const crumbs = (siteUrl, trail) => ({
   itemListElement: trail.map(([name, path], i) => ({ '@type': 'ListItem', position: i + 1, name, item: `${siteUrl}${path}` })),
 });
 
-/* Titles and descriptions mirror src/components/help/HelpLayout.jsx and the help pages, so a
-   prerendered head matches what the app sets after in-app navigation. */
 export function helpPages({ sections, categories, articles, changelog }, copy, siteUrl) {
   const pageTitle = (title) => (title ? `${title} · Draazy ${copy.centre}` : `Draazy ${copy.centre}`);
   const org = { '@id': `${siteUrl}/#organization` };
@@ -304,15 +288,12 @@ export function helpPages({ sections, categories, articles, changelog }, copy, s
   ];
 }
 
-/* Staff runbooks never enter the public bundle: `scripts/gen-staff-help.mjs` writes this to the backend,
-   which serves it to back-office roles only. */
 export function compileStaffHelp(root) {
   const contentDir = join(root, 'src/content/help');
   const { sections, categories } = loadTaxonomy(join(contentDir, 'categories.json'));
   return splitByAccess({ sections, categories, articles: compileArticles(contentDir) }).staff;
 }
 
-/** @param {{ root?: string, siteUrl?: string }} [options] */
 export default function helpContentPlugin(options = {}) {
   const root = options.root || process.cwd();
   const siteUrl = (options.siteUrl || 'https://draazy.com').replace(/\/$/, '');
@@ -343,8 +324,6 @@ export default function helpContentPlugin(options = {}) {
     load(id) {
       return id === RESOLVED_ID ? build() : null;
     },
-    /* Editing a doc invalidates the virtual module so the dev server hot-reloads
-       the compiled output instead of requiring a restart. */
     handleHotUpdate(ctx) {
       const changed = ctx.file.replace(/\\/g, '/');
       if (!changed.includes('/src/content/')) return;
@@ -353,7 +332,6 @@ export default function helpContentPlugin(options = {}) {
       server?.ws.send({ type: 'full-reload' });
       return [];
     },
-    /* Runs after Vite writes dist/index.html and copies the static sitemap. */
     writeBundle() {
       const { sections, categories } = loadTaxonomy(categoriesFile);
       const open = splitByAccess({ sections, categories, articles: compileArticles(contentDir) }).open;
@@ -389,7 +367,7 @@ export default function helpContentPlugin(options = {}) {
       ];
 
       const xml = readFileSync(sitemap, 'utf-8');
-      if (xml.includes('/help/a/')) return; // already injected
+      if (xml.includes('/help/a/')) return;
 
       writeFileSync(sitemap, xml.replace('</urlset>', `${urls.join('\n')}\n</urlset>`), 'utf-8');
     },

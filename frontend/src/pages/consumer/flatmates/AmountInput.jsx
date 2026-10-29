@@ -1,6 +1,5 @@
 import { formatIndian, moneyWords } from '../list-property/format.js';
 
-/* Keeps payloads as bare digits while the field displays Indian grouping and words. */
 export default function AmountInput({ value, onChange, className = '', maxDigits = 8, ...rest }) {
   const words = moneyWords(value);
   return (

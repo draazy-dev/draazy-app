@@ -18,7 +18,6 @@ export function SocietySection({ p }) {
     return () => { alive = false; };
   }, [socSlug]);
 
-  /* No binding, no section: a heading over a generic name would still assert a society that was never picked. */
   if (!soc) return null;
 
   const { rating } = soc;

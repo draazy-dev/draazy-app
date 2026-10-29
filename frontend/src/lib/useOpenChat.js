@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router';
 import { digits } from './contact.js';
 import { getConversation, listConversations, startConversation } from '../services/conversationService.js';
 
-// Inbox rows carry no number (only an open thread does), so this listing's threads are read to find the person.
 async function findThread(them, pid) {
   if (!pid) return null;
   const candidates = (await listConversations()).filter((c) =>
@@ -14,8 +13,6 @@ async function findThread(them, pid) {
   return null;
 }
 
-/* Opens the in-app thread with this person about this listing. An existing thread is reused untouched; only a new one
-   is opened with `greeting`, under a fixed clientId so a second tap cannot post it twice. */
 export function useOpenChat(toast) {
   const navigate = useNavigate();
   return async ({ mobile, propertyId, greeting }) => {

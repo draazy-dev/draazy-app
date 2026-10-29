@@ -7,8 +7,6 @@ import { listMyServiceRequestInvites } from './serviceRequestService.js';
 const PAGE = { page: 0, size: MAX_PAGE_SIZE };
 const SIZE = { size: MAX_PAGE_SIZE };
 
-// Each entry must be the exact read its provider makes (path and query, in that key order), or the
-// seed goes unused.
 const SECTIONS = [
   ['listings', '/me/listings', SIZE],
   ['flatmatePosts', '/me/flatmate-posts', PAGE],
@@ -27,8 +25,6 @@ const SECTIONS = [
   ['entitlements', '/me/entitlements'],
 ];
 
-/* One `GET /me/dashboard` replaces the dashboard's and owner hub's inbox reads; seeds outlive their first reader
-   because panels re-read while mounting. `listingTools` adds the My Listings panel's quota. */
 export function primeMeDashboard({ listingTools = false } = {}) {
   if (!readAccessToken()) return undefined;
   const doc = get('/me/dashboard', listingTools ? { listingTools: true } : undefined);
@@ -38,8 +34,6 @@ export function primeMeDashboard({ listingTools = false } = {}) {
   return doc;
 }
 
-/* What decides the dashboard's tabs and owner inbox reads. `ownsProperty: null` means unknown (no aggregate), so
-   callers read as before; a rental flag the aggregate could not answer is read from its own endpoint. */
 export async function dashboardCaps(doc) {
   const d = doc ? await doc.catch(() => null) : null;
   const any = (rows) => (rows || []).length > 0;

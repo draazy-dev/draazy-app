@@ -2,8 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { DEFAULT_CITY, getCities, getCityLive, onGeoChange } from '../lib/geoConfig.js';
 import { joinCityWaitlist } from '../services/cityService.js';
 
-/* Which cities are live comes from the curated roster (`GET /bootstrap` (`cities`), Pune-only when unreachable)
-   read live via lib/geoConfig.js; a non-live city opens the waitlist instead of switching. */
 const CityContext = createContext(null);
 const CKEY = 'draazyCity';
 
@@ -17,14 +15,11 @@ export function CityProvider({ children }) {
       return 'Pune';
     }
   });
-  const [modal, setModal] = useState(null); // { type: 'waitlist' | 'request', city }
-  // City roster + live status, re-read whenever an admin saves the Maps settings.
+  const [modal, setModal] = useState(null);
   const [cities, setCities] = useState(getCities);
 
   useEffect(() => {
     const sync = () => setCities(getCities());
-    /* `onGeoChange` fires when lib/geoConfig.js finishes fetching `GET /bootstrap` (`geo`); until then the roster
-       is the built-in defaults, so without it a second live city renders as "coming soon". */
     const unsubscribe = onGeoChange(sync);
     window.addEventListener('draazy-settings-change', sync);
     window.addEventListener('storage', sync);
@@ -43,8 +38,6 @@ export function CityProvider({ children }) {
   const setCity = useCallback((next) => {
     const name = String(next || '').trim();
     if (!name) return;
-    // A "coming soon" city is a waitlist prompt, not a destination: only open the
-    // modal and leave the shopper on their current city, so cancelling is a no-op.
     if (!getCityLive(name)) {
       setModal({ type: 'waitlist', city: name });
       return;
@@ -52,13 +45,10 @@ export function CityProvider({ children }) {
     try {
       localStorage.setItem(CKEY, name);
     } catch {
-      /* ignore */
     }
     setCityState(name);
   }, []);
 
-  // Kick the shopper back to the default city when the one they are viewing is taken offline. The
-  // previous {city, live} is remembered so this reacts only to a toggle, not to a deliberate switch.
   const prevRef = useRef({ name: city, live: isLive(city) });
   useEffect(() => {
     const nowLive = isLive(city);
@@ -75,8 +65,6 @@ export function CityProvider({ children }) {
 
   const requestCity = useCallback(async (o) => {
     const cityName = String(o?.city || '').trim();
-    /* Throw rather than return: a silent resolve would toast "you're on the list" for a request
-       that never left the browser. Unreachable today, which is why it has to be loud. */
     if (!cityName) throw new Error('requestCity: a city is required');
     await joinCityWaitlist({
       city: cityName,

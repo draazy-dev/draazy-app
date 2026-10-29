@@ -21,8 +21,6 @@ export default function HelpArticle() {
   const { prev, next } = useArticleNeighbours(article);
 
   useEffect(() => { if (article) markViewed(article.slug); }, [article]);
-  // Deep links to a heading arrive before the prose has painted, so the browser's
-  // native hash scroll lands nowhere. Re-run it once the article is on screen.
 
   useEffect(() => {
     if (!article || !window.location.hash) return undefined;
@@ -85,13 +83,8 @@ export default function HelpArticle() {
               )}
             </div>
           </header>
-          {/* A page that silently switches language reads as a bug rather than a gap in our content, so the fallback
-             to English has to be announced. */}
-
           <ArticleToc headings={article.headings} variant="inline" />
 
-          {/* `lang` drives screen readers, hyphenation and font selection when the body is English inside an
-             otherwise-Marathi page. */}
           <ArticleProse html={article.html} />
 
           {article.tags.length > 0 && (

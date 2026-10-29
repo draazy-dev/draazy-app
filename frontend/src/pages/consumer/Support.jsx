@@ -35,9 +35,6 @@ export default function Support() {
   const [params] = useSearchParams();
   const invoice = (params.get('invoice') || '').replace(/[^\w-]/g, '').slice(0, 40);
 
-  /* No priority or image-attachment control: neither is on the wire, and unknown properties are ignored rather
-     than rejected, so sending one would appear to work while ops never sees it. */
-
   const [tickets, setTickets] = useState([]);
   const [faqs, setFaqs] = useState([]);
   const [openFaq, setOpenFaq] = useState(null);
@@ -73,8 +70,6 @@ export default function Support() {
     let alive = true;
     reload().then((list) => {
       if (!alive) return;
-      // Deep-link: auto-open a ticket from URL ?open=<id>. Resolved from the list we just loaded
-      // rather than on a timer, which would race the request and lose.
       if (openId && list.some((x) => x.id === openId)) openThread(openId);
     });
     return () => { alive = false; };
@@ -91,8 +86,6 @@ export default function Support() {
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   const submit = async () => {
-    /** `name` and `digits` are validated but not sent: the server takes the raiser from the session and
-     * `SupportTicketCreate` has no identity field, yet a human still reads them as contact details. */
     const name = form.name.trim();
     const digits = form.mobile.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
     const subject = form.subject.trim();
@@ -140,8 +133,6 @@ export default function Support() {
   };
 
   const openThread = (id) => {
-    // Optimistic: the badge clears on tap, not on the round trip. `markTicketRead` is idempotent on
-    // both providers, which is what makes firing it on every open safe.
     setTickets((cur) => cur.map((x) => (x.id === id ? { ...x, unread: false } : x)));
     markTicketRead(id).catch(() => {});
     setReplyText('');
@@ -175,8 +166,6 @@ export default function Support() {
       return;
     }
     setReplyText('');
-    // Re-read rather than append locally: the server owns the message id, the timestamp and the
-    // resulting ticket status, and a reply can move a ticket out of `waiting`.
     const full = await getTicket(curTicket.id).catch(() => null);
     if (full) setCurTicket(full);
     reload();
@@ -201,8 +190,6 @@ export default function Support() {
             </p>
           </div>
 
-          {/* Deflection: most tickets are questions the help centre answers, and offering it before the form,
-              not after, is what gets it read. */}
           <Link
             to="/help"
             className="reveal mb-6 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 transition-colors hover:border-teal-400/40 hover:bg-white/[0.05]"

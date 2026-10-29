@@ -8,7 +8,6 @@ import { OwnReviewBar } from '../../property/OwnReviewBar.jsx';
 export default function ReviewsTab({ ctx }) {
   const { t } = useTranslation();
   const { rating, overall, bars, reviews, openReport, reportFor, closeReport, toast, openComposer, deleteMine } = ctx;
-  // An unreadable `rating` must not read as "no reviews yet"; a review may skip every aspect.
   const showAggregate = !rating.loading && !rating.failed && rating.count > 0;
   return (
     <>

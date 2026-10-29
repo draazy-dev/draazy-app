@@ -159,7 +159,7 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     const created = page.waitForResponse((r) => r.request().method() === 'POST' && /\/service-requests$/.test(new URL(r.url()).pathname));
     await payAndSubmit(page);
     const requestId = (await (await created).json()).id;
-    await expect(page.getByText(/couldn't send the PAN and Aadhaar details/)).toBeVisible();
+    await expect(page.getByText(/couldn't send the PAN details/)).toBeVisible();
     /* A fresh context has no local draft: the answers come from the request, the papers must too. */
     const other = await (await browser.newContext()).newPage();
     await signedInAs(other, ownerMobile);

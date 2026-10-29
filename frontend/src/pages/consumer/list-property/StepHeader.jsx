@@ -1,8 +1,6 @@
 import { RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-/* The reset control stays deliberately understated — grey until hover, then it warms to red to signal that it wipes
-   work — so it never competes with the step's primary actions. */
 export default function StepHeader({ title, subtitle, onReset }) {
   const { t } = useTranslation();
   return (

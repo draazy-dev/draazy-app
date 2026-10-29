@@ -9,7 +9,6 @@ const seen = new Map();
 const noise = (...parts) => parts.some((p) => /ResizeObserver loop|(?:chrome|moz|safari)-extension:\/\//.test(String(p ?? '')));
 const newReference = () => crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
-// Dev builds only mint the reference; sandbox and prod builds also send the scrubbed report.
 export function reportError({ kind, scope, error, componentStack }) {
   const name = String(error?.name ?? 'Error');
   const message = String(error?.message ?? error ?? '');

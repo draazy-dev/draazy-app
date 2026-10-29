@@ -3,17 +3,12 @@ import Icon from '../../../components/Icon.jsx';
 import { fmtAgo } from '../../../lib/format.js';
 import useModalDialog from '../../../hooks/useModalDialog.js';
 import useScrollLock from '../../../hooks/useScrollLock.js';
-/* `thread` is fetched and marked read by `useDashboardData.openReview`. */
 export default function DashboardReviewModal({ reviewProp, setReviewProp, thread, listing, reviewInput, setReviewInput, sendReview, REVIEW_STATUS }) {
-  /* The modal hides itself rather than being mount-gated, so lock before returning null. */
   useScrollLock(Boolean(reviewProp));
   const close = useCallback(() => setReviewProp(null), [setReviewProp]);
   const panelRef = useModalDialog(Boolean(reviewProp), close);
   if (!reviewProp) return null;
-  // `thread` is null between opening and the fetch landing, and stays null when the listing has no
-  // case file at all.
   const rs = REVIEW_STATUS[thread?.status] || REVIEW_STATUS.in_review;
-  /* The heading is the listing title, so it must own the dialog label. */
   return (
     <div className="dz-modal-backdrop" onClick={() => setReviewProp(null)}>
       <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="dash-review-title" className="dz-modal flex flex-col outline-none" onClick={(e) => e.stopPropagation()}>
@@ -34,8 +29,6 @@ export default function DashboardReviewModal({ reviewProp, setReviewProp, thread
                 <div className="space-y-1.5">
                   {thread.checklist.map((c) => (
                     <div key={c.item} className="flex items-center justify-between gap-2 text-xs">
-                      {/* Two states, not three: the server stores one boolean per line, so "rejected" and "not looked
-                         at yet" were never distinguishable. */}
                       <span className="text-gray-300 truncate">{c.item}</span>
                       <span className={c.pass ? 'text-emerald-300' : 'text-amber-300'}>
                         {c.pass ? 'checked' : 'pending'}

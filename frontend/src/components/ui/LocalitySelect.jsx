@@ -12,8 +12,6 @@ import { resolveLocality, searchLocalities } from '../../services/localityServic
 
 const dbOption = (l) => ({ value: l.name, label: l.name, meta: { locality: l } });
 
-/** A locality is chosen only from a Google suggestion (or a saved one if Google is down), resolved server-side,
- * so the stored name is canonical. `nameOnly` / `unrestricted` skip the resolve; typed text is never committed. */
 export default function LocalitySelect({
   multi = false,
   unrestricted = false,

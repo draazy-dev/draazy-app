@@ -17,7 +17,6 @@ export default function ProgressTracker({ progress, ownerView = false, compact =
   if (!all) return null;
   const steps = ownerView && progress.track === 'staff' ? OWNER_VIEW_STAFF : all;
   const rejected = progress.flags?.includes('rejected');
-  // A rejection is a verdict reached in review, whatever step the server last stamped.
   const at = all.findIndex(([key]) => key === (rejected ? 'in_review' : progress.step));
   const done = steps.map(([key]) => all.findIndex(([k]) => k === key) <= at);
   const reached = done.filter(Boolean).length;

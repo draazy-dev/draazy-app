@@ -11,7 +11,6 @@ import { useScrollReveal } from '../lib/useScrollReveal.js';
 import { replay, useSignInGate } from '../lib/useSignInGate.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { SUPPORT_PHONE, SUPPORT_TEL } from '../lib/supportContact.js';
-/* Two distinct writes: the ops lead ticket a desk calls back from, and the flow request the customer then tracks. */
 import { useToast } from '../context/ToastContext.jsx';
 import { createTicket } from '../services/ticketService.js';
 import { createServiceRequest as createFlowRequest } from '../services/serviceRequestService.js';
@@ -19,12 +18,9 @@ import ServiceTracker from './ServiceTracker.jsx';
 import AutosaveBanner from './AutosaveBanner.jsx';
 import { useFormDraft, useFieldErrors } from '../lib/hooks.js';
 import { srcSetFor } from '../lib/imgSrcSet.js';
-/* Full-bleed hero needs a wider ladder than imgSrcSet's 960w card default, so a phone fetches ~640w rather than the
-   full 1.26 MB asset while desktop keeps the 1600w source. */
 
 const HERO_WIDTHS = [640, 960, 1280, 1600];
 const CRUMB_KEY = { packers: 'packersMovers', legal: 'propertyLegal', loans: 'homeLoans' };
-/* Shared shell for every service landing page (packers, legal, home-loans, interior, valuation). */
 
 export default function ServiceLanding({
   desk, heroGradient = 'linear-gradient(140deg,rgb(var(--dz-c-slate-950)) 0%,rgb(var(--dz-c-teal-950)) 52%,rgb(var(--dz-c-teal-900)) 100%)',
@@ -52,8 +48,6 @@ export default function ServiceLanding({
   const err = useFieldErrors(formRef);
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
-  // Apply field default/prefill values (e.g. from ?type=/?scope=/?service= query params that
-  // resolve after mount) without clobbering anything the user has already entered.
 
   const fieldDefaults = (quote?.fields || []).map((f) => f.value || '').join('|');
   useEffect(() => {
@@ -70,10 +64,8 @@ export default function ServiceLanding({
   const submit = async (e) => {
     e.preventDefault();
     if (status === 'sending') return;
-    // Public page, so gate on use rather than on arrival.
     if (!isIn) { sendToSignIn('services', undefined, replay(e)); return; }
     const reqd = (quote?.fields || []).find((f) => f.required && !form[f.name]);
-    // A submit resumed after the sign-in sheet sees fields that were blank at mount; the account fills them.
     const name = form.name.trim() || user?.name || '';
     const mobile = form.mobile || user?.mobile || '';
     if (name !== form.name || mobile !== form.mobile) setForm((p) => ({ ...p, name, mobile }));
@@ -86,18 +78,12 @@ export default function ServiceLanding({
     const detail = (quote?.fields || []).filter((f) => form[f.name]).map((f) => `${f.label}: ${form[f.name]}`).join(' · ');
     const service = form[quote?.serviceField] || quote?.title || 'Service request';
     const details = (quote?.fields || []).filter((f) => form[f.name]).reduce((o, f) => { o[f.name] = form[f.name]; return o; }, {});
-    /* One submit, two records that must name each other: `POST /tickets` returns the server id carried onto the
-       request as `ticketId`. */
 
     const raiseLead = async () => {
-      // Contact details are not sent: the page is sign-in gated above and the server copies the
-      // name and number off the session, so a form-supplied pair would be a second, unverified one.
       const ticket = await createTicket({ desk, subject: service, body: detail });
       return ticket?.id || null;
     };
 
-    /* Chained, not gated: a rejected ticket yields a null ref and the flow request is still created, unlinked — a
-       failed lead must not also cost the customer their request. */
     setStatus('sending');
     if (leadRef.current === undefined) leadRef.current = await raiseLead().catch(() => null);
     const ref = leadRef.current;
@@ -121,7 +107,6 @@ export default function ServiceLanding({
   return (
     <div ref={rootRef}>
       <div>
-          {/* A real <img>, not a CSS background — a srcset has no effect on one. */}
         <section className="theme-dark relative overflow-hidden" style={{ background: heroGradient }}>
           {heroImage && (
             <img

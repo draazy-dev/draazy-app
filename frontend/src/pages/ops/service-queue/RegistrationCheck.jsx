@@ -41,7 +41,6 @@ function RegistrationRecord({ record }) {
   );
 }
 
-/** Second-operator check keeps tenant trust badges draft-only until the registered copy is confirmed. */
 export default function RegistrationCheck({ request, onError, onUnavailable }) {
   const titleId = useId();
   const { user } = useAuth();

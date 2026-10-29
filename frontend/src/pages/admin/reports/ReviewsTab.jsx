@@ -11,8 +11,6 @@ import {
 
 const PAGE_SIZE = 10;
 
-/* Reviews are taken down via `PATCH /reviews/{id}/status`, not the report queue;
-   `rejected` hides the text and drops it from the rating aggregate. */
 export default function ReviewsTab() {
   const { toast } = useToast();
   const [data, setData] = useState(null);
@@ -34,7 +32,6 @@ export default function ReviewsTab() {
   const filterKey = `${status}|${search}|${days}`;
   const pageNo = pageState.key === filterKey ? pageState.page : 1;
 
-  // One page per read; the status totals ride along on first load and after a decision.
   useEffect(() => {
     let alive = true;
     listReviewsForModeration({ status, q: search, days, page: pageNo - 1, size: PAGE_SIZE, counts: countsFor.current !== bump })
@@ -52,8 +49,6 @@ export default function ReviewsTab() {
     return () => { alive = false; };
   }, [status, search, days, pageNo, bump]);
 
-  // Not optimistic: a row claiming a verdict the server refused would leave a review up that the
-  // moderator believes is down.
   const decide = async (r, verdict) => {
     try {
       await setReviewStatus(r.id, verdict);

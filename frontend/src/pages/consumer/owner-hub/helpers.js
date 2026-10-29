@@ -1,5 +1,3 @@
-/* Passport completeness: basics, a valuation, a document, and rent details or a vacant mark. */
-
 export function passportChecklist(prop, docCount = 0) {
   const basics = !!(prop.locality && prop.bhkNum && prop.area);
   const valued = !!prop.valuation;

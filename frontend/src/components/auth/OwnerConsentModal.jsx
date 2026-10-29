@@ -7,14 +7,11 @@ import { useOtpFlow } from './useOtpFlow.js';
 import { classifyOtpVerifyError } from '../../lib/otpVerifyError.js';
 import { requestOwnerConsent } from '../../services/flatmateService.js';
 import useScrollLock from '../../hooks/useScrollLock.js';
-/* Owner-consent OTP ping. */
 
 export default function OwnerConsentModal({ ownerMobile, title, locality, onClose, onVerified }) {
-  /* The surrounding copy is English, but `otp.sendError` is a translatable message by contract. */
   const { t } = useTranslation();
   const owner = String(ownerMobile || '').replace(/\D/g, '').slice(0, 10);
   const [verifying, setVerifying] = useState(false);
-  /* The address rides on the SEND too, not just the record. */
   const [failed, setFailed] = useState(null);
   const otp = useOtpFlow((mobile) => requestOwnerConsent({ ownerMobile: mobile, title, locality }));
 
@@ -32,8 +29,6 @@ export default function OwnerConsentModal({ ownerMobile, title, locality, onClos
     if (otp.otp.length !== 6) { otp.setOtpError(true); return; }
     setVerifying(true);
     try {
-      // A wrong code answers 401 and a spent attempt cap 429, so the only way to reach
-      // `onVerified` is for the owner to have actually acted.
       const { consentRecorded } = await requestOwnerConsent({
         ownerMobile: owner, otp: otp.otp, title, locality,
       });
@@ -93,8 +88,6 @@ export default function OwnerConsentModal({ ownerMobile, title, locality, onClos
               {otp.otpError && !failed && <p className="text-red-400 text-xs text-center mt-2">Please enter the complete 6-digit OTP</p>}
               {failed && <p className="text-red-400 text-xs text-center mt-2">{failed}</p>}
               <div className="flex items-center justify-center gap-2 text-sm mt-4">
-                {/* The number, explicitly: `resend` forwards its argument to the dispatch, so a bare handler
-                   reference would post React's click event as `ownerMobile`. */}
                 <span className="text-slate-500">Owner didn't get it?</span>
                 <button type="button" onClick={() => otp.resend(owner)} disabled={!otp.canResend} className="text-teal-400 hover:text-teal-300 font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                   {otp.canResend ? 'Resend OTP' : `Resend in ${otp.seconds}s`}

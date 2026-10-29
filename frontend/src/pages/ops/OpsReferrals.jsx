@@ -19,7 +19,6 @@ const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 250;
 
-/* Background-check signals. goodWhenTrue=true → green when present; false → red when present. */
 const SIGNALS = [
   ['activated', 'Activated', true],
   ['sameDevice', 'Same device', false],
@@ -43,8 +42,6 @@ const AUTO_REASONS = {
 const autoReasonLabel = (code) => AUTO_REASONS[code] || code.replace(/_/g, ' ');
 const TRACK_LABELS = { owner: 'Owner referral', seeker: 'Seeker referral' };
 
-/* Risk is a separate field, so **High risk** is a risk filter rather than a status one;
-   a status tab for it would stay permanently empty. */
 const TABS = [
   { key: 'held', label: 'Held', count: 'held', filter: { status: 'held' }, match: (r) => r.status === 'held' },
   { key: 'pending', label: 'Pending', count: 'pending', filter: { status: 'pending' }, match: (r) => r.status === 'pending' },
@@ -56,7 +53,6 @@ const TABS = [
 const TAB_KEYS = TABS.map((t) => t.key);
 const NOTE = 'Rewards are decided automatically. Held rows release or reject on their own once the hold ends; use this desk to audit, override or claw back.';
 
-/* Tab totals after one row changed from `before` to `after`. */
 const shiftCounts = (counts, before, after) => {
   const next = { ...counts };
   for (const t of TABS) {
@@ -141,7 +137,6 @@ export default function OpsReferrals() {
         toast('Reward clawed back', 'error');
       }
       if (!decided) { reload(); return; }
-      // The decision answers with the row: patch it in place instead of re-reading the page.
       const stays = TABS.find((t) => t.key === tab).match(decided);
       setState((s) => ({
         ...s,
@@ -150,7 +145,6 @@ export default function OpsReferrals() {
       }));
       setCounts((c) => shiftCounts(c, r, decided));
     } catch (e) {
-      // The server's own sentence names the refusal; paraphrasing it here would lose that.
       toast(e.message || 'That decision was refused.', 'error');
     } finally {
       busy.current = false;
@@ -168,8 +162,6 @@ export default function OpsReferrals() {
     stale: reloading,
   };
 
-  /* No offline fallback: referral decisions release money, and the offline store disagreed with the
-     server about what a referral even is. The error branch below is the only failure left. */
   if (state.status === 'error') {
     return (
       <div>

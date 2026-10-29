@@ -28,7 +28,6 @@ export default function FaqSection() {
         <div className="space-y-2">
           {items.map(({ key, q, a }) => (
             <details key={key} className="faq group rounded-xl border border-white/10 bg-white/5 px-4 sm:px-5">
-              {/* Padding lives on the summary so the whole row is the toggle and keeps the 44px touch floor. */}
               <summary className="flex min-h-[48px] items-center justify-between gap-3 py-2.5 cursor-pointer list-none text-white font-semibold text-[15px] leading-snug sm:min-h-[56px]">
                 <span>{q}</span>
                 <Icon name="chevron-down" className="faq-ico w-5 h-5 text-teal-400 flex-shrink-0" />

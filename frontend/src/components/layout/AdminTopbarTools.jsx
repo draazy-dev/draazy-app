@@ -12,23 +12,16 @@ import { listNotifications, markAllRead, markRead } from '../../services/notific
 import { safeNotificationLink, TYPE_META } from '../notifications/notificationModel.js';
 import Icon from '../Icon.jsx';
 import { SERVICE_DESKS, canOpenPath, hasPermission, portalPath, runbooksFor, ticketPath } from '../../lib/adminModules.js';
-/** Rows shown per data category. The chip beside it carries the size of the whole match. */
 
 const RESULT_CAP = 6;
-/** Rows shown per queue in the bell, on the same split: heading counts, list samples. */
-
-/** One request per pause in typing rather than one per keystroke. */
 
 const DEBOUNCE_MS = 200;
 const BELL_REFRESH_MS = 90_000;
-/** "a", "a and b", "a, b and c" — so the notices below read as sentences rather than lists. */
 
 const prose = (words) =>
   words.length < 2 ? (words[0] || '') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
 
 const SEARCH_PLACEHOLDER = 'Search pages, features, listings and people...';
-/* `term` is what the rows in here answer, which is not always what is in the field: it is how the render knows
-   whether it is holding this search's results or the previous one's. */
 
 const NO_RESULTS = { term: '', listings: [], listingsTotal: 0, users: [], usersTotal: 0, failed: [] };
 const NOTHING = { items: [], total: 0 };
@@ -124,7 +117,6 @@ const FILTER_CHIPS = [
   { key: 'listings', label: 'Listings' },
   { key: 'users', label: 'People' },
 ];
-/** Listing moderation statuses, the only ones this palette renders. */
 
 function StatusPill({ status }) {
   const colors = {
@@ -140,7 +132,6 @@ function StatusPill({ status }) {
   );
 }
 
-// A section the caller may read but the server left out is dark, never zero; a failed read darkens all of them.
 function toNotif(bell, canReadProperties, canReadTickets) {
   const pending = bell?.pendingListings;
   const open = bell?.openTickets;
@@ -221,16 +212,12 @@ export default function AdminTopbarTools() {
 
   useEffect(() => {
     const term = q.trim();
-    /* Re-armed on every run rather than only cleared on teardown: a ref initialised once outside the effect stays
-       `false` after StrictMode's mount/unmount/mount and swallows every result for the rest of the session. */
     if (term.length < 2) { setRemote(NO_RESULTS); return undefined; }
     let live = true;
     const timer = setTimeout(async () => {
       const [listings, people] = await Promise.allSettled([
         canReadProperties ? lookupForModeration(term, { size: RESULT_CAP }) : NOTHING,
         canReadUsers ? listUsers({ q: term, page: 0, size: RESULT_CAP }) : NOTHING,
-      // Two guards, not one: `live` drops a response whose search has been superseded, and the
-      // debounce above means the superseded one usually never left.
       ]);
       if (!live) return;
       setRemote({
@@ -250,16 +237,12 @@ export default function AdminTopbarTools() {
 
   const results = useMemo(() => {
     if (!nav) return null;
-    // Only this search's rows count. Between keystrokes `remote` still holds the previous term's,
-    // and rendering those under the new one is how a palette shows a listing that does not match.
     const fresh = remote.term === q.trim();
     const wants = (key) => fresh && (filter === 'all' || filter === key);
     const listings = wants('listings') ? remote.listings : [];
     const users = wants('users') ? remote.users : [];
     const counts = {
       features: nav.pageCount + nav.featureCount,
-      // The whole match, from the server, not `items.length` — the chip is a count of what exists,
-      // and the list below it is capped at six.
       listings: wants('listings') ? remote.listingsTotal : 0,
       users: wants('users') ? remote.usersTotal : 0,
     };
@@ -271,8 +254,6 @@ export default function AdminTopbarTools() {
       counts,
       total: counts.features + counts.listings + counts.users,
       failed: fresh ? remote.failed : [],
-      // Distinguishes "nothing matched" from "the answer is still coming", which otherwise look
-      // identical and one of which is a lie.
       awaiting: !fresh,
     };
   }, [nav, remote, q, filter]);
@@ -301,7 +282,6 @@ export default function AdminTopbarTools() {
 
   const [notif, setNotif] = useState({ pending: [], pendingTotal: 0, open: [], openTotal: 0, replied: [], repliedTotal: 0, blind: [], total: 0 });
 
-  // Read on mount, on open, and on a slow timer while the tab is visible; a route change does not refetch.
   const readBell = useCallback(() => {
     const settle = (bell) => setNotif(toNotif(bell, canReadProperties, canReadTickets));
     adminBell().then(settle, () => settle(null));
@@ -319,7 +299,6 @@ export default function AdminTopbarTools() {
   useEffect(() => {
     if (!notifOpen) return undefined;
     let live = true;
-    // Escalations first: they are the rows a manager must not have to scroll for.
     const rank = (n) => (n.type === 'escalation' ? 0 : 1);
     listNotifications({ page: 0, size: 50, read: false })
       .then((page) => { if (live) setMine([...page.items].sort((a, b) => rank(a) - rank(b) || b.at - a.at).slice(0, 5)); })
@@ -327,7 +306,6 @@ export default function AdminTopbarTools() {
     return () => { live = false; };
   }, [notifOpen, unread]);
 
-  // Queues are standing work, not news: only unread notifications and owner replies light the dot.
   const unseen = unread + notif.repliedTotal;
   const go = (path) => { setSearchOpen(false); setPhoneSearch(false); setNotifOpen(false); setQ(''); navigate(portalPath(user, path)); };
   const openMine = (n) => {
@@ -373,7 +351,6 @@ export default function AdminTopbarTools() {
             </div>
 
             <div className="overflow-y-auto p-2 flex-1">
-              {/* "No matches" is an answer; it must not show before both listing and people searches settle. */}
               {results.total === 0 ? (
                 <div className="px-3 py-6 text-center text-sm text-gray-500">
                   {results.awaiting ? 'Searching listings and people…' : 'No matches found'}
@@ -428,8 +405,6 @@ export default function AdminTopbarTools() {
                   )}
                 </>
               )}
-            {/* Outside the scroll area on purpose: an operator who typed a colleague's name and got a short list has
-               to be able to read that a desk refused without scrolling to it. */}
             </div>
             {results.failed.length > 0 && (
               <div data-testid="palette-partial" className="shrink-0 border-t border-white/10 px-3 py-2.5 text-[11px] leading-relaxed text-amber-200/80">

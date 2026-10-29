@@ -1,7 +1,3 @@
-/* Shared by ~20 surfaces and imported by DateField/TimeField, so every route gets styled pickers
-   and a calendar that floats over the page. */
-
-/* The wrapper carries the caller's field classes to match sibling inputs; the native control sits on top. */
 .dz-datefield {
   position: relative;
   display: flex;
@@ -68,8 +64,6 @@
   transform: translateY(-6px) scale(0.98);
   transform-origin: top center;
   transition: opacity 0.18s var(--dd-ease, ease), transform 0.18s var(--dd-ease, ease);
-  /* Month/year use the shared <Select> with the app's default dark theme; only
-     tighten the trigger to fit the compact card (keeps full month names visible). */
   --dd-trigger-radius: 10px;
   --dd-trigger-pad: 0 0.5rem;
   --dd-trigger-height: 34px;
@@ -87,9 +81,6 @@
 .dz-cal-backdrop {
   display: none;
 }
-
-/* Both pickers render `.dz-cal`; their JS place() writes inline left/top and bails out at this same breakpoint
-   to clear them, or they would beat these rules. Keep the two in sync. */
 @media (max-width: 639.98px) {
 
   .dz-cal {
@@ -107,9 +98,6 @@
     transform: translateY(16px) scale(0.96);
     transform-origin: bottom center;
   }
-
-  /* A real element, not a shadow or pseudo, so a tap on the dimmed page lands here and only
-     closes the picker instead of also hitting whatever sits underneath. */
   .dz-cal-backdrop {
     display: block;
     position: fixed;
@@ -210,8 +198,6 @@
     color: rgb(var(--dz-c-teal-400));
   }
 }
-
-/* Year is fixed-narrow (only 4 digits) so month gets the room full names need. */
 .dz-cal__dd {
   flex: 1 1 auto;
   min-width: 0;
@@ -352,9 +338,6 @@
     transition: none;
   }
 }
-
-/* Guarded by the breakpoint: an unguarded `.dz-timepicker { width: 250px }` has equal specificity
-   and would beat the sheet's full width. */
 @media (min-width: 640px) {
   .dz-timepicker {
     width: 250px;

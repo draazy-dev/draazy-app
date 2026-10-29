@@ -23,8 +23,6 @@ const AMENITIES = [
 ];
 
 const FURNISH_MAP = { unfurnished: 'furnUnfurnished', semi: 'furnSemi', furnished: 'furnFurnished' };
-// Map the real `construction` field to a buyer-facing possession status. No fabrication —
-// every value shown traces back to a real listing field.
 const POSSESSION = { ready: 'possReady', new: 'possNew', under: 'possUnder' };
 
 function metric(p, t) {
@@ -52,8 +50,6 @@ function metric(p, t) {
     area: p.area || 0,
     areaUnit: p.areaUnit || 'sqft',
     areaLabel: fmtArea(p.area, p.areaUnit),
-    /* Only when the area is in sq.ft.: dividing a price by an acreage gives a per-acre figure, and
-       the row that shows it is captioned per sq.ft. A plot compares on its own unit's area row. */
     psf: p.area && isSqftUnit(p.areaUnit) ? Math.round(p.price / p.area) : 0,
     furnish: FURNISH_MAP[p.furnishing] ? t('compare.' + FURNISH_MAP[p.furnishing]) : (p.furnishing || '—'),
     possession: POSSESSION[p.construction] ? t('compare.' + POSSESSION[p.construction]) : '—',
@@ -85,7 +81,6 @@ export default function Compare() {
   const [modal, setModal] = useState(false);
   const [q, setQ] = useState('');
 
-  // Ids that fail to resolve stay in the list as `available: false`.
   useEffect(() => {
     let alive = true;
     if (!ids.length) { setCompared([]); return () => { alive = false; }; }
@@ -95,27 +90,19 @@ export default function Compare() {
     return () => { alive = false; };
   }, [ids]);
 
-  // Debounced only once something is typed: the first empty-query load has no keystrokes to
-  // collapse. Gated on `modal` so /compare does not pull a page for a sheet most visitors never open.
   useEffect(() => {
     if (!modal) { setPickable(null); setPickFailed(false); setQ(''); return undefined; }
     let alive = true;
-    // Cleared per attempt, so typing again after a failure is a real retry rather than a search
-    // whose result is hidden behind a stale error.
     setPickFailed(false);
     const timer = setTimeout(() => {
       listProperties({ q: q.trim() || undefined }, 'newest')
         .then((list) => { if (alive) setPickable(list.filter((p) => !ids.includes(p.id))); })
-        // "The search failed" is a third state: without it a rejected search leaves `pickable` at
-        // `null` forever — a spinner that never resolves.
         .catch(() => { if (alive) setPickFailed(true); });
     }, q.trim() ? 250 : 0);
     return () => { alive = false; clearTimeout(timer); };
   }, [modal, q, ids]);
 
   const loading = compared === null;
-  // Keep a column for every compared id, so a removed or expired listing shows an honest
-  // unavailable card rather than silently vanishing.
   const items = useMemo(() => {
     if (!compared) return [];
     return ids.map((id) => {
@@ -127,8 +114,6 @@ export default function Compare() {
 
   const bestIds = (row) => {
     if (!row.best || !row.cmp || liveItems.length < 2) return [];
-    // 2 acres is not smaller than 900 sq.ft. Without a shared unit the figures are not comparable,
-    // so the row shows them and names no winner.
     if (row.sameUnit && new Set(liveItems.map((m) => m.areaUnit)).size > 1) return [];
     const vals = liveItems.map(row.cmp).filter((v) => v > 0);
     if (vals.length < 2) return [];
@@ -144,8 +129,6 @@ export default function Compare() {
 
   const contactHref = (m) => `/contact?ref=${encodeURIComponent(m.id)}&subject=${encodeURIComponent('Enquiry about ' + m.title)}`;
 
-  // Only available listings and real fields are exported; falls back to the browser print dialog
-  // if PDF generation fails for any reason.
   const exportPdf = () => {
     try {
       const cols = liveItems;
@@ -245,8 +228,6 @@ export default function Compare() {
             <div className="glass-card rounded-2xl p-16 text-center text-gray-500 text-sm">{t('compare.loading')}</div>
           ) : (
             <div className="glass-card rounded-2xl overflow-hidden">
-              {/* The table pages horizontally on small screens, so tell touch users they can swipe.
-                 Hidden once 4 are added — nothing left to reveal — and on sm+. */}
               {items.length > 1 ? (
                 <div className="flex sm:hidden items-center justify-center gap-1.5 py-2 text-[11px] font-medium text-gray-400 border-b border-white/5">
                   <Icon name="chevrons-left-right" className="w-3.5 h-3.5 text-teal-400" />
@@ -382,8 +363,6 @@ export default function Compare() {
           <input value={q} onChange={(e) => setQ(e.target.value)} type="text" placeholder={t('compare.searchPlaceholder')} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:border-teal-400" />
         </div>
         <div className="space-y-2">
-          {/* Three states, not two: `null` is "the search has not answered yet" and
-             `pickFailed` is "it answered with an error". */}
           {pickFailed ? (
             <p className="text-center text-gray-500 text-sm py-6">{t('compare.searchFailed')}</p>
           ) : pickable === null ? (

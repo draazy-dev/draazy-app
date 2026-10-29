@@ -6,7 +6,6 @@ import LivingStyleSheet from './LivingStyleSheet.jsx';
 import { MIN_COMMON, STYLE_KEYS } from './questions.js';
 import useLivingStyle from './useLivingStyle.js';
 
-/** The one optional way in to the questionnaire from the board. Guests sign in first, then land in the sheet. */
 export default function LivingStyleEntry() {
   const { t } = useTranslation();
   const style = useLivingStyle();

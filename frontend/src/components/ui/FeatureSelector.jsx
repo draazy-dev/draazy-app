@@ -3,8 +3,6 @@ import { Check, Plus, Sparkles, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { classNames } from '../../lib/format.js';
 import '../../styles/components/furniture-tiles.css';
-/* Custom entries are held in the same plain string array as the predefined ones, so they flow through the existing
-   state/submit path with no schema change. */
 
 export default function FeatureSelector({
   options,
@@ -17,8 +15,6 @@ export default function FeatureSelector({
   const ph = placeholder || t('ui.addYourOwn');
   const noun = addAriaLabel || t('ui.featureNoun');
   const [draft, setDraft] = useState('');
-  // A short-lived confirmation so a commit always visibly "does something": re-adding an entry
-  // already in the list would otherwise just clear the box and read as nothing happening.
   const [status, setStatus] = useState(null);
   const inputRef = useRef(null);
   const statusTimer = useRef(null);
@@ -37,7 +33,6 @@ export default function FeatureSelector({
   const commit = () => {
     const label = draft.trim().replace(/\s+/g, ' ');
     if (!label) return;
-    // Typing a name we already offer just selects that predefined tile.
     const match = options.find((o) => o.label.toLowerCase() === label.toLowerCase());
     const target = match ? match.label : label;
     const alreadySelected = values.some((v) => v.toLowerCase() === target.toLowerCase());
@@ -77,7 +72,6 @@ export default function FeatureSelector({
             </button>
           );
         })}
-          {/* aria-label overrides title for screen readers but not the mouse tooltip. */}
         {customValues.map((label) => {
           const removeLabel = `Remove ${label}`;
           return (

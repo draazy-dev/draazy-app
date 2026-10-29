@@ -24,8 +24,6 @@ export function ReviewModal({ onClose, onSubmit, initial }) {
 
   const submit = () => {
     if (!rating) return;
-    /* Only what the author actually supplied: `id`, `user`, `at` and `context` are the server's to
-       decide — `context` is the "Visited" badge, so a client sending it certifies its own review. */
     onSubmit({ rating, categories: cats, text: text.trim(), recommend });
   };
 

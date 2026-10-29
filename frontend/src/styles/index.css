@@ -1,17 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Colours live in theme.css; this block holds sizing and type only. */
 :root {
-  /* Noto sits AFTER Outfit so the browser falls through per character and only Devanagari
-     codepoints reach it; Noto first would restyle the entire English site. */
   --font-sans: 'Outfit', 'Noto Sans Devanagari', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --section-gap: 2.5rem;
   --section-gap-lg: 4rem;
   --radius: 1rem;
-
-  /* Control sizing scale: every interactive control shares one height for visual rhythm. */
   --control-h: 40px;
   --control-font: 0.875rem;
   --control-weight: 400;
@@ -19,47 +13,25 @@
   --control-radius: 10px;
   --control-radius-pill: 9999px;
   --control-px: 1rem;
-
-  /* Button tiers. md aligns to --control-h for rhythm with inputs; lg is for hero + prominent
-     mobile CTAs, sm for dense toolbars. */
   --btn-h: var(--control-h);
   --btn-h-sm: 32px;
   --btn-h-lg: 48px;
   --btn-radius: var(--control-radius);
-
-  /* Compact scale (styles/components/chips.css). Drawn under the 44px touch floor on purpose: each
-     tappable class restores the target with a transparent ::before, as .tap-extend does. */
   --dz-icon-btn: 36px;
   --dz-chip-h: 32px;
   --dz-chip-sm-h: 24px;
   --dz-tag-h: 24px;
   --dz-count-h: 20px;
-
-  /* Mobile bottom-chrome system: nothing bottom-anchored hardcodes a bottom-*, and every fixed
-     layer takes a rung off the ladder in docs/system/design-system.md (Bottom chrome). */
   --dz-safe-b: env(safe-area-inset-bottom, 0px);
   --dz-bottom-nav-h: 56px;
-  /* The bar floats, so --dz-bottom-inset is derived from its height PLUS this gap; changing the
-     float here moves every bottom-anchored widget with it. */
   --dz-bottom-nav-gap: 12px;
-  /* max(), not a sum: the float gap and the home-indicator inset are the same thing, so adding them
-     double-counts; one token because the bar's own bottom must agree with it. */
   --dz-bottom-nav-offset: max(var(--dz-bottom-nav-gap), var(--dz-safe-b));
   --dz-bottom-inset: var(--dz-safe-b);
   --dz-cookie-banner-h: 0px;
-
-  /* Top chrome, mirroring the bottom system. --dz-nav-h is the ONLY place the bar height is
-     written down, so everything derived from it resizes together. See docs/system/design-system.md - Top chrome. */
   --dz-nav-h: 58px;
   --dz-top-inset: var(--dz-nav-h);
-
-  /* Drawn height of the top bar's pills on a phone - under the 44px tap floor on purpose; the
-     target is restored by .tap-extend, not by painting a bigger box. */
   --dz-nav-pill-h: 40px;
   --dz-nav-icon-box: 32px;
-
-  /* Floating-card overlays (filter drawer, Modal, pickers, menus, map panel) share this one shape below their
-     breakpoint. See docs/system/design-system.md - Floating cards. */
   --dz-float-edge: 12px;
   --dz-float-radius: 24px;
   --dz-float-top: calc(var(--dz-safe-t, 0px) + min(7.5rem, 16dvh));
@@ -69,8 +41,6 @@
   --dz-float-shadow: 0 25px 50px -12px rgb(var(--dz-c-black) / 0.6), 0 0 0 1px rgb(var(--dz-c-white) / 0.06);
   --dz-float-scrim: rgb(var(--dz-c-black) / 0.35);
 }
-
-/* Portalled overlays render outside .has-bottom-nav, so the root learns about the nav here to float above it. */
 @media (max-width: 1023.98px) {
   :root:has(.has-bottom-nav) {
     --dz-float-bottom: calc(var(--dz-bottom-nav-h) + var(--dz-bottom-nav-offset) + var(--dz-float-edge));
@@ -92,35 +62,20 @@
 @media (min-width: 768px) {
   :root { --dz-nav-h: 72px; }
 }
-
-/* The bar's real height, driven by the token rather than by utility classes on the
-   element — see --dz-nav-h above. */
 .dz-topbar__row { height: var(--dz-nav-h); }
-
-/* Top-bar controls carry .tap-extend and NOT .tap-target: the two set the same property and
-   .tap-target is declared later, so pairing them silently reinstates the painted 44px box. */
 @media (max-width: 639.98px) {
   .dz-topbar__pill { height: var(--dz-nav-pill-h); }
-
-  /* Square controls keep .tap-target rather than .tap-extend: their box is already invisible
-     chrome around a drawn tile, so the hit area can just stay 44px. */
   .dz-topbar__icon-box {
     height: var(--dz-nav-icon-box);
     width: var(--dz-nav-icon-box);
   }
 }
-
-/* Hide-on-scroll top bar. Navbar.jsx toggles the class unconditionally to stay resize-safe;
-   every rule reacting to it lives in here, so desktop is inert structurally, not by promise. */
 @media (max-width: 1023.98px) {
   .dz-topbar { transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1); }
 
   .dz-nav-hidden { --dz-top-inset: 0px; }
 
   .dz-nav-hidden .dz-topbar { transform: translateY(-100%); }
-
-  /* Declared after @tailwind utilities, so it wins over the element's own top-[var(--dz-nav-h)]
-     below lg while leaving that utility to own desktop untouched. */
   .dz-docks-under-nav {
     top: var(--dz-top-inset);
     transition: top 220ms cubic-bezier(0.32, 0.72, 0, 1);
@@ -132,18 +87,10 @@
   .dz-topbar,
   .dz-docks-under-nav { transition: none; }
 }
-
-/* Set by ConsumerLayout on routes that mount the mobile bottom nav. The nav is lg:hidden, so the
-   inset resets above lg and every calc() built on it collapses to a plain offset. */
 .has-bottom-nav {
   --dz-bottom-inset: calc(var(--dz-bottom-nav-h) + var(--dz-bottom-nav-offset));
-  /* Reserving the inset on the wrapper keeps the last card / footer of every consumer page clear
-     of the bar: one rule, no per-page padding. */
   padding-bottom: calc(var(--dz-bottom-inset) + var(--dz-cookie-banner-h));
 }
-
-/* The cookie banner is fixed above the bottom chrome. Reserving its real rendered height on the
-   layout wrapper lets the footer scroll above it instead of becoming the covered last screenful. */
 .consumer-layout { padding-bottom: var(--dz-cookie-banner-h); }
 
 .consumer-layout.has-bottom-nav { padding-bottom: calc(var(--dz-bottom-inset) + var(--dz-cookie-banner-h)); }
@@ -151,15 +98,7 @@
 @media (min-width: 1024px) {
   .has-bottom-nav { --dz-bottom-inset: var(--dz-safe-b); }
 }
-
-/* Full-bleed routes keep the inset *token* but not the reservation: the tab bar is a capsule
-   floating over the media, so reserving the strip drew a dead band across every reel. */
 .consumer-layout.has-bottom-nav.route-fullbleed { padding-bottom: 0; }
-
-/* Floating notched tab bar: the solid bar is drawn by __bg with a notch cut under the active slot and a
-   teal bubble rising through it. Material rationale: docs/system/design-system.md - Bottom chrome. */
-
-/* Registered so the slot index and notch depth interpolate; unregistered custom properties only flip. */
 @property --dz-nav-i {
   syntax: '<number>';
   inherits: true;
@@ -176,7 +115,6 @@
   --dz-bubble: 40px;
   --dz-lift: 10px;
   --dz-icon-lift: -9px;
-  /* Slot centre: five equal flex slots inside the 6px side padding. */
   --dz-slot-x: calc(6px + (100% - 12px) * (var(--dz-nav-i) + 0.5) / 5);
   position: fixed;
   left: calc(env(safe-area-inset-left, 0px) + 12px);
@@ -194,33 +132,27 @@
 }
 
 .dz-bottom-nav.has-active { --dz-notch-y: 0px; }
-
-/* drop-shadow, not box-shadow, so it follows the notch; on this wrapper because a filter on the masked layer itself
-   runs before the mask and gets cut away. */
 .dz-bottom-nav__bg {
   position: absolute;
   inset: 0;
   z-index: -1;
   border-radius: inherit;
   pointer-events: none;
-  filter: drop-shadow(0 10px 22px rgb(0 0 0 / 0.45)) drop-shadow(0 0 0.5px rgb(var(--dz-c-pure-white) / 0.35));
+  filter: drop-shadow(0 10px 22px rgb(var(--dz-c-black) / 0.45)) drop-shadow(0 0 0.5px rgb(var(--dz-c-pure-white) / 0.35));
 }
 
 html.light .dz-bottom-nav__bg {
-  filter: drop-shadow(0 10px 22px rgb(15 23 42 / 0.14)) drop-shadow(0 0 0.5px rgb(15 23 42 / 0.4));
+  filter: drop-shadow(0 10px 22px rgb(var(--dz-c-white) / 0.14)) drop-shadow(0 0 0.5px rgb(var(--dz-c-white) / 0.4));
 }
-
-/* Notch tile (80px, 10px outward fillets) rides the active slot over a bar with a 78px hole, overlapping 1px so no
-   seam shows; it is 120px tall so it still covers the bar while sliding up to close. Position % = (bar - tile). */
 .dz-bottom-nav__bg::before {
   --dz-notch-mask:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='120'%3E%3Cpath d='M0 0H4A10 10 0 0 1 14 10A26 26 0 0 0 66 10A10 10 0 0 1 76 0H80V120H0Z'/%3E%3C/svg%3E")
       calc(-34px + (100% + 68px) * (var(--dz-nav-i) + 0.5) / 5) var(--dz-notch-y) / 80px 120px no-repeat,
     linear-gradient(
       to right,
-      #000 calc(var(--dz-slot-x) - 39px),
+      rgb(var(--dz-c-black)) calc(var(--dz-slot-x) - 39px),
       transparent calc(var(--dz-slot-x) - 39px) calc(var(--dz-slot-x) + 39px),
-      #000 calc(var(--dz-slot-x) + 39px)
+      rgb(var(--dz-c-black)) calc(var(--dz-slot-x) + 39px)
     );
   content: '';
   position: absolute;
@@ -246,14 +178,9 @@ html.light .dz-bottom-nav__bg {
 }
 
 .dz-bottom-nav.has-active .dz-bottom-nav__bubble { transform: scale(1); }
-
-/* Height owned by the token: --dz-bottom-nav-h is what --dz-bottom-inset reserves against, so a
-   hardcoded height here would desync every bottom-anchored widget the moment the bar resized. */
 .dz-bottom-nav__tab {
   height: var(--dz-bottom-nav-h);
   color: rgb(var(--dz-c-gray-300));
-  /* A floating control that does not move under the finger reads as a picture of a button; the
-     dip is the confirmation, and transform costs no layout. */
   transition: transform 140ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
@@ -275,14 +202,9 @@ html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
   transform: translateY(var(--dz-icon-lift));
   color: rgb(var(--dz-c-pure-white));
 }
-
-/* In rem so the label honours the OS font-size setting - a px label is immune to dynamic type,
-   which reads as safe but is the accessibility failure. The overflow guard makes scaling safe. */
 .dz-bottom-nav__label {
   font-size: 0.75rem;
   letter-spacing: 0.01em;
-  /* Not leading-none: line-height 1 is shorter than ascent+descent, so the box clips glyph
-     extents once the label scales. 1.3 clears the full extent and still fits inside the bar. */
   line-height: 1.3;
   max-width: 100%;
   overflow-y: auto;
@@ -291,8 +213,6 @@ html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
   text-overflow: ellipsis;
   transition: transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
-/* Nudged down so it clears the bottom of the notch. */
 .dz-bottom-nav__tab.is-active .dz-bottom-nav__label { transform: translateY(5px); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -304,16 +224,11 @@ html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
 
   .dz-bottom-nav__tab:active { transform: none; }
 }
-
-/* Landscape phones are a height budget, not a width one; guarded three ways so no desktop or
-   landscape tablet can match. Overriding the token is enough. See docs/system/design-system.md - Landscape phones. */
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023.98px) {
   :root {
     --dz-nav-h: 47px;
     --dz-bottom-nav-h: 44px;
   }
-
-  /* A 44px icon-only bar has no height to spare for a raised bubble, so it sits inside the bar with no notch. */
   .dz-bottom-nav {
     --dz-bubble: 36px;
     --dz-lift: -4px;
@@ -321,27 +236,16 @@ html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
   }
 
   .dz-bottom-nav.has-active { --dz-notch-y: -40px; }
-
-  /* Icon-only: the tab keeps its accessible name via aria-label, so hiding the visible text
-     costs a screen reader nothing. */
   .dz-bottom-nav__label { display: none; }
 }
-
-/* viewport-fit=cover lets full-bleed fixed bars run under a rotated phone's notch, so anything
-   pinned edge-to-edge must inset from it. Positioning, not padding, so padding utilities survive. */
 .dz-safe-x {
   left: env(safe-area-inset-left, 0px);
   right: env(safe-area-inset-right, 0px);
 }
-
-/* Tap-target floor (WCAG 2.5.8): grows the hit area without touching the glyph. Deliberately does
-   NOT set display, so Tailwind's hidden/lg:hidden on the same element still win. */
 .tap-target {
   min-width: 44px;
   min-height: 44px;
 }
-
-/* Same floor, painted only where a finger is the pointer, so dense desktop rows keep their size. */
 @media (pointer: coarse) {
   .tap-coarse {
     display: inline-flex;
@@ -351,9 +255,6 @@ html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
     min-height: 44px;
   }
 }
-
-/* Same 44px floor for controls whose *drawn* size is load-bearing: a transparent centred
-   ::before carries the target so the glyph stays as designed. Needs a positioning context. */
 .tap-extend::before {
   content: '';
   position: absolute;
@@ -363,9 +264,6 @@ html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
   height: 44px;
   transform: translate(-50%, -50%);
 }
-
-/* Below sm the drawn square shrinks and .tap-extend keeps the target. A 32px box plus the row's
-   12px gap puts adjacent centres exactly 44px apart - do not shrink the gap on its own. */
 @media (max-width: 639.98px) {
   .dz-topbar__action {
     min-width: 0;
@@ -375,16 +273,11 @@ html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
     padding: 0;
   }
 }
-
-/* Nothing may be reachable ONLY via :hover - on a touch screen that state never fires, so the
-   content is simply invisible. Keyed on the capability so a touch laptop is handled too. */
 @media (hover: none) {
   .reveal-on-hover {
     opacity: 1 !important;
     transform: none !important;
   }
-
-  /* Chrome's tap flash is suppressed globally, so touch needs an explicit pressed response. */
   a:active,
   button:not(:disabled):active,
   [role="button"]:active,
@@ -392,25 +285,14 @@ html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
   [role="tab"]:active,
   summary:active { opacity: 0.72; }
 }
-
-/* Below 640px the default (40px) and compact (32px) buttons both fail the 44px touch minimum.
-   All .btn sizing flows through these vars, so the whole mobile ramp is this override. */
 @media (max-width: 639px) {
   :root {
     --btn-h: 44px;
-    /* .btn-sm holds 44px too: "Request number" - the button the whole contact funnel narrows to -
-       is a .btn-sm. Compact on a phone means narrower or quieter, not shorter than a fingertip. */
     --btn-h-sm: 44px;
     --btn-h-lg: 48px;
-
-    /* Same argument for every non-button control: --control-h drives the dropdown trigger, its
-       options and the shared field heights, so ramping the variable fixes them all at once. */
     --control-h: 44px;
   }
 }
-
-/* Height-only twins of .btn sizes, for buttons that keep their own colours. Kept here rather than in
-   tailwind.config.js because a running dev server never reloads that file. */
 @layer utilities {
   .h-btn { height: var(--btn-h); }
   .h-btn-sm { height: var(--btn-h-sm); }
@@ -432,9 +314,6 @@ html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
   padding-top: var(--section-gap-lg);
   padding-bottom: var(--section-gap-lg);
 }
-
-/* Mobile vertical rhythm. Two knobs, not per-component tuning; desktop keeps its numbers because
-   the block is max-width scoped. See docs/system/design-system.md - Mobile vertical rhythm and type. */
 @media (max-width: 639.98px) {
   :root {
     --section-gap: 1.75rem;
@@ -442,9 +321,6 @@ html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
   }
 
   .section-head { margin-bottom: var(--section-head-gap); }
-
-  /* For sections that hard-code their own padding (they need a different desktop value), this
-     pulls the mobile half back onto the scale without touching the desktop utility. */
   .section-y-m {
     padding-top: var(--section-gap);
     padding-bottom: var(--section-gap);
@@ -505,16 +381,10 @@ html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
 html {
   scroll-behavior: smooth;
   overflow-x: clip;
-  /* Keeps centred content from jumping when overlays remove the classic scrollbar track. */
   scrollbar-gutter: stable;
-  /* Blocks browser pull-to-refresh so route-owned refresh affordances do not double-fire. */
   overscroll-behavior-y: contain;
-  /* Touch laptops can report hover, so this cannot sit under a hover/media query. */
   -webkit-tap-highlight-color: transparent;
-  /* iOS inflates text in landscape, overriding the mobile type ramp at the end of this file. */
   -webkit-text-size-adjust: 100%;
-  /* UA chrome — scrollbars, <select> popups, date and autofill dropdowns — follows this, not the
-     page colours; `html.light` flips it in tailwind.config.js. */
   color-scheme: dark;
 }
 
@@ -524,32 +394,20 @@ body {
   color: var(--text);
   overflow-x: clip;
 }
-
-/* Dark ink on a light page reads thinner than light ink on dark. A hairline stroke in the text's own
-   colour thickens glyphs without changing their metrics, so nothing re-wraps the way a weight bump would. */
 html.light body { -webkit-text-stroke-width: 0.25px; }
 html.light .theme-dark { -webkit-text-stroke-width: 0; }
 html.light svg.lucide[stroke-width="2"] { stroke-width: 2.5; }
-
-/* The app ships its own reduce-motion switch and does not seed it from the OS, so honouring
-   only the media query leaves the people who found the setting still getting the animation. */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
 
 html.dz-reduce-motion { scroll-behavior: auto; }
-
-/* iOS Safari still holds `click` for the double-tap-zoom window on some elements; declaring that
-   the element never zooms makes the tap fire on contact instead of ~300ms later. */
 a,
 button,
 [role="button"],
 [role="tab"],
 summary,
 label { touch-action: manipulation; }
-
-/* A long press on a control must not raise the selection handles or the link callout. `a` is
-   deliberately absent: links wrap card titles and addresses, which are content a user copies. */
 button,
 [role="button"],
 [role="tab"],
@@ -567,8 +425,6 @@ textarea,
   -webkit-user-select: text;
   -webkit-touch-callout: default;
 }
-
-/* Keep browser autofill from repainting fields in its own colours. */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
@@ -582,9 +438,6 @@ h1,
 h2,
 h3,
 h4 { text-wrap: balance; }
-
-/* Radius hierarchy: pill is reserved for nav CTAs, hero search tabs and filter chips; cards,
-   modals and forms use --radius; inner elements use 8px. */
 .btn-teal,
 .btn-outline,
 .dz-btn { border-radius: 10px !important; }
@@ -607,7 +460,6 @@ a[role="button"]:active { transform: scale(0.97) translateY(1px); }
 .dz-control--action:active { transform: scale(0.97) translateY(1px) !important; }
 
 @media (hover: hover) {
-  /* Gated on hover so touch devices do not keep the last tapped card raised. */
   .property-card:hover {
     transform: translateY(-6px);
     box-shadow: 0 12px 40px rgb(var(--dz-c-teal-600) / 0.12), 0 4px 16px rgb(var(--dz-c-ink) / 0.5) !important;
@@ -634,24 +486,15 @@ a[role="button"]:active { transform: scale(0.97) translateY(1px); }
   background: var(--teal-1);
   border-radius: 999px;
 }
-
-/* Never show a horizontal scrollbar app-wide: horizontal regions pan by swipe/drag. :horizontal
-   leaves the themed vertical bars alone. */
 ::-webkit-scrollbar:horizontal {
   display: none;
   height: 0;
 }
-
-/* Reserve a stable gutter and float a transparent-track thumb so it never overlaps the rounded
-   tile edge; auto-hidden so hovering an adjacent card never surfaces a teal bar. */
 .filter-scroll {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
-
-/* Only inside the drawer, which is modal. The same element is the desktop sidebar, where
-   reaching the end of the list should go on scrolling the page behind it. */
 .filter-panel .filter-scroll { overscroll-behavior: contain; }
 
 .filter-scroll:focus-within { scrollbar-color: rgb(var(--dz-c-teal-500) / 0.45) transparent; }
@@ -699,8 +542,6 @@ a[role="button"]:active { transform: scale(0.97) translateY(1px); }
 }
 
 html.light .hero-scrim { display: none; }
-
-/* Light theme: soft drifting glows that fade into the page, so there is no seam above Featured. */
 html.light .hero-bg {
   background: none;
   animation: none;
@@ -708,14 +549,11 @@ html.light .hero-bg {
 }
 
 html.light .hero-bg .shape { display: none; }
-
-/* The gradient-clipped words carry island classes that keep their bright dark-mode stops. */
 html.light .hero-bg .hero-noun [aria-hidden] { background: none; color: rgb(var(--dz-c-teal-700)); }
 html.light .hero-bg .hero-city { background: none; color: rgb(var(--dz-c-orange-700)); }
 html.light .hero-bg .hero-ticker > div { background: rgb(var(--dz-c-pure-white)); box-shadow: var(--tile-shadow); }
 
 .hero-mist { display: none; }
-/* Teal-500 / orange-500 because html.light inverts the 50-400 shades to dark ones. */
 html.light .hero-mist {
   display: block;
   position: absolute;
@@ -922,8 +760,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 
 .heart-pop,
 .dz-cta-pop { animation: heartPop 0.4s ease; }
-
-/* Bare save heart over a photo: no chip behind it, so the shadow carries the contrast. */
 .heart-on-photo {
   color: rgb(var(--dz-c-pure-white));
   filter: drop-shadow(0 1px 2px rgb(var(--dz-c-black) / 0.6));
@@ -951,9 +787,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
     box-shadow: 0 0 30px rgb(var(--dz-c-indigo-600) / 0.25), 0 8px 32px rgb(var(--dz-c-black) / 0.4);
   }
 }
-
-/* Edge fades hinting the category strip scrolls; each shows only when there is more that way.
-   pointer-events:none so scrolling and card clicks pass straight through. */
 .cat-fade {
   position: absolute;
   top: 0;
@@ -1011,8 +844,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgb(var(--dz-c-white) / calc(0.08 * var(--dz-line-boost)));
 }
-
-/* In the components layer so ring-* utilities, which also paint box-shadow, still win. */
 @layer components {
   .glass, .glass-card, .dz-card { box-shadow: var(--tile-shadow); }
 }
@@ -1037,9 +868,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   border: 1px solid rgb(var(--dz-c-white) / calc(0.14 * var(--dz-line-boost)));
   box-shadow: 0 24px 60px rgb(var(--dz-c-black) / 0.5), inset 0 1px 0 rgb(var(--dz-c-white) / 0.06);
 }
-
-/* Always-shown themed scrollbar with a stable gutter, so all three hero search dropdowns behave
-   alike and long Type / BHK / locality lists never run off-screen on mobile. */
 .search-dd-scroll {
   overflow-y: scroll;
   overflow-x: hidden;
@@ -1065,9 +893,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 @media (hover: hover) {
   .search-dd-scroll::-webkit-scrollbar-thumb:hover { background: rgb(var(--dz-c-teal-500) / 0.95); }
 }
-
-/* Shared option row for the Type / BHK dropdowns, on the app-standard option metrics so every
-   value across the hero search matches the rest of the app. */
 .search-dd-opt {
   display: flex;
   align-items: center;
@@ -1261,9 +1086,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 @media (hover: hover) {
   .loc-sugg:hover .loc-sugg-sub { color: rgb(var(--dz-c-slate-400)); }
 }
-
-/* "Powered by Google" attribution mark, required by Places ToS off-map. The letter colours are
-   Google's fixed brand palette and are applied inline; only layout/typography is themed here. */
 .pbg {
   display: flex;
   align-items: center;
@@ -1286,8 +1108,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   letter-spacing: -0.02em;
   line-height: 1;
 }
-
-/* Attribution footer inside the shared dz-dropdown menu (Select / MultiSelect). */
 .dz-dropdown__attrib {
   margin-top: 2px;
   padding-top: 2px;
@@ -1295,8 +1115,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 }
 
 .dz-dropdown__attrib .pbg { justify-content: flex-start; }
-
-/* Attribution footer inside the hero locality dropdown — kept last, bottom-left, out of focus. */
 .loc-attrib {
   margin-top: 2px;
   padding-top: 3px;
@@ -1326,17 +1144,12 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-
-/* Generic scrollbar-hide utility (e.g. the mobile navbar's inline primary nav). */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-
-/* HScroll edge-fade affordance — the touch-first "there's more this way" cue used
-   app-wide on tab bars, chip rows and card rails. */
 .hscroll-fade {
   position: absolute;
   top: 0;
@@ -1349,9 +1162,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 .hscroll-fade--left { left: 0; }
 
 .hscroll-fade--right { right: 0; }
-
-/* `overflow-x: auto` forces the other axis to `auto`, so a rail overhanging by a pixel drags vertically under a
-   thumb. Not `touch-action: pan-x` — that discards vertical gestures instead of passing them up the page. */
 @media (pointer: coarse) and (max-width: 639.98px) {
   .hscroll-row:not([data-axis-free]) {
     overflow-y: hidden;
@@ -1387,9 +1197,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
 .faq-ico { transition: transform .2s ease; }
 
 .t-all { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-
-/* .card-img is shared with property SimilarProperties.jsx, so it stays global. */
-
 .card-img { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
 
 #listingsMap { z-index: 1; }
@@ -1418,9 +1225,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   border: 5px solid transparent;
   border-top-color: var(--coral-1);
 }
-
-/* .filter-overlay/.filter-panel and .filter-fab* are shared by listings and flatmates, so they stay global. */
-
 .filter-overlay {
   position: fixed;
   inset: 0;
@@ -1450,15 +1254,10 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overflow-y: auto;
   overflow-x: hidden;
-  /* The drawer is modal, so reaching the end of the filter list must not hand the scroll to the
-     results page behind it. */
   overscroll-behavior: contain;
 }
 
 .filter-panel.open { transform: translateX(0); }
-
-/* Below lg the drawer is the same floating glass card as the Draaz assistant panel: it rises from the
-   filters pill, sits above the bottom nav on the nav's 12px edges, and leaves the page readable behind. */
 @media (max-width: 1023.98px) {
   .filter-overlay {
     background: var(--dz-float-scrim);
@@ -1513,9 +1312,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     -webkit-overflow-scrolling: touch;
   }
 }
-
-/* Paired with components/ScrollRail.jsx, which sizes and moves the thumb. Touch screens hide native
-   scrollbars at rest, so below lg the drawn rail replaces them; above it the native bar stays. */
 .scroll-rail {
   display: none;
   position: absolute;
@@ -1549,14 +1345,8 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     transition: none;
   }
 }
-
-/* The mobile filters control uses a glass surface because it overlays unpredictable listing imagery.
-  Teal marks filter state without competing with the primary Post action. */
 .filter-fab {
-  /* Aligns the filter control with the bottom nav to keep their capsule edges coherent. */
   left: calc(env(safe-area-inset-left, 0px) + 12px);
-  /* Keeps the filter control above the cookie banner, which otherwise intercepts guest taps.
-    The cookie-banner height is 0px when hidden, preserving the normal nav inset. */
   bottom: calc(var(--dz-bottom-inset) + var(--dz-cookie-banner-h) + 0.75rem);
   background: var(--bottom-nav-bg);
   backdrop-filter: blur(28px) saturate(180%);
@@ -1572,9 +1362,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     0 6px 16px rgb(var(--dz-c-black) / 0.45),
     inset 0 1px 0 rgb(var(--dz-c-white) / 0.12);
 }
-
-/* The press scale is pure feedback flourish; the shadow drop already reports the
-   tap, so the movement is the only part worth cutting. */
 @media (prefers-reduced-motion: reduce) {
 
   .filter-fab,
@@ -1584,23 +1371,14 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   }
 
 }
-
-/* Same fallback the bottom nav takes: without backdrop-filter a translucent fill is unreadable
-   text over content, so those browsers get an opaque capsule. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .filter-fab {
     background: var(--bottom-nav-solid);
   }
 }
-
-/* Filters are on. The capsule earns a teal edge only now, because only now does
-   it carry state the user needs to catch from the corner of their eye. */
 .filter-fab.is-active {
   border-color: rgb(var(--dz-c-teal-400) / 0.42);
 }
-
-/* Solid teal on glass — the one saturated element, so the eye lands on how many
-   filters are applied before it reads the word. */
 .filter-fab__count {
   background: rgb(var(--dz-c-teal-400));
   color: rgb(var(--dz-c-gray-900));
@@ -1706,9 +1484,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   .legal-toc summary::-webkit-details-marker { display: none; }
 
   .legal-toc-caret { transition: transform 0.2s ease; }
-
-  /* Prose for the HTML compiled from src/content/help/**.md. Kept separate from .legal-prose:
-     docs need a wider element vocabulary (tables, code, callouts) and a larger reading size. */
   .doc-prose {
     font-size: 0.9375rem;
     line-height: 1.75;
@@ -1812,9 +1587,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     border-top: 1px solid rgb(var(--dz-c-white) / calc(0.08 * var(--dz-line-boost)));
     margin: 2.25rem 0;
   }
-
-  /* Tables scroll horizontally rather than forcing the article column wider - a 5-column
-     comparison table is unavoidable in docs and must not break the phone layout. */
   .doc-prose table {
     display: block;
     width: 100%;
@@ -1841,8 +1613,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   @media (min-width: 768px) {
     .doc-prose table { white-space: normal; }
   }
-
-  /* Callouts — emitted by the Markdown compiler from `> [!NOTE]` blockquotes. */
   .doc-prose .doc-callout {
     border: 1px solid rgb(var(--dz-c-white) / calc(0.1 * var(--dz-line-boost)));
     border-left-width: 3px;
@@ -1917,9 +1687,6 @@ select option:checked {
   background: linear-gradient(90deg, transparent, rgb(var(--dz-c-white) / 0.08), transparent);
   animation: dzShimmer 1.4s ease-in-out infinite;
 }
-
-/* The shimmer is an INFINITE loop, and a loading state is when someone who asked for less motion
-   is least able to look away. Kept beside the animation, not in the allowlist 3,500 lines down. */
 @media (prefers-reduced-motion: reduce) {
   .skeleton::after,
   .animate-pulse {
@@ -1935,9 +1702,6 @@ html.dz-reduce-motion .animate-pulse {
 @keyframes dzShimmer {
   100% { transform: translateX(100%); }
 }
-
-/* It enters on a state change the user did not ask for, so the entrance is a single short settle.
-   Both opt-outs are honoured here, beside the animation, for the same reason the shimmer's are. */
 .dz-connectivity-card {
   animation: dzConnectivityIn 200ms cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -1959,9 +1723,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     transform: none;
   }
 }
-
-/* Staggered entrance for listing sections + cards. A keyframe rather than a toggled class, so it
-   never fights React re-renders. */
 @keyframes dzListReveal {
   from {
     opacity: 0;
@@ -1992,9 +1753,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   gap: 10px;
   justify-content: center;
 }
-
-/* Boxes flex-fill their row (capped at 48px) so 6 inputs never overflow a
-   narrow auth card on 360/414px phones — no horizontal scroll. */
 .otp-box {
   flex: 1 1 0;
   min-width: 0;
@@ -2138,7 +1896,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  /* The light theme's hairline stroke takes `color`, not the fill, so it would outline the gradient in ink. */
   -webkit-text-stroke-width: 0;
 }
 
@@ -2174,9 +1931,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 
   .thumbnail:hover img { transform: scale(1.1); }
 }
-
-/* Chip used in list context — rent inventory, tenant list, price insights and the
-   similar-property cards. Stays boxed; only the property-header rail below opts out. */
 .tag {
   background: rgb(var(--dz-c-white) / 0.06);
   border: 1px solid rgb(var(--dz-c-white) / calc(0.1 * var(--dz-line-boost)));
@@ -2192,9 +1946,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 @media (hover: hover) and (pointer: fine) {
   .tag:hover { background: rgb(var(--dz-c-white) / 0.12); }
 }
-
-/* Plain phrases inside the trust card, not N badges: they answer a single question, and boxing each
-   separately turned one answer into four tappable-looking buttons. */
 .tag-strip {
   display: flex;
   flex-wrap: wrap;
@@ -2214,8 +1965,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   font-size: 0.8125rem;
   font-weight: 500;
   letter-spacing: 0;
-  /* Beats `.tag-emerald` on specificity on purpose: the label stays neutral so the
-     icon is the only thing saying "verified". */
   color: rgb(var(--dz-c-slate-300));
   cursor: help;
   transition: color 0.2s ease;
@@ -2234,8 +1983,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 }
 
 .tag-strip .tag-emerald svg { color: rgb(var(--dz-c-emerald-400)); }
-
-/* No box of its own to outline, so the focus ring supplies one. */
 .tag-strip .tag:focus-visible {
   outline: 2px solid rgb(var(--dz-c-teal-400) / 0.65);
   outline-offset: 3px;
@@ -2340,16 +2087,11 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     transform: translateY(-2px);
   }
 }
-
-/* A fact `Tip` adopted lost no box to hint that it is tappable, so the label carries the hint. */
 .dz-ph-facts [data-tip] {
   cursor: help;
   text-decoration: underline dotted rgb(var(--dz-c-teal-300) / 0.55);
   text-underline-offset: 3px;
 }
-
-/* Phone density pass: at 390px a tile's border, radius and padding cost more of the line than the value in
-   it, so every group flattens to one hairline ledger. Declared after @tailwind utilities so it wins. */
 @media (max-width: 639.98px) {
   .dz-property :is(.detail-card, .amenity-card, .highlight-pill) {
     padding: 0.75rem 0;
@@ -2358,29 +2100,18 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     border-radius: 0;
     background: none;
   }
-
-  /* The glyph still earns its place as a scanning anchor; its 32px chip does not. */
   .dz-property :is(.detail-card, .amenity-card, .highlight-pill)>span:first-child {
     width: 1.25rem;
     height: 1.25rem;
     border-radius: 0;
     background: none;
   }
-
-  /* A `.detail-card` that `Tip` adopted is tap-activatable, and the flatten above removed the border that
-     carried that hint. Restored on the label alone, so the row stays a ledger line. */
   .dz-property .detail-card[data-tip] p:first-child {
     display: inline-block;
     text-decoration: underline dotted rgb(var(--dz-c-teal-300) / 0.55);
     text-underline-offset: 3px;
   }
-
-  /* The ring inherits the unflattened tile's radius and would draw a rounded box around a square row.
-     Confined to these three classes: `Tip` also wraps `rounded-full` chips, where a square ring is wrong. */
   .dz-property :is(.detail-card, .amenity-card, .highlight-pill)[data-tip]:focus-visible { border-radius: 0; }
-
-  /* `:not(button)` — the report/re-verify row is the one control here, and stripping its box would leave a
-     tap target with no affordance. Its height comes from `min-h-[44px]`, not from the box. */
   .dz-assured-list>*:not(button),
   .dz-share-split>* {
     padding: 0.35rem 0;
@@ -2403,8 +2134,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   justify-content: center;
   gap: 0.5rem;
   padding: calc(env(safe-area-inset-top, 0px) + 1rem) calc(env(safe-area-inset-right, 0px) + 1rem) calc(env(safe-area-inset-bottom, 0px) + 1rem) calc(env(safe-area-inset-left, 0px) + 1rem);
-  /* Hand-rolled overlays lack <Modal>'s scroll lock, so block page drag behind the photo. Pinch stays allowed
-     here, not on the img: touch-action intersects down the tree, so `none` on this box would cancel it below. */
   touch-action: pinch-zoom;
   animation: dzLbFade 0.25s ease;
 }
@@ -2424,10 +2153,7 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 }
 
 .dz-lightbox img {
-  /* The overlay padding already accounts for safe areas, so 100% is safer than viewport width. */
   max-width: 100%;
-  /* dvh, not vh: vh is the viewport with the URL bar collapsed, so on load the photo plus its
-     caption stood taller than the screen actually showing them. */
   max-height: 82dvh;
   border-radius: 1rem;
   box-shadow: 0 30px 80px rgb(var(--dz-c-black) / 0.6);
@@ -2442,7 +2168,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 
 .dz-lb-close {
   position: absolute;
-  /* Safe-area padding on the overlay does not move an absolutely positioned child. */
   top: calc(env(safe-area-inset-top, 0px) + 1.25rem);
   right: calc(env(safe-area-inset-right, 0px) + 1.25rem);
   width: 44px;
@@ -2470,9 +2195,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   border: 1px solid rgb(var(--dz-c-white) / calc(0.15 * var(--dz-line-boost)));
   transition: all 0.2s ease;
 }
-
-/* Same call the hero makes one level up: swipe already works here, and two unshrinkable 48px
-   arrows beside a full-width photo do not fit a 390px screen in the first place. */
 @media (pointer: coarse) {
   .dz-lb-nav { display: none; }
 }
@@ -2499,9 +2221,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   border-radius: 9999px;
   background: linear-gradient(90deg, var(--teal-1), var(--teal-2));
 }
-
-/* 3D extruded bar for CSS mini-charts: front face is the element's own background, depth via
-   --b3-d, face colours via --b3-top/--b3-side. Matches the Chart.js bar3d look. */
 .bar3d {
   position: relative;
   --b3-d: 6px;
@@ -2626,9 +2345,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     color: rgb(var(--dz-c-white));
   }
 }
-
-/* Every consumer overlay shares .dz-modal-backdrop/.dz-modal, so this one block turns all centred dialogs
-   into floating cards above the bottom nav. */
 @media (max-width: 639.98px) {
   .dz-modal-backdrop {
     align-items: flex-end;
@@ -2650,8 +2366,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     padding: 1rem;
     animation: dzFloatIn 0.24s cubic-bezier(0.32, 0.72, 0, 1);
   }
-
-  /* 36px close button fails the touch minimum; grow the hit area, not the glyph. */
   .dz-modal-x {
     width: 44px;
     height: 44px;
@@ -2662,22 +2376,15 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   position: fixed;
   left: 0;
   right: 0;
-  /* Docks above whatever bottom chrome is already claiming space (mobile bottom nav).
-     Resolves to 0 on desktop, i.e. today's `bottom: 0`. */
   bottom: var(--dz-bottom-inset);
   z-index: 60;
   display: flex;
   gap: 0.6rem;
-  /* Left/right insets matter in landscape on notched devices now that the document
-     is viewport-fit=cover; the bottom inset is already carried by --dz-bottom-inset. */
   padding: 0.7rem calc(1rem + env(safe-area-inset-right, 0px)) 0.7rem calc(1rem + env(safe-area-inset-left, 0px));
   background: rgb(var(--dz-c-ink) / 0.92);
   backdrop-filter: blur(16px);
   border-top: 1px solid rgb(var(--dz-c-white) / calc(0.08 * var(--dz-line-boost)));
 }
-
-/* Step actions stay in flow at the end of the step on every breakpoint, so nothing floats over the fields.
-   Compact and right-aligned — within a right thumb's arc — while keeping the 44px touch height. */
 @media (max-width: 1023.98px) {
   .lp-step-actions {
     position: static;
@@ -2693,16 +2400,11 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     backdrop-filter: none;
     box-shadow: none;
   }
-
-  /* Trim the box; the 44px min-height on each button keeps the touch target. */
   .lp-step-actions>button {
     flex: 0 0 auto;
     width: auto;
     padding: 0.5rem 1.1rem;
   }
-
-  /* With the keyboard up the auth primary action is pushed below the fold, on the one screen
-     where dropping the user costs most. Auth never mounts the bottom nav, so no double count. */
   .dz-auth-submit {
     position: sticky;
     bottom: calc(var(--dz-bottom-inset) + 0.75rem);
@@ -2740,9 +2442,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   .star-pick i:hover,
   .star-pick button:hover { transform: scale(1.2); }
 }
-
-/* Tailwind's preflight sets `color: inherit` on form elements, so a `.field` with no colour utility renders
-   white on white. Emitted from @layer components so the ~35 fields bringing their own utilities still win. */
 @layer components {
   .field {
     background: rgb(var(--dz-c-white) / .04);
@@ -2836,9 +2535,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 .faq-item.open .faq-chev { transform: rotate(180deg); }
 
 .faq-chev { transition: transform .3s ease; }
-
-/* The card sits over the bright teal hero gradient, which washed the translucent controls teal
-   and hid the select placeholders. One legible surface for every control in the form. */
 .svc-quote { background: rgb(var(--dz-c-ink) / .72); }
 
 .svc-quote .field,
@@ -2971,8 +2667,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 }
 
 .notif.unread { border-left: 3px solid var(--teal-2); }
-
-/* `both` would pin transform after the entrance and freeze the swipe drag and press scale. */
 .notif.list-reveal {
   opacity: 1;
   animation-fill-mode: backwards;
@@ -2994,18 +2688,12 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   border-color: var(--control-border-active);
   color: rgb(var(--dz-c-teal-300));
 }
-
-/* .seg is already 44px tall on a phone but nothing held its width: the icon-only variants came
-   out 34px wide, stacked in a column at a card corner where a miss lands on the neighbour. */
 @media (pointer: coarse) {
   .seg {
     min-width: var(--control-h);
     justify-content: center;
   }
 }
-
-/* Rent/Buy intent switch on the listings page — brand-gradient active pill,
-   concentric inner buttons (matches the List|Map .sf-seg pattern). */
 .deal-seg-btn { transition: color .2s ease, background .2s ease, box-shadow .2s ease; }
 
 .deal-seg-btn.is-active {
@@ -3054,9 +2742,6 @@ label.lbl {
   transition: all .25s ease;
   cursor: pointer;
 }
-
-/* Gated for the same reason as .thumbnail:hover — the teal this paints is a paler version of the
-   one .pick.sel paints, so on touch the last-tapped option looks half-chosen until another is. */
 @media (hover: hover) and (pointer: fine) {
   .pick:hover { border-color: rgb(var(--dz-c-teal-500) / .4); }
 }
@@ -3181,9 +2866,6 @@ label.lbl {
 @media (prefers-reduced-motion: reduce) {
   .dz-tip { animation: none; }
 }
-
-/* AdvancedMarkers reuse the .price-marker / .map-pin DOM above, so only Google's default
-   InfoWindow chrome is stripped here, to let our dark popup cards fill it edge-to-edge. */
 .gm-style .gm-style-iw.gm-style-iw-c {
   padding: 0 !important;
   background: var(--brand-card);
@@ -3205,20 +2887,11 @@ label.lbl {
 .gm-style .dz-gm-iw-prop .dz-mp-card { width: 268px; }
 
 .gm-style .dz-gm-iw-share .dz-sp { width: 252px; }
-
-/* On cloud-styled (mapId) maps the fullscreenControl:false option is ignored, so the button is
-   stripped here. mapTypeControl / streetViewControl are honoured via <Map> props. */
 .gm-style .gm-fullscreen-control { display: none !important; }
-
-/* Mobile: Messages is a native chat - drop the marketing footer and floating assistant, run
-   edge-to-edge, and fill the space between the top bar and the tab bar. */
 @media (max-width: 767px) {
 
   .route-messages>footer,
   .route-messages>.dz-assistant-slot { display: none; }
-
-  /* Focused mobile auth funnel (/signin, /signup, /staff-login): drop the marketing
-     footer + floating assistant so nothing overlaps the form CTA. Desktop keeps both. */
   .route-auth>footer,
   .route-auth>.dz-assistant-slot { display: none; }
 
@@ -3239,8 +2912,6 @@ label.lbl {
     border-right: 0;
     box-shadow: none;
   }
-
-  /* A touch more headroom for message bubbles on small screens. */
   .messages-page .pc-msgs { padding: 14px 14px 6px; }
 }
 
@@ -3251,13 +2922,10 @@ label.lbl {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  /* dvh plus the indicator inset keeps the bottom action row out from under mobile browser chrome. */
   padding: 5dvh 1rem calc(5dvh + var(--dz-safe-b));
   background: rgb(var(--dz-c-gray-950) / .7);
   backdrop-filter: blur(6px);
   overflow-y: auto;
-  /* This element is the scroller, and it is modal: reaching the end of the form must not hand the
-     gesture to the results page behind it. Same rule .filter-panel carries. */
   overscroll-behavior: contain;
 }
 
@@ -3333,8 +3001,6 @@ textarea.dz-input { height: auto; padding: .625rem 1rem; line-height: 1.5; }
   background: rgb(var(--dz-c-ink-card));
   box-shadow: 0 24px 80px rgb(var(--dz-c-black) / 0.6), 0 0 0 1px rgb(var(--dz-c-white) / 0.06) inset;
 }
-
-/* The shared <Modal> below 640px; its position comes from Modal.jsx utilities built on the --dz-float-* tokens. */
 @media (max-width: 639.98px) {
   .dz-modal-sheet {
     border: 0;
@@ -3411,9 +3077,6 @@ textarea.dz-input { height: auto; padding: .625rem 1rem; line-height: 1.5; }
 
   .t-all { transition: color 0.2s, background-color 0.2s, border-color 0.2s; }
 }
-
-/* User-toggled "Reduce motion" (Settings ▸ Appearance). Mirrors the OS-level
-   reduced-motion rules above so users can opt in regardless of system settings. */
 html.dz-reduce-motion .hero-bg,
 html.dz-reduce-motion .shape,
 html.dz-reduce-motion .shape-1,
@@ -3474,16 +3137,11 @@ html.dz-reduce-motion .list-reveal {
 @keyframes fade-in {
   from { opacity: 0; }
 }
-
-/* Shared element morph: property card image → property hero image.
-   The browser automatically morphs elements with matching view-transition-name. */
 ::view-transition-old(property-hero-*),
 ::view-transition-new(property-hero-*) {
   animation-duration: 280ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
-
-/* Keep the image visible during transition (no fade, just morph position/size) */
 ::view-transition-image-pair(property-hero-*) { isolation: auto; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3491,8 +3149,6 @@ html.dz-reduce-motion .list-reveal {
   ::view-transition-old(root),
   ::view-transition-new(root) { animation: none; }
 }
-
-/* The .price-marker.is-active rule below intentionally stays here: it is not .dz-mdp-scoped. */
 .price-marker.is-active {
   background: rgb(var(--dz-c-pure-white));
   color: rgb(var(--dz-c-emerald-950));
@@ -3503,9 +3159,6 @@ html.dz-reduce-motion .list-reveal {
 }
 
 .price-marker.is-active::after { border-top-color: rgb(var(--dz-c-pure-white)); }
-
-/* Mobile space optimization: headings scale down 20%, scoped to heading elements so numeric
-   price/stat spans reusing the same text-* utilities keep their emphasis. */
 @media (max-width: 639.98px) {
   .consumer-main :is(h1, h2, h3) {
     line-height: 1.15;
@@ -3527,28 +3180,17 @@ html.dz-reduce-motion .list-reveal {
   .consumer-main :is(h1, h2, h3).text-xl { font-size: 1rem; }
 
 }
-
-/* Touch browsers zoom into any editable field under 16px on focus, forcing a pinch back out.
-   !important is needed to beat the class-scoped rules (.pc-input, .pc-search input, etc.). */
 @media (pointer: coarse) {
 
   input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]),
   select,
   textarea { font-size: 16px !important; }
-
-  /* Zoom keys off the field's own size, so the placeholder can drop to the 14px control scale. */
   input::placeholder,
   textarea::placeholder { font-size: 14px; }
 }
-
-/* useKeyboardOpen: the soft keyboard is up, so bottom-pinned chrome would sit on top of the field being typed in. */
 .dz-kbd-open [data-kbd-hide] { display: none !important; }
-/* The chat pane is sized off the inset, so the composer would float a bar's height above the keyboard. */
 .dz-kbd-open .route-messages.has-bottom-nav { --dz-bottom-inset: var(--dz-safe-b); }
 html[data-scroll-locked] .dz-assistant-layer:not(.dz-assistant-layer--open) { display: none !important; }
-
-/* Appended to <body>, so it cannot read the inset .has-bottom-nav sets on the layout wrapper and
-   rebuilds it from the same tokens. Rung 90: it reports state, so it must not outrank a dialog. */
 .dz-autosave-flash {
   position: fixed;
   left: calc(env(safe-area-inset-left, 0px) + 16px);
@@ -3578,9 +3220,6 @@ html[data-scroll-locked] .dz-assistant-layer:not(.dz-assistant-layer--open) { di
 }
 
 .dz-autosave-flash.is-on { opacity: 1; }
-
-/* Below lg the tab bar owns the bottom edge. Auth, which does not mount it, pins its own
-   control to that edge, which this clears just the same. */
 @media (max-width: 1023.98px) {
   .dz-autosave-flash { bottom: calc(var(--dz-bottom-nav-h) + var(--dz-bottom-nav-offset) + 16px); }
 }
@@ -3588,18 +3227,12 @@ html[data-scroll-locked] .dz-assistant-layer:not(.dz-assistant-layer--open) { di
 @media (prefers-reduced-motion: reduce) {
   .dz-autosave-flash { transition: none; }
 }
-
-/* The "add area" chip only reads as an ADD affordance once it fills teal on hover, which never
-   fires on touch - so give it the filled treatment permanently where hover does not exist. */
 @media (hover: none) {
   .loc-sugg .add {
     background: var(--teal-2);
     color: rgb(var(--dz-c-emerald-950));
   }
 }
-
-/* HScroll arrow buttons are 36px - under the touch minimum - and redundant next to native swipe
-   plus the edge fade. Removed on coarse pointers rather than grown. */
 @media (pointer: coarse) {
   .hscroll-arrow { display: none; }
 }

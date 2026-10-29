@@ -1,5 +1,3 @@
-/* `loading` matters for more than a spinner: `NO_CONTACT_GATE` reads as "no request made", which is
-   also what renders the *Request number* button — ignoring `loading` flashes it at an approved user. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NO_CONTACT_GATE } from '../../../lib/contact.js';
 import { contactStatus } from '../../../services/contactService.js';
@@ -7,7 +5,6 @@ import { contactStatus } from '../../../services/contactService.js';
 export function useContactGate(propertyId, refreshKey = '') {
   const [gate, setGate] = useState(NO_CONTACT_GATE);
   const [loading, setLoading] = useState(Boolean(propertyId));
-  // Bumped on every read and on identity/listing change, so a late answer for a previous user never lands.
   const latest = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -40,8 +37,6 @@ export function useContactGate(propertyId, refreshKey = '') {
       .then((next) => {
         if (alive()) setGate(next);
       })
-      // Falling back to the closed state can only under-reveal, never hand out a number we failed
-      // to confirm the caller may see.
       .catch(() => {
         if (alive()) setGate(NO_CONTACT_GATE);
       })

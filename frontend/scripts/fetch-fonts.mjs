@@ -1,30 +1,9 @@
-/* Downloads the web fonts Google Fonts would have served, and emits the
- * @font-face CSS that points at the local copies.
- *
- * Why self-host at all: the <link> to fonts.googleapis.com sat on the critical
- * path and cost a full third-party round trip before a single glyph could be
- * requested — DNS + TLS + CSS, and only then the font itself. `preconnect` warms
- * the socket but cannot remove the hop. On a 4G phone, which is ~80% of this
- * audience, that is the single largest render-blocking item on the page.
- *
- * Why a script instead of pasted URLs: the woff2 filenames are content-hashed and
- * Google rotates them. Pasting them into index.html means they silently rot; this
- * can be re-run to refresh.
- *
- * The per-subset unicode-range is preserved verbatim, which is the part that
- * matters for size: an English visitor never downloads the Devanagari subsets,
- * exactly as before.
- *
- * Usage:  node scripts/fetch-fonts.mjs
- */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const SPEC = 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap';
 
-// Google serves woff2 + unicode-range only to browsers it recognises; a bare
-// fetch gets the legacy ttf payload instead.
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -60,8 +39,6 @@ const main = async () => {
     const url = (block.match(/url\((https:[^)]+\.woff2)\)/) || [])[1];
     if (!family || !url) continue;
 
-    // One family+weight spans several subsets; number them so filenames are stable
-    // and human-readable rather than carrying Google's rotating hash.
     const key = `${slug(family)}-${weight}`;
     const n = (seen.get(key) || 0) + 1;
     seen.set(key, n);
@@ -79,8 +56,6 @@ const main = async () => {
         `  font-family: '${family}';`,
         `  font-style: ${style};`,
         `  font-weight: ${weight};`,
-        // swap: show fallback text immediately rather than holding the paint. A
-        // property listing is readable in a system font; a blank screen is not.
         '  font-display: swap;',
         `  src: url('/fonts/${file}') format('woff2');`,
         range ? `  unicode-range: ${range};` : null,

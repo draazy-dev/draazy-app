@@ -16,13 +16,10 @@ import { Chips, QueueTabs } from '../../components/admin/WorkQueue.jsx';
 import PerformanceTab from './staff-activity/PerformanceTab.jsx';
 import AuditTrail, { describe } from './staff-activity/AuditTrail.jsx';
 
-/** Every figure is counted by the server, not folded from the rows in hand. */
-
 const TABS = [['performance', 'Performance'], ['log', 'Activity log']];
 
 const PAGE_SIZE = 50;
 
-/** The category filter's colours, keyed by the server's `entity`. Anything unlisted is grey. */
 const ENTITY_COLOR = {
   user: 'teal',
   property: 'indigo',
@@ -34,22 +31,18 @@ const ENTITY_COLOR = {
 
 const entityColor = (entity) => ENTITY_COLOR[entity] || 'gray';
 
-/** `user.staff.approve.refused` → `staff approve refused`. The noun is already the category. */
 const readableAction = (action) => String(action || '').split('.').slice(1).join(' ') || action;
 
 export default function AdminStaffActivity() {
   const { optionEnabled, loading: flagsLoading } = useAdminFlags();
   const { user } = useAuth();
-  // The server fills `metadata` for admins only; a manager's column would be empty on every row.
   const showDetails = user?.role === 'admin';
   const [tab, setTab] = useTabParam(TABS.map(([id]) => id), 'performance');
   const [allActors, setAllActors] = useState(false);
 
   const [rows, setRows] = useState(null);
   const [pageInfo, setPageInfo] = useState({ page: 0, totalPages: 1, total: 0 });
-  /** Headline totals for the *narrowed* window: what the page is actually showing. */
   const [headline, setHeadline] = useState({ total: 0, staffCount: 0, byEntity: [] });
-  /** Options and ranking for the *unnarrowed* window, so the pickers keep offering every choice. */
   const [facets, setFacets] = useState({ actions: [], byEntity: [], leaderboard: [] });
   const [error, setError] = useState('');
 
@@ -71,7 +64,6 @@ export default function AdminStaffActivity() {
     [days],
   );
 
-  /** A page flip is this read alone; the headline and facets below do not depend on `page`. */
   const loadFeed = useCallback(async () => {
     setError('');
     try {
@@ -86,8 +78,6 @@ export default function AdminStaffActivity() {
     }
   }, [actor, entity, action, from, q, page]);
 
-  /** The headline takes the full filter; the facets take only the date range and search, because a
-   * picker built from a narrowed window would delete its own options. */
   const loadSummaries = useCallback(async () => {
     try {
       const [narrow, wide] = await Promise.all([
@@ -103,7 +93,6 @@ export default function AdminStaffActivity() {
     }
   }, [actor, entity, action, from, q]);
 
-  /* Debounced because `q` changes on every keystroke and each change is a request. */
   useEffect(() => {
     if (tab !== 'log' || allActors) return undefined;
     const timer = setTimeout(loadFeed, 250);
@@ -116,7 +105,6 @@ export default function AdminStaffActivity() {
     return () => clearTimeout(timer);
   }, [loadSummaries, tab, allActors]);
 
-  /* Any change to the filters is a different result set, so page 1 is the only honest place to be. */
   useEffect(() => { setPage(0); }, [actor, entity, action, days, q]);
 
   const staffOpts = [
@@ -166,8 +154,6 @@ export default function AdminStaffActivity() {
     {
       key: 'detail',
       header: 'Record',
-      /* No prose caption here. The server stores no such sentence and one is not invented: what
-         identifies the record is its id, and a caption assembled by the reader is not evidence. */
       render: (a) => (
         <span className="font-mono text-xs text-gray-400">{a.entityId || '—'}</span>
       ),
@@ -268,7 +254,6 @@ export default function AdminStaffActivity() {
         </div>
       )}
 
-      {/* KPI summary row: two server-counted facts, then the busiest kinds of record in the window. */}
       <div className="mb-6 grid gap-3 grid-cols-2 sm:grid-cols-4">
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
           <div data-testid="kpi-total" className="text-2xl font-bold text-white">{fmtNum(headline.total)}</div>
@@ -287,7 +272,6 @@ export default function AdminStaffActivity() {
       </div>
 
 
-      {/* Filters bar */}
       <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
@@ -322,8 +306,6 @@ export default function AdminStaffActivity() {
         </div>
       </div>
 
-      {/* Activity table. No `pageSize`: these rows are one server page already, and slicing them
-          again in the browser would put a pager under a pager, each counting something different. */}
       <Table
         columns={columns}
         rows={rows || []}

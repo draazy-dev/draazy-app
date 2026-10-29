@@ -7,8 +7,6 @@ import { inr } from './flatmates/helpers.js';
 
 const BTN = 'inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold';
 
-/* An owner opens this from the WhatsApp note sent when their tenant posts a room. The token in the
-   URL fragment is the whole credential, so it is read once and scrubbed from history. */
 export default function OwnerConfirm() {
   const { t } = useTranslation();
   const [token] = useState(() => window.location.hash.slice(1));

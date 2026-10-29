@@ -1,4 +1,3 @@
-/* Pure derivations for the consumer Dashboard. */
 import { parseWhen } from '../../../lib/visitWhen.js';
 import { getOwnerListingState } from '../../../components/listing/ListingStatusCard.jsx';
 
@@ -23,7 +22,6 @@ const addUnique = (arr, value) => {
   if (value && !arr.includes(value)) arr.push(value);
 };
 
-// One due-diligence request is one lead, so group buyer document requests per buyer+property.
 export function buildDocGroups(docReqs = [], titleOfOrListings) {
   const titleOf = titleResolver(titleOfOrListings);
   const map = new Map();
@@ -108,7 +106,6 @@ export function attentionFromItems(items = []) {
     return acc;
   }, { leads: 0, visits: 0, properties: 0 });
 }
-// The "what's waiting on ME" list behind the Home attention panel; sorted stale-first so the oldest lead each group.
 export function buildActionItems({
   isOwner,
   contactReqs = [],
@@ -156,7 +153,6 @@ export function buildActionItems({
         at: g.requestedAt === Infinity ? null : g.requestedAt,
       });
     });
-    // An unread staff message is only "needs info" while the listing is pending with a needs_info review.
     listings.filter((l) => !l.flatmate && (reviewsByProp?.[l.id]?.unread || reviewsByProp?.get?.(l.id)?.unread || 0) > 0).forEach((l) => {
       const rev = reviewsByProp?.[l.id] || reviewsByProp?.get?.(l.id);
       const open = () => (openReview ? openReview(l.uuid || l.id) : go?.('properties'));
@@ -168,7 +164,6 @@ export function buildActionItems({
       });
     });
   }
-  // Shared: upcoming visits still awaiting confirmation (owner and seeker both act here).
   scheduledVisits.filter((v) => v.status === 'scheduled' && isVisitHost(v, userId)).forEach((v) => {
     const who = v.visitorName || v.customer || 'A visitor';
     actionItems.push({
@@ -192,8 +187,6 @@ export function buildActionItems({
   return actionItems;
 }
 
-/* The third tile counts the same leads the Leads panel lists, which is why the caller passes one `leadCount` rather
-   than the arrays: the tile and the panel must not be able to disagree. */
 function isLiveListing(listing) {
   const status = String(listing.status || listing.state || '').toLowerCase();
   if (!['approved', 'live', 'verified'].includes(status)) return false;
@@ -215,7 +208,6 @@ export function buildOwnerStats({ listings = [], items = [], go }) {
   ];
 }
 
-// Seeker Overview stat cards — real figures from the user's saved/viewed stores.
 export function buildSeekerStats({ savedCount = 0, alertCount = 0, followCount = 0, upcomingVisits = 0, go }) {
   return [
     { icon: 'heart', bg: 'bg-red-400/15', fg: 'text-red-400', value: String(savedCount), label: 'Saved', trend: { dir: 'flat', text: savedCount ? 'Saved homes' : 'None yet' }, onClick: () => go('saved'), ariaLabel: 'View saved properties' },

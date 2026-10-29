@@ -1,8 +1,6 @@
 import { Link } from 'react-router';
 import { Compass } from 'lucide-react';
 
-/* Catch-all 404 for unknown routes. Gives a clear "not found" message and
-   obvious paths back into the app (home + browse listings). */
 export default function Stub({ title = 'Page not found' }) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-20 text-center">

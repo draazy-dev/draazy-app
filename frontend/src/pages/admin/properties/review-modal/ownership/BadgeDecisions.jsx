@@ -1,7 +1,5 @@
 import { missingEvidenceId } from './vocabulary.js';
 
-/* Grant and withdraw are never both on offer, and grant is always a deliberate click, never a
-   consequence of recording evidence. */
 export default function BadgeDecisions({
   id, verification, pending, canDecide, reason, setReason, onGrant, onWithdraw,
 }) {

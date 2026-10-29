@@ -2,7 +2,6 @@ import { Link, Navigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 
-// The property page's popup is the one booking form; this route only forwards to it.
 export default function ScheduleVisit() {
   const { t } = useTranslation();
   const [params] = useSearchParams();

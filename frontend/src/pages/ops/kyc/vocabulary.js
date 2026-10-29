@@ -15,8 +15,6 @@ export const DOC_OPTIONS = [
   { value: 'driving_licence', label: 'DL' },
 ];
 
-/* What a reviewer must see with their own eyes before approving. Approve stays locked until every
-   line is ticked — the server cannot check a photo, so this list is the human half of the gate. */
 export const CHECKLISTS = {
   aadhaar: ['Name matches the card', 'DOB or birth year matches', 'Photo matches the selfie', 'Not a masked or photocopied Aadhaar'],
   pan: ['Name matches exactly', 'DOB matches', 'PAN number is clear and unedited', 'Photo or signature supports the holder'],
@@ -48,7 +46,6 @@ export const POSE_LABELS = {
 export const STATUS_LABELS = { pending: 'Pending', verified: 'Verified', rejected: 'Rejected', revoked: 'Revoked' };
 
 export const CLAIM_HOLD_LIMIT = 3;
-/* OVERDUE_HOURS must match IdentityReviewQueueService.OVERDUE_AFTER, which filters "Overdue" server-side. */
 export const WARN_HOURS = 24;
 export const OVERDUE_HOURS = 48;
 

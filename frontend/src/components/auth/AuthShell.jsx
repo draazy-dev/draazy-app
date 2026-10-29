@@ -1,8 +1,5 @@
-// .otp-* stays global in index.css: OtpBoxes is shared with list-property.
 import '../../styles/routes/auth.css';
 
-/* `left` is the desktop panel, `mobileIntro` the brand block shown above the card below lg.
-   align='top' pins tall cards (Sign Up) under the navbar so centring cannot clip them. */
 export default function AuthShell({ left, children, mobileIntro, align = 'center' }) {
   const colAlign = align === 'top'
     ? 'lg:justify-start lg:pt-[calc(var(--dz-nav-h)+16px)] lg:pb-12'

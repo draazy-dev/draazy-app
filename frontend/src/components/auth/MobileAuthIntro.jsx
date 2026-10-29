@@ -1,7 +1,5 @@
 import LogoMark from '../brand/LogoMark.jsx';
 
-/* Phones hide AuthShell's desktop brand panel (rendered `<lg`), so this strip carries the branding and trust points
-   instead. */
 export default function MobileAuthIntro({ eyebrow, tagline, chips = [] }) {
   return (
     <div className="mb-6 text-center slide-up">

@@ -16,14 +16,11 @@ import {
   useClientPaging,
 } from '../../components/admin/WorkQueue.jsx';
 
-/** The widest window the console offers, and therefore what it fetches once and slices locally. */
 const MAX_MONTHS = 24;
 
-/** Search and the type filter are server-side; CSV export walks every page, not just the window. */
 const LEDGER_PAGE_SIZE = 100;
 const TX_PER_PAGE = 20;
 
-/** Must match `AdminFinanceService.LEDGER_KINDS`: an unknown kind is a 400, not an empty page. */
 const KINDS = {
   subscription: { label: 'Subscription', tone: CHIP_TONE.teal },
   service: { label: 'Service', tone: CHIP_TONE.sky },
@@ -41,7 +38,6 @@ const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 const CYCLE_ABBR = { yearly: 'yr', quarterly: 'qtr' };
 const termLabel = (p) => (p.termDays ? ` / ${p.termDays} days` : p.billingCycle ? `/${CYCLE_ABBR[p.billingCycle] ?? 'mo'}` : '');
 
-/** `fmtINR` has no sign handling, so a refund would otherwise read `₹-999`. */
 const money = (n) => (n < 0 ? `−${fmtINR(-n)}` : fmtINR(n));
 const netOf = (m) => m.subscriptions + m.services - m.refunds;
 
@@ -106,7 +102,6 @@ function FlowRow({ label, hint, amount, minus, total }) {
 }
 
 export default function AdminFinance() {
-  /* Chart options below read cssColour at render, so a theme flip must re-render them. */
   useIsLightTheme();
   const [finance, setFinance] = useState(null);
   const [series, setSeries] = useState(null);
@@ -127,7 +122,6 @@ export default function AdminFinance() {
 
   useEffect(() => {
     let alive = true;
-    /* `allSettled`, not `all`: the two reads feed independent panels, and one failing must not blank the other. */
     Promise.allSettled([getFinanceOverview(), getFinanceSeries(MAX_MONTHS)]).then(([f, sr]) => {
       if (!alive) return;
       setFinance(f.status === 'fulfilled' ? f.value : null);
@@ -202,7 +196,6 @@ export default function AdminFinance() {
     setExporting(true);
     setExportFailed(false);
     try {
-      /* The live box, not the debounced term: the CSV must match what the operator typed. */
       const rows = await fetchWholeLedger({ ...txFilters, q: txQ.trim() });
       exportCsv(
         'draazy-transactions.csv',
@@ -324,7 +317,6 @@ export default function AdminFinance() {
             {plans.length === 0 ? (
               <p className="py-2 text-sm text-gray-500">No active paid plans.</p>
             ) : plans.map((p) => (
-              /* Keyed on price too: a repriced plan returns one line per price cohort, so the name is not unique. */
               <div key={`${p.name}:${p.price}`} className="flex items-center justify-between border-b border-white/5 py-2 text-sm">
                 <div>
                   <div className="font-medium">{p.name}</div>

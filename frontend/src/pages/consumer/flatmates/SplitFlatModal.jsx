@@ -8,16 +8,12 @@ import { moneyWords } from '../list-property/format.js';
 import { ROOM_KIND_ORDER, ROOM_KINDS } from './model.js';
 import { maxRoomsForBhk, capBoundsFor, bedroomsOf } from '../../../lib/data/flatSplit.js';
 
-/* The owner answers only what they may decide: which rooms exist, each room's rent, and how
- * many people may live in the FLAT. */
 const blankRoom = (roomKind) => ({ roomKind, rent: '', deposit: '' });
 const digits = (v) => String(v ?? '').replace(/\D/g, '').slice(0, 7);
 const grouped = (v) => (v ? Number(v).toLocaleString('en-IN') : '');
 
 export default function SplitFlatModal({ listing, onClose, onConfirm }) {
   const { t } = useTranslation();
-  /* `Number(listing.bhk)` is NaN for "3 BHK", which would seed one room and a flat cap of one:
-   * a split the owner cannot confirm. */
   const bhk = bedroomsOf(listing?.bhkNum ?? listing?.bhk) || 1;
   const roomCap = maxRoomsForBhk(bhk);
   const [rooms, setRooms] = useState(() => Array.from({ length: Math.min(bhk, 4) }, (_, i) => blankRoom(i === 0 ? 'master' : 'bedroom')));

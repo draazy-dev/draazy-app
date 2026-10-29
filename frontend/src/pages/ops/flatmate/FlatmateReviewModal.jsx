@@ -84,7 +84,6 @@ function Tabs({ active, onChange }) {
   );
 }
 
-/* The Properties desk's frame: the post on the left, everything that decides it in the right rail. */
 function Layout({ main, rail }) {
   return (
     <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6 lg:space-y-0" data-testid="flatmate-review-modal">
@@ -149,7 +148,6 @@ export default function FlatmateReviewModal({ entry, onClose, onChanged }) {
     return () => { alive = false; };
   }, [entry.key, isApp, nonce]);
 
-  // The server's refusal is shown verbatim: it names the missing field or reason.
   const run = useCallback(async (work, message, tone, close) => {
     setBusy(true);
     try {
@@ -174,7 +172,6 @@ export default function FlatmateReviewModal({ entry, onClose, onChanged }) {
   };
 
   const [decided, setDecided] = useState(null);
-  // The list row is a card with no agreement file or mobile, so the badge section waits for the detail read.
   const review = decided || detail.data?.review || null;
   const decideBadge = (decision, note, checks) => run(
     async () => setDecided(await decideFlatmateReview(review.id, decision, note, checks)),

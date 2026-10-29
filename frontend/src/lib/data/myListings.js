@@ -4,7 +4,6 @@ import { myFlatmateGroups, myFlatmatePosts, myFlatmateRooms } from '../../servic
 const SHARE_REQ_IMG = 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&q=80';
 const FLATMATE_GROUP_IMG = 'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&q=80';
 
-// Flatmate moderation states (FlatmateVocabulary.MOD_STATUS) onto the listing card's status vocabulary.
 const CARD_STATUS = { live: 'approved', approved: 'approved', pending: 'pending', flagged: 'pending', removed: 'rejected', rejected: 'rejected', expired: 'expired' };
 const cardStatus = (modStatus) => CARD_STATUS[modStatus] || 'pending';
 
@@ -29,7 +28,6 @@ export function flatmatePostToListing(r) {
   };
 }
 
-/** The caller's own seeker posts, scoped by the provider rather than by browser data. */
 export async function getMyFlatmatePosts() {
   const page = await myFlatmatePosts({ size: 100 });
   return page.items.map(flatmatePostToListing);
@@ -59,14 +57,11 @@ export function flatmateGroupToListing(g) {
   };
 }
 
-/** The caller's own groups, including moderation-hidden rows. */
 export async function getMyFlatmateGroups() {
   const page = await myFlatmateGroups({ size: 100 });
   return page.items.map(flatmateGroupToListing);
 }
 
-/* A room is already a live view model. This small adapter only gives the dashboard its shared
-   card shape; it never reads or writes browser storage. */
 export function roomToListing(room) {
   const image = room.cover || null;
   const locality = room.locality || room.localities?.[0] || 'Pune';
@@ -92,18 +87,15 @@ export function roomToListing(room) {
   };
 }
 
-/** The caller's own rooms, including moderation-hidden rows. */
 export async function getMyRooms() {
   const page = await myFlatmateRooms({ size: 100 });
   return page.items.map(roomToListing);
 }
 
-/* The rows with the room rows swapped, in the order `loadMyListings` builds them. */
 export function withRooms(rows, rooms) {
   return [...rows.filter((l) => l.flatmatePost), ...rows.filter((l) => l.flatmateGroup), ...rooms, ...rows.filter((l) => !l.flatmate)];
 }
 
-/* Combined "My Listings": the owner's property listings plus their flatmate posts. */
 export async function loadMyListings(user) {
   const [mine, rooms, flatmatePosts, flatmateGroups] = await Promise.all([
     myListings(user),
@@ -111,6 +103,5 @@ export async function loadMyListings(user) {
     getMyFlatmatePosts(),
     getMyFlatmateGroups(),
   ]);
-  /* Drop archived rows for this combined panel, except staff takedowns the owner must be able to see. */
   return [...flatmatePosts, ...flatmateGroups, ...rooms, ...mine.filter((l) => !l.archived || l.archivedNote)];
 }

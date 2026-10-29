@@ -13,7 +13,6 @@ import CardActions from './CardActions.jsx';
 import {
   FURNISH_LABEL, LISTING_STATUS_CLS, STATUS_LABEL, STATUS_ICON, FRESHNESS_ICON,
 } from './helpers.js';
-// The panel supplies review and split data in bulk to avoid per-card requests.
 
 export default function ListingCard({
   l, review = null, split = null,
@@ -27,7 +26,6 @@ export default function ListingCard({
   const reserved = dealStatus === 'reserved';
   const isSale = l.deal === 'buy' || l.deal === 'sale';
   const displayStatus = closed ? (isSale ? 'sold' : 'rented') : reserved ? 'under_offer' : l.status;
-  // Freshness describes availability, not approval; unapproved listings cannot be reactivated.
   const fr = !l.flatmate && !closed && l.status === 'approved' ? listingFreshness(l) : null;
   const leads = !l.flatmate ? l.pendingLeads || 0 : 0;
   const qScore = !l.flatmate && Number.isFinite(l.qualityScore) ? l.qualityScore : null;
@@ -41,7 +39,6 @@ export default function ListingCard({
   const ownerStatusMeta = !l.flatmate && !closed && !reserved ? getOwnerListingStatusMeta(l, review, t) : null;
   const resubmittable = mayResubmit(ownerStatusMeta?.state, review);
   const finalRejected = ownerStatusMeta?.state === 'rejected' && !resubmittable;
-  // The server refuses an edit on these with 409 listing_not_editable.
   const editLocked = !l.flatmate && (closed || l.archived || ['sold', 'rented', 'archived'].includes(l.status)
     || (l.status === 'rejected' && !resubmittable));
   const statusPill = ownerStatusMeta ? null : {
@@ -81,7 +78,6 @@ export default function ListingCard({
   else if (fr && fr.owner.cta === 'reactivate') primary = { label: 'Reactivate', icon: 'refresh-cw', tone: 'emerald', onClick: () => onConfirmFresh(l) };
   else if (closed) primary = { label: 'Reopen listing', icon: 'rotate-ccw', tone: 'teal', onClick: () => onReopen(l) };
   else if (!l.flatmate && leads > 0) primary = { label: `${leads} waiting`, icon: 'users-round', tone: 'teal', onClick: () => navigate('/dashboard#leads') };
-  // Rental room management stays visible; unrelated low-frequency actions use "More".
 
   const roomAction = (splitEligible && !isSplit)
     ? { icon: 'layout-grid', label: 'Let room by room', onClick: () => onSplit && onSplit(l) }
@@ -148,7 +144,6 @@ export default function ListingCard({
                 {splitRoom && <p className="text-xs text-gray-500 mt-1">Part of a flat let room by room. To remove it, open the flat's listing and choose "Stop letting room by room".</p>}
               </div>
             )}
-            {/* An occupied room prevents offering the whole flat. */}
             {isSplit && (
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <span className="dz-tag bg-teal-500/15 text-teal-300 font-semibold"><Icon name="layout-grid" className="w-3 h-3" /> {splitRooms} room{splitRooms > 1 ? 's' : ''} listed</span>
@@ -161,7 +156,6 @@ export default function ListingCard({
           <div className="flex flex-row flex-wrap items-center gap-1.5 sm:flex-col sm:items-end sm:flex-shrink-0">
             {!l.flatmate && statusTag}
             {l.archived && l.archivedNote && <p className="w-full text-xs leading-snug text-gray-400 sm:max-w-[16rem] sm:text-right">{l.archivedNote}</p>}
-            {/* Rechecking an edit does not take the original listing offline. */}
             {((l.recheckPending && !onlySeeksOwnershipBadge(l)) || l.reReview) && (
               <div className="w-full sm:max-w-[16rem]">
                 <span className="dz-tag bg-amber-500/15 text-amber-300 font-semibold">
@@ -235,7 +229,6 @@ export default function ListingCard({
         </div>
       )}
 
-      {/* Performance strip — one uniform chip language: what buyers see, at a glance. */}
       {!l.flatmate && (
         <div className="grid grid-cols-2 gap-x-2 gap-y-2 px-3 py-3 border-t sm:px-4 border-white/6 sm:flex sm:flex-wrap sm:items-center sm:gap-x-5 sm:gap-y-1">
           <StatChip icon="eye" value={fmtNum(l.views || 0)} label="Views" title="Times buyers opened this listing" />

@@ -3,7 +3,6 @@ export const STAGES = ['Paid', 'Picked up', 'Papers verified', 'Draft shared', '
 export const papersVerified = (checklist) =>
   !!checklist?.items?.length && checklist.items.every((i) => i.review === 'verified');
 
-/** How many of `STAGES` are behind this case. `checklist` is optional: rows in the queue don't carry it. */
 export function stagesDone(request, checklist) {
   switch (request.status) {
     case 'submitted': return 1;
@@ -16,7 +15,6 @@ export function stagesDone(request, checklist) {
   }
 }
 
-/** The one move this case is waiting on, and whose move it is. */
 export function nextStep(request, checklist) {
   switch (request.status) {
     case 'submitted': return { who: 'desk', text: 'Take the case and start the paper check' };
@@ -41,7 +39,6 @@ const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const str = (v) => (v === null || v === undefined || typeof v === 'object' ? '' : String(v).trim());
 const num = (v) => Number(str(v).replace(/,/g, '')) || 0;
 
-/** Owner, tenants, flat and terms for a queue row, from the wizard snapshot with flat fields as fallback. */
 export function caseSummary(details) {
   const d = obj(details);
   const s = obj(d._state);

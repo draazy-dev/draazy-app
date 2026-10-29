@@ -12,9 +12,6 @@ import {
 } from '../../components/admin/WorkQueue.jsx';
 import { fmtAgo } from './service-queue/helpers.js';
 
-/** The platform-wide support queue (`GET /admin/support-tickets`); under `/ops` because `/admin/*` locks out staff.
- * Paging and counts are server-side. */
-
 const TABS = [
   { key: 'awaiting', label: 'Awaiting reply', awaitingReply: true },
   { key: 'answered', label: 'Answered', awaitingReply: false },
@@ -26,7 +23,6 @@ const NOTES = {
   all: 'Every support conversation on the platform, newest first.',
 };
 
-// Matches the flatmate ops boards, so desks in the same shell page alike.
 const PAGE_SIZE = 25;
 
 const CATEGORY_LABELS = {
@@ -74,7 +70,6 @@ export default function OpsSupportQueue() {
         }
       })
       .catch((err) => {
-        // Never an empty list: "nothing is waiting" over a failed read ends a shift early.
         if (live) setState({ status: 'error', items: [], total: 0, error: err });
       });
     return () => { live = false; };

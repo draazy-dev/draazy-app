@@ -3,9 +3,8 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import Select from './Select.jsx';
 
-/* ── Date helpers (timezone-safe: work in yyyy-mm-dd strings, never Date parsing) ── */
 const pad = (n) => String(n).padStart(2, '0');
-const toIso = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`; // m is 0-based
+const toIso = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
 const parseIso = (iso) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
   return m ? { y: +m[1], m: +m[2] - 1, d: +m[3] } : null;
@@ -15,7 +14,7 @@ const todayIso = () => {
   return toIso(t.getFullYear(), t.getMonth(), t.getDate());
 };
 const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
-const firstWeekday = (y, m) => new Date(y, m, 1).getDay(); // 0 = Sun
+const firstWeekday = (y, m) => new Date(y, m, 1).getDay();
 const addMonths = (y, m, delta) => {
   const total = y * 12 + m + delta;
   return { y: Math.floor(total / 12), m: ((total % 12) + 12) % 12 };
@@ -23,19 +22,15 @@ const addMonths = (y, m, delta) => {
 
 const MONTH_COUNT = 12;
 
-/** Portaled dropdown anchored below the field; selecting a day commits immediately (no Confirm button). */
 export default function DatePickerDialog({ open, value, anchorRef, min, max, onClose, onConfirm, ariaLabel }) {
   const { t, i18n } = useTranslation();
   const dialogLabel = ariaLabel || t('ui.selectDate');
-  /* Intl ships month and weekday names for hi and mr, so the calendar reads in the
-     visitor's language with no hand-maintained table to drift out of sync. */
   const MONTHS = useMemo(() => {
     const f = new Intl.DateTimeFormat(i18n.language, { month: 'long' });
     return Array.from({ length: MONTH_COUNT }, (_, i) => f.format(new Date(2024, i, 1)));
   }, [i18n.language]);
   const WEEKDAYS = useMemo(() => {
     const f = new Intl.DateTimeFormat(i18n.language, { weekday: 'short' });
-    // A known Sunday as the anchor, so this walks Sun to Sat in the grid's own order.
     return Array.from({ length: 7 }, (_, i) => f.format(new Date(2024, 0, 7 + i)));
   }, [i18n.language]);
   const panelRef = useRef(null);
@@ -44,7 +39,6 @@ export default function DatePickerDialog({ open, value, anchorRef, min, max, onC
   const [draft, setDraft] = useState(parseIso(value) ? value : '');
   const [shown, setShown] = useState(false);
 
-  // Re-seed each time the dropdown opens so it reflects the latest committed value.
   useEffect(() => {
     if (!open) { setShown(false); return; }
     const seed = parseIso(value) || parseIso(todayIso());
@@ -69,7 +63,6 @@ export default function DatePickerDialog({ open, value, anchorRef, min, max, onC
 
   const monthOptions = useMemo(() => MONTHS.map((name, i) => ({ value: String(i), label: name })), [MONTHS]);
 
-  // Only weeks containing a day of the current month render, so an all-next-month trailing row never shows.
   const cells = useMemo(() => {
     const lead = firstWeekday(view.y, view.m);
     const weeks = Math.ceil((lead + daysInMonth(view.y, view.m)) / 7);
@@ -101,13 +94,10 @@ export default function DatePickerDialog({ open, value, anchorRef, min, max, onC
     setView({ y: dt.getFullYear(), m: dt.getMonth() });
   }, [draft, view, isBlocked]);
 
-  // Anchor the panel under the field with fixed positioning; flip up near the
-  // viewport bottom and clamp horizontally so it never overflows the screen.
   const place = useCallback(() => {
     const anchor = anchorRef?.current;
     const panel = panelRef.current;
     if (!anchor || !panel) return;
-    // Below 640px the stylesheet docks this as a bottom sheet; inline anchoring would win over it, so clear it.
     if (window.matchMedia('(max-width: 639.98px)').matches) {
       panel.style.left = '';
       panel.style.top = '';
@@ -121,8 +111,6 @@ export default function DatePickerDialog({ open, value, anchorRef, min, max, onC
     if (left < 8) left = 8;
     let top = r.bottom + 8;
     if (top + ph > window.innerHeight - 8 && r.top - 8 - ph > 8) top = r.top - 8 - ph;
-    // Clamp fully on-screen so the bottom rows + Confirm stay reachable even when
-    // the field sits near the viewport edge.
     top = Math.min(top, window.innerHeight - 8 - ph);
     top = Math.max(8, top);
     panel.style.left = `${left}px`;
@@ -143,8 +131,6 @@ export default function DatePickerDialog({ open, value, anchorRef, min, max, onC
     };
   }, [open, place, view]);
 
-  // Close on outside interaction — but ignore clicks inside the panel, the field
-  // that opened it, and any portaled <Select> menu (the month/year dropdowns).
   useEffect(() => {
     if (!open) return undefined;
     const onDown = (e) => {
@@ -161,7 +147,6 @@ export default function DatePickerDialog({ open, value, anchorRef, min, max, onC
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
-      // Let an open month/year <Select> handle Escape first.
       if (e.key === 'Escape') {
         if (document.querySelector('.dz-dropdown.is-open')) return;
         e.preventDefault(); e.stopPropagation(); onClose?.(); return;
@@ -170,7 +155,6 @@ export default function DatePickerDialog({ open, value, anchorRef, min, max, onC
       const moves = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
       if (e.key in moves) { e.preventDefault(); shiftDraft(moves[e.key]); }
     };
-    // Capture phase, so Escape closes this popover before a dialog underneath sees it.
     document.addEventListener('keydown', onKey, true);
     panelRef.current?.focus();
     return () => document.removeEventListener('keydown', onKey, true);

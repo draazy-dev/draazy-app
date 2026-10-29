@@ -1,8 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 
-/* Shown in place of a Google Map that is unconfigured, refused by Google or crashed. Callers pass
-   the map's own wrapper style/className so the placeholder occupies the identical footprint. */
 export default function MapUnavailable({ style, className = '', note, detail, action }) {
   const { t } = useTranslation();
   return (

@@ -64,7 +64,6 @@ export default function InteriorRenovation() {
   const draft = useFormDraft('dzDraft:interior-renovation', form, setForm, { ignore: ['config', 'status', 'budget'], omit: ['name', 'mobile'] });
   const err = useFieldErrors(formRef);
 
-  // Prefill scope from URL (?scope=kitchen)
   useEffect(() => {
     const scopeParam = searchParams.get('scope');
     if (scopeParam) {
@@ -82,9 +81,7 @@ export default function InteriorRenovation() {
 
   const submit = (e) => {
     e.preventDefault();
-    // Public page; book the free consult only after sign-in.
     if (!isIn) { sendToSignIn('services', undefined, replay(e)); return; }
-    // A submit resumed after the sign-in sheet sees fields that were blank at mount; the account fills them.
     const name = form.name.trim() || user?.name || '';
     const mobile = form.mobile || user?.mobile || '';
     if (name !== form.name || mobile !== form.mobile) setForm((p) => ({ ...p, name, mobile }));
@@ -94,8 +91,6 @@ export default function InteriorRenovation() {
       { name: 'scope', ok: !!form.scope, msg: tr('services.interior.errScope') },
     ], toast);
     if (!ok) return;
-    /* One write: the service queue is the single system of record for a lead. Contact fields ride in
-       `details` (all `toCreate` passes) and are not the account's — the form asks who to call. */
     createFlowRequest({
       type: 'interior',
       service: 'Interior & Renovation',
@@ -332,8 +327,6 @@ export default function InteriorRenovation() {
       </div>
 
       {lightbox ? (
-        /* 1500 = the "blocking modals" rung, which keeps the lightbox below the toast layer (1600).
-           See the ladder in index.css. */
         <div className="fixed inset-0 z-[1500] flex items-center justify-center p-6" style={{ background: 'rgb(var(--dz-c-black) / .92)', backdropFilter: 'blur(8px)' }} onClick={() => setLightbox(null)}>
           <img src={lightbox} alt={tr('services.interior.lightboxAlt')} className="rounded-2xl" style={{ maxWidth: '92vw', maxHeight: '86vh', boxShadow: '0 24px 80px rgb(var(--dz-c-black) / .6)' }} />
         </div>

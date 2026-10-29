@@ -3,7 +3,6 @@ import Icon from '../../../components/Icon.jsx';
 import { listingFreshness } from '../../../lib/freshness.js';
 import { mahaReraSearchUrl } from '../../../lib/maharera.js';
 
-// Every check is backed by a real listing field; nothing is implied that the data cannot show.
 export function VerificationSection({ p }) {
   const { t } = useTranslation();
   const fresh = listingFreshness(p);
@@ -74,8 +73,6 @@ export function VerificationSection({ p }) {
             </div>
           ))}
         </div>
-        {/* Kept out of `checks`: an owner-shared number is not a check Draazy passed, so it must not
-            raise the score. */}
         {p.reraId ? (
           <div data-testid="rera-shared" className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-5 flex items-start gap-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-white/10">

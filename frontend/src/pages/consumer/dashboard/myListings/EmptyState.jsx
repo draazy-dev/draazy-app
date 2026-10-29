@@ -1,8 +1,6 @@
 import { Link } from 'react-router';
 import Icon from '../../../../components/Icon.jsx';
 
-// Shown when the owner has posted nothing yet: a friendly prompt to either post a
-// property or value one privately first — both routes land back in this panel.
 export default function EmptyState() {
   return (
     <div className="flex flex-col items-center gap-3 py-12 text-center">

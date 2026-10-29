@@ -61,6 +61,7 @@ test('raising the budget from the empty state recovers matches', async ({ page }
   await page.getByRole('button', { name: 'Smart search' }).click();
   await expect(page.locator('.sf-card')).toHaveCount(0);
 
+  // The hint is a second feed read that starts only once the empty state settles.
   const raise = page.getByRole('button', { name: /Raise budget to/i });
   await expect(raise).toBeVisible({ timeout: 5000 });
   await raise.click();

@@ -8,8 +8,6 @@ import { getEntitlements } from '../../services/entitlementService.js';
 import useScrollLock from '../../hooks/useScrollLock.js';
 import useModalDialog from '../../hooks/useModalDialog.js';
 
-/* Shown when a seeker has no owner contacts left: refer a friend (off when Ops disables
-   `referralRewards`) or buy a Contact Pack. The used/allowance line renders only once the server answers. */
 export default function ContactsExhaustedModal({ onClose }) {
   const { t } = useTranslation();
   const { pathname, search } = useLocation();
@@ -40,7 +38,6 @@ export default function ContactsExhaustedModal({ onClose }) {
           <button onClick={onClose} className="dz-modal-x" aria-label={t('property.close')}><Icon name="x" className="w-5 h-5" /></button>
         </div>
 
-        {/* Free path — refer. Withdrawn entirely when Ops disables referral rewards. */}
         {canRefer && (
           <Link
             to="/refer"

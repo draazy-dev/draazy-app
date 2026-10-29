@@ -4,12 +4,10 @@ const STOP = new Set([
   'which', 'will', 'with', 'would', 'your',
 ]);
 
-// A trailing "s" is dropped so "payments" finds "payment"; the shorter term is still a substring of the longer.
 const termsOf = (text) => [...new Set((text.toLowerCase().match(/\p{L}{4,}/gu) || [])
   .filter((word) => !STOP.has(word))
   .map((word) => word.replace(/s$/, '')))];
 
-/** FAQs worth reading before sending a ticket: a question hit counts three, an answer hit one. */
 export function suggestFaqs(text, faqs, limit = 3) {
   const terms = termsOf((text || '').slice(0, 400));
   if (!terms.length) return [];

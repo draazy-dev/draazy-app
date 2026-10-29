@@ -16,8 +16,6 @@ const addMonths = (ts, months) => {
   return d.getTime();
 };
 
-// Registration Act 1908 s.23 counts four months from execution. Nobody signs before the customer
-// approves the draft, so counting from approval gives the earliest the window can close.
 function registrationDeadline(request) {
   if (request?.type !== 'rental' || request.status !== 'approved') return null;
   const approvedAt = Math.max(0, ...(request.timeline || [])
@@ -31,7 +29,6 @@ function span(ms) {
   return hours <= 48 ? `${hours}h` : `${Math.round(hours / 24)}d`;
 }
 
-// The server's clock (RentAgreementSla) runs from when the matter became the desk's move.
 function slaTone(request, now) {
   const { sla } = request;
   if (sla.waitingOn === 'customer') return { label: "Customer's turn", tone: 'muted' };

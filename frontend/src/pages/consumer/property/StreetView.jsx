@@ -3,8 +3,6 @@ import Icon from '../../../components/Icon.jsx';
 import Modal from '../../../components/ui/Modal.jsx';
 import { GOOGLE_MAPS_API_KEY } from '../../../lib/mapsConfig.js';
 
-/* Lookup and Embed are free SKUs; the Static preview bills past its free monthly quota, a JS panorama per load.
-   The Embed's chrome (address card, compass, zoom, footer) can't be switched off, so it waits behind a tap. */
 export default function StreetView({ lat, lng, tr }) {
   const [pano, setPano] = useState(null);
   const [open, setOpen] = useState(false);
@@ -23,7 +21,6 @@ export default function StreetView({ lat, lng, tr }) {
         const { data } = await new StreetViewService().getPanorama({ location: pin, radius: 50, sources: [StreetViewSource.GOOGLE] });
         if (live) setPano({ id: data.location.pano, date: data.imageDate, heading: Math.round(spherical.computeHeading(data.location.latLng, pin)) });
       })
-      // No Google imagery within 50 m (most inner lanes and gated societies) rejects with ZERO_RESULTS: no tile.
       .catch(() => {});
     return () => { live = false; };
   }, [lat, lng]);
@@ -42,9 +39,7 @@ export default function StreetView({ lat, lng, tr }) {
             src={`https://maps.googleapis.com/maps/api/streetview?size=640x320&${view}&pitch=0&fov=80&return_error_code=true&key=${GOOGLE_MAPS_API_KEY}`}
             alt=""
             loading="lazy"
-            // The site-wide no-referrer would hide our origin from the key's referrer restriction.
             referrerPolicy="strict-origin"
-            // A key without the Static API enabled answers 403; the tile then falls back to a plain row.
             onError={() => setNoPreview(true)}
             className="block h-[180px] sm:h-[260px] w-full object-cover transition-opacity group-hover:opacity-90"
           />

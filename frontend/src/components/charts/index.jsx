@@ -15,7 +15,6 @@ import {
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { cssColour, useIsLightTheme } from '../../lib/themeColour';
 
-/* Colour helpers: derive 3D face shades from a series' base colour; only solid hex / rgb() inputs get the 3D treatment. */
 function toRgb(c) {
   if (typeof c !== 'string') return null;
   let h = c.trim();
@@ -35,7 +34,6 @@ function withAlpha(c, a) {
   return rgb ? `rgba(${rgb.r},${rgb.g},${rgb.b},${a})` : c;
 }
 function shade(rgb, amt, a = 1) {
-  // amt > 0 lightens toward white, amt < 0 darkens toward black.
   const t = amt < 0 ? 0 : 255;
   const p = Math.abs(amt);
   const r = clamp(rgb.r + (t - rgb.r) * p);
@@ -44,7 +42,6 @@ function shade(rgb, amt, a = 1) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
-/* Only the outermost segment of a stack gets the top cap, so stacked bars read as layered blocks. */
 const bar3d = {
   id: 'bar3d',
   afterDatasetsDraw(chart, _args, opts) {
@@ -62,7 +59,6 @@ const bar3d = {
       visible.push({ di, meta });
     });
 
-    // Is this segment the outermost one at its slot (topmost / rightmost)?
     const isOuter = (di, i, bar) => {
       for (const other of visible) {
         if (other.di === di) continue;
@@ -79,13 +75,12 @@ const bar3d = {
     for (const { di, meta } of visible) {
       const raw = chart.data.datasets[di].backgroundColor;
       const rawIsString = typeof raw === 'string';
-      // Skip only when no per-bar hex is resolvable (gradient/function fills).
       if (!rawIsString && !Array.isArray(raw)) continue;
 
       meta.data.forEach((bar, i) => {
         const rawI = rawIsString ? raw : raw[i];
         const base = toRgb(typeof rawI === 'string' ? rawI : null);
-        if (!base) return; // this bar keeps default rendering
+        if (!base) return;
         const top = shade(base, 0.16);
         const side = shade(base, -0.28);
 
@@ -108,7 +103,6 @@ const bar3d = {
           if (Math.abs(bt - tp) < 0.5) return;
         }
 
-        // Front face — gradient along the growth axis.
         const grad = horizontal
           ? ctx.createLinearGradient(left, 0, right, 0)
           : ctx.createLinearGradient(0, tp, 0, bt);
@@ -124,7 +118,6 @@ const bar3d = {
 
         const outer = isOuter(di, i, bar);
 
-        // Side face (right) — always drawn to give depth.
         ctx.fillStyle = side;
         ctx.beginPath();
         ctx.moveTo(right, tp);
@@ -134,7 +127,6 @@ const bar3d = {
         ctx.closePath();
         ctx.fill();
 
-        // Cap — only on the outermost segment of a stack.
         if (outer) {
           ctx.fillStyle = top;
           ctx.beginPath();
@@ -158,8 +150,6 @@ const bar3d = {
   },
 };
 
-/* Chart.js still paints the top faces (legend, tooltips keep working); we
-   squash them into an ellipse and draw per-segment side walls below. */
 const doughnut3d = {
   id: 'doughnut3d',
   beforeDatasetsDraw(chart, _args, opts) {
@@ -173,10 +163,9 @@ const doughnut3d = {
     const p0 = meta.data[0].getProps(['x', 'y', 'outerRadius'], true);
     const cx = p0.x;
     const cy = p0.y;
-    const tilt = opts.tilt ?? 0.6; // vertical squash → perspective ellipse
+    const tilt = opts.tilt ?? 0.6;
     const depth = opts.depth ?? Math.max(14, Math.round(p0.outerRadius * 0.3));
 
-    // Ground shadow.
     ctx.save();
     const g = ctx.createRadialGradient(cx, cy + depth, p0.outerRadius * 0.25, cx, cy + depth, p0.outerRadius * 1.25);
     g.addColorStop(0, cssColour('black', 0.28));
@@ -186,9 +175,8 @@ const doughnut3d = {
     ctx.ellipse(cx, cy + depth * 0.9, p0.outerRadius * 1.12, p0.outerRadius * tilt * 0.85, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Side walls stay gently darker than the top, not near black, so each slice keeps its palette colour.
     for (let z = depth; z >= 1; z--) {
-      const t = z / depth; // 1 at bottom → subtle roundness on the lift
+      const t = z / depth;
       meta.data.forEach((arc, i) => {
         const { innerRadius, outerRadius, startAngle, endAngle } = arc.getProps(
           ['innerRadius', 'outerRadius', 'startAngle', 'endAngle'],
@@ -205,7 +193,6 @@ const doughnut3d = {
     }
     ctx.restore();
 
-    // Squash the top faces into the matching ellipse (Chart draws them next).
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(1, tilt);
@@ -223,7 +210,6 @@ ChartJS.register(CategoryScale, LinearScale, RadialLinearScale, PointElement, Li
 
 const PALETTE_NAMES = ['red-500', 'blue-500', 'green-500', 'amber-400', 'violet-500', 'teal-500'];
 
-// Index getters resolve at read time so the palette follows the live theme.
 export const PALETTE = Object.defineProperties(
   new Array(PALETTE_NAMES.length),
   Object.fromEntries(PALETTE_NAMES.map((name, i) => [i, { enumerable: true, get: () => cssColour(name) }])),
@@ -249,7 +235,6 @@ function merge(extra) {
     ...extra,
     plugins: { ...BASE.plugins, ...(extra?.plugins || {}) },
   };
-  // Replace scales when explicitly provided (e.g. doughnut passes {} for no axes).
   out.scales = extra && 'scales' in extra ? extra.scales : BASE.scales;
   return out;
 }

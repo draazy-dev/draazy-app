@@ -1,11 +1,9 @@
-/* Admin tabs use server-resolved atoms from `user.permissions`; the console composes no union. */
 import {
   BarChart3, BookOpen, Briefcase, Building2, Calculator, FileSignature, FileText, Gauge, Gift, Headset, Landmark, LayoutDashboard, LifeBuoy,
   Library, LineChart, MessageSquare, Paintbrush, Scale, Settings, ShieldCheck, Truck, Users, Flag, IndianRupee, UserPlus,
   MapPin, Plug, UsersRound, Eraser, ThumbsUp, Undo2, Bug, Wallet,
 } from 'lucide-react';
 
-// `value` is the server's desk slug (`desk:<value>` function); Home Loans has tickets, not service requests.
 export const SERVICE_DESKS = [
   { value: 'rental', label: 'Rent Agreement', path: '/admin/rent-agreement', icon: FileSignature },
   { value: 'legal', label: 'Property & Legal', path: '/admin/legal', icon: Scale },
@@ -16,7 +14,6 @@ export const SERVICE_DESKS = [
 ];
 export const DESK_BY_VALUE = Object.fromEntries(SERVICE_DESKS.map((d) => [d.value, d]));
 
-// Home Loans is the ticket board itself; every other desk shows tickets under `?view=tickets`.
 export const ticketPath = (ticket, open = false) => {
   const desk = DESK_BY_VALUE[ticket?.desk] || DESK_BY_VALUE.loans;
   const params = new URLSearchParams(desk.value === 'loans' ? {} : { view: 'tickets' });
@@ -29,7 +26,6 @@ const DESK_MODULES = SERVICE_DESKS.map(({ atom = 'services:read', writeAtom = 's
   key: `desk:${d.value}`, label: d.label, path: d.path, icon: d.icon, desk: d.value, atom, writeAtom, group: 'desks',
 }));
 
-// Sidebar dropdowns, in display order; a module without a `group` stays pinned above them.
 export const NAV_GROUPS = [
   { key: 'listings', label: 'Listings & Users', icon: Building2 },
   { key: 'desks', label: 'Service Desks', icon: Briefcase },
@@ -70,10 +66,8 @@ export const ADMIN_MODULES = [
 export const MODULE_BY_KEY = Object.fromEntries(ADMIN_MODULES.map((m) => [m.key, m]));
 export const MODULE_BY_PATH = Object.fromEntries(ADMIN_MODULES.map((m) => [m.path, m]));
 
-// Keys that every admin-portal user always keeps (landing page).
 export const BASE_MODULE_KEYS = ADMIN_MODULES.filter((m) => m.base).map((m) => m.key);
 
-/* `user.permissions` is the server-resolved effective set; absent arrays grant nothing. */
 export const hasPermission = (user, atom) =>
   !!atom && Array.isArray(user?.permissions) && user.permissions.includes(atom);
 
@@ -81,18 +75,14 @@ export function canAccessModule(user, key) {
   const mod = MODULE_BY_KEY[key];
   if (!mod) return false;
   if (mod.base) return true;
-  // `audit:read` is also held by managers, so a module that is for administrators only names its role.
   if (mod.role && user?.role !== mod.role) return false;
-  // Only staff are scoped to desks; the server lets admin and manager work every desk.
   if (mod.desk && user?.role === 'staff' && !(Array.isArray(user?.desks) && user.desks.includes(mod.desk))) return false;
   return [].concat(mod.atom).some((atom) => hasPermission(user, atom));
 }
 
-/** Can this caller act inside a module, as opposed to only reading it? */
 export const canWriteModule = (user, key) =>
   hasPermission(user, MODULE_BY_KEY[key]?.writeAtom);
 
-// Paths outside the module list (the public site) are always open.
 export function canOpenPath(user, href) {
   const mod = MODULE_BY_PATH[portalPath({ role: 'admin' }, String(href).split(/[?#]/)[0])];
   return !mod || canAccessModule(user, mod.key);
@@ -105,11 +95,9 @@ export const deskFromFunction = (fn) => String(fn || '').startsWith(DESK_FUNCTIO
 
 export const moduleLabel = (key) => MODULE_BY_KEY[key]?.label || key;
 
-// Staff work under /staff, manager and admin under /admin; module paths are written once as /admin.
 export const portalBase = (user) => (user?.role === 'staff' ? '/staff' : '/admin');
 export const portalPath = (user, path) => String(path).replace(/^\/(admin|staff)(?=[/?#]|$)/, portalBase(user));
 
-/** The module whose page `pathname` is on — the most specific path wins, so a desk beats the dashboard. */
 export function moduleForPath(pathname) {
   const path = portalPath({ role: 'admin' }, pathname).replace(/\/+$/, '') || '/admin';
   return ADMIN_MODULES
@@ -117,11 +105,9 @@ export function moduleForPath(pathname) {
     .sort((a, b) => b.path.length - a.path.length)[0] || null;
 }
 
-/* A runbook with no `modules` is general guidance for everyone in the panel. */
 export const runbooksFor = (articles, user) => articles.filter((a) => a.category === 'ops-playbook'
   && (!a.modules?.length || a.modules.some((key) => canAccessModule(user, key))));
 
-/* Labels fall back to the raw atom when a grantable module has no readable shell entry. */
 const ATOM_MODULE_LABELS = {
   dashboard: 'Dashboard',
   postOnBehalf: 'Post on Behalf',

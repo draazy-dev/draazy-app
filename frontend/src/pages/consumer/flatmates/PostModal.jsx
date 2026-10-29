@@ -23,12 +23,9 @@ export default function PostModal({ setPostOpen, submitPost, takeDownPost, postF
   const [localityBusy, setLocalityBusy] = useState(false);
   const [moreToggled, setMoreToggled] = useState(null);
   const hasExtras = !!(post.age || post.occupation || post.title || post.note || post.roomPref !== 'any' || post.verifiedContactOnly);
-  // Latched, so clearing the last optional field does not collapse the section under the cursor.
   if (hasExtras && moreToggled === null) setMoreToggled(true);
   const hiddenError = ['age', 'title', 'note'].some((name) => postErr.has(name));
   const { t: tr } = useTranslation();
-  /* Without the lock a thumb that reaches the end of this form goes on scrolling the results
-   * behind it, so the sheet closes onto a board that has moved. */
   useScrollLock();
   const panelRef = useModalDialog(true, () => setPostOpen(false));
   const title = tr(editingId ? 'flatmates.editModalTitle' : 'flatmates.postModalTitle');

@@ -44,7 +44,6 @@ export const societyLocalityName = async (society, lat, lng) => {
 
 const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 
-/* No saved row yet: mint it from the Google locality of exactly this name, as a manual pick would. */
 const googleLocality = async (name) => {
   const hit = (await fetchLocalitySuggestions(name, newAutocompleteSession())).find((s) => sameName(s.mainText, name));
   const details = hit && await fetchPlaceDetails(hit);
@@ -66,8 +65,6 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
   const [mapSearch, setMapSearch] = useState('');
   const [mapSearchStatus, setMapSearchStatus] = useState('');
   const [flyTo, setFlyTo] = useState(null);
-  // Reverse-geocode auto-fill state: '' | 'filling' | 'done'. Tells the owner we're
-  // pulling their address from the pin, and that they should verify the filled fields.
   const [geoFillStatus, setGeoFillStatus] = useState('');
   const [societyFillNotice, setSocietyFillNotice] = useState(null);
   const [currentLocationStatus, setCurrentLocationStatus] = useState('');
@@ -76,7 +73,6 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
   const societyFillRef = useRef({});
   const societyPickSeqRef = useRef(0);
   const currentLocationSeqRef = useRef(0);
-  /* Address fields the owner hand-edited; auto-fill never overwrites them. */
   const userEditedRef = useRef({});
 
   const set = useCallback((field, value, options) => {
@@ -108,22 +104,15 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
     setMapSearch(v);
     if (mapSearchStatus) setMapSearchStatus('');
   };
-  /* Non-destructive: never overwrites a value the owner entered, and a failed lookup leaves the
-   * field empty. */
   const autofillFromPin = async (lat, lng, replace = false) => {
     const key = `${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`;
     if (lastGeoRef.current === key) return;
     lastGeoRef.current = key;
     setGeoFillStatus('filling');
     const geo = await reverseGeocode(lat, lng);
-    // A newer pin superseded this lookup while it was in flight — discard the stale
-    // response so it can't fill fields (or flip the status) for the wrong location.
     if (lastGeoRef.current !== key) return;
     applyAddressFill({ ...geo, lat, lng }, replace);
   };
-  /* `replace` (a deliberate new pick) writes every non-user field, filling or CLEARING, so a
-   * corrective re-search leaves nothing stale; a pin refine only fills gaps. */
-  /* A locality is only ever bound to a saved row, never to Google's raw text. */
   const bindLocality = async (name, slug, replace, stale = () => false) => {
     const stamp = lastGeoRef.current;
     const canBind = () => !userEditedRef.current.locality && (replace || !formRef.current.locality);
@@ -151,9 +140,7 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
     }
     for (const f of onlyFields.filter((x) => x !== 'locality')) {
       if (edited[f]) continue;
-      // the owner edited it — never touch
       if (replace) {
-        // Deliberate new place: adopt the new value, or clear a stale one it can't supply.
         if (incoming[f]) fills[f] = incoming[f];
         else if (cur[f]) fills[f] = '';
       } else if (!cur[f] && incoming[f]) {
@@ -165,8 +152,6 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
       setForm((prev) => ({ ...prev, ...fills }));
       for (const f of Object.keys(fills)) delete societyFillRef.current[f];
     }
-    // A follow-up lookup that fills nothing must not retract a "filled from the map"
-    // hint an earlier pass earned — but it still clears an in-flight 'filling'.
     setGeoFillStatus((s) => (willFill || s === 'done' ? 'done' : ''));
     const after = {};
     for (const f of AUTOFILL_FIELDS) after[f] = f in fills ? fills[f] : cur[f];
@@ -185,7 +170,6 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
     if (lastGeoRef.current !== key) return;
     applyAddressFill({ ...rev, lat, lng }, false, gaps);
   };
-  // Placement rides the form so a restored draft and an edit prefill both carry it.
   const placePin = (lat, lng, source) => {
     if (source !== 'current') currentLocationSeqRef.current += 1;
     pinSourceRef.current = source;
@@ -201,8 +185,6 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
       autofillFromPin(lat, lng, replace);
     }
   };
-  /* Picking a locality recenters the pin so the listing is never silently left on the Baner
-   * default. */
   const onLocalityChange = (v, coords) => {
     set('locality', v);
     set('localitySlug', coords?.slug || '');
@@ -252,7 +234,6 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
     setSocietyFillNotice((n) => n && { ...n, fields: [...new Set([...n.fields, ...filled.map((f) => SOCIETY_FILL_LABELS[f])])] });
   };
 
-  /* The society is where the home is, so its locality replaces whatever was there, even a hand pick. */
   const followSocietyLocality = async (society, lat, lng, seq) => {
     const stale = () => societyPickSeqRef.current !== seq;
     const { name, slug } = await societyLocalityName(society, lat, lng);
@@ -314,8 +295,6 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
     const seq = societyPickSeqRef.current + 1;
     societyPickSeqRef.current = seq;
     if (!picked || picked.notOnMaps) {
-      /* The pincode beside the society being dropped is that society's, even when a reload or an edit
-         prefill has lost the record of who filled it; the next pick may replace it. */
       if (formRef.current.societyId && !userEditedRef.current.pincode) societyFillRef.current.pincode = true;
       set('societyId', '', { explicit: true });
       set('society', '', { explicit: true });

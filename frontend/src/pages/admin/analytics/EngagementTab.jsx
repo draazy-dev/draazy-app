@@ -17,8 +17,6 @@ export default function EngagementTab({ report, failed, days }) {
   return (
     <div>
       <div className="mb-5 grid gap-6 lg:grid-cols-2">
-        {/* Series stay null, not 0: a week with no sessions has no
-            average length or bounce rate, and Chart.js gaps nulls. */}
         <Card title="Avg. session duration" desc={`Minutes per session · last ${days} days`}>
           <LineChart
             labels={weeks.map((w) => w.week)}

@@ -4,7 +4,6 @@ import { ShieldCheck, Star, X } from 'lucide-react';
 import VerifyIdentityRedirect from '../../../../components/auth/VerifyIdentityRedirect.jsx';
 import { useVerification } from '../../../../context/VerificationContext.jsx';
 import { trackKyc } from '../../../../lib/kycTrack.js';
-/* One badge lifts ALL of an owner's listings, so this is a single panel banner rather than per-card noise. */
 
 export default function VerifyListingsBanner({ enquiryCount = 0 }) {
   const { t } = useTranslation();
@@ -13,7 +12,6 @@ export default function VerifyListingsBanner({ enquiryCount = 0 }) {
   const [dismissed, setDismissed] = useState(false);
 
   if (verified || status === 'pending' || loading || dismissed) return null;
-  // An owner who already has enquiries is shown that value first.
 
   const hasLeads = enquiryCount > 0;
   const headline = hasLeads

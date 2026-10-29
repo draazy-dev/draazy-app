@@ -1,5 +1,3 @@
-/* Run by hand and commit the JPEGs: Cloudflare's Pages build has no Playwright browser, so this cannot run in CI;
-   it borrows Chromium from the e2e install (cd e2e; npm ci; npx playwright install chromium). */
 import { createRequire } from 'node:module';
 import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';

@@ -34,7 +34,6 @@ const DECIDED_TOAST = {
 
 const GROUP_JOIN_TOAST = ['Accepted — they\'re in your group now.', 'Request declined.'];
 
-/** Kinds whose own endpoint opens the thread, so no first message has to be sent to create it. */
 const hasOwnThread = (item) => ['flatmate', 'visit', 'offer'].includes(item.kind);
 const openOwnThread = (item) => (item.kind === 'flatmate'
   ? openFlatmateRequestConversation(item.id)
@@ -100,7 +99,6 @@ export function useRequestActions({ inbox, toast, onChanged }) {
     onChanged?.();
     refreshRequests();
     if (yes && !groupJoin && (item.kind === 'contact' || hasOwnThread(item))) {
-      // The approval stands either way; the chat stays one tap away on the received card.
       await chatWith(item).catch(() => undefined);
     }
     load('received', { quiet: true });
@@ -135,7 +133,6 @@ export function useRequestActions({ inbox, toast, onChanged }) {
       try {
         await dropPendingChat(item.target?.id, targetSlug(item));
       } catch {
-        /* a leftover draft is harmless; the request itself is withdrawn */
       }
     }
     onChanged?.();
@@ -145,7 +142,6 @@ export function useRequestActions({ inbox, toast, onChanged }) {
     load(box, { quiet: true });
   }), [guarded, load, onChanged, patchItem, removeItem, toast]);
 
-  // The accepted side may have no thread yet, e.g. the request was sent from another device.
   const openAccepted = useCallback((item) => guarded(item, async () => {
     try {
       const conv = hasOwnThread(item)

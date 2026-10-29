@@ -43,7 +43,6 @@ const withBox = (boxes) => [
   ...boxes.received.items.map((item) => ({ item, box: 'received' })),
 ];
 
-// Chips are for opening a chat: it is your turn and you have written nothing beyond the opener that started it.
 function yourOpening(messages) {
   if (messages.at(-1)?.from === 'me') return false;
   const mine = messages.filter((m) => m.from === 'me').length;
@@ -72,7 +71,6 @@ function flatmateReplies(conv, rows) {
   return row ? replies[row.box === 'sent' ? 'asker' : 'poster'] : [];
 }
 
-/** Ready-made openers for this chat's case (listing contact, visit, offer, flatmate), from either side. */
 export function quickReplies(conv, boxes, now = Date.now()) {
   if (!conv || conv.request || conv.group || conv.staged || conv.blocked || conv.blockedYou || conv.listingDeleted) return [];
   if ([boxes.sent, boxes.received].some((b) => b.status === 'loading' && !b.items.length)) return [];

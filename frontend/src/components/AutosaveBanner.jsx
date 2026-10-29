@@ -1,7 +1,5 @@
 import Icon from './Icon.jsx';
 
-/* "We restored your unsaved draft" banner — matches the prototype's autosave.js
-   restore banner. Render at the top of a form when `restored` is true. */
 export default function AutosaveBanner({ restored, onStartFresh, className = '' }) {
   if (!restored) return null;
   return (

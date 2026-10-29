@@ -6,8 +6,6 @@ import HelpLayout from '../../../components/help/HelpLayout.jsx';
 import { Breadcrumbs, EmptyState } from '../../../components/help/HelpCards.jsx';
 import { listFaqs } from '../../../services/contentService.js';
 import { useHelpSearch } from '../../../lib/useHelp.js';
-/* FAQs are admin-editable records, so their translations live on the record under a nested `translations` object and
-   are resolved by lib/contentLang.js. */
 
 export default function HelpFaq() {
   const { t } = useTranslation();
@@ -39,7 +37,6 @@ export default function HelpFaq() {
     }
     return [...map.entries()];
   }, [visible, t]);
-  // Where a question needs more than a paragraph, point at the article that has it.
 
   const openFaq = faqs.find((f) => f.id === open);
   const relatedResults = useHelpSearch(openFaq ? openFaq.question : '', 1);

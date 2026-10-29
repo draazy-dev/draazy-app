@@ -1,8 +1,6 @@
 import Icon from '../Icon.jsx';
 import { Link } from 'react-router';
 
-/* Sits next to every verification claim so the badge can't
-   be read as a title certification; wording is deal-aware. */
 export default function VerificationDisclaimer({ deal }) {
   const isRent = deal === 'rent';
   return (

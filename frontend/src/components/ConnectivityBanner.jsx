@@ -4,11 +4,8 @@ import Icon from './Icon.jsx';
 import { useConnectivity } from '../hooks/useConnectivity.js';
 import { dismissUpdate, useAppUpdate } from '../hooks/useAppUpdate.js';
 
-/** How long the "back online" confirmation stays up. */
 const RECOVERY_MS = 4000;
 
-/* Connectivity outranks the update prompt — reloading while offline lands on a blank page. Docked
-   top because --dz-bottom-inset is full; the live region stays mounted or some AT never watches it. */
 export default function ConnectivityBanner({ zClass = 'z-[1450]' }) {
   const { t } = useTranslation();
   const { status } = useConnectivity();
@@ -19,14 +16,10 @@ export default function ConnectivityBanner({ zClass = 'z-[1450]' }) {
   useEffect(() => {
     const was = prev.current;
     prev.current = status;
-    // Dropping again inside the confirmation window retracts it — the last thing the user should
-    // read while offline is "back online".
     if (status !== 'online') setRestored(false);
     else if (was !== 'online') setRestored(true);
   }, [status]);
 
-  /* Keyed on `restored`, not on the transition that set it: owning the timer in the effect above
-     leaks under StrictMode, leaving the confirmation up for good. */
   useEffect(() => {
     if (!restored) return undefined;
     const id = setTimeout(() => setRestored(false), RECOVERY_MS);
@@ -55,8 +48,6 @@ export default function ConnectivityBanner({ zClass = 'z-[1450]' }) {
           <p className="text-[13px] leading-snug text-gray-300 min-w-0">
             <span className="font-semibold text-white">{title}</span>{' '}{body}
           </p>
-          {/* Dismiss is padded to a 32px box rather than the 44px target: the banner is 36px tall
-              and growing it would cover the content it is commenting on. */}
           {showing === 'update' && (
             <div className="flex shrink-0 items-center gap-2">
               <button

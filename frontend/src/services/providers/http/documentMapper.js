@@ -1,4 +1,3 @@
-/** ISO instant → epoch ms. 0 for a missing date, so a sort never produces NaN. */
 function epoch(iso) {
   if (!iso) return 0;
   const t = Date.parse(iso);
@@ -43,7 +42,6 @@ export function toRequest(dto) {
 
 export const toRequestList = (rows) => (Array.isArray(rows) ? rows.map(toRequest).filter(Boolean) : []);
 
-/* Guard decisions to the two server statuses so typos fail closed as `declined`. */
 export function toStatusUpdate(decision, note) {
   const status = decision === 'granted' ? 'granted' : 'declined';
   return { status, note: note || '' };

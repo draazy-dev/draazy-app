@@ -1,15 +1,9 @@
-/* Auth pages: split-screen OTP login. The .otp-* box styles stay global in index.css:
-   OtpBoxes.jsx is shared with list-property. */
-
-/* The left half is painted over by .auth-left; this gradient only shows through the right (form) column. */
 .auth-page {
   position: relative;
   background: radial-gradient(125% 120% at 84% 14%, rgb(var(--dz-c-slate-800)) 0%, rgb(var(--dz-c-slate-900)) 44%, rgb(var(--dz-c-gray-900)) 72%, var(--brand-dark) 100%);
 }
 
 @media (min-width: 1024px) {
-
-  /* Soft teal aura behind the form card so the right half reads as lit, not empty. */
   .auth-page::after {
     content: '';
     position: absolute;
@@ -148,9 +142,6 @@
 .auth-page .country-prefix {
   background: rgb(var(--dz-c-white) / .08);
 }
-
-/* .otp-* boxes are global in index.css; .send-otp-btn is Tier 0 in components/buttons.css. */
-
 .auth-page .role-chip {
   cursor: pointer;
   transition: all .3s cubic-bezier(.4, 0, .2, 1);
@@ -210,8 +201,6 @@
     transform: translate(-4%, 3%) scale(1.06);
   }
 }
-
-/* drop-shadow, not box-shadow: the badge is a bare mark, so box-shadow would halo its rectangular bounding box. */
 .auth-page .auth-brand-badge {
   filter: drop-shadow(0 6px 16px rgb(var(--dz-c-teal-500) / .55)) drop-shadow(0 0 3px rgb(var(--dz-c-teal-400) / .35));
 }
@@ -243,9 +232,6 @@
 }
 
 @media (max-width: 1023px) {
-
-  /* Lit "console" card: translucent gradient fill, teal drop-glow, and a 1px
-     gradient ring that catches light on the top-left edge. */
   .auth-page .auth-card {
     position: relative;
     background: linear-gradient(180deg, rgb(var(--dz-c-white) / .07), rgb(var(--dz-c-white) / .022));

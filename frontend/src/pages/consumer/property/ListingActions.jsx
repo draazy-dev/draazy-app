@@ -19,8 +19,6 @@ export function PhotoActions({ p }) {
     compare.toggle(p.id);
   };
 
-  // Cancelling the OS share sheet rejects with AbortError and must not raise "Couldn't copy link"
-  // for something that worked as intended — that logic lives in lib/share.js for every surface.
   const share = async () => {
     const status = await shareOrCopy({ title: p.title || 'Draazy listing' });
     if (status === 'copied') toast(t('property.shareCopied'), 'success');
@@ -31,7 +29,6 @@ export function PhotoActions({ p }) {
 
   return (
     <>
-      {/* heart-on-photo turns a pressed control rose; a compared listing reads teal instead. */}
       <button type="button" className={ON_PHOTO + ' absolute top-3 left-3' + (inCompare ? ' !text-brand-teal-3' : '')} onClick={toggleCompare} aria-label={compareLabel} title={compareLabel} aria-pressed={inCompare}>
         <Icon name="scale" weight={inCompare ? 'fill' : 'regular'} className="w-6 h-6" aria-hidden="true" />
       </button>

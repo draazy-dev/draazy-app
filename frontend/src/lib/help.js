@@ -1,4 +1,3 @@
-/* English help content is canonical; staff-only content comes from the API after staff sign-in. */
 import {
   sections as rawSections,
   categories as rawCategories,
@@ -9,7 +8,6 @@ import { staffHelpContent } from '../services/contentService.js';
 
 export const changelog = rawChangelog;
 
-/** Roles allowed to see `access: 'staff'` content. */
 const STAFF_ROLES = new Set(['admin', 'manager', 'staff']);
 
 export function isStaff(user) {
@@ -22,14 +20,11 @@ let staffContent = NO_STAFF_CONTENT;
 let staffRequest = null;
 const staffListeners = new Set();
 
-/** Whatever staff content has arrived. One stable identity until the response lands. */
 export function getStaffContent() {
   return staffContent;
 }
 
-/** Once per session. The caller establishes that the reader is staff; the API enforces it. */
 export function loadStaffContent() {
-  // A failure settles as "loaded, empty" so pages stop waiting, and clears the request so the next mount retries.
   staffRequest ??= staffHelpContent()
     .then((content) => { staffContent = { ...content, loaded: true }; })
     .catch(() => {
@@ -47,8 +42,6 @@ export function onStaffContent(notify) {
 
 const byOrder = (items) => items.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
-/* `staff` is passed in rather than read from a module global, so the "may this reader have it"
-   decision stays at one visible call site (lib/useHelp.js). */
 export function helpTree(staff = NO_STAFF_CONTENT) {
   const sections = byOrder([...rawSections, ...staff.sections]);
   const sectionIds = new Set(sections.map((s) => s.id));
@@ -69,14 +62,12 @@ export function articlesInCategory(id, staff) {
   return helpTree(staff).articles.filter((a) => a.category === id);
 }
 
-/** Featured articles for the landing page's "Start here" row. */
 export function featuredArticles(limit = 6, staff) {
   const { articles } = helpTree(staff);
   const featured = articles.filter((a) => a.featured);
   return (featured.length ? featured : articles).slice(0, limit);
 }
 
-/** Previous/next within the same category, ordered as the sidebar is. */
 export function articleNeighbours(article, staff) {
   if (!article) return { prev: null, next: null };
   const siblings = articlesInCategory(article.category, staff);
@@ -86,9 +77,6 @@ export function articleNeighbours(article, staff) {
     next: i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : null,
   };
 }
-
-/* A scored substring match rather than a fuzzy index: the corpus is a few dozen articles, and
-   exact substrings are more predictable for a help centre. */
 
 const FIELD_WEIGHTS = [
   { key: 'title', weight: 12 },
@@ -116,7 +104,6 @@ function hasWordStart(haystack, term) {
   }
 }
 
-/** Short excerpt around the first match, for the results list. */
 export function excerptFor(article, query) {
   const text = article.text || '';
   const i = text.toLowerCase().indexOf(query.toLowerCase());
@@ -149,7 +136,6 @@ export function searchHelp(query, opts = {}) {
         if (hasWordStart(text, term)) score += weight / 2;
       }
     }
-    // Every term must appear somewhere, so multi-word queries narrow rather than widen.
     const matchesAll = terms.every((term) => haystacks.some(({ text }) => text.includes(term)));
     if (score > 0 && matchesAll) results.push({ article, score });
   }
@@ -191,14 +177,14 @@ export function markViewed(slug) {
     const list = JSON.parse(localStorage.getItem(RECENT_KEY)) || [];
     const next = [slug, ...list.filter((s) => s !== slug)].slice(0, RECENT_MAX);
     localStorage.setItem(RECENT_KEY, JSON.stringify(next));
-  } catch { /* storage unavailable — recents are a nicety, not a requirement */ }
+  } catch { }
 }
 
 export function recentArticles(staff) {
   let slugs = [];
   try {
     slugs = JSON.parse(localStorage.getItem(RECENT_KEY)) || [];
-  } catch { /* ignore */ }
+  } catch { }
   const { articles } = helpTree(staff);
   return slugs.map((s) => articles.find((a) => a.slug === s)).filter(Boolean);
 }

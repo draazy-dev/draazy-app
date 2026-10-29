@@ -9,11 +9,8 @@ import {
   toViewModelList,
 } from './conversationMapper.js';
 
-/* The inbox filters, searches and totals client-side, so it needs the whole list. 100 is the server's hard
-   ceiling (`spring.data.web.pageable.max-page-size`) and asking for more is silently clamped. */
 const PAGE_SIZE = 100;
 
-/** Staged chats: composed, but not sendable until the contact gate opens. */
 const QUEUE_KEY = 'dzPendingRequests';
 
 export async function listConversations() {
@@ -34,15 +31,11 @@ export async function getConversation(id) {
   try {
     return toViewModel(await get(`/messages/${encodeURIComponent(id)}`));
   } catch (err) {
-    // A non-participant gets 404 by design — the id is the secret — and the page renders a
-    // "not found" state from `null`, so translate rather than making every caller catch.
     if (err?.status === 404) return null;
     throw err;
   }
 }
 
-/* Find-or-create: 201 new, 200 existing, both returning the thread. Throws without an approved contact
-   request — the guard stopping this endpoint being a way to test mobiles against the user base. */
 export async function startConversation({ counterpartyMobile, propertyId, firstMessage, clientId } = {}) {
   const body = toConversationCreate({ counterpartyMobile, propertyId, body: firstMessage, clientId });
   return toViewModel(await post('/messages', body));
@@ -116,8 +109,6 @@ export async function unreadCount() {
   return Number(res?.count) || 0;
 }
 
-/* Before the contact gate opens `POST /messages` answers 403, so the chat is staged and drained later.
-   `active` means the gate is open: open the thread now, staging only if the server still refuses. */
 export async function queuePendingChat(property, { firstMessage, active = false } = {}) {
   if (!property?.id) return;
   if (active && await openNow(property, firstMessage)) return;
@@ -148,7 +139,6 @@ export async function queuePendingChat(property, { firstMessage, active = false 
   writeQueue(queue);
 }
 
-/* The drain would otherwise send the staged greeting once the gate reopens, after the request was withdrawn. */
 export function dropPendingChat(...keys) {
   const wanted = new Set(keys.filter(Boolean).map(String));
   if (!wanted.size) return;
@@ -158,7 +148,6 @@ export function dropPendingChat(...keys) {
     if (!Array.isArray(arr)) return;
     writeQueue(arr.filter((q) => q?.userId !== mine || !(wanted.has(q.propertyId) || wanted.has(q.propertySlug))));
   } catch {
-    /* a corrupt queue has nothing to drop */
   }
 }
 
@@ -167,8 +156,6 @@ const greeting = (property) =>
 
 const newClientId = () => `q${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
 
-/* The bare greeting has one fixed id per listing, so a second tap from any browser finds the thread rather than
-   adding another hello. A typed message is always new. */
 async function openNow(property, firstMessage) {
   try {
     await post('/messages', toConversationCreate({
@@ -184,8 +171,6 @@ async function openNow(property, firstMessage) {
 
 let draining = null;
 
-/* Single-flight: the page re-reads the inbox from several triggers. Each entry's stable `clientId` also makes a
-   second tab's drain a no-op server-side. Addressed by `propertyId` alone; a refused entry stays queued. */
 export function drainPendingChats() {
   draining ??= drain().finally(() => { draining = null; });
   return draining;
@@ -209,15 +194,12 @@ async function drain() {
       }));
       delivered.add(item.propertyId);
     } catch {
-      /* stays queued */
     }
   }
   writeQueue(readQueue().filter((item) => !delivered.has(item.propertyId)));
   return { sent: delivered.size, blocked: queue.length - delivered.size };
 }
 
-/* `null` is survivable: the mapper then treats every message as the counterparty's, which is the safer
-   direction than claiming a stranger's words are the reader's. */
 const viewerId = () => readUser()?.id ?? null;
 
 function readQueue() {
@@ -228,7 +210,6 @@ function readQueue() {
     const mine = viewerId();
     return arr.filter((item) => item?.userId === mine);
   } catch {
-    // A corrupt queue must not take the inbox down with it.
     return [];
   }
 }
@@ -244,7 +225,6 @@ export function clearConversationDeviceState() {
       .filter((key) => key.startsWith('dzMsgDraft:'))
       .forEach((key) => sessionStorage.removeItem(key));
   } catch {
-    /* storage cleanup is best-effort */
   }
 }
 
@@ -253,7 +233,6 @@ function writeQueue(next) {
     if (next.length) localStorage.setItem(QUEUE_KEY, JSON.stringify(next));
     else localStorage.removeItem(QUEUE_KEY);
   } catch {
-    /* quota or private mode — the staged chat is lost, the inbox still works */
   }
 }
 

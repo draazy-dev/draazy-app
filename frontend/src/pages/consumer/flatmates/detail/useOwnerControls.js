@@ -9,8 +9,6 @@ export function useOwnerControls(kind, item, patch) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
-  /* Steppers are tapped in bursts; pending stores the target until the server clamps and
-   * returns the saved row. */
   const pending = useRef({});
   const fail = (err) => toast(err?.message || t('common.somethingWentWrong'), 'error');
 

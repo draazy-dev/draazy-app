@@ -4,8 +4,6 @@ import Icon from '../Icon.jsx';
 import IdInput from '../IdInput.jsx';
 import { pmfEnabled, track, captureLead } from '../../lib/pmf.js';
 
-// Gate-free fake-door capture for the PMF test: asks only for an email or WhatsApp number, so the
-// top-of-funnel demand signal stays honest. Renders only when VITE_PMF_MODE=on.
 export default function NotifyMe() {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');

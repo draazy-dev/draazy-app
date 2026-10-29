@@ -14,7 +14,6 @@ function pageMeta(payload, requested) {
   };
 }
 
-/** `read` true/false narrows to read or unread rows; omitted lists both. */
 export async function listNotifications({ page = 0, size = DEFAULT_PAGE_SIZE, read } = {}) {
   const requested = { page, size, read };
   return pageMeta(await get('/notifications', requested), requested);
@@ -36,7 +35,6 @@ export async function markAllRead() {
   await post('/notifications/read', {});
 }
 
-// Matches the server's per-call cap on POST /notifications/dismiss.
 const DISMISS_BATCH = 100;
 
 export async function dismiss(id) {
@@ -54,8 +52,6 @@ export async function getNotificationPreferences() {
   return get('/me/notification-preferences');
 }
 
-/** **Every field is required and the caller must send all six.** That is not an oversight in the contract, it is the
- * contract. */
 export async function updateNotificationPreferences(next) {
   return put('/me/notification-preferences', next);
 }

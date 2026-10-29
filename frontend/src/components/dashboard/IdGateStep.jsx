@@ -4,7 +4,6 @@ import Icon from '../Icon.jsx';
 import VerifyIdentityRedirect from '../auth/VerifyIdentityRedirect.jsx';
 import { useVerification } from '../../context/VerificationContext.jsx';
 
-/* An ID still in review is enough to send a verification request; staff grant the badge only once it is verified. */
 export function useIdGate() {
   const { verified, status } = useVerification();
   const inReview = !verified && status === 'pending';

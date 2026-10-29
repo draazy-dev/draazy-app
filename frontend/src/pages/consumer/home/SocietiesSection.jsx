@@ -6,17 +6,12 @@ import { useNearViewport } from '../../../lib/useNearViewport.js';
 
 const titleCase = (slug) => String(slug || '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-/** Fetch far enough ahead that the request is in flight before the strip is legible,
- * yet a hero-only visit never pays for it. */
 const PREFETCH_MARGIN = '400px';
 
-/** Placeholder keys, one per card the rail shows, so the reserved row is the shape of the answer. */
 const SKELETONS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 
 export default function SocietiesSection() {
   const navigate = useNavigate();
-  /* `null` is "not asked yet, or still in flight", a different fact from an empty catalogue — and
-     the scroll gate means the visitor is looking at the section through that window. */
   const [societies, setSocieties] = useState(null);
   const rootRef = useRef(null);
   const inView = useNearViewport(rootRef, PREFETCH_MARGIN);
@@ -32,21 +27,16 @@ export default function SocietiesSection() {
     topSocieties()
       .then((rows) => { if (alive) setSocieties(rows); })
       .catch((err) => {
-        /* An empty strip, not a broken page: nothing else depends on this rail. Logged rather than
-           swallowed, so a catalogue outage is diagnosable. */
         console.warn('[home] society catalogue unavailable', err);
         if (alive) setSocieties([]);
       });
     return () => { alive = false; };
   }, [inView]);
 
-  // The server ranks: most homes (summed over the merge family) first, ties by name.
   const top = useMemo(() => (societies || []).map((soc) => ({
     slug: soc.slug, name: soc.name, localitySlug: soc.localitySlug || '', homes: soc.listingCount,
   })), [societies]);
 
-  // Arrows track whether there is more to scroll; the fades track whether a card is actually
-  // clipped by that edge. Same mechanics as the property-type strip.
   const updateArrows = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -81,8 +71,6 @@ export default function SocietiesSection() {
     };
   }, [updateArrows]);
 
-  // When listings resolve the strip re-sorts and scroll-snap `mandatory` re-snaps to the reordered
-  // child, yanking the strip to the far end — so pin it back once the dataset settles.
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollLeft = 0;
@@ -99,8 +87,6 @@ export default function SocietiesSection() {
     <button
       type="button"
       onClick={() => scrollByPage(dir)}
-      // The skeletons overflow the rail exactly as the real cards do, so `canNext` is true while
-      // the fetch is still out. Paging through placeholders is not an interaction.
       disabled={!enabled || societies === null}
       aria-label={label}
       className="hscroll-arrow grid place-items-center w-9 h-9 rounded-full glass border border-white/10 text-gray-200 transition-all hover:border-teal-400/40 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-gray-200"
@@ -127,8 +113,6 @@ export default function SocietiesSection() {
         </div>
 
         <div className="relative -mx-4 sm:-mx-6 lg:mx-0">
-          {/* `min-h` is load-bearing: the fetch is scroll-gated, so cards can land while the section
-             is on screen and would push everything below it under the reader's thumb. */}
           <div ref={scrollRef} aria-busy={societies === null} className="cat-scroll flex gap-3 overflow-x-auto pt-3 pb-3 px-4 sm:px-6 lg:px-0 scroll-px-4 sm:scroll-px-6 lg:scroll-px-0 min-h-[104px] reveal" style={{ scrollSnapType: 'x mandatory' }}>
             {societies === null ? SKELETONS.map((k) => (
               <div key={k} aria-hidden="true" className="flex-shrink-0 glass rounded-2xl flex items-center gap-4 px-5 py-4 animate-pulse" style={{ minWidth: '220px' }}>
@@ -139,8 +123,6 @@ export default function SocietiesSection() {
                 </div>
               </div>
             )) : null}
-            {/* Resolved and empty is a claim, so it is said rather than left as a header over a
-               blank box. Reached by a catalogue outage, or by no society having a live listing. */}
             {societies !== null && top.length === 0 ? (
               <p className="text-sm text-gray-400 py-6">No societies with homes listed just yet.</p>
             ) : null}
@@ -173,8 +155,6 @@ export default function SocietiesSection() {
           <div className="cat-fade cat-fade--right" aria-hidden="true" style={{ opacity: fadeRight ? 1 : 0, transition: 'opacity .3s ease' }} />
         </div>
 
-        {/* Mobile equivalent of the desktop-only header link — same pattern as
-           Featured / Categories, so no rail loses its escape hatch on a phone. */}
         <button
           onClick={() => navigate('/societies')}
           className="h-btn sm:hidden mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 text-sm font-semibold text-teal-400 hover:bg-white/10 hover:text-teal-300 transition-all"

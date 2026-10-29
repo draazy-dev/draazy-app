@@ -5,7 +5,6 @@ import MapUnavailable from '../property/MapUnavailable.jsx';
 import ErrorBoundary from '../ErrorBoundary.jsx';
 import '../../styles/components/location-picker.css';
 
-/* Without a Maps key, or when Maps fails at runtime, it degrades to the shared placeholder so the card stays intact. */
 export default function SocietyMap({ lat, lng, name, height = 220 }) {
   const { t } = useTranslation();
   const wrapStyle = { height, minHeight: height };
@@ -21,7 +20,6 @@ export default function SocietyMap({ lat, lng, name, height = 220 }) {
           colorScheme={mapColorScheme()}
           defaultCenter={position}
           defaultZoom={15}
-          /* Not greedy: a 220px card mid-page should never capture the scroll gesture. */
           gestureHandling="cooperative"
           clickableIcons={false}
           mapTypeControl={false}

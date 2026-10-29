@@ -46,7 +46,6 @@ export default function KycReviewModal({ openId, nextId, onNext, onClose, onChan
   const kase = useKycCase(openId, { canWrite, userId: user?.id, onChanged });
   const { detail, loading, deciding, error } = kase;
   const summaryRef = useRef(null);
-  // A decision unmounts the button that held focus; hand it back to the dialog instead of <body>.
   const onSettled = () => requestAnimationFrame(() => {
     if (document.activeElement === document.body) summaryRef.current?.focus();
   });

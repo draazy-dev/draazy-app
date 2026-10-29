@@ -1,8 +1,5 @@
 import { useEffect, useRef } from 'react';
 
-/* Ports initScrollReveal: adds `.visible` to `.reveal` elements as they enter the viewport.
-   Also watches for async-rendered reveal content (e.g. sections that appear after a fetch
-   resolves) via a MutationObserver, so late-mounted `.reveal` nodes still animate in. */
 export function useScrollReveal(deps = []) {
   const rootRef = useRef(null);
   useEffect(() => {
@@ -30,7 +27,6 @@ export function useScrollReveal(deps = []) {
 
     root.querySelectorAll('.reveal, .fade-up, .fade-in').forEach(observe);
 
-    // Catch reveal content that mounts after this effect runs (async data, conditional sections).
     const mo = new MutationObserver((mutations) => {
       mutations.forEach((m) => m.addedNodes.forEach(scan));
     });

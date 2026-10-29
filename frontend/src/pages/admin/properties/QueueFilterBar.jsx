@@ -14,7 +14,6 @@ const DEAL_CHIPS = [{ value: '', label: 'All' }, { value: 'buy', label: 'Buy' },
 const SOURCE_CHIPS = [{ value: '', label: 'Any source' }, { value: 'owner', label: 'Owner' }, { value: 'staff', label: 'Staff posted' }];
 export const EMPTY_FILTERS = { q: '', deal: '', progress: '', status: '', source: '', featured: false, days: '' };
 
-/** The one filter bar every queue tab shares: what to look at on the left, where you are on the right. */
 export default function QueueFilterBar({ tab, filters, onChange, onClear, paging }) {
   const dirty = Object.keys(EMPTY_FILTERS).some((k) => filters[k] !== EMPTY_FILTERS[k]);
   return (

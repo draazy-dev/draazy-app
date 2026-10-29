@@ -40,13 +40,9 @@ export default function useProperty() {
   const freshAuthIdentity = useRef(authIdentity);
   const { toast } = useToast();
   const { flagEnabled } = useAppFlags();
-  // Keyed on the route param, not `p.id`, so the gate is requested in parallel with the listing —
-  // and because a hook cannot sit below this function's `p === undefined` early return.
   const { gate: contactGate, loading: contactGateLoading, refresh: refreshContactGate } = useContactGate(id, authIdentity);
   const { visits: myVisits, refresh: refreshMyVisits } = useMyVisits(p?.uuid, isIn && authIdentity);
   const rootRef = useScrollReveal([p]);
-  /* Declared up here rather than beside its handler because everything below line 86 is past an early return — a hook
-     there changes call order between the found and not-found renders. */
   const photoAskBusy = useRef(false);
   const location = useLocation();
   const sendToSignIn = useSignInGate();
@@ -65,12 +61,8 @@ export default function useProperty() {
     setActive(0);
     getProperty(id).then((r) => {
       if (!alive) return;
-      // `r ?? null`: `undefined` is "still asking" and `null` is "there is nothing there", so
-      // skipping the write on a miss would spin the skeleton forever.
       setP(r ?? null);
       if (r) {
-        // `r.uuid`, not the routing slug on `r.id`: the demand table keys on the property UUID.
-        // Not awaited — a telemetry write must not delay the page it is measuring.
         recordSignal({ kind: 'view', localitySlug: r.localitySlug, propertyId: r.uuid });
         pushRecentProp(r.id);
         track('view_listing', { id: r.id, locality: r.locality, deal: r.deal });
@@ -126,7 +118,6 @@ export default function useProperty() {
     setVisitOpen(true);
   };
 
-  // Gate: only the owner or internal back-office users can view non-approved listings
   const isOwner = isIn && p.ownerMobile && String(p.ownerMobile) === String(user?.mobile);
   const isAdmin = isInternal(user);
   const isApproved = p.status === 'approved';
@@ -145,11 +136,7 @@ export default function useProperty() {
   const isRent = p.deal === 'rent';
   const kind = propertyKind(p);
   const isLand = kind === 'land';
-  /* Fallback, not a synonym: `landUse` is the column the Land-use filter reads, and it covers farm land — which the
-     wizard never asks about, because it is agricultural by definition. */
   const plotZone = p.plotZone || LANDUSE_LBL[p.landUse] || '';
-  /* The owner's answer or nothing: a derived bathroom count would sit beside the price and
-   * carpet area with no hedge, and a confident wrong number stops a reader asking. */
   const baths = p.bath ?? null;
   const furnishLabel = ['unfurnished', 'semi', 'furnished'].includes(p.furnishing) ? tr(`property.furnishing.${p.furnishing}`) : '—';
   const parkingLabel = p.parkingSpaces ? String(p.parkingSpaces) : '—';
@@ -165,7 +152,6 @@ export default function useProperty() {
   const title = `${bhkLabel ? `${bhkLabel} ` : ''}${typeLabel} for ${isRent ? 'Rent' : 'Sale'} in ${p.locality}`;
   const priceStr = isRent ? `₹${(p.price || 0).toLocaleString('en-IN')}/month` : fmtINR(p.price);
 
-  // `area` first: it is what the card shows and what ₹/sq.ft divides by; the breakdown keeps carpet/built-up/super.
   const areaCandidate = [
     [isLand ? tr('property.plotArea') : tr('property.totalArea'), p.area, p.areaUnit],
     [tr('property.carpetArea'), p.carpetArea, 'sqft'],
@@ -180,11 +166,7 @@ export default function useProperty() {
   let details;
   const landPossession = possessionDateLabel(tr, p.availableDate) || availableLabel(tr, p);
   if (isLand) {
-    /* `naSanctioned` is the retired boolean, read only when the three-state is unanswered so a
-     * listing published under it keeps saying what its owner said. */
     const naStatus = p.naStatus || (p.naSanctioned ? 'sanctioned' : '');
-    /* Answered rows only: a dash beside a measurement reads as a specification rather than an
-     * unasked question, and the toggles default to off, so off is silence. */
     const landSpecs = [
       ['ruler', tr('property.spec.plotDimensions'), p.plotLength && p.plotWidth ? `${p.plotLength} × ${p.plotWidth} ft` : ''],
       ['milestone', tr('property.spec.roadWidth'), p.roadWidth ? `${p.roadWidth} ft` : ''],
@@ -206,8 +188,6 @@ export default function useProperty() {
       ...landSpecs,
     ];
   } else if (kind === 'commercial') {
-    /* Answered rows only: an unstated floor load is a question for the owner, not a dash that
-     * reads like a specification. */
     const specs = commercialSpecsFor(p.commercialType)
       .filter(({ key }) => String(p[key] ?? '').trim())
       .map(({ key, unit }) => ['ruler', tr('property.spec.' + key),
@@ -252,8 +232,6 @@ export default function useProperty() {
     if (plotZone) highlights.push(['layout-grid', tr('property.zoneLabel', { zone: plotZone })]);
     if (p.ownershipVerified) highlights.push(['file-check', tr('property.clearTitleHl')]);
   } else {
-    // Guarded because `deriveFacing` returns '' when no direction was stated: an unguarded push
-    // renders a pill reading " Facing" and burns one of the four `slice(0, 4)` slots.
     const facing = deriveFacing(p);
     if (facing) highlights.push(['compass', tr('property.facingLabel', { facing })]);
     if (p.amenities?.includes('security')) highlights.push(['shield-check', tr('property.security247')]);
@@ -261,8 +239,6 @@ export default function useProperty() {
   }
   const topHighlights = highlights.slice(0, 4);
 
-  // Type-aware "Read more" blurb — a co-op community pitch (schools/hospitals) is
-  // meaningless for an office or a plot, so each kind gets its own framing.
   const amenPhrase = (p.amenities || []).map((a) => AMEN_LABEL[a] || a).join(', ') || tr('property.modernAmenities');
   const overviewMore = isLand
     ? tr('property.overviewLand', {
@@ -289,14 +265,11 @@ export default function useProperty() {
   if (p.ownershipVerified) tags.push([tr('property.ownershipVerified'), 'tag-emerald', 'file-check', 'tag.ownershipVerified']);
   tags.push([tr('property.zeroBrokerageDirect'), '', 'hand-coins', 'tag.zeroBrokerage']);
 
-  /* Re-stated here only to spend a toast instead of a round trip; the server enforces both
-   * independently. */
   const requestPhotos = async (e) => {
     const again = replay(e);
     if (!isIn) { sendToSignIn('photos', undefined, again); return; }
     if (isOwner) { toast(tr('property.ownListingPhotos'), 'info'); return; }
     if (photoAskBusy.current) return;
-    // Captured before the await, so a 401 after the buyer moved on still returns them to this listing.
     const back = window.location.pathname + window.location.search + window.location.hash;
     photoAskBusy.current = true;
     try {
@@ -336,7 +309,6 @@ export default function useProperty() {
     tr, p, active, setActive, ovOpen, setOvOpen, lightbox, setLightbox,
     reportOpen, setReportOpen, contactOpen, setContactOpen,
     visitOpen, setVisitOpen,
-    // A request or a booking changes what the CTAs offer next, so both re-read once their modal closes.
     closeContact: () => { setContactOpen(false); refreshContactGate().catch(() => {}); },
     closeVisit: () => { setVisitOpen(false); refreshMyVisits(); refreshContactGate().catch(() => {}); },
     contactStatus: contactGate.status, myVisits,
@@ -345,8 +317,6 @@ export default function useProperty() {
     closeInlineOtp: () => { setInlineOtpReason(null); setResumeAction(null); },
     onInlineOtpVerified: () => { setInlineOtpReason(null); setResumeAfterVerify((n) => n + 1); },
     ownerMob, contactApproved, canChat, isOwner, isAdmin, isApproved,
-    // Owner and staff previews both need saying out loud: otherwise the only difference between a
-    // live page and a pending one is invisible. Not `!isApproved` — sold/rented is also unapproved.
     ownerPreview: (isOwner || isAdmin) && (p.status === 'pending' || p.status === 'flagged'),
     staffPreview: !isOwner && isAdmin && (p.status === 'pending' || p.status === 'flagged'),
     isRent, kind, isLand, baths, furnishLabel, parkingLabel, possessionLabel, title, priceStr,

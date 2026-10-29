@@ -6,8 +6,6 @@ import { usePricing } from '../../context/PricingContext.jsx';
 import { listPlans } from '../../services/planService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
-/** Prices come from the `GET /bootstrap` `plans` catalogue, which is what `POST /me/subscription` bills;
- * `fee()` is only the fallback, because a stale price still converts and a blank one does not. */
 const rupees = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 
 const seekerPlans = (t, fee, n) => [
@@ -18,7 +16,6 @@ const ownerPlans = (t, fee, n) => [
   { id: 'owner-free', free: true, name: t('misc1.plansOwnerFreeName'), price: '₹0', sub: t('misc1.plansOwnerFreeSub'), tag: t('misc1.plansOwnerFreeTag'), feats: [t('misc1.plansOwnerFreeFeat1'), t('misc1.plansOwnerFreeFeat2'), t('misc1.plansOwnerFreeFeat3'), t('misc1.plansOwnerFreeFeat4', { days: n.featuredDays }), t('misc1.plansOwnerFreeFeat5')], cta: t('misc1.plansOwnerFreeCta'), href: '/list-property' },
   { id: 'listing-pass', name: t('misc1.plansListingPassName'), price: fee('listingPass'), sub: t('misc1.plansListingPassSub', { days: n.passDays }), tag: t('misc1.plansListingPassTag'), feats: [t('misc1.plansListingPassFeat1', { days: n.passDays }), t('misc1.plansListingPassFeat2'), t('misc1.plansListingPassFeat3'), t('misc1.plansListingPassFeat4'), n.passGuaranteeDays > 0 && t('misc1.refundGuaranteePass', { days: n.passGuaranteeDays })].filter(Boolean), cta: t('misc1.plansListingPassCta'), href: '/dashboard#properties', pop: true },
 ];
-/** `price` resolves a plan slug to the card's price so FAQ prose can't quote a different number. */
 const plansFaqs = (t, rentFee, price, n) => [
   [t('misc1.plansFaq1Q'), t('misc1.plansFaq1A', { fee: price('contactPack'), count: n.contacts, days: n.packDays })],
   [t('misc1.plansFaq2Q'), t('misc1.plansFaq2A')],
@@ -44,7 +41,6 @@ function PlanCard({ p }) {
   );
 }
 
-// Cards are 82% wide so the next plan peeks as a swipe affordance; desktop keeps the plain grid below.
 function PlanCarousel({ plans }) {
   const scrollRef = useRef(null);
   const [active, setActive] = useState(0);
@@ -62,7 +58,6 @@ function PlanCarousel({ plans }) {
     setActive(idx);
   };
 
-  // Reset to the first card whenever the persona (plan set) changes.
   const plansKey = plans.map((p) => p.id).join('|');
   useEffect(() => {
     const el = scrollRef.current;
@@ -98,8 +93,6 @@ function PlanCarousel({ plans }) {
               aria-label={p.name}
               aria-current={i === active ? 'true' : undefined}
               onClick={() => goTo(i)}
-              /* 24x44, not 44x44: wider dots would overlap; 24px with 32px spacing meets WCAG 2.5.8.
-                 data-tap-exempt marks it reviewed. */
               data-tap-exempt
               className="grid h-11 w-6 place-items-center"
             >
@@ -118,10 +111,7 @@ function PlanCarousel({ plans }) {
 export default function Plans() {
   const { t } = useTranslation();
   const { hasEverListed } = useAuth();
-  // Fallback price list from `GET /bootstrap`; a compiled-in constant would quote a price nobody could change.
   const { fee, referral, refunds, loaded } = usePricing();
-  // The live catalogue, keyed by slug. Empty until it resolves and after a failure; both cases
-  // fall through to `fee()` below.
   const [catalogue, setCatalogue] = useState({});
   useEffect(() => {
     let alive = true;
@@ -132,13 +122,10 @@ export default function Plans() {
         rows.forEach((r) => { if (r.slug) byslug[r.slug] = r; });
         setCatalogue(byslug);
       })
-      // A pricing page that cannot reach the catalogue still has to render — it is the page that
-      // exists to convert. It falls back to the configured fee rather than showing nothing.
       .catch(() => { if (alive) setCatalogue({}); });
     return () => { alive = false; };
   }, []);
   const RENT_FEE = fee('rentAgreementPlatform');
-  /** Server price when the catalogue has this plan, otherwise the card's configured fallback. */
   const priced = (p) => (catalogue[p.id] ? { ...p, price: rupees(catalogue[p.id].price) } : p);
   const n = {
     contacts: catalogue['contact-pack']?.contactLimit ?? 15,
@@ -151,15 +138,11 @@ export default function Plans() {
   };
   const SEEKER = seekerPlans(t, fee, n).map(priced);
   const OWNER = ownerPlans(t, fee, n).map(priced);
-  /** Falls back to the configured fee only while the catalogue is
-   * unreachable, so prose can't quote a different number than the card. */
   const priceOf = (key) => {
     const slug = key === 'listingPass' ? 'listing-pass' : 'contact-pack';
     return catalogue[slug] ? rupees(catalogue[slug].price) : fee(key);
   };
   const FAQS = plansFaqs(t, RENT_FEE, priceOf, n);
-  /* `null` means 'not chosen', not 'seeker': seeding from `hasEverListed` would latch a first-render false while
-     auth still loads. Deriving follows auth until the user touches the toggle. */
   const [persona, setPersona] = useState(null);
   const activePersona = persona ?? (hasEverListed ? 'owner' : 'seeker');
   const personas = [
@@ -175,7 +158,6 @@ export default function Plans() {
         <p className="text-gray-400 mt-2">{t('misc1.plansSubtitle')}</p>
       </div>
 
-      {/* Mobile: persona toggle + swipeable plan carousel */}
       <div className="md:hidden mb-12">
         <div className="deal-seg flex w-full p-1 rounded-full glass border border-white/10 mb-2" role="radiogroup" aria-label={t('misc1.plansTitle')}>
           {personas.map((o) => {
@@ -197,7 +179,6 @@ export default function Plans() {
         <PlanCarousel plans={activePlans} />
       </div>
 
-      {/* Desktop: both persona sections as grids */}
       <div className="hidden md:block">
         <section className="mb-12">
           <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-4 flex items-center gap-2"><Icon name="search" className="w-4 h-4 text-teal-400" /> {t('misc1.plansForSeekers')}</h2>
@@ -223,8 +204,6 @@ export default function Plans() {
         <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-4 flex items-center gap-2"><Icon name="help-circle" className="w-4 h-4 text-teal-400" /> {t('misc1.plansFrequentlyAsked')}</h2>
         <div className="space-y-3">
           {FAQS.map(([q, a]) => (
-            /* py-4 sits on the summary, not the card, so the tapped question gets the padding and the card
-               measures the same open or closed. */
             <details key={q} className="glass rounded-xl px-5">
               <summary className="flex items-center justify-between cursor-pointer font-medium text-sm py-4 min-h-[44px]">{q}<Icon name="chevron-down" className="faq-chevron w-4 h-4 text-gray-400 transition-transform flex-shrink-0" /></summary>
               <p className="text-gray-400 text-sm mt-3 pb-4 leading-relaxed">{a}</p>

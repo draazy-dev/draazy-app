@@ -1,18 +1,12 @@
-/* Knowledge base for "Draaz", the Draazy help assistant. Pure data; the matcher ranks entries by
-   keyword overlap. Action shape: { label, icon, to | ask, external? } — `external` hands off to the OS. */
-
 import { SUPPORT_PHONE, SUPPORT_TEL } from '../lib/supportContact.js';
 
 export const ASSISTANT = {
   name: 'Draaz',
   tagline: 'Draazy guide',
-  /* First bubble when the panel opens with an empty thread. */
   greeting:
     "Hi, I'm Draaz — your Draazy guide. I can show you how anything here works and take you straight to it. What are you looking to do?",
 };
 
-/* Top-of-panel chips: the highest-intent starting points. `ask` chips run the
-   text through the matcher; `nav` chips jump straight to a route. */
 export const QUICK_ACTIONS = [
   { label: 'Find a home', icon: 'search', kind: 'nav', to: '/listings' },
   { label: 'List my property', icon: 'plus-circle', kind: 'nav', to: '/list-property' },
@@ -20,8 +14,6 @@ export const QUICK_ACTIONS = [
   { label: 'Talk to a human', icon: 'headset', kind: 'ask', text: 'Talk to a human' },
 ];
 
-/* Human-support escalation — surfaced on every low-confidence answer so the
-   assistant is never a dead end. */
 export const ESCALATION = {
   intro: "Happy to hand you to a person. You can:",
   actions: [
@@ -310,8 +302,6 @@ export const KB = [
   },
 ];
 
-/* Per-route follow-up suggestions: KB ids surfaced as chips when the panel opens
-   on that page, so the assistant is context-aware. Matched by path prefix. */
 export const ROUTE_SUGGESTIONS = {
   '/listings': ['search', 'save-search', 'contact-gate', 'compare'],
   '/property': ['contact-gate', 'schedule-visit', 'offers', 'report'],

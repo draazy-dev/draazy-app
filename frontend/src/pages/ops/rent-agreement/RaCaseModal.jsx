@@ -55,7 +55,6 @@ export default function RaCaseModal({ request, nextId, onNext, onClose, onChange
   );
 }
 
-/** A queue row is a summary, so the full case is read once when it opens and refreshed by the desk's own actions. */
 function CaseBody({ id, onChanged }) {
   const [initial, setInitial] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -86,7 +85,6 @@ function CaseView({ initial, onChanged }) {
     let live = true;
     readServiceRequestChecklist(detail.id)
       .then((res) => { if (live) { setChecklist(res); setChecklistStatus('ready'); } })
-      // Not an empty list: that would tell the desk the customer sent nothing.
       .catch(() => { if (live) setChecklistStatus('error'); });
     return () => { live = false; };
   }, [detail.id]);
@@ -110,7 +108,6 @@ function CaseView({ initial, onChanged }) {
     if (result.written) setInternalNote('');
   };
 
-  /** Runs one desk action; the server's sentence is the toast on failure, and the rethrow keeps the form's input. */
   const act = (fn, success, note) => async (...args) => {
     try {
       applyUpdate(await fn(detail.id, ...args));
@@ -128,7 +125,6 @@ function CaseView({ initial, onChanged }) {
     try {
       await act(takeServiceRequest, 'This case is now yours. The customer can see the change.')();
     } catch {
-      // Toasted by `act`; a 409 names the colleague holding it.
     } finally {
       setTaking(false);
     }

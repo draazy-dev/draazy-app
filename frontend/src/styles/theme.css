@@ -1,8 +1,3 @@
-/* Every colour is declared here; check-colours.mjs fails on a literal elsewhere.
-   Dark is the default, html.light swaps the palette; channels are bare R G B so callers add alpha. */
-
-/* Dark islands keep the dark palette in light mode;
-   keep this list identical to the island `color` rule at the end of the file. */
 :root,
 .theme-dark, .btn-teal, .dz-lightbox, .pc-lightbox, .reels-page, .bg-black, [class*="from-black/"],
 .badge-seeker, .sf-match-great, .ba-knob, .ba-tag,
@@ -56,7 +51,6 @@
   --text: rgb(var(--dz-c-white));
   --text-muted: rgb(var(--dz-c-slate-400));
   --text-subtle: rgb(var(--dz-c-slate-500));
-  /* Hairlines on a light page need about twice the alpha to read as well as on a dark one. */
   --dz-line-boost: 1;
   --glass: rgb(var(--dz-c-white) / 0.05);
   --glass-strong: rgb(var(--dz-c-white) / 0.08);
@@ -85,8 +79,6 @@
   --dd-placeholder: rgb(var(--dz-c-gray-400));
   --dd-shadow: 0 24px 60px rgb(var(--dz-c-black) / 0.55), 0 2px 10px rgb(var(--dz-c-black) / 0.4), 0 0 0 1px rgb(var(--dz-c-white) / 0.07);
   --dd-menu-solid: rgb(28 26 43);
-
-  /* Tinted with the app's own indigo/teal: a gallery or reel can put near-white imagery behind the bar. */
   --bottom-nav-bg: linear-gradient(180deg, rgb(45 41 120 / 0.74), rgb(14 12 24 / 0.86));
   --bottom-nav-shadow: 0 12px 36px rgb(var(--dz-c-black) / 0.52), 0 2px 8px rgb(var(--dz-c-teal-600) / 0.18);
   --bottom-nav-solid: rgb(23 20 43);
@@ -97,12 +89,9 @@
   --cta-btn-text: var(--dz-c-slate-900);
   --section-alt: rgb(18 16 31);
 }
-
-/* Never flips, and never re-declared by an island. */
 :root {
   --dz-c-pure-white: 255 255 255;
   --dz-c-black: 0 0 0;
-  /* The real page colour, so a fade at the foot of a dark island lands on the page behind it. */
   --dz-c-page: 15 13 26;
 }
 
@@ -133,7 +122,6 @@ html.light {
   --dz-t-teal-500: var(--dz-c-teal-700); --dz-t-emerald-500: var(--dz-c-emerald-700); --dz-t-green-500: var(--dz-c-green-700); --dz-t-cyan-500: var(--dz-c-cyan-700); --dz-t-sky-500: var(--dz-c-sky-700); --dz-t-blue-500: var(--dz-c-blue-700); --dz-t-indigo-500: var(--dz-c-indigo-700); --dz-t-violet-500: var(--dz-c-violet-700); --dz-t-purple-500: var(--dz-c-purple-700); --dz-t-pink-500: var(--dz-c-pink-700); --dz-t-rose-500: var(--dz-c-rose-700); --dz-t-red-500: var(--dz-c-red-700); --dz-t-orange-500: var(--dz-c-orange-700); --dz-t-amber-500: var(--dz-c-amber-700); --dz-t-yellow-500: var(--dz-c-yellow-700);
 
   --dz-line-boost: 2;
-  /* Tiles (`--glass`, a navy tint here) sit a shade darker than the page; the shadow lifts them off it. */
   --glass-strong: rgb(255 255 255 / 0.9);
   --glass-solid: rgb(231 236 236);
   --glass-solid-strong: rgb(255 255 255);
@@ -152,9 +140,6 @@ html.light {
   --cta-btn-text: var(--dz-c-pure-white);
   --section-alt: rgb(232 239 238);
 }
-
-/* Text inherited from <body> was resolved there, so an island re-states it. Specificity (0,0,1):
-   beats preflight's `button, a { color: inherit }` (this file loads later), loses to any `text-*` class. */
 html:where(.light) :where(
   .theme-dark, .btn-teal, .dz-lightbox, .pc-lightbox, .reels-page, .bg-black, [class*="from-black/"],
   .badge-seeker, .sf-match-great, .ba-knob, .ba-tag,

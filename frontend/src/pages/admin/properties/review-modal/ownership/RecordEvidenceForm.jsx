@@ -4,8 +4,6 @@ import { DOC_TYPES, istDate } from './vocabulary.js';
 
 const CAPTION = 'mb-1 block text-xs font-medium text-gray-400';
 
-/* A `Select` renders a button, so a caption cannot label it: its real name is `ariaLabel`, and every
-   caption must stay a substring of that name for voice control. */
 export default function RecordEvidenceForm({
   id, documents, form, setForm, pending, canDecide, canRecord, needsSubject,
   onChangeDocument, onChangeDocType, onSubmit,

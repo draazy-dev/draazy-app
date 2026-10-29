@@ -1,6 +1,3 @@
-/* Listings route styles (Tier 1), loaded with the /listings chunk. Anything shared with
-   /flatmates (DualRange, checkbox marks, .fg-*, .page-btn) lives in routes/filters.css. */
-
 @media (hover: hover) {
   .card-hover:hover {
     transform: translateY(-6px);
@@ -11,9 +8,6 @@
     transform: scale(1.08);
   }
 }
-
-/* Base .card-img { transition } is SHARED with property SimilarProperties.jsx -> kept global in index.css. */
-
 .heart-btn.active svg {
   fill: rgb(var(--dz-c-rose-500));
   color: rgb(var(--dz-c-rose-500));
@@ -53,12 +47,6 @@
 .toggle-cb:checked+.toggle-ui::after {
   transform: translateX(18px);
 }
-
-/* .filter-overlay/.filter-panel/.filter-fab* are shared with flatmates FilterBar.jsx and stay
-   global in index.css; .fg-* and .page-btn* are shared too and live in routes/filters.css. */
-
-/* Smart-search controls on phones: neither carries a class buttons.css scopes `:focus-visible`
-   to, so both would fall back to the UA outline. They sit 4px apart, so they have to agree. */
 .lst-search-go:focus-visible,
 .lst-search-bell:focus-visible,
 .lst-search-field:focus-visible {
@@ -67,8 +55,6 @@
 }
 
 .lst-search-go { transition: background-color .25s ease, box-shadow .25s ease, transform .25s ease, filter .25s ease; }
-
-/* The bell is the bar's full height, so the shared +2px offset would hang 4px outside it. */
 .lst-search-bell:focus-visible {
   outline-offset: -2px;
 }

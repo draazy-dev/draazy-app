@@ -1,9 +1,7 @@
-/* This mapper absorbs ManagedPropertyDto quirks once instead of at every call site. */
 import { readUser } from '../../../lib/auth.js';
 
 const fmtIndian = (n) => Number(n || 0).toLocaleString('en-IN');
 
-/** ISO-8601 → epoch ms, because that is what the owner cards already sort on. Null stays null. */
 const toMillis = (iso) => {
   if (!iso) return null;
   const ms = Date.parse(iso);
@@ -16,11 +14,8 @@ export const bhkLabel = (n) => {
   return num >= 5 ? '5+ BHK' : `${num} BHK`;
 };
 
-/** The catalogue only knows `buy` and `rent`; anything that is not `rent` is a sale, which keeps a future third
- * intent from silently rendering as a rental. */
 export const toClientDeal = (deal) => (deal === 'rent' ? 'rent' : 'sale');
 
-/** Owner-hub deal → wire deal. The inverse, and the one that stops a 422. */
 export const toWireDeal = (deal) => (deal === 'rent' ? 'rent' : 'buy');
 
 export function toManaged(dto) {
@@ -52,8 +47,6 @@ export function toManaged(dto) {
     img: null,
     image: null,
     gallery: [],
-    // Never durable: the record belongs to the caller by construction — the server scopes every
-    // read to the token — so the owner is whoever is holding it.
     owner: u.name || '',
     ownerMobile: u.mobile || '',
     rented: !!dto.rented,
@@ -71,8 +64,6 @@ export function toManaged(dto) {
 
 export const toManagedList = (rows) => (Array.isArray(rows) ? rows.map(toManaged).filter(Boolean) : []);
 
-/** The Rent Panel must render and print these values rather than re-deriving them from the record it happens to be
- * holding, or last March's receipt silently reprints at this March's rent after a tenant change. */
 export function toRentReceipt(dto) {
   if (!dto) return null;
   return {
@@ -86,7 +77,6 @@ export function toRentReceipt(dto) {
   };
 }
 
-/** The receipt list, wire → panel rows. Newest month first; the server orders them. */
 export const toRentReceiptList = (rows) =>
   (Array.isArray(rows) ? rows.map(toRentReceipt).filter(Boolean) : []);
 
@@ -101,8 +91,6 @@ export const toTrackedRentList = (rows) => (Array.isArray(rows) ? rows : []).map
   receipts: toRentReceiptList(dto.receipts),
 }));
 
-/** Only the fields the server owns a column for survive; `visibility`, `status`, `owner` and `publishedListingId` are
- * refused by the contract on purpose. */
 export function toCreateRequest(data = {}) {
   const deal = toWireDeal(data.deal);
   const price = Number(data.price) || 0;
@@ -121,16 +109,12 @@ export function toCreateRequest(data = {}) {
     rented: !!data.rented,
     tenantName: data.tenantName || null,
     tenantMobile: data.tenantMobile || null,
-    // `deal === 'rent'` mirrors the browser store's rule: for a rental the price *is* the rent, and
-    // the tracker should not start out disagreeing with the headline.
     monthlyRent: deal === 'rent' ? price : (Number(data.monthlyRent) || null),
     dueDay: data.dueDay == null ? null : Number(data.dueDay) || null,
     valuation: data.valuation || null,
   };
 }
 
-/** The update contract is all-nullable and the server treats null as "leave alone", so only keys the caller actually
- * passed are forwarded. */
 export function toUpdateRequest(patch = {}) {
   const body = {};
   if ('deal' in patch) body.deal = toWireDeal(patch.deal);

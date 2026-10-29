@@ -8,7 +8,6 @@ import { MAX_LOCALITIES } from '../../../consumer/flatmates/constants.js';
 
 const isoDate = (v) => (/^\d{4}-\d{2}-\d{2}/.test(v || '') ? v.slice(0, 10) : '');
 
-/** `null` hides a field the kind does not have. */
 function initialOf({ room, group, post }) {
   if (room) return { title: room.title, note: room.note, rent: room.budget ?? '', deposit: room.deposit ?? '', localities: [room.locality].filter(Boolean), moveIn: isoDate(room.availableFrom) };
   if (group) {

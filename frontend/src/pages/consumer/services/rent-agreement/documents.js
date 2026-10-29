@@ -1,7 +1,6 @@
 import { OWNER_DOC_CATEGORY, TENANT_DOC_SLUGS } from './constants.js';
 import { coOwnerDocSlots, docReady, ownerDocSlots, tenantDocSlots } from './validation.js';
 
-/* Every upload the actor owns, tagged with the checklist category the server gates checkout on. */
 export function collectDocs({ mode, inviteRole, ownerMode, tenantMode, owner, coOwners = [], tenants = [], ownerDocs = {}, tenantDocs = {} }) {
   const out = [];
   const push = (key, category, doc) => {
@@ -40,7 +39,6 @@ export function slotForCategory(category) {
   return di >= 0 ? { side: 'tenant', key: `t${tenant[1]}-${di}` } : null;
 }
 
-/** Drops the doc slots of the row at `index` and shifts later rows down, so docs stay with their party. */
 export function removeIndexedDocs(docs, prefix, index) {
   const re = new RegExp(`^${prefix}(\\d+)-(.+)$`);
   return Object.fromEntries(Object.entries(docs).flatMap(([k, v]) => {

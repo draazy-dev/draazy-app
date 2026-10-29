@@ -20,8 +20,6 @@ export function Block({ icon: Icon, title, children, className, aside }) {
   );
 }
 
-/* A failed read must never render as an empty queue: "nothing to do" and "the read did not work"
-   look the same and only one of them means the desk can go home. */
 export function QueueState({ state, onRetry, empty }) {
   if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') {

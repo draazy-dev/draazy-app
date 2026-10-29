@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Icon from '../../../components/Icon.jsx';
 
-// Seeded copy, not real events.
 const ITEMS = [
   { icon: 'shield-check', text: 'New listing from a KYC-done owner in Hinjawadi', color: 'text-emerald-300' },
   { icon: 'heart', text: 'Someone just saved a 2 BHK in Baner', color: 'text-rose-300' },
@@ -18,7 +17,7 @@ export default function ActivityTicker() {
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (media.matches) return undefined; // static line, no cycling
+    if (media.matches) return undefined;
 
     const id = setInterval(() => {
       setShow(false);

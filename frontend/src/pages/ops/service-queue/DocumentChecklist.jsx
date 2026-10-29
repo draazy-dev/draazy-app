@@ -15,7 +15,6 @@ function RowIcon({ item }) {
   return <Minus className="h-4 w-4 shrink-0 text-gray-600" aria-hidden="true" />;
 }
 
-/** One review in flight per request, so a late response cannot overwrite a newer checklist. */
 export function usePaperReview(request, onChange, onError) {
   const [busy, setBusy] = useState('');
   const gated = request.type === 'rental';
@@ -40,7 +39,6 @@ export const papersCount = (checklist, gated) => {
   return `${fmtNum(checklist.ready)} of ${fmtNum(checklist.total)} received${gated ? ` · ${fmtNum(verified)} verified` : ''}`;
 };
 
-/** `label` is the short name shown inside a party's card; buttons keep the full name for screen readers. */
 export function PaperRow({ item, label = item.name, review, file, onOpen }) {
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
@@ -101,7 +99,6 @@ export function PaperRow({ item, label = item.name, review, file, onOpen }) {
   );
 }
 
-/** Loading, read failure, and what the counts mean — everything about the checklist except its rows. */
 export function PapersNotice({ checklist, status, review }) {
   const verified = status === 'ready' ? checklist.items.filter((i) => i.review === 'verified').length : 0;
   return (
@@ -110,7 +107,6 @@ export function PapersNotice({ checklist, status, review }) {
       {status === 'error' ? (
         <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-200">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-          {/* Not "no documents": we do not know that, and saying it sends somebody chasing paperwork already sent. */}
           <span>The document list could not be read, so this is not a list of what is missing. Try again before asking the customer for anything.</span>
         </div>
       ) : null}

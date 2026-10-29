@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import Select from './Select.jsx';
 import { parseTime, formatTime, to12h, HOUR_OPTIONS, minuteOptions } from '../../lib/timeOfDay.js';
 
-/** Any hour/minute/meridiem rather than fixed slots, so one control serves every time-of-day field. */
 export default function TimePickerDialog({ open, value, anchorRef, format = '12h', minuteStep = 5, onClose, onConfirm, ariaLabel }) {
   const { t } = useTranslation();
   const dialogLabel = ariaLabel || t('ui.selectTime');
@@ -13,7 +12,6 @@ export default function TimePickerDialog({ open, value, anchorRef, format = '12h
   const [draft, setDraft] = useState(seed);
   const [shown, setShown] = useState(false);
 
-  // Re-seed each time the panel opens so it reflects the latest committed value.
   useEffect(() => {
     if (!open) { setShown(false); return; }
     setDraft(parseTime(value) || { h24: 10, min: 0 });
@@ -34,14 +32,10 @@ export default function TimePickerDialog({ open, value, anchorRef, format = '12h
     return { ...d, h24: m === 'PM' ? base + 12 : base };
   });
 
-  // Anchor the panel under the field with fixed positioning; flip up near the
-  // viewport bottom and clamp horizontally so it never overflows the screen.
   const place = useCallback(() => {
     const anchor = anchorRef?.current;
     const panel = panelRef.current;
     if (!anchor || !panel) return;
-    // Mirrors DatePickerDialog: below 640px the shared `.dz-cal` rules dock this
-    // panel as a bottom sheet, so anchoring must stand down and clear itself.
     if (window.matchMedia('(max-width: 639.98px)').matches) {
       panel.style.left = '';
       panel.style.top = '';
@@ -75,8 +69,6 @@ export default function TimePickerDialog({ open, value, anchorRef, format = '12h
     };
   }, [open, place]);
 
-  // Close on outside interaction — but ignore clicks inside the panel, the field
-  // that opened it, and any portaled <Select> menu (the hour/minute dropdowns).
   useEffect(() => {
     if (!open) return undefined;
     const onDown = (e) => {
@@ -94,12 +86,11 @@ export default function TimePickerDialog({ open, value, anchorRef, format = '12h
     if (!open) return undefined;
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        if (document.querySelector('.dz-dropdown.is-open')) return; // let an open Select close first
+        if (document.querySelector('.dz-dropdown.is-open')) return;
         e.preventDefault(); e.stopPropagation(); onClose?.(); return;
       }
       if (e.key === 'Enter') { e.preventDefault(); onConfirm?.(formatTime(draft, format)); }
     };
-    // Capture phase, so Escape closes this popover before a dialog underneath sees it.
     document.addEventListener('keydown', onKey, true);
     panelRef.current?.focus();
     return () => document.removeEventListener('keydown', onKey, true);

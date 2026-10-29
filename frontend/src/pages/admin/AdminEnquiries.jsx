@@ -18,7 +18,6 @@ import {
 import FunnelView from './enquiries/FunnelView.jsx';
 import { ENQUIRY_STATUS_OPTS, VISIT_STATUS_OPTS, DEAL_STATUS_OPTS, DEAL_TYPE_OPTS, AWAITING_STATUSES } from './enquiries/constants.js';
 
-// Non-ISO values (a pre-written slot string) pass through unchanged.
 const fmtWhen = (v) => {
   if (!v) return '\u2014';
   const d = new Date(v);
@@ -37,8 +36,6 @@ const NOTES = {
 };
 const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 
-/** The board is read-only: `contact_requests.status` is the owner's decision, so "Responded" writes a note.
- * Opening a row's detail is audited. */
 export default function AdminEnquiries() {
   const { toast } = useToast();
   const [tab, setTab] = useTabParam(['enquiries', 'visits', 'deals', 'funnel'], 'enquiries');
@@ -58,7 +55,6 @@ export default function AdminEnquiries() {
   const page = pageState.key === resetKey ? pageState.page : 1;
   const latest = useRef(0);
 
-  // Debounced: `q` changes on every keystroke and each settled value is a request.
   useEffect(() => {
     const id = setTimeout(() => setQLive(q.trim()), 250);
     return () => clearTimeout(id);
@@ -74,7 +70,6 @@ export default function AdminEnquiries() {
     return () => { latest.current += 1; };
   }, [tab, statusF, typeF, qLive, dateRange, page, toast]);
 
-  // One read feeds the tab and chip counts, the GMV note and the funnel; only the funnel date filter moves it.
   useEffect(() => {
     let live = true;
     getEnquirySummary({ days: funnelTime })
@@ -83,7 +78,6 @@ export default function AdminEnquiries() {
     return () => { live = false; };
   }, [funnelTime, toast]);
 
-  // Filed against the listing: that is the case file a colleague opens tomorrow.
   const noteResponded = async (r) => {
     try {
       await addNote('listing', r.propertyId, `Responded to enquiry from ${r.customer}.`, 'responded');
@@ -126,7 +120,6 @@ export default function AdminEnquiries() {
 
   const note = tab === 'deals' ? `Deals agreed through the platform \u2014 ${fmtINR(summary.gmv)} across all deals.` : NOTES[tab];
 
-  // The export is the first 100 matching rows.
   const doExport = async () => {
     try {
       const all = (await LISTERS[tab]({ status: statusF, deal: tab === 'deals' ? typeF : '', q: qLive, days: dateRange, page: 0, size: MAX_PAGE_SIZE })).items;

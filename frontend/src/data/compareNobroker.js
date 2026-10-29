@@ -1,5 +1,3 @@
-/* Read by both the page and the build-time prerender so the HTML never says more than the screen;
-   re-read every source and update AS_OF before changing a figure. */
 export const AS_OF = 'October 2026';
 export const CHECKED_ON = '9 October 2026';
 export const CORRECTIONS_EMAIL = 'support@draazy.com';

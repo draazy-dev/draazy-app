@@ -1,5 +1,4 @@
 export const STEP_LABELS = ['Property', 'Owner', 'Tenant', 'Terms', 'Witnesses', 'Review'];
-/* Last step a signed-out visitor may reach: later steps collect PAN/Aadhaar, which need an account behind them. */
 
 export const LAST_PUBLIC_STEP = 0;
 
@@ -57,7 +56,6 @@ export const START_DATE_FUTURE_DAYS = 180;
 export const DUE_DAY_MAX = 28;
 export const MH_PINCODE = /^(?!403)4[0-4]\d{4}$/;
 export const CASH_LIMIT = 200000;
-// The IGR portal's deposit-payment modes and the fields each one asks for. Must match `RentAgreementDetailsRules`.
 export const DEPOSIT_PAY_FIELDS = {
   upi: ['ref', 'amount', 'date'],
   netbanking: ['bank', 'branch', 'ref', 'amount', 'date'],
@@ -68,12 +66,9 @@ export const MAX_DEPOSIT_PAYMENTS = 10;
 export const PAYMENT_REF = /^[A-Za-z0-9]{4,30}$/;
 export const BANKS = ['State Bank of India', 'HDFC Bank', 'ICICI Bank', 'Axis Bank', 'Kotak Mahindra Bank', 'Bank of Maharashtra', 'Bank of Baroda', 'Punjab National Bank', 'Union Bank of India', 'Canara Bank', 'Bank of India', 'IDFC FIRST Bank', 'IndusInd Bank', 'Yes Bank', 'Cosmos Co-operative Bank', 'Saraswat Co-operative Bank'];
 export const TDS_RENT_THRESHOLD = 50000;
-// Commercial leave & licence (TDS 194-I, a different clause set) is quoted by the legal desk.
 
 export const COMMERCIAL_ROUTE = '/services/property-legal';
 export const RESIDENTIAL_PROPERTY_TYPES = ['Flat / Apartment', 'Independent House / Bungalow', 'Row House'];
-// Owner doc slot -> its category in the dashboard's personal Document vault, so the wizard can
-// reuse docs already on file. Values must match DocumentsTab's KYC group.
 
 export const OWNER_VAULT_CAT = { 'o-pan': 'PAN Card', 'o-aadhaar': 'Aadhaar Card', 'o-photo': 'Passport Photo', 'o-own': 'Ownership Proof' };
 

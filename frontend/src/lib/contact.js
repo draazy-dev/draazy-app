@@ -1,9 +1,7 @@
-/* Contact storage stays compatible with the static app's auth.js helpers. */
 const USER_KEY = 'draazyUser';
 
 export const digits = (num) => String(num || '').replace(/\D/g, '');
 
-/* Shared "nothing is known" gate for providers and `useContactGate`. */
 export const NO_CONTACT_GATE = Object.freeze({
   status: 'none',
   verifiedContactOnly: false,
@@ -11,7 +9,6 @@ export const NO_CONTACT_GATE = Object.freeze({
   ownerHidesNumber: false,
 });
 
-/* Full mobile only: masked prefixes collide and would share contact-request buckets. */
 export const isFullMobile = (num) => digits(num).length === 10;
 
 export function maskPhone(num) {
@@ -38,7 +35,6 @@ export const myMobile = () => {
   return u ? digits(u.mobile) : '';
 };
 
-/* Masked or missing numbers never name a bucket, because masks and blanks collide. */
 const mobileKey = (prefix, mobile) =>
   isFullMobile(mobile) ? prefix + digits(mobile) : null;
 
@@ -65,7 +61,6 @@ export const isOwnerViewer = (ownerMobile) => {
   return isFullMobile(m) && isFullMobile(ownerMobile) && m === digits(ownerMobile);
 };
 
-/* Verification grants a privilege, so sessions without a full mobile fail closed. */
 function isViewerVerified(u) {
   const key = mobileKey('draazyIdentity:', u && u.mobile);
   if (!key) return false;
@@ -89,7 +84,6 @@ function findContactReq(ownerMobile, propId) {
   );
 }
 
-/* → 'owner' | 'approved' | 'pending' | 'declined' | 'none' */
 export function contactStatus(ownerMobile, propId) {
   if (isOwnerViewer(ownerMobile)) return 'owner';
   const r = findContactReq(ownerMobile, propId);
@@ -99,11 +93,7 @@ export function contactStatus(ownerMobile, propId) {
 export function requestContact(ownerMobile, propId) {
   const u = readUser();
   if (!u) return 'login';
-  // A masked owner number cannot address a bucket, so refuse with a distinct code rather than
-  // faking a sent request.
   if (!isFullMobile(ownerMobile)) return 'unavailable';
-  // Badge-not-gate (ADR-019): contact is L1-only, except where the owner accepts verified
-  // contacts only — an unverified requester is then asked to earn the badge first.
   if (ownerVerifiedOnly(ownerMobile) && !isViewerVerified(u)) return 'verification_required';
   const existing = findContactReq(ownerMobile, propId);
   if (existing) return existing.status;
@@ -131,7 +121,6 @@ export function setContactStatus(ownerMobile, reqId, status) {
 export const pendingContactCount = (ownerMobile) =>
   getContactReqs(ownerMobile).filter((x) => x.status === 'pending').length;
 
-/* Owners may keep phones masked after approval; buyers use chat or callbacks instead. */
 const ownerPrefsKey = (mobile) => mobileKey('dzOwnerPrefs:', mobile);
 export function getOwnerPrefsFor(mobile) {
   const key = ownerPrefsKey(mobile);
@@ -151,8 +140,5 @@ export function setOwnerPrefs(patch) {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('pn:store', { detail: { key } }));
   return next;
 }
-// True when this owner has opted to keep their number masked from approved buyers.
 export const ownerHidesNumber = (mobile) => !!getOwnerPrefsFor(mobile).hideNumber;
-// True when this owner accepts contact requests ONLY from Verified-badge users.
-// This is the sole path that can turn a contact request into 'verification_required'.
 export const ownerVerifiedOnly = (mobile) => !!getOwnerPrefsFor(mobile).verifiedContactOnly;

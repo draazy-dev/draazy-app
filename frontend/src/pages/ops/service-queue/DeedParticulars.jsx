@@ -27,7 +27,6 @@ const depositPayments = (rows, deposit) => {
     [text(p.bank), text(p.branch)].filter(Boolean).join(', '),
   ].filter(Boolean).join(' · '));
   const paid = list(rows).reduce((sum, p) => sum + (Number(text(p.amount)) || 0), 0);
-  // An amendment can change the deposit after these were filed.
   if (lines.length && paid !== (Number(text(deposit)) || 0)) lines.push(`Adds up to ${inr(paid)}, not the deposit — confirm with the customer`);
   return lines.join('\n');
 };
@@ -66,7 +65,6 @@ const group = (key, kind, title, rows, name = '') => ({
   rows: rows.map(([label, value]) => [label, text(value)]).filter(([, value]) => value),
 });
 
-/** The wizard snapshot as cards. Party keys match the checklist's paper prefixes (`licensor-0`, `tenant-0`). */
 export function deedGroups(details) {
   const state = obj(obj(details)._state);
   const prop = obj(state.prop);

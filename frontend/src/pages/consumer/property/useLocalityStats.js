@@ -17,7 +17,6 @@ const fetchLocality = (slug) => {
   return inflight.get(slug);
 };
 
-/** The property's locality from GET /localities/{slug} (listing-derived figures), or null until it loads / if unknown. */
 export function useLocalityStats(p) {
   const slug = localitySlugOf(p);
   const [state, setState] = useState({ slug: '', loc: null });

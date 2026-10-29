@@ -22,8 +22,6 @@ import ReviewsTab from './reports/ReviewsTab.jsx';
 
 const fmtDate = (ms) => (ms ? new Date(ms).toLocaleDateString('en-IN') : '—');
 
-/** `resolved` is omitted: it equals `dismissed` server-side, so
- * filtering on it would offer a state no report can be in. */
 const STATUS_OPTS = [
   { value: '', label: 'All statuses' },
   { value: 'open', label: 'Open' },
@@ -32,16 +30,12 @@ const STATUS_OPTS = [
   { value: 'dismissed', label: 'Dismissed' },
 ];
 
-/** Derived from the arrays ReportModal offers so the filter can't
- * drift; keyed by tab as reasons are valid per target type. */
 const REASON_OPTS = {
   listings: [{ value: '', label: 'All reasons' }, ...LISTING_REPORT_REASONS.map(([value, label]) => ({ value, label }))],
   users: [{ value: '', label: 'All reasons' }, ...OWNER_REPORT_REASONS.map(([value, label]) => ({ value, label }))],
   posts: [{ value: '', label: 'All reasons' }, ...SHARE_REPORT_REASONS.map(([value, label]) => ({ value, label }))],
 };
 
-/** Which `kind` each tab owns; a kind missing here renders in no tab. `review` is absent on purpose:
- * reviews are moderated through `PATCH /reviews/{id}/status`. */
 const TAB_KIND = {
   listings: ['listing'],
   users: ['user'],
@@ -92,8 +86,6 @@ export default function AdminReports() {
   const [selected, setSelected] = useState(new Set());
   const countsFor = useRef('');
 
-  /** Derived, not an effect: an effect leaves a frame with a
-   * stale reason; `reasonF` is kept so returning restores it. */
   const reasonOpts = REASON_OPTS[tab] || REASON_OPTS.listings;
   const activeReason = reasonOpts.some((o) => o.value === reasonF) ? reasonF : '';
 
@@ -105,7 +97,6 @@ export default function AdminReports() {
   const filterKey = `${tab}|${statusF}|${activeReason}|${dateRange}|${search}`;
   const pageNo = pageState.key === filterKey ? pageState.page : 1;
 
-  // One page per read; the tab and status totals ride along only on first load, tab change and after a decision.
   useEffect(() => {
     if (tab === 'reviews') return undefined;
     let alive = true;
@@ -132,8 +123,6 @@ export default function AdminReports() {
     return () => { alive = false; };
   }, [searchParams, canSeeReports]);
 
-  /** `enforcement` is the machine verb the server executes; never infer
-   * it from the human `actionTaken` label, which gets reworded. */
   const act = async (id, status, actionTaken, enforcement) => {
     const note = window.prompt('Internal note (optional):');
     let updated;
@@ -143,8 +132,6 @@ export default function AdminReports() {
       toast('That decision could not be saved. Please reload the queue.', 'error');
       return;
     }
-    // No client audit/note: ReportService.triage writes the audit row; the server's `status` is authoritative
-    // (`resolved` stores as `dismissed`).
     const saved = updated?.status || status;
     const resolveAction = (existing) => (status === 'open' ? '' : (actionTaken || existing));
     setData((prev) => ({ ...prev, items: prev.items.map((r) => r.id === id ? { ...r, status: saved, actionTaken: resolveAction(r.actionTaken), handledAt: Date.now() } : r) }));
@@ -153,8 +140,6 @@ export default function AdminReports() {
     toast(actionTaken || (status === 'open' ? 'Reopened' : saved));
   };
 
-  /** No bulk endpoint, so N requests: `allSettled` so one
-   * refusal doesn't abandon the rest, then a single re-read.  */
   const bulkTriage = async (status, actionTaken, confirmMsg, doneMsg) => {
     if (!selected.size) return;
     if (!window.confirm(confirmMsg)) return;
@@ -225,14 +210,12 @@ export default function AdminReports() {
       {inTab(r, 'listings')
         ? <button type="button" onClick={() => act(r.id, 'actioned', 'Listing taken down', 'hide_content')} className={BTN.danger}><Ban className="h-3.5 w-3.5" />Take down</button>
         : inTab(r, 'posts')
-          /* `hide_content`, not `suspend_account`: a post is content, and suspending its author is heavier. */
           ? <button type="button" onClick={() => act(r.id, 'actioned', 'Post taken down', 'hide_content')} className={BTN.danger}><Ban className="h-3.5 w-3.5" />Take down</button>
           : <button type="button" onClick={() => act(r.id, 'actioned', 'User suspended', 'suspend_account')} className={BTN.danger}><Ban className="h-3.5 w-3.5" />Suspend</button>}
       <button type="button" onClick={() => act(r.id, 'resolved', 'Reviewed, no action needed')} className="dz-btn dz-btn-primary dz-btn-sm"><CheckCircle2 className="h-3.5 w-3.5" />Resolve</button>
       <button type="button" onClick={() => act(r.id, 'dismissed')} className="dz-btn dz-btn-ghost dz-btn-sm"><XCircle className="h-3.5 w-3.5" />Dismiss</button>
     </>
   ) : (
-    /* No Reopen: a decided report is terminal server-side; reopening would let a moderator undo a colleague. */
     <span className="py-1 text-xs text-gray-500" title="A decided report cannot be reopened — file a new one if it recurs">Decided</span>
   ));
 
@@ -276,7 +259,6 @@ export default function AdminReports() {
                 <span className="col-span-2 text-gray-300 md:col-span-4">{r.details}</span>
               </FactRow>
             ) : null}
-            {/* "Withheld", not "Anonymous": the platform knows who filed this; ops is not told. */}
             <FactRow label="People">
               <Cell>{`Reporter: ${r.reportedBy || 'Withheld'}`}</Cell>
               {r.reporterMobile ? <Cell className="tabular-nums">{r.reporterMobile}</Cell> : null}
@@ -292,8 +274,6 @@ export default function AdminReports() {
   const doExport = () => exportCsv(
     `draazy-reports-${tab}.csv`,
     ['ID', 'Kind', 'Target', 'Reason', 'Reporter', 'Reported', 'Status', 'Action Taken'],
-    // Same "Withheld" as every on-screen surface. A blank cell in an exported sheet is read as
-    // missing data rather than as withheld data, which is the ambiguity the wording exists to avoid.
     rows.map((r) => [r.id, r.kind, r.targetTitle || r.targetId, r.reasonLabel, r.reportedBy || 'Withheld', fmtDate(r.at), r.status, r.actionTaken || '']),
   );
 
@@ -323,8 +303,6 @@ export default function AdminReports() {
             <>
               <SearchBox value={q} onChange={setQ} placeholder="Item, reason or note" label="Search reports" />
               <Chips label="Status" options={statusChips} value={statusF} onChange={setStatusF} />
-              {/* `searchable={false}`: `Select` turns itself into a search combobox at eight options and
-                  autofocuses the input, which on mobile summons the keyboard over eight items. */}
               <div className="w-56"><Select value={activeReason} onChange={setReasonF} options={reasonOpts} searchable={false} ariaLabel="Filter by reason" size="sm" /></div>
               <Chips label="Reported" options={DATE_CHIPS} value={dateRange} onChange={setDateRange} />
               {hasFilters ? <ClearFilters onClick={clearFilters} /> : null}

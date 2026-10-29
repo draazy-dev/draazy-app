@@ -1,8 +1,3 @@
-/* Owner Hub — shared option sets. Residential-focused (the valuation tools model
-   homes, not land/commercial). */
-
-/* The option `value` is what gets stored on a property, so it stays an English
-   id — only the label is keyed, and renaming copy can never orphan saved data. */
 export const HOME_TYPES = [
   { value: 'Flat', labelKey: 'ownerHub.typeFlat' },
   { value: 'Villa', labelKey: 'ownerHub.typeVilla' },
@@ -22,8 +17,6 @@ export const FURNISHING_OPTIONS = [
   { value: 'furnished', labelKey: 'ownerHub.furnFurnished' },
 ];
 
-/* Document category ids are stored on every uploaded document, so they stay
-   English too — look the id up here to render a translated heading. */
 export const DOC_CAT_KEYS = {
   'Title & Ownership': 'ownerHub.catTitle',
   Society: 'ownerHub.catSociety',

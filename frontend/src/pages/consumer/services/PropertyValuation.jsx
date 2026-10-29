@@ -18,8 +18,6 @@ import { useFormDraft, useFieldErrors } from '../../../lib/hooks.js';
 
 const RATES= { 'Koregaon Park': 16500, 'Kalyani Nagar': 15500, Kothrud: 13000, 'Viman Nagar': 12500, Baner: 11500, Aundh: 12000, Kharadi: 10500, Wakad: 9200, Hadapsar: 8800, Hinjawadi: 8200, Wagholi: 6800, Undri: 7200, Ravet: 7800 };
 const YOY = { 'Koregaon Park': 6.2, 'Kalyani Nagar': 6.8, Kothrud: 7.1, 'Viman Nagar': 7.5, Baner: 8.4, Aundh: 7.8, Kharadi: 9.6, Wakad: 8.9, Hadapsar: 7.2, Hinjawadi: 9.2, Wagholi: 10.1, Undri: 8.0, Ravet: 9.4 };
-// City-average fallbacks so the estimator still returns an indicative figure for
-// any Pune locality (curated or user-minted) that has no hand-tuned rate/YoY.
 const PUNE_AVG_RATE = Math.round(Object.values(RATES).reduce((a, b) => a + b, 0) / Object.values(RATES).length);
 const PUNE_AVG_YOY = +(Object.values(YOY).reduce((a, b) => a + b, 0) / Object.values(YOY).length).toFixed(1);
 const fmtShort = (n) => (n >= 1e7 ? '₹' + (n / 1e7).toFixed(2) + ' Cr' : '₹' + (n / 1e5).toFixed(1) + ' L');
@@ -87,9 +85,7 @@ export default function PropertyValuation() {
 
   const submit = (e) => {
     e.preventDefault();
-    // Instant estimate is public; the certified report requires sign-in.
     if (!isIn) { sendToSignIn('services', undefined, replay(e)); return; }
-    // A submit resumed after the sign-in sheet sees fields that were blank at mount; the account fills them.
     const name = form.name.trim() || user?.name || '';
     const mobile = form.mobile || user?.mobile || '';
     if (name !== form.name || mobile !== form.mobile) setForm((p) => ({ ...p, name, mobile }));
@@ -99,8 +95,6 @@ export default function PropertyValuation() {
       { name: 'purpose', ok: !!form.purpose, msg: tr('services.valuation.errPurpose') },
     ], toast);
     if (!ok) return;
-    /* One write, so one record of the lead — see the note in InteriorRenovation.jsx. Contact fields
-       ride in `details`, which `toCreate` passes through untouched. */
     createFlowRequest({
       type: 'valuation',
       service: 'Property Valuation',
@@ -118,8 +112,6 @@ export default function PropertyValuation() {
     setDone(true);
   };
   const scrollToForm = () => {
-    // Carry the instant-estimate inputs into the certified-report lead so the
-    // customer doesn't re-enter locality/area (fill only empty fields).
     setForm((p) => ({ ...p, location: p.location || loc, area: p.area || String(area || '') }));
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
@@ -129,8 +121,6 @@ export default function PropertyValuation() {
   return (
     <div ref={rootRef}>
       <div>
-        {/* A dark valuation-specific gradient, because the shared bright-teal --hero-gradient washes
-            the translucent estimator controls out. */}
         <section className="theme-dark relative overflow-hidden" style={{ background: 'linear-gradient(140deg,rgb(var(--dz-c-slate-950)) 0%,rgb(var(--dz-c-teal-950)) 55%,rgb(var(--dz-c-teal-900)) 100%)' }}>
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1600&q=80')" }} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(140deg,rgb(var(--dz-c-slate-950) / .93) 0%,rgb(var(--dz-c-teal-950) / .9) 55%,rgb(var(--dz-c-teal-900) / .92) 100%)' }} />

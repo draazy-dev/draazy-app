@@ -17,8 +17,6 @@ const distanceLabel = (km) => (km < 1
   ? `${Math.max(50, Math.round((km * 1000) / 50) * 50)} m`
   : `${km.toFixed(1)} km`);
 
-/** A society comes only from a Google Maps suggestion, resolved or minted server-side, never from typed text.
- * `onChange` gets the bound society, `{ notOnMaps: true, source: 'notOnMaps' }`, or `null` once typed over. */
 export default function SocietySelect({
   value, name, notOnMaps = false, allowNotOnMaps = true, onChange,
   localityLabel = '', lat = null, lng = null,
@@ -43,7 +41,6 @@ export default function SocietySelect({
   const reqRef = useRef(0);
   const listId = useId();
 
-  // Any user action that supersedes an in-flight pick makes its late answer stale.
   const cancel = useCallback(() => { reqRef.current += 1; setBusy(false); }, []);
 
   useEffect(() => {
@@ -60,7 +57,6 @@ export default function SocietySelect({
         includedPrimaryTypes: GOOGLE_TYPES,
         ...(lat != null && lng != null ? { locationBias: { center: { lat: Number(lat), lng: Number(lng) }, radius: GOOGLE_BIAS_RADIUS_M } } : {}),
       });
-      // Google down or empty: offer societies an owner already picked from Google, never older seeded rows.
       const saved = out.some((g) => g.mainText) ? [] : await searchSocieties(q, localityLabel, { mapped: true }).catch(() => []);
       if (alive) { setGoogleRaw(out); setSavedRaw(saved); }
     }, 250);
@@ -68,7 +64,6 @@ export default function SocietySelect({
   }, [query, open, pending, lat, lng, localityLabel]);
   const google = useMemo(() => googleRaw.filter((g) => g.mainText).slice(0, GOOGLE_LIMIT), [googleRaw]);
   const saved = useMemo(() => savedRaw.slice(0, GOOGLE_LIMIT), [savedRaw]);
-  // "Not on Google Maps" is an answer to a search that came up short, so it waits for typed text.
   const typed = query.trim() !== '';
   const offerNotOnMaps = allowNotOnMaps && typed;
   const menuOpen = open && (!!pending || google.length > 0 || typed);
@@ -218,7 +213,6 @@ export default function SocietySelect({
     else if (e.key === 'Escape') { cancel(); setOpen(false); setPending(null); }
   };
 
-  // Returning to the box while still signed out means the sign-in was dismissed: drop the stalled pick.
   const onFocus = () => {
     focusedRef.current = true;
     if (!user && awaitingRef.current) { awaitingRef.current = null; setQuery(name || ''); }

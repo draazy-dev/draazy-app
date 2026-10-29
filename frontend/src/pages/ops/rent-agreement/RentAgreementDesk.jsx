@@ -31,13 +31,11 @@ export default function RentAgreementDesk() {
     setPage(1);
   }
 
-  // `null` on failure, so a tab count is omitted rather than reading "0".
   const [summary, setSummary] = useState(null);
   const tickets = useDeskTickets(summary?.openTickets);
   const summarySeq = useRef(0);
   const summaryKey = useRef('');
   const [reloadToken, setReloadToken] = useState(0);
-  // A poll re-reads the list only when the summary moved; a user-driven load always does.
   const loadSummary = useCallback((polling = false) => {
     const seq = ++summarySeq.current;
     getServiceRequestQueueSummary('rental').then((value) => {
@@ -65,7 +63,6 @@ export default function RentAgreementDesk() {
   const total = queue.page?.total ?? 0;
   const pageCount = Math.ceil(total / PAGE_SIZE);
 
-  // A desk left open still escalates rows to overdue, but a hidden tab polls nothing.
   useEffect(() => {
     const poll = () => { if (!document.hidden) loadSummary(true); };
     const t = setInterval(poll, 60_000);
@@ -73,7 +70,6 @@ export default function RentAgreementDesk() {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', poll); };
   }, [loadSummary]);
 
-  // The open case is held as an object: taking it can move it off this tab, and the modal must stay put.
   const [open, setOpen] = useState(null);
   const close = useCallback(() => setOpen(null), []);
   const openIndex = rows.findIndex((r) => r.id === open?.id);

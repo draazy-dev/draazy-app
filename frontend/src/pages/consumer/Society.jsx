@@ -36,16 +36,12 @@ export default function Society() {
   const head = socLoading || loadError ? {} : societyHead(soc);
   usePageHead({ title: head.title, description: head.description, path: `/society/${soc.slug}`, noindex: Boolean(soc._generic || head.thin) });
 
-  /* The page URL is the whole share payload (family discussing
-     a flat), so there is no deep-link contract to invent. */
   const shareSociety = async () => {
     const status = await shareOrCopy({ title: soc.name });
     if (status === 'copied') toast(t('property.shareCopied'), 'success');
     if (status === 'failed') toast(t('property.shareCopyFail'), 'error');
   };
 
-  /* Same skeleton as the route's Suspense: until the seam read settles the page could only draw a generic
-     not-found society, so the two waits are made to look like one. */
   if (socLoading) return <SocietySkeleton />;
   if (loadError) {
     return (
@@ -71,13 +67,9 @@ export default function Society() {
         <section className="theme-dark rounded-3xl overflow-hidden relative mb-6 glass reveal">
           <img src={hero} alt={soc.name} className="w-full h-56 sm:h-72 object-cover" />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,rgb(var(--dz-c-ink) / .1),rgb(var(--dz-c-ink) / .88))' }} />
-          {/* !h-11 below sm: these float over the hero photo so a taller pill
-              reflows nothing; 36px from sm up, where pills read as chips. */}
           <div className="absolute top-4 right-4 flex gap-2">
             {soc._generic ? null : <button onClick={onFollow} className={(followed ? 'btn-teal' : 'btn-outline') + ' !h-11 sm:!h-9 !px-3 text-sm'}><Icon name={followed ? 'check' : 'bell'} className="w-4 h-4 mr-1.5" /> {followed ? t('society.following') : t('society.follow')}</button>}
             {soc._generic ? null : <button onClick={toggleComposer} className="btn-outline !h-11 sm:!h-9 !px-3 text-sm"><Icon name={myReview ? 'pencil' : 'star'} className="w-4 h-4 mr-1.5" /> {t(myReview ? 'common.editReview' : 'society.review')}</button>}
-            {/* Label collapses below sm (three pills overflow 360px); aria-label
-                names it, and min-width stands in for the missing text width. */}
             <button onClick={shareSociety} aria-label={t('society.share')} className="btn-outline !h-11 sm:!h-9 !px-3 !min-w-[44px] sm:!min-w-0 justify-center text-sm"><Icon name="share-network" className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">{t('society.share')}</span></button>
           </div>
           <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8">
@@ -88,8 +80,6 @@ export default function Society() {
             <p className="text-gray-300 mt-1 flex items-center gap-3 flex-wrap">
               {soc.builder ? <span className="flex items-center gap-1.5"><Icon name="hard-hat" className="w-4 h-4 text-teal-400" /> {soc.builder}</span> : null}
               <span className="flex items-center gap-1.5"><Icon name="map-pin" className="w-4 h-4 text-teal-400" /> {locName}, Pune</span>
-              {/* Stays blank until the summary read settles: the hero star strip is the most quotable number and
-                  must not assert one it may contradict. */}
               {rating.loading ? (
                 <span className="skeleton inline-block h-4 w-24 rounded" aria-hidden="true" />
               ) : rating.failed ? (
@@ -110,8 +100,6 @@ export default function Society() {
               <StarInput value={pick} onChange={setPick} size={22} />
             </div>
             <textarea value={revText} onChange={(e) => setRevText(e.target.value)} rows={3} placeholder={t('society.reviewPlaceholder')} className={inp} />
-            {/* An untouched row sends no key, so 'did not rate' is absent rather than a 1 dragging the
-                average down. */}
             <div className="mt-3">
               <p className="text-sm font-medium text-gray-300 mb-2">{t('society.rateByCategory')}</p>
               <div className="space-y-2">

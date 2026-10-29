@@ -14,11 +14,8 @@ import { generateSingle } from '../../../lib/rentReceipt.js';
 import AmountInput from '../flatmates/AmountInput.jsx';
 import { FIELD_CLS } from './constants.js';
 
-// Shared by the fetch window and the row window: fetching fewer receipts than rows shows a settled month as unpaid.
 const LEDGER_MONTHS = 6;
-// Must match ManagedProperty.MAX_MONTHLY_RENT on the server.
 const MAX_RENT = 10_000_000;
-// 29–31 never fall due in February.
 const DUE_DAYS = Array.from({ length: 28 }, (_, i) => String(i + 1));
 const invalid = (err) => (err ? ' dz-invalid' : '');
 const blankForm = (prop) => ({
@@ -28,8 +25,6 @@ const blankForm = (prop) => ({
   dueDay: String(prop.dueDay || 5),
 });
 
-// Settled months are a server fact; every figure comes off the returned receipt, never off `prop`.
-// Gateway payments are webhook-controlled, so nothing here asserts them.
 export default function RentPanel({ prop, onChange }) {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
@@ -47,22 +42,16 @@ export default function RentPanel({ prop, onChange }) {
     monthlyRent: (v) => (!(Number(v) > 0) ? t('ownerHub.errRent') : Number(v) > MAX_RENT ? t('ownerHub.errRentMax') : ''),
   };
   const check = (k, v = form[k]) => setErrors((e) => ({ ...e, [k]: checks[k](v) }));
-  // An invalid field re-checks as it is corrected, so the message clears the moment it is fixed.
   const set = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }));
     if (errors[k]) check(k, v);
   };
 
-  // `null` while the first read is in flight, so a settled month never flashes a "Mark received" button.
   const [receipts, setReceipts] = useState(null);
   const [failed, setFailed] = useState(false);
   const [busyMonth, setBusyMonth] = useState('');
-  // Re-armed in the effect body, not only cleared in cleanup: under StrictMode a mount/cleanup/
-  // re-mount would otherwise leave this false forever and silently swallow every state update.
   const alive = useRef(true);
-  // Re-entrancy guard: `busyMonth` is state, so a second handler in the same render still reads the old value.
   const busyRef = useRef('');
-  // Kept out of `load`'s deps so a language toggle doesn't blank the ledger and refetch.
   const tRef = useRef(t);
   tRef.current = t;
 
@@ -78,7 +67,6 @@ export default function RentPanel({ prop, onChange }) {
         setFailed(false);
       }
     } catch {
-      // Stay on the read-only pending shape so settled months never look unpaid; `failed` offers a retry.
       if (alive.current) {
         setFailed(true);
         toast(tRef.current('ownerHub.rentReceiptsFailed'), 'error');
@@ -117,7 +105,6 @@ export default function RentPanel({ prop, onChange }) {
       onChange?.();
       toast(wasTracking ? t('ownerHub.rentDetailsSaved') : t('ownerHub.trackingOn'), 'success');
     } catch (e) {
-      // 422 carries the server's own words: it names the field it refused.
       toast((e?.status === 422 && e.message) || t('ownerHub.saveFailed'), 'error');
     } finally {
       setSaving(false);
@@ -162,12 +149,9 @@ export default function RentPanel({ prop, onChange }) {
       toast(t('ownerHub.rentRecorded'), 'success');
     } catch (e) {
       if (e?.status === 409) {
-        // Already recorded — somewhere else, or a double press. Our view is the stale thing, so
-        // converge on the server's rather than report a failure the owner cannot act on.
         await load();
         toast(t('ownerHub.rentAlreadyRecorded'), 'info');
       } else if (e?.status === 422) {
-        // The server's own words: it knows which of rent, tenant or tracking is missing.
         toast(e.message || t('ownerHub.setRentFirst'), 'error');
       } else {
         toast(t('ownerHub.rentRecordFailed'), 'error');
@@ -178,7 +162,6 @@ export default function RentPanel({ prop, onChange }) {
     }
   };
 
-  // Printed from the receipt, not `prop`, so figures match the month; `txnRef` is the server's stable receipt id.
   const download = (r) => generateSingle({
     tenant: r.tenantName || t('ownerHub.tenant'),
     landlord: r.landlordName || t('ownerHub.landlord'),
@@ -248,7 +231,6 @@ export default function RentPanel({ prop, onChange }) {
     );
   }
 
-  // While pending (or failed) rows stay read-only rather than "unpaid", so no button earns a 409.
   const pending = receipts === null;
   const s = currentDueStatus(prop, i18n.language);
   const thisMonth = byMonth.get(s.ym) || null;
@@ -266,8 +248,6 @@ export default function RentPanel({ prop, onChange }) {
         <p className="text-2xl font-extrabold text-white leading-tight mt-0.5">{rentStr(thisMonth ? thisMonth.amount : prop.monthlyRent)}</p>
         <p className={'text-xs font-medium mt-1 flex items-center gap-1 ' + (paid ? 'text-emerald-300' : pending ? 'text-gray-400' : s.overdue ? 'text-rose-300' : 'text-amber-300')}>
           <Icon name={paid ? 'check-circle' : s.overdue && !pending ? 'alert-circle' : 'clock'} className="w-3.5 h-3.5" />
-          {/* `overdue` asserts that nothing was paid, so it waits for the read; `dueBy` states when
-              the month falls due, which is true either way and needs no such guard. */}
           {paid ? t('ownerHub.receivedThisMonth') : s.overdue && !pending ? t('ownerHub.overdueOn', { day: s.dueDay }) : t('ownerHub.dueBy', { day: s.dueDay })}
         </p>
         {!paid && (
@@ -298,7 +278,6 @@ export default function RentPanel({ prop, onChange }) {
               {r ? (
                 <span className="flex items-center gap-3">
                   <span className="text-emerald-300 text-xs flex items-center gap-1"><Icon name="check-circle" className="w-3.5 h-3.5" /> {rentStr(r.amount)}</span>
-                  {/* The month in the label keeps six rows' accessible names distinct. */}
                   <button onClick={() => download(r)} aria-label={t('ownerHub.receiptFor', { month: m.label })} className="text-brand-teal-3 text-xs hover:underline flex items-center gap-1"><Icon name="download" className="w-3.5 h-3.5" /> {t('ownerHub.receipt')}</button>
                 </span>
               ) : (

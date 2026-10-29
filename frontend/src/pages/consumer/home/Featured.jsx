@@ -20,14 +20,12 @@ const specs = (p) => {
   return out.slice(0, 3);
 };
 
-// The API sends a card its first five photos; the cover leads so the tile opens on the same frame as before.
 const MAX_CARD_PHOTOS = 5;
 const cardPhotos = (p) => {
   const photos = [...new Set([p.image || p.img, ...(p.gallery || [])].filter(Boolean))].slice(0, MAX_CARD_PHOTOS);
   return photos.length ? photos : [''];
 };
 
-/* Guests are sent to sign-in; members toggle the saved store that the navbar heart-count reads. */
 function FeaturedCard({ p, priority = false }) {
   const { t } = useTranslation();
   const { isIn } = useAuth();
@@ -53,8 +51,6 @@ function FeaturedCard({ p, priority = false }) {
   return (
     <Link to={propertyHref(p)} className="property-card list-reveal glass rounded-2xl overflow-hidden group cursor-pointer flex flex-col">
       <div className="card-img-wrap relative overflow-hidden" style={{ aspectRatio: '16/10' }}>
-        {/* Swipeable on a phone only, like the property gallery; above sm the tile shows its cover. Each slide clips
-            its own photo so the hover zoom cannot spill the next one into view. */}
         <div onScroll={onSwipe} className="no-scrollbar flex w-full h-full overflow-x-auto overflow-y-hidden sm:overflow-hidden overscroll-x-contain snap-x snap-mandatory">
           {photos.map((src, i) => (
             <div key={src || i} className="snap-start snap-always shrink-0 w-full h-full overflow-hidden">
@@ -72,7 +68,6 @@ function FeaturedCard({ p, priority = false }) {
             </div>
           ))}
         </div>
-        {/* Overlays let touches through, or a swipe starting on them would not reach the scroller. */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
         <div className="pointer-events-none absolute top-3 left-3 flex gap-1.5">
           {(p.ownerVerified || p.ownershipVerified) && (
@@ -81,8 +76,6 @@ function FeaturedCard({ p, priority = false }) {
             </span>
           )}
         </div>
-        {/* .tap-extend adds a transparent 44px hit area (WCAG 2.5.8). Never pair it with
-            .tap-target — they set the same property and .tap-target wins by order. */}
         <button
           className="tap-extend heart-on-photo absolute top-3 right-3 w-9 h-9 flex items-center justify-center transition-all"
           onClick={handleSave}
@@ -120,13 +113,10 @@ function FeaturedCard({ p, priority = false }) {
   );
 }
 
-/* Featured is a paid promotion slot: promoted listings come first, padded with fresh approved stock. */
 export default function Featured({ navigate }) {
   const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  // Verified-supply social proof counted by whoever holds the catalogue, since an exact client-side
-  // count is unavailable against a paginated API. Best-effort: a failure just hides the line.
   const [vstats, setVstats] = useState(null);
 
   useEffect(() => {
@@ -136,16 +126,12 @@ export default function Featured({ navigate }) {
       .catch(() => { if (alive) setLoading(false); });
     trustStats()
       .then((s) => { if (alive && s && s.verifiedListings > 0) setVstats(s); })
-      .catch(() => { /* the rail stands on its own without the proof line */ });
+      .catch(() => { });
     return () => { alive = false; };
   }, []);
 
-  // Once the fetch settles with no promoted/approved stock there is nothing to
-  // feature — drop the whole rail rather than show an empty heading.
   if (!loading && !items.length) return null;
 
-  // Inventory proof belongs beside the stock it describes on a phone. One node in two
-  // mutually-exclusive positions, so the accessibility tree never sees a duplicate.
   const verifiedProof = vstats && (
     <>
       <Icon name="shield-check" className="w-4 h-4" />
@@ -159,8 +145,6 @@ export default function Featured({ navigate }) {
         <div className="section-head flex items-end justify-between sm:mb-8 list-reveal">
           <div>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold sm:mb-2">{t('home.featured.title')}</h2>
-            {/* The subtitle repeats what the rail below it already shows; on a
-                phone that costs a line of the fold for nothing. Restored at lg. */}
             <p className="hidden lg:block text-gray-400 text-sm sm:text-base">{t('home.featured.subtitle')}</p>
             {vstats && (
               <p className="hidden sm:inline-flex mt-2 items-center gap-1.5 text-xs sm:text-sm font-medium text-emerald-300/90">
@@ -173,7 +157,6 @@ export default function Featured({ navigate }) {
           </button>
         </div>
 
-        {/* The negative offset pulls the line out of the section header gap so it reads as a rail caption. */}
         {vstats && (
           <p className="sm:hidden flex w-fit -mt-3 mb-2 items-center gap-1.5 text-xs font-medium text-emerald-300/90">
             {verifiedProof}
@@ -182,9 +165,7 @@ export default function Featured({ navigate }) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading
-            ? /* Two placeholders on a phone, six from sm up. This rail is the first
-                 thing above the mobile fold now, and six stacked grey cards read as
-                 a broken page rather than as loading. */
+            ?
               Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className={'glass rounded-2xl overflow-hidden' + (i >= 2 ? ' hidden sm:block' : '')} aria-hidden="true">
                   <div className="skeleton" style={{ aspectRatio: '16/10' }} />
@@ -195,13 +176,10 @@ export default function Featured({ navigate }) {
                   </div>
                 </div>
               ))
-            : /* The first card is above the fold on mobile, so it must not be
-                 lazy — that would defer the one image the first impression rests on. */
+            :
               items.map((p, i) => <FeaturedCard key={p.id} p={p} priority={i === 0} />)}
         </div>
 
-        {/* Mobile keeps an in-section path to the full catalogue (the header
-           "View All" is desktop-only to avoid crowding the heading row). */}
         {!loading && (
           <button
             onClick={() => navigate('/listings')}

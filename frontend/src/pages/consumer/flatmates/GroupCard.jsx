@@ -13,7 +13,6 @@ export function GroupJoinButton({ g, onJoin }) {
 
 const groupMatch = (g, myPost) => matchFor({ localities: groupLocalities(g), budget: shareFloor(g) || perHead(g), budgetMax: perHead(g), gender: g.policy === 'women' ? 'female' : g.policy === 'men' ? 'male' : 'any' }, myPost);
 
-/** [label, icon, tip] for each proof this group carries, strongest first. */
 export function groupTrust(g, t) {
   const tier = showHostBadge(g, g.reviewStatus) && hostTierMeta(g);
   return [
@@ -40,7 +39,6 @@ export function GroupBadges({ g, reviewStatus, myPost, owned }) {
 
 const METER_MAX = 6;
 
-/* Filled circles are people already in, dashed ones the open seats — the group's size and gap read in one glance. */
 function SeatMeter({ g }) {
   const { t: tr } = useTranslation();
   const left = seatsLeft(g);

@@ -13,7 +13,6 @@ export function computeEmi(principal, annualRate, years) {
 const fmt = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
 const fmtShort = (n) => (n >= 1e7 ? '₹' + (n / 1e7).toFixed(2) + ' Cr' : '₹' + (n / 1e5).toFixed(1) + ' L');
 
-// Module-level for stable identity: a Row defined inside the component would remount the range input mid-drag.
 const Row = ({ label, value, min, max, step, onChange, val }) => (
   <div>
     <div className="flex items-center justify-between mb-2">

@@ -18,13 +18,10 @@ export default function Modal({ open, onClose, title, children, footer, size = '
 
   const width = { sm: 'max-w-sm', lg: 'max-w-2xl', xl: 'max-w-6xl' }[size] || 'max-w-lg';
   const closeLabel = title ? t('common.closeTitle', { title }) : t('common.close');
-  // Below 640px the dialog is a floating card above the bottom nav, and `z-[1550]` places it in the app's
-  // floating-chrome band — see docs/system/design-system.md § Floating cards.
 
   return createPortal(
     <div className="fixed inset-0 z-[1550] flex items-end justify-center px-[var(--dz-float-edge)] pt-[var(--dz-float-top)] pb-[var(--dz-float-bottom)] sm:items-center sm:p-4">
       <div className="dz-float-scrim absolute inset-0 sm:bg-black/75 sm:backdrop-blur-md" onClick={onClose} />
-      {/* Escape and the close button remain the accessible ways out; the drag is additive. */}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
         ref={panelRef}
@@ -40,7 +37,6 @@ export default function Modal({ open, onClose, title, children, footer, size = '
           width,
         )}
       >
-        {/* `bare`: the body draws its own heading, so only the close button floats over it. */}
         {bare ? (
           <button onClick={onClose} aria-label={closeLabel} className="tap-target absolute right-2 top-2 z-10 inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition sm:right-3 sm:top-3 sm:min-h-0 sm:min-w-0 sm:p-1.5">
             <X className="h-5 w-5" />

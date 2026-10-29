@@ -8,7 +8,6 @@ const KIND_LABEL = {
   offer: 'Price offer',
 };
 
-/** Kinds that connect two people, so they also show as a request thread in Messages. */
 export const CONNECTION_KINDS = new Set(['contact', 'flatmate', 'group', 'visit', 'offer']);
 
 const ACCEPTED_LABEL = { contact: 'Approved', visit: 'Confirmed', document: 'Granted', offer: 'Agreed' };
@@ -36,12 +35,10 @@ export const requestKey = (item) => `${item.kind}:${item.id}`;
 
 const SHARE_LABEL = { bring: 'Coming as 2', match: 'Wants a room-sharer' };
 
-/** Only the non-default intents are worth a tag: `bring` fills two places on accept. */
 export const shareLabel = (share) => SHARE_LABEL[share] || '';
 
 export const threadId = (item) => `request:${requestKey(item)}`;
 
-// Must match the keys the old leads panel minted, or existing notes disappear from their rows.
 const LEAD_KEY = {
   contact: (item) => `number:${item.id}`,
   photo: (item) => `photo:${item.id}`,
@@ -54,7 +51,6 @@ export const leadKey = (item) => LEAD_KEY[item.kind]?.(item) || requestKey(item)
 
 export const isPending = (item) => item.state === 'pending';
 
-/** A seeker asking into a flatmate group; `kind: 'group'` is a group applying to a listing. */
 export const isGroupJoin = (item) => item.kind === 'flatmate' && item.target?.type === 'group';
 
 export const stateLabel = (item) => (item.state === 'accepted' && ACCEPTED_LABEL[item.kind]) || STATE_LABEL[item.state] || item.state;
@@ -80,7 +76,6 @@ export const messageOf = (item) => item.message || (DEFAULT_MESSAGE[item.kind] |
 
 export const initialsOf = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || '?';
 
-/** `null` hides the control; `{ enabled: false, label }` shows the wait. */
 export function remindState(item, now) {
   const next = item.reminders?.nextAt ? Date.parse(item.reminders.nextAt) : NaN;
   if (!isPending(item) || Number.isNaN(next)) return null;
@@ -91,7 +86,6 @@ export function remindState(item, now) {
   return { enabled: false, label: hours < 24 ? `Remind in ${hours}h` : 'Remind tomorrow' };
 }
 
-/** The slug or id a target link ends in, for matching staged chats keyed by slug. */
 export const targetSlug = (item) => String(item.target?.link || '').split('?')[0].split('/').filter(Boolean).at(-1) || '';
 
 export function withdrawCopy(item) {

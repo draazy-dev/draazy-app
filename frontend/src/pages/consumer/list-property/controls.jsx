@@ -18,8 +18,6 @@ export const Pill = ({ selected, onClick, children, className = '', dataErr, ari
 
 export { default as FieldError } from '../../../components/ui/FieldError.jsx';
 
-// One row of equal-width answers, so a 2–4 option question never wraps or hides behind a dropdown on a phone.
-// `fit` sizes tiles to their text instead, for one long label ("Semi-Furnished") that would wrap in a third.
 export const PillRow = ({ options, value, onChange, label, cols = 'grid-cols-2', fit = false, role = 'button', dataErr, invalid = false }) => (
   <div
     role={role === 'radio' ? 'radiogroup' : 'group'}

@@ -9,7 +9,6 @@ const GROUP_ONLY = { men: 'male', women: 'female' };
 
 export const restrictedGender = (item, kind) => (kind === 'group' ? GROUP_ONLY[item?.policy] : ROOM_ONLY[item?.gender]) || null;
 
-/** Resolves `{ gender }` to send with the request, or `null` when the request must not go out. */
 export function useGenderGate() {
   const { t } = useTranslation();
   const { toast } = useToast();

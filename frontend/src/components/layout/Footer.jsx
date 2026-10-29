@@ -20,7 +20,6 @@ const Soc = ({ k, label, href, hover }) => (
     </svg>
   </a>
 );
-/* A footer column that collapses on phones (tap the heading) but stays open from sm: upward. */
 
 const FooterCol = ({ title, children }) => {
   const [open, setOpen] = useState(false);
@@ -48,8 +47,6 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-0 sm:gap-10 lg:gap-8 mb-0 sm:mb-12">
-          {/* Column 1 — brand + social */}
-
           <div className="sm:col-span-2 lg:col-span-1 pb-6 sm:pb-0">
             <Link to="/" className="tap-target sm:min-h-0 sm:min-w-0 inline-flex items-center gap-2.5 mb-4">
               <LogoMark className="w-9 h-9 shrink-0 text-teal-400" />
@@ -66,8 +63,6 @@ export default function Footer() {
               <Soc k="youtube" label="Draazy on YouTube" href="https://www.youtube.com/@draazy-x1u" hover="hover:bg-orange-500/10 hover:text-orange-400" />
             </div>
           </div>
-          {/* Column 2 — Explore links */}
-
           <FooterCol title="Explore">
             <ul className="space-y-3">
               {[
@@ -89,8 +84,6 @@ export default function Footer() {
               ))}
             </ul>
           </FooterCol>
-          {/* Column 3 — Company links */}
-
           <FooterCol title="Company">
             <ul className="space-y-3">
               {[
@@ -123,8 +116,6 @@ export default function Footer() {
               </li>
             </ul>
           </FooterCol>
-          {/* Column 4 — Contact */}
-
           <FooterCol title="Contact">
             <address className="not-italic space-y-3">
               <a href={SUPPORT_TEL} className="flex items-center gap-2.5 group">
@@ -149,10 +140,7 @@ export default function Footer() {
           </FooterCol>
 
         </div>
-        {/* ── Bottom bar ── */}
-
         <div className="border-t border-white/5 pt-5 sm:pt-7 flex flex-col sm:flex-row items-center justify-between gap-3">
-          {/* Standalone links in a row, not prose — so they carry the 44px floor on phones. */}
           <p className="text-xs text-gray-600 order-2 sm:order-1">© 2026 Draazy. All rights reserved. Made with care in Pune.</p>
           <nav className="flex items-center gap-5 order-1 sm:order-2" aria-label="Legal links">
             {[['Privacy', '/privacy'], ['Terms', '/terms']].map(([label, to]) => (

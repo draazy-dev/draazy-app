@@ -5,7 +5,6 @@ import Modal from '../../ui/Modal.jsx';
 import FieldError from '../../ui/FieldError.jsx';
 import { onlyDigits, grpINR } from './helpers.jsx';
 
-// Add transaction — modal on every viewport (bottom-sheet feel on mobile)
 export default function AddTransactionModal({ open, onClose, txForm, setTxForm, catOpts, errors = {}, onSubmit }) {
   const { t } = useTranslation();
   return (

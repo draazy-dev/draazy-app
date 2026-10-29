@@ -37,8 +37,6 @@ const Card = memo(function Card({ p, locName, index = 0, list = false, linkState
   const { isIn } = useAuth();
   const savedList = useSaved();
   const sendToSignIn = useSignInGate();
-  // Read from the shared set rather than per-card state: thirty cards asking the network the same
-  // question thirty times is what this context exists to prevent.
   const saved = savedList.has(p.id);
   const handleHeart = (e) => {
     e.preventDefault();
@@ -68,7 +66,6 @@ const Card = memo(function Card({ p, locName, index = 0, list = false, linkState
   let title = isPlot ? landTitle(p, t) : bhkLabel ? `${bhkLabel} ${p.type}` : p.type;
   if (p.shareType === 'flatmates') title = t('listings.titleFlatmateShared');
   const bhkChip = bhkLabel && !title.includes(bhkLabel) ? bhkLabel : '';
-  // Renters of a home pick on BHK, not square feet; shops and offices still quote area.
   const showArea = !(isRent && bhkLabel);
   const chips = [];
   if (isRent) {

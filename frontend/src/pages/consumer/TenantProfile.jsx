@@ -13,7 +13,6 @@ import { myTenantProfile, saveTenantProfile } from '../../services/rentService.j
 import { useVerification } from '../../context/VerificationContext.jsx';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
-// Mirrors @Size on TenantProfileUpdateRequest.about.
 const ABOUT_MAX = 2000;
 
 const FIELD_LABEL_KEY = {
@@ -26,7 +25,6 @@ export default function TenantProfile() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  /* Opens empty and is filled by the two effects below. */
   const { verified: badgeVerified, maskedDocument, verifiedAt, status: verificationStatus } = useVerification();
   const [form, setForm] = useState(
     { name: user?.name || '', employment: '', income: '', occupants: '', moveIn: '', priorLandlord: '', about: '', idVerified: false, kyc: null },
@@ -34,21 +32,13 @@ export default function TenantProfile() {
   const [errors, setErrors] = useState({});
   const [justSaved, setJustSaved] = useState(false);
   const [kycOpen, setKycOpen] = useState(false);
-  // A read that has not answered yet looks exactly like one that failed, so `loadError` alone would
-  // leave the writes below armed over a blank form. This flag covers the pending half.
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [saving, setSaving] = useState(false);
-  // The `saving` flip only lands on the next render, so a second click inside that gap would sail
-  // past the disabled button. The ref is the guard that closes before the paint does.
   const savingRef = useRef(false);
-  // The score belongs to the server: a tenant who could compute their own would be grading the
-  // number owners use to decide about them. Refreshed by every save.
   const [score, setScore] = useState(null);
   const nameRef = useRef(null);
-  /* `kyc` must survive the merge: the wire carries a server-owned `verified` flag but no record of what* was
-     verified, so the masked-number display is assembled from the badge instead. */
 
   useEffect(() => {
     let alive = true;
@@ -68,21 +58,15 @@ export default function TenantProfile() {
           moveIn: p.moveIn || prev.moveIn,
           priorLandlord: p.priorLandlord || prev.priorLandlord,
           about: p.about || prev.about,
-          // Server verification counts too, but never *downgrades* a local one.
           idVerified: prev.idVerified || p.verified,
         }));
-      /* A read that failed and an empty profile look identical in this form, and `PUT` replaces the whole record — so
-         one save over unread data silently deletes fields the user never saw. */
       })
       .catch((err) => { if (alive) { setLoaded(true); setLoadError(err || new Error('tenant profile load failed')); } });
     return () => { alive = false; };
   }, [reloadNonce]);
-    /* Identity is one person-level badge, mirrored into the profile rather than asked for again. */
 
   useEffect(() => {
     if (!badgeVerified) return;
-    // Read outside the updater: StrictMode double-invokes it, and a clock inside would stamp the
-    // two runs differently — an updater has to answer the same thing every time it is replayed.
     const mirrored = { type: 'identity', label: 'Verified ID', masked: maskedDocument ? `ID ending ${maskedDocument}` : 'Verified ID on file', verifiedAt: verifiedAt || Date.now() };
     setForm((prev) => (prev.idVerified && prev.kyc ? prev : {
       ...prev,
@@ -101,12 +85,9 @@ export default function TenantProfile() {
         priorLandlord: next.priorLandlord,
         about: next.about,
       });
-      // The save returns the freshly recomputed score, so the meter moves on the same round-trip
-      // that changed the fields feeding it.
       if (saved && saved.score != null) setScore(saved.score);
       return true;
     } catch (err) {
-      // `ApiError` never carries a `body`; the refused field is in `fields`.
       const first = err?.isValidation ? err.fields?.[0]?.field : null;
       const labelKey = FIELD_LABEL_KEY[first];
       toast(
@@ -122,11 +103,8 @@ export default function TenantProfile() {
   const set = (k, v) => { setForm((p) => ({ ...p, [k]: v })); setJustSaved(false); };
   const setIncome = (v) => set('income', String(v).replace(/\D/g, '').slice(0, 9));
   const s = score;
-  // Until the server answers there is no score to show. A dash reads as "not known yet"; a 0 would
-  // tell a tenant with a complete profile that they scored nothing.
   const sLabel = s == null ? '—' : `${s}%`;
   const sWidth = `${s || 0}%`;
-  /* What is still missing, and what each item is worth. */
 
   const factors = [
     { key: 'idVerified', label: t('misc.tpBoostId'), pts: 30, done: !!form.idVerified },
@@ -137,7 +115,6 @@ export default function TenantProfile() {
     { key: 'occupants', label: t('misc.tpBoostOccupants'), pts: 10, done: !!form.occupants },
   ];
   const pending = factors.filter((f) => !f.done);
-  // Rendered twice: the mobile progress header and the desktop aside show the same meter.
   const scoreBar = <div className="h-2 rounded-full bg-white/10 overflow-hidden" role="progressbar" aria-label={t('misc.tpTrustScore')} aria-valuenow={s ?? undefined} aria-valuemin={0} aria-valuemax={100}><div className="h-full rounded-full" style={{ width: sWidth, background: 'linear-gradient(90deg,rgb(var(--dz-c-teal-600)),rgb(var(--dz-c-teal-500)))' }} /></div>;
   const boostSub = pending.length ? t('misc.tpBoostSub', { count: pending.length }) : t('misc.tpBoostDone');
 
@@ -157,8 +134,6 @@ export default function TenantProfile() {
     savingRef.current = true;
     setSaving(true);
     try {
-      // Two PUTs in flight is a lost update, not a duplicate: the endpoint replaces the record, so
-      // the slower answer quietly reverts whatever the faster one wrote.
       if (!(await persist({ ...form, name: form.name.trim() }))) return;
       setJustSaved(true);
       toast(t('misc.tpProfileSaved'), 'success');
@@ -184,9 +159,6 @@ export default function TenantProfile() {
           </span>
         )}
       </div>
-      {/* Mobile-only progress header — puts the payoff and live feedback above the form so tenants see their score
-         climb as they fill each field. */}
-
       <div className="glass rounded-2xl p-4 mt-4 lg:hidden">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-semibold inline-flex items-center gap-2"><Icon name="trending-up" className="w-4 h-4 text-emerald-400" /> {t('misc.tpTrustScore')}</span>
@@ -248,9 +220,6 @@ export default function TenantProfile() {
                 : <button type="button" onClick={() => setKycOpen(true)} disabled={saving || !loaded || !!loadError} className="px-4 py-2 rounded-lg text-sm font-semibold btn-teal flex-shrink-0 disabled:opacity-60 disabled:cursor-not-allowed">{form.idVerified ? t('misc.tpReverify') : t('misc.tpVerifyNow')}</button>}
             </div>
           </div>
-          {/* Both writes are blocked while the profile is unread — failed *or* still in flight: each sends the whole
-             form, the form is empty until the read lands, and the PUT replaces the record. */}
-
           <button type="submit" disabled={saving || !loaded || !!loadError} className="btn-teal w-full py-3 rounded-xl font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"><Icon name="save" className="w-4 h-4" /> {t('misc.tpSaveProfile')}</button>
 
           {justSaved && (

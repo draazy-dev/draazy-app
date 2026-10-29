@@ -15,8 +15,6 @@ import { CHIP, Cell, FactRow, IconAction } from '../../../components/admin/WorkQ
 const RED_CHIP = classNames(CHIP, 'border-rose-400/40 bg-rose-500/15 text-rose-200');
 const GROUP = 'mt-2.5 border-t border-white/[0.06] pt-2.5';
 
-/* Which clock each queue answers to. The age is the desk's whole point: a row nobody opens
-   escalates by colour and by a text token, so the warning never rests on colour alone. */
 const WAIT = {
   verify: { at: (l) => l.resubmittedAt || l.submittedAt, warn: 24, breach: 48, verb: 'waiting' },
   recheck: { at: (l) => l.recheckRequestedAt, warn: 24, breach: 72, verb: 'waiting' },
@@ -82,7 +80,6 @@ function RowChips({ listing: l, ownerReplied, hasPhoto }) {
   );
 }
 
-// The slot keeps its height when empty so price and icons sit at the same spot on every tile.
 function PrimaryActions({ listing: l, actions }) {
   const recheck = l.recheckPending && !onlySeeksOwnershipBadge(l);
   if (l.archived) return <div className="min-h-9 max-md:hidden" />;

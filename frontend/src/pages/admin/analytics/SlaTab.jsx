@@ -1,24 +1,17 @@
 import { Link } from 'react-router';
 import { LoadFailedNotice } from './constants.jsx';
 
-/** Elapsed hours, or an explicit statement that nobody recorded them. Never `0h`. */
 const hours = (v) => (v == null ? 'not recorded' : `${Math.round(v * 10) / 10}h`);
 
-/** Nullable percentage. A dash rather than `100%`, which would claim perfect compliance. */
 const rate = (v) => (v == null ? '—' : `${v}%`);
 
-/** Target hours as the unit the desk talks in — days once a target runs past two of them. */
 const targetLabel = (h) => (h == null ? '—' : h >= 48 ? `${Math.round(h / 24)}d` : `${h}h`);
 
-/* Grey is 'no measurement', not a performance band, so the
-   null check comes first; green/red are real comparisons. */
 const avgTone = (avgHours, targetHours) => (
   avgHours == null || targetHours == null ? 'text-gray-500'
     : avgHours <= targetHours ? 'text-emerald-400'
       : 'text-rose-400');
 
-/** Derived figures are nullable and render as a dash or 'not recorded';
- * counts print zero, as 'nothing waiting' is a measurement. */
 function Track({ title, desc, track, completedLabel, outstandingLabel }) {
   if (!track) return null;
   const compliant = track.slaRatePct == null ? null : track.slaRatePct >= 90;
@@ -65,8 +58,6 @@ function Track({ title, desc, track, completedLabel, outstandingLabel }) {
   );
 }
 
-/** No weekly compliance line: it needs snapshots nothing writes. Null averages render 'not recorded', since
- * coercing to 0 would claim instant service and 0% compliance at once. */
 export default function SlaTab({ sla, failed, days, flatmates }) {
   if (failed) {
     return (
@@ -80,8 +71,6 @@ export default function SlaTab({ sla, failed, days, flatmates }) {
 
   const compliant = sla.slaRatePct == null ? null : sla.slaRatePct >= 90;
   const overdue = sla.pendingBreachingCount;
-  /* The target is served, so it can be absent: a missing one read as
-     0 would mark every listing late, so comparisons are suppressed. */
   const target = sla.targetHours;
   const withinTargetLabel = target == null ? 'Within target' : `Within ${target}h target`;
 
@@ -116,7 +105,6 @@ export default function SlaTab({ sla, failed, days, flatmates }) {
         {sla.worstPending.length === 0 ? (
           <p className="text-sm text-emerald-300">Nothing is waiting for review.</p>
         ) : (
-          // A scrollable region needs keyboard focus to be reachable without a mouse (WCAG 2.1.1).
           // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- named scroll region
           <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Longest waiting listings">
             <table className="w-full text-sm">
@@ -141,8 +129,6 @@ export default function SlaTab({ sla, failed, days, flatmates }) {
         )}
       </div>
 
-      {/* Pickup is the first assignment in the audit log, not the
-          current owner column, which forgets tickets handed back. */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Track
           title="Ticket Pickup"
@@ -176,8 +162,6 @@ export default function SlaTab({ sla, failed, days, flatmates }) {
         />
       </div>
 
-      {/* Targets are policy, not measurement — but every one of them is the number the server
-          compared against, so the table cannot drift away from the panels above it. */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <h3 className="text-sm font-semibold text-gray-300 mb-3">SLA Targets</h3>
         <div className="space-y-3">

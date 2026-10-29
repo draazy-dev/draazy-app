@@ -4,12 +4,8 @@ import { areaProfileForTypes, defaultAreaRangeSqft, formatAreaRange } from '../.
 import { SEARCH_TYPES, BUY_TYPES, RENT_TYPES } from '../../../data/propertyTypes.js';
 import { AMEN_BUY, AMEN_RENT, AMEN_LBL, FURN_LBL } from './constants.js';
 
-/* The parse MERGES onto the filters already on screen, because a typed phrase refines the search the user has been
-   building rather than restarting it. */
 const GENERIC_LOC_WORDS = new Set([
   'nagar', 'road', 'park', 'east', 'west',
-  // City-wide words and bare suffixes: alone they name no area, so a query that merely mentions the
-  // city would otherwise select every locality carrying the suffix.
   'pune', 'city', 'gaon', 'wadi', 'peth', 'pimpri',
   'club',
 ]);
@@ -18,15 +14,11 @@ const FILLER = new Set([
   'in', 'at', 'for', 'with', 'and', 'or', 'of', 'on', 'to', 'a', 'an', 'the', 'is', 'are', 'any',
   'i', 'me', 'my', 'we', 'want', 'need', 'looking', 'search', 'searching', 'show', 'find', 'get',
   'please', 'available', 'property', 'properties', 'place', 'places', 'pune', 'city',
-  // Comparison words the money rule did not claim, because the figure beside them turned out to be
-  // a size: on their own they name nothing.
   'under', 'below', 'upto', 'above', 'over', 'within', 'max', 'min',
 ]);
 
 const RENT_CEILING = RANGE.rent[1];
 
-// What a shopper types ("elevator", "power backup") is not what the chip says, so this cannot be
-// derived from the `AMEN_*` option lists.
 const AMENITY_WORDS = [
   ['gym', /\b(?:gym|gymnasium)\b/],
   ['pool', /\b(?:swimming pool|pool)\b/],
@@ -59,8 +51,6 @@ const SQFT = '(?:sq\\.?\\s?ft\\.?|sqft|sft|square\\s?(?:feet|foot|ft))(?![a-z])'
 const AREA_RE = new RegExp(`(?:\\b(${MAX_WORDS}|${MIN_WORDS})\\s*)?\\b(\\d+(?:\\.\\d+)?)(?:\\s*(?:-|–|to)\\s*(\\d+(?:\\.\\d+)?))?\\s*${SQFT}`);
 const MAX_PREFIX_RE = new RegExp(`^(?:${MAX_WORDS})$`);
 
-/* Locality names are data, not pattern source: a `.` or `(` in one would otherwise be compiled as syntax and either
-   match the wrong places or throw. */
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const word = (w) => new RegExp('\\b' + escapeRe(w) + '\\b');
 
@@ -81,8 +71,6 @@ const toRupees = (amt, unit) => {
   return amt * 1e3;
 };
 
-// Fresh Sets are the point: they are the only members a parse adds to rather than replaces, so this
-// is what stops it writing through into the filter state still on screen.
 const cloneFilters = (f) => deserializeF(serializeF(f));
 
 const normalise = (s) => s.replace(/(\d),(?=\d)/g, '$1').replace(/[,;/]/g, ' ').replace(/\s+/g, ' ');
@@ -91,14 +79,10 @@ export function parseSmartQuery(raw, { current, localities, locNameBySlug }) {
   const typed = (raw || '').toLowerCase().trim();
   if (!typed) return null;
 
-  /* The parse is destructive on purpose: each rule blanks the text it claimed, so what survives to the end is exactly
-     the words no rule understood — which is what `q` has to carry. */
   let rest = ` ${normalise(typed)} `;
   const peek = (re) => rest.match(re);
   const eat = (re) => {
     const m = rest.match(re);
-    // Spliced by index rather than by `String.replace`, which would blank the first occurrence of
-    // the matched text and not necessarily the span that matched.
     if (m) rest = `${rest.slice(0, m.index)} ${rest.slice(m.index + m[0].length)}`;
     return m;
   };
@@ -107,15 +91,10 @@ export function parseSmartQuery(raw, { current, localities, locNameBySlug }) {
   const wantsBuy = wantsRent ? null : eat(/\b(?:buy|sale|sell|purchase|resale)\b/);
   const explicitDeal = wantsRent ? 'rent' : wantsBuy ? 'buy' : null;
 
-  /* RK and studio before the type rule, because "studio" is also one of the browse taxonomy's matches for Flat — it
-     is both the size and the kind, and only one rule may consume it. */
   const rkM = eat(/\b(?:1\s*rk|rk|studio)\b/);
   const bhkM = eat(/\b(\d)\s*(?:bhk|bed\s?rooms?|beds?)\b/);
 
-  /* Localities are read early so an area name keeps its whole self: "Pimple Saudagar" must not leave "saudagar"
-     stranded in the free text. */
   const locSlugs = [];
-  // Six letters is where a one-letter slip stops colliding with ordinary words ("under" vs Undri).
   const nearMiss = (w) => (w.length < 6 ? undefined
     : rest.split(' ').find((t) => t.length >= 6 && withinOneEdit(w, t)));
   localities
@@ -133,8 +112,6 @@ export function parseSmartQuery(raw, { current, localities, locNameBySlug }) {
       if (typo) eat(word(typo));
     });
 
-  // "near Baner" resolves to the same locality filter; the connector is noted only so the summary
-  // can say "near Baner" rather than restate it as the area itself.
   const nearWord = Boolean(eat(/\b(?:nearby|near|close to|next to|walking distance (?:of|to|from))\b/));
 
   eat(/\b(?:owner only|only owner|direct owner|no broker|nobroker|without broker)\b/);
@@ -162,8 +139,6 @@ export function parseSmartQuery(raw, { current, localities, locNameBySlug }) {
   const areaM = eat(AREA_RE);
   const money = readMoney(eat, peek);
 
-  /* An explicit word is a statement; a shared-room search exists only on Rent; otherwise the magnitude decides,
-     because the rent slider's ceiling is also the line above which no amount is a rent. */
   let deal = explicitDeal || current.deal;
   if (!explicitDeal && typeKeys.includes('flatmates')) deal = 'rent';
   else if (!explicitDeal && money.amount != null) deal = money.amount > RENT_CEILING ? 'buy' : 'rent';
@@ -183,8 +158,6 @@ export function parseSmartQuery(raw, { current, localities, locNameBySlug }) {
   }
   typeHits.forEach(([k, text]) => { if (!allowedTypes.has(k)) rest += ` ${text}`; });
 
-  // A section the chosen type hides has no control in the panel, so a value written into it would
-  // sit dormant in state and spring into effect the moment the type changed.
   let bhkKey = bhkM ? normBhk(bhkM[1], deal) : rkM ? normBhk('0', deal) : null;
   if (bhkKey && !sectionVisible('bhk', next.types)) bhkKey = null;
   if (bhkKey) next.bhk.add(bhkKey);
@@ -231,13 +204,9 @@ export function parseSmartQuery(raw, { current, localities, locNameBySlug }) {
   return { next, deal, parts, q };
 }
 
-/* `lo` and `hi` are independently nullable: "above 1 cr" states a floor and no ceiling, and forcing the missing end
-   to a default here would invent a bound the user did not type. */
 function readMoney(eat, peek) {
   const rangeM = eat(RANGE_RE);
   if (rangeM) {
-    // "50-80 lakh" writes the unit once, at the end; the lower bound inherits it, because a range
-    // whose ends sit five orders of magnitude apart is not what anybody meant.
     const unit = rangeM[2] || rangeM[4];
     const a = toRupees(parseFloat(rangeM[1]), unit);
     const b = toRupees(parseFloat(rangeM[3]), rangeM[4] || unit);
@@ -254,8 +223,6 @@ function readMoney(eat, peek) {
     const lo = toRupees(parseFloat(minM[1]), minM[2]);
     return { lo, hi: null, amount: lo, text: minM[0].trim() };
   }
-  /* An unsuffixed figure must clear ₹1,000 to count: below that it is a floor, a phase or a year rather than a price
-     — and it is only eaten once it has counted. */
   const bareM = peek(BARE_RE);
   if (bareM && (bareM[2] || parseFloat(bareM[1]) >= 1000)) {
     eat(BARE_RE);
@@ -272,7 +239,6 @@ function applyMoney(next, isRent, money) {
   next[key] = [money.lo == null ? dLo : clamp(money.lo), money.hi == null ? dHi : clamp(money.hi)];
 }
 
-/* A bare size is read as "about": a band either side, because no listing is exactly the figure a shopper types. */
 function applyArea(next, [, prefix, a, b]) {
   const [dLo, dHi] = defaultAreaRangeSqft(areaProfileForTypes(next.types, next.areaUnit));
   const clamp = (v) => Math.min(Math.max(Math.round(v), dLo), dHi);

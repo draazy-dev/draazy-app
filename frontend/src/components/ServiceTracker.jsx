@@ -26,7 +26,6 @@ const hasForeignTenant = (request) => {
 
 const SEGMENT = { done: 'bg-emerald-500', active: 'bg-teal-500', todo: 'bg-white/15' };
 
-// Segments, not labelled chips: five labels cannot share a 360px row without scrolling the current step away.
 function Progress({ status }) {
   const pct = progressPct(status);
   if (pct == null) return null;
@@ -110,7 +109,6 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [changeReq]);
-  // `tick` re-runs the API read after a mutation.
 
   const [requests, setRequests] = useState([]);
   useEffect(() => {
@@ -256,8 +254,6 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
                   <PoliceIntimationStep request={r} t={t} />
                   <FormCStep request={r} t={t} />
 
-                  {/* Mobile lays the actions out as an even 2-col grid so long labels don't wrap into a ragged
-                     staircase; a solo Messages button spans the full width. */}
                   {(() => {
                   const soloMsg = r.status !== 'draft_shared' && !(r.status === 'completed' && r.finalDoc);
                   return (

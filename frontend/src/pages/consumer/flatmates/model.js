@@ -33,8 +33,6 @@ export const roomKindOf = (r) => {
   return r.attachedBath === 'attached' ? 'master' : 'bedroom';
 };
 
-/* An owner letting a vacant flat room-by-room starts at 'empty' and becomes a real household as
- * rooms fill, so the state is derived, never stored stale. */
 export const OCCUPANCY_EMPTY = 'empty';
 export const OCCUPANCY_FILLING = 'filling';
 export const OCCUPANCY_OCCUPIED = 'occupied';
@@ -50,8 +48,6 @@ export const filledSeatsOf = (item) => Math.max(0, seatsTotalOf(item) - seatsOpe
 
 export const occupancyOf = (item) => {
   if (!item) return OCCUPANCY_OCCUPIED;
-  // 'filling' is a DERIVED state and must never be trusted at rest: a stored 'filling' is re-derived from the flat
-  // ledger exactly like 'empty', so it is not silently collapsed to 'occupied'.
   if (item.occupancy !== OCCUPANCY_EMPTY && item.occupancy !== OCCUPANCY_FILLING) return OCCUPANCY_OCCUPIED;
   const committed = item.flatCommitted != null ? item.flatCommitted : filledSeatsOf(item);
   return committed > 0 ? OCCUPANCY_FILLING : OCCUPANCY_EMPTY;
@@ -59,7 +55,6 @@ export const occupancyOf = (item) => {
 
 export const asKind = (kind) => (item) => ({ ...item, kind });
 
-/* 'room' — an owner splitting a flat prices each ROOM. */
 export const PRICE_ROOM = 'room';
 export const PRICE_PERSON = 'person';
 export const priceBasisOf = (r) => (r?.priceBasis === PRICE_ROOM ? PRICE_ROOM : PRICE_PERSON);
@@ -69,20 +64,15 @@ export const perPersonRent = (r, people) => Math.round(rentOf(r) / Math.max(1, N
 export { canSplitIntoRooms, maxRoomsForBhk, capBoundsFor } from '../../../lib/data/flatSplit.js';
 export { ROOM_SHARE_MAX };
 
-/* ─── Occupancy ─── The owner declares how many people may live in the FLAT (the society's
- * rule) and which rooms exist — never how many people belong in a given room. */
 export const DEFAULT_MAX_OCCUPANTS = 3;
 export const maxOccupantsOf = (flat) => Number(flat?.maxOccupants) || DEFAULT_MAX_OCCUPANTS;
 export const occupantsOf = (r) => Math.max(0, Number(r?.occupants) || 0);
-/* Rooms in one flat share a single ceiling, so the cap can only be read across siblings — which means the key must
-   identify a FLAT, never just a building. */
 const flatKeyOf = (r) => {
   if (r?.flatKey) return 'flat:' + r.flatKey;
   if (r?.propertyId) return 'prop:' + r.propertyId;
   return 'room:' + (r?.id || '');
 };
 
-/* ledger. */
 export const decorateRooms = (rooms = []) => {
   const ledger = {};
   rooms.forEach((r) => {
@@ -109,8 +99,6 @@ export const hasSharerAlready = (r) => {
   const open = Number(r?.seatsOpen);
   return r?.seatsOpen != null && open > 0 && open < roomPlacesOf(r);
 };
-/* A legacy room with no `seatsTotal` is priced "each, if shared" by `decorateRooms`, so calling it a
-   single room would contradict its own price tag. */
 export const roomTypeLabel = (r, t) => {
   if (!r?.roomType) return null;
   if (r.roomType === ROOM_DOUBLE) return t('flatmates.roomDouble');

@@ -4,7 +4,6 @@ let memory = null;
 
 const mint = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-/** First-party, random and device-local; the server compares it across accounts to spot self-referral. */
 export function deviceId() {
   try {
     let id = localStorage.getItem(KEY);

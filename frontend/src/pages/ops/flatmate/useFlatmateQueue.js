@@ -11,7 +11,6 @@ import { claimLabel } from './board.jsx';
 const KINDS = ['post', 'room', 'group'];
 const PUBLISHED = ['approved', 'live'];
 const HIDDEN = ['flagged', 'removed', 'rejected', 'expired'];
-// The API's page ceiling. Past it the desk is told the list is partial rather than shown a short one.
 const SOURCE_SIZE = 100;
 
 export const QUEUE_TABS = [
@@ -54,7 +53,6 @@ const fromPost = (row) => ({
   snippet: row.freeText,
 });
 
-// 'new post' must match FlatmatePublication.UNREVIEWED: a flatless post that published itself.
 const recheckLabel = (reason) => ((reason || '').split(', ').includes('new post')
   ? 'Live · not yet reviewed' : 'Edited since review');
 
@@ -85,7 +83,6 @@ const keyOf = (type, row) => {
   return row.id;
 };
 
-/* The badge queue is an SLA queue, so the oldest claim leads; every other tab leads with the newest. */
 export function buildQueue(results, tab) {
   const byKey = new Map();
   results.forEach(({ type, page }) => page.items.forEach((row) => {
@@ -98,8 +95,6 @@ export function buildQueue(results, tab) {
   const truncated = results.some(({ page }) => page.total > page.items.length);
   return { items, truncated };
 }
-/* One failed source fails the whole tab: a queue missing a third of its rows would read as
-   "nothing to do" when the truth is "the read did not work". */
 export default function useFlatmateQueue(tab) {
   const [state, setState] = useState({ status: 'loading', items: [], truncated: false, counts: null, error: '' });
   const [nonce, setNonce] = useState(0);
@@ -109,7 +104,6 @@ export default function useFlatmateQueue(tab) {
     let alive = true;
     setState((s) => ({ ...s, status: 'loading', error: '' }));
     const sources = sourcesFor(tab);
-    // The tab labels are a nicety: without them the desk still works, so their failure is not the queue's.
     const counts = getFlatmateModerationSummary().catch(() => null);
     Promise.all([Promise.all(sources.map((s) => s.load().then((page) => ({ type: s.type, page })))), counts])
       .then(([results, summary]) => {

@@ -9,9 +9,6 @@ import { docsFor, commercialProfileFromType } from '../list-property/constants.j
 import { propertyKind } from './derivations.js';
 import { replay, useSignInGate } from '../../../lib/useSignInGate.js';
 
-/* Papers are never openly viewable: the owner approves which documents each buyer or tenant may see. */
-
-// Sale (built-property) checklist, framed as buyer due-diligence.
 const SALE_DOCS = [
   { name: 'Sale Deed', icon: 'file-signature', proves: 'Legal proof the ownership was transferred to the seller.' },
   { name: 'Index II', icon: 'landmark', proves: 'Government registration summary of the property.' },
@@ -22,8 +19,6 @@ const SALE_DOCS = [
   { name: 'Approved Layout Plan', icon: 'clipboard-list', proves: 'Sanctioned building/layout drawing.' },
 ];
 
-// Icon + fallback blurb per document key used by the deal/type-aware doc sets
-// (rent + non-residential sale). Residential sale keeps the curated SALE_DOCS above.
 const DOC_ICON = {
   'Ownership Proof': 'file-check', 'Society NOC': 'users', 'Fire NOC': 'shield-check',
   'Shop Act License': 'clipboard-list', 'MPCB Consent': 'shield-check', 'Factory License': 'clipboard-list',
@@ -32,8 +27,6 @@ const DOC_ICON = {
   'Property Tax Receipt': 'receipt-indian-rupee', 'Land Revenue Receipt': 'receipt-indian-rupee',
   'Electricity Bill': 'zap',
 };
-// Plain-language explanation per document, written from the seeker's side —
-// what it proves / what Draazy checked — not the owner-side upload hints.
 const DOC_PROVES = {
   'Ownership Proof': 'Draazy confirmed the person listing genuinely owns this property — you deal with the real owner, not a broker.',
   'Society NOC': 'The society permits this home to be let out — no surprise objection after you move in.',
@@ -53,15 +46,12 @@ const DOC_PROVES = {
   'Electricity Bill': 'An active connection with dues cleared.',
 };
 
-// Map a detail-page listing to the canonical property-type key docsFor expects.
 function docPtype(p) {
   const kind = propertyKind(p);
   if (kind === 'land') return /farm/i.test(p.type || '') ? 'farmland' : 'openplot';
   if (kind === 'commercial') return 'commercial';
   return 'flat';
 }
-// A representative commercial subtype so docsFor appends the right profile docs
-// (industrial → MPCB/Factory, retail → Shop Act). Only consulted for sale (buy).
 const PROFILE_SUBTYPE = { workspace: 'office', retail: 'shop', industrial: 'warehouse' };
 const buildDocs = (p, deal) => docsFor(
   deal, docPtype(p), deal === 'buy' ? (p.commercialType || PROFILE_SUBTYPE[commercialProfileFromType(p.type)]) : undefined,
@@ -71,8 +61,6 @@ const buildDocs = (p, deal) => docsFor(
   proves: DOC_PROVES[d.key] || d.hint || 'Checked by Draazy as part of verifying this listing.',
 }));
 
-// Owner-approval state per document, as reflected back to the buyer; `labelKey` resolves to
-// `property.<key>` at render. `expired` is a lapse rather than a refusal, hence the neutral slate.
 const ACCESS = {
   granted: { labelKey: 'accessGranted', icon: 'eye', cls: 'text-emerald-300' },
   pending: { labelKey: 'accessPending', icon: 'clock', cls: 'text-amber-300' },
@@ -81,7 +69,6 @@ const ACCESS = {
   none: { labelKey: 'accessNone', icon: 'lock', cls: 'text-slate-400' },
 };
 
-/* Total function: an unmapped status must not throw in the .map below; Object.hasOwn: `constructor` is truthy. */
 const warnedStatuses = new Set();
 function accessFor(status) {
   if (Object.hasOwn(ACCESS, status)) return ACCESS[status];
@@ -127,28 +114,19 @@ export function DocumentsSection({ p, user, isIn, toast }) {
   }, [isIn, p.id, count, requestPropertyId, requestReload, user?.mobile]);
 
   if (!count) return null;
-  // Commercial and land sales derive their title-chain from `docsFor`, so a buyer never sees a
-  // flat's Society NOC on an office or a plot; residential sale keeps the curated checklist.
   const docs = (isRent
     ? buildDocs(p, 'rent')
     : (propertyKind(p) === 'residential' ? SALE_DOCS : buildDocs(p, 'buy'))
   ).slice(0, count);
 
-  // First match wins and the server returns newest-first, so a fresh pending row beats an older
-  // expired one for the same category — that ordering is load-bearing.
   const statusOf = (name) => myReqs.find((request) =>
     (request.categories || [request.docType]).includes(name))?.status || 'none';
-  /* Expired rows are history: counting them keeps `requested` true and hides the ask affordance forever. */
   const liveReqs = myReqs.filter((request) => request.status !== 'expired');
   const requested = liveReqs.length > 0;
   const lapsed = myReqs.length > 0 && liveReqs.length === 0;
   const grantedReqs = myReqs.filter((r) => r.status === 'granted');
   const grantedCount = docs.filter((document) => statusOf(document.name) === 'granted').length;
-  /* "Reviewing" is only true while pending. Re-offering the button right after a decline is an
-     owner-harassment path, so it stays hidden even though the server permits asking again. */
   const declined = requested && liveReqs.every((request) => request.status === 'declined');
-  // Requester-scoped rather than owner-mobile scoped: possession of an id buys nothing; the API
-  // also requires the JWT to identify the buyer who wrote this exact request.
   const viewDocsLink = grantedCount > 0
     ? `/view-documents/${encodeURIComponent(grantedReqs[0].id)}`
     : null;
@@ -192,7 +170,6 @@ export function DocumentsSection({ p, user, isIn, toast }) {
           <span className="tag tag-emerald flex items-center gap-1.5"><Icon name={isRent ? 'shield-check' : 'file-text'} className="w-3.5 h-3.5" /> {isRent ? t('property.checks', { count: docs.length }) : t('property.documents', { count: docs.length })}</span>
         </div>
 
-        {/* Persistent notice: rent is verification-only; sale is owner-gated document sharing. */}
         <div className="rounded-xl border border-brand-teal-2/20 p-3.5 flex items-start gap-2.5 mb-5" style={{ background: 'rgb(var(--dz-c-teal-500) / .06)' }}>
           <Icon name={isRent ? 'shield-check' : 'user-check'} className="w-4 h-4 text-brand-teal-3 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-slate-300 leading-relaxed">{isRent

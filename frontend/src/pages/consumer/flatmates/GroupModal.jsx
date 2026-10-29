@@ -40,7 +40,6 @@ export default function GroupModal({ setGroupOpen, submitGroup, grpFormRef, grpD
         <form onSubmit={submitGroup} className="space-y-4" ref={grpFormRef}>
           <AutosaveBanner restored={grpDraft.restored} onStartFresh={grpDraft.startFresh} />
           <div data-err="title"><label htmlFor="grp-title" className={lbl}>{tr('flatmates.groupTitleLabel')}<RequiredMark /></label><input id="grp-title" value={grp.title} onChange={(e) => { setGrp({ ...grp, title: e.target.value, consentVerified: false }); grpErr.clear('title'); }} className={'field w-full rounded-xl px-3.5 py-2.5 text-sm' + grpErr.cx('title')} placeholder={tr('flatmates.groupTitlePlaceholder')} /><FieldError show={grpErr.has('title')}>{grpErr.msg('title')}</FieldError></div>
-          {/* Only a legacy group that already has a flat reaches the flat branch; a new flat-share is a room post. */}
           {grp.hunting ? (
             <>
               {policyField}
@@ -57,7 +56,6 @@ export default function GroupModal({ setGroupOpen, submitGroup, grpFormRef, grpD
           </div>
           <div className="grid grid-cols-2 gap-3">{seatsField}</div>
 
-          {/* Rendered as caption text (not an input tile) so it can't be mistaken for a field the host must fill. */}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 -mt-1">
             <Icon name="calculator" className="w-3.5 h-3.5 text-teal-400" />
             <span className="text-xs text-gray-400">{tr('flatmates.eachFlatmatePays')}</span>
@@ -77,8 +75,6 @@ export default function GroupModal({ setGroupOpen, submitGroup, grpFormRef, grpD
               </div>
             </div>
             {grp.role === 'owner' ? (
-              /* "You have not listed a property" is a claim about this owner's account, and it
-               * may only be made once the read has actually come back empty. */
               myListingsStatus === 'loading' ? (
                 <p className="text-xs text-gray-500 leading-relaxed" aria-busy="true">{tr('common.loading')}</p>
               ) : myListingsStatus === 'error' ? (

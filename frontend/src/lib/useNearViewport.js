@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 
-/* True once the element in `ref` is within `margin` of the viewport, and stays true; true at once without IntersectionObserver.
-   The element must be mounted on the first render. */
 export function useNearViewport(ref, margin) {
   const [near, setNear] = useState(false);
   useEffect(() => {

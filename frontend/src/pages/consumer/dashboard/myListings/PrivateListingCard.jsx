@@ -5,8 +5,6 @@ import { FURNISH_LABEL, LISTING_STATUS_CLS } from './helpers.js';
 import CardActions from './CardActions.jsx';
 import HomeRooms from './HomeRooms.jsx';
 
-// Private (managed-only) property, not yet posted to buyers. A home saved from a tenant's room post has no rent
-// or photos yet, so it publishes through the full wizard instead of the one-tap publish.
 export default function PrivateListingCard({ l, home, onPublish, onDelete }) {
   const fromRoom = !!l.sourceRoomId;
   const bhk = home?.bhk ?? l.bhk;

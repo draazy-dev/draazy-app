@@ -3,9 +3,6 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import LocalitySearchInput from '../../../components/search/LocalitySearchInput.jsx';
 
-/* The map only appears after focusing on 1–maxAreas localities: a whole city of markers is expensive. */
-
-// Areas worth suggesting first: most live stock.
 const popularAreas = (localities, limit = 8) =>
   localities
     .filter((l) => !l.archived)
@@ -25,7 +22,6 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
   }, [f.localities.size, initialDraft]);
 
   const bySlug = useMemo(() => new Map(localities.filter((l) => !l.archived).map((l) => [l.slug, l])), [localities]);
-  // A stored slug that is retired or failed to load is never drawn, so it must not count as chosen either.
   const shown = [...draft].filter((slug) => bySlug.has(slug));
   const choices = useMemo(() => {
     const first = [...new Set([...initialDraft, ...draft])];

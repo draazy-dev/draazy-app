@@ -1,6 +1,5 @@
 import { fmtINR } from '../../../lib/format.js';
 
-/** Wire `Message` → the view model's message shape. */
 export function toMessage(m) {
   if (!m) return null;
   return {
@@ -26,7 +25,6 @@ export function toViewModel(c) {
     id: c.id,
     propertyId: c.propertyId ?? undefined,
     propertySlug: c.propertySlug ?? undefined,
-    // A flatmate group's thread: many members, no counterparty and no listing.
     group,
     flatmate: c.flatmateKind && c.flatmateTargetId ? { kind: c.flatmateKind, id: c.flatmateTargetId } : null,
 
@@ -37,14 +35,11 @@ export function toViewModel(c) {
       name,
       avatar: initialsOf(name),
       role: group ? 'Group' : c.counterpartyRole === 'owner' ? 'Owner' : 'Buyer',
-      // Masked (98XXXXX210) until the reader's contact request against this listing is approved —
-      // a server decision (ADR-019), deliberately passed through untouched.
       mobile: c.counterpartyMobile ?? '',
     },
 
     youAre: c.youAre || (group ? 'member' : c.counterpartyRole === 'owner' ? 'buyer' : 'owner'),
 
-    /* Server threads exist only after contact approval; waiting states belong to the gate above. */
     staged: false,
 
     at: c.updatedAt ? Date.parse(c.updatedAt) : Date.now(),
@@ -61,13 +56,11 @@ export function toViewModel(c) {
   };
 }
 
-/** Wire page (or bare array) → a plain array. */
 export const toViewModelList = (payload) =>
   (Array.isArray(payload) ? payload : payload?.content ?? [])
     .map((c) => toViewModel(c))
     .filter(Boolean);
 
-/* Staged chats share the server row shape so the page renders queued messages identically. */
 export function stagedToViewModel(item) {
   const name = item?.party?.name || 'Owner';
   const prop = item.property || { title: 'Conversation', price: '', loc: '', img: '' };
@@ -93,7 +86,6 @@ export function stagedToViewModel(item) {
   };
 }
 
-/** View-model input → the `ConversationCreate` body. */
 export function toConversationCreate({ counterpartyMobile, propertyId, body, clientId }) {
   const out = { body };
   if (counterpartyMobile) out.counterpartyMobile = counterpartyMobile;

@@ -8,8 +8,6 @@ export const Card = ({ children, className = '', ...rest }) => (
 
 export function Stat({ icon, bg, fg, value, label, trend, onClick, ariaLabel }) {
   const tIcon = trend ? (trend.dir === 'up' ? 'trending-up' : trend.dir === 'down' ? 'trending-down' : 'minus') : null;
-  // Status → a small, legible chip instead of faint gray text, so the sub-status
-  // reads at a glance: green = positive/handled, red = needs attention, neutral = info.
   const tChip = trend
     ? (trend.dir === 'up'
         ? 'bg-emerald-500/15 text-emerald-300'
@@ -17,7 +15,6 @@ export function Stat({ icon, bg, fg, value, label, trend, onClick, ariaLabel }) 
           ? 'bg-rose-500/15 text-rose-300'
           : 'bg-white/[0.06] text-gray-400')
     : '';
-  /* Icon and number share one row so four tiles fit with less phone scroll. */
   const body = (
     <>
       <div className="flex items-center gap-2.5">
@@ -35,7 +32,6 @@ export function Stat({ icon, bg, fg, value, label, trend, onClick, ariaLabel }) 
       ) : null}
     </>
   );
-  /* With a target, the tile becomes a keyboard-focusable button into that tab. */
   if (onClick) {
     return (
       <button
@@ -50,13 +46,9 @@ export function Stat({ icon, bg, fg, value, label, trend, onClick, ariaLabel }) 
   }
   return <Card className="p-3.5 sm:p-4">{body}</Card>;
 }
-/* Horizontal sub-navigation used inside consolidated tabs (Activity, My Properties) to switch between grouped
-   sub-sections without adding more top-level tabs. */
 
 export function SubNav({ items, active, onChange, variant = 'pill', wrapClassName = 'mb-5' }) {
   if (!items || items.length < 2) return null;
-  // Underline variant reuses the app-wide `.dz-detail-tab` style so every tab strip reads as one
-  // standard.
 
   if (variant === 'underline') {
     return (
@@ -119,8 +111,6 @@ const CHIP_TINTS = {
   violet: 'bg-violet-400/15 text-violet-300',
   emerald: 'bg-emerald-400/15 text-emerald-300',
 };
-/* Borderless "quiet list" wrapper for request/lead rows: the outer Card is the only frame; inside, rows are separated
-   by a single hairline divider, not a full box. */
 
 export const RequestList = ({ children }) => (
   <div className="-mx-3 divide-y divide-white/[0.05]">{children}</div>
@@ -130,8 +120,6 @@ const URGENCY_TINTS = {
   hot: 'bg-rose-500/15 text-rose-300',
   warm: 'bg-amber-400/15 text-amber-300',
 };
-/* The identity block is `basis-full` on phones so the actions passed via `children` wrap onto their own
-   thumb-friendly row rather than squeezing the name; from `sm` up they sit inline. */
 
 export function RequestRow({ icon, tint = 'teal', avatar, title, badge, meta, time, urgency, attention = false, onOpen, children }) {
   const chip = CHIP_TINTS[tint] || CHIP_TINTS.teal;
@@ -215,8 +203,6 @@ export const StatusBadge = ({ status }) => {
     responded: 'bg-indigo-500/15 text-indigo-300',
     confirmed: 'bg-emerald-500/15 text-emerald-300',
     cancelled: 'bg-rose-500/15 text-rose-300',
-    // Without these two, photo requests fall through to the same grey chip and a declined row looks
-    // identical to a satisfied one.
     resolved: 'bg-emerald-500/15 text-emerald-300',
     declined: 'bg-rose-500/15 text-rose-300',
   };

@@ -71,8 +71,6 @@ export default function RentAgreement() {
               {!locked && (
               <HScroll wrapClassName="mb-8" className="flex items-center pb-2" fadeColor="rgb(var(--dz-c-ink-card))">
                 {STEP_LABELS.map((s, i) => {
-                  /* Padlocks every step behind the sign-in line, reading the *same* `gated` the clamp does so the two
-                     cannot disagree — see § 5.1 in the flow doc. */
                   const awaitingStep = invitingOwner ? 1 : inviting ? 2 : -1;
                   const isLocked = gated && i > LAST_PUBLIC_STEP;
                   const st = isLocked ? 'locked' : (i === step ? 'active' : (i === awaitingStep ? 'pending' : (i < step ? 'done' : '')));
@@ -80,7 +78,6 @@ export default function RentAgreement() {
                   <div key={s} className={'flex items-start ' + (i < STEP_LABELS.length - 1 ? 'flex-1' : '')}>
                     <div className="flex flex-col items-center flex-shrink-0">
                       <div
-                        /* The only state carried by a glyph alone, so the only one that needs saying out loud. */
                         className={'step-dot w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ' + st}
                         {...(isLocked ? { role: 'img', 'aria-label': tr('services.ra.gate.stepLocked') } : {})}
                       >{st === 'locked' ? <Icon name="lock" className="w-4 h-4" /> : st === 'done' ? <Icon name="check" className="w-4 h-4" /> : st === 'pending' ? <Icon name="clock" className="w-4 h-4" /> : i + 1}</div>
@@ -94,8 +91,6 @@ export default function RentAgreement() {
               )}
 
               {done ? (
-                  /* Reached only once the poll has spent its budget still seeing `awaiting_payment`, so it says
-                     unconfirmed, not failed — see § 5.10. */
                 <div className="space-y-4">
                   {paymentPending ? (
                     <div className="p-6 rounded-xl bg-amber-500/10 text-center">
@@ -118,8 +113,6 @@ export default function RentAgreement() {
                   {inviting && inviteResult ? (
                     <div className="p-5 rounded-xl bg-white/[0.03]">
                       <p className="text-white font-semibold text-sm flex items-center gap-2"><Icon name="message-circle" className="w-4 h-4 text-emerald-400" /> {tr('services.ra.invite.sendTitle', invitedSide)}</p>
-                      {/* Two different waits needing different advice: a pending party is a number nobody has signed
-                         up to, so the link cannot open until they do. */}
                       <p className="text-gray-400 text-xs mt-1">{tr('services.ra.invite.sendDesc', { mobile: inviteResult.toMobile ? '••••' + inviteResult.toMobile.slice(-4) : '' })}</p>
                       {inviteResult.pending ? (
                         <p className="text-amber-200/90 text-[11px] mt-2 flex items-start gap-1.5"><Icon name="clock" className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> {tr('services.ra.invite.pendingSignup')}</p>
@@ -139,8 +132,6 @@ export default function RentAgreement() {
                     </div>
                   ) : null}
                 </div>
-                /* Between the modal closing and the webhook landing a paid agreement and an abandoned one look alike
-                   here, so hold a neutral panel until the poll knows. */
               ) : paymentConfirming ? (
                 <div className="p-6 rounded-xl bg-teal-500/10 text-center" role="status" aria-live="polite">
                   <Icon name="circle-notch" className="w-10 h-10 text-teal-300 mx-auto mb-2 animate-spin" />
@@ -176,11 +167,8 @@ export default function RentAgreement() {
                   <p className="text-gray-600 text-[11px] mt-2">{tr('services.ra.locked.startNewHint')}</p>
                 </div>
               ) : (
-                  /* Mobile-only cost summary (collapsible) — desktop uses the sidebar */
                 <>
                   <MobileCostSummary cost={cost} />
-                  {/* No button of its own: the Next control below relabels itself and runs the validation first. */}
-
                   {gated && (
                     <div role="status" className="mb-6 p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-2.5">
                       <Icon name="lock" className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
@@ -218,7 +206,6 @@ export default function RentAgreement() {
                       </div>
                     </div>
                   )}
-                  {/* Invited tenant: sees the whole agreement, but can edit only their own Tenant step. */}
 
                   {mode === 'invite' && (
                     step === ownStep ? (
@@ -271,8 +258,6 @@ export default function RentAgreement() {
               </>
               )}
             </div>
-            {/* Summary sidebar — desktop only; mobile uses the collapsible summary inside the wizard */}
-
             {!locked && (
             <div className="hidden lg:block">
               <CostSidebar cost={cost} />

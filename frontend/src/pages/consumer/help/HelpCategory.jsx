@@ -27,8 +27,6 @@ export default function HelpCategory() {
   const articles = allArticles.filter((a) => a.category === category.id);
   const siblings = categories.filter((c) => c.section === category.section && c.id !== category.id);
 
-  // Staff runbooks stay out of the index: a crawler has no staff session, so the
-  // category is a real URL with nothing behind it for the public.
   return (
     <HelpLayout
       title={category.title}

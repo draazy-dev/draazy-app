@@ -167,7 +167,6 @@ export default function PropertyEditModal({ edit, setEdit, onClose, onSubmit, sa
   const [loadError, setLoadError] = useState('');
   const id = edit?.id;
 
-  // Queue rows are slim, so everything past Basics comes from one read of the whole listing.
   useEffect(() => {
     if (!id) return undefined;
     let live = true;

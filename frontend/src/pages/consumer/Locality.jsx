@@ -51,7 +51,6 @@ export default function Locality() {
   const loc = status === 'ready' ? load.data : null;
   const guide = guides.find((g) => g.slug === slug);
 
-  // A written guide is real content even before the area has listings, so it lifts the noindex.
   const noindex = !guide && (status === 'missing' || (!!loc && !loc.indexable));
   useEffect(() => {
     if (!noindex) return undefined;
@@ -82,7 +81,6 @@ export default function Locality() {
   }, [loc]);
 
   const [reviews, setReviews] = useState([]);
-  /* `'error'` keeps a failed read from rendering as "no reviews yet", which would say something false. */
   const [summary, setSummary] = useState(null);
   const [revText, setRevText] = useState('');
   const [pick, setPick] = useState(5);

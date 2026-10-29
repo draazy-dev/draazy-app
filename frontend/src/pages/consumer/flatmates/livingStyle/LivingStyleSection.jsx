@@ -22,8 +22,6 @@ function Compare({ mine, theirs }) {
   return <span className={'inline-flex items-center gap-1 text-[11px] ' + s.cls} data-cmp={s.key}><Icon name={s.icon} className="w-3 h-3" />{t(`flatmates.ls.cmp_${s.key}`)}</span>;
 }
 
-/** The author's answers on a detail page, each set against the viewer's own. The server only returns answers to
- *  questions the viewer also answered, so a viewer with fewer than three sees an invitation instead. */
 export default function LivingStyleSection({ kind, id, owned }) {
   const { t } = useTranslation();
   const mine = useLivingStyle();

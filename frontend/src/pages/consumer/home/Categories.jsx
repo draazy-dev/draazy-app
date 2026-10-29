@@ -77,7 +77,6 @@ export default function Categories({ navigate }) {
     };
   }, []);
 
-  // Arrows track more-to-scroll; fades show only when a card is actually clipped by that edge.
   const updateArrows = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -86,7 +85,7 @@ export default function Categories({ navigate }) {
     setCanNext(scrollLeft < scrollWidth - clientWidth - 4);
 
     const stripLeft = el.getBoundingClientRect().left;
-    const TH = 8; // ignore sub-pixel / near-aligned cards
+    const TH = 8;
     let leftCut = false;
     let rightCut = false;
     el.querySelectorAll('.cat-card').forEach((c) => {
@@ -116,8 +115,6 @@ export default function Categories({ navigate }) {
     updateArrows();
   }, [counts, flatmateCount, updateArrows]);
 
-  // Advance ~80% of the visible width so a near-full page of tiles moves while
-  // one partial card stays visible as an anchor.
   const scrollByPage = (dir) => {
     const el = scrollRef.current;
     if (!el) return;
@@ -153,7 +150,6 @@ export default function Categories({ navigate }) {
           </div>
         </div>
 
-        {/* pt-3 gives the -8px hover lift room: overflow-x-auto also clips vertical overflow. */}
         <div className="relative -mx-4 sm:-mx-6 lg:mx-0">
           <div ref={scrollRef} className="cat-scroll flex gap-3 overflow-x-auto pt-3 pb-3 px-4 sm:px-6 lg:px-0 scroll-px-4 sm:scroll-px-6 lg:scroll-px-0 reveal" style={{ scrollSnapType: 'x mandatory' }}>
             {CATEGORIES.map((c) => {
@@ -187,7 +183,6 @@ export default function Categories({ navigate }) {
           <div className="cat-fade cat-fade--right" aria-hidden="true" style={{ opacity: fadeRight ? 1 : 0, transition: 'opacity .3s ease' }} />
         </div>
 
-        {/* The header "View All" is desktop-only to avoid crowding the heading, so mobile needs this path. */}
         <button
           onClick={() => navigate('/listings')}
           className="h-btn sm:hidden mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 text-sm font-semibold text-teal-400 hover:bg-white/10 hover:text-teal-300 transition-all"

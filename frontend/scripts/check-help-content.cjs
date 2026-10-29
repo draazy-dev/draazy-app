@@ -28,8 +28,6 @@ async function main() {
     for (const id of new Set(dupes)) errors.push(`${label}: duplicate heading anchor "${id}"`);
   };
 
-  /* Internal links are authored by hand in Markdown, so a renamed slug leaves a
-     dead link that nothing else would catch until a reader hits it. */
   const checkLinks = (label, html) => {
     for (const m of html.matchAll(/href="\/help\/(a|c)\/([^"#?]+)/g)) {
       const [, kind, id] = m;

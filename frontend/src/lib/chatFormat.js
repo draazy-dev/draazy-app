@@ -1,12 +1,8 @@
-/* Pure presentation only, so a component needing a timestamp formatted does not thereby pull in a
-   data layer. The one dependency is `contactService`, which is a real service call. */
-
 import { isFullMobile } from './contact.js';
 
 const DAY = 86400000;
 const now = () => Date.now();
 
-/** Epoch of a conversation's most recent message, falling back to the thread's own timestamp. */
 export const lastAt = (c) => (c.messages[c.messages.length - 1]?.at) || c.at || 0;
 
 export function formatTime(at, fallback = '') {
@@ -34,8 +30,6 @@ export function relTime(at, fallback = '') {
   return new Date(at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-// A thread the server holds implies an approved contact request in one direction, so the owner side
-// is decided by the row in hand; the buyer side must ask the gate. Promise either way, for one shape.
 export async function canRevealParty(conv) {
   return !!conv && isFullMobile(conv.party?.mobile);
 }

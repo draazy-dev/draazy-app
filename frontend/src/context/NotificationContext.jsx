@@ -6,8 +6,6 @@ import { useConversationUnread } from './ConversationContext.jsx';
 
 const NotificationContext = createContext(null);
 const POLL_MS = 60_000;
-// The stream says when the count changes, but only from the server instance holding it, so a slow
-// poll still catches a notification written on another instance.
 const STREAM_POLL_MS = 300_000;
 
 function clearLegacyNotificationStorage() {
@@ -17,7 +15,6 @@ function clearLegacyNotificationStorage() {
       .filter((key) => key.startsWith('dzNotifications:'))
       .forEach((key) => localStorage.removeItem(key));
   } catch {
-    // localStorage may be disabled; a cleanup miss must not block the app shell.
   }
 }
 
@@ -30,7 +27,6 @@ export function NotificationProvider({ children }) {
   const lastRefreshAt = useRef(0);
   const streamUp = useRef(streamConnected);
   streamUp.current = streamConnected;
-  // null until the first read after sign-in, so the backlog a user signs in to never raises an alert.
   const lastCount = useRef(null);
 
   const refresh = useCallback(async () => {
@@ -67,11 +63,9 @@ export function NotificationProvider({ children }) {
   }, [refresh]);
 
   useEffect(() => {
-    // Focus and visibilitychange fire together on a tab switch; one read answers both.
     const onVisible = () => {
       if (document.visibilityState === 'visible' && Date.now() - lastRefreshAt.current >= 1_000) refresh();
     };
-    // One fixed timer: the stream reconnects every few minutes, so a timer keyed on its state never fires.
     const poll = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       const due = streamUp.current ? STREAM_POLL_MS : POLL_MS;

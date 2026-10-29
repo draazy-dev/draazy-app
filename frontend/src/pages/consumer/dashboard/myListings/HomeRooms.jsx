@@ -5,7 +5,6 @@ import { detailPath } from '../../flatmates/helpers.js';
 
 const isLive = (r) => r.status === 'active' && (r.modStatus === 'live' || r.modStatus === 'approved');
 
-/* Flatmate rooms a tenant listed in the owner's flat, confirmed by the owner on WhatsApp. */
 export default function HomeRooms({ rooms }) {
   if (!rooms?.length) return null;
   return (

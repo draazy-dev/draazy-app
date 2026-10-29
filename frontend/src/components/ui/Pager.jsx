@@ -1,8 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 
-/* Compact page-number model: always the first & last page plus the current one and its
-   neighbours, with the rest collapsed to ellipses. */
 function pageItems(current, total) {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const start = Math.max(2, current - 1);
@@ -15,14 +13,10 @@ function pageItems(current, total) {
   return items;
 }
 
-/** Page numbers for a server-paged result set. `page` is ONE-BASED, matching what the control says
-    on screen; zero-based callers convert here. Shared by /listings and /flatmates. */
 export default function Pager({ page, pageCount, onGoTo }) {
   const { t } = useTranslation();
   if (!(pageCount > 1)) return null;
   return (
-    /* A landmark, not a bare `div`: paging is one of the few controls a keyboard user wants to
-       reach directly rather than by tabbing past every card above it. */
     <nav className="flex items-center justify-center gap-2 mt-12" aria-label={t('common.pagination')}>
       <button
         onClick={() => onGoTo(page - 1)}

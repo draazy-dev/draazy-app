@@ -13,13 +13,12 @@ const read = () => {
   }
 };
 
-/** First touch wins: a stored, unexpired code is never replaced by a later link. */
 export function captureReferral(search) {
   const code = new URLSearchParams(search).get('ref')?.trim();
   if (!isReferralCode(code) || read()) return;
   try {
     localStorage.setItem(KEY, JSON.stringify({ code, at: Date.now() }));
-  } catch { /* storage unavailable: signup still reads ?ref */ }
+  } catch { }
 }
 
 export const storedReferral = () => read()?.code || '';
@@ -27,5 +26,5 @@ export const storedReferral = () => read()?.code || '';
 export function clearReferral() {
   try {
     localStorage.removeItem(KEY);
-  } catch { /* nothing to clear */ }
+  } catch { }
 }

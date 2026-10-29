@@ -2,9 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import Icon from './Icon.jsx';
 
-/* DPDPA-aligned: only strictly-necessary cookies are exempt, everything else is opt-in.
-   Withdrawal must be as easy as consent — the footer reopens via `pn:open-cookie-preferences`. */
-
 const KEY = 'dz_cookie_consent_v1';
 const VERSION = 1;
 export const CONSENT_CHANGE = 'dz:consent-change';
@@ -13,7 +10,7 @@ export function getCookieConsent() {
   try {
     const v = JSON.parse(localStorage.getItem(KEY));
     if (v && v.version === VERSION) return v;
-  } catch { /* ignore */ }
+  } catch { }
   return null;
 }
 
@@ -30,7 +27,6 @@ export default function CookieConsent() {
     return () => window.removeEventListener('pn:open-cookie-preferences', reopen);
   }, []);
 
-  // Bottom-anchored widgets (e.g. the Draaz FAB) step aside so nothing overlaps the actions.
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('pn:cookie-banner', { detail: { visible: open } }));
   }, [open]);
@@ -63,7 +59,7 @@ export default function CookieConsent() {
       localStorage.setItem(KEY, JSON.stringify({
         necessary: true, functional: allowed, analytics: allowed, marketing: allowed, version: VERSION, ts: Date.now(),
       }));
-    } catch { /* ignore */ }
+    } catch { }
     window.dispatchEvent(new Event(CONSENT_CHANGE));
     setOpen(false);
   };

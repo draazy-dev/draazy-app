@@ -24,8 +24,6 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
   const mapCapped = view === 'map' && !mapGated && total > results.length;
   const resultsMapStyle = { height: 'clamp(320px, calc(100dvh - var(--dz-nav-h) - 11rem), 72dvh)', minHeight: 320 };
   useBackToClose(view === 'map' && !!activeProperty, onCloseProperty, { key: '__dzMapDetail' });
-  // Offer to relax whichever narrowing filters are actually active, so a dead-end search has a
-  // one-tap path back to results rather than only "clear everything".
   const isRent = f.deal === 'rent';
   const broadeners = [];
   if (f.localities.size) broadeners.push({ id: 'loc', label: t('listings.broadenAllLocalities'), apply: () => set({ localities: new Set() }) });
@@ -63,15 +61,12 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
     />
   );
 
-  /* `aria-busy` tells a screen reader the number is being updated. A gated map sends no search, so it has no count. */
   const countLine = mapGated ? null : loaded ? (
     <p className="text-gray-400 text-sm" aria-busy={searching ? 'true' : undefined}>{t('listings.showing')} <span className="text-teal-400 font-semibold">{count}</span> {t('listings.propertyNoun', { count })}
       {verifiedCount > 0 ? <span className="text-emerald-300/90"> · <Icon name="shield-check" className="w-3.5 h-3.5 inline-block -mt-0.5" /> {t('listings.verifiedCount', { count: verifiedCount })}</span> : null}
       {unstatedCount > 0 ? <span className="text-amber-300/90"> · <Icon name="info" className="w-3.5 h-3.5 inline-block -mt-0.5" /> {t('listings.unstatedCount', { count: unstatedCount })}</span> : null}
     </p>
   ) : loadFailed ? (
-    /* "Showing 0 properties" is a claim about Pune's inventory, and after a failed read a false
-     * one — say nothing about the count; the card below says what happened. */
     <p className="text-gray-400 text-sm">{t('listings.countUnavailable')}</p>
   ) : (
     <p className="text-gray-400 text-sm inline-flex items-center gap-2" aria-live="polite">
@@ -87,7 +82,6 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                     <Icon name="sparkles" className="w-4 h-4 text-teal-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input type="text" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) smartSearch(); }} enterKeyHint="search" aria-label={t('listings.smartSearch')} placeholder={f.deal === 'rent' ? t('listings.smartPlaceholderRent') : t('listings.smartPlaceholderBuy')} className="lst-search-field w-full pl-9 pr-[88px] sm:pr-3 h-11 sm:h-10 rounded-full glass border border-white/10 text-sm text-white placeholder-gray-500 focus:border-teal-400/50 outline-none bg-white/5" />
 
-                    {/* `search-submit-shape.spec.js` pins its diameter to `barH - 8`. */}
                     <div className="sm:hidden absolute inset-y-0 right-1 flex items-center gap-1">
                       <button type="button" onClick={saveSearch} disabled={savingSearch} aria-busy={savingSearch || undefined} aria-label={t('listings.alertMe')} className="lst-search-bell w-11 self-stretch flex items-center justify-center text-gray-400 hover:text-teal-300 disabled:opacity-50 disabled:pointer-events-none t-all"><Icon name={savingSearch ? 'loader' : 'bell-plus'} className={'w-4 h-4' + (savingSearch ? ' animate-spin' : '')} /></button>
                       <button type="button" onClick={smartSearch} aria-label={t('listings.smartSearch')} className="lst-search-go tap-extend relative w-9 h-9 rounded-full btn-primary flex items-center justify-center"><Icon name="search" className="w-4 h-4" /></button>
@@ -102,7 +96,6 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
 
               <div className="sm:hidden mb-2 list-reveal" style={{ animationDelay: '180ms' }}>{countLine}</div>
 
-              {/* `.dz-docks-under-nav` sets the offset below lg (tracks the hide-on-scroll bar); no `top-*`. */}
               <div className="dz-docks-under-nav sm:hidden sticky z-30 -mx-4 mb-3.5 px-4 py-2 flex items-center justify-between gap-2 bg-ink/85 backdrop-blur border-b border-white/5">
                 {viewToggles}
                 {sortSelect}
@@ -171,8 +164,6 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                       </div>
                     )}
 
-                    {/* `data-no-ptr` opts the map out of pull-to-refresh: it is not an overflow scroller, so a
-                       downward pan would otherwise arm the pull and refetch. */}
                     <div data-no-ptr>
                       <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="w-8 h-8 border-2 border-teal-400/30 border-t-teal-400 rounded-full animate-spin" /></div>}>
                         <PropertyMap properties={results} locName={locNameBySlug} focus={mapFocus} activeId={activeId} onSelect={onSelectProperty} wrapStyle={resultsMapStyle} gestureHandling="greedy" unavailableAction={{ label: t('listings.mapShowList'), onClick: () => setView('list') }} />
@@ -199,8 +190,6 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                   </>
                 )
               ) : loadFailed ? (
-                /* A search that could not run must not look like one that found nothing: the
-                 * empty state below would send the user to widen a budget never applied. */
                 <LoadError message={t('listings.loadError')} error={loadError} onRetry={onRetryLoad} className="glass rounded-2xl px-5 py-8 sm:p-12" />
               ) : !loaded ? (
                 <div className={view === 'list' ? 'flex flex-col gap-4' : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6'}>
@@ -246,7 +235,6 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
 
               {view !== 'map' && <Pager page={page} pageCount={pageCount} onGoTo={goToPage} />}
 
-              {/* Puts filtering in the thumb arc without moving the top controls bar. */}
               <button
                 type="button"
                 ref={filterTriggerRef}

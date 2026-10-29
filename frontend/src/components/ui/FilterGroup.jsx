@@ -1,16 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
-/* Filter-sheet primitives shared by BOTH search surfaces (/listings and /flatmates), so the two read as one filter. */
-
-/* `summary` is the header read-out: pass an EMPTY STRING while the value is still the default, or a formatted default
-   lights every section up as if it were narrowing the results. */
 
 export function FilterGroup({ icon, title, summary, children, defaultCollapsed = false }) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const toggle = () => setCollapsed((v) => !v);
-  /* Keep the heading in the outline while the button stays keyboard-reachable. */
   return (
     <div className={'filter-group' + (collapsed ? ' collapsed' : '')}>
       <h4 className="m-0">
@@ -20,8 +15,6 @@ export function FilterGroup({ icon, title, summary, children, defaultCollapsed =
           aria-expanded={!collapsed}
           onClick={toggle}
         >
-          {/* `ui.*`, not `listings.*`: route namespaces are code-split, so a listings key would resolve to a raw
-             string on every other surface reusing this component. */}
           <Icon name={icon} className="w-4 h-4 text-gray-500" /> {title}
           <span className={'fg-summary' + (summary ? ' active' : '')}>{summary || t('ui.any')}</span>
           <Icon name="chevron-down" className="fg-chev" />

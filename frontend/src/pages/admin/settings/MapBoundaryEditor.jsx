@@ -5,15 +5,10 @@ import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, GOOGLE_MAPS_HAS_DDS, mapColorS
 import { fetchAdminSuggestions, fetchPlaceViewport, newAutocompleteSession } from '../../../lib/places.js';
 import { cssColour } from '../../../lib/themeColour';
 
-/* Edits the SAME center/bounds as the numeric inputs (controlled) so
-   they stay in sync; with no Maps key only the numeric inputs remain. */
-
 const r5 = (n) => Math.round(n * 1e5) / 1e5;
 const validBounds = (b) => b && [b.north, b.south, b.east, b.west].every((n) => Number.isFinite(n));
 const validCenter = (c) => c && Number.isFinite(c.lat) && Number.isFinite(c.lng);
 
-// An editable + draggable google.maps.Rectangle bound to `bounds`. Emits rounded
-// bounds on user edits; ignores the echo when we programmatically reset it from props.
 function EditableRectangle({ bounds, onBoundsChange }) {
   const map = useMap();
   const maps = useMapsLibrary('maps');
@@ -48,11 +43,8 @@ function EditableRectangle({ bounds, onBoundsChange }) {
       rect.setMap(null);
       rectRef.current = null;
     };
-    // onBoundsChange is intentionally omitted — cbRef keeps the listener stable so
-    // the rectangle isn't torn down and rebuilt on every parent re-render.
   }, [map, maps]);
 
-  // Push external (numeric-input / search) changes onto the rectangle without looping.
   useEffect(() => {
     const rect = rectRef.current;
     if (!rect || !validBounds(bounds)) return;
@@ -73,8 +65,6 @@ function EditableRectangle({ bounds, onBoundsChange }) {
   return null;
 }
 
-// Purely visual: the saved constraint stays the rectangle (Places restriction is rectangle/circle-only); Google
-// calls are wrapped so a map without data-driven feature layers shows no outline.
 const BOUNDARY_LAYER_TYPES = [
   'LOCALITY',
   'ADMINISTRATIVE_AREA_LEVEL_3',
@@ -94,7 +84,6 @@ function BoundaryHighlight({ placeId }) {
 
   useEffect(() => {
     if (!map || !GOOGLE_MAPS_HAS_DDS || typeof map.getFeatureLayer !== 'function') return undefined;
-    // Only the layer that actually contains this placeId paints; the rest never match.
     const styleFn = (opts) =>
       placeId && opts.feature?.placeId === placeId ? highlightStyle() : null;
     const layers = [];
@@ -104,7 +93,6 @@ function BoundaryHighlight({ placeId }) {
         layer.style = placeId ? styleFn : null;
         layers.push(layer);
       } catch {
-        // This feature layer isn't enabled on the configured Map ID — skip it.
       }
     }
     return () => {
@@ -117,7 +105,6 @@ function BoundaryHighlight({ placeId }) {
   return null;
 }
 
-// Overlay search: type a place → pick → drop its viewport into the boundary.
 function CitySearch({ onPick }) {
   const map = useMap();
   const [q, setQ] = useState('');
@@ -144,7 +131,7 @@ function CitySearch({ onPick }) {
     const display = s.secondaryText ? `${s.mainText}, ${s.secondaryText}` : s.mainText;
     setQ(display);
     const vp = await fetchPlaceViewport(s);
-    tokenRef.current = null; // details fetch closes the billing session
+    tokenRef.current = null;
     setBusy(false);
     if (!vp) return;
     onPick(vp, s.placeId);
@@ -192,7 +179,6 @@ function CitySearch({ onPick }) {
   );
 }
 
-// Fits the map to the boundary on first load so the rectangle is framed on open.
 function InitialFit({ bounds, center }) {
   const map = useMap();
   const done = useRef(false);

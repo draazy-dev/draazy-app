@@ -1,10 +1,7 @@
 import { get, patch, post, unwrapFullPage } from '../../http.js';
-// Leaf module, no imports of its own — see its header. Deliberately not from `http.js`.
 import { MAX_PAGE_SIZE } from '../../apiLimits.js';
 import { slotFromParts, slotFromWhen, whenFromSlot } from '../../../lib/visitWhen.js';
 
-/** It is passed through as-is — masking is the server's decision to make, and a client that tried to "helpfully" fill
- * in a real number would be defeating the gate. */
 function toViewModel(row) {
   const mode = row?.mode || 'in-person';
   const parties = Array.isArray(row?.parties) ? row.parties : [];
@@ -31,12 +28,10 @@ function toViewModel(row) {
 
 const paged = () => ({ size: MAX_PAGE_SIZE });
 
-/** `GET /visits` — visits the caller booked, optionally on one listing. Caller-scoped by the token. Paged. */
 export async function listVisits({ propertyId } = {}) {
   return unwrapFullPage(await get('/visits', propertyId ? { propertyId, ...paged() } : paged()), 'visit').map(toViewModel);
 }
 
-/** `GET /me/visit-requests` — visits on the caller's own listings. Paged. */
 export async function myVisitRequests() {
   return unwrapFullPage(await get('/me/visit-requests', paged()), 'visit').map(toViewModel);
 }
@@ -53,14 +48,11 @@ export async function scheduleVisit(req = {}) {
   return vm;
 }
 
-/** Returns 200 with no body, so the caller gets the id and target status back rather than a row. */
 export async function updateVisitStatus(id, status) {
   await patch(`/visit-requests/${encodeURIComponent(id)}/status`, { status });
   return { id, status };
 }
 
-/** The server resets the visit to `scheduled`; it returns 200 with no body, so the caller gets the id and new `when`
- * back rather than a row. */
 export async function rescheduleVisit(id, when) {
   await patch(`/visits/${encodeURIComponent(id)}/slot`, { slot: slotFromWhen(when) });
   return { id, when };

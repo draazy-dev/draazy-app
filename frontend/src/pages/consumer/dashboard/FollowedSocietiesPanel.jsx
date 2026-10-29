@@ -7,13 +7,10 @@ import SocietyFinder from './SocietyFinder.jsx';
 
 const titleCase = (slug) => String(slug || '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-/** Followed societies: the follow context decides what is followed and describes each from the same read;
- * an unresolved slug (browser-local) still gets a title-cased row and can be unfollowed. */
 export default function FollowedSocietiesPanel() {
   const follows = useFollows();
   const { slugs, rows: bySlug, busy, loading, refreshRows } = follows;
 
-  // A follow made in the finder below has no row yet: re-read once its write settles, once per missing set.
   const missing = useMemo(() => [...slugs].filter((s) => !bySlug.has(s)).join(','), [slugs, bySlug]);
   const tried = useRef('');
   useEffect(() => {

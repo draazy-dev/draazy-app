@@ -22,7 +22,6 @@ export default function Breadcrumbs({ trail, className = '' }) {
   );
 }
 
-/** Home › Services › the named service; `k` is its key in `services.hub.card`. */
 export function ServiceBreadcrumbs({ k, className = 'mb-4' }) {
   const { t } = useTranslation();
   return <Breadcrumbs className={className} trail={[[t('nav.home'), '/'], [t('nav.services'), '/services'], [t(`services.hub.card.${k}.name`), null]]} />;

@@ -3,9 +3,6 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import useScrollLock from '../../../hooks/useScrollLock.js';
 
-/* `data-no-ptr` on the overlay: Saved arms pull-to-refresh on the page root and this sheet is a DOM
-   descendant, so a drag inside it would otherwise read as an overscroll — see lib/usePullToRefresh.js. */
-
 export default function CategorySwitcher({ categories, activeKey, counts = {}, onSelect, labelFor, descFor }) {
   const { t: tr } = useTranslation();
   const CATEGORY_LABEL = tr('saved.categoryLabel');
@@ -20,12 +17,8 @@ export default function CategorySwitcher({ categories, activeKey, counts = {}, o
     [categories, activeKey],
   );
 
-  // While the sheet is open, behave like a proper modal: close on Escape, trap Tab inside the
-  // panel, and hand focus back to the switcher on close (WCAG 2.4.3).
   useEffect(() => {
     if (!open) {
-      // Only pull focus back to the switcher after an actual open→close (never on
-      // first mount, which would steal focus / scroll on page load).
       if (wasOpen.current) triggerRef.current?.focus();
       wasOpen.current = false;
       return undefined;

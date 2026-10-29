@@ -5,8 +5,6 @@ import LivingStyleQuestions, { LoadError } from './LivingStyleQuestions.jsx';
 import { STYLE_KEYS } from './questions.js';
 import useLivingStyle from './useLivingStyle.js';
 
-/** The questionnaire, open by default, for the post forms. Each tap saves to the profile,
- *  so nothing rides on the post's submit. */
 export default function LivingStyleInline({ className = '' }) {
   const { t } = useTranslation();
   const { toast } = useToast();

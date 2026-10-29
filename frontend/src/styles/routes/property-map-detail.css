@@ -1,5 +1,3 @@
-/* Map detail drawer (stay-on-map master–detail), Tier 1 route CSS imported by MapDetailPanel.jsx.
-   Its non-.dz-mdp rule (.price-marker.is-active) lives in index.css. */
 .dz-mdp {
   position: fixed;
   z-index: 150;
@@ -11,8 +9,6 @@
   box-shadow: 0 24px 60px rgb(var(--dz-c-black) / 0.55);
   overflow: hidden;
 }
-
-/* Desktop: right-docked column clear of the map controls */
 @media (min-width: 768px) {
   .dz-mdp {
     top: 84px;
@@ -23,8 +19,6 @@
     animation: dzMdpIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   }
 }
-
-/* Mobile: floating card (--dz-float-* tokens in index.css) */
 @media (max-width: 767px) {
   .dz-mdp {
     left: var(--dz-float-edge);
@@ -54,8 +48,6 @@
 }
 
 @media (max-width: 767px) {
-  /* A one-finger drag in the fixed sheet must move the sheet or nothing, never the page behind;
-     `pinch-zoom` not `none` so the price and address stay magnifiable. */
   .dz-mdp { touch-action: pinch-zoom; }
   .dz-mdp-scroll { touch-action: pan-y pinch-zoom; }
 }

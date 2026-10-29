@@ -16,13 +16,8 @@ import {
   KB,
 } from '../../data/assistant.js';
 
-/* Deliberately not migrated from the older `dz_nestor_*` keys: an existing thread is a transcript of a conversation
-   with a differently-named bot. */
-
 const MSG_KEY = 'dz_draaz_msgs';
 const NUDGE_KEY = 'dz_draaz_nudge';
-/* The hint is an introduction, so it has a budget of two sightings and the count lives in localStorage — the 6s
-   auto-hide counts as one, or the bubble greets again on the next route. */
 const NUDGE_TIMEOUT_MS = 6000;
 const NUDGE_MAX_SHOWS = 2;
 
@@ -36,14 +31,10 @@ function nudgeShows() {
 function recordNudgeShown() {
   try { localStorage.setItem(NUDGE_KEY, String(nudgeShows() + 1)); } catch {}
 }
-/* Routes where the user is deciding or transacting: the ~110px bubble lands on the price band or the wizard's first
-   field. */
 
 const NUDGE_MUTED = ['/property/', '/list-property', '/checkout', '/schedule-visit', '/signin', '/signup'];
 
 let msgSeq = 0;
-// Stateless-enough unique id: monotonic counter + random suffix so keys never
-// collide even across remounts / StrictMode double-invokes.
 const uid = () => `m${Date.now().toString(36)}-${(msgSeq++).toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 
 function loadMsgs() {
@@ -51,7 +42,6 @@ function loadMsgs() {
     const raw = sessionStorage.getItem(MSG_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    // Guard against corrupt/foreign data so a bad blob can't crash the thread render.
     if (Array.isArray(parsed) && parsed.every((m) => m && typeof m === 'object' && m.id && m.role)) {
       return parsed;
     }
@@ -82,7 +72,6 @@ export default function AssistantWidget() {
   const sheet = useSheetViewport();
   useScrollLock(open && sheet);
 
-  // FAQs feed the matcher only, so they load the first time the panel opens, not on every page.
   const faqsRequested = useRef(false);
   useEffect(() => {
     if (!open || faqsRequested.current) return;
@@ -118,8 +107,6 @@ export default function AssistantWidget() {
     window.addEventListener('pn:cookie-banner', onBar);
     return () => window.removeEventListener('pn:cookie-banner', onBar);
   }, []);
-  // Auto-clear the hint: a timeout spends a sighting exactly as an explicit close does.
-  // The ref guard is because StrictMode double-invokes effects, which spent the whole budget.
 
   const nudgeCounted = useRef(false);
   useEffect(() => {
@@ -134,8 +121,6 @@ export default function AssistantWidget() {
 
   const dismissNudge = useCallback(() => {
     setShowNudge(false);
-    // Closing it by hand is a clearer "no" than letting it time out, so spend the
-    // whole budget rather than one sighting.
     try { localStorage.setItem(NUDGE_KEY, String(NUDGE_MAX_SHOWS)); } catch {}
   }, []);
 
@@ -173,7 +158,6 @@ export default function AssistantWidget() {
     if (a.ask) { ask(a.ask); return; }
     if (!a.to) return;
     if (a.external) {
-      // Only hand off known-safe protocols; never navigate arbitrary strings.
       if (a.to.startsWith('tel:')) window.location.href = a.to;
       else if (/^https?:\/\//.test(a.to)) window.open(a.to, '_blank', 'noopener,noreferrer');
       return;
@@ -201,9 +185,7 @@ export default function AssistantWidget() {
     const ids = ROUTE_SUGGESTIONS[key] || ROUTE_SUGGESTIONS['/'];
     return ids.map((id) => KB.find((e) => e.id === id)).filter(Boolean);
   }, [pathname]);
-  // Extra clearance over transient page-owned bars --dz-bottom-inset cannot see.
 
-  // ponytail: fold these into --dz-bottom-inset if a third such bar shows up.
   const detailBar = pathname.startsWith('/property/')
     || /^\/flatmates\/(room|group|post)\//.test(pathname)
     || pathname === '/society'
@@ -213,11 +195,8 @@ export default function AssistantWidget() {
   let anchorClass = 'bottom-[calc(var(--dz-bottom-inset)+1.5rem)]';
   if (detailBar) anchorClass = 'bottom-[calc(var(--dz-bottom-inset)+5.75rem)] lg:bottom-[calc(var(--dz-bottom-inset)+1.5rem)]';
   else if (cityBar) anchorClass = 'bottom-[calc(var(--dz-bottom-inset)+9rem)] sm:bottom-[calc(var(--dz-bottom-inset)+1.5rem)]';
-  // On phones the collapsed FAB and the full-width consent bar collide, so hide
-  // the FAB there while the consent UI is up (desktop keeps it — no overlap).
   const hideClass = cookieBar && !open ? 'max-sm:hidden' : '';
   const centerClass = open ? 'max-sm:left-4 max-sm:flex max-sm:justify-center' : '';
-  // Early returns stay after all hooks so the hook order is stable.
 
   if (pathname.startsWith('/messages')) return null;
   if (!flagEnabled('assistant')) return null;
@@ -263,8 +242,6 @@ function Fab({ onOpen, showNudge, onDismissNudge, nudgeMuted }) {
         <div className={'relative max-w-[240px] animate-slideIn rounded-2xl rounded-br-md bg-ink-card/95 px-3.5 py-2.5 text-[12.5px] leading-snug text-gray-200 shadow-2xl shadow-black/50 ring-1 ring-white/[0.06] backdrop-blur' + (nudgeMuted ? ' max-lg:hidden' : '')}>
           <button
             onClick={onDismissNudge}
-            /* A 44px circle would be bigger than the bubble it closes, so `.tap-extend` puts the target back under
-               the finger while the glyph stays 20px. */
             aria-label="Dismiss"
             className="tap-extend pointer-events-auto absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-ink-card text-gray-400 shadow-md ring-1 ring-white/[0.08] hover:text-white"
           >
@@ -295,7 +272,6 @@ function Panel({
       aria-label="Draaz help assistant"
       className="pointer-events-auto animate-slideIn relative flex h-[min(560px,calc(100dvh-6rem))] w-full max-w-[384px] sm:w-[384px] flex-col overflow-hidden rounded-3xl bg-ink-card/95 shadow-2xl shadow-black/60 ring-1 ring-white/[0.06] backdrop-blur-xl"
     >
-      {/* Signature: a soft teal aurora — clipped to the header so it never bleeds into the chat thread. */}
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-0 h-16 overflow-hidden">
         <div className="absolute -top-14 left-1/2 h-28 w-64 -translate-x-1/2 rounded-full bg-teal-500/15 blur-3xl" />
       </div>

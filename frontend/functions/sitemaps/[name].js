@@ -6,7 +6,6 @@ const SOURCES = {
   'societies.xml': { path: '/societies?hasListings=true&size=100&page=', toRow: societySitemapRow },
   'landing.xml': { rows: (env, request) => landingSitemapRows((path) => apiGet(env, request, path)) },
 };
-// ponytail: 50 pages of 100 rows each; split into numbered sitemaps if the catalogue outgrows 5,000.
 const MAX_PAGES = 50;
 
 async function pagedRows(source, env, request) {
@@ -26,14 +25,12 @@ export async function onRequestGet({ request, env, params, waitUntil }) {
   if (!source) return new Response('Not found', { status: 404, headers });
 
   const cache = globalThis.caches?.default;
-  // Keyed on the path alone: a query string must not buy a fresh 50-page crawl of the API.
   const key = new Request(new URL(new URL(request.url).pathname, request.url));
   const hit = cache && await cache.match(key);
   if (hit) return hit;
 
   const rows = !listingsIndexable(env) ? []
     : await (source.rows ? source.rows(env, request) : pagedRows(source, env, request));
-  // A partial sitemap would tell crawlers the missing URLs are gone; a 503 asks them to come back.
   if (!rows) return new Response('Sitemap unavailable', { status: 503, headers: { 'Retry-After': '3600', ...headers } });
 
   const response = new Response(sitemapXml(rows), {

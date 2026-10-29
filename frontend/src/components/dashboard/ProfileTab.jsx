@@ -31,8 +31,6 @@ const SectionHead = ({ icon, iconCls = 'text-teal-400', title, sub }) => (
     <div><h2 className="text-lg font-bold text-white flex items-center gap-2">{icon ? <Icon name={icon} className={'w-5 h-5 ' + iconCls} /> : null} {title}</h2>{sub ? <p className="text-gray-500 text-xs mt-0.5">{sub}</p> : null}</div>
   </div>
 );
-// Collapses on mobile (tap the header) but stays open on desktop, so phones get a
-// scannable accordion without changing the web view.
 
 const CollapsibleCard = ({ icon, iconCls = 'text-teal-400', title, sub, defaultOpen = false, children }) => {
   const [open, setOpen] = useState(defaultOpen);
@@ -65,7 +63,6 @@ const PrefRow = ({ title, desc, children }) => (
     <div className="flex-shrink-0 pt-0.5">{children}</div>
   </div>
 );
-// Trust chips reused in the identity header. Green = confirmed, amber = pending.
 
 const VerifiedChip = ({ label }) => (
   <span className="dz-tag border border-emerald-500/20 bg-emerald-500/12 font-semibold text-emerald-300">
@@ -94,13 +91,9 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
   const { logout } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  /* Seeded from the published defaults — the same shape the server returns for a user who has never saved — not from
-     a local copy, which would flash a stale value before the real one. */
   const [form, setForm] = useState({ name: user?.name || '', mobile: user?.mobile || '', email: user?.email || '', city: user?.city || 'Pune', gender: '' });
   const [prefs, setPrefs] = useState(NOTIFICATION_PREFERENCE_DEFAULTS);
   const [app, setApp] = useState(() => getAppPrefs());
-  /* Not seeded: the server sends these two non-nullable on every `/auth/me`, so there is always a real answer and
-     never a gap to paper over. */
   const owner = {
     verifiedContactOnly: !!user?.verifiedContactOnly,
     hideNumber: !!user?.hideNumber,
@@ -113,8 +106,6 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
   const [pushBusy, setPushBusy] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   const [delText, setDelText] = useState('');
-  // An erasure request already in flight. Replaces the form so a user who has asked is told
-  // where it stands, rather than being invited to ask again.
   const [erasure, setErasure] = useState(null);
   const [erasing, setErasing] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
@@ -128,7 +119,6 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
     : !genderLocked ? `You can change it ${genderLeft} more ${genderLeft === 1 ? 'time' : 'times'}.`
       : identityVerified ? 'Confirmed from your ID. Contact support to change it.'
         : 'No changes left. Contact support to change it.';
-  /* Preferences are account-level, so the panel shows what the platform will honour on whatever device is asking. */
 
   useEffect(() => {
     let alive = true;
@@ -145,7 +135,6 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
   }, []);
 
   const fld = 'field w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500';
-  /* The score is the server's — the person it describes cannot be the one who computes it. */
 
   const [trust, setTrust] = useState(null);
   useEffect(() => {
@@ -160,8 +149,6 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       .catch(() => {});
     return () => { alive = false; };
   }, [user]);
-  // Mobile is the account key; editing it inline would orphan stored data.
-  // Help URLs carry language, so the prefix must change before HelpLangRoute reads it.
 
   const save = async () => {
     const name = form.name.trim();
@@ -176,15 +163,12 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       toast(err?.code === 'NAME_LOCKED_WHILE_VERIFIED' ? 'Name is locked while verified.' : err?.message || 'Could not save your profile. Please try again.', 'error');
     }
   };
-  // Only enable Save once an editable field actually changed.
 
   const dirty =
     (!nameLocked && form.name.trim() !== (user?.name || '').trim()) ||
     form.email.trim() !== (user?.email || '').trim() ||
     form.city !== (user?.city || 'Pune') ||
     genderDirty;
-  /* Optimistic, then reconciled from the write's response; a failure rolls the control back rather than leaving a
-     switch showing a state the server never accepted. */
 
   const changePrefs = async (patch, announce = true) => {
     const before = prefs;
@@ -201,8 +185,6 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
   const changeQuiet = (patch, announce = true) => changePrefs({ quietHours: { ...prefs.quietHours, ...patch } }, announce);
 
   const changeApp = (patch) => { setApp(setAppPrefs(patch)); };
-  /* Saved on the account, not the device: the gate that enforces this runs on the server, where no browser is
-     present. */
 
   const changeOwner = async (patch) => {
     try {
@@ -233,8 +215,6 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
     }
   };
 
-  /* The right of access, answered by the system of record: the server's document is downloaded verbatim, exclusions
-     and all, so a subject is told what was left out. */
   const [exporting, setExporting] = useState(false);
   const downloadData = async () => {
     if (exporting) return;
@@ -266,8 +246,6 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       const filed = await requestErasure({ reason: '' });
       setErasure(filed || null);
       setDelOpen(false);
-      // Not "deleted": the account is still here and the user is still signed in. Saying otherwise
-      // would send them away believing their data is gone while it demonstrably is not.
       toast('Your erasure request has been submitted for review', 'success');
     } catch (err) {
       toast(err?.body?.error || err?.message || 'Could not submit your request right now. Please try again.', 'error');
@@ -400,8 +378,6 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
           <PrefRow title="Accept verified contacts only" desc="Only verified users can ask to contact you or chat.">
             <Switch checked={!!owner.verifiedContactOnly} onChange={(v) => changeOwner({ verifiedContactOnly: v })} label="Accept verified contacts only" />
           </PrefRow>
-            {/* Copy deliberately does not promise masking — the preference is stored but nothing on the server reads
-               it yet. */}
           <PrefRow title="Hide my number from approved buyers" desc="Approved buyers can chat with you, but won't see your phone number.">
             <Switch checked={!!owner.hideNumber} onChange={(v) => changeOwner({ hideNumber: v })} label="Hide my number from approved buyers" />
           </PrefRow>

@@ -1,6 +1,5 @@
 import { PROVIDER_LOAD_FAILED, isDefinitelyOffline } from './seamErrors.js';
 
-/* Staff screens are English-only, so these are sentences rather than i18n keys. */
 const OFFLINE = "Can't reach Draazy. Check your internet connection and try again.";
 
 const WRONG = {
@@ -24,7 +23,6 @@ function tooMany(seconds) {
   return `Too many tries. Wait ${wait} and try again.`;
 }
 
-/** The sentence a staff sign-in step shows for `err`. `step` is password | totp | enrol | invite. */
 export function staffAuthError(err, step) {
   if (err?.code === PROVIDER_LOAD_FAILED) {
     return isDefinitelyOffline() ? OFFLINE : 'Draazy was updated. Reload the page to continue.';
@@ -33,8 +31,6 @@ export function staffAuthError(err, step) {
   if (err.code === 'staff_sign_in_expired') return 'Your sign-in timed out. Enter your email and password again.';
   if (err.status === 429) return tooMany(err.retryAfterSeconds);
   if (err.status === 401) return WRONG[step];
-  // The server's sentences for these name the remedy; only our backend sends an `error` code with them,
-  // so a proxy's 403 page never reaches the user as `err.message`.
   if (err.status === 403 || err.status === 409) {
     const fromServer = Boolean(err.code) && err.message && err.message !== err.code;
     return fromServer ? err.message : "This account can't sign in right now. Contact an admin.";

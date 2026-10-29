@@ -1,4 +1,3 @@
-/** `{id}` is the UUID, never the slug; a non-participant gets 404 rather than 403. */
 import { ApiError, PAGE_LOAD_TTL, del, get, patch, post, unwrapPage } from '../../http.js';
 import { MAX_PAGE_SIZE } from '../../apiLimits.js';
 import { toCaseFile, toReviewBadge } from './propertyReviewMapper.js';
@@ -6,22 +5,18 @@ import { toCaseFile, toReviewBadge } from './propertyReviewMapper.js';
 const caseFilePath = (propertyId) => `/properties/${encodeURIComponent(propertyId)}/verification`;
 const ownershipPath = (propertyId) => `${caseFilePath(propertyId)}/ownership`;
 
-/** Keep the raw response: verified, verifiedAt, verifiedUntil, missingKinds and evidence. */
 export function getOwnershipVerification(propertyId) {
   return get(ownershipPath(propertyId));
 }
 
-/** DocumentSummary[]: id, category, fileName, sizeBytes, mimeType, uploadedAt. No file URL. */
 export function listOwnershipDocuments(propertyId) {
   return get(`${ownershipPath(propertyId)}/documents`);
 }
 
-/** One audited mint per open; resolves the signed URL itself. */
 export async function getOwnershipDocumentUrl(propertyId, docId) {
   return (await get(`${ownershipPath(propertyId)}/documents/${encodeURIComponent(docId)}/url`))?.url || null;
 }
 
-/** `issuedAt` is the document's own instant, not the upload or review time. */
 export function recordOwnershipEvidence(propertyId, { docType, documentId, issuedAt, issuedOn, subjectName }) {
   return post(`${ownershipPath(propertyId)}/evidence`, { docType, documentId, issuedAt, issuedOn, subjectName });
 }
@@ -30,7 +25,6 @@ export function verifyOwnership(propertyId) {
   return post(ownershipPath(propertyId));
 }
 
-/** A query parameter survives proxies that discard DELETE bodies. */
 export function revokeOwnershipVerification(propertyId, reason) {
   return del(ownershipPath(propertyId), { query: { reason } });
 }
@@ -52,12 +46,10 @@ export async function getPropertyReview(propertyId) {
   }
 }
 
-/** Idempotent open avoids a GET-then-POST race between reviewers; an existing case stays untouched. */
 export async function startPropertyReview(propertyId, { markRead = false } = {}) {
   return toCaseFile(await post(`${caseFilePath(propertyId)}${markRead ? '?markRead=true' : ''}`));
 }
 
-/** Moves a pending listing to In review and stamps the reviewer; idempotent, 403 for the maker. */
 export async function beginPropertyReview(propertyId) {
   return toCaseFile(await post(`${caseFilePath(propertyId)}/start`));
 }
@@ -66,13 +58,10 @@ export async function addPropertyReviewMessage(propertyId, body, clarificationRe
   return toCaseFile(await post(`${caseFilePath(propertyId)}/messages`, { body, clarificationRequested }));
 }
 
-/** "The other side" is resolved server-side so a caller cannot clear another reader's unread flag. */
 export async function markPropertyReviewRead(propertyId) {
   await post(`${caseFilePath(propertyId)}/read`);
 }
 
-/** Tick one checklist line, addressed by its text — the rows are seeded and immutable, so there is no id. PATCH one
- * line at a time, because a whole-list write races a second reviewer. */
 export async function setPropertyReviewChecklistItem(propertyId, item, pass) {
   const body = { item, pass: Boolean(pass) };
   return toCaseFile(await patch(`${caseFilePath(propertyId)}/checklist`, body));

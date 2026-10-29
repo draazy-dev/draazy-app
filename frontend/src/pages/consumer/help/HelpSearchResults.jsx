@@ -5,9 +5,6 @@ import HelpLayout from '../../../components/help/HelpLayout.jsx';
 import { Breadcrumbs, EmptyState } from '../../../components/help/HelpCards.jsx';
 import { excerptFor } from '../../../lib/help.js';
 import { useHelpSearch, useHelpTree } from '../../../lib/useHelp.js';
-/* Full search results. */
-
-/** Wrap matched terms so the reader can see why a result matched. */
 
 function Highlight({ text, terms }) {
   if (!terms.length) return text;

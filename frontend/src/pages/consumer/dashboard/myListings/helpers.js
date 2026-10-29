@@ -1,8 +1,4 @@
-// Placeholder is deterministic so no-photo properties never render an empty src.
-// Pure presentational constants stay module-scoped because they hold no React state.
 export const FURNISH_LABEL = { furnished: 'Furnished', semi: 'Semi-furnished', 'semi-furnished': 'Semi-furnished', unfurnished: 'Unfurnished' };
-// Accent colour per stat tone. Kept tiny + shared so every chip in the strip
-// speaks one visual language (icon + value + caption), only the accent changes.
 
 export const CHIP_ACCENT = {
   muted: 'text-gray-400',
@@ -27,4 +23,3 @@ export const LISTING_STATUS_CLS = {
 };
 export const STATUS_LABEL = { under_offer: 'Under Offer', private: 'Private', pending: 'Under review', approved: 'Live', paused: 'Paused', rejected: 'Not approved', sold: 'Sold', rented: 'Rented', archived: 'Archived', expired: 'Expired' };
 export const STATUS_ICON = { approved: 'check-circle', paused: 'pause-circle', pending: 'clock', rejected: 'x-circle', under_offer: 'handshake', sold: 'party-popper', rented: 'party-popper', private: 'lock', expired: 'clock' };
-// Shared action styling: one prominent primary, quiet secondaries, danger for delete.

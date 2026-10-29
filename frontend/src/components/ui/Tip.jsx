@@ -2,17 +2,6 @@ import { useState, useRef, useLayoutEffect, useEffect, useCallback, cloneElement
 import { createPortal } from 'react-dom';
 import { tipFor } from '../../data/optionInfo.js';
 
-/**
- * Tip — wraps a single element (an option tile/row) and reveals a small popover
- * explaining what that option means. No visible affordance is added: the wrapped
- * element itself is the trigger (hover on desktop, keyboard focus, tap on touch).
- *
- * Usage: <Tip k="keydetail.bedrooms">{tileJSX}</Tip>  (or pass explicit title/body)
- *
- * The child is cloned (not wrapped in an extra DOM node) so grid/flex layout is
- * untouched. The popover renders in a portal with fixed positioning so it is never
- * clipped by a card's overflow or z-index.
- */
 export default function Tip({ k, title, body, children }) {
   const info = k ? tipFor(k) : (title || body ? { title, body } : null);
   const [open, setOpen] = useState(false);
@@ -22,7 +11,6 @@ export default function Tip({ k, title, body, children }) {
   const idRef = useRef('dz-tip-' + Math.random().toString(36).slice(2, 9));
   const id = idRef.current;
 
-  // Touch-only devices report `hover: none` — there we open on tap instead of hover/focus.
   const canHover = typeof window !== 'undefined' && window.matchMedia
     ? window.matchMedia('(hover: hover)').matches : true;
 

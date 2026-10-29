@@ -9,8 +9,6 @@ async function searchLocality(q, token) {
   return (await searchLocalities(q)).map((l) => ({ slug: l.slug, mainText: l.name, locality: l }));
 }
 
-/* Locality search bar: a Google pick is resolved server-side to a canonical locality row, so `onPick`
-   always receives `{ slug, name, lat, lng }`. Typed text is never committed. */
 export default function LocalitySearchInput(props) {
   const { t } = useTranslation();
 

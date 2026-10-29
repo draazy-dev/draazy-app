@@ -25,7 +25,6 @@ export function Identity({ avatar, title, meta, badges, action }) {
   );
 }
 
-/** The property page's trust card: what this post has proven, then the platform promise every post shares. */
 export function TrustPanel({ items = [] }) {
   const { t } = useTranslation();
   const rows = [...items.map(([label, icon, body]) => [label, icon, body, true]), [t('flatmates.trustNumberPrivate'), 'phone-off', t('flatmates.trustNumberPrivateBody'), false]];
@@ -42,7 +41,6 @@ export function TrustPanel({ items = [] }) {
   );
 }
 
-/** Icon tiles, as on the property page's key details. Empty values are dropped, not shown as "Not specified". */
 export function SpecGrid({ items }) {
   const tiles = items.filter(([, , v]) => filled(v));
   if (!tiles.length) return null;
@@ -61,7 +59,6 @@ export function SpecGrid({ items }) {
   );
 }
 
-/** The property page's amenity tiles, for a room's furniture. */
 export function ItemGrid({ items }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -75,7 +72,6 @@ export function ItemGrid({ items }) {
   );
 }
 
-/** [label, price, note] per way of splitting the rent, the property page's "sharing" tiles. */
 export function SplitTiles({ tiles }) {
   return (
     <div data-testid="fm-split" className="grid gap-2 mt-3" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>

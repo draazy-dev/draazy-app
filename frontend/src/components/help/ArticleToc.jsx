@@ -2,18 +2,6 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 
-/* "On this page" navigation.
- *
- * Two variants, because the same list needs two very different shapes:
- *   - `rail`   sticky right-hand column with scroll-spy, wide screens only
- *   - `inline` collapsed <details> above the article on narrower screens
- *
- * The inline variant starts closed for the same reason LegalPage.jsx collapses
- * its TOC on phones: a long link list between the title and the first paragraph
- * pushes the content the reader came for below the fold.
- *
- * The page renders both and lets CSS pick one, so only the rail runs scroll-spy. */
-
 export default function ArticleToc({ headings, variant = 'inline' }) {
   const { t } = useTranslation();
   const isRail = variant === 'rail';
@@ -22,9 +10,6 @@ export default function ArticleToc({ headings, variant = 'inline' }) {
   useEffect(() => {
     if (!isRail || !headings.length) return undefined;
 
-    // Trigger the highlight when a heading crosses the upper third of the
-    // viewport, so the marker tracks what is being read rather than what has
-    // just scrolled past the very top.
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -50,7 +35,6 @@ export default function ArticleToc({ headings, variant = 'inline' }) {
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setActiveId(id);
-    // Keep the URL shareable without the jump-then-scroll flash a plain hash causes.
     window.history.replaceState(null, '', `#${id}`);
   };
 

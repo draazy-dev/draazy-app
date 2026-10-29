@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import Icon from './Icon.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { addServiceRequestDoc, readServiceRequestChecklist } from '../services/serviceRequestService.js';
-/** The rent-agreement papers the desk sent back, each with its reason and a re-upload. */
 
 export default function RejectedPapers({ requestId, onUploaded }) {
   const { toast } = useToast();

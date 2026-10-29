@@ -9,8 +9,6 @@ import { FURN_KEY } from './constants.js';
 import { SaveBtn, CardBadge, CardLink, TileChip, Facts } from './atoms.jsx';
 
 export function roomPriceLabel(r, tr) {
-  /* Per-room pricing: the owner sets one rent for the room and tenants decide whether to split
-   * it, so the headline is the room's rent and the per-person price is derived. */
   const perRoom = priceBasisOf(r) === PRICE_ROOM;
   if (perRoom && hasSharerAlready(r)) return tr('flatmates.yourShareMo');
   if (perRoom && (r.shareMax || 1) > 1) return tr('flatmates.fromPerPersonMo');

@@ -11,8 +11,6 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { maskPhone, fmtPhone, digits, isOwnerViewer } from '../../lib/contact.js';
 import { replay, useSignInGate } from '../../lib/useSignInGate.js';
-/* The card is a fixed seven fields, not a spread user row; the
-   rating is its own read since rows on hand are only page one. */
 import { createEntityReview, deleteReview, getEntityReviewSummary, listEntityReviews, reviewRefusal, updateReview } from '../../services/reviewService.js';
 import { messagesLinkForProp } from '../../lib/chatFormat.js';
 import { queuePendingChat } from '../../services/conversationService.js';
@@ -22,8 +20,6 @@ import { propertyHref } from '../../lib/listingSeo.js';
 import { Stars } from './property/Stars.jsx';
 import { OwnReviewBar } from './property/OwnReviewBar.jsx';
 
-/* The relative label is derived at render: '2 days ago' is only
-   true on the day it's computed, so a stored one goes stale. */
 const toCard = (r) => ({
   id: r.id,
   n: r.user || 'User',
@@ -35,8 +31,6 @@ const toCard = (r) => ({
 });
 
 function ReviewCard({ v, children }) {
-  /* Rendered verbatim, never through t(): that would fall
-     through to the raw string or resolve an unrelated key. / */
   return (
     <div className="border-b border-white/5 pb-4 last:border-0">
       <div className="flex items-center gap-3 mb-2">
@@ -56,22 +50,14 @@ export default function Owner() {
   const navigate = useNavigate();
   const sendToSignIn = useSignInGate();
   const [owner, setOwner] = useState(undefined);
-  // A separate read from `owner`, and `[]` rather than `null`: an owner with nothing live is the
-  // common case, and the empty state is also the right answer to a failed read.
   const [listings, setListings] = useState([]);
-  // `null` until the cards land; `reviewsFailed` stays apart from an empty array so an unreadable
-  // list never renders as "no reviews yet", which states a fact nobody has established.
   const [reviews, setReviews] = useState(null);
   const [reviewsFailed, setReviewsFailed] = useState(false);
-  // `null` until the summary read settles. `summaryFailed` is kept apart from `count === 0` so an
-  // unreadable rating never renders as an owner nobody has reviewed.
   const [summary, setSummary] = useState(null);
   const [summaryFailed, setSummaryFailed] = useState(false);
   const [picked, setPicked] = useState(0);
   const [hover, setHover] = useState(0);
   const [revText, setRevText] = useState('');
-  // Submitting is a round trip, so the control has to say so: without it a second click passes the
-  // star and text guards while the first write is still open and files a duplicate review.
   const [posting, setPosting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [reported, setReported] = useState(false);
@@ -82,14 +68,12 @@ export default function Owner() {
     let alive = true;
     setOwner(undefined);
     setListings([]);
-    // `null` from the seam covers unknown, malformed and archived alike — all three are "no such
-    // owner" from a visitor's side, and the page's not-found state is the honest render of each.
     ownerProfile(id)
       .then((r) => { if (alive) setOwner(r); })
       .catch(() => { if (alive) setOwner(null); });
     ownerListings(id)
       .then((rows) => { if (alive) setListings(rows || []); })
-      .catch(() => { /* the card stands without the rail */ });
+      .catch(() => { });
     return () => { alive = false; };
   }, [id]);
 
@@ -125,23 +109,15 @@ export default function Owner() {
     </div>
   );
 
-  // A year, computed server-side: a signup minute published on a public page is a correlation
-  // handle nobody gains anything from.
   const memberSince = owner.memberSince ?? '\u2014';
-  /* A percentage over a subset is a different claim: the rail is capped at 12
-     and a failed read is [], so show an em-dash. */
   const verifiedPct = owner.listingCount > 0 && listings.length === owner.listingCount
     ? `${Math.round((listings.filter((l) => l.verified).length / listings.length) * 100)}%`
     : '\u2014';
   const masked = maskPhone(owner.mobile);
-  /* Owner-only: the contact gate is per listing and this surface has
-     no listing in context; isOwnerViewer is a local comparison. */
   const revealed = isOwnerViewer(owner.mobile);
 
   const latestListing = listings[0] || null;
   const introText = t('owner.chatIntro', { name: (owner.name || '').split(' ')[0] || t('owner.chatFallbackName') });
-  /* Figures come from the summary read, never `reviews`; `revAvg` stays null so an unrated owner isn't shown as
-     rated badly; `dist` arrives ascending but the bars read downwards. */
   const revLoading = !summary && !summaryFailed;
   const revCount = summary ? summary.count : 0;
   const revAvg = summary && Number.isFinite(summary.avg) ? summary.avg : null;
@@ -150,8 +126,6 @@ export default function Owner() {
 
   const myReview = reviews?.find((v) => v.mine);
 
-  /* Re-read both figures as a pair: the aggregate is the server's
-     to compute, so the headline and list can't disagree. */
   const reloadReviews = () => Promise.all([
     listEntityReviews('owner', id).catch(() => null),
     getEntityReviewSummary('owner', id).catch(() => 'error'),
@@ -176,8 +150,6 @@ export default function Owner() {
     const review = { rating: picked, text: revText.trim() };
     (editing ? updateReview(myReview.id, review) : createEntityReview('owner', id, review))
       .then((saved) => {
-        /* A signed-out write answers 'login' rather than throwing; the
-           check above isn't enough as a session can expire mid-page. */
         if (saved === 'login') { sendToSignIn('review', undefined, again); return; }
         return reloadReviews().then(() => {
           resetComposer();
@@ -235,8 +207,6 @@ export default function Owner() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-2xl font-bold text-white">{owner.name}</h1>
-                  {/* Gated on the server's boolean: the badge must only
-                      mark sellers the platform has verified. /} */}
                   {owner.verified ? <span data-testid="owner-verified-pill" className="dz-tag bg-teal-500/15 border border-teal-500/25 text-teal-300 font-medium"><Icon name="badge-check" className="w-3.5 h-3.5" /> {t('owner.verifiedOwner')}</span> : null}
                   <span className="dz-tag bg-emerald-500/15 border border-emerald-500/25 text-emerald-300 font-medium"><Icon name="hand-coins" className="w-3.5 h-3.5" /> {t('owner.zeroBrokerage')}</span>
                 </div>
@@ -250,18 +220,12 @@ export default function Owner() {
                 {revealed ? (
                     <a href={`tel:+91${digits(owner.mobile)}`} className="h-btn px-4 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5 flex items-center gap-2"><Icon name="phone" className="w-4 h-4 text-teal-400" /> {t('owner.call')}</a>
                 ) : (
-                  /* No Call for visitors: the number is granted per
-                     listing, so send them to one; in-app Message needs no number. */
                   <a href="#owner-listings" className="h-btn px-4 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5 flex items-center gap-2"><Icon name="lock-keyhole" className="w-4 h-4 text-teal-400" /> {t('owner.contactViaListing')}</a>
                 )}
                 <button onClick={messageOwner} type="button" className="btn-teal px-4 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center gap-2"><Icon name="send" className="w-4 h-4" /> {t('owner.message')}</button>
                 <button onClick={() => setReported(true)} type="button" className="h-btn px-4 rounded-xl border border-white/10 text-gray-400 text-sm font-medium hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/30 flex items-center gap-2 transition-all"><Icon name="flag" className="w-4 h-4" /> {t('owner.report')}</button>
               </div>
             </div>
-            {/* No response-time tile: the server records none, and an
-                em-dash would falsely imply it is measured but unknown. */}
-            {/* Two columns below `sm`: at 360px three tiles leave ~83px,
-                and unbreakable Devanagari words would overflow. */}
             <div id="owner-header-stats" className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/10">
               <div><p className="text-2xl font-bold gradient-text">{owner.listingCount ?? listings.length}</p><p className="text-gray-500 text-xs">{t('owner.statListed')}</p></div>
               <div><p className="text-2xl font-bold gradient-text">{memberSince}</p><p className="text-gray-500 text-xs">{t('owner.statMemberSince')}</p></div>
@@ -273,15 +237,9 @@ export default function Owner() {
             <div className="space-y-6">
               <div className="glass-card rounded-2xl p-6">
                 <h2 className="text-lg font-bold text-white mb-3">{t('owner.aboutTitle')}</h2>
-                {/* The unverified variant keeps what's still true (direct, no broker, no commission) and drops the
-                    'verified' claim the server cannot support. */}
                 <p className="text-gray-400 text-sm leading-relaxed">{t(owner.verified ? 'owner.aboutBody' : 'owner.aboutBodyUnverified', { name: owner.name })}</p>
                 <div className="flex flex-wrap gap-2 mt-4">
-                  {/* Gated like the header pill, or the emerald badge would
-                      assert 'KYC done' where the teal one was withheld. */}
                   {owner.verified ? <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-medium"><Icon name="user-check" className="w-3.5 h-3.5" /> {t('owner.badgeVerifiedOwner')}</span> : null}
-                  {/* No 'Ownership Verified' pill: that is modelled per listing
-                      (PropertySummary.ownershipVerified), with no owner-level claim to read. */}
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/15 text-gray-300 text-xs font-medium"><Icon name="phone-off" className="w-3.5 h-3.5" /> {t('owner.badgeNumberProtected')}</span>
                 </div>
               </div>
@@ -320,8 +278,6 @@ export default function Owner() {
                       <p className="text-5xl font-extrabold gradient-text">{revAvg == null ? '—' : revAvg.toFixed(1)}</p>
                     )}
                     <div className="flex justify-center my-2"><Stars value={revAvg} /></div>
-                    {/* Three outcomes: folding failure into `noReviews` would
-                        make an outage read as a fact about the owner. */}
                     <p className="text-gray-500 text-xs">
                       {revLoading ? <span className="skeleton inline-block h-3 w-24 rounded" aria-hidden="true" />
                         : summaryFailed ? <span className="text-amber-300/80" data-testid="owner-rating-unavailable">{t('owner.ratingUnavailable')}</span>
@@ -355,8 +311,6 @@ export default function Owner() {
                   </div>
                 </div>
                 )}
-                {/* Same three outcomes as the headline: an unfetched review
-                    list must not read as a statement about the owner. */}
                 <div className="space-y-4">
                   {reviewsFailed ? (
                     <p className="text-amber-300/80 text-sm" data-testid="owner-reviews-unavailable">{t('common.somethingWentWrong')}</p>
@@ -392,8 +346,6 @@ export default function Owner() {
                   ) : (
                     <>
                       <div className="flex items-center gap-3 py-3 px-4 rounded-xl border border-white/10 text-gray-300 text-sm"><Icon name="phone-off" className="w-4 h-4 text-gray-500" /> <span className="tracking-wider">{masked}</span></div>
-                      {/* No request button here either — the number is granted per listing, so the
-                          only honest next step from a profile is to open one. */}
                       <p className="text-gray-500 text-xs mt-2 mb-2.5">{t('owner.numberHidden')}</p>
                       <a href="#owner-listings" className="btn-teal inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold"><Icon name="lock-keyhole" className="w-4 h-4" /> {t('owner.contactViaListing')}</a>
                     </>

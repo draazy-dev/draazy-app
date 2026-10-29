@@ -3,7 +3,6 @@ import Icon from '../../../components/Icon.jsx';
 import Modal from '../../../components/ui/Modal.jsx';
 import DateField from '../../../components/ui/DateField.jsx';
 import { avatarFor, timeAgo } from '../../../lib/format.js';
-/* Lead detail sheet — progressive disclosure for a single request. */
 
 const toDateInput = (ts) => {
   if (!ts) return '';
@@ -30,7 +29,6 @@ export default function LeadSheet({ lead, annotation, onClose, onSaveAnnotation 
   };
   const saveFollowUp = (v) => {
     setFollowUp(v);
-    // Anchor at local noon so the stored timestamp never drifts to the day before.
     saveRef.current({ followUpAt: v ? new Date(v + 'T12:00').getTime() : null });
   };
 

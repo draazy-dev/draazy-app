@@ -93,7 +93,6 @@ const PhotosDocumentsStep = ({
         />
       )}
 
-      {/* The two fields that sell the place come before the optional paperwork. */}
       <div className="mb-6">
         <HeadlineField
           className="mb-6"

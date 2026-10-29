@@ -3,7 +3,6 @@ import Icon from '../../../../components/Icon.jsx';
 import '../../../../styles/components/furniture-tiles.css';
 import { STYLE_ICONS, STYLE_KEYS } from './questions.js';
 
-// Keeps a trailing emoji on its word's line instead of wrapping alone.
 const glueEmoji = (label) => label.replace(/ (?=\p{Extended_Pictographic})/u, '\u00A0');
 
 export function LoadError({ onRetry }) {
@@ -16,7 +15,6 @@ export function LoadError({ onRetry }) {
   );
 }
 
-/** Twelve one-tap rows. Tapping the chosen option again clears that answer. */
 export default function LivingStyleQuestions({ answers, onChange, disabled = false }) {
   const { t } = useTranslation();
   const pick = (key, value) => {

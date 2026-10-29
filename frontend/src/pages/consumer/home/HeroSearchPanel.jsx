@@ -8,23 +8,19 @@ import { listRecentSearches } from '../../../services/recentSearchService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useCity } from '../../../context/CityContext.jsx';
 
-/* Rendered by both the desktop hero and the mobile search sheet; only one is ever displayed (the hero copy is
-   `display: none` below lg), so the accessibility tree never sees a duplicate. */
 export default function HeroSearchPanel({ idPrefix = '' }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { city } = useCity();
   const { user } = useAuth();
   const popularChips = popularChipsFor(city);
-  // Keyed on the session: sign-in is a modal over Home, so without it the previous account's searches would stay on
-  // screen after sign-out.
   const [recentSearches, setRecentSearches] = useState([]);
   useEffect(() => {
     let alive = true;
     setRecentSearches([]);
     listRecentSearches()
       .then((rows) => { if (alive) setRecentSearches(rows); })
-      .catch(() => { /* stay on popular chips; a missing rail is not worth telling anyone about */ });
+      .catch(() => { });
     return () => { alive = false; };
   }, [user?.mobile]);
   const hasRecent = recentSearches.length > 0;
@@ -33,7 +29,6 @@ export default function HeroSearchPanel({ idPrefix = '' }) {
     <>
       <HeroSearch idPrefix={idPrefix} />
 
-      {/* Negative offset trims HeroSearch's mb-8 so the gap matches the buy/rent → search-bar spacing. */}
       <div className="flex justify-center -mt-4">
         <button onClick={() => navigate('/listings?view=map')} className="h-btn group inline-flex items-center gap-2 px-4 rounded-full text-sm font-semibold text-teal-100 bg-teal-500/15 border border-teal-400/40 hover:bg-teal-500/25 hover:border-teal-400/60 hover:text-white transition-all shadow-sm shadow-teal-500/10">
           <Icon name="map" className="w-4 h-4 text-teal-300 group-hover:text-teal-200" />

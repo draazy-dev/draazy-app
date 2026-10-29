@@ -1,5 +1,3 @@
-/* Self-check for the assistant matcher: node src/lib/assistant/match.selfcheck.mjs
-   Must stay outside match.js — a runtime guard there is not statically dead, so it would ship. */
 import { tokenize, rankAnswers } from './match.js';
 
 const assert = (cond, msg) => {
@@ -23,8 +21,6 @@ assert(rankAnswers('   ').length === 0, 'blank → no matches');
 const faqR = rankAnswers('zero brokerage', { faqs: [{ id: 'F1', question: 'Is Draazy zero brokerage?', answer: 'Yes.' }] });
 assert(faqR.length > 0, 'faq entries are searchable');
 
-// A curated entry must win over an imported FAQ that duplicates its question,
-// so trust questions keep Draaz's crafted answer + deep-link (not a bare FAQ).
 const dupFaq = [{ id: 'F2', question: 'How are owners and listings verified?', answer: 'We check them.' }];
 const vr = rankAnswers('How are owners and listings verified?', { faqs: dupFaq });
 assert(vr[0]?.entry.id === 'verification', 'curated verification beats duplicate FAQ, got ' + vr[0]?.entry.id);

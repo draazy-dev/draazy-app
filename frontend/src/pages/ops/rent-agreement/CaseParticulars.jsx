@@ -9,7 +9,6 @@ import { openRequestDoc } from '../service-queue/helpers.js';
 const card = 'rounded-xl border border-white/10 bg-black/10 p-4';
 const label = 'text-[11px] uppercase tracking-wide text-gray-500';
 const KEY_TERMS = new Set(['Rent', 'Refundable deposit', 'Term', 'Start date']);
-// Checklist ids look like `licensor-0-pan`, `tenant-1-photo`, `ownership-proof`; any other id is the property's.
 const ownerKey = (id) => /^(licensor|tenant)-\d+/.exec(id)?.[0] || 'property';
 const shortName = (name) => name.split(' — ').slice(1).join(' — ') || name;
 const indexOf = (key) => Number(key.split('-')[1]);

@@ -2,9 +2,6 @@ import { Children, cloneElement, isValidElement, useEffect, useMemo, useState } 
 import { Link } from 'react-router';
 import Icon from './Icon.jsx';
 
-/* Pages only author their prose; the shell owns navigation, anchors and chrome so all four stay consistent,
-   and the document head comes from data/routeHeads.js. */
-
 const POLICIES = [
   ['Privacy Policy', '/privacy', 'privacy'],
   ['Terms of Service', '/terms', 'terms'],
@@ -33,8 +30,6 @@ const isMobile = () => typeof window !== 'undefined' && window.matchMedia('(max-
 
 export default function LegalPage({ title, lastUpdated, current, children }) {
   const [showTop, setShowTop] = useState(false);
-  // TOC is a scanning aid, not the content. On phones a 10–13 item list buries
-  // the policy below the fold, so start collapsed there and open on desktop.
   const [tocOpen, setTocOpen] = useState(isDesktop);
 
   useEffect(() => {

@@ -12,7 +12,6 @@ const TONE = {
   due: 'bg-amber-500/10 border-amber-500/25 text-amber-300',
 };
 
-/** Rent an owner tracks against this user's mobile: this month's status plus the receipts issued to them. */
 export default function TrackedRent({ homes }) {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();

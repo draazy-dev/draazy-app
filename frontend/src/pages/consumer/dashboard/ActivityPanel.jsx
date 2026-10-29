@@ -4,7 +4,6 @@ import RecentPanel from './RecentPanel.jsx';
 import AlertsPanel from './AlertsPanel.jsx';
 import FollowedSocietiesPanel from './FollowedSocietiesPanel.jsx';
 import MyFlatmateGroupsPanel from './MyFlatmateGroupsPanel.jsx';
-/* What the seeker is tracking; saved homes live on /saved, behind the top-bar heart. */
 
 const ITEMS = [
   { key: 'alerts', label: 'Alerts', icon: 'bell-plus' },

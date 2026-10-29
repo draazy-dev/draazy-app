@@ -73,7 +73,6 @@ export default function DuplicatesTab({ onRefresh, onCount, canModerate = true }
       });
     } catch (err) {
       console.error('[DuplicatesTab] failed to load clusters', err);
-      // A failed read must not render as "supply looks clean"; that is a false negative.
       onCount?.(null);
       setState({ status: 'error', clusters: [], truncated: false, scanned: 0 });
     }
@@ -143,7 +142,6 @@ export default function DuplicatesTab({ onRefresh, onCount, canModerate = true }
       </p>
 
       {truncated && (
-        /* Capped clustering fails by omission, not by partial clusters, so the list must say incomplete. */
         <p className="dz-card mb-4 flex items-start gap-2 px-4 py-3 text-xs text-amber-300">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>

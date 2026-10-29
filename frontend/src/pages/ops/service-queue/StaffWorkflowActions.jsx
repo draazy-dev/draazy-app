@@ -14,7 +14,6 @@ const REGISTRATION_FIELDS = [
 ];
 const EMPTY_REGISTRATION = Object.fromEntries(REGISTRATION_FIELDS.map(({ key }) => [key, '']));
 
-// Keys must match DraftingChecklist.java; the server refuses a rent-agreement draft without all of them.
 const DRAFT_CHECKS = [
   { key: 'identity', label: 'Aadhaar / PAN numbers in the draft match the uploaded scans' },
   { key: 'title', label: 'Ownership proof (index II / sale deed / tax bill) names every licensor' },
@@ -49,7 +48,6 @@ export default function StaffWorkflowActions({ request, onShareDraft, onUploadFi
       setChecks([]);
       form.reset();
     } catch {
-      // The desk has already toasted the server's reason; keep the file for a retry.
     } finally {
       setBusy('');
     }
@@ -66,7 +64,6 @@ export default function StaffWorkflowActions({ request, onShareDraft, onUploadFi
       setRegistration(EMPTY_REGISTRATION);
       form.reset();
     } catch {
-      // As above.
     } finally {
       setBusy('');
     }

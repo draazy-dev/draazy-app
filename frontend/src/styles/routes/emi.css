@@ -1,8 +1,3 @@
-/* EMI calculator route styles (Tier 1), loaded with the /services/emi-calculator chunk.
-   --emi-pct is set inline by EmiCalculator.jsx. */
-
-/* The gradient is built here, not in the component's inline style, so the coarse-pointer
-   block below can repaint the rail. */
 .emi-page input[type=range] {
   -webkit-appearance: none;
   appearance: none;
@@ -43,9 +38,6 @@
 .emi-page input[type=range]:focus-visible {
   box-shadow: 0 0 0 3px rgb(var(--dz-c-teal-500) / .25);
 }
-
-/* Extend the target, not the drawing (docs/system/design-system.md, tap-extend): the rail stays
-   drawn at 6px via a centred background band while the element grows to a 32px finger strip. */
 @media (pointer: coarse) {
   .emi-page input[type=range] {
     height: 32px;

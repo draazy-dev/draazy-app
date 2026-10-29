@@ -1,4 +1,3 @@
-// node scripts/vite-plugin-content-index.test.mjs
 import assert from 'node:assert/strict';
 import { compileIndex } from './vite-plugin-content-index.mjs';
 

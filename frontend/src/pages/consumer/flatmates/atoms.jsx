@@ -59,8 +59,6 @@ const MatchPill = ({ match }) => {
   );
 };
 
-// Honest freshness flag: shown only for posts created in the last 24h so seekers
-// can spot the newest, most-likely-still-available requests at a glance.
 const Fresh = ({ item }) => {
   const { t } = useTranslation();
   return (isFresh(item)
@@ -79,7 +77,6 @@ const StyleMatch = ({ pct }) => {
   );
 };
 
-/** One badge per card: living-style match, else the post-based match, else the freshness flag. */
 const CardBadge = ({ item, match }) => (Number.isFinite(item.styleMatch)
   ? <StyleMatch pct={item.styleMatch} />
   : match ? <MatchPill match={match} /> : <Fresh item={item} />);

@@ -1,5 +1,3 @@
-/* Prerendered shell per static route, plus the readable copy of the service pages and home,
-   so crawlers and link previews see the right page without JavaScript. */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { esc, headTags, jsonLd, renderPage } from './seo-html.mjs';
@@ -58,14 +56,12 @@ ${sub ? `<p class="mt-5 max-w-2xl text-base text-gray-300 sm:text-lg">${esc(sub)
 ${parts.filter(Boolean).join('\n')}
 </main>`;
 
-/* Hub card order and targets mirror the SERVICES table in src/pages/consumer/Services.jsx. */
 const HUB_CARDS = [
   ['rentAgreement', '/services/rent-agreement'], ['buyHome', '/listings?deal=buy'], ['rentHome', '/listings?deal=rent'],
   ['localityInsights', '/locality/baner'], ['homeLoans', '/home-loans'], ['propertyLegal', '/services/property-legal'],
   ['packersMovers', '/services/packers-movers'], ['interior', '/services/interior-renovation'], ['valuation', '/services/property-valuation'],
 ];
 
-/* ServiceLanding pages (legal, packers, home loans). Stat strips are left out: plan 6.5 lists them as unbacked. */
 const landing = (p, extra = '') => ({
   faq: p.faq,
   body: main(p.titleTop, p.titleAccent, p.subtitle,
@@ -92,7 +88,6 @@ const trust = (p) => ({
     p.faq && faqSection('Frequently asked questions', p.faq)),
 });
 
-/* Only copy each page actually renders, read from the same locale file, so the HTML never says more than the screen. */
 export function routeBodies({ services: s }) {
   const ra = s.ra;
   return {
@@ -130,14 +125,12 @@ const faqPage = (faq) => ({
   mainEntity: vals(faq).map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
 });
 
-/* Footer "Explore" and "Company" links, so the home page's crawlable copy reaches the content hubs. */
 const HOME_LINKS = [
   ['Buy property', '/listings?deal=buy'], ['Rent property', '/listings?deal=rent'], ['Flatmates', '/flatmates'],
   ['Browse societies', '/societies'], ['Services', '/services'], ['EMI calculator', '/emi-calculator'],
   ['Locality guides', '/locality'], ['Blog', '/blog'], ['Help centre', '/help'],
 ];
 
-/* Only home sections that render regardless of the city's stock: hero heading, Why Draazy, owner CTA, FAQ. */
 export function homeBody({ home: h }) {
   const faq = Object.keys(h.faq).filter((k) => /^q\d+$/.test(k)).map((k) => ({ q: h.faq[k], a: h.faq[`a${k.slice(1)}`] }));
   const why = [{ name: h.why.heroTitle, desc: h.why.heroBody }, ...[1, 2, 3].map((n) => ({ name: h.why[`row${n}Title`], desc: h.why[`row${n}Body`] }))];
@@ -164,8 +157,6 @@ export function routePage(shell, path, head, { body = '', faq } = {}) {
   return renderPage(shell, tags, body);
 }
 
-/* public/sitemap.xml is an empty <urlset>; each prerender plugin adds its own pages. No lastmod: a build date
-   would claim every static page changed on each deploy. */
 export function withStaticUrls(xml) {
   if (xml.includes(`<loc>${SITE}/</loc>`)) return xml;
   const urls = Object.keys(ROUTE_HEADS).map((p) => `  <url><loc>${SITE}${p}</loc></url>`).join('\n');
@@ -193,8 +184,6 @@ export default function routeHeadsPlugin() {
       const sitemap = join(outDir, 'sitemap.xml');
       if (existsSync(sitemap)) writeFileSync(sitemap, withStaticUrls(readFileSync(sitemap, 'utf-8')), 'utf-8');
     },
-    /* closeBundle, not writeBundle: every other prerender plugin and the spa-fallback's 404.html copy read
-       dist/index.html as the bare shell during writeBundle, and must not inherit home's content and canonical. */
     closeBundle() {
       const shellFile = join(outDir, 'index.html');
       if (!existsSync(shellFile)) return;

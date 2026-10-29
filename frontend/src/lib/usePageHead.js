@@ -2,8 +2,6 @@ import { useEffect } from 'react';
 
 const SITE = 'https://draazy.com';
 
-/* A prerendered page's tags hold that page's values, not the app's. `data-shell` (set by
-   scripts/vite-plugin-blog.mjs) is the app-wide value to restore; empty means the shell had none. */
 function previousValue(el, attr) {
   const shell = el.getAttribute('data-shell');
   el.removeAttribute('data-shell');

@@ -1,10 +1,6 @@
-// The task runner loads its wasm glue with a script tag, so a CDN copy dies on script-src 'self'.
-// Bundling it also keeps the runtime on the same version as the package we install.
 import wasmBinaryPath from '@mediapipe/tasks-vision/vision_wasm_internal.wasm?url';
 import wasmLoaderPath from '@mediapipe/tasks-vision/vision_wasm_internal.js?url';
 
-// Pinned float16/1 and self-hosted: listing storage.googleapis.com in connect-src would make any
-// GCS bucket an approved POST destination, and '/latest/' could swap the model under us.
 const LANDMARKER_MODEL = '/models/face_landmarker.task';
 
 let taskPromise;
@@ -24,8 +20,6 @@ async function createLandmarker() {
 }
 
 export function loadFaceLandmarker() {
-  // Cache the promise for one landmarker per session, but forget a rejected one: caching that
-  // would make a single bad fetch permanent, replaying the same failure on every later attempt.
   if (!taskPromise) {
     taskPromise = createLandmarker().catch((error) => {
       taskPromise = null;
@@ -68,8 +62,6 @@ export function readSelfieGuidance(result, stage) {
   const landmarks = result?.faceLandmarks?.[0];
   if (!landmarks?.length) return { ok: false, messageKey: 'noFace' };
   const box = faceBox(landmarks);
-  // Laptop webcams sit an arm's length away; a stricter threshold rejects readable faces.
-  // The staged checks still run after this size gate.
   if (box.width < 0.18 || box.height < 0.18) return { ok: false, messageKey: 'closer' };
   if (box.width > 0.62 || box.height > 0.72) return { ok: false, messageKey: 'backOff' };
   if (Math.abs(box.centerX - 0.5) > 0.12 || Math.abs(box.centerY - 0.58) > 0.16) {

@@ -3,12 +3,10 @@ import { bootstrapSection } from './bootstrap.js';
 import { GRIEVANCE_OFFICER_DEFAULT, PRICING_DEFAULTS } from '../../settingsService.js';
 import { DEFAULT_MAX_PHOTOS, MAX_PHOTOS_CEILING } from '../../../lib/uploads/policy.js';
 
-/** The `ETag` of the last document read or written, sent back as `If-Match` so a stale save answers 412. */
 let settingsEtag = null;
 
 let settingsRead = null;
 
-/** The whole configuration document; concurrent callers share one read, which withStatus would otherwise bypass. */
 export function getSettings() {
   settingsRead ??= get('/admin/settings', undefined, { withStatus: true })
     .then(({ data: doc, etag }) => {
@@ -19,13 +17,11 @@ export function getSettings() {
   return settingsRead;
 }
 
-/** Only the console module switches (`adminFlags`) - the shell reads this, not the whole document. */
 export async function getAdminFlags() {
   const flags = await get('/admin/settings/flags');
   return flags && typeof flags === 'object' ? flags : {};
 }
 
-/** Deep-merge `patch` into the stored document; resolves with the document **as saved**. */
 export async function updateSettings(patch) {
   const { data: doc, etag } = await put('/admin/settings', patch, {
     withStatus: true,
@@ -36,13 +32,10 @@ export async function updateSettings(patch) {
   return doc && typeof doc === 'object' ? doc : {};
 }
 
-/** Not a stub and not a missing feature: migration V61 deleted `settings.customRoles`, and `PUT /admin/settings`
- * answers **422** for the key rather than storing it — sending it here would fail the write. */
 export async function getCustomRoles() {
   return [];
 }
 
-/* App flags affect anonymous visitors, so they publish outside admin-only settings. */
 export async function getAppFlags() {
   const flags = await bootstrapSection('flags');
   return flags && typeof flags === 'object' ? flags : {};
@@ -86,7 +79,6 @@ export async function getGrievanceOfficer() {
   return { name: text(officer?.name), email: text(officer?.email) || GRIEVANCE_OFFICER_DEFAULT.email };
 }
 
-/** The `listingPolicy` section of `GET /bootstrap` (`common/settings/ListingPolicyController.java`). */
 export async function getListingPolicy() {
   const raw = await bootstrapSection('listingPolicy');
   const n = raw?.maxPhotos;

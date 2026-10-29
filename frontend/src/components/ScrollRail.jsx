@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 
-// Phones draw overlay scrollbars that vanish at rest and iOS ignores scrollbar styling, so the rail is drawn.
 export default function ScrollRail({ className, children }) {
   const scrollRef = useRef(null);
   const thumbRef = useRef(null);

@@ -9,7 +9,6 @@ const fileFromBlob = (file, type, blob) => {
   return new File([blob], name, { type: blob.type, lastModified: file.lastModified });
 };
 
-/* Without OffscreenCanvas the image worker cannot draw, so the same pipeline runs on the main thread. */
 async function processImageOnMainThread(file, type, document, signal) {
   const { processImage, imageErrorMessage } = await import('./imageProcess.js');
   signal?.throwIfAborted();
@@ -55,7 +54,6 @@ function processInWorker(file, type, document, signal) {
   });
 }
 
-/** Issuer-original PDFs must never enter a rewriting/compression path. `withLook` also resolves a dark/blurry hint. */
 export async function prepareUpload(file, { document = false, originalPdf = false, withLook = false, signal } = {}) {
   signal?.throwIfAborted();
   const type = await uploadType(file, document);

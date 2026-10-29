@@ -30,8 +30,6 @@ function ChargesUnavailable({ cost }) {
 function CostLines({ cost }) {
   const { t } = useTranslation();
   const ready = cost.status === 'ready';
-  // Any figure this browser had to derive (see `useRentAgreement`) makes the total an estimate
-  // again, and it is labelled as one. All-server figures are the bill, not an estimate.
   const estimated = (cost.computed || []).length > 0;
   return (
     <div className="space-y-2.5 text-sm">
@@ -53,8 +51,6 @@ function CostLines({ cost }) {
     </div>
   );
 }
-/* The Art. 36A formula only describes a locally derived figure, so once the statutory numbers come from the server it
-   is replaced by the published schedule's own note. */
 
 function CostFootnote({ cost }) {
   const { t } = useTranslation();
@@ -63,15 +59,12 @@ function CostFootnote({ cost }) {
   if (!text) return null;
   return <p className="text-gray-600 text-[11px] mt-4 leading-relaxed">{text}</p>;
 }
-// Mobile-only collapsible cost summary so the estimate is reachable while filling the form.
 
 export function MobileCostSummary({ cost }) {
   const { t } = useTranslation();
   return (
     <details className="ra-mcost lg:hidden glass-card rounded-2xl p-4 mb-6 group">
       <summary className="flex items-center justify-between cursor-pointer select-none">
-        {/* A dash, not ₹0 — the collapsed summary is the one line most people read, so it must not be the place a
-           failed read gets rounded down into a price. */}
         <span className="text-white font-semibold text-sm flex items-center gap-2"><Icon name="receipt" className="w-4 h-4 text-teal-400" /> {t('services.ra.cost.estimatedTotal')}</span>
         <span className="flex items-center gap-2"><span className="text-lg font-bold gradient-text">{cost.total == null ? '—' : fmt(cost.total)}</span><Icon name="chevron-down" className="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180" /></span>
       </summary>

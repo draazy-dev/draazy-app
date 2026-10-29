@@ -1,5 +1,3 @@
-/* Pins the re-moderation rule across the three places it is written down, because "editing this field
-   sends your listing back for review" is a promise the owner acts on. Exit 1 = drift. */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -47,7 +45,6 @@ function ok(condition, what) {
 
 const quoted = (blob) => [...blob.matchAll(/'([^']+)'|"([^"]+)"/g)].map((m) => m[1] ?? m[2]);
 
-/* The scan sees flat `if (in.field())` blocks; derived-field helpers are checked separately. */
 console.log('\n  1. ListingEditRules.apply — the two foundation sets');
 const serviceSrc = read(SERVICE);
 const applyBody = (read(RULES).split('EditImpact apply(Property p, ListingUpdate in) {')[1] || '')
@@ -66,10 +63,7 @@ const serverSet = new Set([...serverOffSearch, ...serverStaysLive]);
 ok(serverOffSearch.size > 0, 'no off-search fields parsed out of ListingEditRules.apply — the block shape changed and this check now proves nothing');
 ok(serverStaysLive.size > 0, 'no stays-live fields parsed out of ListingEditRules.apply — the block shape changed and this check now proves nothing');
 
-/* A field in both sets would make the outcome depend on block order; a field in neither is a search
-   facet that costs nothing, which is the bait-and-switch this whole rule exists to price. */
 const inBoth = [...serverOffSearch].filter((f) => serverStaysLive.has(f));
-/* Guard placement matters: an approved listing must not leave search because staff fixed a typo. */
 ok(
   inBoth.length === 0,
   `ListingEditRules.apply puts ${inBoth.join(', ')} in BOTH foundation sets. The outcome would then`
@@ -78,8 +72,6 @@ ok(
 console.log(`     off search: ${sorted(serverOffSearch)}`);
 console.log(`     stays live: ${sorted(serverStaysLive)}`);
 
-/* 2. An independent oracle: ListingFoundationTest derives the union from the search facets rather than
-   from `apply`. Each half is compared separately, because a field moving between them is the costly drift. */
 console.log('  2. ListingFoundationTest OFF_SEARCH / STAYS_LIVE agree');
 const testSrc = read(TEST);
 const oracle = (name) => {
@@ -91,11 +83,8 @@ const oracle = (name) => {
 sameSet(serverOffSearch, oracle('OFF_SEARCH'), 'ListingEditRules.apply off-search set vs ListingFoundationTest#OFF_SEARCH');
 sameSet(serverStaysLive, oracle('STAYS_LIVE'), 'ListingEditRules.apply stays-live set vs ListingFoundationTest#STAYS_LIVE');
 
-/* 3. The client mirrors the OWNER rule, so pin which path that is: `update` acts on the impact and
-   `updateAsModerator` deliberately does not, and mirroring `apply` alone would not catch an inversion. */
 console.log('  3. update() reverts or queues a re-check; updateAsModerator() does neither');
 
-/* Position does not prove unconditional execution, since status guards can wrap these branches. */
 const atDepthZero = (s) => {
   let out = s;
   let prev;
@@ -124,8 +113,6 @@ ok(
   + ' listing — which is the only status where "comes off search" means anything. Every other status'
   + ' is already off search, so this guard is the whole rule.',
 );
-/* Asserted by emptying the branch of its nested blocks: the owner note may be conditional and the re-pend
-   below is, but the re-check itself may not be — a price edit that queues nothing is a free edit. */
 const recheckBranch = (serviceSrc.split('else if (impact.recheckOnly()) {')[1] || '').split('\n        }')[0];
 ok(
   atDepthZero(recheckBranch).includes('p.requestRecheck('),
@@ -153,7 +140,6 @@ ok(
   + ' not a checker change.',
 );
 
-/* ─── 4. The live form maps onto it ────────────────────────────────────────────────────────────── */
 console.log('  4. list-property/editPolicy.js FOUNDATION_*_KEYS');
 const {
   FOUNDATION_FORM_KEYS, FOUNDATION_OFF_SEARCH_KEYS, FOUNDATION_STAYS_LIVE_KEYS,
@@ -163,8 +149,6 @@ sameSet(new Set(Object.keys(FOUNDATION_OFF_SEARCH_KEYS)), serverOffSearch, 'edit
 sameSet(new Set(Object.keys(FOUNDATION_STAYS_LIVE_KEYS)), serverStaysLive, 'editPolicy FOUNDATION_STAYS_LIVE_KEYS vs ListingEditRules.apply');
 sameSet(new Set(Object.keys(FOUNDATION_FORM_KEYS)), serverSet, 'editPolicy FOUNDATION_FORM_KEYS vs ListingEditRules.apply');
 
-/* `classifyChanges` only ever emits keys from the two tier lists and PHOTO_FIELD, so a form key in none of
-   them can never fire — silently. PHOTO_FIELD comes from the url arguments, hence neither tier list. */
 const reportable = new Set([...TIER_A_FIELDS, ...TIER_B_FIELDS].map((f) => f.key).concat(PHOTO_FIELD.key));
 for (const [wire, formKeys] of Object.entries(FOUNDATION_FORM_KEYS)) {
   for (const key of formKeys) {
@@ -176,12 +160,9 @@ for (const [wire, formKeys] of Object.entries(FOUNDATION_FORM_KEYS)) {
   }
 }
 
-/* 5. The lists agreeing is not the promise; the banner is. "Your listing comes off search" is a lie in both
-   directions, so each edit must land in the right bucket and *not* in the other, nor in `instant`. */
 console.log('  5. classifyChanges routes each foundation edit to the outcome the server will pick');
 const PROBE = { price: ['1000000', '1200000'], monthlyRent: ['25000', '31000'], bhk: ['2', '3'], propertyType: ['flat', 'villa'], locality: ['Kothrud', 'Baner'], deal: ['sale', 'rent'], furnishing: ['unfurnished', 'semi'], possession: ['ready', 'under-construction'], society: ['old-society', 'new-society'], electricityMeterNo: ['170012345678', '170087654321'], carpetArea: ['1000', '1250'] };
 const probe = (key) => {
-  // The gallery is not a form field; it reaches classifyChanges as the two url lists.
   if (key === PHOTO_FIELD.key) return classifyChanges({}, {}, ['a.jpg', 'b.jpg'], ['a.jpg']);
   const [before, after] = PROBE[key] || ['before', 'after'];
   return classifyChanges({ [key]: before }, { [key]: after });
@@ -212,15 +193,12 @@ for (const formKeys of Object.values(FOUNDATION_STAYS_LIVE_KEYS)) {
   }
 }
 
-/* The converse: an ordinary edit must not claim re-moderation, or the warning becomes noise and owners
-   learn to ignore it. `deposit` is Tier B and `floor` Tier A; the server classifies neither. */
 const ordinary = classifyChanges({ deposit: '50000', floor: '3' }, { deposit: '60000', floor: '7' });
 ok(ordinary.remoderation.length === 0, 'a deposit/floor edit is reported as re-moderation, but the server does not revert on either');
 ok(ordinary.staysLive.length === 0, 'a deposit/floor edit is reported as a server-side re-check, but the server classifies neither field');
 ok(ordinary.instant.some((c) => c.key === 'deposit'), 'a deposit edit is no longer reported as publishing instantly');
 ok(ordinary.recheck.some((c) => c.key === 'floor'), 'a floor edit is no longer reported as a re-check');
 
-/* ─── Report ──────────────────────────────────────────────────────────────────────────────────── */
 if (failures.length) {
   console.error(`\n  ✗ ${failures.length} of ${checks} checks failed\n`);
   failures.forEach((f) => console.error(`    • ${f}\n`));

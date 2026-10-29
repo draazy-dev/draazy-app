@@ -35,7 +35,6 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
   const propId = String(p.id || '');
   const routeId = propertyKey(useParams().id);
   const { gate, loading } = useContactGate(routeId || propId);
-  // `isIn` gates the fetch: signed out there is no quota to report, and no token to ask with.
   const { entitlements } = useEntitlements(isIn);
   const left = contactsLeft(entitlements);
   const freeTill = freeContactsTill(entitlements);
@@ -51,12 +50,9 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
 
   const request = async () => {
     if (!isIn) {
-      /* Close only if the gate actually opened. */
       if (sendToSignIn('contact')) onClose();
       return;
     }
-    // Contact quota spent, so offer the referral or Contact Pack route. The refusal is the
-    // server's, caught below: a browser that could pre-check this could also answer it generously.
     track('contact_click', { action: 'request_number', id: propId });
     captureLead({ context: 'request_number', property: propId });
 
@@ -67,7 +63,6 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
       toast(t('property.requestSentNumber'), 'success');
       onClose();
     } catch (err) {
-      // Owner accepts verified contacts only, so offer the opt-in badge flow rather than a request.
       if (err?.code === 'verification_required') {
         setVerify(true);
         return;
@@ -90,11 +85,9 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
         return;
       }
       if (err?.status === 401) {
-        // `back` is the listing as it was when the request left, not wherever they navigated meanwhile.
         if (sendToSignIn('contact', back)) onClose();
         return;
       }
-      // Listing withdrawn / owner contact pulled — nothing was requested, so no quota is spent.
       toast(t('property.contactUnavailable'), 'error');
       onClose();
     } finally {
@@ -257,8 +250,6 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
                         <Icon name="lock-keyhole" className="w-3.5 h-3.5" /> {t('property.requestNumber')}
                       </button>
 
-                      {/* Below `lg` this sheet is the only contact surface, so the free-contact countdown has to be
-                         here or a phone buyer meets the wall as a bare 422. */}
                       {isIn && Number.isFinite(left) && (
                         <p className="text-[11px] mt-1.5" data-testid="contacts-left">
                           {left > 0 ? (

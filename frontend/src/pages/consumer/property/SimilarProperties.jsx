@@ -28,8 +28,6 @@ export function SimilarProperties({ p }) {
     return () => { alive = false; };
   }, [near, p.id, p.uuid, p.deal, p.localitySlug, p.bhkNum, p.price, p.lat, p.lng]);
 
-  // This section mounts asynchronously (after the parent's scroll-reveal observer
-  // has already scanned the page), so reveal it directly once the cards render.
   useEffect(() => {
     if (items.length && secRef.current) secRef.current.classList.add('visible');
   }, [items]);

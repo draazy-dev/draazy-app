@@ -3,14 +3,10 @@ import { getAppFlags } from '../services/settingsService.js';
 
 const AppFlagsContext = createContext(null);
 
-/* Flags come from the public `GET /bootstrap`, not the admin settings document, because they gate what logged-out visitors see;
-   `flagEnabled` tests `!== false`, so an undecided flag is on and a failed fetch takes nothing away. */
 export function AppFlagsProvider({ children }) {
   const [flags, setFlags] = useState({});
 
   useEffect(() => {
-    /* A counter declared inside the effect rather than a `useRef` cleared in cleanup: under
-       StrictMode such a ref stays false for the component's life, swallowing every result. */
     let generation = 0;
 
     const sync = async () => {
@@ -19,16 +15,11 @@ export function AppFlagsProvider({ children }) {
         const next = await getAppFlags();
         if (mine === generation) setFlags(next && typeof next === 'object' ? next : {});
       } catch {
-        /* Deliberately not a reset: clearing to `{}` means "nothing is switched off", so it could
-           only ever undo a good earlier read — turning maintenance mode back off on one bad poll. */
       }
     };
 
     sync();
-    // Same-tab: raised by whichever settings provider handled the write, so an admin toggling a flag
-    // sees the consumer UI re-gate without a reload.
     window.addEventListener('draazy-settings-change', sync);
-    // Cross-tab: the browser's own signal that another tab wrote to local storage.
     window.addEventListener('storage', sync);
     return () => {
       generation += 1;

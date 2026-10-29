@@ -1,9 +1,3 @@
-/* Button.jsx — the canonical 3-tier button for Draazy.
-   Tiers (variant): 'primary' | 'secondary' | 'icon'.
-   Sizes: 'sm' (32px) | 'md' (40px, default) | 'lg' (48px).
-   Renders a native <button> by default, or a router <Link> when `to` is set,
-   or any element via `as`. Styling lives in styles/index.css (.btn* classes). */
-
 import { Link } from 'react-router';
 import Icon from '../Icon.jsx';
 

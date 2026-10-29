@@ -8,8 +8,6 @@ import { propertyKind } from './derivations.js';
 import { useLocalityStats, localitySlugOf } from './useLocalityStats.js';
 import { fmtNum } from '../../../lib/format.js';
 
-// Commute is served from the cache-at-write flow (traffic-aware "live" times when available; a free-flow estimate
-// otherwise). The locality line is listing-derived and each figure is hidden when the server has none.
 export default function LocationInsights({ p, lat, lng }) {
   const { t } = useTranslation();
   const agoLabel = (ts) => {

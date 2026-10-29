@@ -5,10 +5,6 @@ import HelpLayout from '../../../components/help/HelpLayout.jsx';
 import HelpSearch from '../../../components/help/HelpSearch.jsx';
 import { ArticleCard, CategoryCard } from '../../../components/help/HelpCards.jsx';
 import { useHelpTree, useFeaturedArticles, useRecentArticles } from '../../../lib/useHelp.js';
-/* Help centre landing page. Uses the `wide` shell — the topic rail is redundant here because the whole page is the
-   topic index. */
-
-/* Slugs surfaced as "Popular" under the search box. */
 
 const POPULAR = ['zero-brokerage', 'spot-a-scam', 'post-a-listing'];
 
@@ -33,8 +29,6 @@ export default function HelpHome() {
         </p>
         <div className="mx-auto mt-6 max-w-xl">
           <HelpSearch variant="hero" />
-        {/* "Popular:" reads like a sentence but behaves like a nav row — every item is a destination, not prose — so
-           WCAG 2.5.8's inline-text exemption should not be doing the work here. */}
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 text-xs text-gray-600">
           <span>{t('help.popular')}</span>
@@ -50,8 +44,6 @@ export default function HelpHome() {
           })}
         </div>
       </section>
-      {/* Recently viewed — only once there is history worth showing */}
-
       {recent.length > 0 && (
         <section className="mb-12">
           <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-gray-500">

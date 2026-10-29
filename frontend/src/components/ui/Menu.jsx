@@ -6,8 +6,6 @@ import useSheetViewport from '../../lib/useSheetViewport.js';
 import useSwipeDismiss from '../../lib/useSwipeDismiss.js';
 import Icon from '../Icon.jsx';
 
-/* Portaled to <body> so the panel escapes card overflow/stacking traps; items take
-   { icon, label, onClick | href | to, tone, disabled, divider }. */
 export default function Menu({ items = [], ariaLabel, className, onNavigate }) {
   const { t } = useTranslation();
   const menuLabel = ariaLabel || t('ui.moreActions');
@@ -15,8 +13,6 @@ export default function Menu({ items = [], ariaLabel, className, onNavigate }) {
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
-  /* Below 640px an anchored kebab panel is a cluster of ~32px targets in a random corner,
-     so the items become a floating action card of full-width rows instead. */
   const sheet = useSheetViewport();
 
   const close = useCallback(() => setOpen(false), []);
@@ -41,14 +37,11 @@ export default function Menu({ items = [], ariaLabel, className, onNavigate }) {
     const trigger = triggerRef.current;
     const menu = menuRef.current;
     if (!trigger || !menu) return;
-    // Sheet mode is laid out entirely in CSS. Drop any inline geometry a previous
-    // desktop-width pass wrote, or it would out-specify the sheet rules.
     if (sheet) { menu.removeAttribute('style'); return; }
     const r = trigger.getBoundingClientRect();
     menu.style.position = 'fixed';
     menu.style.zIndex = '9999';
     const mw = menu.offsetWidth;
-    // Right-align the panel to the trigger so it opens inward from the row's edge.
     let left = r.right - mw;
     if (left < 8) left = 8;
     if (left + mw > window.innerWidth - 8) left = Math.max(8, window.innerWidth - 8 - mw);
@@ -79,7 +72,6 @@ export default function Menu({ items = [], ariaLabel, className, onNavigate }) {
     else if (it.onClick) it.onClick();
   };
 
-  /* Drag the card's top edge down to dismiss. Mobile-only by construction. */
   const swipe = useSwipeDismiss(close);
 
   return (
@@ -103,7 +95,6 @@ export default function Menu({ items = [], ariaLabel, className, onNavigate }) {
       {open && typeof document !== 'undefined'
         ? createPortal(
             <>
-              {/* The card is a modal surface, so the page behind it must read as dismissed. */}
               {sheet ? <div className="dz-dropdown__scrim" onClick={close} aria-hidden="true" /> : null}
               <div
                 ref={menuRef}
@@ -129,7 +120,6 @@ export default function Menu({ items = [], ariaLabel, className, onNavigate }) {
                       onClick={() => pick(it)}
                       className={classNames(
                         'w-full flex items-center gap-2.5 px-2.5 rounded-lg font-medium text-left transition-colors',
-                        // Sheet rows are primary targets, not a compact overflow list.
                         sheet ? 'min-h-[48px] py-3 text-[15px]' : 'py-2 text-[13px]',
                         it.disabled && 'opacity-40 cursor-not-allowed',
                         !it.disabled && (danger

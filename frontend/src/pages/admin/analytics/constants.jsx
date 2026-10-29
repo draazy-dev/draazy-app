@@ -25,8 +25,6 @@ export const RANGE_OPTIONS = [
 ];
 
 export function Card({ title, desc, action, children, height = 240 }) {
-  // Charts own their (definite) height; pass the card's height down to chart
-  // children that don't set their own so per-card sizing is preserved.
   const kids = Children.map(children, (c) =>
     isValidElement(c) && typeof c.type === 'function' && c.props.height == null
       ? cloneElement(c, { height })
@@ -46,8 +44,6 @@ export function Card({ title, desc, action, children, height = 240 }) {
   );
 }
 
-/* API-backed tabs must not turn a 500 into zeroed KPIs that read as an all-clear.
-   `role="alert"` announces this late-mounted failure state. */
 export function LoadFailedNotice({ children }) {
   return (
     <div

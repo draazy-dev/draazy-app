@@ -1,32 +1,3 @@
-/**
- * Wire → view-model translation for the note domain, and the one place `listing` becomes `property`.
- *
- * ## The vocabulary bridge
- *
- * Every note call site in this app says `listing`. The contract says `property` — as it does in
- * `/properties`, in `ReportTargetTypes`, in `PropertyResponse`. Both words are defensible and
- * neither is going to move, so the translation happens here, once, rather than at forty call sites
- * or by teaching the API a second client's noun.
- *
- * `toWireType` is deliberately a *whitelist* and not a `listing → property` string swap with a
- * pass-through default. A typo would otherwise sail through to the server, which refuses unknown
- * kinds with a 400 — a clear failure, but one raised a network round trip away from the mistake.
- *
- * ## Shape
- *
- * The wire note is `{id, entityType, entityId, authorId, authorName, action, text, createdAt,
- * updatedAt}`; the view model is `{id, author, action, text, at, editedAt}` — the shape the
- * `InternalNote` widget and the Communication Log already render.
- *
- * `author` falls back to `authorId` because a byline with an ugly id in it is a fact; a blank
- * byline reads as "the system did this".
- *
- * `editedAt` is null when the note has never been corrected. The server sets `updatedAt` on insert
- * as well as on update, so "has this been edited?" is `updatedAt > createdAt` rather than
- * `updatedAt != null` — presence would mark every note as edited the moment it was written.
- */
-
-/** The entity kinds the server accepts, keyed by the word this app uses. */
 const WIRE_TYPES = {
   listing: 'property',
   property: 'property',
@@ -36,11 +7,6 @@ const WIRE_TYPES = {
   service_request: 'service_request',
 };
 
-/**
- * This app's word for an entity kind → the contract's word.
- *
- * @throws {Error} when the kind is not one of the four. Not an `ApiError`: nothing was sent.
- */
 export function toWireType(entityType) {
   const wire = WIRE_TYPES[String(entityType || '').toLowerCase()];
   if (!wire) {
@@ -51,7 +17,6 @@ export function toWireType(entityType) {
   return wire;
 }
 
-/** One wire `InternalNote` → the view model the note surfaces render. */
 export function toNote(row) {
   const at = row?.createdAt || null;
   const updated = row?.updatedAt || null;
@@ -67,13 +32,6 @@ export function toNote(row) {
   };
 }
 
-/**
- * A bare array of wire notes → view models.
- *
- * The notes routes answer with an array rather than a page envelope, so there is no `content` to
- * unwrap and no truncation to warn about. Anything that is not an array becomes an empty list —
- * the widget's "no notes" state is a truthful thing to show when the shape is unrecognisable.
- */
 export function toNotes(rows) {
   return (Array.isArray(rows) ? rows : []).map(toNote);
 }

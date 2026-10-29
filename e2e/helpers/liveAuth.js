@@ -171,6 +171,7 @@ export async function signedInAs(page, mobile) {
   if (saved && Date.now() - saved.at < SESSION_MAX_AGE_MS) {
     // Seed storage before boot so the session marker does not trigger an unnecessary refresh.
     await page.context().addCookies(saved.cookies);
+    // Init scripts re-run on every navigation; seed once, or a later sign-in on this page is overwritten.
     await page.addInitScript((snapshot) => {
       for (const [k, v] of Object.entries(snapshot.local)) localStorage.setItem(k, v);
       for (const [k, v] of Object.entries(snapshot.session)) sessionStorage.setItem(k, v);

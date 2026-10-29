@@ -3,7 +3,6 @@ const onlyDigits = (v) => String(v ?? '').replace(/\D/g, '');
 export const cleanAadhaar = (v) => onlyDigits(v).slice(0, 12);
 export const formatAadhaar = (v) => cleanAadhaar(v).replace(/(\d{4})(?=\d)/g, '$1 ');
 
-// PAN is AAAAA9999A, so a character that does not fit its position is dropped rather than kept to fail later.
 export function cleanPan(v) {
   let out = '';
   for (const c of String(v ?? '').toUpperCase()) {

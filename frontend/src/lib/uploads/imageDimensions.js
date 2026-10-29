@@ -61,7 +61,6 @@ function webpSize(view) {
   throw new Error('Invalid WebP metadata.');
 }
 
-/** Bound advertised dimensions before allocating decoded pixels; decoding still validates the image. */
 export async function checkImageDimensions(file, type) {
   const buffer = await file.arrayBuffer();
   const view = new DataView(buffer);

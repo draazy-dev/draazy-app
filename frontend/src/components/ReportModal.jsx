@@ -4,9 +4,6 @@ import { createReport } from '../services/reportService.js';
 import { LISTING_REPORT_REASONS } from '../lib/reportReasons.js';
 import useScrollLock from '../hooks/useScrollLock.js';
 
-/* **`kind` must match the reason set**: the server validates the reason against the target type,
-   so `SHARE_REPORT_REASONS` needs `kind="share"` and not `"user"`. */
-
 export default function ReportModal({
   target,
   kind = 'listing',
@@ -31,8 +28,6 @@ export default function ReportModal({
   const submit = async () => {
     if (!reason || sending) return;
     setSending(true);
-    /* The modal stays open on failure so the report is not lost with it: a 409 duplicate or any
-       other refusal must not be thanked, since the reporter would assume it was heard. */
     let result;
     try {
       result = await createReport({

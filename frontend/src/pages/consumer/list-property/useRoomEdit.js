@@ -64,7 +64,6 @@ const HOME_FIELDS = ['propertyType', 'homeTypeLabel', 'bhk', 'bathrooms', 'balco
   'floorsInHouse', 'gatedCommunity', 'furnishing', 'furniture', 'locality', 'localitySlug', 'society', 'societyId',
   'flatNumber', 'tower', 'street', 'landmark', 'pincode', 'pinPlaced', 'propLat', 'propLng'];
 
-/** The flat a tenant described in a room post, as the owner's whole-flat listing; no room or rent fields. */
 export const homeToForm = (home) => {
   const asRoom = roomToForm({ ...home, host: { details: home } });
   return {
@@ -80,7 +79,6 @@ export function useHomePrefill({ homeId, canLoad, setForm }) {
   useEffect(() => {
     if (!homeId || !canLoad) return undefined;
     let live = true;
-    // A failed read leaves the wizard blank; the submit still reports the 404 if the home isn't the caller's.
     getOwnerHomePrefill(homeId)
       .then((home) => { if (live) setForm(homeToForm(home)); })
       .catch(() => {});

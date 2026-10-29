@@ -14,7 +14,6 @@ export default function CancelDialog({ request, onClose, onConfirm }) {
       await onConfirm(trimmed);
       onClose();
     } catch {
-      // The desk has already toasted the reason; stay open so the reason is not lost.
     } finally {
       setBusy(false);
     }

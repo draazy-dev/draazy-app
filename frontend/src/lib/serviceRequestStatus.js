@@ -1,4 +1,3 @@
-/** No storage, network or user-state dependency, so the tracker can render a server response with it. */
 export const STEPS = ['Submitted', 'Documents', 'Draft & approval', 'Registration', 'Ready'];
 
 const ACTIVE = {
@@ -31,7 +30,6 @@ const activeStep = (status) => (ACTIVE[status] == null ? 0 : ACTIVE[status]);
 
 export const stepStates = (status) => {
   if (status === 'completed') return STEPS.map(() => 'done');
-  // Unpaid is not submitted: nothing is in progress until the payment lands.
   if (status === 'awaiting_payment') return STEPS.map(() => 'todo');
   const active = activeStep(status);
   return STEPS.map((_, index) => (index < active ? 'done' : index === active ? 'active' : 'todo'));
@@ -48,10 +46,8 @@ export const progressPct = (status) => {
 export const statusMeta = (status) =>
   STATUS_META[status] || { label: 'In progress', color: 'rgb(var(--dz-c-gray-300))', bg: 'rgb(var(--dz-c-white) / .1)', icon: 'loader' };
 
-/** Route a legacy invite token to the rent-agreement entry point. */
 export const invitePath = (inviteId) =>
   `/services/rent-agreement?invite=${encodeURIComponent(inviteId || '')}`;
 
-/** Route an API invite row to the invited party's detail flow. */
 export const inviteRouteFor = (row) =>
   `/services/rent-agreement?party=${encodeURIComponent(row?.id || '')}&request=${encodeURIComponent(row?.requestId || '')}`;

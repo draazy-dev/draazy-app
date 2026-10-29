@@ -24,7 +24,6 @@ const maskLast4 = (value) => {
   return `•••• ${digits.slice(-4)}`;
 };
 
-/** `propertyId` must be pid(listing): the UUID, not a public listing slug. */
 export default function OwnershipEvidencePanel({ propertyId, listing, onRefresh, onVerification }) {
   const { user } = useAuth();
   const internal = isInternal(user);
@@ -45,7 +44,6 @@ function OwnershipCase({ propertyId, listing, actorId, onRefresh, onVerification
   const [notice, setNotice] = useState('');
   const inFlight = useRef(false);
   const mounted = useRef(false);
-  // A ref so a parent re-render never re-fetches the case.
   const onVerificationRef = useRef(onVerification);
   onVerificationRef.current = onVerification;
   const canDecide = Boolean(actorId && !isMadeBy(listing, actorId));
@@ -81,11 +79,9 @@ function OwnershipCase({ propertyId, listing, actorId, onRefresh, onVerification
   const changeDocument = (documentId) => {
     const picked = (data?.documents || []).find((row) => row.id === documentId);
     const docType = DOC_TYPES.find((type) => type.category.toLowerCase() === picked?.category?.toLowerCase())?.value || '';
-    // UploadedAt is not an issue date; every newly selected file needs its date read by the reviewer.
     setForm({ ...EMPTY_FORM, documentId, docType });
   };
 
-  // A subject name belongs to the document it was read off, so switching type discards it.
   const changeDocType = (docType) => setForm((previous) => ({ ...previous, docType, subjectName: '' }));
 
   const runDecision = async (action, operation, message) => {
@@ -96,8 +92,6 @@ function OwnershipCase({ propertyId, listing, actorId, onRefresh, onVerification
     setNotice('');
     try {
       const verification = await operation();
-      /* Same assertion the load path makes, for the same reason: three sections dereference these
-         arrays, and a response short of one would blank the modal just after the write committed. */
       if (!Array.isArray(verification?.missingKinds) || !Array.isArray(verification?.evidence)) {
         throw new Error('The ownership case response is incomplete.');
       }
@@ -163,7 +157,6 @@ function OwnershipCase({ propertyId, listing, actorId, onRefresh, onVerification
                 <Fact label="Property address" value={[listing.address, listing.locality, listing.pincode].filter(Boolean).join(', ')} />
               </dl>
               <details className="group mt-3 text-xs">
-                {/* The chevron is the only affordance: this theme suppresses the native summary marker. */}
                 <summary className="inline-flex cursor-pointer list-none items-center gap-1 font-semibold text-teal-300 hover:text-teal-200 [&::-webkit-details-marker]:hidden">
                   What counts as proof for {listing.deal === 'buy' ? 'a sale' : 'a rental'} listing
                   <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
@@ -202,15 +195,12 @@ function OwnershipCase({ propertyId, listing, actorId, onRefresh, onVerification
         </>
       )}
       {error && <p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
-      {/* Only when there is something to announce: an always-mounted status region collides with
-          the loading one, which makes a bare `getByRole('status')` ambiguous for that window. */}
       {notice && <p role="status" className="mt-3 text-sm text-teal-300">{notice}</p>}
       <p className="text-[11px] text-gray-500">Staff only. Document checks are not a legal title guarantee.</p>
     </section>
   );
 }
 
-/** An absent fact is styled as absent; the reviewer must never read a gap as a value. */
 function Fact({ label, value, fallback = 'Not provided', mono }) {
   return (
     <div className="min-w-0">

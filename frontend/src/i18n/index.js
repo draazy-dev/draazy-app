@@ -1,11 +1,9 @@
 
-/* English is the fallback for every user, so it is eager; Marathi/Hindi load on demand. */
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 import { EAGER_NAMESPACES } from './namespaces.js';
 
-/** Static imports keep the eager namespace list deliberate rather than folder-driven. */
 import enAuth from './locales/en/auth.json';
 import enChrome from './locales/en/chrome.json';
 import enCommon from './locales/en/common.json';
@@ -36,10 +34,8 @@ export function loadNamespaces(namespaces) {
         continue;
       }
       const load = () => importer().then((mod) => {
-        // Deep merge, overwriting: namespaces may share a top-level key.
         i18n.addResourceBundle('en', 'translation', mod.default || mod, true, true);
       });
-      // One retry: a single failed fetch otherwise leaves the page on raw keys until reload.
       promise = load()
         .catch(load)
         .catch((err) => {

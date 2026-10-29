@@ -16,7 +16,6 @@ import { emptyFilters } from './flatmates/useFlatmateDiscovery.jsx';
 import useFlatmatesSearch from './flatmates/useFlatmatesSearch.js';
 
 const SIZE = 24;
-// The feed has no strict women-only filter, so that page reads one larger page and picks the matches itself.
 const WOMEN_SIZE = 50;
 const SAVE_KIND = { r: 'room', g: 'group' };
 
@@ -36,7 +35,6 @@ function Landing({ target }) {
   usePageHead({ title: copy.title, description: copy.description, path: flatmatePath(target), noindex: loaded && count < MIN_INDEXABLE.flatmates });
 
   const onSave = async (key, want) => {
-    // The resume asks for "saved": toggling a row the account had already saved would unsave it.
     if (!user) { sendToSignIn('save', undefined, () => latest.current(key, true)); return; }
     const on = want ?? !saved[key];
     setSaved((m) => ({ ...m, [key]: on }));

@@ -15,7 +15,6 @@ import { setAppPrefs } from '../../lib/localPrefs.js';
 import { useIsLightTheme } from '../../lib/themeColour.js';
 import useScrollLock from '../../hooks/useScrollLock.js';
 import NotificationBell from '../notifications/NotificationBell.jsx';
-/* Below lg the account menu is a full-height drawer; at lg+ the same state renders an anchored dropdown. */
 
 const ACCT_DRAWER = '(max-width: 1023px)';
 
@@ -32,11 +31,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [cityOpen, setCityOpen] = useState(false);
   const [acctOpen, setAcctOpen] = useState(false);
-  /* Help is the one area whose URL carries the language, and HelpLangRoute treats that prefix as authoritative — it
-     calls changeLanguage() and i18n persists it device-wide. */
   const postLabel = t('chrome.postPropertyFree');
-  // Bump on any local-prefs write so the badges below refresh live in the same tab, without
-  // waiting for a route change.
   const [, setStoreTick] = useState(0);
   useEffect(() => {
     const bump = () => setStoreTick((n) => n + 1);
@@ -56,9 +51,7 @@ export default function Navbar() {
   const dealParam = new URLSearchParams(location.search).get('deal');
   const typeParam = (new URLSearchParams(location.search).get('type') || '').toLowerCase();
   const isHome = path === '/';
-  // Compare Properties is only relevant while browsing buy/rent listings or a property detail page.
   const showCompare = path.startsWith('/listings') || path.startsWith('/property');
-  // Flatmates is a rent-only feature: surface it only on the Flatmates page or while viewing rent listings.
   const showFlatmates = path.startsWith('/flatmates') || (path.startsWith('/listings') && (dealParam === 'rent' || typeParam === 'flatmates'));
   const activeKey = path.startsWith('/reels') ? 'reels'
     : path === '/services' ? 'services'
@@ -70,8 +63,6 @@ export default function Navbar() {
     (activeKey === key
       ? 'text-white after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-1.5 after:h-1.5 after:rounded-full after:bg-teal-400'
       : 'text-gray-400 hover:text-white');
-  // Mobile-only left-slot control off home: the city is fixed (Pune-only) there, so the pill gives
-  // way to a compact icon-only Back affordance that keeps the bar from overflowing.
 
   const goBack = () => {
     if (location.key && location.key !== 'default') navigate(-1);
@@ -88,8 +79,6 @@ export default function Navbar() {
       <Icon name="chevron-left" className="w-4 h-4 text-teal-500" />
     </button>
   );
-  // Shared account-menu building blocks, reused by the desktop dropdown (lg+) and
-  // the mobile drawer (below lg) so both surfaces stay in sync.
 
   const rowCls = 'flex items-center gap-3 min-h-[44px] px-3 py-2.5 rounded-xl text-sm text-gray-200 hover:bg-white/5 transition-all';
   const acctIdentity = (
@@ -115,7 +104,6 @@ export default function Navbar() {
     </button>
   );
   const acctItems = (close, { mobile = false } = {}) => (
-      /* Compare is the exception, and only on the drawer's side of the breakpoint. */
     <>
       {mobile ? (
         <Link to="/compare" onClick={close} className={rowCls}>
@@ -134,8 +122,6 @@ export default function Navbar() {
       <Link to="/support" onClick={close} className={rowCls}><Icon name="life-buoy" className="w-4 h-4 text-gray-400" /> Contact support</Link>
       <Link to="/plans" onClick={close} className={rowCls}><Icon name="tag" className="w-4 h-4 text-gray-400" /> Pricing &amp; Plans</Link>
     </>
-  /* `card` draws the row as a filled tile, used atop the mobile drawer where Refer is the one revenue-driving action
-     and has to win against five same-weight rows below it. */
   );
   const acctRefer = (close, { card = false } = {}) => (
     <Link
@@ -160,8 +146,6 @@ export default function Navbar() {
     const root = document.documentElement;
     let ticking = false;
     let lastY = 0;
-    // Thresholds live in lib/chrome.js so the top bar's behaviour is configured
-    // alongside the bottom bar's, rather than as loose constants in this effect.
     const { hideAfter: HIDE_AFTER, delta: DELTA } = TOPBAR_SCROLL;
     const onScroll = () => {
       if (ticking) return;
@@ -174,7 +158,6 @@ export default function Navbar() {
 
         const moved = y - lastY;
         if (Math.abs(moved) > DELTA) {
-          // Toggled at every width; only the mobile stylesheet reacts to the class.
           root.classList.toggle('dz-nav-hidden', moved > 0 && y > HIDE_AFTER);
           lastY = y;
         } else if (y <= HIDE_AFTER) {
@@ -194,8 +177,6 @@ export default function Navbar() {
   useEffect(() => {
     const onDoc = (e) => {
       if (cityRef.current && !cityRef.current.contains(e.target)) setCityOpen(false);
-      // Ignore clicks inside the desktop dropdown (acctRef) or the mobile account
-      // drawer (acctDrawerRef, rendered outside the nav), so neither self-closes.
       const inAcct = acctRef.current && acctRef.current.contains(e.target);
       const inAcctDrawer = acctDrawerRef.current && acctDrawerRef.current.contains(e.target);
       if (!inAcct && !inAcctDrawer) setAcctOpen(false);
@@ -203,8 +184,6 @@ export default function Navbar() {
     document.addEventListener('click', onDoc);
     return () => document.removeEventListener('click', onDoc);
   }, []);
-  /* Subscribed rather than sampled: the same `acctOpen` renders a drawer below lg and an anchored dropdown at lg+,
-     and only the drawer should lock the page. */
 
   const [acctIsDrawer, setAcctIsDrawer] = useState(
     () => typeof window !== 'undefined' && window.matchMedia(ACCT_DRAWER).matches,
@@ -228,7 +207,6 @@ export default function Navbar() {
   useEffect(() => { setAcctOpen(false); }, [location.pathname, location.search]);
 
   return (
-    /* Skip-to-content link (WCAG 2.4.1) */
     <>
     <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-teal-500 focus:text-white focus:text-sm focus:font-semibold">
       Skip to content
@@ -295,9 +273,6 @@ export default function Navbar() {
             </div>
             {mobileContext}
           </div>
-          {/* Primary journeys live in the full desktop nav below, and inside the hamburger menu on mobile — no inline
-             mobile strip, to keep the bar uncluttered when space is tight. */}
-
           <div className="hidden lg:flex items-center gap-1">
             <Link to="/listings?deal=buy" className={linkCls('buy')}>{t('nav.buy')}</Link>
             <Link to="/listings?deal=rent" className={linkCls('rent')}>{t('nav.rent')}</Link>
@@ -306,14 +281,11 @@ export default function Navbar() {
             <Link to="/services" className={linkCls('services')}>{t('nav.services')}</Link>
           </div>
 
-            {/* Desktop-only. Below lg the bottom tab bar owns Post — it has the raised centre slot in the thumb arc,
-               which is a better home for the primary supply-side CTA than the top-right corner. */}
           <div className="flex items-center gap-3 shrink-0">
             <Link to="/list-property" className="h-btn hidden lg:inline-flex items-center gap-2 px-5 rounded-full bg-gradient-to-r from-teal-600 to-teal-500 text-sm font-semibold text-white hover:shadow-lg hover:shadow-teal-500/25 transition-all duration-300 hover:scale-105">
               <Icon name="plus-circle" className="w-4 h-4" />
               {postLabel}
             </Link>
-            {/* Signed in, this target leaves the phone bar for the drawer; signed out has no drawer. */}
             {showCompare || compareCount > 0 ? (
               <Link to="/compare" className={'dz-topbar__action tap-target tap-extend relative items-center justify-center p-2 rounded-xl hover:bg-white/5 transition-all duration-300 group ' + (isIn ? 'hidden lg:inline-flex' : 'inline-flex')} title="Compare Properties" aria-label="Compare properties">
                 <Icon name="scale" className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
@@ -341,7 +313,6 @@ export default function Navbar() {
                     <span className="hidden sm:inline text-sm font-semibold text-gray-100">{firstName(user)}</span>
                     <Icon name="chevron-down" className="w-3.5 h-3.5 text-gray-400" style={{ transform: acctOpen ? 'rotate(180deg)' : '' }} />
                   </button>
-                  {/* Desktop (lg+): anchored dropdown. */}
                   {acctOpen ? (
                     <div className="hidden lg:block absolute right-0 mt-2 w-64 rounded-2xl bg-ink-card border border-white/10 shadow-2xl shadow-black/50 p-2 z-[60] max-h-[80vh] overflow-y-auto">
                       <div className="py-1 flex items-center justify-between gap-2">{acctIdentity}{themeBtn}</div>
@@ -354,7 +325,6 @@ export default function Navbar() {
                   ) : null}
                 </div>
               </>
-              /* Visible at every width: it is the only sign-in affordance, so no breakpoint may hide it. */
             ) : (
               <Link to="/signin" className="h-btn dz-topbar__pill tap-extend relative inline-flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 rounded-full bg-gradient-to-r from-teal-500 to-teal-400 text-sm font-semibold text-white hover:shadow-lg hover:shadow-teal-500/25 transition-all duration-300 hover:scale-105">
                 <Icon name="log-in" className="w-4 h-4" /> Sign In
@@ -364,14 +334,10 @@ export default function Navbar() {
         </div>
       </div>
     </nav>
-    {/* Mobile account menu — a right-anchored slide-in drawer with a dimmed backdrop. */}
-
     {isIn ? (
       <div
         ref={acctDrawerRef}
         className={'lg:hidden fixed inset-0 z-[80] transition-opacity duration-300 ' + (acctOpen ? 'opacity-100' : 'opacity-0 pointer-events-none')}
-        /* The header and footer mount unconditionally so the panel keeps its shape through the slide-out, which left
-           real buttons focusable inside an `aria-hidden` subtree. */
         aria-hidden={!acctOpen}
         inert={!acctOpen}
       >

@@ -1,26 +1,15 @@
-/* Owner tabs show only with real inventory. */
 export const TABS = [
-  // Not owner-gated: Property Tools (Rent-o-meter) is the "value your home" acquisition entry, reachable by any
-  // signed-in user (old /owner-hub route).
   { tab: 'overview', label: 'Home', icon: 'layout-grid' },
   { tab: 'properties', label: 'My Properties', icon: 'home' },
-  // Tenant mirror of My Properties — "the home you rent". Shown to buyers/tenants
-  // and anyone with a finalised tenancy; a pure owner with no rental won't see it.
   { tab: 'rental', label: 'Rental', icon: 'key-round', tenant: true },
   { tab: 'activity', label: 'Alerts & activity', icon: 'bell' },
-  // Role-aware (like Documents): owners see a property P&L, tenants see the Rent
-  // Wallet, and a user who is both can switch.
   { tab: 'leads', label: 'Requests', icon: 'messages-square' },
   { tab: 'finances', label: 'Finances', icon: 'wallet' },
   { tab: 'documents', label: 'Documents', icon: 'folder-lock' },
   { tab: 'visits', label: 'Visits', icon: 'calendar-check' },
-  // Account-level and universal (every user has a plan — buyers included), so it
-  // lives in its own section rather than buried in Profile & Settings.
   { tab: 'billing', label: 'Plan & Billing', icon: 'receipt-indian-rupee' },
   { tab: 'profile', label: 'Profile', icon: 'user-cog' },
 ];
-/* Back-compat: legacy tab hashes/?tab= values map onto the new tab (+ optional sub-section) so existing deep-links
-   keep landing; `link` sends the ones the top bar already owns to that page. */
 export const TAB_ALIAS = {
   'owner-hub': { tab: 'properties' },
   listings: { tab: 'properties' },

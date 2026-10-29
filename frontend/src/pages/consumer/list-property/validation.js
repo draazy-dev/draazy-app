@@ -9,11 +9,7 @@ import { YOUTUBE_ID_RE, normalizeYouTubeId } from './video.js';
 import { isValidMobile } from '../../../lib/hooks.js';
 
 const hasText = (v) => typeof v === 'string' && v.trim().length > 0;
-/* A required amount must be a real, positive number, so "0", "-5" and pasted junk are all
- * rejected even though a non-empty string is truthy. */
 const isPositive = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0; };
-/* Deposit is the one money field where zero is a real answer — a zero-deposit rental is a
- * genuine offer and refusing it would force the owner to lie. */
 const isNonNegative = (v) => { const n = Number(v); return v !== '' && v != null && Number.isFinite(n) && n >= 0; };
 const inRange = (v, [min, max]) => { const n = Number(v); return Number.isFinite(n) && n >= min && n <= max; };
 const SALE_PRICE_MIN = 100000;
@@ -29,7 +25,6 @@ const saneAreaRangeFor = (form) => (
   isResidentialType(form.propertyType) ? RESIDENTIAL_AREA_RANGE : areaRangeFor(form.propertyType, form.areaUnit)
 );
 const isTowered = (form) => form.propertyType === 'flat';
-/* Exported because `LocationStep` drops the asterisk on exactly this rule. */
 export const isIndustrial = (form) => isCommercialType(form.propertyType)
   && commercialProfileFromType(form.commercialType) === 'industrial';
 export const isPreCompletion = (form) => !isLandType(form.propertyType)
@@ -72,8 +67,6 @@ export const scrollToError = (err) => {
     const el = document.querySelector(`[data-err="${first}"]`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Custom selects expose a button trigger rather than a native select. Duplicated by the
-      // field-error helper in `lib/hooks.js`, and the two must not drift.
       const FOCUSABLE = 'input,select,textarea,button,[tabindex]';
       const f = el.matches(FOCUSABLE) ? el : el.querySelector(FOCUSABLE);
       f?.focus?.({ preventScroll: true });
@@ -107,7 +100,6 @@ export const validateStep1 = (form, original) => {
       err.superBuiltUp = 'min';
     }
   }
-  /* The three answers a Maharashtra land buyer cannot proceed without. */
   if (isLandType(form.propertyType)) {
     if (!hasText(form.naStatus)) err.naStatus = true;
     if (!hasText(form.otherRights)) err.otherRights = true;
@@ -115,7 +107,6 @@ export const validateStep1 = (form, original) => {
       err.buyerEligibility = true;
     }
   }
-  /* A null floor is excluded, not unfiltered: `PropertySpecs` compares with `ge`/`le`. */
   if (isTowered(form) && isMissing(form.floor)) err.floor = true;
   if (isTowered(form) && isMissing(form.totalFloors)) err.totalFloors = true;
   if ((isTowered(form) || commercial) && !isMissing(form.floor) && !isMissing(form.totalFloors)
@@ -126,17 +117,12 @@ export const validateLocationStep = (form, original) => {
   const err = {};
   const land = isLandType(form.propertyType);
   if (!form.locality || !form.localitySlug) err.locality = true;
-  // Indian PIN codes are six digits and never start with 0.
   if (!/^[1-9]\d{5}$/.test(form.pincode)) err.pincode = true;
   const validated = keepChangedErrors(err, form, original);
-  /* An edit whose address boxes are untouched keeps the line the server already holds, so a
-   * complete address is only demanded of an owner who is actually replacing it. */
   const savedLine = hasText(original?.existingAddress);
   const addressUnchanged = savedLine && sameListingKind(form, original)
     && ADDRESS_PARTS.every((key) => Object.is(form[key], original[key]))
     && Object.is(form.societyId, original.societyId);
-  /* A partial replacement must not reduce the preserved address to a street alone — but only where a unit and a
-     project are answerable: a farm sits on a gat number, and an old plot often has no layout name. */
   if (!addressUnchanged && !land && !isIndustrial(form)) {
     if (!hasText(form.flatNumber)) validated.flatNumber = true;
     if (!form.societyId && !form.societyNotOnMaps) validated.society = true;
@@ -188,7 +174,6 @@ export const validateStep3 = (form, photos, original, maxPhotos) => {
   if ((!original || original.form?.title !== form.title) && hasContactDetails(form.title)) {
     nextErr = { ...nextErr, title: 'contact' };
   }
-  // Never demand more of an edit than the listing already carries: a price fix must not wait on a photo shoot.
   const had = original ? (original.images || original.gallery || []).filter(Boolean).length : 0;
   const floor = original ? Math.min(MIN_PUBLISH_PHOTOS, Math.max(had, 1)) : MIN_PUBLISH_PHOTOS;
   if (list.length < floor) return { ...nextErr, photos: 'min' };
@@ -198,8 +183,6 @@ export const validateStep3 = (form, photos, original, maxPhotos) => {
   return covered.size < Math.min(MIN_PUBLISH_KEY_CATEGORIES, keyCats.length) ? { ...nextErr, photos: 'categories' } : nextErr;
 };
 
-// Room listings must not inherit whole-property ownership or pricing requirements. An edit is only
-// held to a field the saved room already answered, or one the host changes.
 const ROOM_NOTICE_MAX_DAYS = 180;
 const ROOM_LOCK_IN_MAX_MONTHS = 24;
 const isWholeInRange = (v, max) => hasValue(v) && Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= max;
@@ -223,7 +206,6 @@ export const validateFlatmateRoom = (form, original) => {
 };
 export const validateFlatmateLocation = (form, original) => {
   const err = keepChangedErrors(hasText(form.flatNumber) ? {} : { flatNumber: true }, form, original);
-  // A room saved before societies were Google-bound has no id to carry forward, so editing it is not blocked.
   const legacyRoom = !!original && !original.societyId;
   if (!form.societyId && !form.societyNotOnMaps && !legacyRoom) err.society = true;
   if (!form.pinPlaced) err.location = true;

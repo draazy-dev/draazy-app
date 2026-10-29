@@ -1,7 +1,3 @@
-/* flatmates — split out of index.css so it ships with the /flatmates route chunk. The `.sf-`
-   prefix is a fossil, deliberately not renamed: it is load-bearing in dozens of e2e selectors. */
-
-/* Flatmate map: per-locality posting preview popup (dark, actionable). */
 .dz-sp {
   padding: 0;
 }
@@ -27,8 +23,6 @@
 .dz-sp-list {
   max-height: 306px;
   overflow-y: auto;
-  /* The popup floats over a 460px map inside a scrolling page, so reaching the end of the list
-     must not hand the gesture on to the page behind it. */
   overscroll-behavior: contain;
   padding: 6px;
   display: flex;
@@ -225,7 +219,6 @@
 }
 
 @media (hover: hover) {
-  /* Touch fakes hover and would leave the row chevron/CTA highlighted until another tap. */
   .dz-sp-rowmain:hover .dz-sp-chev {
     transform: translateX(2px);
     color: rgb(var(--dz-c-teal-400));
@@ -252,7 +245,6 @@
 
   .dz-sp-cta,
   .dz-sp-all {
-    /* These grow by height because centred tap extenders would overlap neighbouring rows. */
     min-height: var(--btn-h);
   }
 
@@ -261,11 +253,6 @@
     height: var(--btn-h);
   }
 }
-
-/* Flatmates (scoped) */
-/* `.field` moved to index.css as a global base — it was only ever styled here, so every `.field`
-   rendered outside .sf-page was invisible. The global `.field:focus` covers the focus state. */
-
 .sf-page .btn-ghost {
   background: rgb(var(--dz-c-white) / .05);
   border: 1px solid rgb(var(--dz-c-white) / calc(.1 * var(--dz-line-boost)));
@@ -283,9 +270,6 @@
   border: 1px solid rgb(var(--dz-c-white) / calc(.07 * var(--dz-line-boost)));
   transition: all .25s ease;
 }
-
-/* Ungated, this left every tapped card raised for the rest of the session — tapping a child
-   applies the fake hover to the card too. */
 @media (hover: hover) {
   .sf-page .btn-ghost:hover {
     border-color: rgb(var(--dz-c-teal-500) / .4);
@@ -307,9 +291,6 @@
 .sf-page .badge-seeker {
   background: var(--brand-gradient);
 }
-
-/* Legibility floor for the VERIFIED badge on a phone: it is the identity signal someone uses to
-   decide whether it is safe to move in with a stranger. 12px is the product-wide floor. */
 @media (max-width: 639.98px) {
   .sf-page .badge-seeker {
     font-size: 12px;
@@ -334,10 +315,6 @@
   color: rgb(var(--dz-c-rose-500));
   border-color: rgb(var(--dz-c-rose-500) / .4);
 }
-
-/* sf-page: List|Map segmented control + match/fresh badges (Flatmates route only). */
-/* Height matches the search field (h-10); the inner buttons are inset by 4px so their
-   corners stay concentric with the container's. */
 .sf-page .sf-seg {
   display: inline-flex;
   align-items: center;
@@ -370,9 +347,6 @@
     color: rgb(var(--dz-c-white));
   }
 }
-
-/* The pill-in-pill construction caps the inner buttons at container height minus 10, leaving
-   List|Map at 30px. Coarse only: grow the container, then extend with a centred ::before. */
 @media (pointer: coarse) {
   .sf-page .sf-seg {
     height: var(--control-h);
@@ -398,18 +372,12 @@
   color: rgb(var(--dz-c-pure-white));
   box-shadow: var(--btn-primary-shadow);
 }
-
-/* Below lg the track matches the 44px search field and each button is the same 36px circle,
-   4px off the outer edge, as the smart-search submit beside it (1px border + 3px padding). */
 @media (max-width: 1023px) {
   .sf-page .sf-seg {
     height: 44px;
     padding: 3px;
   }
 }
-
-/* Icon-only below sm: the painted circle stays 36px and a centred 44px square carries the target,
-   as `.tap-extend` does for the search submit. */
 @media (max-width: 639px) {
   .sf-page .sf-seg__btn {
     position: relative;
@@ -428,15 +396,9 @@
     transform: translate(-50%, -50%);
   }
 }
-
-/* Post CTA in the tab row — hidden below lg, where the bottom bar's `+` is the only posting
-   control. Hidden here rather than by utility: .btn-teal loads after index.css and wins the tie. */
 @media (max-width: 1023px) {
   .sf-page .sf-post-cta { display: none; }
 }
-
-/* Smart-search submit: `.btn-primary` paints it but carries none of the classes buttons.css
-   scopes `:focus-visible` to, so the ring would fall back to the UA outline. */
 .sf-page .sf-search-go:focus-visible { outline: 2px solid var(--teal-2); outline-offset: 2px; }
 .sf-page .sf-search-go { transition: background-color .25s ease, box-shadow .25s ease, transform .25s ease, filter .25s ease; }
 

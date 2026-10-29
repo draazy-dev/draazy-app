@@ -3,7 +3,6 @@ import { prepareUpload } from '../uploads/prepareUpload.js';
 const DOC_MIME = 'image/jpeg';
 const DOC_QUALITY = 0.92;
 
-/** The quality probe wants a thumbnail; a capture wants every pixel the sensor gave. */
 const PROBE_EDGE = 240;
 
 export async function startCameraStream({ facingMode, width = 1280, height = 720 }) {
@@ -29,7 +28,6 @@ function guidedRegion(video, guide) {
   const frameHeight = video.videoHeight;
   const preview = video.getBoundingClientRect();
   const area = guide?.getBoundingClientRect();
-  // Before the first frame arrives there is no transform to invert, and no guide to honour.
   if (!frameWidth || !frameHeight || !preview.width || !area?.width) {
     return { x: 0, y: 0, width: frameWidth || 1280, height: frameHeight || 720 };
   }
@@ -71,8 +69,6 @@ export function releasePreviewUrl(url) {
 }
 
 export function readFrameQuality(video, guide) {
-  // Judged on the guided region, not on a corner of the whole frame: the hint is about the card the
-  // user is holding, and a room can be bright and sharp while the card in front of it is neither.
   const { canvas, context } = canvasFor(video, guide, PROBE_EDGE);
   const image = context.getImageData(0, 0, canvas.width, canvas.height).data;
   let brightness = 0;

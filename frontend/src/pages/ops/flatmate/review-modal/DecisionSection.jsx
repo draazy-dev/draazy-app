@@ -7,7 +7,6 @@ import { MOD_LABEL } from '../FlatmateQueueCard.jsx';
 const PUBLIC = ['approved', 'live'];
 const WITHHELD = ['removed', 'rejected'];
 
-/* The visibility axis. Publishing grants no badge; hiding says nothing about the paperwork. */
 export default function DecisionSection({ modStatus, recheck, publishLabel = 'Publish', busy, onDecide }) {
   const [note, setNote] = useState('');
   const noNote = !note.trim();
@@ -28,12 +27,10 @@ export default function DecisionSection({ modStatus, recheck, publishLabel = 'Pu
       {expired ? (
         <p className="mb-3 text-sm text-gray-400">Expired — only the host&apos;s renewal brings it back.</p>
       ) : null}
-      {/* Keyed off the timestamp: the server's own presence test is `recheck_requested_at is not null`. */}
       {recheck?.at && !expired ? (
         <div className="flatmate-mod-recheck mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-500/[0.06] p-3 text-sm text-amber-200">
           <History className="h-4 w-4 shrink-0" />
           <span className="min-w-0 flex-1">Re-check: {recheck.reason || 'edited'} · {fmtDate(recheck.at)}</span>
-          {/* Re-stamping the current state is the server's "I read the edit and it is fine". */}
           <button type="button" disabled={busy} onClick={() => onDecide(modStatus, note)} className="dz-btn dz-btn-success">
             <Check className="h-4 w-4" />Looks fine
           </button>

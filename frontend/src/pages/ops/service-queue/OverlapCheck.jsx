@@ -6,7 +6,6 @@ const MATCH_LABEL = { listing: 'same listing', address: 'same flat, society and 
 const shortId = (id) => id.slice(0, 8);
 const term = (row) => (row.startDate && row.endDate ? `${row.startDate} → ${row.endDate}` : 'term not stated');
 
-/** Other rent agreements on this flat over the same months, for the drafter to rule out first. */
 export default function OverlapCheck({ request }) {
   const titleId = useId();
   const [rows, setRows] = useState(null);

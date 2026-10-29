@@ -114,7 +114,6 @@ export default function useListProperty() {
   const [showDupGuard, setShowDupGuard] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
-  // Prevent another submit while the network write is pending.
   const [posting, setPosting] = useState(false);
   const [dupExistingId, setDupExistingId] = useState('');
   const [dupPending, setDupPending] = useState(false);
@@ -138,7 +137,6 @@ export default function useListProperty() {
 
   const [form, setForm] = useState(() => initialForEntry(searchParams, flatmateMode, editId));
   const entryForm = useRef(form);
-  // Async geocodes must read the latest form rather than an older render closure.
   const formRef = useRef(form);
   const skipLeaveGuard = useRef(false);
   const pendingLeave = useRef(null);
@@ -152,7 +150,6 @@ export default function useListProperty() {
   const previousOwnerId = useRef(ownerId);
   const expiredOwnerId = useRef('');
   const draftable = !editId && !editRoomId && !homeId;
-  // Runs before the draft hook's first restore, so a draft left in the shared slot by this owner is found.
   const [draftOwner, setDraftOwner] = useState(() => { if (draftable) adoptSharedDraft(ownerId); return ownerId; });
   const keepWorkOnRestore = useRef(false);
   const signedIn = !!ownerId;
@@ -236,8 +233,6 @@ export default function useListProperty() {
     if (roomDraft) setRentMode('flatmate');
     const step = Math.min(parseStep(savedStep), LISTING_STEPS.length);
     if (step > 1) writeStepParam(step, { replace: true });
-    // `?flatmate=1` hides the Sale/Rent picker, so a restored sale draft
-    // must not strand the user outside the room flow.
     const roomFields = roomDraft ? { ...fields, deal: 'rent' } : fields;
     return roomFields.locality && !roomFields.localitySlug ? { ...roomFields, locality: '', localitySlug: '' } : roomFields;
   }, [editId, flatmateMode, ownerId, restorePhotos, writeStepParam]);
@@ -268,7 +263,6 @@ export default function useListProperty() {
     previousOwnerId.current = ownerId;
     const expired = expiredOwnerId.current;
     if (ownerId) expiredOwnerId.current = '';
-    /* An expired session keeps the listing for the same owner signing back in. */
     if (expired && (!ownerId || ownerId === expired)) return;
     if (!previous && !expired) {
       const working = form !== entryForm.current || photos.length > 0;
@@ -329,15 +323,12 @@ export default function useListProperty() {
   );
 
   useEffect(() => {
-    // Entry intent wins over a draft, but never over an existing listing. The home type is reset
-    // with the property type because they are one answer.
     if (flatmateMode && !editId) {
       setForm((f) => ({ ...f, deal: 'rent', propertyType: 'flat', homeTypeLabel: homeTypeLabelFor('flat'), hostRole: 'tenant' }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- flatmate mode.
   }, []);
 
-  // Readiness belongs to a listing AND owner, never merely to the last completed request.
   const [editListing, setEditListing] = useState(null);
   const [editLoad, setEditLoad] = useState(null);
   const [editAttempt, setEditAttempt] = useState(0);
@@ -346,7 +337,6 @@ export default function useListProperty() {
   const roomEdit = useRoomEdit({ roomId: editRoomId, canLoad: !authLoading, setForm, setPhotos });
   useHomePrefill({ homeId, canLoad: !authLoading && signedIn, setForm });
   const roomBaseline = editRoomId ? roomEdit.baseline : undefined;
-  // A room PATCH leaves the binding alone unless it changed, so a room on an archived society can still be saved.
   const roomSocietyField = !editRoomId ? { societyId: form.societyId || '' }
     : form.societyId === (roomBaseline?.societyId || '') ? {}
       : form.societyId ? { societyId: form.societyId } : { clearSociety: true };
@@ -448,8 +438,6 @@ export default function useListProperty() {
         const loaded = withInFlatAsFurniture({
           ...initialForm,
           ...listing.form,
-          /* Listings posted against the old boolean carry `naSanctioned`; without this the owner opens the edit on an
-             unanswered picker and re-saving would erase their own answer. */
           naStatus: listing.form.naStatus || (listing.form.naSanctioned ? 'sanctioned' : ''),
           pinPlaced: placed,
           ...(placed ? {} : { propLat: initialForm.propLat, propLng: initialForm.propLng }),
@@ -460,8 +448,6 @@ export default function useListProperty() {
         const imgs = (listing.images || listing.gallery || []).filter(Boolean);
         setForm(snapshot);
         setEditListing({ ...listing, form: snapshot });
-        /* Categories are not stored, so photos come back as 'Other' — except the tagged plan, which `submit.js`
-           reads: without restoring it, any save at all would withdraw the owner's floor plan unasked. */
         setPhotos(imgs.map((url) => ({
           url,
           category: url === listing.floorPlan ? FLOOR_PLAN_CATEGORY : 'Other',
@@ -481,7 +467,6 @@ export default function useListProperty() {
     return classifyChanges(editListing.form, form,
       (editListing.images || editListing.gallery || []).filter(Boolean), photos.map((p) => p.url).filter(Boolean));
   }, [editId, editReady, editListing, form, photos]);
-  // A staff-posted draft is held to the new-listing bar: the desk asks far less than the owner wizard.
   const claimMode = !!editListing && getOwnerListingState(editListing) === 'confirm';
   const baseline = claimMode ? null : editListing;
 
@@ -508,7 +493,6 @@ export default function useListProperty() {
     });
   }, []);
 
-  // Prevent another property's type-specific answers from silently being saved.
   const TYPE_SPECIFIC_KEYS = [
     'commercialType',
     'washrooms', 'shellType', 'parkingSpaces', 'powerBackup', 'pantry', 'camCharges', 'suitableFor', 'fixtures',
@@ -517,21 +501,16 @@ export default function useListProperty() {
     'areaUnit', 'plotLength', 'plotWidth', 'openSides', 'roadWidth', 'cornerPlot', 'boundaryWall',
     'plotZone', 'plottedProject', 'naStatus', 'waterSource', 'electricity', 'roadAccess', 'otherRights', 'buyerEligibility',
     'plotArea', 'floorsInHouse', 'furniture', 'monthlyRent',
-    // Commercial never asks for it, so a residential answer left behind would publish unseen.
     'age',
   ];
   const changePropertyType = useCallback((v) => {
     setForm((prev) => {
       const next = { ...prev, propertyType: v };
       TYPE_SPECIFIC_KEYS.forEach((k) => { next[k] = initialForm[k]; });
-      /* Not a TYPE_SPECIFIC_KEY, because those reset to `initialForm` and every type would come
-       * back "Flat". */
       next.homeTypeLabel = homeTypeLabelFor(v) || prev.homeTypeLabel;
       next.areaUnit = defaultAreaUnitFor(v);
       const kind = leaseKindOf(v);
       if (leaseKindOf(prev.propertyType) !== kind) Object.assign(next, LEASE_DEFAULTS[kind]);
-      /* The land form renders neither control, and the stale possession is worse than cosmetic: an "under
-         construction" left behind is what the validator's land exclusion exists to survive. */
       return isLandType(v) ? { ...next, overlooking: '', construction: '' } : next;
     });
     if (!photoCategoriesFor(v, '').includes(FLOOR_PLAN_CATEGORY)) {
@@ -548,8 +527,6 @@ export default function useListProperty() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- type changes.
   }, [form.deal]);
 
-  /* The subtype picks a use-profile, which decides which fixtures, amenities, specs and photo categories exist at all
-     — Office to Warehouse otherwise keeps a Server Room the warehouse form cannot unpick. */
   const changeCommercialType = useCallback((v) => {
     setForm((prev) => ({
       ...prev,
@@ -560,8 +537,6 @@ export default function useListProperty() {
       pantry: false,
       ...Object.fromEntries(COMMERCIAL_SPEC_KEYS.map((k) => [k, initialForm[k]])),
     }));
-    /* Floor Plan is exempt: it carries a claim, and dropping it would quietly unpublish the
-     * plan. */
     setPhotos((prev) => prev.map((p) => (
       p.category && p.category !== FLOOR_PLAN_CATEGORY ? { ...p, category: 'Other' } : p
     )));
@@ -619,11 +594,7 @@ export default function useListProperty() {
     setCurrentStep(clamped);
     if (requested !== clamped || (clamped === 1 && rawStepParam)) writeStepParam(clamped, { replace: true });
   }, [draftEnabled, draftHydrated, editReady, entryStep, lastStep, maxReachableStep, rawStepParam, writeStepParam]);
-  // After the swap, not before: on phones a smooth scroll started over the old step is cut short
-  // as the page height changes.
   useLayoutEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [currentStep]);
-  // Back between steps is a history pop; the browser would restore the old step's footer position
-  // over the scroll above.
   useEffect(() => {
     const previous = window.history.scrollRestoration;
     window.history.scrollRestoration = 'manual';
@@ -640,19 +611,15 @@ export default function useListProperty() {
       : (currentStep === 1 ? validateStep1(form, baseline?.form)
         : currentStep === 2 ? validateLocationStep(form, baseline?.form)
           : currentStep === 3 ? validatePricingStep(form, baseline?.form) : {});
-    /* An edit is exempt: a listing published before the pin existed would otherwise be barred
-     * from its own price correction. */
     if (currentStep === 2 && !locationSet && !editListing) err.location = true;
     if (Object.keys(err).length) { setErrors(err); scrollToError(err); return; }
     setErrors({});
     const advance = () => {
       if (currentStep < lastStep) {
         goToStep(currentStep + 1);
-        // A validation failure must not produce the successful-advance haptic.
         haptic('step');
       }
     };
-    // Sign in before the media step, which is the last one in both flows.
     if (currentStep === lastStep - 1 && !signedIn) {
       setCurrentStep(lastStep);
       writeStepParam(lastStep, { replace: false, pushedFrom: currentStep });
@@ -687,7 +654,6 @@ export default function useListProperty() {
     else goToStep(currentStep - 1, { replace: true });
   };
 
-  // Resetting an edit restores the server snapshot without touching a separate new-post draft.
   const openResetConfirm = () => { if (editReady) setShowResetConfirm(true); };
   const confirmReset = () => {
     if (!editReady || posting) return;
@@ -697,7 +663,6 @@ export default function useListProperty() {
   };
 
   const finalizeListing = async () => {
-    // Never PATCH unhydrated defaults over the owner's saved listing.
     if (!editReady) {
       toast(t('listProperty.editLoadFailed', 'We could not load that listing. Reload the page and try again.'), 'error');
       return;
@@ -705,7 +670,6 @@ export default function useListProperty() {
     const request = editRequest.current;
     const res = await persistListing({ form, user, editId, editListing, photos, homeId });
     if (editId && request !== editRequest.current) return;
-    // Same owner already has this exact property live → stop and point them to it.
     if (res && res.ok === false && res.blocked) {
       setDupExistingId(res.existingId || '');
       setShowDupGuard(true);
@@ -746,7 +710,6 @@ export default function useListProperty() {
     }
     if (!editId) clearFormDraft();
     if (!editId) track('listing_submitted', { deal: res?.listing?.deal, type: res?.listing?.type });
-    // Refresh owner eligibility and quota after consuming a new-post allowance.
     if (!editId) refreshUser();
     skipLeaveGuard.current = true;
     triggerConfetti();
@@ -866,7 +829,6 @@ export default function useListProperty() {
       triggerConfetti();
       setShowSuccess(true);
     } catch (err) {
-      // The eligibility refusal explains what the host must change.
       const refused = err?.status === 400 && err?.message;
       toast(refused || (editRoomId ? t('listProperty.edit.roomSaveFailed') : 'Could not post your flatmate listing. Please try again.'), 'error');
       if (refused) window.scrollTo({ top: 0, behavior: 'smooth' });

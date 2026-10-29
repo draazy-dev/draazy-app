@@ -1,5 +1,3 @@
-/* localStorage keys match the HTML prototype's, for data interop. */
-
 const DOC_CATEGORIES = {
   'Title & Ownership': ['Sale Deed', 'Agreement to Sale', 'Mother Deed / Title Chain', 'Conveyance Deed', 'Index II', '7/12 Extract', '8A Extract', 'Property Card', 'Power of Attorney', 'Encumbrance Certificate', 'Legal Title Search Report'],
   'Society': ['Society Registration Certificate', 'Society NOC', 'Share Certificate', 'Maintenance Receipt'],
@@ -11,7 +9,6 @@ export { DOC_CATEGORIES };
 
 export const ALL_DOC_TYPES = Object.values(DOC_CATEGORIES).flat().concat(['Other']);
 
-/* Keyed by the exact slot name used on the Documents tab. */
 export const DOC_INFO = {
   'Sale Deed': { title: 'Sale Deed', body: 'The core legal proof that ownership was transferred to you. Registered at the sub-registrar, it is the single most important document a buyer or bank will ask to see.' },
   'Agreement to Sale': { title: 'Agreement to Sale', body: 'The contract recording the agreed price and terms before the final sale. It shows the transaction history and any conditions between buyer and seller.' },
@@ -68,7 +65,7 @@ function get(k, def) {
   try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch { return def; }
 }
 function set(k, v) {
-  try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* quota */ }
+  try { localStorage.setItem(k, JSON.stringify(v)); } catch { }
   return v;
 }
 
@@ -137,8 +134,6 @@ export function respondDocRequest(mobile, reqId, decision) {
   if (req) {
     req.status = decision === 'granted' ? 'granted' : 'declined';
     req.respondedAt = Date.now();
-    // Buyer requests by category and owner uploads by category, so the category match is
-    // exact scope — no separate "pick which docs" step is needed.
     if (req.status === 'granted') {
       const categories = new Set(req.categories || [req.docType]);
       req.sharedDocIds = getDocsForProp(mobile, req.propId)
@@ -152,8 +147,6 @@ export function respondDocRequest(mobile, reqId, decision) {
   return req;
 }
 
-/* Takes the docs rather than re-reading localStorage, which holds nothing the seam fetched
-   and would report a false 0/N. */
 export function checklistFromDocs(docs) {
   const uploadedCategories = new Set((docs || []).map((d) => d.category));
   const ready = HOME_LOAN_CHECKLIST.filter((c) => uploadedCategories.has(c));

@@ -2,9 +2,6 @@ import { ExternalLink, Image as ImageIcon, MapPin, FileText } from 'lucide-react
 import { titleCase } from '../../societies/helpers.jsx';
 import RemovePhoto from './RemovePhoto.jsx';
 
-/* Verbatim, because the details grid can only say a field was filled in: deciding whether a listing is real
-   means reading the prose, and a pending listing has no public page to read it on. */
-
 const text = (v) => (typeof v === 'string' ? v.trim() : '');
 const joined = (...parts) => parts.map(text).filter(Boolean).join(', ');
 
@@ -14,7 +11,6 @@ const dtClass = 'text-[11px] text-gray-500';
 const ddClass = 'mt-0.5 break-words text-sm font-semibold text-gray-100';
 const missing = <span className="font-medium text-amber-300">Not given</span>;
 
-/** Owner-supplied gallery text becomes `href` and `img src`, so only https or same-origin is allowed. */
 const safePhotoUrl = (src) => {
   if (typeof src !== 'string' || !src.trim()) return null;
   try {
@@ -39,8 +35,6 @@ export function SubmittedPhotos({ listing, onPhotoRemoved }) {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {photos.map((raw, i) => {
             const src = safePhotoUrl(raw);
-            /* Keyed by address, so a removal can't slide an open confirm onto the next photo; the occurrence
-               suffix keeps a gallery that repeats an address from colliding. */
             const key = `${raw}#${photos.slice(0, i).filter((p) => p === raw).length}`;
             if (!src) {
               return (
@@ -99,7 +93,6 @@ export function SubmittedLocation({ listing }) {
   const society = text(d.society) || (listing.societySlug ? titleCase(listing.societySlug) : '');
   const unit = joined(d.flatNumber, d.tower);
   const near = joined(d.street, d.landmark);
-  /* The map pin is coordinates plus a Google Maps link, never owner prose. */
   const hasPin = Number.isFinite(listing.lat) && Number.isFinite(listing.lng);
   return (
     <div className={block}>

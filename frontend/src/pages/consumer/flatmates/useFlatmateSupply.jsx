@@ -45,8 +45,6 @@ const preferencesForm = (p) => ({
   moveInByStored: p.moveInBy || '',
 });
 
-// Marks "this mount already sent the visitor to sign in" in the same ref that latches a handled
-// `?post=`. A Symbol rather than a string so it can never collide with a value the URL carries.
 const SIGNIN_LATCH = Symbol('sent-to-signin');
 
 export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: navigate, setInterests, ownsGroup, myPost, myPostsStatus, askGender, onGroupEdited = (id) => navigate(detailPath('group', id)) }) {
@@ -67,14 +65,10 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
   const postErr = useFieldErrors(postFormRef);
   const grpErr = useFieldErrors(grpFormRef);
 
-  // The opt-in identity badge, held once in VerificationContext (see below for why it also
-  // gates the Flatmates Verified filter and verified-only contact).
   const { verified: identityVerified } = useVerification();
   const isVerified = user ? identityVerified : false;
   const hasProfileName = !!user?.name?.trim();
 
-  // Posting needs only an L1 sign-in, never identity verification. Signed out, the tap resumes through
-  // the `?post=` intent below, which waits for `myPost` (the one-live-request check needs it).
   const requireSignedIn = (action, intent) => {
     if (!user) {
       const next = new URLSearchParams(params);
@@ -84,14 +78,9 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     }
     action();
   };
-  /* No `listRoom` twin of these: the app-wide sheet navigates to `/list-property?flatmate=1` from wherever it was
-     opened, so a board-only copy would be a second door to the same room. */
-  // An edited legacy group can leave `hunting: false` behind, and a new group never posts a flat.
   const createGroup = () => requireSignedIn(() => { setGrp((g) => ({ ...g, hunting: true })); setGroupOpen(true); }, 'group');
   const openPostModal = (id = null) => {
     requireSignedIn(() => {
-      // One live request per person: a fresh post while one already exists edits the existing
-      // request rather than silently creating a duplicate; the modal says so and offers take-down.
       if (!id && myPost) id = myPost.id;
       setEditingId(id);
       if (id && myPost && myPost.id === id) {
@@ -120,7 +109,6 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     }, 'solo');
   };
   const postIntent = params.get('post');
-  /* A Symbol marks the signed-out redirect — it can never equal a `?post=` value. */
   const handledIntent = useRef(null);
   useEffect(() => {
     if (!postIntent) { handledIntent.current = null; return; }
@@ -229,8 +217,6 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
       verified: isVerified,
       time: 'Just now',
     };
-    // The id and timestamp are the server's to assign — a client-minted `'s' + Date.now()` collides
-    // with a real id. On failure the modal stays open with what the user typed still in it.
     try {
       if (editingId && myPost && myPost.id === editingId) {
         await flatmateService.updatePost(editingId, data);
@@ -248,7 +234,6 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     setPost(BLANK_POST);
     toast(editingId ? t('flatmates.requestUpdated') : t('flatmates.requestLive'));
   };
-  // Archiving frees the one-live-request slot, so the same sheet turns into a blank new request.
   const takeDownPost = async () => {
     if (!editingId || !window.confirm(t('flatmates.takeDownConfirm'))) return;
     try {
@@ -285,8 +270,6 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     });
     grpErr.clear('title'); if (rent) grpErr.clear('rent');
   };
-  // Seeds the owner-consent number too, making the consent-OTP step one tap. The number is only
-  // pre-filled, never marked verified — the owner's OTP is still required.
   const prefillGroupFromTenancy = async (t) => {
     if (!t) return;
     const live = await liveLocality(t.localitySlug);
@@ -348,12 +331,8 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     ], toast);
     if (!ok) return;
     const seats = parseInt(grp.seats, 10) || 2;
-    // Derive the host eligibility tier from the declared role + proof signal.
-    // Sign-in (L1) is the floor; the Verified badge is an optional trust signal.
     const role = grp.role === 'owner' ? 'owner' : 'tenant';
     const propertyId = grp.propertyId || '';
-    // A tenant claims the Tenant tier only by declaring AND attaching the agreement — the artifact
-    // Ops verifies. Declared-without-upload stays identity tier: still posts, no host badge.
     const agreementDoc = role === 'tenant' && grp.agreement ? (grp.agreementDoc || null) : null;
     const agreementDeclared = role === 'tenant' ? (!!grp.agreement && hasAgreementEvidence(agreementDoc)) : false;
     const verificationTier = role === 'owner'
@@ -377,8 +356,6 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
   const persistGroup = async (group) => {
     const editedId = editingGroupId;
     let created;
-    // The saved record carries the server-assigned id, which the review queue below keys on — the
-    // locally minted `'mg' + Date.now()` would enqueue a review against a group that does not exist.
     try {
       if (editedId) await flatmateService.updateGroup(editedId, group);
       else created = await flatmateService.createGroup(group);
@@ -396,8 +373,6 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     }
     toast(t(created?.publiclyVisible ? 'flatmates.groupLive' : 'flatmates.groupInReview'));
   };
-  // Requires a valid 10-digit number, plus the title and locality the consent row is scoped by:
-  // the server names the flat from those two, so without them the owner's SMS vouches for nothing.
   const openConsent = () => {
     const m = digits(grp.consentMobile);
     if (m.length !== 10) { toast(t('flatmates.enterOwnerMobile'), 'error'); return; }
@@ -414,13 +389,9 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     const opener = GROUP_OPENER;
     const gate = await askGender(g, 'group');
     if (!gate) return;
-    /* One record for both answers: the device receiving the duplicate `409` is often not the
-     * one that made the request, and must still hold the same Messages thread. */
     const ask = {
       request: { propertyId: key, property: { title: g.title, price: inr(perHead(g)) + '/mo', loc: (g.locality || 'Pune') + ', Pune', img: FLATMATE_GROUP_IMG }, party: { name: g.title, avatar: (g.title || 'GR').slice(0, 2).toUpperCase() }, firstMessage: opener },
     };
-    // Optimistic, and it doubles as the re-entrancy guard: the card re-renders into its requested
-    // state before the request settles, so a second tap has no button to land on.
     setInterests((m) => ({ ...m, [key]: true }));
     try {
       await flatmateService.joinGroup(g.id, { share: 'solo', message: opener, gender: gate.gender });
@@ -433,14 +404,10 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
       }
       setInterests((m) => { const n = { ...m }; delete n[key]; return n; });
       if (err?.code === flatmateService.CONFLICT_GROUP_FULL) {
-        // The only authoritative word that the snapshot is stale. Rolling back alone re-renders a
-        // live Join button, leaving the user to tap and be refused forever — so refresh first.
         await refresh();
         toast(t('flatmates.groupAlreadyFull', { title: g.title }), 'error');
         return;
       }
-      // The clamp is a rule, not a fault: "this flat is full" is the useful message, and the
-      // server's own text says which cap was hit.
       toast(err?.message || t('common.somethingWentWrong'), 'error');
       return;
     }

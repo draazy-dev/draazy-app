@@ -8,8 +8,6 @@ import { MIN_COMMON } from './livingStyle/questions.js';
 
 const chipCx = (on) => 'seg w-full !h-auto min-h-11 px-1.5 py-1.5 rounded-xl text-xs font-semibold leading-tight text-center text-gray-300 box-border disabled:opacity-40' + (on ? ' active' : '');
 
-/** Answers to filter the board by, within a question OR, across questions AND. The server only applies a
- *  question the viewer has answered themselves, once they have answered MIN_COMMON, so only those are offered. */
 export default function VibeFilter({ vibe, onChange }) {
   const { t } = useTranslation();
   const style = useLivingStyle();

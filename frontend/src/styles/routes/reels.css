@@ -1,19 +1,12 @@
-
-/* Reels (vertical snap-scroll walkthroughs) */
 .reels-page {
   position: relative;
   background: rgb(var(--dz-c-ink));
 }
-
-/* Deliberately not minus --dz-bottom-inset: the floating tab bar is a capsule over the media, so reserving
-   a strip would cut the photo off. `.route-fullbleed` drops ConsumerLayout's padding-bottom. */
 .reels-page .reel-wrap {
   height: calc(100vh - var(--dz-nav-h));
   height: calc(100dvh - var(--dz-nav-h));
   overflow-y: auto;
   scroll-snap-type: y mandatory;
-  /* Stops a flick past the first or last reel from rubber-banding the document and exposing the page
-     background behind edge-to-edge media. */
   overscroll-behavior-y: contain;
 }
 
@@ -31,8 +24,6 @@
   display: flex;
   align-items: flex-end;
 }
-
-/* Horizontal photo carousel within each property */
 .reels-page .reel-gallery {
   position: absolute;
   inset: 0;
@@ -83,9 +74,6 @@
   pointer-events: none;
   background: linear-gradient(180deg, rgb(var(--dz-c-ink) / .15) 30%, rgb(var(--dz-c-ink) / .92));
 }
-
-/* Purely an indicator — the tap it reports is handled by `.reel-gallery` underneath, which is
-   why it takes no pointer events of its own. */
 .reels-page .play-badge {
   position: absolute;
   top: 50%;
@@ -103,12 +91,8 @@
   pointer-events: none;
   transition: opacity .3s ease, transform .3s ease;
 }
-
-/* Anchored off --dz-bottom-inset to clear the floating tab bar the media runs under, plus the caption height. */
 .reels-page .rail {
   position: absolute;
-  /* `viewport-fit=cover` puts the page under the sensor housing, which in landscape sits over
-     this column. */
   right: calc(env(safe-area-inset-right, 0px) + 14px);
   bottom: calc(var(--dz-bottom-inset) + 132px);
   display: flex;
@@ -148,9 +132,6 @@
   justify-content: center;
   transition: transform .18s ease, background .18s ease, color .18s ease;
 }
-
-/* Declared after the base `.rail .ic` rule: a media query adds no specificity, so an equal-specificity
-   override placed earlier loses on source order. */
 @media (max-height: 700px) {
   .reels-page .rail {
     bottom: calc(var(--dz-bottom-inset) + 138px);
@@ -160,33 +141,22 @@
   .reels-page .rail .lb {
     display: none;
   }
-
-  /* 44px: below that a thumb starts missing. */
   .reels-page .rail .ic {
     width: 44px;
     height: 44px;
   }
 }
-
-/* The primary action still has to read as the primary action once it is a rail icon
-   rather than a filled pill — brand fill plus its glow is what carries that. */
 .reels-page .rail .is-cta .ic {
   background: linear-gradient(135deg, rgb(var(--dz-c-teal-600)), rgb(var(--dz-c-teal-500)));
   border-color: transparent;
   box-shadow: 0 8px 22px rgb(var(--dz-c-teal-500) / .42);
 }
-
-/* Property caption. Its own bottom padding is what keeps the text clear of the floating
-   tab bar, now that the media itself runs underneath the bar. */
 .reels-page .reel-info {
   position: relative;
   z-index: 4;
   width: 100%;
   padding: 20px calc(env(safe-area-inset-right, 0px) + 20px) calc(var(--dz-bottom-inset) + 14px) calc(env(safe-area-inset-left, 0px) + 20px);
 }
-
-/* Loading / empty notice. Fills the same box a reel would, so the page never collapses
-   to a bare dark rectangle between the top overlay and the tab bar. */
 .reels-page .reel-note {
   height: calc(100vh - var(--dz-nav-h));
   height: calc(100dvh - var(--dz-nav-h));
@@ -224,8 +194,6 @@
   outline: 2px solid rgb(var(--dz-c-teal-400));
   outline-offset: 2px;
 }
-
-/* Photo position dots (above the property caption) */
 .reels-page .reel-dots {
   display: flex;
   gap: 6px;
@@ -244,9 +212,6 @@
   width: 18px;
   background: rgb(var(--dz-c-pure-white));
 }
-
-
-/* Interaction states on the rail */
 .reels-page .rail button:active .ic,
 .reels-page .rail a:active .ic {
   transform: scale(.88);
@@ -284,8 +249,6 @@
   opacity: 0;
   transform: translate(-50%, -50%) scale(1.4);
 }
-
-/* Ken Burns "live tour" motion on the active photo */
 @keyframes reelKenBurns {
   from {
     transform: scale(1.02) translate(0, 0);
@@ -295,8 +258,6 @@
     transform: scale(1.14) translate(-1.5%, -1.5%);
   }
 }
-
-/* Double-tap heart burst */
 .reels-page .reel-heart-burst {
   position: absolute;
   top: 50%;
@@ -341,8 +302,6 @@
   background: linear-gradient(180deg, rgb(var(--dz-c-ink) / .75), rgb(var(--dz-c-ink) / 0));
   pointer-events: none;
 }
-
-/* Only the controls take taps: the full-width topbar's empty gutter would swallow presses meant for play/pause. */
 .reels-page .reels-filters {
   pointer-events: auto;
 }
@@ -396,9 +355,6 @@
   cursor: pointer;
   transition: background .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .1s ease;
 }
-
-/* Ungated, a tap leaves the chip lit until the next tap lands elsewhere — the filter reads as
-   selected when it is not. */
 @media (hover: hover) and (pointer: fine) {
   .reels-page .reels-chip:hover {
     background: rgb(var(--dz-c-white) / .18);
@@ -420,8 +376,6 @@
   outline: 2px solid rgb(var(--dz-c-teal-400));
   outline-offset: 2px;
 }
-
-/* Bottom info chrome */
 .reels-page .reels-badge {
   font-size: 10px;
   padding: 2px 8px;

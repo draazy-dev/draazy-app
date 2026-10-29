@@ -9,7 +9,6 @@ const RULES = [
   [/[A-Za-z0-9_+=-]{32,}/g, '[token]'],
 ];
 
-// Cut before scrubbing so a huge input cannot stall the regexes, then again so the cap holds.
 export function scrub(text, max = 1000) {
   let out = typeof text === 'string' ? text.slice(0, max * 2 + 200) : '';
   for (const [re, to] of RULES) out = out.replace(re, to);

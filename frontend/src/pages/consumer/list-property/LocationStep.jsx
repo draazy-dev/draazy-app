@@ -84,7 +84,6 @@ const LocationStep = ({
         </div>
       )}
 
-      {/* Locate first so the owner can confirm auto-filled details below. */}
       <div className="mb-6" data-err="location">
         {!showSocietyFirst && (
           <>

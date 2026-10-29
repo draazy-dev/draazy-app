@@ -27,7 +27,6 @@ export default function SeekerMustHaves({ post, setPost }) {
   const set = (patch) => setPost({ ...post, ...patch });
   return (
     <fieldset className="rounded-xl border border-teal-400/25 bg-teal-500/[0.04] px-3.5 pb-3.5" data-testid="seeker-must-haves">
-      {/* Floated so the legend sits inside the box instead of on its top border. */}
       <legend className="float-left w-full flex items-center min-h-[44px] py-2.5 text-sm font-semibold text-white">{t('flatmates.mustHaves')}</legend>
       <div className="clear-both space-y-4 pt-1">
         <div>

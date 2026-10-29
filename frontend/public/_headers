@@ -1,99 +1,24 @@
-# Response headers for Cloudflare Pages. Ported from the Netlify config this replaced; the values
-# are unchanged, only the syntax is.
-#
-# index.html also carries a <meta> CSP so `vite preview` and any non-Pages host stay covered, but a
-# meta CSP cannot express frame-ancestors or form-action — those (and every header below) only work
-# as real headers.
-
 /*
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
-  # `no-referrer`, matching the API chain (SecurityConfig) rather than the usual
-  # `strict-origin-when-cross-origin`. That policy still sends the *full* URL — path, query and all
-  # — on same-origin requests, and this app serves `/shared-documents`, whose URL carries a live
-  # bearer credential for someone's title deeds (D42). Sending no referrer at all costs this site
-  # nothing (analytics is first-party) and removes the whole class.
+  # /shared-documents URLs carry a live bearer credential, so never send a referrer.
   Referrer-Policy: no-referrer
-  # payment= lets the Cashfree checkout frame use the Payment Request API (card/UPI wallets); everything else stays shut.
   Permissions-Policy: geolocation=(self), camera=(self), microphone=(), payment=(self "https://sdk.cashfree.com" "https://sandbox.cashfree.com" "https://api.cashfree.com"), usb=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   Cross-Origin-Opener-Policy: same-origin
-  # Deltas vs the meta CSP: frame-ancestors + form-action added (meta can't do either), ws:/wss:
-  # dropped (dev-only HMR), data: dropped from frame-src (a data: iframe is a script-execution
-  # primitive this app never needs).
-  #
-  # images.unsplash.com is in connect-src, not just img-src, because the service worker caches
-  # listing photos: a plain <img> is an img-src load, but the SW's fetch() for that same URL has no
-  # image element behind it and is checked against connect-src. Without it every listing photo
-  # failed with ERR_FAILED the moment the worker took control — and only in production, because
-  # `vite preview` sends no CSP header and a <meta> CSP does not apply to the worker script.
-  #
-  # connect-src stays 'self' with no backend origin listed, and that is the whole point of the
-  # `/api` proxy in functions/api/[[path]].js: the API is same-origin, so nothing has to be added
-  # here. If this line ever needs a backend host, the topology has drifted and the refresh cookie
-  # has already stopped being delivered.
-  #
-  # script-src has no 'unsafe-inline': the two inline scripts in index.html (pre-paint theme and the
-  # bootstrap fetch) are allowed by sha256, and scripts/check-csp.mjs recomputes both from index.html,
-  # so editing either without updating the three copies of the hash fails `npm run check:csp`.
-  # 'unsafe-eval' is already gone: the Maps SDK has not needed it since the 2019 loader change, and PDF.js probes for eval
-  # in a try/catch and falls back to its slower font path.
-  #
-  # connect-src names places.googleapis.com explicitly rather than `https://*.googleapis.com`. The
-  # wildcard matched storage.googleapis.com, i.e. anyone with a GCS bucket had a CSP-approved POST
-  # destination for the in-memory access token — the exfiltration channel this policy exists to
-  # close. places.googleapis.com is the Places API v1 endpoint the Maps JS SDK calls behind
-  # `AutocompleteSuggestion.fetchAutocompleteSuggestions` and `Place.fetchFields` (lib/places.js);
-  # geocoding and vector tiles go to maps.googleapis.com, already listed. storage.googleapis.com is
-  # now absent outright: it was listed for the MediaPipe face model alone, and that model is served
-  # from public/models, so the channel the paragraph above describes is closed rather than narrowed.
-  # Adding it back means some asset has drifted off our origin — self-host it instead.
-  #
-  # fonts.googleapis.com / fonts.gstatic.com stay in style-src / font-src even though our web fonts
-  # are self-hosted in public/fonts. They are NOT dead allowances: the Maps SDK pulls Google Sans +
-  # Material Symbols itself, and without them the map controls lose their icons. Keep this in step
-  # with the meta CSP in index.html.
-  #
-  # 'wasm-unsafe-eval' is required by the selfie liveness check, which compiles the MediaPipe face
-  # landmarker in the browser so no image leaves the device. It grants WASM compilation only and
-  # does not restore eval() for JavaScript. Removing it does not fail loudly: the landmarker cannot
-  # load and the selfie step silently loses its liveness guidance.
-  #
-  # PostHog hosts are its US cloud. An EU project (VITE_POSTHOG_HOST) must swap both, here and in
-  # index.html, or every capture is silently blocked.
-  #
-  # Hosted checkout POSTs a form from THIS document into an iframe on the checkout host, so the
-  # rails need frame-src and form-action too. Both pairs listed: one artefact serves both envs.
+  # 'wasm-unsafe-eval' is required by the selfie liveness check; removing it fails silently.
   Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-ZXdSxc/Anc08bj274JFX2HAdiHdWoQmZxe3rCLP4Fvk=' 'sha256-fmzqcwzg8Fu+3I6J6TQN6xFPxlE8VlpY+1cYig0HEAY=' 'wasm-unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com https://www.googletagmanager.com https://us-assets.i.posthog.com https://sdk.cashfree.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https: https://i.ytimg.com; connect-src 'self' https://images.unsplash.com https://maps.googleapis.com https://maps.gstatic.com https://places.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://us.i.posthog.com https://us-assets.i.posthog.com https://sandbox.cashfree.com https://payments-test.cashfree.com https://api.cashfree.com https://payments.cashfree.com; frame-src 'self' blob: https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com https://www.youtube-nocookie.com https://www.google.com https://challenges.cloudflare.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' https://sandbox.cashfree.com https://api.cashfree.com; frame-ancestors 'none'
-  # Pages adds Access-Control-Allow-Origin: * to static files by default; nothing cross-origin reads them.
   ! Access-Control-Allow-Origin
 
-# Vite's build output, content-addressed: the hash in the filename IS the bytes, so a URL can never
-# point at different content and a revalidation can only ever answer 304. `immutable` is what tells
-# the browser not to ask — without it a returning visitor pays a conditional request per chunk
-# before first paint, on exactly the connection this app is built for.
-#
-# Stated here rather than left to the Pages default, because the default is the thing that changes
-# under us. It also keeps the HTTP cache in step with the service worker, whose CacheFirst rule for
-# the same paths already treats them as immutable (frontend/vite.config.js).
-#
-# Safe only while every file here is hashed. `globIgnores: ['**/floorplans/**']` in the PWA config
-# is a reminder that unhashed assets do exist in dist — they live under /floorplans, not /assets.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Self-hosted fonts. Content-addressed by weight+subset and only ever replaced by re-running
-# scripts/fetch-fonts.mjs, so a year-long immutable cache is safe — and it is the whole point of
-# self-hosting: a repeat visitor pays nothing for type.
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
 
-# The MediaPipe face landmarker, self-hosted so identity verification depends on no third party: it keeps
-# storage.googleapis.com out of connect-src, and a pinned file cannot be swapped remotely.
 /models/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Never indexed, even when linked from elsewhere: shared documents, and one person's flatmate post (privacy).
 /shared-documents
   X-Robots-Tag: noindex, nofollow
 /view-documents/*
@@ -101,7 +26,6 @@
 /flatmates/:kind/:id
   X-Robots-Tag: noindex
 
-# Only draazy.com is indexed; the other hosts serve the same deployment. Crawlable, so the noindex is seen.
 https://sandbox.draazy.com/*
   X-Robots-Tag: noindex
 https://draazy.pages.dev/*

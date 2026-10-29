@@ -78,24 +78,18 @@ export default function Signup() {
   const { toast } = useToast();
   const [referral, setReferral] = useState(() => storedReferral() || (isReferralCode(params.get('ref')?.trim()) ? params.get('ref').trim() : ''));
   const mobile = useMobileInput(params.get('mobile') || '');
-  // Set when Sign In redirects a visitor here because no account matched their number.
   const isNew = params.get('new') === '1';
   const [errs, setErrs] = useState({});
   const [terms, setTerms] = useState(false);
   const [creating, setCreating] = useState(false);
   const [done, setDone] = useState(false);
-  /* See Signin.jsx: the confirmation is held for a second before the redirect, during which the
-     live navbar is still clickable — so the timer has to be cancellable. */
   const redirectTimer = useRef(null);
   useEffect(() => () => clearTimeout(redirectTimer.current), []);
   const turnstile = useTurnstile();
   const otp = useOtpFlow((m) => sendOtpSvc({ mobile: m, turnstileToken: turnstile.spend() }));
   const [createError, setCreateError] = useState(null);
-  /* True once the refusal is one a fresh code cannot fix. Separate from the message, which is
-     cleared on the next keystroke — the whole point is that more typing cannot help. */
   const [otpSpent, setOtpSpent] = useState(false);
   const [otpCanBeRenewed, setOtpCanBeRenewed] = useState(true);
-  // Set when the code was accepted but the profile save failed: the retry patches, it never re-verifies.
   const signedIn = useRef(null);
   const { city } = useCity();
   const cityKnown = cityHasData(city);
@@ -149,18 +143,14 @@ export default function Signup() {
       const code = referral.trim();
       if (wasNew) track('signup_completed', { role, referred: Boolean(code) });
       if (wasNew && code) {
-        // One generic refusal for every reason: the server never says which check failed.
         redeemReferral(code, 'link').catch(() => toast(t('auth.referralNotApplied'), 'info'));
       }
       clearReferral();
-      /* Keyed on `wasNew`, not on "this is the sign-up screen": a mobile that already has an
-         account passes straight through `register`, and both doors must agree on a destination. */
       redirectTimer.current = setTimeout(
         () => navigate(postAuthDest(params, wasNew ? '/listings' : '/dashboard'), { replace: true }),
         1000,
       );
     } catch (err) {
-      /* Read the STATUS, never `err.message`: the server speaks English and this form is trilingual. */
       if (err?.signedIn) signedIn.current = err.signedIn;
       if (signedIn.current) {
         const key = err?.status === 409 ? 'auth.errEmailTaken'
@@ -172,7 +162,6 @@ export default function Signup() {
       setCreateError(t(messageKey, { count }));
       setOtpSpent(terminal);
       setOtpCanBeRenewed(!terminal || resendable === true);
-      // Set the message FIRST: if a reload starts, it is never read; if the heal is refused, it is.
       healStaleShell(err);
     } finally {
       setCreating(false);
@@ -256,7 +245,6 @@ export default function Signup() {
 
           {!otp.otpSent ? (
             <>
-              {/* Inert without VITE_TURNSTILE_SITE_KEY. Not gating the button — see Signin.jsx. */}
               <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
               <button type="button" onClick={sendOtp} disabled={otp.sending} className="send-otp-btn w-full h-btn-lg rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2">
                 <Send className="w-4 h-4" /> {otp.sending ? t('auth.sending') : t('auth.sendOtp')}

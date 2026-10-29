@@ -5,8 +5,6 @@ import { useToast } from '../../../context/ToastContext.jsx';
 import { C, AX, axis, Card, LoadFailedNotice } from './constants.jsx';
 import AudiencePanel from './AudiencePanel.jsx';
 
-/** No 'New vs returning' card: the session id dies with the
- * tab, so a returning visitor is structurally underivable. */
 export default function TrafficTab({ report, failed, audience, audienceFailed, days }) {
   const { toast } = useToast();
 
@@ -28,14 +26,10 @@ export default function TrafficTab({ report, failed, audience, audienceFailed, d
         </LoadFailedNotice>
       );
     }
-    // Pre-arrival. Distinct from a loaded report over an empty window, which does render — as the
-    // flat zero line that actually happened.
     if (!report) return null;
 
     const { series, sources, devices, identity } = report;
     const deviceTotal = devices.mobile + devices.tablet + devices.desktop;
-    // Count sessions, not rows: the endpoint returns every channel
-    // with zeroes, so rows.length would hide the empty state.
     const sourceTotal = sources.reduce((sum, s) => sum + s.sessions, 0);
 
     return (
@@ -54,8 +48,6 @@ export default function TrafficTab({ report, failed, audience, audienceFailed, d
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Sessions, not page views, so arrival isn't weighted by reading
-              depth; no paid slice as the collector strips utm_source. */}
           <Card title="Traffic sources" desc="Sessions by channel">
             {sourceTotal ? (
               <DoughnutChart
@@ -68,7 +60,6 @@ export default function TrafficTab({ report, failed, audience, audienceFailed, d
             )}
           </Card>
 
-          {/* Also per session, attributed to the session's first view — one arrival is one device. */}
           <Card title="Device split" desc="Sessions by device">
             {deviceTotal ? (
               <DoughnutChart

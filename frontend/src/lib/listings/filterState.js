@@ -1,5 +1,3 @@
-/* Single source of truth for the filter shape, the Set<->array serialisation used by return-to-search
-   snapshots, and the two-way URL mapping that makes a search shareable and back-button-safe. */
 import { canonicalTypeKey, BUY_TYPES, RENT_TYPES, COMMERCIAL_TYPES, LAND_USE } from '../../data/propertyTypes.js';
 import { AMEN_BUY, AMEN_RENT, AVAIL_FROM, FURN, ROOM_TYPES, TENANTS } from '../../pages/consumer/listings/constants.js';
 import { FACING, NA_STATUS, SHELL } from '../../pages/consumer/listings/filtersPanel/facetOptions.js';
@@ -8,8 +6,6 @@ import { clampNearRadius, nearMaxFor, nearToParams } from '../nearParams.js';
 import { BUILT_AREA_RANGE, areaProfileForTypes, areaRangeToUrl, defaultAreaRangeSqft, isDefaultAreaRange, parseAreaRange } from './areaUnits.js';
 import { sectionVisible, VERIF_SECTIONS } from './filterRelevance.js';
 
-/* Default range values — a filter at its default is omitted from the URL so the
-   address bar only ever carries what the user actually narrowed. */
 export const RANGE = {
   budget: [0, 50000000],
   rent: [0, 100000],
@@ -56,14 +52,10 @@ export const INITIAL = (deal) => ({
 });
 
 export const FOOD_KEYS = ['veg', 'jain', 'nonveg'];
-// `true` is how snapshots stored before Veg/Jain existed spelled "Non-veg OK".
 const normalizeFood = (v) => (v === true ? 'nonveg' : FOOD_KEYS.includes(v) ? v : '');
 
-// Filter state carries Set instances that JSON can't represent, so return-to-search
-// snapshots round-trip these keys through arrays.
 export const SET_KEYS = ['types', 'commercialTypes', 'bhk', 'furnishing', 'facing', 'localities', 'societies', 'amenities', 'room', 'tenants', 'constr', 'landUse', 'shell', 'na'];
 export const serializeF = (f) => { const o = { ...f }; SET_KEYS.forEach((k) => { o[k] = [...f[k]]; }); return o; };
-// A snapshot can cross deploys; starting from INITIAL keeps missing newer keys safe.
 export const deserializeF = (o) => {
   const f = { ...INITIAL(o?.deal), ...o };
   SET_KEYS.forEach((k) => { f[k] = new Set(o?.[k] || []); });
@@ -77,19 +69,14 @@ export const deserializeF = (o) => {
   return f;
 };
 
-/* Every URL param this module owns. The state->URL sync deletes all of these before writing the
-   current filters, so clearing a filter reliably drops it from the address bar. */
 export const FILTER_PARAM_KEYS = [
   'loc', 'soc', 'ptype', 'ctype', 'bhks', 'bhk', 'furn', 'facing', 'minBaths', 'amen', 'v',
   'postedBy', 'owneronly', 'postedByOwner', 'room', 'tenants', 'landuse', 'na', 'constr',
   'avail', 'availfrom', 'pets', 'food', 'shell', 'preLeased', 'budget', 'rent', 'area',
   'areaUnit', 'age', 'floor', 'deposit', 'near', 'nearlabel', 'nearr', 'nearmode',
 ];
-/* Retired params that still arrive from bookmarks and shared links. Listed so the state->URL sync
-   strips them; otherwise a withdrawn filter rides along for the whole session. */
 const LEGACY_ALIASES = ['type', 'locality', 'sharing'];
 
-/* Filtered links reset cleanly; a bare deal switch keeps compatible state across journeys. */
 export const hasFilterParams = (params) => [...FILTER_PARAM_KEYS, ...LEGACY_ALIASES].some((k) => params.has(k));
 
 const VERIF_KEYS = ['owner', 'ownership', 'rera'];
@@ -104,7 +91,6 @@ export { normBhk };
 
 const joinSet = (s) => [...s].join(',');
 const splitCsv = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
-// A value no control offers would paint a chip nobody can recreate and match nothing server-side.
 const offered = (options, v) => {
   const keys = new Set(options.map(([k]) => k));
   return new Set(splitCsv(v).filter((k) => keys.has(k)));
@@ -132,7 +118,6 @@ function parseRange(v, def) {
   return [a, b];
 }
 
-/* filters -> plain { param: string } map, carrying only what the user narrowed. */
 export function filtersToParams(f) {
   const p = {};
   const isRent = f.deal === 'rent';
@@ -171,14 +156,10 @@ export function filtersToParams(f) {
     if (f.preLeased && rel('preLeased')) p.preLeased = 'true';
     if (rangeChanged(f.budget, RANGE.budget)) p.budget = `${f.budget[0]}-${f.budget[1]}`;
   }
-  // Near-a-Place carries a human label so any point (a society/POI, not just a registry landmark)
-  // shows its real name; built through the shared near contract so it can't drift from home search.
   Object.assign(p, nearToParams({ near: f.near, nearLabel: f.nearLabel, radius: f.nearRadius, mode: f.nearMode }));
   return p;
 }
 
-/* URLSearchParams -> full filter state for the given deal. Also understands the
-   legacy home-search params (?type=, ?locality=, single ?bhk=). */
 export function paramsToFilters(params, deal) {
   const f = INITIAL(deal);
   const isRent = deal === 'rent';
@@ -191,11 +172,9 @@ export function paramsToFilters(params, deal) {
 
   if (f.types.has('commercial')) f.commercialTypes = offered(COMMERCIAL_TYPES, get('ctype'));
 
-  // Localities carried as slugs (or home-search names) -> slugify to match data.
   const locTokens = splitCsv(get('loc') || get('locality')).map((s) => s.toLowerCase().replace(/\s+/g, '-'));
   if (locTokens.length) f.localities = new Set(locTokens);
 
-  // Societies carried as slugs (society hub / hero search) — kept verbatim.
   const socTokens = splitCsv(get('soc'));
   if (socTokens.length) f.societies = new Set(socTokens);
 
@@ -248,14 +227,12 @@ export function paramsToFilters(params, deal) {
     const mode = get('nearmode');
     if (mode === 'min' || mode === 'km') f.nearMode = mode;
     const r = Number(get('nearr'));
-    // Read after the mode, because the two axes have different ceilings.
     if (!Number.isNaN(r) && r > 0) f.nearRadius = clampNearRadius(r, nearMaxFor(f.nearMode));
   }
 
   return f;
 }
 
-/* Deal switches keep compatible filters and drop only what the new journey cannot express. */
 export function switchDealFilters(prev, deal) {
   const f = INITIAL(deal);
   const allowedTypes = new Set((deal === 'rent' ? RENT_TYPES : BUY_TYPES).map(([k]) => k));
@@ -293,8 +270,6 @@ export function switchDealFilters(prev, deal) {
   return f;
 }
 
-/* Apply the current filters onto a URLSearchParams (mutates a copy): clears all
-   managed keys + legacy aliases, then writes the non-default filters. */
 export function applyFiltersToSearchParams(params, f) {
   const next = new URLSearchParams(params);
   [...FILTER_PARAM_KEYS, ...LEGACY_ALIASES].forEach((k) => next.delete(k));

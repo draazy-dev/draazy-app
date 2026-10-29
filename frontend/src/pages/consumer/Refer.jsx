@@ -21,10 +21,8 @@ export default function Refer() {
   const { toast } = useToast();
   const { referral } = usePricing();
   const { flagEnabled } = useAppFlags();
-  // Contact rewards are Ops-switchable; the owner track (agreement + Featured) is the base programme.
   const contactRewards = flagEnabled('referralRewards');
 
-  /** Nothing renders until the summary resolves, or Copy would copy ''. */
   const [summary, setSummary] = useState(null);
   const [summaryFailed, setSummaryFailed] = useState(false);
   const reloadSummary = useCallback(() => {
@@ -54,7 +52,7 @@ export default function Refer() {
   const writeClipboard = async (text) => {
     try {
       if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; }
-    } catch { /* fall through */ }
+    } catch { }
     try {
       const ta = document.createElement('textarea');
       ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
@@ -65,7 +63,6 @@ export default function Refer() {
     } catch { return false; }
   };
 
-  // Copying is not an invite; only a completed share re-reads the server's count.
   const copyCode = async () => {
     const ok = await writeClipboard(CODE);
     if (ok) { setCopied('code'); setTimeout(() => setCopied((c) => (c === 'code' ? null : c)), 2000); }
@@ -86,7 +83,7 @@ export default function Refer() {
     try {
       await navigator.share({ title: t('misc1.referBadge'), text: shareText(), url: LINK });
       reloadSummary();
-    } catch { /* cancelled: not an invite */ }
+    } catch { }
   };
   const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share;
 

@@ -6,7 +6,6 @@ export default function Hero() {
   const { t } = useTranslation();
   return (
     <>
-      {/* Hero */}
       <section className="hero theme-dark relative overflow-hidden">
         <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 20% 30%,rgb(var(--dz-c-pure-white) / .3) 0,transparent 40%),radial-gradient(circle at 80% 70%,rgb(var(--dz-c-teal-500) / .5) 0,transparent 40%)' }} />
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
@@ -22,7 +21,6 @@ export default function Hero() {
         </div>
       </section>
 
-      {/* How it works */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
         <div className="glass-card rounded-2xl p-6 grid grid-cols-1 sm:grid-cols-3 gap-6 reveal">
           <div className="flex items-start gap-3"><div className="w-9 h-9 rounded-xl bg-teal-400/15 flex items-center justify-center flex-shrink-0 font-bold text-teal-400">1</div><div><p className="text-white font-semibold text-sm">{t('services.ra.hero.step1Title')}</p><p className="text-gray-400 text-xs mt-0.5">{t('services.ra.hero.step1Desc')}</p></div></div>

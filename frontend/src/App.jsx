@@ -25,14 +25,10 @@ import LegacyHelpLangRedirect from './components/help/LegacyHelpLangRedirect.jsx
 const AdminLayout = lazy(() => import('./components/layout/AdminLayout.jsx'));
 const StaffLogin = lazy(() => import('./pages/consumer/StaffLogin.jsx'));
 
-/* Route-shaped Suspense fallbacks, necessarily in the entry chunk. They must stay free of imports
-   of their own or they drag a route's dependencies into the critical path. */
 import DashboardSkeleton from './pages/consumer/dashboard/DashboardSkeleton.jsx';
 import FlatmatesSkeleton from './pages/consumer/flatmates/FlatmatesSkeleton.jsx';
 import SocietySkeleton from './pages/consumer/society/SocietySkeleton.jsx';
 
-/* `lazyPage(loader, ...namespaces)` is `lazy()` plus the route's English locale namespaces, so English
-   is not bundled whole onto every visitor's critical path. `npm run check:i18n` proves the list. */
 const Listings = lazyPage(() => import('./pages/consumer/Listings.jsx'), 'listings', 'owner', 'property', 'verify');
 const Property = lazyPage(() => import('./pages/consumer/Property.jsx'), 'listings', 'owner', 'property', 'verify');
 const Owner = lazyPage(() => import('./pages/consumer/Owner.jsx'), 'owner');
@@ -68,7 +64,6 @@ const Society = lazyPage(() => import('./pages/consumer/Society.jsx'), 'list-pro
 const Societies = lazyPage(() => import('./pages/consumer/Societies.jsx'), 'list-property', 'society');
 const Reels = lazyPage(() => import('./pages/consumer/Reels.jsx'), 'compare-saved', 'reels-docs');
 const Saved = lazyPage(() => import('./pages/consumer/Saved.jsx'), 'compare-saved', 'flatmates', 'listings');
-// Static teaser only: keep this route free of payment calls until the rail is live.
 const PayRent = lazyPage(() => import('./pages/consumer/PayRentComingSoon.jsx'), 'misc2');
 const ViewDocuments = lazyPage(() => import('./pages/consumer/ViewDocuments.jsx'), 'reels-docs');
 const Messages = lazyPage(() => import('./pages/consumer/Messages.jsx'), 'flatmates', 'misc2');
@@ -118,7 +113,6 @@ const AdminErrorLog = lazy(() => import('./pages/admin/AdminErrorLog.jsx'));
 const AdminPostOnBehalf = lazyPage(() => import('./pages/admin/AdminPostOnBehalf.jsx'), 'list-property');
 const AdminStaffActivity = lazy(() => import('./pages/admin/AdminStaffActivity.jsx'));
 const AdminPlaces = lazy(() => import('./pages/admin/AdminPlaces.jsx'));
-/* The manager warning owns the only translated string on this page; the rest is still English. */
 const AdminTeam = lazyPage(() => import('./pages/admin/AdminTeam.jsx'), 'team');
 
 const OpsReferrals = lazy(() => import('./pages/ops/OpsReferrals.jsx'));
@@ -132,14 +126,10 @@ const RentAgreementDesk = lazy(() => import('./pages/ops/rent-agreement/RentAgre
 function ScrollToTop() {
   const { pathname } = useLocation();
   const navType = useNavigationType();
-  // Async content and reveal animations land a restored scroll position part-way down the page,
-  // so force the top on reload. Genuine back/forward (POP) is left alone.
   useEffect(() => {
     const navEntry = performance.getEntriesByType?.('navigation')?.[0];
     if (navEntry?.type === 'reload') window.scrollTo(0, 0);
   }, []);
-  // Pathname-only, so a `?tab=` switch does not yank the reader back to the top; POP is still
-  // gated so the browser can restore its own position.
   const prevPath = useRef(pathname);
   useEffect(() => {
     if (pathname === prevPath.current) return;
@@ -155,13 +145,9 @@ function ReferralCapture() {
   return null;
 }
 
-/* Separate from `ScrollToTop` because it is permanent and sends to our own API. The beacon reduces
-   the pathname to a pattern and never emits back-office routes. */
 function PageViewTelemetry() {
   const { pathname } = useLocation();
 
-  // Mounted once, separate from the effect below: restarting the interval on every route change
-  // would mean a fast-browsing session never flushes until the queue cap or a hidden tab.
   useEffect(() => startPageViewBeacon(), []);
 
   useEffect(() => { recordPageView(pathname); }, [pathname]);
@@ -187,7 +173,6 @@ function LoadingFallback() {
   );
 }
 
-// Old /ops bookmarks carry ?open=<id> and similar; the target's own query wins on a clash.
 function LegacyRedirect({ to }) {
   const { search, hash } = useLocation();
   const [pathname, fixed = ''] = to.split('?');
@@ -197,7 +182,6 @@ function LegacyRedirect({ to }) {
   return <Navigate to={`${pathname}${query ? `?${query}` : ''}${hash}`} replace />;
 }
 
-// Old `?type=` bookmarks land on that desk's own page.
 function DeskRedirect() {
   const { search } = useLocation();
   return <Navigate to={DESK_BY_VALUE[new URLSearchParams(search).get('type')]?.path || '/admin'} replace />;
@@ -208,8 +192,6 @@ function PortalHome() {
   return <Navigate to={portalBase(user)} replace />;
 }
 
-/* Mounted under both /admin/* and /staff/*. Route objects rather than <Route> elements because these
-   paths are relative to the mount, and back-office views are never collected (`isBackOffice`). */
 const BACK_OFFICE_ROUTES = [{
   element: <AdminLayout />,
   children: [
@@ -251,7 +233,6 @@ const BACK_OFFICE_ROUTES = [{
   ],
 }];
 
-// Each role has one prefix: a link written as /admin/x lands a staff member on /staff/x, and back.
 function BackOffice() {
   const { user } = useAuth();
   const { pathname, search, hash } = useLocation();
@@ -261,8 +242,6 @@ function BackOffice() {
 }
 
 export default function App() {
-  // Apply saved appearance prefs (e.g. Reduce motion) to <html> once on load so
-  // the choice persists across sessions and route changes before any page mounts.
   useEffect(() => { applyAppPrefs(); installReducedMotionScroll(); }, []);
   useKeyboardOpen();
   return (
@@ -274,11 +253,8 @@ export default function App() {
       <StaticRouteHead />
       <Suspense fallback={<LoadingFallback />}>
       <Routes>
-        {/* Standalone full-screen secure viewer (own chrome, no consumer nav) */}
         <Route path="/view-documents/:requestId" element={<ProtectedRoute><ViewDocuments /></ProtectedRoute>} />
         <Route path="/verify-identity" element={<ProtectedRoute><AppFlagsProvider><AppFlagRoute flag="kycBadgeEnabled"><VerifyIdentity /></AppFlagRoute></AppFlagsProvider></ProtectedRoute>} />
-        {/* Public by design: the token in the URL fragment IS the credential, and the recipient has
-            no account. The fragment never reaches a server — the token travels on `X-Share-Token`. */}
         <Route path="/shared-documents" element={<ViewDocuments shared />} />
         <Route element={<ConsumerLayout />}>
           <Route path="/" element={<Home />} />
@@ -290,11 +266,8 @@ export default function App() {
           <Route path="/signup" element={<AppFlagRoute flag="signupsEnabled"><Signup /></AppFlagRoute>} />
           <Route path="/staff-login" element={<StaffLogin />} />
           <Route path="/staff-invite" element={<StaffInvite />} />
-          {/* Public: the owner has no account; the fragment token is the credential. */}
           <Route path="/owner-confirm" element={<OwnerConfirm />} />
           <Route path="/services" element={<Services />} />
-          {/* Public service landing pages — anyone can browse; sign-in is enforced only at the
-              "use the service" action (quote submit / generate / book) inside each page. */}
           <Route path="/services/packers-movers" element={<PackersMovers />} />
           <Route path="/services/property-legal" element={<PropertyLegal />} />
           <Route path="/home-loans" element={<HomeLoans />} />
@@ -318,20 +291,14 @@ export default function App() {
           <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
           <Route path="/schedule-visit" element={<AppFlagRoute flag="scheduleVisit"><ProtectedRoute><ScheduleVisit /></ProtectedRoute></AppFlagRoute>} />
           <Route path="/societies" element={<Societies />} />
-          {/* Own boundary so the outer centred spinner never covers this route: the society page
-              opens on a 224–288px hero, so the swap would shunt everything below it downward. */}
           <Route path="/society/:slug" element={<Suspense fallback={<SocietySkeleton />}><Society /></Suspense>} />
           <Route path="/reels" element={<Reels />} />
-          {/* No auth wall: saves live in localStorage and several surfaces write them while signed
-              out, so a guard here made the bottom nav's Saved tab a dead end for those users. */}
           <Route path="/saved" element={<Saved />} />
           <Route path="/pay-rent" element={<ProtectedRoute><PayRent /></ProtectedRoute>} />
           <Route path="/locality" element={<LocalityIndex />} />
           <Route path="/locality/:slug" element={<Locality />} />
           <Route path="/map" element={<Navigate to="/listings?view=map" replace />} />
           <Route path="/messages" element={<AppFlagRoute flag="inAppMessaging"><ProtectedRoute><Messages /></ProtectedRoute></AppFlagRoute>} />
-          {/* Same reasoning as /society: hero, filter deck and first card row arrive together, so a
-              centred spinner guarantees a reflow as someone reaches for the List/Map toggle. */}
           <Route path="/flatmates" element={<Suspense fallback={<FlatmatesSkeleton />}><Flatmates /></Suspense>} />
           <Route path="/flatmates/:kind/:id" element={<FlatmateDetail />} />
           <Route path="/flatmates/:place" element={<FlatmateLanding />} />
@@ -339,7 +306,6 @@ export default function App() {
           <Route path="/rent/:place/:bhk" element={<RentBuyLanding deal="rent" />} />
           <Route path="/buy/:place" element={<RentBuyLanding deal="buy" />} />
           <Route path="/buy/:place/:bhk" element={<RentBuyLanding deal="buy" />} />
-          {/* Permanent redirect for legacy external links and search results. */}
           <Route path="/share-flat" element={<Navigate to="/flatmates" replace />} />
           <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
           <Route path="/help" element={<HelpHome />} />
@@ -350,7 +316,6 @@ export default function App() {
           <Route path="/help/a/:slug" element={<HelpArticle />} />
           <Route path="/hi/help/*" element={<LegacyHelpLangRedirect />} />
           <Route path="/mr/help/*" element={<LegacyHelpLangRedirect />} />
-          {/* Legacy/guessable aliases so /docs and /help-center land somewhere useful. */}
           <Route path="/docs" element={<Navigate to="/help" replace />} />
           <Route path="/help-center" element={<Navigate to="/help" replace />} />
           <Route path="/blog" element={<BlogIndex />} />
@@ -377,7 +342,6 @@ export default function App() {
           />
           <Route
             path="/dashboard"
-            /** ProtectedRoute wraps Suspense so signed-out users never see dashboard chrome. */
             element={
               <ProtectedRoute>
                 <Suspense fallback={<DashboardSkeleton />}>

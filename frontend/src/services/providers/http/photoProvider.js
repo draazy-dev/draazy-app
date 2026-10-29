@@ -1,6 +1,5 @@
 import { postMultipart } from '../../http.js';
 
-// The platform supplies the multipart boundary; the server scopes storage to the session.
 export async function uploadPhoto(file, options) {
   const form = new FormData();
   form.append('file', file);

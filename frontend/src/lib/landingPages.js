@@ -1,12 +1,8 @@
-/* Programmatic rent/buy and flatmate landing pages, shared by the app (RentBuyLanding.jsx, FlatmateLanding.jsx), the
-   edge renderer (edge/landing-pages.mjs) and the landing sitemap. Places are the locality guides. */
 import { GUIDE_LOCALITIES } from './guideLocalities.js';
 import { expandBhkToken } from './listings/bhkOptions.js';
 
 export const PUNE = { slug: 'pune', name: 'Pune' };
 
-/* Guide taglines are copied because the edge cannot read Markdown;
-   edge/landing-pages.test.mjs checks them against the guides. */
 export const TAGLINES = {
   aundh: 'Settled, leafy and close to the University',
   balewadi: 'Newer towers by the sports complex, between Baner and Hinjawadi',
@@ -26,7 +22,6 @@ export const LANDING_PLACES = Object.entries(GUIDE_LOCALITIES).map(([slug, name]
 
 export const LANDING_BHKS = [1, 2, 3, 4];
 
-/* Open listings an indexable page needs: an area, one BHK in an area, or live flatmate posts in an area. */
 export const MIN_INDEXABLE = { place: 5, bhk: 3, flatmates: 3 };
 
 const DEALS = { rent: 'rent', buy: 'sale' };
@@ -34,7 +29,6 @@ const BHK_SEGMENT = /^([1-4])-bhk$/;
 
 export const landingPath = (deal, slug = PUNE.slug, bhk) => `/${deal}/${slug}${bhk ? `/${bhk}-bhk` : ''}`;
 
-/** `segments` are the path parts after `/rent` or `/buy`; null when the URL is not a landing page. */
 export function parseLanding(deal, segments) {
   if (!DEALS[deal]) return null;
   const [slug, bhkSegment, ...rest] = segments || [];
@@ -45,7 +39,6 @@ export function parseLanding(deal, segments) {
   return bhk ? { deal, place, bhk } : null;
 }
 
-/* A rent search for 4 BHK is the app's 4plus filter, so it also matches larger homes. */
 export const bhkMatches = ({ deal }, bhk, row) => (deal === 'rent' && bhk === 4 ? Number(row.bhk) >= 4 : Number(row.bhk) === bhk);
 
 export const isIndexable = ({ bhk }, count) => count >= (bhk ? MIN_INDEXABLE.bhk : MIN_INDEXABLE.place);
@@ -68,7 +61,6 @@ export function landingCopy({ deal, place, bhk }) {
   };
 }
 
-/** `GET /properties` query for a landing page, in the names the listings page sends. */
 export const landingQuery = ({ deal, place, bhk }) => ({
   deal,
   ...(place !== PUNE && { localities: [place.slug] }),
@@ -76,7 +68,6 @@ export const landingQuery = ({ deal, place, bhk }) => ({
   rank: 'relevance',
 });
 
-/** The same search on the full listings page, for "More filters". */
 export function listingsUrl({ deal, place, bhk }) {
   const params = new URLSearchParams({ deal });
   if (place !== PUNE) params.set('loc', place.slug);
@@ -86,7 +77,6 @@ export function listingsUrl({ deal, place, bhk }) {
 
 const WOMEN_ONLY = { slug: 'women-only-pune', name: 'Women-only' };
 
-/** `/flatmates/<segment>`: a locality guide slug or the women-only page; null otherwise. */
 export function parseFlatmateLanding(segment) {
   if (segment === WOMEN_ONLY.slug) return { women: true, place: PUNE };
   const place = LANDING_PLACES.find((p) => p.slug === segment);
@@ -109,5 +99,4 @@ export function flatmateCopy({ women, place }) {
   };
 }
 
-/** A feed row (rooms carry `gender`, groups carry `policy`) that is meant for women only. */
 export const isWomenOnly = (row) => row.gender === 'female' || row.policy === 'women';

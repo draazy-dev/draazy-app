@@ -19,7 +19,6 @@ import { listMyServiceRequestInvites } from '../../../services/serviceRequestSer
 import { listTrackedRent } from '../../../services/managedService.js';
 import TrackedRent from './TrackedRent.jsx';
 
-/* The tenant hub. No rent moves through Draazy; receipts here are ones the owner recorded. */
 export default function MyRentalPanel({ user }) {
   const { t: tr } = useTranslation();
   const { toast } = useToast();
@@ -29,7 +28,6 @@ export default function MyRentalPanel({ user }) {
   const sending = useRef(false);
   const headingRef = useRef(null);
   const [idx, setIdx] = useState(0);
-  /* Gates the empty state: before the reads land, "no rental" would be a false claim. */
   const [loaded, setLoaded] = useState(false);
 
   const pendingRows = tenancies.filter((x) => x.pending);
@@ -59,7 +57,6 @@ export default function MyRentalPanel({ user }) {
       headingRef.current?.focus();
     }
   };
-  /* Caller-scoped reads, issued together because none depends on another and the panel blocks on all of them. */
   const [rent, setRent] = useState({ profile: null, agreements: [] });
   const [invites, setInvites] = useState([]);
   const [tracked, setTracked] = useState([]);
@@ -69,7 +66,6 @@ export default function MyRentalPanel({ user }) {
       myTenancies().catch(() => []),
       myTenantProfile().catch(() => null),
       myRentAgreements().catch(() => []),
-      /* The invite is created by the owner, so it can only come from the server, never local storage. */
       listMyServiceRequestInvites().catch(() => []),
       listTrackedRent().catch(() => []),
     ]).then(async ([rows, profileRow, agreementRows, inviteRows, trackedRows]) => {
@@ -91,24 +87,16 @@ export default function MyRentalPanel({ user }) {
       });
       setLoaded(true);
     })
-      // Release the gate so a failed card hydration is not a permanent skeleton.
       .catch(() => { if (alive) setLoaded(true); });
     return () => { alive = false; };
-    // Keyed on the mobile: the /auth/me refresh swaps the user object every tick and would re-flash the panel.
   }, [user?.mobile, reloadKey]);
 
-  // Lease dates only. Nothing here knows whether the rent was actually paid — that money never
-  // touches the platform — so this is a schedule, not a settlement status.
   const status = useMemo(() => (t ? tenancyStatus(t) : null), [t]);
 
   const agreement = rent.agreements[0] || null;
   const profile = rent.profile;
-  // Server-computed, so there is no fallback; a dash means not known yet.
   const score = profile?.score ?? null;
-  // Rent-agreement co-fill requests addressed to this user (owner invited them to
-  // add their tenant details). Fetched with the panel's other reads, above.
 
-  /* Everything below dereferences `t`, and "no rental" is not a claim to make until the reads land. */
   if (!loaded) {
     return (
       <div className="space-y-6">
@@ -191,7 +179,6 @@ export default function MyRentalPanel({ user }) {
         </div>
       </Card>
 
-      {/* Next rent due — a schedule derived from the lease, not a settlement status */}
       <Card className="p-5">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-500/15">
@@ -218,7 +205,6 @@ export default function MyRentalPanel({ user }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        {/* No payment history: no rent moves through Draazy, so the tenant's own record lives in Finances. */}
         <Card className="p-6">
           <SectionHead
             icon="receipt-indian-rupee"
@@ -262,8 +248,6 @@ export default function MyRentalPanel({ user }) {
 
           <Card className="p-5">
             <SectionHead icon="shield-check" title="Verified-Tenant score" />
-            {/* The score is the server's, so before it arrives there is no number to show. A dash
-                says "not known yet"; a 0 would read as "you scored nothing". */}
             <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5"><span>Trust score</span><span className="text-white font-semibold">{score == null ? '—' : `${score}%`}</span></div>
             <div className="insight-bar"><span style={{ width: `${score || 0}%` }} /></div>
             <p className="text-gray-500 text-xs mt-2.5">A higher score gets you priority with owners. Add your ID, employment and income to boost it.</p>
@@ -294,7 +278,6 @@ function PendingTenancies({ rows, busy, onAnswer }) {
   );
 }
 
-/* Co-fill requests: the owner started the agreement and asked this tenant to fill their own details. */
 function PendingInvites({ invites }) {
   if (!invites || !invites.length) return null;
   return (
@@ -360,7 +343,6 @@ const ActionTile = ({ to, icon, title, desc, soon }) => (
   </Link>
 );
 
-/* `YYYY-MM-DD` / `YYYY-MM` → "Mon YYYY" */
 function fmtMonth(s) {
   if (!s) return '';
   const [y, m] = String(s).split('-');

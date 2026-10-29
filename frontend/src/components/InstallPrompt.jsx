@@ -7,34 +7,28 @@ import { getCookieConsent } from './CookieConsent.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { alertsAskPending } from '../lib/browserAlerts.js';
 
-/* Chromium: stash beforeinstallprompt and call prompt() from a click (it throws outside a gesture). iOS/WebKit has
-   no install API, so we can only point at Share → Add to Home Screen. */
-
 const KEY = 'dz_install_prompt_v1';
 const VERSION = 1;
 const DAY = 24 * 60 * 60 * 1000;
 
-/* Index is the dismissal count: two 'not now' answers settle it, so the last entry is terminal. */
 const COOLDOWNS = [7 * DAY, 14 * DAY, Infinity];
 
-/* Page views, not seconds: a timer measures patience, not interest, and the count persists across visits. */
 const MIN_VIEWS = 3;
 
 function read() {
   try {
     const v = JSON.parse(localStorage.getItem(KEY));
     if (v && v.version === VERSION) return v;
-  } catch { /* ignore */ }
+  } catch { }
   return { dismissals: 0, lastDismissAt: 0, installed: false, views: 0 };
 }
 
 function write(value) {
   try {
     localStorage.setItem(KEY, JSON.stringify({ ...value, version: VERSION }));
-  } catch { /* ignore */ }
+  } catch { }
 }
 
-/* `navigator.standalone` is the iOS spelling of standalone mode and predates the media query. */
 function isInstalled(state) {
   if (state.installed) return true;
   if (typeof window === 'undefined') return false;
@@ -57,8 +51,6 @@ export default function InstallPrompt() {
   const [deferred, setDeferred] = useState(null);
   const [engaged, setEngaged] = useState(false);
   const [gone, setGone] = useState(false);
-  // The consent bar is legally required and owns the bottom of the screen while
-  // it is up; two stacked bars would bury it. Same event the assistant listens to.
   const [cookieBar, setCookieBar] = useState(() => !getCookieConsent());
 
   useEffect(() => {
@@ -66,12 +58,9 @@ export default function InstallPrompt() {
     if (isInstalled(state) || isSilenced(state)) { setGone(true); return undefined; }
 
     const onBeforeInstall = (e) => {
-      // Suppress Chrome's own mini-infobar so the user gets one ask, not two.
       e.preventDefault();
       setDeferred(e);
     };
-    // Fires however the app was installed, including from the browser menu —
-    // so the nudge disappears even when it wasn't the thing that converted.
     const onInstalled = () => { write({ ...read(), installed: true }); setGone(true); };
     const onCookieBar = (e) => setCookieBar(!!e.detail?.visible);
 
@@ -86,7 +75,6 @@ export default function InstallPrompt() {
     };
   }, []);
 
-  /* The ref makes the per-path increment idempotent: StrictMode runs effects twice and would double-count. */
   const counted = useRef(null);
   useEffect(() => {
     if (counted.current === pathname) return;
@@ -105,12 +93,8 @@ export default function InstallPrompt() {
 
   const install = async () => {
     if (!deferred) return;
-    // Must be called synchronously from the click — awaiting first would lose
-    // the user gesture and the call would be rejected.
     deferred.prompt();
     const { outcome } = await deferred.userChoice;
-    // The event is single-use whatever the answer. A decline is a dismissal, so
-    // the same escalating cooldown applies and we don't re-ask next session.
     setDeferred(null);
     if (outcome === 'accepted') write({ ...read(), installed: true });
     else dismiss();
@@ -118,7 +102,6 @@ export default function InstallPrompt() {
   };
 
   const ios = typeof navigator !== 'undefined' && isIOS();
-  // One bottom card at a time: a signed-in user is asked about browser notifications first.
   if (gone || cookieBar || !engaged || (!deferred && !ios) || (isIn && alertsAskPending())) return null;
 
   return (
@@ -129,8 +112,6 @@ export default function InstallPrompt() {
         className="pointer-events-auto w-full max-w-md rounded-2xl border border-white/10 bg-ink-card/95 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgb(var(--dz-c-black)/0.7)] p-3.5"
       >
         <div className="flex items-start gap-3">
-          {/* Tinted tile kept (unlike the navbar): this row previews the
-              rounded-square home-screen icon the user is about to install. */}
           <div className="w-10 h-10 rounded-xl bg-teal-500/10 flex items-center justify-center shrink-0">
             <LogoMark className="w-6 h-6 text-teal-400" />
           </div>
@@ -150,8 +131,6 @@ export default function InstallPrompt() {
           </button>
         </div>
 
-        {/* iOS gets no button: there is nothing to call. The copy above is the
-            whole instruction, so a CTA would be a dead control. */}
         {!ios && (
           <div className="mt-3 flex items-center gap-2">
             <button

@@ -10,7 +10,6 @@ export default function PackersMovers() {
   const [searchParams] = useSearchParams();
   const [prefillService, setPrefillService] = useState('');
 
-  // Prefill service from URL (?service=vehicle)
   useEffect(() => {
     const serviceParam = searchParams.get('service');
     if (serviceParam) {

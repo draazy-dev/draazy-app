@@ -1,4 +1,3 @@
-/* Route handlers do the I/O; the render functions are pure so the Node self-check covers them. */
 import { esc, headTags, jsonLd, renderPage } from '../scripts/seo-html.mjs';
 import { NOINDEX, SITE, crumbs, edgePage, fetchShell, headersFor, htmlResponse, notFoundPage, page } from './seo-pages.mjs';
 import { listingPrice, listingTitle, propertyPath } from '../src/lib/listingSeo.js';
@@ -22,7 +21,6 @@ const toQuery = (params) => {
 
 export const landingApiPath = (target) => `/properties?${toQuery({ ...landingQuery(target), size: LISTED, page: 0 })}`;
 
-/** `data` is the anonymous `GET /properties` page (PropertySearchResponse.java). */
 export function landingPage(shell, target, data, { site = SITE } = {}) {
   const { deal, place, bhk } = target;
   const copy = landingCopy(target);
@@ -75,7 +73,6 @@ export function landingPage(shell, target, data, { site = SITE } = {}) {
 const notFound = async (request, env) => htmlResponse(notFoundPage(await fetchShell(env, request)), headersFor(request));
 const redirectTo = (request, path) => htmlResponse({ status: 301, location: `${path}${new URL(request.url).search}` }, headersFor(request));
 
-/** `/rent/...` and `/buy/...`; `segments` is the catch-all's path array. */
 export async function landingRoute({ request, env, deal, segments }) {
   const target = parseLanding(deal, [].concat(segments ?? []));
   if (!target) return notFound(request, env);
@@ -86,7 +83,6 @@ export async function landingRoute({ request, env, deal, segments }) {
 
 export const flatmateApiPath = ({ women, place }, size = FEED_PAGE) => `/flatmates/feed?${toQuery({ tab: 'move-in', ...(women ? { gender: 'female' } : { locality: place.name }), size, page: 0 })}`;
 
-/* The women-only filter also admits hosts open to anyone, so the strict subset is picked out here. */
 const flatmateRows = (target, data) => {
   const content = data.content || [];
   return target.women ? content.filter(isWomenOnly) : content;
@@ -94,7 +90,6 @@ const flatmateRows = (target, data) => {
 const flatmateCount = (target, data) => (target.women ? flatmateRows(target, data).length : data.totalElements ?? flatmateRows(target, data).length);
 
 function flatmateItem(row, place) {
-  // Rooms carry seatsTotal too, so room fields are tested first (same order as flatmateProvider).
   if (!(row.roomType || row.roomKind) && (row.members || row.seatsTotal != null)) {
     const seats = Number(row.seatsOpen) > 0 ? `${row.seatsOpen} ${row.seatsOpen === 1 ? 'seat' : 'seats'} open` : '';
     return { href: `/flatmates/group/${encodeURIComponent(row.id)}`, name: row.title || `Flat share in ${row.locality || place.name}`, facts: [Number(row.perHead) > 0 && `${rupees(row.perHead)}/month each`, seats] };
@@ -106,7 +101,6 @@ function flatmateItem(row, place) {
   };
 }
 
-/** Only what the anonymous GET /flatmates/feed page already shows: no names, no contact. */
 export function flatmatePage(shell, target, data, { site = SITE } = {}) {
   const copy = flatmateCopy(target);
   const path = flatmatePath(target);
@@ -145,7 +139,6 @@ export function flatmatePage(shell, target, data, { site = SITE } = {}) {
   return { status: 200, html: renderPage(shell, head, body) };
 }
 
-/** `/flatmates/<slug>`: one segment, so it never shadows `/flatmates/:kind/:id`. */
 export async function flatmateRoute({ request, env, slug }) {
   const target = parseFlatmateLanding(slug);
   if (!target) return notFound(request, env);
@@ -156,8 +149,6 @@ export async function flatmateRoute({ request, env, slug }) {
 
 const usable = (api) => api.status === 200 && api.data;
 
-/** Rows for sitemaps/landing.xml: every landing URL over its threshold, or null when the API could not answer.
-    One search per area and deal (up to 100 rows, counted by BHK here) keeps the whole sitemap at 39 API calls. */
 export async function landingSitemapRows(get) {
   const rows = [];
   for (const deal of ['rent', 'buy']) {

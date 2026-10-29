@@ -27,8 +27,6 @@ const CATS = [
   ['move', 'Move & Setup', 'truck'],
 ];
 const SPOT_CHIPS = ['govt', 'doorstep', 'fast'];
-/* Rent Agreement leads the list — it is the platform's primary paid service, so it
-   holds the first grid slot on every category and renders with the featured treatment. */
 const FEATURED_SLUG = 'rentAgreement';
 const SERVICES = [
   ['Rent Agreement', 'file-signature', 'finance', '1521791136064-7986c2920216', 'Hassle-free online Maharashtra rent agreements with doorstep biometric.', '/services/rent-agreement', 'rentAgreement'],
@@ -55,7 +53,6 @@ const PACK = [
   { id: 'verify', icon: 'shield-check' },
   { id: 'internet', icon: 'wifi' },
 ];
-/* Prices come from the server-controlled `movePack` block; never render a client fallback. */
 const STAT_BAND = [
   { to: Number(STATS.localityGuides), slug: 'localityGuides' },
   { to: parseInt(STATS.otpVerified, 10), suffix: '%', slug: 'otpVerified' },
@@ -89,7 +86,6 @@ function Counter({ to, prefix = '', suffix = '', run }) {
   return <p className="text-2xl sm:text-3xl font-extrabold gradient-text">{prefix}{fmtCount(v)}{suffix}</p>;
 }
 
-/* Move-in Pack configuration from the `/bootstrap` section; fails closed so unconfirmed prices are never offered. */
 function useMovePackConfig() {
   const [cfg, setCfg] = useState({ enabled: false, items: {} });
   useEffect(() => {
@@ -97,8 +93,6 @@ function useMovePackConfig() {
     const sync = () => {
       getMovePack()
         .then((next) => { if (live) setCfg(next); })
-        // Swallowed on purpose: the fallback already in state *is* the failure behaviour, and a
-        // toast about a config read is noise to a visitor who has not asked for anything yet.
         .catch(() => {});
     };
     sync();
@@ -122,7 +116,6 @@ export default function Services() {
   const { toast } = useToast();
   const [cat, setCat] = useState('all');
   const [packSel, setPackSel] = useState({});
-  /* Ref and state prevent duplicate ticket creation before the button rerenders disabled. */
   const [booking, setBooking] = useState(false);
   const bookingRef = useRef(false);
   const [countRun, setCountRun] = useState(false);
@@ -209,8 +202,6 @@ export default function Services() {
     setBooking(true);
     const names = items.map((i) => tr('services.hub.pack.' + i.id));
     const accepted = total - save;
-     /* `quotedValue` records the bundle amount accepted by the customer.
-       Keep selections after a failure so retry preserves their choices. */
     try {
       await createTicket({
         subject: 'Move-in Pack booking',
@@ -229,8 +220,6 @@ export default function Services() {
     toast(tr('services.hub.packBookedToast'), 'success');
   };
 
-    /* Waitlist submissions remain unauthenticated and send only service intent plus contact details.
-      Show success only after the server confirms the request. */
   const submitNotify = async (e) => {
     e.preventDefault();
     const mob = (notify.mobile || '').replace(/\D/g, '');
@@ -393,7 +382,6 @@ export default function Services() {
                 <p className="text-gray-300 mt-2 mb-4">{packLive ? tr('services.hub.packDesc') : tr('services.hub.packComingSoonDesc')}</p>
                 <div className="grid sm:grid-cols-2 gap-2.5">
                   {PACK.map((p) => {
-                      /* A missing server price is unsellable; never substitute zero for it. */
                     const price = movePack.items[p.id];
                     const sellable = packLive && typeof price === 'number';
                     const on = sellable && !!packSel[p.id];

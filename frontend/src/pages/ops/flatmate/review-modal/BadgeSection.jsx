@@ -16,7 +16,6 @@ const BILL = 'electricity_bill';
 const BILL_MAX_AGE_DAYS = 90;
 const isoDay = (d) => d.toLocaleDateString('en-CA');
 const daysAgo = (n) => isoDay(new Date(Date.now() - n * 86_400_000));
-// The server resolves the account from the mobile, so an account always comes with one.
 const ownerLabel = (r) => (r.ownerConsentAccount ? `${r.ownerConsentAccount} (${r.ownerConsentMobile})` : r.ownerConsentMobile || 'the owner');
 
 function EvidenceChip({ review: r }) {
@@ -56,7 +55,6 @@ function Tick({ checked, onChange, label, hint, testId }) {
   );
 }
 
-/* The server re-checks every one of these; the form exists so the reviewer cannot skip a step by accident. */
 function TenantChecklist({ review: r, busy, onApprove }) {
   const bill = r.evidenceType === BILL;
   const today = isoDay(new Date());
@@ -113,7 +111,6 @@ function ReasonForm({ label, confirm, busy, onSubmit, onCancel }) {
 
 const yesNo = (v) => (v == null ? '—' : v ? 'Yes' : 'No');
 
-/* The badge axis: approving grants the badge, rejecting or revoking withholds it and nothing else. */
 export default function BadgeSection({ review: r, busy, onDecide, onRevoke }) {
   const [mode, setMode] = useState(null);
   const pending = r.status === 'pending';

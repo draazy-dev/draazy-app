@@ -1,4 +1,3 @@
-/* Colour tokens (--dd-bg, --dd-text, --dd-menu-solid…) live in styles/theme.css. */
 :root {
   --dd-accent: var(--teal-2);
   --dd-accent-soft: rgb(var(--dz-c-teal-500) / 0.15);
@@ -44,7 +43,6 @@
 }
 
 .dz-dropdown.dz-dd-sort {
-  /* Shares a row with view toggles, so fixed width prevents wrapping on narrow listing bars. */
   flex: 0 1 126px;
   width: 126px;
 }
@@ -57,7 +55,6 @@
 }
 
 .dz-dropdown--sm.dz-dd-photocat {
-  /* Caption sits on thumbnails, so the trigger must stay compact and transparent. */
   width: 100%;
   --dd-trigger-pad: 0 0.4rem;
 }
@@ -156,8 +153,6 @@
   transform: rotate(180deg);
   color: var(--dd-accent);
 }
-
-/* Chips mode: the box wears the trigger's skin; 1.4rem reads as a pill on one line and a card once it wraps. */
 .dz-dropdown__box {
   display: flex;
   flex-wrap: wrap;
@@ -264,7 +259,6 @@
 }
 
 .dz-dropdown__menu--sheet {
-  /* Phone dropdowns are floating cards (--dz-float-* in index.css) so options stay thumb-reachable above the nav. */
   position: fixed;
   left: calc(env(safe-area-inset-left, 0px) + var(--dz-float-edge));
   right: calc(env(safe-area-inset-right, 0px) + var(--dz-float-edge));
@@ -410,9 +404,6 @@
   flex: 1;
   white-space: nowrap;
 }
-
-/* Sits inside a card header, so it takes the card's squarer radius and drops the
-   floating shadow that bled onto the row beneath it. */
 .dz-dropdown.dd-type-filter {
   --dd-trigger-radius: 0.75rem;
   --dd-trigger-shadow: none;

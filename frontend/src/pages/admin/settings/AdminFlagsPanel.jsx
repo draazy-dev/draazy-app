@@ -3,8 +3,6 @@ import { AlertTriangle, ToggleRight } from 'lucide-react';
 import { classNames } from '../../../lib/format.js';
 import Switch from '../../../components/ui/Switch.jsx';
 
-/* Whole-module kill switches plus the two bulk-data exports. Everything else in the console is
-   always on: a switch nobody would flip in an incident is only another way to break a page. */
 const ADMIN_FLAG_SECTIONS = [
   { section: 'properties', title: 'Properties', desc: 'Listing management', critical: true, options: [
     { key: 'csvExport', label: 'CSV export', desc: 'Download the listing table as a CSV file' },

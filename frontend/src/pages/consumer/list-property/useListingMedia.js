@@ -134,8 +134,6 @@ export default function useListingMedia({ setErrors }) {
     setVideoName('');
     setMediaStatus('');
   };
-  // Swept after a week, a draft can outlive its photos. An <img> probe (CSP keeps the bucket out of connect-src)
-  // can't tell a 404 from a blip, so only what fails twice while online is dropped.
   const restorePhotos = useCallback((saved) => {
     const seq = ++restoreSeq.current;
     setPhotos(saved);

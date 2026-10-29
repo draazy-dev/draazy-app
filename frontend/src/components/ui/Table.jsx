@@ -2,9 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { classNames } from '../../lib/format.js';
 
-/* Themed data table. columns: [{ key, header, render?(row), className? }]
-   Pass pageSize to enable client-side pagination (port of admin-components.js pager):
-   shows "Showing X–Y of Z" plus prev/next + numbered page buttons with ellipsis. */
 function pageNumbers(page, total) {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const out = [1];
@@ -23,11 +20,11 @@ export default function Table({
   onRowClick,
   pageSize,
   label = 'records',
-  selectable,     // enable row checkboxes
-  selected,       // Set of selected row keys
-  onSelect,       // (key) => void — toggle single row
-  onSelectAll,    // (checked) => void — toggle all visible rows
-  mobileCard,     // optional (row) => JSX — stacked card layout shown < sm instead of the table
+  selectable,
+  selected,
+  onSelect,
+  onSelectAll,
+  mobileCard,
 }) {
   const [page, setPage] = useState(1);
   const totalPages = pageSize ? Math.max(1, Math.ceil(rows.length / pageSize)) : 1;
@@ -53,7 +50,6 @@ export default function Table({
 
   return (
     <div>
-      {/* Mobile: stacked cards (only when a card renderer is supplied) */}
       {mobileCard ? (
         <div className="sm:hidden">
           {selectable && rows.length > 0 ? (

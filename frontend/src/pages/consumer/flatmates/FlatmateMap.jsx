@@ -11,14 +11,10 @@ import ErrorBoundary from '../../../components/ErrorBoundary.jsx';
 
 const MAX_ROWS = 3;
 const IW_OFFSET = [0, -22];
-// A price marker stands taller than a bubble: its tail puts the anchor 7px below the pill.
 const PRICE_IW_OFFSET = [0, -42];
 
-// stable identity so vis.gl doesn't re-run setOptions each render
 const PREFIX = { group: 'g', room: 'r', seeker: 's' };
 
-// A map cluster is a mixed feed just like the list, so this dispatches on the
-// record's own `kind` rather than on the active tab.
 function rowModel(item, t) {
   if (item.kind === 'room') {
     return {
@@ -111,8 +107,6 @@ function framing(spots) {
 
 const priceLabel = (rent) => '₹' + Math.round(rent / 1000) + 'k';
 
-/* Rooms sit on the host's pin (split rooms share their flat's), else their locality centre as the
-   radius search does; seekers and teams have no address, so they stay one bubble per locality. */
 function toSpots(items, localityCoords) {
   const spots = {};
   const seen = new Set();
@@ -145,8 +139,6 @@ function FlatmateMap({ items, kindWord, onInterest, onRoomInterest, onJoin, onSa
   const spots = useMemo(() => toSpots(items, localityCoords), [items, localityCoords]);
   const [openKey, setOpenKey] = useState(null);
   const open = openKey ? spots.find((s) => s.key === openKey) : null;
-  // Stable identity so vis.gl doesn't re-run setOptions on every render (same
-  // reason IW_OFFSET is hoisted) — framing() builds a fresh bounds/center object.
   const frame = useMemo(() => framing(spots), [spots]);
   if (!GOOGLE_MAPS_API_KEY) return <MapUnavailable style={{ height: 460 }} />;
   return (
@@ -157,8 +149,6 @@ function FlatmateMap({ items, kindWord, onInterest, onRoomInterest, onJoin, onSa
           {...frame}
           mapId={GOOGLE_MAPS_MAP_ID}
           colorScheme={mapColorScheme()}
-          /* Not greedy: this map is 460px inside a scrolling page, so a greedy map would
-           * swallow every one-finger drag. */
           gestureHandling="cooperative"
           clickableIcons={false}
           mapTypeControl={false}

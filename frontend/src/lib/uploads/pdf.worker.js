@@ -20,14 +20,12 @@ function rejectSignatureFields(pdf) {
   }
 }
 
-// Never re-save a small PDF: even metadata changes invalidate an issuer's signature.
 self.onmessage = async ({ data: { file } }) => {
   try {
     const pdf = await PDFDocument.load(await file.arrayBuffer(), { updateMetadata: false, throwOnInvalidObject: true });
     if (pdf.getPageCount() < 1 || pdf.getPageCount() > 100) throw new Error('Please upload a PDF with 1 to 100 pages.');
     if (file.size < MAX_UPLOAD_BYTES) { self.postMessage({ unchanged: true }); return; }
     rejectSignatureFields(pdf);
-    // Object-stream compression preserves text, vectors and pages; never replace them with screenshots.
     const bytes = await pdf.save({ useObjectStreams: true, updateFieldAppearances: false, addDefaultPage: false });
     self.postMessage({ blob: new Blob([bytes], { type: 'application/pdf' }) });
   } catch (error) {

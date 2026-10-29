@@ -238,7 +238,6 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
   );
 }
 
-// Mirrors the /signin card header so both sign-in surfaces read as one flow.
 function SheetHeading({ icon: Icon, title, sub }) {
   return (
     <div className="text-center pt-1">

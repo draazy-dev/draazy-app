@@ -12,7 +12,6 @@ const demote = (arg) => (arg && typeof arg === 'object' && arg.behavior === 'smo
 
 let installed = false;
 
-/* Script `behavior: 'smooth'` ignores the OS setting and our own toggle, so each call site would need a check. */
 export function installReducedMotionScroll() {
   if (installed) return;
   installed = true;

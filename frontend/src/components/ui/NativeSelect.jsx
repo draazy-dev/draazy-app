@@ -10,15 +10,13 @@ function collectOptions(children) {
       const label = Array.isArray(raw) ? raw.join('') : String(raw ?? '');
       out.push({ value: child.props.value ?? label, label, disabled: child.props.disabled });
     } else if (child.props && child.props.children) {
-      out.push(...collectOptions(child.props.children)); // optgroup
+      out.push(...collectOptions(child.props.children));
     }
   });
   return out;
 }
 
 export default function NativeSelect({ value, onChange, children, className, disabled, searchable, title, id, name, invalid, dataErr, size, ...rest }) {
-  // First empty-value <option> becomes the placeholder and is excluded from the
-  // menu — exactly matching dropdowns.js buildMenuFromSelect in the HTML app.
   const { placeholder, options } = useMemo(() => {
     const all = collectOptions(children);
     let ph = null;

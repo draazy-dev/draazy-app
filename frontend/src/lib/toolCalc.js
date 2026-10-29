@@ -9,7 +9,6 @@ export function computeStampDuty(value, ratePct) {
   return { stamp, reg, total: stamp + reg, rate: ratePct };
 }
 
-/* Rent for the whole term when it rises by `incrementPct` after every `every` (11 or 12) months. */
 export const rentForTerm = (rent, months, incrementPct, every) => {
   const pct = Number(incrementPct);
   const bps = Number.isFinite(pct) && pct >= 0 && pct <= 100 ? Math.round(pct * 100) : 0;
@@ -40,7 +39,6 @@ export function rentalYield({ price, rent, maintenance, propertyTax, vacancyMont
   };
 }
 
-/** 'YYYY-MM' values from `from` to `to` inclusive; empty when either is missing, reversed or longer than the cap. */
 export function monthsBetween(from, to) {
   const ok = /^\d{4}-(0[1-9]|1[0-2])$/;
   if (!ok.test(from) || !ok.test(to) || to < from) return [];
@@ -54,7 +52,6 @@ export function monthsBetween(from, to) {
   });
 }
 
-// 'YYYY-MM' for the last 36 months and the next 12; index 36 is this month.
 export function monthOptions(now = new Date()) {
   const start = now.getFullYear() * 12 + now.getMonth() - 36;
   return Array.from({ length: 49 }, (_, i) => {

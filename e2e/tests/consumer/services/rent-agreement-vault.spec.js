@@ -36,7 +36,7 @@ async function toOwnerStep(page) {
      below into the Property panel and fail far from its cause. */
   await expect(page.locator('.step-dot').nth(1), 'wizard advanced to the Owner step').toHaveClass(/\bactive\b/);
 }
-/** Drop a file into one of the four owner document slots. `slot` is its index in `OWNER_DOCS`. */
+/** Drop a file into the owner's document slot. `slot` is its index in `OWNER_DOCS`. */
 async function uploadOwnerDoc(page, slot, name) {
   const p = page.locator('.step-panel.active');
   await p.locator('input[type="file"]').nth(slot).setInputFiles({ name, mimeType: 'image/png', buffer: PNG });

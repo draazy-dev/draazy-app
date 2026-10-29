@@ -15,9 +15,8 @@ import ErrorBoundary from '../ErrorBoundary.jsx';
 
 const mapLabel = (m) => (m.deal === 'rent' ? '₹' + Math.round(m.price / 1000) + 'k' : m.price >= 1e7 ? '₹' + (m.price / 1e7).toFixed(2) + 'Cr' : '₹' + Math.round(m.price / 1e5) + 'L');
 const MAX_AMEN_CHIPS = 5;
-const IW_OFFSET = [0, -42]; // stable identity so vis.gl doesn't re-run setOptions each render
+const IW_OFFSET = [0, -42];
 
-// Same title the standard tile (Card.jsx) shows, so the popup reads identically.
 const popupTitle = (p) => {
   if (p.shareType === 'flatmates') return 'Flatmate / Shared';
   const t = (p.type || '').toLowerCase();
@@ -25,8 +24,6 @@ const popupTitle = (p) => {
   return p.bhkNum ? `${p.bhkNum} BHK ${p.type}` : p.type;
 };
 
-// Compact key-facts for the tile grid — mirrors the reference tile's attribute
-// grid, adapted to what each listing kind actually has (no invented fields).
 const buildFacts = (p, isShare, isPlot, baths) => {
   const area = fmtArea(p.area, p.areaUnit);
   const furn = FURN_LBL[p.furnishing];
@@ -49,8 +46,6 @@ const buildFacts = (p, isShare, isPlot, baths) => {
   return facts;
 };
 
-// Keeps the target marker visible: the listings map's detail drawer covers the right (desktop) or
-// bottom (mobile), so shift the pin clear of it; the single-property page has no drawer.
 function PanToActive({ lat, lng, offset = true }) {
   const map = useMap();
   useEffect(() => {
@@ -63,13 +58,11 @@ function PanToActive({ lat, lng, offset = true }) {
   return null;
 }
 
-// Fits the listings map to its markers, else to the selected localities' centres, so a sparse
-// locality does not open unfocused. Keyed off content only: a marker click must not refit.
 function FitToContent({ positions, focus, active }) {
   const map = useMap();
   const sig = positions.map((p) => p.join(',')).join('|') + '::' + focus.map((p) => p.join(',')).join('|');
   useEffect(() => {
-    if (!map || active) return; // an active property is centred by PanToActive
+    if (!map || active) return;
     const g = typeof window !== 'undefined' ? window.google : null;
     if (!g || !g.maps) return;
     const pts = positions.length ? positions : focus;
@@ -87,8 +80,6 @@ function FitToContent({ positions, focus, active }) {
   return null;
 }
 
-// Rich InfoWindow tile, used only on the single-property mini-map; the listings map opens the
-// detail drawer on marker click instead.
 function PropertyPopup({ p, locName }) {
   const { t } = useTranslation();
   const isRent = p.deal === 'rent';
@@ -144,24 +135,19 @@ function PropertyPopup({ p, locName }) {
 }
 
 export default function PropertyMap({ properties, locName, focus = [], activeId, onSelect, wrapStyle: wrapStyleProp, gestureHandling = 'cooperative', unavailableAction }) {
-  const [openId, setOpenId] = useState(null); // single-property InfoWindow (no onSelect)
+  const [openId, setOpenId] = useState(null);
   const { t } = useTranslation();
   const refused = useSyncExternalStore(subscribeMapsRefusal, isMapsRefused);
   const [loadFailed, setLoadFailed] = useState(false);
-  // Single-property mode (Property details page): one pin, no listings drawer.
   const single = !onSelect && properties.length === 1;
   const activeIdx = properties.findIndex((p) => p.id === activeId);
   const activePos = activeIdx >= 0 ? propLatLng(properties[activeIdx]) : (single ? propLatLng(properties[0]) : null);
   const openProp = !onSelect && openId ? properties.find((p) => p.id === openId) : null;
   const openPos = openProp ? propLatLng(openProp) : null;
   const cityCenter = getActiveCityGeo().center;
-  // Centre from the first paint — on the property in single mode, or on an explicit focus point
-  // when there are no markers — so the map is never left at the world/zero view.
   const focusCenter = properties.length === 0 && focus.length === 1 ? { lat: focus[0][0], lng: focus[0][1] } : null;
   const initialCenter = single && activePos ? { lat: activePos[0], lng: activePos[1] } : (focusCenter || cityCenter);
   const initialZoom = single ? 15 : (focusCenter ? 14 : 12);
-  // Callers can hand an explicit footprint (e.g. an embedded locality map card);
-  // otherwise fall back to the mode's default height.
   const wrapStyle = wrapStyleProp || (single ? { height: '100%' } : { height: '72dvh', minHeight: 'min(520px, 70dvh)' });
   if (!GOOGLE_MAPS_API_KEY) return <MapUnavailable style={wrapStyle} action={unavailableAction} />;
   if (refused || loadFailed) return <MapUnavailable style={wrapStyle} detail={t('pmap.mapLoadFailed')} action={unavailableAction} />;

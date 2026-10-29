@@ -31,13 +31,11 @@ function AdminLayoutInner() {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const { tabEnabled } = useAdminFlags();
-  /* `adminOnly` is not a third filter: the server's catalogue already makes those atoms administrator-only. */
   const nav = ADMIN_MODULES.filter((m) => (!m.flagKey || tabEnabled(m.flagKey)) && canAccessModule(user, m.key));
   const navGroups = NAV_GROUPS
     .map((g) => ({ ...g, items: nav.filter((m) => m.group === g.key) }))
     .filter((g) => g.items.length);
   const [open, setOpen] = useState(false);
-  // Only explicit toggles are stored; an untouched group is open exactly while it holds the current page.
   const [expanded, setExpanded] = useState({});
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -64,8 +62,6 @@ function AdminLayoutInner() {
         end={!!end}
         onClick={() => setOpen(false)}
         className={({ isActive }) =>
-          /* py-3 below sm: nav rows at 40px are a long thumb-drag,
-             and a miss lands on the neighbouring section. */
           'flex items-center gap-3 rounded-xl px-3 py-3 sm:py-2.5 text-sm transition-all ' +
           (isActive ? 'bg-brand-teal/15 text-teal-300' : 'text-gray-300 hover:bg-white/5 hover:text-white')
         }
@@ -77,7 +73,6 @@ function AdminLayoutInner() {
 
   return (
     <div className="ph-no-capture min-h-[100dvh] bg-ink lg:flex">
-      {/* Staff get the same connectivity banner: a queue that fails to load looks exactly like an empty one. */}
       <ConnectivityBanner />
       <aside
         className={
@@ -86,8 +81,6 @@ function AdminLayoutInner() {
         }
       >
         <div className="flex items-center justify-between px-5 py-4">
-          {/* min-h on touch only: the drawer has nothing beside the
-              wordmark; the desktop rail keeps its 56px header. */}
           <Link to={portalBase(user)} className="flex min-h-[44px] items-center gap-2 sm:min-h-0">
             <LogoMark className="h-8 w-8 shrink-0 text-brand-teal" />
             <span className="font-extrabold">
@@ -95,13 +88,10 @@ function AdminLayoutInner() {
               <span className="ml-1 text-xs font-medium text-gray-400">{roleLabel(user?.role)}</span>
             </span>
           </Link>
-          {/* tap-extend, not tap-target: growing the box would push
-              the wordmark; aria-label as phones never show `title`. */}
           <button onClick={() => setOpen(false)} aria-label="Close menu" className="tap-extend relative rounded-lg p-1 hover:bg-white/5 lg:hidden [@media(pointer:coarse)]:p-3">
             <X className="h-5 w-5" />
           </button>
         </div>
-        {/* The phone top bar has no room for these two; the desktop bar carries them from lg up. */}
         {canPostOnBehalf ? (
           <div className="space-y-1 border-b border-white/10 px-3 pb-3 lg:hidden">
             <button type="button" onClick={() => goFromDrawer(portalPath(user, '/admin/post-on-behalf'))} className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-teal-500/30 bg-teal-500/10 px-3 text-sm font-medium text-teal-300 transition hover:bg-teal-500/20">
@@ -186,8 +176,6 @@ function AdminLayoutInner() {
               {light ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
             </button>
 
-            {/* New tab so checking an SLA mid-queue doesn't lose the
-                queue; AdminTopbarTools is flex-1, so no margin here. */}
             <a
               href={runbookHref}
               target="_blank"
@@ -217,10 +205,7 @@ function AdminLayoutInner() {
             </div>
           </div>
         </header>
-        {/* Bottom padding carries the home-indicator inset (--dz-safe-b) so the last queue row isn't under the
-            gesture bar; env() is 0px outside an installed notched app. */}
         <main className="flex-1 p-4 pb-[calc(1rem+var(--dz-safe-b))] sm:p-6 sm:pb-[calc(1.5rem+var(--dz-safe-b))]">
-          {/* Same placement as the consumer shell: a throwing module must not take the sidebar down with it. */}
           <ErrorBoundary scope="admin-route" resetKey={pathname}>
             <Outlet />
           </ErrorBoundary>

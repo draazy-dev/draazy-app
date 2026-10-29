@@ -7,7 +7,6 @@ import { submitHelpFeedback } from '../../services/contentService.js';
 
 const TAP_GUARD_MS = 800;
 
-/* localStorage is the widget's own memory (a returning reader sees "thanks"); the POST is the measurement. */
 export default function ArticleFeedback({ slug, title }) {
   const { t } = useTranslation();
   const remembered = () => getFeedback(slug);
@@ -15,16 +14,12 @@ export default function ArticleFeedback({ slug, title }) {
   const [comment, setComment] = useState('');
   const [sent, setSent] = useState(() => !!remembered());
   const sentAt = useRef(0);
-  // Fire-and-forget on purpose: the reader has answered and been thanked, and there is nothing
-  // they could do about an upload failure. Loud in dev only.
 
   const report = (helpful, reason) => {
     submitHelpFeedback({ slug, helpful, comment: reason }).catch((err) => {
       if (import.meta.env.DEV) console.warn('[help] feedback upload failed', err);
     });
   };
-  // Double-click is guarded only by `setSent(true)` running in the same tick as the handler, so
-  // React removes the button before the second click lands. Moving it after an await reopens it.
 
   const pick = (helpful) => {
     setChoice(helpful);
@@ -34,8 +29,6 @@ export default function ArticleFeedback({ slug, title }) {
       sentAt.current = Date.now();
       setSent(true);
     } else {
-      // Reported before the reason is typed: a negative that only counts when explained biases the
-      // measure. No local record here, so abandoning still leaves the box reachable next time.
       report(false);
       setSent(false);
     }
@@ -50,7 +43,6 @@ export default function ArticleFeedback({ slug, title }) {
     setSent(true);
   };
 
-  // The thanks copy renders where the buttons were, so a second tap of a double-tap would land on this link.
   const ignoreEarlyTap = (e) => {
     if (Date.now() - sentAt.current < TAP_GUARD_MS) e.preventDefault();
   };

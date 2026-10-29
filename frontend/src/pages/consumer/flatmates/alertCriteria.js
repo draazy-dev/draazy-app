@@ -1,17 +1,11 @@
-/* One place turns filter state (+ active tab) into a persistable record and its display chips, so
-   the empty-state card, the toolbar "Save search" and the dashboard Alerts panel cannot diverge. */
 import { inr, BUDGET_MIN, BUDGET_MAX } from './helpers.js';
 import { TAB_MOVE_IN, TAB_TEAMS, TAB_TEAM_UP, TAB_PEOPLE, normalizeTab } from './model.js';
 
-/* Budget persists as two scalars, both `undefined` when untouched: a stored 40000 would be
-   indistinguishable from a real ₹40,000 ceiling. */
 const budgetFields = (budget) => ({
   budget: budget[1] < BUDGET_MAX ? budget[1] : undefined,
   budgetMin: budget[0] > BUDGET_MIN ? budget[0] : undefined,
 });
 
-/* Human text for a record's budget, or null when it narrows nothing. Reads off the two persisted
-   scalars, so a ceiling-only alert works unchanged. */
 function budgetText(rec) {
   const lo = rec.budgetMin != null && rec.budgetMin > BUDGET_MIN ? rec.budgetMin : null;
   const hi = rec.budget != null && rec.budget < BUDGET_MAX ? rec.budget : null;
@@ -41,7 +35,6 @@ const VIBE_LBL = {
   sleep: ['Sleeps by 11 pm', 'Sleeps around midnight', 'Night owl'],
 };
 
-/* One chip per question, its picked answers joined: "Veg only / Eggs ok". */
 function vibeChipTexts(vibe) {
   const byKey = new Map();
   (vibe || []).forEach((token) => {
@@ -59,18 +52,15 @@ export const fmtDate = (iso) => {
 };
 
 export function tabMeta(tab) {
-  // Alerts persist their tab, so resolve legacy values rather than mislabelling.
   return TAB_META[normalizeTab(tab)] || TAB_META[TAB_MOVE_IN];
 }
 
-/* Human move-in chip text, or null when the move-in filter is off. */
 function moveInText(rec) {
   if (rec.moveIn === 'now') return 'Move-in: Immediate';
   if (isDateVal(rec.moveIn)) return `Move-in by ${fmtDate(rec.moveIn)}`;
   return null;
 }
 
-/* Short human summary of the whole search (used as the alert label). */
 export function flatmateAlertLabel(rec) {
   const parts = [tabMeta(rec.tab).word];
   if (rec.locality) parts.push(rec.locality);
@@ -86,8 +76,6 @@ export function flatmateAlertLabel(rec) {
   return parts.join(' · ');
 }
 
-/* Records only filters the active tab honours, mirroring the tab-gated FilterBar so a stale value
-   never rides along invisibly. */
 export function buildFlatmateAlertRecord(filters, tab) {
   const rec = {
     kind: 'flatmates',
@@ -110,7 +98,6 @@ export function buildFlatmateAlertRecord(filters, tab) {
   return rec;
 }
 
-/* Normalised list of display chips for a flatmates alert record. */
 export function flatmateCriteriaChips(rec) {
   const meta = tabMeta(rec.tab);
   const chips = [{ icon: meta.icon, text: meta.word }];

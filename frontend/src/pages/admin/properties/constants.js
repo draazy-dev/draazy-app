@@ -3,7 +3,6 @@ import { availabilityLabel } from '../../../lib/availability.js';
 import { COMMERCIAL_SUBTYPES } from '../../consumer/list-property/constants.js';
 import i18n from '../../../i18n/index.js';
 
-// The four pending buckets the server partitions by `progress`; their labels match the tracker's.
 export const PROGRESS_OPTS = [
   { value: 'awaiting_confirmation', label: 'Awaiting owner confirmation' },
   { value: 'ready', label: 'Ready for review' },
@@ -12,7 +11,6 @@ export const PROGRESS_OPTS = [
 ];
 const PROGRESS = new Set(PROGRESS_OPTS.map((o) => o.value));
 
-// The server refuses the maker as checker (403); this only keeps the buttons honest.
 export const isMadeBy = (listing, userId) => Boolean(userId)
   && [listing?.ownerId, listing?.postedByStaff].some((id) => id != null && String(id) === String(userId));
 export const MAKER_REASON = 'You posted this listing, so another staff member must review or edit it.';
@@ -29,7 +27,6 @@ export const STATUS_OPTS = [
   { value: 'archived', label: 'Archived' },
 ];
 
-// Archived is its own axis, not a status: unset, a moderation read mixes soft-deleted rows in.
 export const statusQuery = (value) => (value === 'archived'
   ? { archived: true }
   : PROGRESS.has(value)
@@ -49,16 +46,13 @@ const EDIT_STATUS_OPTS = [
   { value: 'pending', label: 'Pending' },
 ];
 
-// A legacy value stays pickable, so opening the modal never silently rewrites it.
 const withCurrent = (opts, current, label) =>
   (!current || opts.some((o) => o.value === current) ? opts : [...opts, { value: current, label }]);
 
-// The labels the listing wizard stores as `type` (`listingLabels` in list-property/submit.js).
 const EDIT_TYPES = ['Flat', 'Independent House', 'Villa', ...COMMERCIAL_SUBTYPES.map((s) => s.label), 'Open Plot', 'Farm Land']
   .map((v) => ({ value: v, label: v }));
 export const editTypeOpts = (current) => withCurrent(EDIT_TYPES, current, current);
 
-// The wizard's BHK pills; '' is a plot or commercial unit, which has no bedroom count.
 const EDIT_BHKS = [
   { value: '', label: 'Not applicable' },
   { value: '0', label: '1 RK' },
@@ -79,8 +73,6 @@ export const statusLabel = (status) => ({
   rejected: 'Not approved',
 }[status] || cap(String(status || '').replace(/[_-]/g, ' ')));
 export const perSqftLabel = (l) =>
-  // A plot priced by the acre divided by its acreage is a per-acre figure, so the row that captions
-  // it "/ sq.ft" has nothing honest to say about one.
   l.area && l.deal !== 'rent' && isSqftUnit(l.areaUnit)
     ? fmtINR(Math.round(l.price / l.area)) + ' / sq.ft'
     : l.deal === 'rent'
@@ -92,8 +84,6 @@ export { fmtAgo } from '../../../lib/format.js';
 
 export { exportCsv } from '../../../lib/csv.js';
 
-/* A row is worth showing only when the owner stated it: a grid of em-dashes hides the handful of facts
-   that decide the case. `0` and `false` are statements and survive; blank and null do not. */
 const stated = (v) => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && !v.length);
 
 export function detailKvs(l) {
@@ -113,13 +103,10 @@ export function detailKvs(l) {
   };
   const sqft = (v) => fmtNum(v) + ' sq.ft';
 
-  /* Three areas, three claims: each row reads its own field, never the generic `area`,
-     which is how a label ends up on the wrong figure unnoticed by a reviewer. */
   push('Carpet area', stated(l.carpetArea) ? sqft(l.carpetArea) : null);
   push('Built-up area', stated(l.builtUpArea) ? sqft(l.builtUpArea) : null);
   push('Super built-up area', stated(l.superBuiltUpArea) ? sqft(l.superBuiltUpArea) : null);
   if (!stated(l.carpetArea) && !stated(l.builtUpArea) && !stated(l.superBuiltUpArea)) {
-    // The unqualified headline area, unlike the three above it, is whatever unit the owner chose.
     push('Area', stated(l.area) ? `${fmtArea(l.area, l.areaUnit)} (unqualified)` : null);
   }
 

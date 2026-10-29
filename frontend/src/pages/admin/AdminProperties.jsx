@@ -25,8 +25,6 @@ const loadReviewModal = () => import('./properties/PropertyReviewModal.jsx');
 const PropertyReviewModal = lazy(loadReviewModal);
 const DuplicatesTab = lazy(() => import('./properties/DuplicatesTab.jsx'));
 
-// The verification routes bind `{id}` as a UUID while `propertyMapper` sets `id` to `slug || id`,
-// so only the review calls need the real key off `uuid`.
 const pid = (listing) => listing?.uuid || listing?.id;
 
 const TABS = [
@@ -51,7 +49,6 @@ function queueFilters(tab, f) {
     case 'verify': return { ...common, status: 'pending', archived: false, progress: f.progress || undefined };
     case 'recheck': return { ...common, recheck: true, archived: false };
     case 'badge': return { ...common, badge: true, archived: false };
-    // Never predicate this on `real` — the mapper does not emit that field, and doing so hid fifty-three listings.
     case 'followup': return { ...common, status: 'approved', archived: false, unconfirmed: true };
     case 'flagged': return { ...common, status: 'flagged', archived: false };
     default: return {
@@ -63,7 +60,6 @@ function queueFilters(tab, f) {
   }
 }
 
-// `null`, `failed` and `[]` stay distinct, and `stale` makes rows inert until they answer `key`.
 function useModerationQueue(enabled, filters, sort, page, reloadToken) {
   const key = JSON.stringify([filters, sort, page]);
   const [state, setState] = useState({ page: null, failed: false, key: null });
@@ -84,14 +80,11 @@ function useModerationQueue(enabled, filters, sort, page, reloadToken) {
     return () => { alive = false; clearTimeout(t); };
   }, [enabled, key, reloadToken, debounced]);
   return useMemo(
-    // Not stale before the first answer: `page` is null there, so the loading gate shows instead.
     () => ({ page: state.page, failed: state.failed, stale: state.key != null && state.key !== key }),
     [state, key],
   );
 }
 
-// `pointer-events-none` is the load-bearing part: rows answering a superseded query still carry
-// Approve/Reject/Remind, and acting on one would reach the wrong owner.
 function QueueBody({ stale, children }) {
   return (
     <div aria-busy={stale || undefined} className={stale ? 'pointer-events-none select-none opacity-50' : undefined} data-testid={stale ? 'queue-updating' : undefined}>
@@ -100,7 +93,6 @@ function QueueBody({ stale, children }) {
   );
 }
 
-// The wording is the point: "nothing here" after a 500 would tell the desk the backlog is clear.
 function QueueFailed({ noun }) {
   return (
     <p className="p-10 text-center text-sm text-gray-400" data-testid="queue-error">
@@ -123,7 +115,6 @@ export default function AdminProperties() {
   const activeTab = tab;
 
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  // Reset during render, not in an effect: the tab also changes from outside (palette, back button).
   const [filtersTab, setFiltersTab] = useState(activeTab);
   if (filtersTab !== activeTab) {
     setFiltersTab(activeTab);
@@ -153,8 +144,6 @@ export default function AdminProperties() {
   const [recheckRejectReasonNote, setRecheckRejectReasonNote] = useState('');
   const [internalNote, setInternalNote] = useState('');
 
-  // The database counting the whole catalogue. `null` on failure, so a tab count is omitted rather
-  // than reading "0" — an all-clear nobody issued.
   const [summary, setSummary] = useState(null);
   const loadSummary = useCallback(() => moderationSummary()
     .then(setSummary)
@@ -167,7 +156,6 @@ export default function AdminProperties() {
   const [reloadToken, setReloadToken] = useState(0);
   const refresh = () => loadSummary().finally(() => setReloadToken((n) => n + 1));
 
-  // Without a tick a desk left open never escalates a row to overdue.
   const [, setAgeTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setAgeTick((n) => n + 1), 60_000);
@@ -190,11 +178,9 @@ export default function AdminProperties() {
   const total = queue.page?.total ?? 0;
   const pageCount = queue.page?.pageCount ?? 0;
 
-  // Fetch the review modal once the queue is on screen, so the first Review click does not wait on it.
   const queueReady = queue.page != null;
   useEffect(() => { if (queueReady) loadReviewModal(); }, [queueReady]);
 
-  // Approving removes the row the modal opened from, which drops focus to <body>; hand it back to the list.
   const panelRef = useRef(null);
   const focusPending = useRef(null);
   useEffect(() => {
@@ -209,7 +195,6 @@ export default function AdminProperties() {
     target?.focus();
   }, [review, queue.page, queue.stale]);
 
-  // A decision can empty the last page; step back rather than showing "nothing here" over a backlog.
   useEffect(() => {
     if (queue.page && !queue.stale && rows.length === 0 && page > 1 && pageCount > 0) setPage(pageCount);
   }, [queue.page, queue.stale, rows.length, page, pageCount, setPage]);
@@ -218,10 +203,8 @@ export default function AdminProperties() {
 
   const showReview = (full) => {
     setReview(full);
-    // Opening the case marks the owner's replies read server-side.
     setOpenedIds((ids) => new Set(ids).add(pid(full)));
   };
-  // A row is slim, so the modal and the View card read the whole listing; the newest click wins.
   const detailTicket = useRef(0);
   const withDetail = (l, show) => {
     const ticket = ++detailTicket.current;
@@ -235,13 +218,11 @@ export default function AdminProperties() {
   const openReview = (l) => withDetail(l, showReview);
   const openView = (l) => withDetail(l, setView);
 
-  // Keyed by id, not a boolean: the bell links here with a new ?review= while the page is mounted.
   const handledReviewId = useRef(null);
   const reviewParam = params.get('review');
   useEffect(() => {
     if (!reviewParam || handledReviewId.current === reviewParam) return undefined;
     let live = true;
-    // The id may be the uuid (review inbox) or the slug (analytics); the server takes either.
     getModerationProperty(reviewParam)
       .then((l) => {
         if (!live) return;
@@ -251,7 +232,6 @@ export default function AdminProperties() {
       })
       .catch((err) => { if (live) toast(`Could not open listing ${reviewParam}: ${err.message}`, 'error'); });
     return () => { live = false; };
-    // `showReview` only sets state; listing it would re-run the lookup on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewParam, toast]);
 
@@ -263,11 +243,9 @@ export default function AdminProperties() {
       toast(`Could not clear the flag: ${err.message}`, 'error');
       return;
     }
-    // Clearing withdraws the complaint, it does not verify: the server returns the row to `pending`.
     toast('Flag cleared — back in the review queue', 'success');
     refresh();
   };
-  // `PropertyModerationService` clears the re-check on any `setStatus`, so re-approving is "checked it, all fine".
   const recheckBusy = useRef(false);
   const doRecheckPass = async (l) => {
     if (recheckBusy.current) return;
@@ -293,7 +271,6 @@ export default function AdminProperties() {
     if (!code) { toast('Choose a reason code before rejecting', 'error'); return; }
     if (code === 'other' && !note) { toast('Add a note for Other', 'error'); return; }
     const l = findListing(recheckRejectFor.id) || recheckRejectFor;
-    // One call writes the case file, the status and the owner's reason together; start first because deciding 404s.
     try {
       await startPropertyReview(pid(l));
       await decidePropertyReview(pid(l), 'reject', { reasonCode: code, note: note || undefined, expectedStatus: l.status });
@@ -352,7 +329,6 @@ export default function AdminProperties() {
     if (edit?._fromReview) setReview(edit._ref);
     setEdit(null);
   };
-  // Two calls: `ListingUpdate` deliberately omits `status` so a PATCH cannot self-escalate.
   const submitEdit = async () => {
     const ref = edit._ref || {};
     const { patch: nextPatch, error } = editPatch(edit);
@@ -360,7 +336,6 @@ export default function AdminProperties() {
     if (savingEdit) return;
     setSavingEdit(true);
     try {
-      // The moderator route: `/me/listings/{id}` is owner-scoped and 404s for anyone else's listing.
       if (Object.keys(nextPatch).length) await updateListingAsModerator(edit.id, nextPatch);
       if (canModerate && edit.status && edit.status !== edit._ref.status) await setListingStatus(edit.id, edit.status, { expectedStatus: edit._ref.status });
     } catch (err) {
@@ -375,13 +350,10 @@ export default function AdminProperties() {
     if (edit._fromReview) {
       const saved = { ...ref, ...nextPatch, ...(canModerate ? { status: edit.status } : {}) };
       const fresh = await getModerationProperty(ref.uuid || edit.id).catch(() => null);
-      // Something opened while the read was in flight wins over this late reopen.
       setReview((current) => current ?? (fresh || saved));
     }
   };
 
-  /* The tab is opened synchronously inside the click and navigated only once the server accepts:
-     opening it after the await loses it to popup blockers, and before would promise an unrecorded send. */
   const chase = async (l, templateId) => {
     const handoff = window.open('', '_blank');
     try {
@@ -397,7 +369,6 @@ export default function AdminProperties() {
   const handleReminder = (l) => chase(l, 'wa-gentle');
   const handleConfirmReminder = (l) => chase(l, freshnessState(l) === 'dormant' ? 'wa-dormant' : 'wa-stale');
 
-  // The export reaches past the ten on screen: it asks the server for the first hundred matches.
   const exportCurrentCsv = async () => {
     try {
       const res = await searchForModeration(query, sort, { page: 1, size: 100 });

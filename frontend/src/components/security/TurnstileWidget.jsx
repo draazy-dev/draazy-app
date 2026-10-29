@@ -1,7 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
-// Hidden unless Cloudflare needs a click; the token goes up via onToken(null when absent) for the
-// CF-Turnstile-Response header. No site key → renders nothing, matching a backend with Turnstile off.
 export default function TurnstileWidget({
   siteKey = import.meta.env?.VITE_TURNSTILE_SITE_KEY,
   onToken,
@@ -12,7 +10,6 @@ export default function TurnstileWidget({
   const [failed, setFailed] = useState(false);
   const instanceId = useId();
 
-  // A ref, so an inline onToken doesn't re-render the widget and discard a solved single-use challenge.
   const onTokenRef = useRef(onToken);
   useEffect(() => {
     onTokenRef.current = onToken;
@@ -24,12 +21,10 @@ export default function TurnstileWidget({
       return undefined;
     }
 
-    // Re-armed per effect run: StrictMode's mount → cleanup → re-mount would otherwise leave it false.
     let active = true;
 
     const render = () => {
       if (!active || !containerRef.current || !window.turnstile) return;
-      // Clear first: StrictMode's double-effect would otherwise stack two widgets in one container.
       containerRef.current.innerHTML = '';
       try {
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
@@ -38,7 +33,6 @@ export default function TurnstileWidget({
           size: 'flexible',
           appearance: 'interaction-only',
           callback: (token) => active && onTokenRef.current?.(token),
-          // Clearing an expired token stops a form submitting one the server will reject.
           'expired-callback': () => active && onTokenRef.current?.(null),
           'timeout-callback': () => active && onTokenRef.current?.(null),
           'error-callback': () => {
@@ -56,7 +50,6 @@ export default function TurnstileWidget({
     if (window.turnstile) {
       render();
     } else {
-      // One script tag app-wide: two copies fight over window.turnstile and the second render does nothing.
       const SCRIPT_ID = 'cf-turnstile-script';
       let script = document.getElementById(SCRIPT_ID);
       if (!script) {
@@ -67,7 +60,6 @@ export default function TurnstileWidget({
         script.defer = true;
         document.head.appendChild(script);
       }
-      // Also attached when the tag exists but is still loading, or a second widget would never render.
       script.addEventListener('load', render);
       script.addEventListener('error', () => {
         if (!active) return;
@@ -82,7 +74,6 @@ export default function TurnstileWidget({
         try {
           window.turnstile.remove(widgetIdRef.current);
         } catch {
-          // Already gone — the container was unmounted before Turnstile finished cleaning up.
         }
       }
       widgetIdRef.current = null;

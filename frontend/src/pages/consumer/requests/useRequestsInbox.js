@@ -26,7 +26,6 @@ export function useRequestsInbox({ refreshMs = 60000 } = {}) {
       if (latest()) setBoxes((cur) => ({ ...cur, [box]: { items, status: 'ready' } }));
     } catch {
       if (!latest()) return;
-      // A failed background refresh must not blank a list the user is reading.
       setBoxes((cur) => (quiet && cur[box].status === 'ready' ? cur : { ...cur, [box]: { items: [], status: 'error' } }));
     }
   }, []);
@@ -42,7 +41,6 @@ export function useRequestsInbox({ refreshMs = 60000 } = {}) {
     return () => clearInterval(poll);
   }, [load, refreshMs]);
 
-  // Bumping the seq drops any list fetched before the change, which would otherwise undo it.
   const patchItem = useCallback((box, item, patch) => {
     const key = requestKey(item);
     seq.current[box] += 1;

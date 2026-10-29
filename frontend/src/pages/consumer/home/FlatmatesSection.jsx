@@ -15,7 +15,7 @@ export default function FlatmatesSection({ navigate }) {
     let alive = true;
     flatmatePulse()
       .then((p) => { if (alive) setPulse(p); })
-      .catch(() => { /* the pitch stands on its own without live numbers */ });
+      .catch(() => { });
     return () => { alive = false; };
   }, []);
 
@@ -52,8 +52,6 @@ export default function FlatmatesSection({ navigate }) {
             {(split || seeking > 0) && (
               <div className="glass rounded-2xl p-4 sm:p-7 border border-white/10" style={{ background: 'var(--glass)' }}>
                 {split && (
-                  /* flex-wrap, not a fixed row: with Android's larger system font sizes the amount drops under its
-                     label instead of overlapping it. */
                   <dl>
                     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 pb-3 sm:pb-4 border-b border-dashed border-white/15">
                       <dt className="min-w-0 leading-snug">

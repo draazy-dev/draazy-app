@@ -14,7 +14,6 @@ export const STAFF_FILTERS = [
 ];
 
 const LEAD_TYPES = new Set(['enquiry', 'price', 'visit', 'share']);
-// Refund and service rows reaching staff are requests to act (refund filed, amendment applied), not news.
 const STAFF_WORK_TYPES = new Set(['queue', 'sla', 'refund', 'service']);
 
 export const TYPE_META = {
@@ -63,7 +62,6 @@ export const isToday = (at) => dayKey(at) === dayKey(Date.now());
 export function collapseNotifications(rows) {
   const groups = new Map();
   rows.forEach((n) => {
-    // The server's own type, so a contact and a photo request sharing a link and a UI type stay separate rows.
     const key = `${n.wireType ?? n.type}|${safeNotificationLink(n.link)}|${dayKey(n.at)}`;
     const existing = groups.get(key);
     if (!existing) {

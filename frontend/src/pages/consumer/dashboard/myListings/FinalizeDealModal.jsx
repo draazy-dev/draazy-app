@@ -24,7 +24,6 @@ export default function FinalizeDealModal({ listing, onFinalize, onClose }) {
     date: (v) => (!v ? 'Pick the date the deal closed.' : v > today ? "The deal date can't be in the future." : ''),
   };
   const check = (name, value = form[name]) => setErrors((e) => ({ ...e, [name]: checks[name](value) }));
-  // An invalid field re-checks as it is corrected, so the message clears the moment it is fixed.
   const set = (name, value) => {
     setForm((f) => ({ ...f, [name]: value }));
     if (errors[name] || name === 'date') check(name, value);

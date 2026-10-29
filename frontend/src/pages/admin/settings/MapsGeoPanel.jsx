@@ -6,13 +6,9 @@ import { fetchAdminSuggestions, newAutocompleteSession } from '../../../lib/plac
 import Switch from '../../../components/ui/Switch.jsx';
 import MapBoundaryEditor from './MapBoundaryEditor.jsx';
 
-/* Mirrors lib/geoConfig.js; consumer autocomplete reads this
-   live to hide blacklisted places from every suggestion box. */
-
 const num = (v) => (v === '' || v == null ? '' : String(v));
 const toNum = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
 
-// Effective values for a city = admin override merged over the built-in default.
 function cityValues(geo, city) {
   const base = CITY_GEO[city] || CITY_GEO[DEFAULT_CITY];
   const ov = (geo.cities && geo.cities[city]) || {};
@@ -21,8 +17,6 @@ function cityValues(geo, city) {
 
 const BOUND_FIELDS = [['north', 'North'], ['south', 'South'], ['east', 'East'], ['west', 'West']];
 
-/* Entries store a placeId, which isBlacklisted matches exactly,
-   avoiding the false positives of short free-text terms. */
 function BlacklistPlaceSearch({ onPick }) {
   const [q, setQ] = useState('');
   const [suggs, setSuggs] = useState([]);
@@ -111,7 +105,6 @@ export default function MapsGeoPanel({
   const [note, setNote] = useState('');
   const [coverageError, setCoverageError] = useState('');
 
-  // No client-side stand-in: the write key `slug` can't be derived from a display name without guessing.
   const cityRows = cities;
   const enforce = geo.enforceCityLimit !== false;
   const blacklist = Array.isArray(geo.blacklist) ? geo.blacklist : [];
@@ -129,7 +122,6 @@ export default function MapsGeoPanel({
     }
   }, [city, cityRows]);
 
-  // Numeric view of the editable form, shared with the visual map editor.
   const centerNum = { lat: toNum(center.lat), lng: toNum(center.lng) };
   const boundsNum = {
     north: toNum(bounds.north), south: toNum(bounds.south),
@@ -145,7 +137,6 @@ export default function MapsGeoPanel({
     });
   }, [city, geo]);
 
-  // The map editor edits the same center/bounds the numeric inputs do.
   const applyGeo = ({ center: c, bounds: b }) => {
     if (c) setCenter({ lat: num(c.lat), lng: num(c.lng) });
     if (b) setBounds({ north: num(b.north), south: num(b.south), east: num(b.east), west: num(b.west) });
@@ -171,8 +162,6 @@ export default function MapsGeoPanel({
 
   const toggleEnforce = () => onSave({ ...geo, enforceCityLimit: !enforce }, `City limit ${!enforce ? 'enabled' : 'disabled'}`);
 
-  // Keyed by the server's `slug`, never the display name, so
-  // it cannot fire against a row the roster doesn't contain.
   const toggleLive = (name) => {
     const target = cityRows.find((row) => row.name === name);
     if (!target || !onToggleCityLive || togglePending) return;
@@ -188,8 +177,6 @@ export default function MapsGeoPanel({
     setNote('');
   };
 
-  // Blacklist a specific place picked from Google — stored with its placeId for an exact
-  // match (no substring false positives). Skips duplicates by placeId.
   const addBlacklistPlace = ({ placeId, term: placeTerm, note: placeNote }) => {
     if (!placeId || blacklist.some((b) => b.placeId === placeId)) return;
     const entry = { id: 'bl' + Date.now().toString(36), placeId, term: placeTerm, note: placeNote, at: Date.now() };
@@ -227,8 +214,6 @@ export default function MapsGeoPanel({
         </div>
         <p className="mt-1 mb-4 text-xs text-gray-400">Map centre and bounding box used to centre maps and bound Places suggestions.</p>
 
-        {/* City selector pills — colour dot shows launch status (green = live), with a text
-            equivalent for anyone who cannot see the colour. */}
         <div className="mb-5 flex flex-wrap gap-2">
           {cityRows.map((c) => (
             <button

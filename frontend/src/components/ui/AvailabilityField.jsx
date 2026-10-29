@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import DateField from './DateField.jsx';
 import { addDaysIso, firstOfNextMonthIso, istToday, MAX_AVAILABLE_DAYS } from '../../lib/availability.js';
 
-/** Availability entry: two quick chips plus a date; the value is always an ISO date. */
 export default function AvailabilityField({ value, onChange, dataErr, invalid, ariaLabel, className = '' }) {
   const { t } = useTranslation();
   const today = istToday();

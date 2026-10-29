@@ -36,8 +36,6 @@ import {
   submitServiceRequestPartyDetails,
   withdrawServiceRequestParty,
 } from '../../../../services/serviceRequestService.js';
-// Where the wizard autosaves. Named because two things have to agree on it: the autosave itself and
-// the purge that cleans entries written before the identity numbers were kept out of it.
 
 const DRAFT_KEY = 'dzDraft:rentAgreement';
 
@@ -60,26 +58,19 @@ export function useRentAgreement() {
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState({});
   const [done, setDone] = useState(false);
-  /* A request already filed whose identities, papers or checkout step failed. */
-  // Submission is a round-trip plus a lazily-imported SDK, so the button stays clickable for a
-  // visible beat. Without this guard a second click issues a second payment session.
   const [submitting, setSubmitting] = useState(false);
   const [pendingRequestId, setPendingRequestId] = useState(null);
   const [restoredIdentityFields, setRestoredIdentityFields] = useState([]);
   const filedRef = useRef(null);
   const uploadedRef = useRef(new Map());
   const [openFaq, setOpenFaq] = useState(-1);
-  // After submission the owner's create-wizard is locked (the submitted request is the legal source
-  // of truth); `startNew` bypasses that lock for a separate agreement on a different property.
   const [startNew, setStartNew] = useState(false);
 
-  // Invite mode
   const [mode, setMode] = useState('owner');
   const [inviteCtx, setInviteCtx] = useState(null);
   const { entitlements, refresh: refreshEntitlements } = useEntitlements(isIn && !inviteCtx);
   const referralCredit = (entitlements?.agreements?.remaining ?? 0) >= 1;
   const [inviteError, setInviteError] = useState(null);
-  /* The owner's own listings, for the "pick one of your properties" shortcut and the `?listing=` prefill. */
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
   const [myProperties, setMyProperties] = useState([]);
   useEffect(() => {
@@ -92,33 +83,26 @@ export function useRentAgreement() {
   }, [isIn, user]);
   const [inviteResult, setInviteResult] = useState(null);
   const [copied, setCopied] = useState(false);
-  // Step 1 — Property
 
   const [prop, setProp] = useState(emptyProp());
-  // Step 2 — Licensors: `owner` is licensor 0, `coOwners` licensors 1..n. Their doc slots share
-  // `ownerDocs` (`o-*` for the owner, `c{i}-*` per co-owner).
 
   const [owner, setOwner] = useState(emptyOwner(isIn, user));
   const [coOwners, setCoOwners] = useState([]);
   const [ownerDocs, setOwnerDocs] = useState({});
   const [ownerMode, setOwnerMode] = useState('fill');
-  // Step 3 — Tenant
 
   const [tenantMode, setTenantMode] = useState('fill');
   const [tenants, setTenants] = useState([emptyTenant()]);
   const [tenantDocs, setTenantDocs] = useState({});
   const [invite, setInvite] = useState(emptyInvite());
-  // Step 4 — Terms
 
   const [terms, setTerms] = useState(emptyTerms());
   const [maint, setMaint] = useState('Tenant');
   const regArea = prop.gramPanchayat ? 'rural' : 'urban';
   const { furnItems, setFurnItems, custom, setCustom, isChecked, toggleFurn, bumpQty, removeFurn, addCustom, furnitureText } = useRaFurniture();
   const [clauses, setClauses] = useState('');
-  // Step 5 — Witnesses
 
   const [wit, setWit] = useState(emptyWit());
-  // Step 6 — Review
 
   const [declare, setDeclare] = useState(false);
 
@@ -128,7 +112,6 @@ export function useRentAgreement() {
   const setTenant = (i, k, v) => setTenants((arr) => arr.map((t, idx) => (idx === i ? { ...t, [k]: v } : t)));
   const setCoOwner = (i, k, v) => setCoOwners((arr) => arr.map((c, idx) => (idx === i ? { ...c, [k]: v } : c)));
   const clearErr = (k) => setErrors((e) => (e[k] ? { ...e, [k]: false } : e));
-  // ── Form state capture for autosave & co-fill ──
 
   const captureFormState = () => ({
     step,
@@ -136,17 +119,13 @@ export function useRentAgreement() {
     ...(ownerMode === 'invite'
       ? { owner: { ...emptyOwner(false), oMobile: digits(invite.invMobile).slice(-10) }, coOwners: [] }
       : { owner, coOwners }),
-    // The invitee files their own police record; a blank one would fail the server's workplace rule.
     tenants: tenantMode === 'invite' ? tenants.map(({ police: _police, ...invited }) => invited) : tenants,
     tenantMode, ownerMode, invite, selectedPropertyId,
-  /* The same capture minus the statutory identity numbers, for anything that outlives this tab (the co-fill payload
-     and the autosave) — see `docs/flows/consumer/rent-agreement.md` § 5.9. */
   });
   const captureShareableState = () => {
     const { selectedPropertyId: _selectedPropertyId, ...state } = captureFormState();
     return redactIdentityNumbers(state);
   };
-  // Merged over the blank shapes: drafts saved before a field existed must not leave it undefined.
 
   const applyFormState = (s) => {
     if (!s || typeof s !== 'object') return;
@@ -184,8 +163,6 @@ export function useRentAgreement() {
       setTenantDocs(restore(s.docRefs.tenant));
     }
   };
-  // Once submitted, details are locked (the request is the legal drafting basis). Read from the
-  // server: a browser-store read would let the owner pay for the same agreement twice after a reload.
 
   const [activeRequests, setActiveRequests] = useState([]);
   const [requestsNonce, setRequestsNonce] = useState(0);
@@ -295,7 +272,6 @@ export function useRentAgreement() {
     setStartNew(true);
   };
 
-  // Begin a fresh agreement for a different property: clear the saved draft and reset every field.
   const startNewAgreement = () => {
     clearDraft();
     setStep(0);
@@ -321,8 +297,6 @@ export function useRentAgreement() {
     setInviteResult(null);
     setCopied(false);
     setOpenFaq(-1);
-    // These belong to the attempt being abandoned. Left set, the "could not confirm your payment"
-    // panel reappears over a fresh agreement that has not been submitted, let alone paid for.
     resetPayment();
     setPendingRequestId(null);
     filedRef.current = null;
@@ -332,10 +306,6 @@ export function useRentAgreement() {
     setStartNew(true);
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-  // ── Draft autosave/restore ──
-
-  // Purges identity numbers from a pre-existing draft. **Must stay above the `useFormDraft` call**
-  // — see `docs/flows/consumer/rent-agreement.md` § 5.9 for the ordering and why it runs on read.
 
   useEffect(() => {
     try {
@@ -350,8 +320,6 @@ export function useRentAgreement() {
     } catch {}
   }, []);
 
-  // `useFormDraft` restores via a functional updater — resolve it against live state before
-  // dispatching, otherwise the whole draft is dropped. Saved from the *shareable* capture (§ 5.9).
   const form = {
     ...captureShareableState(),
     identityReminders: identityReminderFields(captureFormState()),
@@ -363,23 +331,18 @@ export function useRentAgreement() {
     applyFormState(next);
   };
   const { restored, clear: clearDraft, flush: flushDraft, startFresh } = useFormDraft(DRAFT_KEY, form, restoreFormState, { enabled: mode === 'owner' && !done, ignore: ['oName', 'oMobile', 'step'] });
-    /* `gated` represents resolved signed-out owner mode, distinct from pending authentication. */
 
   const gated = mode === 'owner' && !loading && !isIn;
-    /* Flush the debounced owner draft so recent input survives a reload mid-sign-in. */
 
   const gateToSignIn = (resume) => {
     flushDraft();
     sendToSignIn('services', undefined, resume);
   };
-    /* Signed-out owners remain on public steps even when restored drafts name a later step. */
 
   useLayoutEffect(() => {
     if (!gated) return;
     if (step > LAST_PUBLIC_STEP) setStep(LAST_PUBLIC_STEP);
   }, [gated, step]);
-  // ── Owner KYC autofill ──
-  // Deliberately carries no PAN or Aadhaar — see `persistOwnerKYC` — so the owner retypes those.
 
   useEffect(() => {
     if (mode !== 'owner' || !isIn) return;
@@ -393,8 +356,6 @@ export function useRentAgreement() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- seed owner only when mode/sign-in flips
   }, [mode, isIn]);
-  /* `pan` and `aadhaar` are deliberately excluded and must stay excluded: this key is plain JSON on `localStorage`,
-     never expired, and Aadhaar is not ours to retain (Aadhaar Act s.29). */
 
   const persistOwnerKYC = () => {
     if (mode !== 'owner' || ownerMode === 'invite' || !isIn) return;
@@ -404,15 +365,12 @@ export function useRentAgreement() {
       localStorage.setItem('draazyOwnerKYC:' + mob, JSON.stringify({ name: owner.oName, mother: owner.oMother, dob: owner.oDob, alias: owner.oAlias, age: owner.oAge, gender: owner.oGender, occupation: owner.oOccupation, email: owner.oEmail, addr: owner.oAddr, mobile: owner.oMobile, savedAt: Date.now() }));
     } catch {}
   };
-  /* Prefills document slots the owner already keeps in the vault. */
 
   const vaultEnabled = mode === 'owner' && isIn && !!user?.mobile;
   useEffect(() => {
     if (!vaultEnabled) return;
     let cancelled = false;
     (async () => {
-      // A vault read must never cost the owner the wizard: an unreachable or empty vault means
-      // "no prefill", not a broken step.
       const personal = await listDocuments(user.mobile, 'personal').catch(() => null);
       if (cancelled || !personal) return;
       const held = new Set(personal.map((d) => String(d.id)));
@@ -431,8 +389,6 @@ export function useRentAgreement() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh vault only when it becomes available
   }, [vaultEnabled]);
-  /* Saves a freshly uploaded owner doc back to the vault for reuse, skipping vault-sourced picks, over-size files and
-     duplicates. */
 
   const saveOwnerDocToVault = async (k, d, file) => {
     if (!vaultEnabled || !d?.dataUrl || d.fromVault || !file) return;
@@ -456,8 +412,6 @@ export function useRentAgreement() {
     getDealFees('rent')
       .then((f) => {
         if (!alive) return;
-        // No published row is not an empty row: falling through to `ready` with `null` would render
-        // a confident ₹0 for a price nobody published.
         setFeeRow(f || null);
         setFeeStatus(f ? 'ready' : 'error');
       })
@@ -473,15 +427,11 @@ export function useRentAgreement() {
   const cost = useMemo(() => {
     const rent = num(terms.rent), dep = num(terms.deposit), nr = num(terms.nrDeposit);
     const months = parseInt(terms.months, 10) || 11;
-    // Rent, deposit and term are the customer's own answers, not charges — they stay readable while
-    // the schedule is loading or unavailable. Only the money we would be taking goes blank.
     const answers = { rent, dep, months, status: feeStatus, retry: retryFees };
     if (feeStatus !== 'ready' || !feeRow) {
       return { ...answers, stamp: null, reg: null, dhc: null, service: null, total: null, computed: [], notes: null };
     }
     const years = Math.ceil(months / 12);
-    /* `stampDuty`/`registration` arrive `null` because neither is a flat figure; anything derived here lands in
-       `computed`, so the sidebar labels it an estimate. */
     const computed = [];
     let stamp = feeRow.stampDuty;
     if (stamp == null) { stamp = leaveLicenceStamp(rentForTerm(rent, months, terms.increment, terms.incrementEvery), nr, dep, years); computed.push('stamp'); }
@@ -499,7 +449,6 @@ export function useRentAgreement() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- retryFees is a stable state increment
   }, [terms.rent, terms.deposit, terms.nrDeposit, terms.months, terms.increment, terms.incrementEvery, regArea, feeStatus, feeRow, referralCredit]);
-  // Built outside `generate` so the size guard below measures the object that will be posted.
 
   const propertyLine = () =>[prop.flatNo, prop.society, prop.locality, prop.city].filter(Boolean).join(', ');
   const invitedLabel = () => 'Invited: ' + (invite.invName || '••••••' + digits(invite.invMobile).slice(-4)) + ' (pending)';
@@ -510,7 +459,6 @@ export function useRentAgreement() {
     startDate: terms.startDate, regArea: regArea === 'urban' ? 'Municipal / Urban' : 'Rural',
     _state: captureShareableState(),
   });
-  /* The server caps serialized `details` at `DETAILS_MAX_CHARS` and answers 400. */
 
   const detailsSize = detailsChars(buildDetails());
   const detailsTooLong = detailsSize > DETAILS_MAX_CHARS;
@@ -520,7 +468,6 @@ export function useRentAgreement() {
   const inviteAwaitingPayment = inviteCtx?.req?.status === 'awaiting_payment';
   const formSnapshot = () => ({ mode, inviteRole, prop, owner, coOwners, ownerMode, tenantMode, tenants, invite, terms, wit, ownerDocs, tenantDocs });
   const collectDocs = () => collectFormDocs(formSnapshot());
-  // ── Parties ──
 
   const addTenant = () => setTenants((arr) => (arr.length < MAX_TENANTS ? [...arr, emptyTenant()] : arr));
   const removeTenant = (i) => {
@@ -529,7 +476,6 @@ export function useRentAgreement() {
     setTenantDocs((d) => removeIndexedDocs(d, 't', i));
     setErrors({});
   };
-  // Joint owners all execute the deed, so the primary's capacity follows whether there are co-owners.
   const addCoOwner = () => {
     if (coOwners.length >= MAX_LICENSORS - 1) return;
     setCoOwners((arr) => [...arr, emptyCoOwner()]);
@@ -547,12 +493,9 @@ export function useRentAgreement() {
   useEffect(() => {
     const partyId = searchParams.get('party');
     const requestId = searchParams.get('request');
-    // Wait for a restore to settle before deciding: a signed-in party arriving on a cold tab has no
-    // cached user for a moment, and bouncing them would lose the invitation they followed.
     if (!partyId && !requestId) return;
     if (loading) return;
     if (!isIn || !user?.mobile) {
-      // A dismissed sheet must leave a way back in: the header's sign-in drops this invite URL.
       setInviteError({ kind: 'signin' });
       if (!signInSentRef.current) sendToSignIn('invite');
       signInSentRef.current = true;
@@ -572,14 +515,12 @@ export function useRentAgreement() {
         if (row && row.status === 'declined') {
           if (alive) setInviteError({ kind: 'expired' });
           return;
-        /* An accepted invitation leaves the pending list, so a reload finds no row. */
         }
         const reqId = row?.requestId || requestId;
         if (!reqId) {
           if (alive) setInviteError({ kind: 'expired' });
           return;
         }
-          /* Two accepts can race (StrictMode, or two tabs) and the loser is refused. */
         if (row && row.status !== 'accepted') {
           try {
             await decideServiceRequestInvite(row.id, 'accept');
@@ -624,11 +565,8 @@ export function useRentAgreement() {
       }
     })();
     return () => { alive = false; };
-    /* `sendToSignIn` is deliberately absent: its identity changes whenever `t` does, so listing it would re-run this
-       invite lookup on every language switch. */
     // eslint-disable-next-line react-hooks/exhaustive-deps -- invite URL should resolve once per signed-in user
   }, [searchParams, isIn, loading, user]);
-  // ── Pending co-fill invites for the signed-in user (banner outside the invite flow) ──
 
   const [myInvites, setMyInvites] = useState([]);
   useEffect(() => {
@@ -650,7 +588,6 @@ export function useRentAgreement() {
     return () => { alive = false; };
   }, [mode, isIn, user, searchParams]);
 
-  // ── Property auto-fill from ?listing=<id> (or ?flat=<id> from a flatmate reissue) ──
   const listingPickRef = useRef(0);
   const propRef = useRef(prop);
   const listingRefusedRef = useRef(false);
@@ -684,17 +621,12 @@ export function useRentAgreement() {
   const listingAppliedRef = useRef(null);
   useEffect(() => {
     if (mode === 'invite') return;
-    // The flatmate reissue CTA links here as `?flat=<listing-id>`, so accept `flat` as an alias
-    // for `listing` — a room's propertyId is its listing id.
     const reissue = searchParams.get('reissue') === '1';
     const listingId = searchParams.get('listing') || searchParams.get('flat');
-    /* Matched against the loaded rows on both `id` and `slug`: a listing created through the API has a null slug
-       until moderation names one, so the two are not interchangeable. */
     if (!listingId || listingAppliedRef.current === listingId) return;
     const l = myProperties.find((row) => row.id === listingId || row.slug === listingId);
     if (!l) return;
     // eslint-disable-next-line
-    // Prefill from listing
     listingAppliedRef.current = listingId;
     applyListing(l, { overwrite: false }).then((applied) => {
       if (applied && reissue) toast(tr('services.ra.reissueHint'));
@@ -765,11 +697,8 @@ export function useRentAgreement() {
     return true;
   };
   const next = () => {
-     /* Validate before sign-in navigation so restored drafts return to a valid step. */
     if (!validateStep(step)) return;
     if (gated && step >= LAST_PUBLIC_STEP) { gateToSignIn(() => latestStep.current.next()); return; }
-    // Warned at each transition, not only at the end: the limit is on the whole form, so naming the
-    // offending field here puts it beside the control that has to shrink.
     if (detailsTooLong) toast(tr('services.ra.detailsTooLong', { field: tr(detailsWorstField.label), over: detailsSize - DETAILS_MAX_CHARS }), 'error');
     setStep((s) => Math.min(5, s + 1));
     scrollTop();
@@ -788,7 +717,6 @@ export function useRentAgreement() {
       toast(tr('services.ra.invite.copyFail'), 'error');
     }
   };
-  /* Takes an unanswered invitation back (V107). */
 
   const [withdrawing, setWithdrawing] = useState(false);
   const withdrawInvite = async () => {
@@ -813,7 +741,6 @@ export function useRentAgreement() {
     setTenantDocs(release);
   };
 
-  // A retry skips papers that already landed on this request; a replaced file in the same slot is sent.
   const uploadDocs = async (requestId, docs) => {
     let ok = true;
     let stale = false;
@@ -836,7 +763,6 @@ export function useRentAgreement() {
     if (stale) { releaseFiled(); return 'reattach'; }
     return ok;
   };
-  // Never log the payload of an identities call: its body is a set of Aadhaar numbers.
 
   const handOff = async (requestId, parties, docs) => {
     let identitiesError = null;
@@ -844,7 +770,6 @@ export function useRentAgreement() {
       await recordServiceRequestIdentities(requestId, parties);
     } catch (err) {
       console.error('Rent Agreement identity hand-off failed', err?.status || err?.message);
-      // Formats are checked before submit, so a 422 here is a number another party (often a co-filler) already holds.
       identitiesError = err?.status === 422 ? 'services.ra.identitiesDuplicate' : 'services.ra.identitiesRetry';
     }
     const docsOk = await uploadDocs(requestId, docs);
@@ -853,7 +778,6 @@ export function useRentAgreement() {
     if (!docsOk) return tr('services.ra.docsRetry');
     return null;
   };
-  /* After the create: identities, papers, checkout. */
 
   const finishOwnerRequest = async (requestId, docs) => {
     const handOffFailure = await handOff(requestId, identityParties({ owner, coOwners, tenants, wit }), docs);
@@ -878,8 +802,6 @@ export function useRentAgreement() {
     const invitePath = inviteRouteFor({ id: party?.id, requestId: request?.id });
     const link = new URL(invitePath, window.location.origin).toString();
     const signupLink = new URL(`/signup?next=${encodeURIComponent(invitePath)}`, window.location.origin).toString();
-    /* The invitee is told by the server: `CoFillParties.invite` raises `service.party-invited` through the `Notifier`
-       port, the only place quiet hours and preferences are applied. */
     const inviter = role === 'owner' ? tenants[0]?.name?.trim() || user?.name || 'Your tenant' : owner.oName || user?.name || 'Your owner';
     const text = `Hi${invite.invName ? ' ' + invite.invName : ''}, ${inviter} invited you to complete your rent-agreement details on Draazy${property ? ` for ${property}` : ''}. Please sign in (or create an account) first, then open this invite: ${link}\n\nSign up: ${signupLink}`;
     setInviteResult({
@@ -887,8 +809,6 @@ export function useRentAgreement() {
       toMobile: inviteMobile,
       link,
       waLink: `https://wa.me/91${inviteMobile}?text=${encodeURIComponent(text)}`,
-      // Two different waits (V107): a `pending` party is a number nobody has signed up to, so
-      // "ask them to create an account" is the advice; otherwise the account just hasn't answered.
       requestId: request?.id || null,
       partyId: party?.id || null,
       pending: !!party?.pending,
@@ -948,7 +868,6 @@ export function useRentAgreement() {
     }
     if (invitingRole && inviteMobile) {
       const request = await fileRequest(JSON.stringify({ details, propertyId, inviteMobile }),
-      // Only the requester may hand off their own side, so it happens while their session owns it.
         () => createCoFillServiceRequest({ request: { type: 'rental', details, propertyId }, role: invitingRole, mobile: inviteMobile }), docs);
       if (!request) return false;
       let invitedRequest = request;
@@ -967,7 +886,6 @@ export function useRentAgreement() {
       shareInvite(invitedRequest, invitingRole, inviteMobile);
       return true;
     }
-    /* No admin lead ticket is raised: an unpaid request is invisible to the ops queue by design (§ 5.10). */
     const key = filingKey({ details, propertyId });
     const request = await fileRequest(key,
       () => createServiceRequestLive({ type: 'rental', service: 'Rent Agreement', customer: { name: details.ownerName }, details, propertyId }), docs);
@@ -997,7 +915,6 @@ export function useRentAgreement() {
   };
 
   const generate = async () => {
-    // Hold while auth is unresolved; an expired session goes through `gateToSignIn` to keep the draft.
     if (submitting || done) return;
     if (loading) return;
     if (!isIn) { gateToSignIn(() => latestStep.current.generate()); return; }
@@ -1006,7 +923,6 @@ export function useRentAgreement() {
       if (Object.keys(e).length) { setStep(s); flagErrors(s, e); toast(tr('services.ra.validationRequired'), 'error'); return; }
     }
     if (!declare) { toast(tr('services.ra.declarationRequired'), 'error'); return; }
-    // Refuse before the server does, and name the field that has to shrink.
     if (detailsTooLong) {
       setStep(detailsWorstField.step);
       toast(tr('services.ra.detailsTooLong', { field: tr(detailsWorstField.label), over: detailsSize - DETAILS_MAX_CHARS }), 'error');
@@ -1027,14 +943,11 @@ export function useRentAgreement() {
       if (finished && mode === 'owner') clearDraft();
     } catch (err) {
       console.error('Rent Agreement submit failed', err?.status || err?.message);
-      // A 422 names the rule the server enforces (`RentAgreementDetailsRules`); say which.
       if (mountedRef.current) toast(err?.status === 422 && err?.message ? tr('services.ra.detailsRejected', { detail: err.message }) : tr('services.ra.saveError'), 'error');
       return;
     } finally {
       if (mountedRef.current) setSubmitting(false);
     }
-    // The checkout modal can stay open long enough for the customer to navigate away; scrolling a
-    // page they already left is a visible artefact rather than a harmless no-op.
 
     if (!finished || !mountedRef.current) return;
     setDone(true);

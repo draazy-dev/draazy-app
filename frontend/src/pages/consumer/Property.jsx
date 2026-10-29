@@ -55,8 +55,6 @@ export default function Property() {
     setVisitOpen(true);
     setVisitIntent(false);
   }, [flagEnabled, isIn, p, setVisitOpen, visitIntent, visitOpen]);
-  // A skeleton in the page's own shape rather than a centred spinner: it holds the
-  // layout, so the hero arriving does not shove the page down.
   if (ctx.loading) return <PropertySkeleton />;
   if (ctx.notFound) return <ListingUnavailable reason="not-found" tr={tr} />;
   if (ctx.underReview) {
@@ -111,13 +109,10 @@ export default function Property() {
             ]}
           />
 
-          {/* Keyed on the listing: `active` is reset here on an id change but the gallery's own `ask` slide is not,
-             so an in-place navigation would otherwise park the next listing's hero on its request-photos card. */}
           <Gallery key={p.id} gallery={gallery} active={active} setActive={setActive} title={title} p={p} setLightbox={setLightbox} requestPhotos={requestPhotos} priceStr={priceOnHero ? ctx.priceStr : null} actions={<PhotoActions p={p} />} />
 
           <PropertyHeader ctx={ctx} priceOnHero={priceOnHero} />
 
-          {/* SECTION TABS — collapse the long scroll into grouped tabs. */}
           <div className="dz-docks-under-nav sticky top-[var(--dz-nav-h)] z-30 section-mb flex items-stretch">
             <HScroll role="tablist" aria-label={tr('property.tablistAria')} wrapClassName="flex-1 min-w-0" className="flex gap-1 sm:gap-2 border-b border-white/10 bg-ink/80 backdrop-blur-md">
               {tabs.map((t) => (
@@ -134,7 +129,6 @@ export default function Property() {
               ))}
             </HScroll>
 
-            {/* Outside the tablist: a CTA is not a tab, and HScroll's row would scroll it out of reach. */}
             <div className="hidden lg:flex items-center pl-3 border-b border-white/10 bg-ink/80 backdrop-blur-md">
               {isOwner ? (
                 <Link to="/dashboard?tab=listings" className="btn-teal flex items-center gap-1.5 text-sm font-semibold py-2 px-4 shadow-none">
@@ -145,8 +139,6 @@ export default function Property() {
                   <Icon name="message-circle" className="w-4 h-4" /> {tr('property.chat')}
                 </Link>
               ) : (
-                /* Deliberately no wa.me deep link and no number on this surface: it routes through the same gate as
-                   every other contact entry point, so an always-visible CTA is not a way around it. */
                 <ContactCta status={contactStatus} onClick={handleContact} className="btn-teal flex items-center gap-1.5 text-sm font-semibold py-2 px-4 shadow-none" />
               )}
             </div>
@@ -161,8 +153,6 @@ export default function Property() {
         {isOwner ? (
           <Link to="/dashboard?tab=listings" className="btn-teal flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold py-3 px-4"><Icon name="layout-dashboard" className="w-4 h-4" /> {tr('property.manageListing')}</Link>
         ) : (
-          /* Never branches on approval: the sidebar owner card is `lg:` only, so this sheet is
-           * a phone's only surface for the number, WhatsApp and chat in every gate state. */
           <ContactCta status={contactStatus} onClick={handleContact} className="btn-teal flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold py-3 px-4" />
         )}
 

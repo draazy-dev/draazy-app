@@ -19,7 +19,7 @@ function loadDraft() {
     if (!raw) return null;
     const d = JSON.parse(raw);
     if (d && d.form && (d.form.ownerName || d.form.ownerMobile || d.form.propertyType)) return d;
-  } catch { /* ignore corrupt draft */ }
+  } catch { }
   return null;
 }
 
@@ -37,8 +37,6 @@ export default function AdminPostOnBehalf() {
   const [draft, setDraft] = useState(() => loadDraft());
   const [restored, setRestored] = useState(false);
 
-  /* The desk is exempt from the freemium ceiling, but an owner past their plan is an upgrade conversation
-     only the operator can have. A reply for an edited number is dropped so standing never crosses owners. */
   const [standing, setStanding] = useState(null);
   const ownerMobile = form.ownerMobile;
   useEffect(() => {
@@ -47,19 +45,17 @@ export default function AdminPostOnBehalf() {
     let alive = true;
     ownerListingStanding(m)
       .then((s) => { if (alive && s && s.mobile === m) setStanding(s); })
-      .catch(() => { /* advisory only — see above */ });
+      .catch(() => { });
     return () => { alive = false; };
   }, [ownerMobile]);
 
-  // Autosave the in-progress form so an accidental refresh mid-call doesn't lose
-  // everything. Skipped once the wizard is submitted (success) — the draft is cleared then.
   useEffect(() => {
     if (success) return;
     if (form === INITIAL_FORM) return;
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, step, savedAt: Date.now() })); } catch { /* quota */ }
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, step, savedAt: Date.now() })); } catch { }
   }, [form, step, success]);
 
-  const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } setDraft(null); };
+  const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch { } setDraft(null); };
 
   const resumeDraft = () => {
     if (!draft) return;
@@ -72,8 +68,6 @@ export default function AdminPostOnBehalf() {
   const set = (field, value) => {
     setForm((prev) => {
       const next = { ...prev, [field]: value };
-      // Cascade resets so stale config from a previous choice can never leak into
-      // the saved listing or the Review screen.
       if (field === 'propertyType') {
         next.bhk = '';
         next.commercialType = '';
@@ -82,7 +76,6 @@ export default function AdminPostOnBehalf() {
         if (NONRES_TYPES.includes(value)) next.furnishing = 'unfurnished';
         if (LAND_TYPES.includes(value)) { next.floor = ''; next.totalFloors = ''; }
       }
-      // Sale has no security deposit or preferred-tenant list — drop rent-era values.
       if (field === 'deal' && value === 'buy') next.deposit = '';
       return next;
     });
@@ -99,10 +92,7 @@ export default function AdminPostOnBehalf() {
       if (form.propertyType === 'commercial' && !form.shellType) err.shellType = true;
       if (!form.bhk && !NONRES_TYPES.includes(form.propertyType)) err.bhk = true;
       if (!form.carpetArea) err.carpetArea = true;
-      /* The server 422s this unnamed, so the operator would only see a generic toast on the last step. */
       if (form.floor && form.totalFloors && (parseInt(form.floor, 10) || 0) > Number(form.totalFloors)) err.floor = true;
-      /* Held to the same bar as the owner's own wizard: a land listing that reaches a buyer without
-         these is one the ops desk has to chase the owner about later anyway. */
       if (LAND_TYPES.includes(form.propertyType)) {
         if (!form.naStatus) err.naStatus = true;
         if (!form.otherRights) err.otherRights = true;
@@ -139,7 +129,6 @@ export default function AdminPostOnBehalf() {
       const titlePrefix = bhkNum ? bhkNum + ' BHK ' : '';
       const title = titlePrefix + typeLabel + ' in ' + (form.locality || 'Pune');
       const society = form.societyId ? form.society : '';
-      /* Only keys `toListingCreate` reads travel; everything else the owner adds after claiming. */
       const listing = {
         title, type: typeLabel, bhkNum, deal: form.deal,
         locality: form.locality || 'Pune',
@@ -152,8 +141,6 @@ export default function AdminPostOnBehalf() {
         images: form.photos,
         reraId: sale && !land ? form.reraId.trim() : '',
         landUse: landUseFor(form.propertyType),
-        /* Possession is a sale-only question here and on the consumer form, so a rental or a plot
-           states nothing rather than claiming "ready to move". `writePossession` omits the key. */
         construction: sale && !land ? (form.possession || 'ready') : undefined,
         available: availableFrom,
         society,
@@ -179,22 +166,16 @@ export default function AdminPostOnBehalf() {
       };
 
       const created = await createListingOnBehalf(form.ownerMobile, form.ownerName, listing);
-      /* No client-side audit write: `OnBehalfListingService` records both rows itself, naming the
-         staff member from their token, and the Staff Activity console reads those. */
       setCreatedListing(created);
       setClaimMessage(null);
       setSuccess(true);
       clearDraft();
       toast('Listing created \u2014 send the owner their claim link', 'success');
-      /* `ListingCreate` has no notes field, so the call notes go to the listing's internal-notes
-         timeline. The listing already exists, so a failure here is reported, not retried. */
       if (form.ownerNotes.trim()) {
         addNote('listing', created.uuid, form.ownerNotes)
           .catch(() => toast('Listing created, but the internal note was not saved', 'error'));
       }
     } catch (err) {
-      /* A 422 names its field and `writePossession` names an unmappable value, but the toast can say
-         neither — so log it, or staff can only report "it failed". */
       console.error(err);
       toast('Failed to create listing \u2014 please try again', 'error');
     } finally {
@@ -202,7 +183,6 @@ export default function AdminPostOnBehalf() {
     }
   }
 
-  // Opened synchronously inside the click so popup blockers allow it; navigated once the server records the message.
   const sendClaimLink = async () => {
     const handoff = window.open('', '_blank');
     try {
@@ -288,8 +268,6 @@ export default function AdminPostOnBehalf() {
         </div>
       )}
 
-      {/* Rent vs Sale is the first decision staff make on the call — surface it up
-          top and keep it visible on every step (it drives deposit, price labels & fields). */}
       <div className="mb-6 max-w-2xl">
         <span className="mb-1.5 block text-sm font-medium text-gray-300">Listing for</span>
         <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1" role="group" aria-label="Listing deal type">

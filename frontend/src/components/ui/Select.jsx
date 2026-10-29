@@ -30,8 +30,6 @@ const Select = forwardRef(function Select({
   noResultsText,
   anchored,
 }, ref) {
-  /* Resolved at render rather than as a default parameter: a default is evaluated against whatever language was
-     active on first mount and would never follow a later switch. */
   const { t } = useTranslation();
   const ph = placeholder || t('ui.selectPlaceholder');
   const noResults = noResultsText || t('ui.noMatches');
@@ -51,14 +49,10 @@ const Select = forwardRef(function Select({
   const searchRef = useRef(null);
   useImperativeHandle(ref, () => triggerRef.current, []);
   const [portalOpen, setPortalOpen] = useState(false);
-  /* On phones the menu docks to the bottom edge as a sheet: an anchored panel there opens under the thumb and is
-     routinely half-covered by the keyboard when the field is searchable. */
   const listId = useId();
   const sheet = useSheetViewport() && !anchored;
   const picker = sheet && isSearchable;
   useVisualViewportInsets(open && picker);
-  // Fall back to showing the raw value as its own label so a locality picked from
-  // live search (not in the static list) still displays on the trigger.
 
   const selected = opts.find((o) => o.value === value)
     || (value != null && value !== '' ? { value, label: String(value) } : null);
@@ -82,8 +76,6 @@ const Select = forwardRef(function Select({
     setAsyncOpts([]);
     setLoading(false);
   }, []);
-  // Debounced live search. Fires only while open with a ≥2-char query; races are
-  // guarded by a cancelled flag so a stale response can't clobber a newer one.
 
   useEffect(() => {
     if (!asyncSearch || !open) return undefined;
@@ -124,21 +116,15 @@ const Select = forwardRef(function Select({
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [open, close]);
-  // Portal the menu to <body> with fixed positioning so it escapes any
-  // ancestor overflow/transform/stacking trap and can flip up near the viewport edge.
 
   const position = useCallback(() => {
     const trigger = triggerRef.current;
     const menu = menuRef.current;
     if (!trigger || !menu) return;
-    // Sheet mode is laid out entirely in CSS. Drop any inline geometry a previous
-    // desktop-width pass wrote, or it would out-specify the sheet rules.
     if (sheet) { menu.removeAttribute('style'); return; }
     const r = trigger.getBoundingClientRect();
     menu.style.position = 'fixed';
     menu.style.right = 'auto';
-    // Anchor to the pill's left edge: at least as wide as the pill, growing to its widest option
-    // (options never wrap), clamped to the viewport so it never overflows the screen.
     menu.style.width = 'auto';
     menu.style.minWidth = `${r.width}px`;
     menu.style.maxWidth = `${window.innerWidth - 16}px`;
@@ -167,11 +153,8 @@ const Select = forwardRef(function Select({
       window.removeEventListener('resize', onAnchor);
     };
   }, [open, position, visible.length]);
-  /* A sheet covers the page, so the page behind it must not scroll with it. */
 
   useScrollLock(open && sheet);
-  // Focus the search box only after position() has anchored the portaled menu: focusing while it
-  // still resolves to its static page-bottom position drags the window to the footer.
 
   useLayoutEffect(() => {
     if (!open || !isSearchable) return;
@@ -188,7 +171,6 @@ const Select = forwardRef(function Select({
     if (onPick) onPick(opt);
     closeToTrigger();
   };
-  /* Drag the card's top edge down to dismiss. Mobile-only by construction. */
 
   const swipe = useSwipeDismiss(close);
 
@@ -226,7 +208,6 @@ const Select = forwardRef(function Select({
         }
         break;
       case 'Escape':
-        /* Escape closes the innermost thing only. */
         e.preventDefault();
         e.stopPropagation();
         closeToTrigger();
@@ -262,7 +243,6 @@ const Select = forwardRef(function Select({
 
       {open && typeof document !== 'undefined'
         ? createPortal(
-              /* Scrim: a sheet is modal, so the page behind it must read as dismissed, not merely covered. */
             <>
               {sheet ? <div className="dz-dropdown__scrim" onClick={close} aria-hidden="true" /> : null}
               <div

@@ -84,7 +84,6 @@ function AskRefund({ summary, busy, onAsk }) {
   );
 }
 
-/** D-b refunds: the holder asks, a colleague approves, and only then does the gateway move money. */
 export default function Refunds({ request }) {
   const titleId = useId();
   const { toast } = useToast();

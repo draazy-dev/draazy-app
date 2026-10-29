@@ -32,17 +32,11 @@ import { parseSmartQuery } from './listings/listingsSmartQuery.js';
 
 const SORTS = ['relevance', 'price-low', 'price-high', 'newest', 'price-psf', 'verified'];
 
-/* The grid asks for a page; the map asks for as many pins as it will draw, because a map with a
- * "next page" button is not a map. */
 const PAGE_SIZE = 24;
-/* 100 is the server's ceiling (`spring.data.web.pageable.max-page-size`) and asking for more is silently clamped,
-   which would leave the "showing the first N" note quoting pins never drawn. */
 const MAP_MARKER_CAP = 100;
 const MAP_MAX_AREAS = 3;
 const LAST_LISTINGS_SEARCH_KEY = 'draazy.listings.lastSearch.v1';
 
-/* Localities are created on demand, so only the words no other rule claimed are looked up; the query is then parsed
-   again against the filters as they are after the lookup, so a change made meanwhile is not undone. */
 async function parseWithLocalities(raw, readCtx) {
   const first = parseSmartQuery(raw, readCtx());
   if (!first?.q) return first && { ...first, hits: [], locNames: readCtx().locNameBySlug };
@@ -94,18 +88,13 @@ export default function Listings() {
   const [initialListingsSearch] = useState(readStoredListingsSearch);
   const [storedInitialFilters] = useState(() => (!initialHadUrlParams.current ? deserializeStoredFilters(initialListingsSearch?.filters) : null));
 
-  // URL param compat: ?type= / ?ptype= accept one or more canonical type keys
-  // (comma-separated) or legacy labels; ?deal=rent|buy is honoured directly.
   const urlTypeRaw = params.get('ptype') || params.get('type') || '';
   const urlTypeKeys = urlTypeRaw.split(',').map(canonicalTypeKey).filter(Boolean);
-  // An explicit ?deal= always wins; otherwise a shared-room search opens on Rent.
   const dealParam = params.get('deal');
   const urlDeal = dealParam === 'rent' || dealParam === 'buy'
     ? dealParam
     : ((!initialHadUrlParams.current && storedInitialFilters?.deal) || (urlTypeKeys.includes('flatmates') ? 'rent' : 'buy'));
 
-  // All filters round-trip through the address bar, so a search is shareable, refresh-safe and
-  // back-button-safe (see filterState.js).
   const backRestoreInitial = pendingDrawerBackSnapshot;
   const buildInitial = () => backRestoreInitial?.f || storedInitialFilters || paramsToFilters(params, urlDeal);
 
@@ -118,8 +107,6 @@ export default function Listings() {
   });
   const [view, setView] = useState(backRestoreInitial?.view || (params.get('view') === 'map' ? 'map' : params.get('view') === 'list' ? 'list' : (!initialHadUrlParams.current && ['map', 'list', 'grid'].includes(initialListingsSearch?.view) ? initialListingsSearch.view : 'grid')));
   const [activeId, setActiveId] = useState(backRestoreInitial?.activeId || params.get('property') || null);
-  // Only Pune has inventory today, so a data-less live city gets an honest empty state here
-  // rather than Pune listings mislabelled as its own.
   const { city } = useCity();
   const hasData = cityHasData(city);
   const [localities, setLocalities] = useState([]);
@@ -127,8 +114,6 @@ export default function Listings() {
   const [aiQuery, setAiQuery] = useState('');
   const [savingSearch, setSavingSearch] = useState(false);
   const [alertSeed, setAlertSeed] = useState(null);
-  /* Held in state and mirrored to `?q=` by the same effect that writes the filters, because the
-   * address bar tolerates only one writer. */
   const [freeText, setFreeText] = useState(() => backRestoreInitial?.freeText || params.get('q') || (!initialHadUrlParams.current ? initialListingsSearch?.q || '' : ''));
   const stateDrivenDealRef = useRef(null);
   const normalizeFilterPatch = (prev, partial) => {
@@ -171,13 +156,9 @@ export default function Listings() {
     latestFilterStateRef.current = f;
   }, [f]);
 
-  // Map search can be turned off by feature flag. When it is, a `view=map` deep-link
-  // must not leave the user staring at a blank map — fall back to grid and surface a note.
   const mapEnabled = flagEnabled('mapSearch');
   const effView = view === 'map' && !mapEnabled ? 'grid' : view;
 
-  // Return-to-search: restore the exact prior listings view (map + areas + filters +
-  // open property + scroll) when the property page sends the user "back to map".
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current) return;
@@ -192,7 +173,6 @@ export default function Listings() {
     if (snap.scrollY != null) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, snap.scrollY)));
   }, [location.state]);
 
-  // The return URL handed to the property page, so its breadcrumb lands on the same results, sort and page.
   const buildReturnSearch = () => {
     const sp = applyFiltersToSearchParams(new URLSearchParams(), f);
     sp.set('deal', f.deal);
@@ -204,8 +184,6 @@ export default function Listings() {
     return '/listings?' + sp.toString();
   };
 
-  // Save the full context (incl. non-URL filters) so the return is lossless even after
-  // a refresh on the property page.
   const saveReturnContext = () => setLastSearch({ search: buildReturnSearch(), filters: serializeF(f), q: freeText, view, activeId, scrollY: window.scrollY });
 
   const onSelectProperty = (id) => setActiveId(id);
@@ -225,9 +203,6 @@ export default function Listings() {
     pendingDrawerBackSnapshot = snapshot;
   }, [activeId, effView, freeText, sort]);
 
-  /* URL; a bare deal change is the toggle, and carries over what both sides can express. */
-  // Mirrors the full filter set to the address bar, writing only when the query string actually
-  // changes so there is no history churn or render loop.
   useEffect(() => {
     const restoreSnapshot = drawerBackRestoreSnapshotRef.current || pendingDrawerBackSnapshot;
     if (restoreSnapshot) {
@@ -293,8 +268,6 @@ export default function Listings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a deal.
   }, [urlDeal]);
 
-  // A Places pick resolves to a locality that isn't in the option list yet;
-  // register it (slug → name) so its chip and the dropdown summary show a friendly name.
   const addLocalityOption = useCallback(({ slug, name, lat, lng, archived, liveListings }) => {
     if (!slug) return;
     const option = { slug, name: name || slug, lat: lat ?? null, lng: lng ?? null, archived: !!archived, liveListings: liveListings || 0 };
@@ -320,17 +293,12 @@ export default function Listings() {
     return () => { alive = false; };
   }, [socSlugsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- names already loaded are not refetched.
 
-  // Deferred filter state — keeps the inputs responsive while the request for the new results is
-  // in flight, so a checkbox never waits on the network to look checked.
   const deferredF = useDeferredValue(f);
 
-  // Map view is area-first: plotting a whole city is a heavy read and an unreadable map, so it
-  // draws only once 1–MAP_MAX_AREAS localities are chosen, and asks for at most MAP_MARKER_CAP pins.
   const mapAreaCount = f.localities.size;
   const mapGated = effView === 'map' && (mapAreaCount === 0 || mapAreaCount > MAP_MAX_AREAS);
   const size = effView === 'map' ? MAP_MARKER_CAP : PAGE_SIZE;
 
-  // Names and centres come one slug at a time: for the chosen areas, and for the map gate's suggestions while it shows.
   const askedLocalitiesRef = useRef(new Set());
   const locSlugsKey = [...new Set([...f.localities, ...(mapGated ? suggestedMapLocalities : [])])].sort().join(',');
   useEffect(() => {
@@ -362,17 +330,11 @@ export default function Listings() {
   const search = useListingsSearch({ query, relaxedQuery, page: requestPage, size });
   const results = search.data.items;
   const total = search.data.total;
-  // A server count: the browser sees one page, so counting badges on it would answer "how many of
-  // these 24" while reading as "how many in Baner".
   const verifiedCount = search.data.verifiedTotal;
-  /* Area, age, floor and deposit bounds keep listings that never stated the value, because most
-   * of the catalogue never states it. */
   const unstatedCount = search.data.unstatedTotal;
   const relaxedNear = search.relaxed
     ? { locNames: [...deferredF.localities].map((s) => locNameBySlug[s] || s), nearLabel: deferredF.nearLabel || tr('listings.thePlace') }
     : null;
-  /* "Loaded" is not "not loading": a failed read is settled with nothing to show, and a count
-   * for it would be a claim about Pune's inventory rather than about the request. */
   const loaded = search.status === 'ready' || results.length > 0;
   const pageCount = Math.max(1, search.data.pageCount || 1);
   const safePage = Math.min(requestPage, pageCount);
@@ -382,8 +344,6 @@ export default function Listings() {
 
   const ptr = usePullToRefresh(search.refresh);
 
-  // The map fits to its property markers, but a zero-inventory locality has none — the locality
-  // centres give it something to focus on rather than the city default.
   const locSig = [...f.localities].sort().join(',');
   const mapFocus = useMemo(() => {
     if (!f.localities.size) return [];
@@ -393,15 +353,11 @@ export default function Listings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `locSig` is.
   }, [locSig, localities]);
 
-  // The server already returned exactly one page, so there is nothing left to slice. `mapGated`
-  // suspends the request rather than fetching a batch the map has decided not to draw.
   const pageResults = mapGated ? [] : results;
   const activeIndex = activeId ? pageResults.findIndex((p) => p.id === activeId) : -1;
   const activeProperty = activeIndex >= 0 ? pageResults[activeIndex] : null;
   const goToPage = (n) => {
     setPage(Math.min(Math.max(1, n), pageCount));
-    /* No explicit `behavior`: it defaults to `auto`, which the spec defines as deferring to the computed
-       `scroll-behavior` — so both the media query and the app's own "Reduce motion" toggle are already honoured. */
     window.scrollTo({ top: 0 });
   };
 
@@ -448,8 +404,6 @@ export default function Listings() {
   };
 
   const saveSearch = async (e) => {
-    // Alerts are keyed by mobile and live in the login-only dashboard, so a search saved while
-    // signed out would be orphaned under 'anon' and never surface there.
     if (!isIn) {
       sendToSignIn('alerts', undefined, replay(e));
       return;
@@ -457,8 +411,6 @@ export default function Listings() {
     if (savingSearch) return;
     setSavingSearch(true);
     try {
-      // A typed query is parsed first so the pop-up opens on the criteria the user is reading; if parsing fails
-      // the pop-up still opens on the visible filters, which it shows in full before anything is saved.
       const parsed = aiQuery.trim() ? await parseTyped().catch(() => null) : null;
       if (parsed) applyParsed(parsed);
       setAlertSeed(parsed ? { filters: parsed.next, names: parsed.locNames } : { filters: f, names: locNameBySlug });
@@ -473,8 +425,6 @@ export default function Listings() {
         <AlertSetupModal initial={alertSeed.filters} locNameBySlug={alertSeed.names} onSubmit={createSavedSearch} onClose={() => setAlertSeed(null)} />
       ) : null}
 
-      {/* This route is selfPadded, so the top offset derives from the navbar token plus a breathing gap rather than
-         restating the bar's height. */}
       <div ref={ptr.ref} className="pt-[calc(var(--dz-nav-h)+8px)] sm:pt-[calc(var(--dz-nav-h)+20px)] pb-20">
         {(ptr.pullDistance > 0 || ptr.isRefreshing) && (
           <div

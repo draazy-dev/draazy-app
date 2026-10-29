@@ -17,7 +17,6 @@ function readLatLng(e) {
   return lat == null || lng == null ? null : [lat, lng];
 }
 
-// Static — vis.gl re-runs setOptions when style/props change identity, so hoist.
 const MAP_STYLE = { width: '100%', height: '100%' };
 const DEFAULT_CENTER = { lat: 18.5590, lng: 73.7760 };
 const finiteCoord = (value) => {
@@ -63,8 +62,6 @@ function ReportFailure({ onUnavailable }) {
   return null;
 }
 
-/* With Maps down the pin comes from the society or locality pick, so a dead 280px box only pushes the form down.
-   `hint` is help that only makes sense while there is a map to drag. */
 export function PinMapBox({ invalid = false, hint = null, ...props }) {
   const { t } = useTranslation();
   const [down, setDown] = useState(false);
@@ -75,8 +72,6 @@ export function PinMapBox({ invalid = false, hint = null, ...props }) {
     </p>
   );
   if (!GOOGLE_MAPS_API_KEY) return note;
-  /* A failed map stays mounted but hidden: tearing it down while Google's script is still unwinding throws from
-     its cleanup into the page's error boundary instead of this one. */
   return (
     <>
       {down ? note : null}

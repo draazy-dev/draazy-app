@@ -32,7 +32,6 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
     ...(isRent && !isLand && furnishLabel !== '—' ? [[furnishLabel, 'tag.furnishing']] : []),
   ];
   const fresh = listingFreshness(p);
-  // `aging` says only "updated N days ago", which the date already does.
   const freshNote = fresh.buyer.show && fresh.state !== 'aging' ? fresh.buyer.short : '';
   const social = [
     ...(Number(p.views) > 0 ? [['eye', tr('property.viewsCount', { count: Number(p.views), value: fmtNum(p.views) })]] : []),
@@ -64,8 +63,6 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                 </ul>
               ) : null}
 
-              {/* Owner-activity signal: tells the buyer whether the owner is keeping this listing current, so they
-                 don't chase a ghost listing. */}
               <p
                 data-testid="property-freshness"
                 className={'mt-2 flex items-start gap-1.5 text-[13px] ' + (fresh.buyer.show ? FRESH_TONE[fresh.buyer.tone] : FRESH_TONE.gray)}
@@ -75,8 +72,6 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                 <span>{tr(dateKey, { time: dateValue })}{freshNote ? ` · ${freshNote}` : ''}</span>
               </p>
 
-              {/* No `weight` prop: `file-check` resolves to a Lucide fallback, which ignores it, so asking for `fill`
-                 produced two solid Phosphor glyphs beside one outline. */}
               <div data-testid="property-trust" className="mt-5 rounded-2xl border border-emerald-500/20 px-3.5 pt-3 pb-[5px] lg:p-4" style={{ background: 'linear-gradient(135deg,rgb(var(--dz-c-emerald-500) / .08),rgb(var(--dz-c-teal-500) / .06))' }}>
                 <div className="tag-strip">
                   {tags.map(([label, cls, ic, tipKey]) => (
@@ -91,8 +86,6 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                   ) : null}
                 </div>
 
-                {/* Every claim in here is a *platform* promise and is byte-for-byte identical on every listing, so it
-                   carries no information that helps a buyer choose between two homes. */}
                 <MobileCollapse
                   className="mt-2.5 border-t border-white/10 pt-[3px] lg:mt-3 lg:pt-3"
                   label={tr('property.assuredTitle')}
@@ -108,14 +101,11 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                     <span className="inline-flex items-center gap-2 text-xs text-slate-200 rounded-lg border border-white/10 bg-white/5 px-3 py-2"><Icon name="user-check" className="w-4 h-4 text-emerald-400" /> {tr('property.assuredVerified')}</span>
                     <span className="inline-flex items-center gap-2 text-xs text-slate-200 rounded-lg border border-white/10 bg-white/5 px-3 py-2"><Icon name="phone-off" className="w-4 h-4 text-gray-400" /> {tr('property.numberProtected')}</span>
 
-                    {/* Inside a collapsed panel, so the automated tap-target sweep never reaches it — the 44px
-                       minimum has to be asserted here by hand. */}
                     <button type="button" onClick={() => setReportOpen(true)} className="inline-flex items-center gap-2 min-h-[44px] text-xs text-slate-200 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-white/10 hover:border-amber-400/30 transition-smooth"><Icon name="flag" className="w-4 h-4 text-amber-400" /> {tr('property.reportReverify')}</button>
                     <Link to="/how-verification-works" className="inline-flex items-center gap-2 min-h-[44px] text-xs text-slate-200 rounded-lg border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10 hover:border-emerald-400/30 transition-smooth"><Icon name="info" className="w-4 h-4 text-emerald-400" /> {tr('property.assuredHow')}</Link>
                   </div>
                 </MobileCollapse>
               </div>
-              {/* A studio / 1-BHK isn't practical to split, so gate on 2+ BHK. */}
               {isRent && kind === 'residential' && (p.bhkNum || 0) >= 2 && p.price > 0 ? (
                 <MobileCollapse
                   className="mt-5 glass-strong rounded-2xl px-3.5 py-[5px] lg:p-5"
@@ -162,8 +152,6 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                 <OwnerCard p={p} isIn={isIn} toast={toast} contactApproved={contactApproved} contactStatus={contactStatus} ownerMob={ownerMob} onContact={handleContact} canChat={canChat} />
               </div>
 
-              {/* Hidden on mobile: the sticky bottom bar already exposes "Visit", so this standalone button would be
-                 a third copy of the same action. */}
               {flagEnabled('scheduleVisit') && (
                 <div className="hidden lg:block">
                   <VisitCta visits={myVisits} onSchedule={handleSchedule} label={tr('property.scheduleVisit')} iconClassName="w-5 h-5" className="btn-teal w-full flex items-center justify-center gap-2 py-3 shadow-none" />

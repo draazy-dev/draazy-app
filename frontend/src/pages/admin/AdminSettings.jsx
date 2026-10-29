@@ -111,7 +111,6 @@ const humanize = (k) =>
     .replace('Sms', 'SMS')
     .replace('Emi', 'EMI');
 
-/** Alphabetical order avoids moving a city pill under the cursor the instant it is toggled. */
 const sortCities = (rows = []) => [...rows].sort(
   (a, b) => String(a.name || '').localeCompare(String(b.name || '')),
 );
@@ -151,15 +150,12 @@ export default function AdminSettings() {
 
   useEffect(() => {
     let alive = true;
-    // Without the catch the page sits on `<Loading />` for ever, which reads as a slow server
-    // rather than a failed request — on the screen an operator opens when something is wrong.
     getSettings()
       .then((s) => { if (alive) setSettings(s); })
       .catch(() => { if (alive) setLoadError(true); });
     return () => { alive = false; };
   }, []);
 
-  /** `listCities()` avoids `geoConfig`'s built-in fallback, which would make guessed slugs look live. */
   const loadCityRoster = useCallback(async () => {
     try {
       const rows = await listCities();
@@ -173,13 +169,10 @@ export default function AdminSettings() {
 
   useEffect(() => { loadCityRoster(); }, [loadCityRoster]);
 
-  /** Re-read on shared geo-cache refresh so this panel does not become a stale third copy. */
   useEffect(() => onGeoChange(loadCityRoster), [loadCityRoster]);
 
-  /** Stable identity keeps the Maps panel from re-syncing over a half-typed bounding box. */
   const geo = useMemo(() => settings?.geo || {}, [settings?.geo]);
 
-  // Declared above the early return to satisfy the Rules of Hooks.
   const requestAdminFlagToggle = useCallback((section, key, value, moduleTitle) => {
     const label = moduleTitle || humanize(key);
     setConfirm({
@@ -190,8 +183,6 @@ export default function AdminSettings() {
       danger: !value,
       confirmLabel: value ? 'Enable' : 'Disable',
       action: () => {
-        // The toast waits for the write: reporting a module as disabled when the PUT was rejected
-        // is the failure an operator is least likely to check.
         setFlag(section, key, value)
           .then(() => toast(`${label} ${value ? 'enabled' : 'disabled'}`, 'toggle'))
           .catch((err) => toast(saveError(err), 'error'));
@@ -228,8 +219,6 @@ export default function AdminSettings() {
     return !blank;
   };
 
-  /* Reports what actually happened, never an unconditional success — the caller applied the value
-     optimistically, so the returned boolean is its cue to roll back. Auditing is the server's. */
   const persist = async (patch, okMessage, okKind = 'success') => {
     try {
       await updateSettings(patch);
@@ -286,7 +275,6 @@ export default function AdminSettings() {
     persist({ flatmates: { maxGroupsPerPerson: maxGroups } }, 'Group limit saved');
   };
 
-  // Move-in Pack: admin-owned prices + launch toggle (consumer /services reads settings.movePack).
   const movePack = settings.movePack || { enabled: false, items: {} };
   const setMovePackItem = (k, v) => setSettings((s) => ({ ...s, movePack: { ...movePack, items: { ...movePack.items,   [k]: v === '' ? '' : Number(v) } } }));
   const setMovePackEnabled = (v) => setSettings((s) => ({ ...s, movePack: { ...movePack, enabled: v } }));
@@ -296,8 +284,6 @@ export default function AdminSettings() {
         'Move-in Pack saved',
       );
 
-  // Google Places geo policy (city limit + blacklist) — persisted to settings.geo
-  // and read live by lib/geoConfig.js across every locality search in the app.
   const saveGeo = (nextGeo, detail) => {
     const sanitized = stripGeoLive(nextGeo);
     setSettings((s) => ({ ...s, geo: sanitized }));
@@ -324,8 +310,6 @@ export default function AdminSettings() {
     } finally {
       setPendingCity(null);
     }
-    // No `logAudit` here either: `CityAdminService` records `city.update` against the
-    // authenticated operator as part of the same write.
     toast(`${city.name} marked ${live ? 'live' : 'coming soon'}`);
     return true;
   };
@@ -339,15 +323,11 @@ export default function AdminSettings() {
       confirmLabel: nextVal ? 'Enable' : 'Disable',
       action: async () => {
         setSettings((s) => ({ ...s, flags: { ...s.flags, [k]: nextVal } }));
-        // Only the flag that changed, for the reason `AdminFlagsContext.setFlag` gives: a whole
-        // block re-asserts values this handler never read.
         const saved = await persist(
           { flags: { [k]: nextVal } },
           `${humanize(k)} ${nextVal ? 'enabled' : 'disabled'}`,
           'toggle',
         );
-        // Put the switch back one key at a time, for the reason `saveCityLaunchState` gives. These
-        // flags are kill switches, so a stale position tells an operator the platform is closed.
         if (!saved) setSettings((s) => ({ ...s, flags: { ...s.flags, [k]: !nextVal } }));
       },
     });
