@@ -94,7 +94,7 @@ test.describe('Dashboard settings', () => {
     const lightMode = page.getByRole('switch', { name: 'Light mode' });
     const bodyBg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     const favicon = page.locator('link[rel="icon"]');
-    const lightTile = /fill='%23f3f7f6'/;
+    const lightTile = /stop-color='%23a9d4cf'/;
     const darkTile = /fill='%230f0d1a'/;
 
     await expect(html).toHaveClass(/\blight\b/);
