@@ -356,7 +356,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
         return expired;
     }
 
-    private Map<String, Object> boundedDetails(String type, Map<String, Object> details) {
+    Map<String, Object> boundedDetails(String type, Map<String, Object> details) {
         if (details == null || details.isEmpty()) {
             return details;
         }

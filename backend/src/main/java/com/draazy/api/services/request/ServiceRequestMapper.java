@@ -119,11 +119,37 @@ public class ServiceRequestMapper {
                         policeIntimation(police.get(r.getId()), names),
                         RentAgreementSla.of(r, now),
                         amendment(proposed.get(r.getId())),
-                        approvalSummary.summary(r, approvals.getOrDefault(r.getId(), List.of())));
+                        approvalSummary.summary(r, approvals.getOrDefault(r.getId(), List.of())),
+                        charges(r),
+                        attention(r, viewer));
         }).toList();
     }
 
-    // Staff who are a side of the request read it as a customer does.
+    private static ServiceRequestDto.Attention attention(ServiceRequest request, AuthPrincipal viewer) {
+        Map<String, Object> a = request.getAttention();
+        if (a == null || request.getStatus() != ServiceRequestStatus.ACTION_REQUIRED) {
+            return null;
+        }
+        List<ServiceRequestDto.Paper> papers = a.get("papers") instanceof List<?> l ? l.stream().filter(Map.class::isInstance)
+                .map(p -> new ServiceRequestDto.Paper(String.valueOf(((Map<?, ?>) p).get("id")), String.valueOf(((Map<?, ?>) p).get("name"))))
+                .toList() : List.of();
+        boolean forYou = a.get("recipients") instanceof List<?> to && to.contains(viewer.userId().toString());
+        return new ServiceRequestDto.Attention(String.valueOf(a.get("party")), String.valueOf(a.get("reason")), papers,
+                Instant.parse(String.valueOf(a.get("askedAt"))), forYou);
+    }
+
+    private static ServiceRequestDto.Charges charges(ServiceRequest request) {
+        if (request.getAmount() == null || !ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())) {
+            return null;
+        }
+        LeaveAndLicenceCharges.Charges quoted = ServiceRequestPricing.quotedCharges(request.getDetails());
+        if (quoted == null || quoted.total() > request.getAmount()) {
+            return null;
+        }
+        return new ServiceRequestDto.Charges(request.getAmount() - quoted.total(), quoted.stampDuty(),
+                quoted.exactDutyInPaise(), quoted.registration(), quoted.handling(), request.isReferralCredit());
+    }
+
     private static boolean deskView(AuthPrincipal viewer, ServiceRequest request, List<ServiceRequestParty> parties) {
         return Roles.isBackOffice(viewer.role()) && !viewer.userId().equals(request.getRequesterId())
                 && parties.stream().noneMatch(p -> CoFillParties.ACCEPTED.equals(p.getStatus())

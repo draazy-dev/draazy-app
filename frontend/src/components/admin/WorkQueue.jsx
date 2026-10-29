@@ -150,10 +150,9 @@ export const Cell = ({ children, className }) => (
   <span className={classNames('truncate', className)} title={typeof children === 'string' ? children : undefined}>{children || DASH}</span>
 );
 
-/** A queue row without a photo, laid out like the Properties tile: details left, actions in the right rail. */
-export function RowCard({ title, lead, badges, meta, facts, chips, primary, figure, icons, testId = 'queue-row', id, selected }) {
+export function RowCard({ title, lead, badges, meta, facts, chips, primary, figure, icons, testId = 'queue-row', id, selected, className }) {
   return (
-    <li data-testid={testId} data-id={id} className={classNames('list-card glass overflow-hidden rounded-2xl transition hover:border-white/15', selected && 'ring-1 ring-teal-400/50')}>
+    <li data-testid={testId} data-id={id} className={classNames('list-card glass overflow-hidden rounded-2xl transition hover:border-white/15', selected && 'ring-1 ring-teal-400/50', className)}>
       <div className="lr">
         <div className="lr-body">
           <div className="lr-info flex-1">

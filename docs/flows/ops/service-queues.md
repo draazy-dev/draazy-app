@@ -377,17 +377,23 @@ open  --(Resolve / Set status)-->  in-progress | waiting | resolved | closed
   make.
 
 ### 7.2 Service request (`ServiceRequestStatus`, server-owned)
-Nine wire values, and the transition table is the server's:
+Ten wire values, and the transition table is the server's:
 ```
 awaiting-payment  -> new, cancelled
 new               -> assigned, in-progress, cancelled
-assigned          -> in-progress, draft-shared, cancelled
-in-progress       -> assigned, draft-shared, cancelled
+assigned          -> in-progress, draft-shared, action-required, cancelled
+in-progress       -> assigned, draft-shared, action-required, cancelled
 draft-shared      -> approved, changes-requested, in-progress, draft-shared, cancelled
-changes-requested -> assigned, in-progress, draft-shared, cancelled
+changes-requested -> assigned, in-progress, draft-shared, action-required, cancelled
+action-required   -> in-progress, cancelled
 approved          -> completed, cancelled
 completed, cancelled -> (terminal)
 ```
+- `action-required` (rent agreements): the holder sent the case back to the owner or tenant for
+  checklist papers to upload again and/or a question (`POST …/attention`); the side asked hands it
+  back with `POST …/attention/resolve`, refused with 409 until every paper has a copy newer than the
+  ask. It counts as the customer's turn (no desk SLA) and sits on the desk's **With customer** tab.
+  Anything else the holder corrects directly (`PUT …/desk-details`, `PUT …/desk-identities`).
 - `STAFF_SETTABLE = {assigned, in-progress, cancelled}`. Everything else is a consequence of an
   action (a draft shared, a decision taken), not a status a desk may pick.
 - **The React prototype's extra statuses do not exist.** `docs_review`, `registration` and

@@ -6,7 +6,7 @@ import { useToast } from '../../../context/ToastContext.jsx';
 import { fmtINR } from '../../../lib/format.js';
 import { AMENDABLE_TERMS, amendmentRows, currentTerm } from '../../../lib/amendmentTerms.js';
 
-const AMENDABLE = new Set(['docs_review', 'changes_requested']);
+const AMENDABLE = new Set(['docs_review', 'changes_requested', 'action_required']);
 const REASON_MAX = 300;
 
 function Owed({ delta }) {

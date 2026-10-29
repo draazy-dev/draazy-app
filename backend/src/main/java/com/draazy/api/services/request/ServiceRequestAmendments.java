@@ -33,7 +33,8 @@ public class ServiceRequestAmendments {
     private static final int REASON_MAX = 300;
 
     private static final Set<ServiceRequestStatus> AMENDABLE = EnumSet.of(ServiceRequestStatus.ASSIGNED,
-            ServiceRequestStatus.IN_PROGRESS, ServiceRequestStatus.CHANGES_REQUESTED);
+            ServiceRequestStatus.IN_PROGRESS, ServiceRequestStatus.CHANGES_REQUESTED,
+            ServiceRequestStatus.ACTION_REQUIRED);
 
     private static final Set<String> FLAT_TERMS = Set.of("rent", "deposit", "nrDeposit", "months", "regArea");
 
@@ -286,9 +287,8 @@ public class ServiceRequestAmendments {
     }
 
     private void notifyOtherParties(ServiceRequest request, String type, String title, String body) {
-        parties.findByRequestId(request.getId()).stream()
-                .filter(p -> CoFillParties.ACCEPTED.equals(p.getStatus()) && p.getUserId() != null
-                        && !p.getUserId().equals(request.getRequesterId()))
+        CoFillParties.joined(parties.findByRequestId(request.getId()))
+                .filter(p -> !p.getUserId().equals(request.getRequesterId()))
                 .forEach(p -> notifier.notify(p.getUserId(), type, title, body,
                         ServiceRequestTypes.pageFor(request.getType())));
     }

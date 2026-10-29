@@ -8,12 +8,6 @@ const months = (v) => (text(v) ? `${text(v)} months` : '');
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const list = (v) => (Array.isArray(v) ? v.map(obj) : []);
 const area = (value, unit) => (text(value) ? `${text(value)} ${text(unit) || 'sqft'}` : '');
-const propertyAttributes = (prop) => {
-  const hasRows = Array.isArray(prop.propertyAttributes);
-  const rows = hasRows ? list(prop.propertyAttributes) : [];
-  const source = hasRows || !text(prop.surveyNo) ? rows : [{ kind: 'Survey No.', number: prop.surveyNo }];
-  return source.map((row) => [text(row.kind), text(row.number)].filter(Boolean).join(' ')).filter(Boolean).join('\n');
-};
 const VISIT_AT = { property: 'At the rented flat', licensor: "At the licensor's address", licensee: "At the licensee's address" };
 const RESIDENCY = { resident: 'Resident / Aadhaar e-registration', nri: 'NRI / no Aadhaar — SRO route', foreign: 'Foreign national — SRO route' };
 const CAPACITY = { owner: 'Owner', 'co-owner': 'Co-owner', poa: 'Power of attorney holder' };
@@ -36,10 +30,10 @@ const poa = (p) => (text(p.poaRegNo)
   : '');
 
 const licensor = (p, k) => [
-  ['Mother\'s name', p[k.mother]], ['Date of birth', p[k.dob]], ['Alias', p[k.alias]], ['Age', p[k.age]], ['Capacity', CAPACITY[p.capacity] || p.capacity], ['Mobile', text(p[k.mobile])],
+  ['Date of birth', p[k.dob]], ['Age', p[k.age]], ['Capacity', CAPACITY[p.capacity] || p.capacity], ['Mobile', text(p[k.mobile])],
   ['Residency', RESIDENCY[p.residency] || 'Resident / Aadhaar e-registration'], ['Passport', maskId(p.passport)],
   ['SRO route', p.residency === 'nri' || p.residency === 'foreign' ? 'Yes — staff appointment required' : ''],
-  ['Address', p[k.addr]], ['Power of attorney', poa(p)],
+  ['Power of attorney', poa(p)],
 ];
 
 const policeAddress = (row, same, fallback) => (same ? fallback : [text(row.address), text(row.pincode), text(row.village), text(row.policeStation)].filter(Boolean).join(', '));
@@ -71,45 +65,45 @@ export function deedGroups(details) {
   const terms = obj(state.terms);
   const owner = obj(state.owner);
   const wit = obj(state.wit);
-  const flatArea = text(prop.area) ? `${text(prop.area)} ${text(prop.areaUnit) || 'sqft'} ${text(prop.areaBasis)}`.trim() : '';
+  const flatArea = area(prop.area, prop.areaUnit);
   const increment = text(terms.increment) ? `${text(terms.increment)}% every ${text(terms.incrementEvery) || 11} months` : '';
   const furniture = list(state.furnItems).map((f) => text(f.name) + (Number(f.qty) > 1 ? ` ×${f.qty}` : '')).filter(Boolean).join(', ');
   return [
     group('property', 'property', 'Property', [
-      ['Type', prop.propType], ['Furnishing', prop.furnish], ['Flat', prop.flatNo], ['Society / building', prop.society],
-      ['Locality', prop.locality], ['City', prop.city], ['Taluka', prop.taluka], ['Village / city', prop.villageCity],
-      ['Road', prop.roadName], ['Police station', prop.policeStation], ['Pincode', prop.pincode], ['Area', flatArea],
-      ['Floor', prop.floor], ['Property attributes', propertyAttributes(prop)], ['Gallery / balcony area', area(prop.galleryArea, prop.galleryAreaUnit)], ['Registration area', state.regArea],
+      ['Type', prop.propType], ['Flat', prop.flatNo], ['Society / building', prop.society],
+      ['Locality', prop.locality], ['City', prop.city], ['Taluka', prop.taluka],
+      ['Landmark', prop.landmark], ['Police station', prop.policeStation],
+      ['Pincode', prop.pincode], ['Area', flatArea],
+      ['Road vicinity', prop.roadVicinity], ['Road type', prop.roadType],
+      ['Floor', prop.floor], ['Registration area', state.regArea],
     ]),
     group('terms', 'terms', 'Terms', [
       ['Rent', inr(terms.rent)], ['Refundable deposit', inr(terms.deposit)], ['Deposit paid by', depositPayments(terms.depositPayments, terms.deposit)], ['Term', months(terms.months)], ['Start date', terms.startDate],
       ['Non-refundable deposit', inr(terms.nrDeposit)], ['Escalation', increment], ['Lock-in', months(terms.lockin)],
-      ['Notice', months(terms.notice)], ['Rent due by day', terms.dueDay], ['Payment mode', terms.payMode],
-      ['Maintenance paid by', state.maint], ['Utilities paid by', terms.utilitiesBy], ['Property tax paid by', terms.taxBy],
-      ['Registration cost borne by', terms.costBy], ['Parking', [terms.parking, area(terms.parkingArea, terms.parkingAreaUnit)].map(text).filter(Boolean).join(' · ')], ['Occupants', terms.occupants],
+      ['Maintenance paid by', state.maint],
+      ['Registration cost borne by', terms.costBy], ['Parking', [terms.parking, area(terms.parkingArea, terms.parkingAreaUnit)].map(text).filter(Boolean).join(' · ')],
       ['Furniture & fittings', furniture], ['Extra clauses', state.clauses], ['Deed language', terms.language],
     ]),
     group('visit', 'visit', 'Biometric visit', [
       ['Where', VISIT_AT[text(terms.visitAt)] || terms.visitAt], ['Preferred date', terms.visitDate],
       ['Preferred time', terms.visitSlot === 'any' ? '' : terms.visitSlot],
     ]),
-    group('licensor-0', 'licensor', 'Licensor 1', licensor(owner, { mother: 'oMother', dob: 'oDob', alias: 'oAlias', age: 'oAge', addr: 'oAddr', mobile: 'oMobile' }), owner.oName),
+    group('licensor-0', 'licensor', 'Licensor 1', licensor(owner, { dob: 'oDob', age: 'oAge', mobile: 'oMobile' }), owner.oName),
     ...list(state.coOwners).map((c, i) => group(`licensor-${i + 1}`, 'licensor', `Licensor ${i + 2}`,
-      licensor(c, { mother: 'mother', dob: 'dob', alias: 'alias', age: 'age', addr: 'addr', mobile: 'mobile' }), c.name)),
+      licensor(c, { dob: 'dob', age: 'age', mobile: 'mobile' }), c.name)),
     ...list(state.tenants).map((t, i) => group(`tenant-${i}`, 'licensee', `Licensee ${i + 1}`, [
-      ['Mother\'s name', t.mother], ['Date of birth', t.dob], ['Alias', t.alias], ['Age', t.age], ['Occupation', t.occupation], ['Mobile', text(t.mobile)],
+      ['Date of birth', t.dob], ['Age', t.age], ['Occupation', t.occupation], ['Mobile', text(t.mobile)],
       ['Residency', RESIDENCY[t.residency] || 'Resident / Aadhaar e-registration'], ['Passport', maskId(t.passport)],
       ['SRO route', t.residency === 'nri' || t.residency === 'foreign' ? 'Yes — staff appointment required' : ''],
-      ['Address', t.addr],
       ...policeRows(t),
     ], t.name)),
     ...[1, 2].map((n) => group(`witness-${n}`, 'witness', `Witness ${n}`, [
-      ['Age', wit[`w${n}Age`]], ['Mobile', text(wit[`w${n}Mobile`])], ['Address', wit[`w${n}Addr`]],
+      ['Age', wit[`w${n}Age`]], ['Mobile', text(wit[`w${n}Mobile`])],
     ], wit[`w${n}Name`])),
   ].filter((g) => g.rows.length || g.name);
 }
 
-const WIDE = new Set(['Address', 'Permanent address', 'Previous address', 'Workplace address', 'Family / co-occupants', 'Power of attorney', 'Residency', 'Extra clauses', 'Furniture & fittings', 'Where', 'Deposit paid by', 'Property attributes']);
+const WIDE = new Set(['Address', 'Permanent address', 'Previous address', 'Workplace address', 'Family / co-occupants', 'Power of attorney', 'Residency', 'Extra clauses', 'Furniture & fittings', 'Where', 'Deposit paid by']);
 
 export function Fields({ rows }) {
   return (

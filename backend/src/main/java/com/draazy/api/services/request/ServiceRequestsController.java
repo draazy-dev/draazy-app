@@ -68,15 +68,6 @@ public class ServiceRequestsController {
     private static final String OPS_MAY_SEE_THE_QUEUE =
             "!" + BACK_OFFICE + " or (" + QUEUE_READ + ")";
 
-    // Ops-only routes: the desk's own reads and writes, where there is no second audience.
-    private static final String SERVICES_READ =
-            "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "') and "
-                    + BackOfficePermissions.REQUIRE_SERVICES_READ;
-
-    private static final String SERVICES_WRITE =
-            "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "') and "
-                    + BackOfficePermissions.REQUIRE_SERVICES_WRITE;
-
     public ServiceRequestsController(ServiceRequestService service,
             ServiceRequestStaffTransitions staffTransitions,
             ServiceRequestIdentityService identities,
@@ -195,7 +186,7 @@ public class ServiceRequestsController {
     }
 
     @PutMapping(Routes.ServiceRequests.CHECKLIST_ITEM)
-    @PreAuthorize(SERVICES_WRITE)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_WRITE)
     public ServiceRequestChecklistDto reviewDocument(@CurrentUser AuthPrincipal principal,
             @PathVariable String id, @PathVariable String category,
             @Valid @RequestBody DocumentReviewRequest body) {
@@ -208,7 +199,7 @@ public class ServiceRequestsController {
     }
 
     @PatchMapping(Routes.ServiceRequests.STATUS)
-    @PreAuthorize(SERVICES_WRITE)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_WRITE)
     public ServiceRequestDto updateStatus(@CurrentUser AuthPrincipal principal,
             @PathVariable String id, @Valid @RequestBody StatusRequest body) {
         return staffTransitions.updateStatus(principal, id, body.status(), body.note());
@@ -246,7 +237,7 @@ public class ServiceRequestsController {
     }
 
     @GetMapping(Routes.ServiceRequests.IDENTITIES)
-    @PreAuthorize(SERVICES_READ)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_READ)
     public List<ServiceRequestIdentityDto> getIdentities(@CurrentUser AuthPrincipal principal,
             @PathVariable String id) {
         return identities.forAssignee(principal, id);
@@ -260,7 +251,7 @@ public class ServiceRequestsController {
 
     @PostMapping(value = Routes.ServiceRequests.DRAFT,
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize(SERVICES_WRITE)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_WRITE)
     public ServiceRequestDto shareDraft(@CurrentUser AuthPrincipal principal, @PathVariable String id,
             @RequestParam(value = "note", required = false) String note,
             @RequestParam(value = "checks", required = false) List<String> checks,
@@ -290,7 +281,7 @@ public class ServiceRequestsController {
 
     @PostMapping(value = Routes.ServiceRequests.FINAL_DOC,
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize(SERVICES_WRITE)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_WRITE)
     @ResponseStatus(HttpStatus.CREATED)
     public DocumentDto uploadFinalDoc(@CurrentUser AuthPrincipal principal, @PathVariable String id,
             @RequestParam("file") MultipartFile file, @ModelAttribute RegistrationParticulars registration) {

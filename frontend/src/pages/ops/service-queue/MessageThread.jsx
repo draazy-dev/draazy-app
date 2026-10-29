@@ -22,35 +22,37 @@ export default function MessageThread({ messages, onSend }) {
   };
 
   return (
-    <section className="rounded-2xl border border-white/10 p-4" aria-labelledby="service-thread-title">
+    <section className="rounded-xl border border-white/10 bg-black/10 p-4" aria-labelledby="service-thread-title">
       <h4 id="service-thread-title" className="text-sm font-semibold">Customer thread</h4>
       {messages?.length ? (
-        <ul className="mt-3 max-h-56 space-y-2 overflow-y-auto" aria-live="polite">
-          {messages.map((message) => (
-            <li key={message.id} className={classNames(
-              'rounded-xl p-3 text-sm',
-              message.from === 'staff' ? 'bg-sky-500/10 text-sky-50' : 'bg-white/5 text-gray-100',
-            )}>
-              <div className="mb-1 flex justify-between gap-3 text-xs text-gray-400">
-                <span>{message.from === 'staff' ? 'Desk' : 'Customer'}</span>
-                <span>{fmtAgo(message.at)}</span>
-              </div>
-              <p className="whitespace-pre-wrap">{message.text}</p>
-            </li>
-          ))}
+        <ul className="mt-3 flex max-h-80 flex-col gap-2 overflow-y-auto pr-1" aria-live="polite">
+          {messages.map((message) => {
+            const desk = message.from === 'staff';
+            return (
+              <li key={message.id} className={classNames('flex max-w-[85%] flex-col', desk ? 'items-end self-end' : 'items-start self-start')}>
+                <p className={classNames(
+                  'whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm',
+                  desk ? 'rounded-br-md bg-brand-teal/20 text-teal-50' : 'rounded-bl-md bg-white/10 text-gray-100',
+                )}>
+                  {message.text}
+                </p>
+                <span className="mt-0.5 px-1 text-[11px] text-gray-500">{desk ? 'Desk' : 'Customer'} · {fmtAgo(message.at)}</span>
+              </li>
+            );
+          })}
         </ul>
-      ) : <p className="mt-2 text-sm text-gray-500">No messages yet.</p>}
-      <form onSubmit={submit} className="mt-3 flex gap-2">
+      ) : <p className="mt-3 rounded-xl border border-dashed border-white/10 p-4 text-center text-sm text-gray-500">No messages yet. The customer sees replies in their tracker.</p>}
+      <form onSubmit={submit} className="mt-3 flex items-end gap-2 rounded-2xl border border-white/10 bg-white/5 p-1.5 focus-within:border-brand-teal/50">
         <label className="sr-only" htmlFor="service-thread-message">Reply to customer</label>
         <input
           id="service-thread-message"
           value={text}
           onChange={(event) => setText(event.target.value)}
           maxLength={4000}
-          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+          className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm outline-none"
           placeholder="Reply to the customer"
         />
-        <button type="submit" disabled={!text.trim() || sending} className="dz-btn dz-btn-primary disabled:opacity-40">
+        <button type="submit" disabled={!text.trim() || sending} className="dz-btn dz-btn-primary rounded-xl px-3 disabled:opacity-40">
           <Send className="h-4 w-4" aria-hidden="true" /> {sending ? 'Sending…' : 'Send'}
         </button>
       </form>

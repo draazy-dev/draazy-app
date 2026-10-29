@@ -437,8 +437,11 @@ test.describe('Ops → Drafting desk (live)', () => {
     const mineBefore = await countFor(page, 'mine');
     await page.getByPlaceholder('Name, mobile or request id').fill(request.id);
     await expect(page.getByTestId('ra-row')).toHaveCount(1);
-    await expect(page.getByTestId('ra-row').first().getByTestId('requester-mobile')).toContainText(request.mobile);
-    await page.getByTestId('ra-row').first().click();
+    const card = page.getByTestId('ra-row').first();
+    await expect(card.getByTestId('requester-mobile')).toContainText(request.mobile);
+    await expect(card.getByText('Unassigned', { exact: true })).toBeVisible();
+    await expect(card.getByText(/Step 1 of 7 · Paid/)).toBeVisible();
+    await card.click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('list', { name: 'Case stages' })).toBeVisible();
@@ -453,6 +456,7 @@ test.describe('Ops → Drafting desk (live)', () => {
     await page.getByRole('tab', { name: /My cases/ }).click();
     await expect(page).toHaveURL(/tab=mine/);
     await expect(page.getByTestId('ra-row')).toHaveCount(1);
+    await expect(page.getByTestId('ra-row').first().getByText('Yours', { exact: true })).toBeVisible();
 
     const context = await browser.newContext();
     const legalPage = await context.newPage();

@@ -687,6 +687,11 @@ public final class Routes {
         public static final String AMENDMENT_ACCEPT = AMENDMENTS + "/{amendmentId}/accept";
         public static final String AMENDMENT_WITHDRAW = AMENDMENTS + "/{amendmentId}/withdraw";
 
+        public static final String ATTENTION = BY_ID + "/attention";
+        public static final String ATTENTION_RESOLVE = ATTENTION + "/resolve";
+        public static final String DESK_DETAILS = BY_ID + "/desk-details";
+        public static final String DESK_IDENTITIES = BY_ID + "/desk-identities";
+
         public static final String REFUNDS = BY_ID + "/refunds";
         public static final String REFUND_APPROVE = REFUNDS + "/{refundId}/approve";
         public static final String REFUND_REJECT = REFUNDS + "/{refundId}/reject";

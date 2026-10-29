@@ -56,11 +56,12 @@ The list is paged at 20 rows. A failed load is shown as an error, not as an empt
 | `in-progress` | Status set to in-progress | Continue work |
 | `draft-shared` | **Share draft** succeeds | Customer reviews |
 | `changes-requested` | Customer rejects the draft | Revise or cancel |
+| `action-required` | **Send back for correction** | Owner or tenant fixes it; their **Done** returns it to `in-progress` |
 | `approved` | Customer approves the draft | Upload final or registered copy |
 | `completed` | Final document uploaded | Run registration and police checks if rental |
 | `cancelled` | Staff cancel with a reason | Terminal |
 
-Only `assigned`, `in-progress`, and `cancelled` are directly staff-settable. `draft-shared`, `approved`, `changes-requested`, and `completed` are created by draft upload, customer decision, and final upload.
+Only `assigned`, `in-progress`, and `cancelled` are directly staff-settable. `draft-shared`, `approved`, `changes-requested`, `action-required`, and `completed` are created by draft upload, customer decision, send-back, and final upload.
 
 ## Age and SLA targets
 
@@ -72,7 +73,7 @@ Rent agreements carry server SLA due dates:
 | `assigned` / `in-progress` | First draft within 48 hours |
 | `changes-requested` | Revision within 24 hours |
 | `approved` | Registration within 7 days |
-| `draft-shared` | Customer's turn; no desk timer |
+| `draft-shared` / `action-required` | Customer's turn; no desk timer |
 
 The **SLA** cell shows **Due in**, **Overdue by**, or **Customer's turn** from that SLA. It turns warning when two hours or less remain. Non-rental queues fall back to age colouring: amber after 24 hours and rose after 72 hours while not completed or cancelled.
 
@@ -82,8 +83,14 @@ The **SLA** cell shows **Due in**, **Overdue by**, or **Customer's turn** from t
 2. Use **Documents** to verify every required paper. If the checklist cannot load, retry before asking the customer for anything.
 3. Check **Overlap check**. If another paid agreement overlaps the same flat and months, confirm the old tenancy ended or this is a replacement before drafting.
 4. Use **Priced terms** only for rent, deposit, term, increment, or registration-area corrections. The customer must accept; any higher fee is paid before the draft goes out.
-5. Use **Parties' identity numbers → Reveal** (inside **Parties**) only when you hold the matter. Hide or close the modal when done; reads and refusals are audited.
+5. Use **ID numbers → Reveal** only when you hold the matter. Hide or close the modal when done; reads and refusals are audited.
 6. Share the draft only after the checklist is verified and no priced-term amendment is open.
+
+## Corrections
+
+- **Fix it yourself.** While you hold the case and no draft is out with the customer, every card under Licensor, Licensee, Witnesses, Property and Terms has **Edit**, including passport, visa/OCI and FRRO details. List rows (furniture, deposit payments, occupants) can be added and removed there. Saving tells the customer how many details changed, with your note. Rent, deposit, term, escalation and registration area go through **Priced terms**.
+- **Fix a PAN or Aadhaar.** Take the case first (admins too), then on **ID numbers**, **Reveal** and **Correct** on the party. Every party on the form is listed, even one whose numbers were never recorded. The customer is told an ID was corrected; the audit records who changed which party, never the number. Renaming a party on the form keeps their numbers.
+- **Send it back.** Only for what you cannot do yourself: a fresh copy of a paper, or an answer only the customer has. Use **Send back for correction** in the rail, pick the side, tick the papers to upload again and/or ask your question. They get an in-app notification (WhatsApp when the template is set) and an amber banner on their tracker with an upload for each paper. Only the side you asked can mark it **Done**, and only once every ticked paper is uploaded again; that returns the case to `in-progress`, with their reply in the thread. Review the new copies on the checklist as usual.
 
 ## Draft checks and customer decision
 

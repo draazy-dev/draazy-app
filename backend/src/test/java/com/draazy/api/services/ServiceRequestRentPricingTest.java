@@ -40,7 +40,13 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .content(terms(p, 32_000, 150_000, "11", "Municipal / Urban")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("awaiting-payment"))
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1000 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 918 + 1000 + 300))
+                .andExpect(jsonPath("$.charges.platformFee").value(PLATFORM_HALF))
+                .andExpect(jsonPath("$.charges.stampDuty").value(918))
+                .andExpect(jsonPath("$.charges.exactDutyInPaise").value(91_750))
+                .andExpect(jsonPath("$.charges.registration").value(1000))
+                .andExpect(jsonPath("$.charges.handling").value(300))
+                .andExpect(jsonPath("$.charges.referralCredit").value(false));
     }
 
     @Test
@@ -54,7 +60,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(located(p, "false", "Rural")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1000 + 1000 + 300))
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 918 + 1000 + 300))
                 .andExpect(jsonPath("$.details.regArea").value("Municipal / Urban"))
                 .andExpect(jsonPath("$.details._state.regArea").value("urban"));
     }
@@ -70,7 +76,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(located(p, "true", "Municipal / Urban")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1000 + 500 + 300))
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 918 + 500 + 300))
                 .andExpect(jsonPath("$.details.regArea").value("Rural"))
                 .andExpect(jsonPath("$.details._state.regArea").value("rural"));
     }
@@ -120,7 +126,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1000 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 918 + 1000 + 300));
     }
 
     @Test
@@ -138,7 +144,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1100 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1043 + 1000 + 300));
     }
 
     @Test
@@ -166,7 +172,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(terms(p, 32_000, 150_000, "", "Municipal / Urban")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1000 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 918 + 1000 + 300));
     }
 
     @Test
@@ -208,7 +214,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(escalated(p, "\"increment\":\"5\",\"incrementEvery\":\"12\"")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1200 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1175 + 1000 + 300));
     }
 
     @Test
@@ -222,7 +228,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(escalated(p, "\"increment\":\"5\"")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1200 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1178 + 1000 + 300));
     }
 
     @Test

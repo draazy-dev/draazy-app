@@ -52,6 +52,13 @@ class WhatsAppDecisionMessenger implements DecisionMessenger {
                 mobile, List.of(tenantName, place, link));
     }
 
+    @Override
+    public boolean sendServiceAttention(String mobile, String service) {
+        return send(DecisionMessenger.SERVICE_ATTENTION, "Service attention", "service-template-name",
+                props.serviceTemplateName(), props.serviceTemplateLang(), props.phoneNumberId(), mobile,
+                List.of(service));
+    }
+
     private boolean send(String operation, String what, String property, String template, String lang,
             String fromNumberId, String mobile, List<String> parameters) {
         if (isBlank(template) || isBlank(lang)) {

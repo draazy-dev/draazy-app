@@ -16,6 +16,7 @@ const MAP = {
   new: 'bg-sky-500/15 text-sky-300 border-sky-400/30',
   in_progress: 'bg-indigo-500/15 text-indigo-300 border-indigo-400/30',
   'in-progress': 'bg-indigo-500/15 text-indigo-300 border-indigo-400/30',
+  action_required: 'bg-amber-500/15 text-amber-300 border-amber-400/30',
   waiting: 'bg-amber-500/15 text-amber-300 border-amber-400/30',
   scheduled: 'bg-indigo-500/15 text-indigo-300 border-indigo-400/30',
   responded: 'bg-indigo-500/15 text-indigo-300 border-indigo-400/30',
@@ -44,6 +45,7 @@ const LABELS = {
   'under review': 'Under Review',
   in_progress: 'In Progress',
   'in-progress': 'In Progress',
+  action_required: 'Needs attention',
 };
 
 export default function Badge({ status, children, className }) {

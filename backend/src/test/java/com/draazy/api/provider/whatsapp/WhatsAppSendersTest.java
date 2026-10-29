@@ -42,17 +42,17 @@ class WhatsAppSendersTest {
 
     private static WhatsAppProperties props(String otpName, String otpLang, String idName, String idLang) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                otpName, otpLang, idName, idLang, null, null, null, null, null);
+                otpName, otpLang, idName, idLang, null, null, null, null, null, null, null);
     }
 
     private static WhatsAppProperties digestProps(String name, String lang) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                "login", "en_US", null, null, name, lang, null, null, null);
+                "login", "en_US", null, null, name, lang, null, null, null, null, null);
     }
 
     private static WhatsAppProperties noticeProps(String noticeNumberId) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                "login", "en_US", null, null, null, null, "notice", "en", noticeNumberId);
+                "login", "en_US", null, null, null, null, "notice", "en", noticeNumberId, null, null);
     }
 
     @SuppressWarnings("unchecked")
@@ -183,7 +183,7 @@ class WhatsAppSendersTest {
         when(optOuts.isOptedOut(MOBILE)).thenReturn(true);
         WhatsAppDecisionMessenger messenger = new WhatsAppDecisionMessenger(client,
                 new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                        "login", "en_US", "decision", "en", "waiting", "en_US", "notice", "en", null), calls, optOuts);
+                        "login", "en_US", "decision", "en", "waiting", "en_US", "notice", "en", null, null, null), calls, optOuts);
 
         assertThat(messenger.sendWaitingDigest(MOBILE, "3 requests")).isFalse();
         assertThat(messenger.sendOwnerNotice(MOBILE, "Asha", "Baner", "https://draazy.test/owner-confirm#t")).isFalse();

@@ -36,6 +36,7 @@ public class ServiceRequestQueryService {
             ServiceRequestStatus.ASSIGNED,
             ServiceRequestStatus.IN_PROGRESS,
             ServiceRequestStatus.DRAFT_SHARED,
+            ServiceRequestStatus.ACTION_REQUIRED,
             ServiceRequestStatus.CHANGES_REQUESTED,
             ServiceRequestStatus.APPROVED);
 
@@ -119,7 +120,8 @@ public class ServiceRequestQueryService {
                 count(byStatus, ServiceRequestStatus.NEW),
                 mine,
                 sum(byStatus, IN_PROGRESS_STATUSES),
-                count(byStatus, ServiceRequestStatus.DRAFT_SHARED),
+                count(byStatus, ServiceRequestStatus.DRAFT_SHARED)
+                        + count(byStatus, ServiceRequestStatus.ACTION_REQUIRED),
                 count(byStatus, ServiceRequestStatus.COMPLETED)
                         + count(byStatus, ServiceRequestStatus.CANCELLED),
                 overdue,

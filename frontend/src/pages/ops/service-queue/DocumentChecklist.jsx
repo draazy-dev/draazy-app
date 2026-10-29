@@ -3,7 +3,7 @@ import { Check, ExternalLink, Minus, ShieldAlert, X } from 'lucide-react';
 import { reviewServiceRequestDocument } from '../../../services/serviceRequestService.js';
 import { classNames, fmtNum } from '../../../lib/format.js';
 
-const REVIEWABLE = new Set(['docs_review', 'draft_shared', 'changes_requested', 'approved']);
+const REVIEWABLE = new Set(['docs_review', 'draft_shared', 'changes_requested', 'action_required', 'approved']);
 const REASON_MAX = 300;
 
 const STATE_LABEL = { verified: 'verified', rejected: 'rejected', pending: 'received, not yet verified' };

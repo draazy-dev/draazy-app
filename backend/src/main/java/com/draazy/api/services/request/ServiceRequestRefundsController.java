@@ -2,9 +2,7 @@ package com.draazy.api.services.request;
 
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
-import com.draazy.api.security.BackOfficePermissions;
 import com.draazy.api.security.CurrentUser;
-import com.draazy.api.security.Roles;
 import com.draazy.api.services.request.ServiceRequestRefunds.RefundSummaryDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -23,10 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class ServiceRequestRefundsController {
 
-    private static final String OPS = "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "') and ";
-    private static final String SERVICES_READ = OPS + BackOfficePermissions.REQUIRE_SERVICES_READ;
-    private static final String SERVICES_WRITE = OPS + BackOfficePermissions.REQUIRE_SERVICES_WRITE;
-
     private final ServiceRequestRefunds refunds;
 
     public ServiceRequestRefundsController(ServiceRequestRefunds refunds) {
@@ -34,14 +28,14 @@ public class ServiceRequestRefundsController {
     }
 
     @GetMapping(Routes.ServiceRequests.REFUNDS)
-    @PreAuthorize(SERVICES_READ)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_READ)
     public RefundSummaryDto getServiceRequestRefunds(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         return refunds.summary(principal, id);
     }
 
     @PostMapping(Routes.ServiceRequests.REFUNDS)
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize(SERVICES_WRITE)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_WRITE)
     public RefundSummaryDto requestServiceRequestRefund(@CurrentUser AuthPrincipal principal,
             @PathVariable String id, @Valid @RequestBody RefundRequest body) {
         return refunds.request(principal, id, body.amount(), Boolean.TRUE.equals(body.dutyPaid()), body.grn(),
@@ -49,14 +43,14 @@ public class ServiceRequestRefundsController {
     }
 
     @PostMapping(Routes.ServiceRequests.REFUND_APPROVE)
-    @PreAuthorize(SERVICES_WRITE)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_WRITE)
     public RefundSummaryDto approveServiceRequestRefund(@CurrentUser AuthPrincipal principal,
             @PathVariable String id, @PathVariable String refundId, @RequestBody(required = false) Decision body) {
         return refunds.approve(principal, id, refundId, body == null ? null : body.note());
     }
 
     @PostMapping(Routes.ServiceRequests.REFUND_REJECT)
-    @PreAuthorize(SERVICES_WRITE)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_WRITE)
     public RefundSummaryDto rejectServiceRequestRefund(@CurrentUser AuthPrincipal principal,
             @PathVariable String id, @PathVariable String refundId, @RequestBody(required = false) Decision body) {
         return refunds.reject(principal, id, refundId, body == null ? null : body.note());

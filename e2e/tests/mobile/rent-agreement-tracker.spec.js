@@ -58,6 +58,16 @@ test.describe('Rent agreement tracker on a phone', () => {
     expect(errors).toEqual([]);
   });
 
+  test('the hero starts with the breadcrumb, not a blank band', async ({ page }) => {
+    await seedConsent(page);
+    await page.goto('/services/rent-agreement');
+    const hero = page.locator('section.hero');
+    const crumbs = hero.getByRole('navigation').first();
+    await expect(crumbs).toBeVisible();
+    const gap = await crumbs.evaluate((el) => el.getBoundingClientRect().top - el.closest('section').getBoundingClientRect().top);
+    expect(gap).toBeLessThanOrEqual(24);
+  });
+
   test('the wizard actions sit in flow at the end of the form, and Ask Draaz does not cover Next', async ({ page }) => {
     await seedConsent(page);
     await signedInAsNew(page);

@@ -56,8 +56,11 @@ public class ServiceRequest extends VersionedEntity {
     @Column(name = "referral_credit", nullable = false)
     private boolean referralCredit;
 
-    protected ServiceRequest() {
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "attention")
+    private Map<String, Object> attention;
 
+    protected ServiceRequest() {
     }
 
     public ServiceRequest(UUID requesterId, String type, UUID propertyId,
@@ -72,6 +75,10 @@ public class ServiceRequest extends VersionedEntity {
 
     void replaceDetails(Map<String, Object> details) {
         this.details = details;
+    }
+
+    void askAttention(Map<String, Object> attention) {
+        this.attention = attention;
     }
 
     void charge(long extra) {
@@ -99,5 +106,8 @@ public class ServiceRequest extends VersionedEntity {
     void moveTo(ServiceRequestStatus status) {
         this.status = status;
         this.statusChangedAt = Instant.now();
+        if (status != ServiceRequestStatus.ACTION_REQUIRED) {
+            this.attention = null;
+        }
     }
 }

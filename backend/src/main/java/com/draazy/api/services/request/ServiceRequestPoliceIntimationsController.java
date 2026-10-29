@@ -2,9 +2,7 @@ package com.draazy.api.services.request;
 
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
-import com.draazy.api.security.BackOfficePermissions;
 import com.draazy.api.security.CurrentUser;
-import com.draazy.api.security.Roles;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
@@ -17,9 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class ServiceRequestPoliceIntimationsController {
 
-    private static final String OPS = "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "') and ";
-    private static final String SERVICES_WRITE = OPS + BackOfficePermissions.REQUIRE_SERVICES_WRITE;
-
     private final ServiceRequestPoliceIntimations intimations;
 
     public ServiceRequestPoliceIntimationsController(ServiceRequestPoliceIntimations intimations) {
@@ -27,7 +22,7 @@ public class ServiceRequestPoliceIntimationsController {
     }
 
     @PostMapping(Routes.ServiceRequests.POLICE_INTIMATION)
-    @PreAuthorize(SERVICES_WRITE)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_WRITE)
     public ServiceRequestDto confirmServiceRequestPoliceIntimation(@CurrentUser AuthPrincipal principal,
             @PathVariable String id, @Valid @RequestBody(required = false) ConfirmPoliceIntimation body) {
         return intimations.confirm(principal, id, body == null ? null : body.reference(),

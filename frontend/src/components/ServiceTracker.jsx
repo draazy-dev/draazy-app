@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { STEPS, stepStates, statusMeta, isActive, progressPct } from '../lib/serviceRequestStatus.js';
 import {
-  listServiceRequests, decideServiceRequestDraft, approveServiceRequestDraftParty, addServiceRequestMessage, markServiceRequestRead, markServiceRequestDraftOpened,
+  listServiceRequests, decideServiceRequestDraft, approveServiceRequestDraftParty, markServiceRequestRead, markServiceRequestDraftOpened,
   getServiceRequestDocumentUrl,
 } from '../services/serviceRequestService.js';
 import { openDocFrom } from '../lib/openDoc.js';
@@ -13,11 +13,13 @@ import { timeAgo } from '../lib/format.js';
 import useScrollLock from '../hooks/useScrollLock.js';
 import RejectedPapers from './RejectedPapers.jsx';
 import RevisedTerms from './RevisedTerms.jsx';
+import AttentionNeeded from './AttentionNeeded.jsx';
+import TrackerChat from './TrackerChat.jsx';
 import IdentityRefill, { needsIdentityRefill } from './IdentityRefill.jsx';
 
 const openRequestFile = (requestId, docId) => openDocFrom(() => getServiceRequestDocumentUrl(requestId, docId));
 
-const REUPLOADABLE = new Set(['docs_review', 'draft_shared', 'changes_requested', 'approved']);
+const REUPLOADABLE = new Set(['docs_review', 'draft_shared', 'changes_requested', 'action_required', 'approved']);
 const rank = (r) => (r.status === 'cancelled' ? 2 : isActive(r.status) ? 0 : 1);
 const hasForeignTenant = (request) => {
   const tenants = request.details?._state?.tenants;
@@ -95,7 +97,6 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
   const mobile = user?.mobile || '';
   const [tick, setTick] = useState(0);
   const [openId, setOpenId] = useState(null);
-  const [msg, setMsg] = useState('');
   const [changeReq, setChangeReq] = useState(null);
   const [changeNote, setChangeNote] = useState('');
   const [otpDraft, setOtpDraft] = useState({});
@@ -170,14 +171,6 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
       toast('Change request sent to our team.', 'success');
     } catch (e) { console.warn('[service-tracker] request-changes failed', e); toast('Could not send the change request. Please try again.', 'error'); }
   };
-  const send = async (r) => {
-    if (!msg.trim()) return;
-    try {
-      await addServiceRequestMessage(r.id, msg);
-      setMsg('');
-      refresh();
-    } catch (e) { console.warn('[service-tracker] send message failed', e); toast('Message could not be sent. Please try again.', 'error'); }
-  };
   const openThread = async (r) => {
     setOpenId((current) => (current === r.id ? null : r.id));
     try {
@@ -212,7 +205,9 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
         ) : (
           <div className="space-y-4">
             {shown.map((r) => {
-              const m = statusMeta(r.status);
+              const m = r.status === 'action_required' && r.attention && !r.attention.forYou
+                ? { ...statusMeta('awaiting_party'), label: `Waiting on the ${r.attention.party}` }
+                : statusMeta(r.status);
               const unreadStaff = (r.messages || []).filter((x) => x.from === 'staff' && !x.read).length;
               return (
                 <div key={r.id} className="rounded-xl border border-white/10 border-l-4 bg-white/[0.03] p-4" style={{ borderLeftColor: m.color }}>
@@ -224,6 +219,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
                   <p className="text-gray-500 text-xs mt-0.5 mb-3">{r.service} · Ref {r.id.slice(0, 10)}</p>
                   <Progress status={r.status} />
 
+                  {r.status === 'action_required' && r.attention ? <AttentionNeeded request={r} onChanged={refresh} /> : null}
                   {r.type === 'rental' && REUPLOADABLE.has(r.status) ? <RejectedPapers requestId={r.id} onUploaded={refresh} /> : null}
                   {r.type === 'rental' && r.amendment ? <RevisedTerms request={r} onChanged={refresh} /> : null}
                   {r.type === 'rental' && isActive(r.status) && needsIdentityRefill(r) ? <IdentityRefill request={r} viewerMobile={mobile} onSaved={refresh} /> : null}
@@ -277,23 +273,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
                   );
                   })()}
 
-                  {openId === r.id ? (
-                    <div className="mt-3 rounded-xl border border-white/8 bg-black/20 p-3">
-                      <div className="space-y-2 max-h-56 overflow-y-auto mb-2">
-                        {(r.messages || []).map((x, i) => (
-                          <div key={x.id || i} className={'flex ' + (x.from === 'user' ? 'justify-end' : 'justify-start')}>
-                            <div className={'max-w-[80%] rounded-2xl px-3 py-1.5 text-xs ' + (x.from === 'user' ? 'bg-brand-teal/20 text-teal-100' : 'bg-white/8 text-gray-200')}>{x.text}</div>
-                          </div>
-                        ))}
-                      </div>
-                      {isActive(r.status) ? (
-                        <div className="flex items-center gap-2">
-                          <input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(r); }} aria-label="Message our team" placeholder="Message our team…" className="flex-1 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs text-white outline-none focus:border-teal-400/50" />
-                          <button onClick={() => send(r)} className="btn-teal px-3 py-2 rounded-lg text-xs font-semibold">Send</button>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
+                  {openId === r.id ? <TrackerChat request={r} open={isActive(r.status)} onSent={refresh} /> : null}
                 </div>
               );
             })}

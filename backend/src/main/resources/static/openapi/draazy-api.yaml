@@ -9,39 +9,9 @@ info:
 
     **This specification is the single source of truth for the Draazy HTTP API.**
     Endpoints, request/response shapes, and enums are defined here and nowhere else.
-    Companion docs describe *behaviour and data*, not the wire contract:
-      - `docs/system/data-model.md`     — ER map / DB persistence design (field shapes are the schemas below)
-      - `docs/system/cross-cutting.md`  — auth, contact gate, maker-checker, audit rules
-      - `docs/system/platform-architecture.md` — component/vendor decisions & ADRs (KYC, payments, verification posture)
-      - `docs/system/package-structure.md` — the 11 bounded contexts and their package/schema mapping
-      - `docs/flows/**`                 — per-feature behavioural specs
 
     `x-roles` follows the server's role hierarchy (admin > manager > staff): a route listing `staff`
     also admits managers and admins.
-
-    ### Changelog
-    - 1.3.0 — **Flatmates re-modelled around seeker intent.** The flatmates/rooms/groups triple is
-      replaced by two feeds, `move-in` and `team-up` (`FlatmateTab`; the old values survive as
-      deprecated read aliases). `FlatmatePost` is renamed `FlatmateSeekerPost` and re-shaped to what
-      a seeker actually posts; `FlatmateRoom`, `FlatmateGroup`, `FlatmateRequest`, `FlatmateReview`,
-      `GroupApplication`, `AgreementDoc`, `FlatmateAlertCriteria` and `HostEligibility` are new.
-      New supply model: `RoomKind`, `PriceBasis` (per-room vs per-person rent), `Occupancy` and the
-      flat occupancy ledger, plus the owner **flat split** (`POST|DELETE /properties/{id}/split`).
-      Room enquiries carry a `ShareIntent`. The flatmates "Verified" pill is the **same** identity
-      L2 badge as the rest of the app (ADR-009a), not a separate seeker OTP. `SavedSearch` gains
-      `kind`/`criteria`/`label`/`mobile` and an `sms` channel for flatmate alerts. Moderation adds
-      the ops flatmate-verification queue and the admin flatmate/group-application desks.
-    - 1.2.0 — **Verification is a badge, not a gate** (ADR-019): browsing and contacting
-      owners require only a signed-in mobile-OTP account (L1); identity verification is an
-      **opt-in "Verified" badge** (L2) and is hard-required only at the deal step (L3).
-      The badge is earned by submitting live-captured photos of a government ID and a selfie
-      (`/me/verification/identity`) that staff review in `/moderation/identity-reviews`;
-      dedup is a keyed `identity_hash` of the confirmed document number (ADR-009b). Contact
-      `403 verification_required` is returned **only** when the target owner opted into
-      "verified contact only".
-    - 1.1.0 — Reconciled the role model to the canonical `buyer/owner/staff/admin`
-      set (`staff` scoped by `team`); aligned `Team` to the ops teams; made this
-      spec the sole API source of truth (retired the duplicate markdown catalogue).
 
     ## Conventions
     - Base path: `/api`
@@ -7045,7 +7015,11 @@ paths:
         licensee with slot any / morning / afternoon / evening and a preferred date from tomorrow
         to 90 days ahead, witness ages 18+, witness names when the witness section is filed on create,
         licensor capacity owner / co-owner / poa, POA registration fields, a distinct mobile per
-        party, at most 3 co-owners and 6 tenants, and well-formed emails) is a `422`.
+        party, at most 3 co-owners and 6 tenants, and well-formed emails) is a `422`. So is a
+        `_state.prop` with a present-but-blank `landmark|policeStation|roadVicinity|roadType`
+        (absent keys are tolerated on save; each is at most 80 characters). Older drafts may still send
+        `villageCity|roadName|propertyAttributes|galleryArea|constructionType|propertyAge|zone`; those are
+        no longer validated or required, since staff read them from the owner's Index II.
       requestBody:
         required: true
         content:
@@ -7382,13 +7356,15 @@ paths:
       summary: Record the parties' identity numbers (requester only)
       operationId: putServiceRequestIdentities
       description: >
-        The requester replaces all rows except roles owned by an accepted co-fill party; including
-        one of those roles is a `409` because the invited party records their own identity numbers.
+        The requester replaces the rows it sends and drops rows of parties no longer on the form; a
+        party it omits keeps its numbers, so an owner finishing a co-filled form need not retype them.
+        Sending a role owned by an accepted co-fill party is a `409` because the invited party records
+        their own identity numbers.
         An accepted co-fill party may write only their own side (a tenant invitee the `tenant` rows),
         and that write replaces only that role. `witness` rows are indexed 0 and 1. Duplicate
         role/index pairs, Aadhaar numbers or PANs are `422`; duplicate messages never echo the
-        number. No role annotation: the guard is participant identity -- staff and admin are refused,
-        because a desk that could write these could also invent them. Once retention has blanked the
+        number. No role annotation: the guard is participant identity -- staff and admin are refused
+        here and correct a mistyped number through `desk-identities`, which is audited. Once retention has blanked the
         numbers on a stalled open request (`identities.purged`), a co-fill party may refill their
         purged rows even after checkout opened, and while that purge is the latest identity event the
         requester's write adds `identities.recorded` to the timeline (D282).
@@ -7436,6 +7412,31 @@ paths:
           description: The request is unassigned, or assigned to somebody else
         '404':
           description: No such request
+  /service-requests/{id}/identities/masked:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    get:
+      tags: [Services & Support]
+      summary: Read the parties' identity numbers masked to the last four (parties only)
+      operationId: getServiceRequestMaskedIdentities
+      description: >
+        For the requester and accepted co-fill parties, so each side can check what the other
+        recorded without ever receiving a full number. Purged rows are omitted.
+      responses:
+        '200':
+          description: One row per recorded party
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    partyRole: { type: string, enum: [owner, tenant, witness] }
+                    partyIndex: { type: integer }
+                    pan: { type: [string, 'null'], example: XXXXXX234F }
+                    aadhaar: { type: [string, 'null'], example: XXXX XXXX 1234 }
+        '404':
+          description: No such request, or the caller is not a party to it
   /service-requests/{id}/draft:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -7647,15 +7648,19 @@ paths:
 
         **A rent agreement must be registrable first.** Every licensor (the owner plus each
         `_state.coOwners` entry) and every licensee (`_state.tenants`, at least one) needs an
-        identity row with an Aadhaar number for resident parties and a PAN card, Aadhaar card (or
-        passport scan for `_state.*.residency` `nri` / `foreign`) and photo filed under
-        `licensor-{i}-pan|aadhaar|passport|visa|photo` / `tenant-{j}-pan|aadhaar|passport|visa|photo`, plus
+        identity row with a PAN, whatever their residency (staff take Aadhaar in person at the
+        doorstep, so no Aadhaar number and no witness identity rows are needed); non-resident
+        parties (`_state.*.residency` `nri` / `foreign`) also need a passport scan
+        (`licensor-{i}-passport` / `tenant-{j}-passport`, plus `-visa` for `foreign`), each tenant
+        with a police record also needs `tenant-{j}-addressproof` / `-prevaddressproof` as applicable and
+        `tenant-{j}-workidproof` unless the occupation is student, homemaker or retired, plus
         `licensor-{i}-poa` where that licensor's `capacity` is `poa`; the flat needs
-        `ownership-proof`; both witnesses (`witness` 0 and 1) need an identity row; and no two
-        parties may share an Aadhaar number. Last, the deed's particulars must be stated: a monthly
+        `ownership-proof`; and no two parties may share a PAN. Last, the deed's particulars must be stated: a monthly
         rent above zero, `terms.startDate`, `prop.flatNo|society|locality|pincode|area`, a residential
-        `prop.propType`, every licensor's and licensee's name, age and address, and each witness's name,
-        age and address. Parties with `_state.*.type: entity` are out of the self-serve flow and are
+        `prop.propType`, the IGR property particulars
+        `prop.landmark|policeStation|roadVicinity|roadType`,
+        every licensor's and licensee's name and age, and each witness's name and
+        age. Parties with `_state.*.type: entity` are out of the self-serve flow and are
         refused here with the legal-desk quote message. Last, every `_state.tenants` entry must have confirmed through
         `confirmRentAgreementTenant` or be an accepted co-fill party's own number. Anything short is
         a `409` naming what is missing.
@@ -7675,7 +7680,7 @@ paths:
 
 
         **A rent agreement names the declaration its requester accepted.** `declaration` must be
-        the current version (`ra-decl-2026-09`) of the review step's authority-and-consent text; the
+        the current version (`ra-decl-2026-10`) of the review step's authority-and-consent text; the
         audit log keeps who accepted it, when, and a SHA-256 of the exact English wording. Checked after
         readiness, so an incomplete request still says what it is missing. Other request types ignore it.
       requestBody:
@@ -7699,8 +7704,8 @@ paths:
           description: >
             Not awaiting payment, an open order that can no longer be resumed, nothing payable, an invitation is still
             outstanding, no invited party has accepted, required rent-agreement documents are
-            missing (`Upload required documents before checkout: ...`), or required Aadhaar identity
-            rows are missing (`Record Aadhaar numbers before checkout: ...`), or the deed's
+            missing (`Upload required documents before checkout: ...`), or required PAN identity
+            rows are missing (`Record PAN numbers before checkout: ...`), or the deed's
             particulars are incomplete (`Complete the agreement before checkout: ...`), or a rent agreement's
             `declaration` is absent or not the current version (`Accept the declaration on the review step before checkout.`). All are "the request
             is not in a state where opening checkout means anything", which is what this file uses
@@ -7815,6 +7820,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceRequest' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           description: Not a rent agreement, not held by the caller, not in a drafting state, or an amendment is already open
@@ -7864,6 +7870,128 @@ paths:
           description: No such open amendment
         '409':
           description: Not held by the caller
+  /service-requests/{id}/attention:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Services & Support]
+      summary: Send a rent agreement back to the owner or tenant for a correction (staff)
+      description: >
+        The operator holding the request, while the desk is working it (assigned, in-progress or
+        changes-requested), moves it to action-required. The accepted parties on that side (else the
+        requester) get an in-app notification, and WhatsApp when they opted in. `papers` are checklist
+        ids on that side the customer must re-upload before handing it back; `reason` is the question,
+        required when no paper is ticked.
+      operationId: askServiceRequestAttention
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [party]
+              properties:
+                party: { type: string, enum: [owner, tenant] }
+                reason: { type: string, maxLength: 500 }
+                papers: { type: array, maxItems: 10, items: { type: string, maxLength: 64 } }
+      responses:
+        '200':
+          description: Sent back; the request carries `attention`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Not a rent agreement, not held by the caller (admins and managers may act on any), or not in a working state
+        '422':
+          description: Unknown party, a paper not on that side's checklist, neither a paper nor a reason, too many papers, or a reason over 500 characters
+  /service-requests/{id}/attention/resolve:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Services & Support]
+      summary: Hand a corrected rent agreement back to the desk (requester or accepted party)
+      operationId: resolveServiceRequestAttention
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Back in progress with the desk
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceRequest' }
+        '404':
+          description: No such request for this caller
+        '409':
+          description: The request is not waiting on the caller, or a requested paper has no new copy yet
+        '422':
+          description: The note is over 500 characters
+  /service-requests/{id}/desk-details:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    put:
+      tags: [Services & Support]
+      summary: Correct a rent agreement's form (staff)
+      description: >
+        The operator holding the request replaces its form state (`details._state`); the summary lines
+        are rebuilt from it and the customer is notified. Admins and managers may edit a request they do
+        not hold. A party renamed here keeps their recorded numbers under the new name. PAN and Aadhaar
+        numbers are refused with 400 (they go through `desk-identities`), and a change to a priced term is
+        refused with 409: propose it as an amendment so the customer accepts the new price.
+      operationId: editServiceRequestDetails
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state: { type: object, additionalProperties: true }
+                note: { type: string, maxLength: 300 }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceRequest' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Not a rent agreement, not held by the caller, not editable in its status, or a priced term changed
+        '422':
+          description: The form breaks a rent-agreement rule, or nothing changed
+  /service-requests/{id}/desk-identities:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    put:
+      tags: [Services & Support]
+      summary: Correct a party's PAN or Aadhaar (staff)
+      description: >
+        The operator holding a rent agreement replaces the numbers of the parties sent; other parties
+        keep theirs. Only the assignee may write, as only the assignee may read them; an admin or
+        manager assigns themselves first. Each party must be on the form (owner 0, a co-owner, a
+        tenant, or witness 0/1). The customers are notified; the audit row records the changed slots
+        (`tenant-0`), never the numbers.
+      operationId: correctServiceRequestIdentities
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceRequestIdentities' }
+      responses:
+        '204':
+          description: Saved. Empty, so the numbers are not echoed back.
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Not a rent agreement, not assigned to the caller, or not editable in its status
+        '422':
+          description: A malformed PAN or Aadhaar, a party not on the form, a PAN or Aadhaar repeated across parties, or nothing changed
   /service-requests/{id}/refunds:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     get:
@@ -16042,7 +16170,7 @@ components:
         id: { type: string }
         type: { type: string, example: rent-agreement }
         team: { $ref: '#/components/schemas/Team' }
-        status: { type: string, enum: [awaiting-payment, new, assigned, in-progress, draft-shared, changes-requested, approved, completed, cancelled] }
+        status: { type: string, enum: [awaiting-payment, new, assigned, in-progress, draft-shared, changes-requested, action-required, approved, completed, cancelled] }
         propertyId: { type: [string, 'null'] }
         ticketId: { type: [string, 'null'] }
         details: { type: ['object', 'null'], additionalProperties: true }
@@ -16078,6 +16206,39 @@ components:
           oneOf: [ { type: 'null' }, { $ref: '#/components/schemas/ServiceRequestAmendment' } ]
         draftApproval:
           oneOf: [ { type: 'null' }, { $ref: '#/components/schemas/ServiceRequestDraftApproval' } ]
+        charges:
+          description: >-
+            How `amount` splits for a priced rent agreement; null when the terms can't be priced.
+            `platformFee` is `amount` less the statutory lines, so the four lines sum to `amount`.
+          oneOf:
+            - { type: 'null' }
+            - type: object
+              properties:
+                platformFee: { type: integer, format: int64 }
+                stampDuty: { type: integer, format: int64, description: 'Whole rupees GRAS collects: 0.25% rounded to the nearest rupee as the IGR calculator does, never under ₹100.' }
+                exactDutyInPaise: { type: integer, format: int64, description: '0.25% of the consideration before the IGR rounding, in paise.' }
+                registration: { type: integer, format: int64 }
+                handling: { type: integer, format: int64 }
+                referralCredit: { type: boolean }
+        attention:
+          description: >-
+            Set only while the status is `action-required`: which side the desk sent the case back to,
+            why, and whether the viewer is one of the people asked.
+          oneOf:
+            - { type: 'null' }
+            - type: object
+              properties:
+                party: { type: string, enum: [owner, tenant] }
+                reason: { type: string }
+                papers:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      name: { type: string }
+                askedAt: { type: string, format: date-time }
+                forYou: { type: boolean }
     ServiceRequestQueueRow:
       type: object
       description: >-
@@ -16086,7 +16247,7 @@ components:
       properties:
         id: { type: string }
         type: { type: string, example: rent-agreement }
-        status: { type: string, enum: [awaiting-payment, new, assigned, in-progress, draft-shared, changes-requested, approved, completed, cancelled] }
+        status: { type: string, enum: [awaiting-payment, new, assigned, in-progress, draft-shared, changes-requested, action-required, approved, completed, cancelled] }
         details:
           type: ['object', 'null']
           additionalProperties: true
@@ -16287,7 +16448,7 @@ components:
             answer is a 422 once a rent is stated. Rent-agreement
             `_state.owner`, `_state.coOwners[]` and `_state.tenants[]` may carry `type`
             (`individual` or `entity`) and `residency` (`resident`, `nri`, `foreign`); non-resident
-            parties use `passport` instead of Aadhaar, and foreign nationals also carry `visaOci`
+            parties use `passport` as their identity paper, and foreign nationals also carry `visaOci`
             plus optional `frro` for the SRO route.
         ticketId: { type: string }
     CoFillServiceRequestCreate:

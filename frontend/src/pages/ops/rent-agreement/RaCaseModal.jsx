@@ -19,6 +19,7 @@ import PartyIdentities from '../service-queue/PartyIdentities.jsx';
 import PoliceIntimation from '../service-queue/PoliceIntimation.jsx';
 import Refunds from '../service-queue/Refunds.jsx';
 import RegistrationCheck from '../service-queue/RegistrationCheck.jsx';
+import SendBackForCorrection from '../service-queue/SendBackForCorrection.jsx';
 import StaffWorkflowActions from '../service-queue/StaffWorkflowActions.jsx';
 import { fmtAgo } from '../service-queue/helpers.js';
 import CaseParticulars from './CaseParticulars.jsx';
@@ -26,7 +27,8 @@ import { STAGES, caseSummary, nextStep, stagesDone } from './stages.js';
 
 const card = 'rounded-xl border border-white/10 bg-black/10 p-4';
 const CLOSED = new Set(['completed', 'cancelled']);
-const PRE_DRAFT = new Set(['submitted', 'docs_review', 'changes_requested']);
+const PRE_DRAFT = new Set(['submitted', 'docs_review', 'changes_requested', 'action_required']);
+const DESK_EDITABLE = new Set(['docs_review', 'changes_requested', 'action_required']);
 const NEXT_TONE = {
   desk: 'border-brand-teal/40 bg-brand-teal/10 text-teal-100',
   customer: 'border-white/10 bg-white/5 text-gray-300',
@@ -91,6 +93,7 @@ function CaseView({ initial, onChanged }) {
 
   const s = caseSummary(detail.details);
   const done = stagesDone(detail, checklist);
+  const deskEditable = !!detail.assignedToMe && DESK_EDITABLE.has(detail.status);
   const next = nextStep(detail, checklistStatus === 'ready' ? checklist : null);
   const closed = CLOSED.has(detail.status);
   const toastError = (message) => toast(message, 'error');
@@ -175,36 +178,29 @@ function CaseView({ initial, onChanged }) {
           onChecklist={setChecklist}
           onError={toastError}
           onUnavailable={docUnavailable}
+          editable={deskEditable}
+          onSaved={applyUpdate}
+          append={{
+            property: PRE_DRAFT.has(detail.status) ? <OverlapCheck key={`overlap-${detail.id}`} request={detail} /> : null,
+            terms: <AmendTerms key={`amend-${detail.id}`} request={detail} onUpdated={applyUpdate} />,
+          }}
+          tabs={[
+            { id: 'messages', title: 'Messages', count: detail.messages?.length, countLabel: 'messages', body: <MessageThread messages={detail.messages} onSend={sendMessage} /> },
+            detail.amount > 0 ? {
+              id: 'payment', title: 'Payment',
+              body: <><PaymentCard request={detail} /><Refunds key={`refunds-${detail.id}`} request={detail} /></>,
+            } : null,
+            detail.timeline?.length ? { id: 'activity', title: 'Activity', body: <Timeline events={detail.timeline} /> } : null,
+          ]}
         >
-          <PartyIdentities key={`${detail.id}:${detail.assignedTo || ''}:${closed}`} requestId={detail.id} className={card} />
+          <PartyIdentities
+            key={`${detail.id}:${detail.assignedTo || ''}:${closed}`}
+            requestId={detail.id}
+            state={detail.details?._state}
+            editable={deskEditable}
+            className={card}
+          />
         </CaseParticulars>
-
-        {PRE_DRAFT.has(detail.status) ? <OverlapCheck key={`overlap-${detail.id}`} request={detail} /> : null}
-
-        {detail.draft ? <DraftStatus request={detail} /> : null}
-
-        {detail.status === 'completed' ? (
-          <RegistrationCheck key={`reg-${detail.id}`} request={detail} onError={toastError} onUnavailable={docUnavailable} />
-        ) : null}
-
-        <AmendTerms key={`amend-${detail.id}`} request={detail} onUpdated={applyUpdate} />
-        {detail.amount > 0 ? <Refunds key={`refunds-${detail.id}`} request={detail} /> : null}
-
-        <MessageThread messages={detail.messages} onSend={sendMessage} />
-
-        {detail.timeline?.length ? (
-          <details className={card}>
-            <summary className="cursor-pointer text-sm font-semibold">Timeline ({detail.timeline.length})</summary>
-            <ul className="mt-2 space-y-1 text-sm">
-              {detail.timeline.map((e, i) => (
-                <li key={`${e.stage}-${i}`} className="flex justify-between gap-2 border-b border-white/5 py-1 last:border-0">
-                  <span className="text-gray-300">{e.stage}</span>
-                  <span className="text-xs text-gray-500">{e.by || '—'} · {fmtAgo(e.at)}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : null}
       </div>
 
       <aside className="space-y-4 lg:sticky lg:top-0 lg:self-start">
@@ -223,10 +219,17 @@ function CaseView({ initial, onChanged }) {
           ) : null}
         </div>
 
+        {detail.draft ? <DraftStatus request={detail} /> : null}
+
         <StaffWorkflowActions request={detail} onShareDraft={shareDraft} onUploadFinal={uploadFinal} />
 
+        <SendBackForCorrection key={`attention-${detail.id}`} request={detail} checklist={checklist} onUpdated={applyUpdate} />
+
         {detail.status === 'completed' ? (
-          <PoliceIntimation key={`police-${detail.id}`} request={detail} onUpdated={applyUpdate} onError={toastError} />
+          <>
+            <RegistrationCheck key={`reg-${detail.id}`} request={detail} onError={toastError} onUnavailable={docUnavailable} />
+            <PoliceIntimation key={`police-${detail.id}`} request={detail} onUpdated={applyUpdate} onError={toastError} />
+          </>
         ) : null}
 
         <div className={card}>
@@ -273,5 +276,43 @@ function DraftStatus({ request }) {
         </ul>
       ) : null}
     </section>
+  );
+}
+
+function PaymentCard({ request }) {
+  const c = request.charges;
+  const rows = c ? [
+    ['Stamp duty', c.stampDuty],
+    ['Registration fee', c.registration],
+    ['Government handling', c.handling],
+    ['Service fee', c.platformFee],
+  ] : [];
+  return (
+    <section className={card} aria-label="Payment">
+      <h4 className="text-sm font-semibold">Paid {fmtINR(request.amount)}</h4>
+      {rows.length ? (
+        <dl className="mt-2 space-y-1 text-sm">
+          {rows.map(([l, v]) => (
+            <div key={l} className="flex justify-between gap-2">
+              <dt className="text-gray-400">{l}</dt>
+              <dd className="text-gray-200">{l === 'Service fee' && c.referralCredit && !v ? 'Waived (referral)' : fmtINR(v)}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </section>
+  );
+}
+
+function Timeline({ events }) {
+  return (
+    <ol className={classNames(card, 'space-y-0')} aria-label="Timeline">
+      {events.map((e, i) => (
+        <li key={`${e.stage}-${i}`} className="flex justify-between gap-2 border-b border-white/5 py-2 text-sm last:border-0">
+          <span className="text-gray-300">{e.stage}</span>
+          <span className="shrink-0 text-xs text-gray-500">{e.by || '—'} · {fmtAgo(e.at)}</span>
+        </li>
+      ))}
+    </ol>
   );
 }

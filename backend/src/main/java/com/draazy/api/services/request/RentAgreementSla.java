@@ -33,7 +33,8 @@ public final class RentAgreementSla {
         if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())) {
             return null;
         }
-        if (request.getStatus() == ServiceRequestStatus.DRAFT_SHARED) {
+        if (request.getStatus() == ServiceRequestStatus.DRAFT_SHARED
+                || request.getStatus() == ServiceRequestStatus.ACTION_REQUIRED) {
             return new ServiceRequestDto.Sla(CUSTOMER, null, false);
         }
         Duration target = DESK_TARGETS.get(request.getStatus());

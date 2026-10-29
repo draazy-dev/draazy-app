@@ -1,10 +1,11 @@
 import { useId, useState } from 'react';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, Pencil } from 'lucide-react';
 import { classNames } from '../../../lib/format.js';
 import { Fields, deedGroups } from '../service-queue/DeedParticulars.jsx';
 import { PaperRow, PapersNotice, papersCount, usePaperReview } from '../service-queue/DocumentChecklist.jsx';
 import ServiceDocuments from '../service-queue/ServiceDocuments.jsx';
 import { openRequestDoc } from '../service-queue/helpers.js';
+import DeskEditForm from './DeskEditForm.jsx';
 
 const card = 'rounded-xl border border-white/10 bg-black/10 p-4';
 const label = 'text-[11px] uppercase tracking-wide text-gray-500';
@@ -13,7 +14,15 @@ const ownerKey = (id) => /^(licensor|tenant)-\d+/.exec(id)?.[0] || 'property';
 const shortName = (name) => name.split(' — ').slice(1).join(' — ') || name;
 const indexOf = (key) => Number(key.split('-')[1]);
 
-/** Deed cards of one kind, plus a bare card for a party the checklist names but the form left blank. */
+function editScope(key) {
+  if (key === 'property') return { roots: [['prop']] };
+  if (key === 'terms') return { roots: [['terms'], ['maint'], ['furnItems'], ['clauses']] };
+  const n = indexOf(key);
+  if (key.startsWith('licensor-')) return { roots: [n === 0 ? ['owner'] : ['coOwners', n - 1]] };
+  if (key.startsWith('tenant-')) return { roots: [['tenants', n]] };
+  return { roots: [['wit']], only: (k) => String(k).startsWith(`w${n}`) };
+}
+
 function partyCards(groups, items, kind, prefix, title) {
   const cards = groups.filter((g) => g.kind === kind);
   const extra = [...new Set(items.map((i) => ownerKey(i.id)))]
@@ -22,9 +31,11 @@ function partyCards(groups, items, kind, prefix, title) {
   return [...cards, ...extra].sort((a, b) => indexOf(a.key) - indexOf(b.key));
 }
 
-export default function CaseParticulars({ request, checklist, status, onChecklist, onError, onUnavailable, children }) {
+export default function CaseParticulars({ request, checklist, status, onChecklist, onError, onUnavailable, children, append = {}, tabs = [], editable = false, onSaved }) {
   const base = useId();
   const [tab, setTab] = useState('licensor');
+  const [editTarget, setEditing] = useState(null);
+  const editing = editable ? editTarget : null;
   const review = usePaperReview(request, onChecklist, onError);
   const groups = deedGroups(request.details);
   const items = status === 'ready' ? checklist.items : [];
@@ -33,18 +44,23 @@ export default function CaseParticulars({ request, checklist, status, onChecklis
   const others = docs.filter((d) => !claimed.has(d.id));
   const open = async (doc) => { if (!(await openRequestDoc(request.id, doc.id))) onUnavailable(); };
   const find = (key) => groups.find((g) => g.key === key);
+  const editor = (key, title) => (
+    <DeskEditForm key={`edit-${key}`} request={request} title={title} {...editScope(key)}
+      onSaved={onSaved} onCancel={() => setEditing(null)} onError={onError} />
+  );
 
-  const detailCard = (group) => (
+  const detailCard = (group) => (editing === group.key ? editor(group.key, group.title) : (
     <DetailCard
       key={group.key}
       group={group}
+      onEdit={editable && !editing && (group.rows.length || group.name) ? () => setEditing(group.key) : null}
       papers={items.filter((i) => ownerKey(i.id) === group.key)}
       paperRow={(item) => (
         <PaperRow key={item.id} item={item} label={shortName(item.name)} review={review}
           file={docs.find((d) => d.id === item.documentId)} onOpen={open} />
       )}
     />
-  );
+  ));
   const licensees = partyCards(groups, items, 'licensee', 'tenant-', 'Licensee');
   const witnesses = groups.filter((g) => g.kind === 'witness');
 
@@ -53,8 +69,8 @@ export default function CaseParticulars({ request, checklist, status, onChecklis
     { id: 'licensee', title: 'Licensee', prefix: 'tenant-', body: licensees.length ? licensees.map(detailCard) : <p className="text-sm text-gray-500">No licensee on the form.</p> },
     witnesses.length ? { id: 'witnesses', title: 'Witnesses', body: <div className="grid gap-3 md:grid-cols-2">{witnesses.map(detailCard)}</div> } : null,
     children ? { id: 'ids', title: 'ID numbers', body: children } : null,
-    { id: 'property', title: 'Property', prefix: 'property', body: detailCard(find('property') || { key: 'property', title: 'Property', name: '', rows: [] }) },
-    { id: 'terms', title: 'Terms', body: <TermsCard terms={find('terms')} visit={find('visit')} /> },
+    { id: 'property', title: 'Property', prefix: 'property', body: <>{detailCard(find('property') || { key: 'property', title: 'Property', name: '', rows: [] })}{append.property}</> },
+    { id: 'terms', title: 'Terms', body: <>{editing === 'terms' ? editor('terms', 'Terms') : <TermsCard terms={find('terms')} visit={find('visit')} onEdit={editable && !editing ? () => setEditing('terms') : null} />}{append.terms}</> },
     others.length ? {
       id: 'files', title: items.length ? 'Other files' : 'Files',
       body: (
@@ -70,6 +86,7 @@ export default function CaseParticulars({ request, checklist, status, onChecklis
         </div>
       ),
     } : null,
+    ...tabs,
   ].filter(Boolean);
   const current = sections.find((s) => s.id === tab) || sections[0];
   const tally = (prefix) => {
@@ -90,7 +107,7 @@ export default function CaseParticulars({ request, checklist, status, onChecklis
 
       <div role="tablist" aria-label="Case sections" className="no-scrollbar flex gap-1 overflow-x-auto border-b border-white/10">
         {sections.map((s) => {
-          const count = s.prefix ? tally(s.prefix) : '';
+          const count = s.prefix ? tally(s.prefix) : s.count || '';
           return (
             <button
               key={s.id}
@@ -99,13 +116,15 @@ export default function CaseParticulars({ request, checklist, status, onChecklis
               id={`${base}-tab-${s.id}`}
               aria-controls={`${base}-panel`}
               aria-selected={current.id === s.id}
+              disabled={!!editing && current.id !== s.id}
+              title={editing && current.id !== s.id ? 'Save or cancel the edit first' : undefined}
               onClick={() => setTab(s.id)}
-              className={classNames('relative -mb-px inline-flex min-h-[40px] flex-shrink-0 items-center gap-1.5 border-b-2 px-3 text-sm font-semibold transition-colors', current.id === s.id
+              className={classNames('relative -mb-px inline-flex min-h-[40px] flex-shrink-0 items-center gap-1.5 border-b-2 px-3 text-sm font-semibold transition-colors disabled:opacity-40', current.id === s.id
                 ? 'border-brand-teal text-white'
                 : 'border-transparent text-gray-400 hover:text-gray-200')}
             >
               {s.title}
-              {count ? <span className="text-xs font-normal text-gray-500">{count}<span className="sr-only"> papers verified</span></span> : null}
+              {count ? <span className="text-xs font-normal text-gray-500">{count}<span className="sr-only">{s.prefix ? ' papers verified' : ` ${s.countLabel}`}</span></span> : null}
             </button>
           );
         })}
@@ -117,18 +136,29 @@ export default function CaseParticulars({ request, checklist, status, onChecklis
     </div>
   );
 }
-function DetailCard({ group, papers, paperRow }) {
+function EditButton({ onEdit, what }) {
+  return (
+    <button type="button" onClick={onEdit} aria-label={`Edit ${what}`} className="dz-btn dz-btn-ghost min-h-[32px] px-2.5 py-1 text-xs">
+      <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Edit
+    </button>
+  );
+}
+
+function DetailCard({ group, papers, paperRow, onEdit }) {
   const verified = papers.filter((p) => p.review === 'verified').length;
   return (
     <article aria-label={group.title} className={card}>
-      <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+      <header className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {group.name ? <span className="font-semibold text-white">{group.name}</span> : null}
         <span className={group.name ? 'text-xs uppercase tracking-wide text-gray-500' : 'text-sm font-semibold'}>{group.title}</span>
-        {papers.length ? (
-          <span className={classNames('dz-tag ml-auto', verified === papers.length ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/5 text-gray-400')}>
-            {verified}/{papers.length} papers verified
-          </span>
-        ) : null}
+        <span className="ml-auto flex items-center gap-2">
+          {papers.length ? (
+            <span className={classNames('dz-tag', verified === papers.length ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/5 text-gray-400')}>
+              {verified}/{papers.length} papers verified
+            </span>
+          ) : null}
+          {onEdit ? <EditButton onEdit={onEdit} what={group.title} /> : null}
+        </span>
       </header>
       <div className={classNames('mt-3 grid gap-4', papers.length > 0 && 'md:grid-cols-2')}>
         {group.rows.length ? <Fields rows={group.rows} /> : null}
@@ -144,12 +174,13 @@ function DetailCard({ group, papers, paperRow }) {
   );
 }
 
-function TermsCard({ terms, visit }) {
+function TermsCard({ terms, visit, onEdit }) {
   const rows = terms?.rows || [];
   const key = rows.filter(([l]) => KEY_TERMS.has(l));
   const rest = rows.filter(([l]) => !KEY_TERMS.has(l));
   return (
     <div className={card}>
+      {onEdit ? <div className="mb-3 flex justify-end"><EditButton onEdit={onEdit} what="Terms" /></div> : null}
       {key.length ? (
         <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {key.map(([l, v]) => (

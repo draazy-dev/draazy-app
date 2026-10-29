@@ -382,6 +382,19 @@ Owner notices go to numbers a tenant typed, so they draw more blocks and spam re
 template. A second number on the same WABA keeps those off the login number's quality rating. It does not
 add capacity: since October 2025 Meta's messaging limit is shared by every number in the business portfolio.
 
+**WhatsApp "needs your attention" template.** Sent when the desk sends a rent agreement back to the owner
+or tenant for a correction (`POST /service-requests/{id}/attention`), to each person asked whose account
+allows WhatsApp. The in-app notification and the tracker banner go out regardless.
+
+| Setting | Value |
+|---|---|
+| Meta category | `UTILITY`; **needs Meta approval before the name is set** |
+| Body parameters | `{{1}}` the service, today always `rent agreement` |
+| Suggested name | `draazy_service_attention` |
+| Suggested body text | `Our team needs a small correction on your {{1}} before we can continue. Open the Draazy app to see what to fix.` |
+| Template name | `WHATSAPP_SERVICE_TEMPLATE_NAME`; blank means in-app only |
+| Language | `WHATSAPP_SERVICE_TEMPLATE_LANG`, default `en_US` |
+
 **WhatsApp webhook (STOP replies and failed deliveries).** Optional, but set it before WhatsApp
 messages anyone beyond OTPs. A reply of exactly STOP (or UNSUBSCRIBE, CANCEL…) opts that number out of
 every non-OTP template; START opts it back in. A `failed` delivery lands in the provider call log as

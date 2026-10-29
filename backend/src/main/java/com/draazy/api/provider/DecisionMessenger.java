@@ -10,6 +10,7 @@ public interface DecisionMessenger {
     String IDENTITY_DECISION = "identity-decision";
     String WAITING_DIGEST = "waiting-digest";
     String OWNER_NOTICE = "owner-notice";
+    String SERVICE_ATTENTION = "service-attention";
 
     void sendIdentityDecision(String mobile, String line);
 
@@ -17,6 +18,10 @@ public interface DecisionMessenger {
 
     // link carries a one-time credential: implementations must never log it.
     boolean sendOwnerNotice(String mobile, String tenantName, String place, String link);
+
+    default boolean sendServiceAttention(String mobile, String service) {
+        return false;
+    }
 }
 
 @Component
@@ -50,6 +55,14 @@ class LoggingDecisionMessenger implements DecisionMessenger {
     public boolean sendOwnerNotice(String mobile, String tenantName, String place, String link) {
         log.info("[MOCK WHATSAPP] owner notice to {} about {} ({})", MobileMask.mask(mobile), tenantName, place);
         calls.record(ProviderCalls.WHATSAPP, OWNER_NOTICE, ProviderCalls.Outcome.SKIPPED, mobile, null,
+                "mock", null);
+        return false;
+    }
+
+    @Override
+    public boolean sendServiceAttention(String mobile, String service) {
+        log.info("[MOCK WHATSAPP] {} needs attention, to {}", service, MobileMask.mask(mobile));
+        calls.record(ProviderCalls.WHATSAPP, SERVICE_ATTENTION, ProviderCalls.Outcome.SKIPPED, mobile, null,
                 "mock", null);
         return false;
     }

@@ -21,7 +21,8 @@ public enum ServiceRequestStatus {
 
     CHANGES_REQUESTED("changes-requested"),
 
-    /** The checker said yes. Only the customer can cause this. */
+    ACTION_REQUIRED("action-required"),
+
     APPROVED("approved"),
 
     COMPLETED("completed"),
@@ -70,10 +71,11 @@ public enum ServiceRequestStatus {
     private static final Map<ServiceRequestStatus, Set<ServiceRequestStatus>> ALLOWED = Map.of(
             AWAITING_PAYMENT, Set.of(NEW, CANCELLED),
             NEW, Set.of(ASSIGNED, IN_PROGRESS, CANCELLED),
-            ASSIGNED, Set.of(IN_PROGRESS, DRAFT_SHARED, CANCELLED),
-            IN_PROGRESS, Set.of(ASSIGNED, DRAFT_SHARED, CANCELLED),
+            ASSIGNED, Set.of(IN_PROGRESS, DRAFT_SHARED, ACTION_REQUIRED, CANCELLED),
+            IN_PROGRESS, Set.of(ASSIGNED, DRAFT_SHARED, ACTION_REQUIRED, CANCELLED),
             DRAFT_SHARED, Set.of(APPROVED, CHANGES_REQUESTED, IN_PROGRESS, DRAFT_SHARED, CANCELLED),
-            CHANGES_REQUESTED, Set.of(ASSIGNED, IN_PROGRESS, DRAFT_SHARED, CANCELLED),
+            CHANGES_REQUESTED, Set.of(ASSIGNED, IN_PROGRESS, DRAFT_SHARED, ACTION_REQUIRED, CANCELLED),
+            ACTION_REQUIRED, Set.of(IN_PROGRESS, CANCELLED),
             APPROVED, Set.of(COMPLETED, CANCELLED),
             COMPLETED, Set.of(),
             CANCELLED, Set.of());

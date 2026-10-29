@@ -2,9 +2,7 @@ package com.draazy.api.services.request;
 
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
-import com.draazy.api.security.BackOfficePermissions;
 import com.draazy.api.security.CurrentUser;
-import com.draazy.api.security.Roles;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -24,10 +22,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class ServiceRequestAmendmentsController {
-
-    private static final String SERVICES_WRITE = "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN
-            + "') and " + BackOfficePermissions.REQUIRE_SERVICES_WRITE;
-
     private final ServiceRequestAmendments amendments;
 
     public ServiceRequestAmendmentsController(ServiceRequestAmendments amendments) {
@@ -36,7 +30,7 @@ public class ServiceRequestAmendmentsController {
 
     @PostMapping(Routes.ServiceRequests.AMENDMENTS)
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize(SERVICES_WRITE)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_WRITE)
     public ServiceRequestDto proposeServiceRequestAmendment(@CurrentUser AuthPrincipal principal,
             @PathVariable String id, @Valid @RequestBody AmendmentRequest body) {
         return amendments.propose(principal, id, new ServiceRequestAmendments.Terms(body.rent(),
@@ -46,7 +40,7 @@ public class ServiceRequestAmendmentsController {
     }
 
     @PostMapping(Routes.ServiceRequests.AMENDMENT_WITHDRAW)
-    @PreAuthorize(SERVICES_WRITE)
+    @PreAuthorize(ServiceDeskGuards.SERVICES_WRITE)
     public ServiceRequestDto withdrawServiceRequestAmendment(@CurrentUser AuthPrincipal principal,
             @PathVariable String id, @PathVariable String amendmentId) {
         return amendments.withdraw(principal, id, amendmentId);

@@ -98,7 +98,7 @@ class TeamPerformanceRepository {
             left join (
               select team, created_at as waiting_since
               from service_requests
-              where status not in ('awaiting-payment', 'draft-shared', 'completed', 'cancelled')
+              where status not in ('awaiting-payment', 'draft-shared', 'action-required', 'completed', 'cancelled')
               union all
               select team, created_at as waiting_since
               from tickets
@@ -175,7 +175,7 @@ class TeamPerformanceRepository {
             left join (
               select team, created_at as waiting_since
               from service_requests
-              where status not in ('awaiting-payment', 'draft-shared', 'completed', 'cancelled')
+              where status not in ('awaiting-payment', 'draft-shared', 'action-required', 'completed', 'cancelled')
               union all
               select team, created_at as waiting_since
               from tickets

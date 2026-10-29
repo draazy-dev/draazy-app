@@ -6,7 +6,8 @@ export const papersVerified = (checklist) =>
 export function stagesDone(request, checklist) {
   switch (request.status) {
     case 'submitted': return 1;
-    case 'docs_review': return papersVerified(checklist) ? 3 : 2;
+    case 'docs_review':
+    case 'action_required': return papersVerified(checklist) ? 3 : 2;
     case 'draft_shared':
     case 'changes_requested': return 4;
     case 'approved': return 5;
@@ -24,6 +25,7 @@ export function nextStep(request, checklist) {
       return papersVerified(checklist)
         ? { who: 'desk', text: 'Papers verified — prepare and share the draft' }
         : { who: 'desk', text: 'Verify or reject each uploaded paper' };
+    case 'action_required': return { who: 'customer', text: `Sent back to the ${request.attention?.party || 'customer'} for a correction` };
     case 'draft_shared': return { who: 'customer', text: 'Waiting for every party to approve the draft' };
     case 'changes_requested': return { who: 'desk', text: 'Customer asked for changes — revise and re-share the draft' };
     case 'approved': return { who: 'desk', text: 'Book the registration, then upload the registered copy' };

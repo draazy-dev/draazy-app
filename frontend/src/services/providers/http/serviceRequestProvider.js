@@ -91,6 +91,22 @@ export async function withdrawServiceRequestAmendment(id, amendmentId) {
     `/service-requests/${encodeURIComponent(id)}/amendments/${encodeURIComponent(amendmentId)}/withdraw`));
 }
 
+export async function askServiceRequestAttention(id, { party, reason, papers = [] }) {
+  return toViewModel(await post(`/service-requests/${encodeURIComponent(id)}/attention`, { party, reason, papers }));
+}
+
+export async function resolveServiceRequestAttention(id, note) {
+  return toViewModel(await post(`/service-requests/${encodeURIComponent(id)}/attention/resolve`, note ? { note } : {}));
+}
+
+export async function editServiceRequestDetails(id, state, note) {
+  return toViewModel(await put(`/service-requests/${encodeURIComponent(id)}/desk-details`, { state, note }));
+}
+
+export async function correctServiceRequestIdentities(id, parties) {
+  await put(`/service-requests/${encodeURIComponent(id)}/desk-identities`, { parties });
+}
+
 const refundsPath = (id) => `/service-requests/${encodeURIComponent(id)}/refunds`;
 
 export async function getServiceRequestRefunds(id) {

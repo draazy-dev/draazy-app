@@ -1,23 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { ChevronRight, MapPin, RefreshCw } from 'lucide-react';
 import { getServiceRequestQueueSummary } from '../../../services/serviceRequestService.js';
 import PageHeader from '../../../components/ui/PageHeader.jsx';
 import Loading from '../../../components/ui/Loading.jsx';
 import { classNames, fmtINR } from '../../../lib/format.js';
 import { useTabParam } from '../../../lib/useTabParam.js';
-import { Chips, DATE_CHIPS, PageNav, QueueTabs, SearchBox } from '../../../components/admin/WorkQueue.jsx';
+import { BTN, CHIP, CHIP_TONE, Cell, Chips, DATE_CHIPS, FactRow, PageNav, QueueTabs, RowCard, RowList, SearchBox } from '../../../components/admin/WorkQueue.jsx';
 import AdminServices from '../../admin/AdminServices.jsx';
 import useDeskTickets from '../../admin/useDeskTickets.js';
 import AgeTone from '../service-queue/AgeTone.jsx';
 import { OverdueToggle, stageTabs, useQueue } from '../service-queue/deskQueue.jsx';
 import RaCaseModal from './RaCaseModal.jsx';
-import { caseSummary, nextStep } from './stages.js';
+import { STAGES, caseSummary, nextStep, stagesDone } from './stages.js';
 
 const PAGE_SIZE = 20;
 const TABS = stageTabs('case');
 const TAB_KEYS = TABS.map((t) => t.key);
-const GRID = 'lg:grid lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_minmax(0,0.7fr)] lg:items-center lg:gap-3';
 const NEXT_TONE = { desk: 'text-teal-200', customer: 'text-gray-400', done: 'text-gray-500' };
+const TURN = {
+  desk: { label: 'Our move', tone: CHIP_TONE.teal },
+  customer: { label: 'With customer', tone: CHIP_TONE.sky },
+  done: { label: 'Closed', tone: CHIP_TONE.neutral },
+};
 
 export default function RentAgreementDesk() {
   const [tab, setTab] = useTabParam(TAB_KEYS, 'pickup');
@@ -114,17 +118,7 @@ export default function RentAgreementDesk() {
           ) : queue.page == null ? <Loading /> : rows.length === 0 ? (
             <p className="p-10 text-center text-sm text-gray-400">{q.trim() || overdue || days ? 'No cases match these filters.' : active.empty}</p>
           ) : (
-            <div>
-              <div aria-hidden="true" className={classNames(GRID, 'hidden border-b border-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500')}>
-                <div>Owner → Tenant</div>
-                <div>Flat</div>
-                <div>Terms</div>
-                <div>Next step</div>
-                <div>SLA</div>
-                <div>Holder</div>
-              </div>
-              <ul>{rows.map((row) => <CaseRow key={row.id} row={row} onOpen={() => setOpen(row)} />)}</ul>
-            </div>
+            <RowList>{rows.map((row) => <CaseRow key={row.id} row={row} onOpen={() => setOpen(row)} />)}</RowList>
           )}
         </div>
         {pageCount > 1 ? <div className="flex justify-end border-t border-white/10 p-3"><PageNav {...paging} /></div> : null}
@@ -142,31 +136,82 @@ export default function RentAgreementDesk() {
   );
 }
 
+function StageLine({ done }) {
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-2 text-[11px] text-gray-400">
+      <span className="flex gap-1" aria-hidden="true">
+        {STAGES.map((label, i) => <span key={label} className={classNames('h-1.5 w-1.5 rounded-full', i < done ? 'bg-teal-500' : 'bg-gray-600')} />)}
+      </span>
+      {done ? <span>Step {done} of {STAGES.length} · <span className="text-teal-300">{STAGES[done - 1]}</span></span> : <span>Not started</span>}
+    </span>
+  );
+}
+
 function CaseRow({ row, onOpen }) {
   const s = caseSummary(row.details);
   const next = nextStep(row);
+  const turn = TURN[next.who];
   const heldByOther = row.assignedTo && !row.assignedToMe;
   return (
-    <li className="border-b border-white/[0.06] last:border-b-0">
-      <button type="button" onClick={onOpen} data-testid="ra-row" className={classNames(GRID, 'block w-full cursor-pointer space-y-1 px-4 py-3 text-left transition-colors hover:bg-white/[0.03] lg:space-y-0', heldByOther && 'opacity-70')}>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-white">{s.owner || 'Owner not given'}</div>
-          <div className="truncate text-xs text-gray-400">→ {s.tenants || 'Tenant not given'}</div>
-          {row.requesterMobile ? <div className="truncate text-xs tabular-nums text-gray-500" data-testid="requester-mobile">{row.requesterName ? `By ${row.requesterName} · ` : 'By '}{row.requesterMobile}</div> : null}
-        </div>
-        <div className="min-w-0 truncate text-xs text-gray-300">
-          {[s.flat, s.locality].filter(Boolean).join(' · ') || '—'}
-        </div>
-        <div className="text-xs tabular-nums text-gray-300">
-          {s.rent ? `${fmtINR(s.rent)}/mo` : '—'}
-          <span className="text-gray-500">{s.deposit ? ` · ${fmtINR(s.deposit)} dep` : ''}{s.months ? ` · ${s.months} mo` : ''}</span>
-        </div>
-        <div className={classNames('min-w-0 text-xs', NEXT_TONE[next.who])}>{next.text}</div>
-        <div className="text-xs"><AgeTone request={row} /></div>
-        <div className="truncate text-xs">
-          {row.assignedToMe ? <span className="text-teal-200">You</span> : row.assignedTo ? <span className="text-gray-300">{row.assignedTo}</span> : <span className="text-gray-500">Unassigned</span>}
-        </div>
-      </button>
-    </li>
+    <RowCard
+      testId="ra-row"
+      id={row.id}
+      className={classNames('relative', heldByOther && 'opacity-70')}
+      title={s.flat || 'Flat not given'}
+      badges={(
+        <>
+          <span className={classNames(CHIP, turn.tone)}>{turn.label}</span>
+          {row.assignedToMe ? <span className={classNames(CHIP, CHIP_TONE.teal)}>Yours</span> : null}
+        </>
+      )}
+      meta={(
+        <>
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-teal-400" aria-hidden="true" />
+          <span className="min-w-0 truncate">{[s.locality, 'Pune'].filter(Boolean).join(', ')}</span>
+          <span className="max-sm:hidden text-gray-600" aria-hidden="true">·</span>
+          <span className="relative z-10 min-w-0 truncate tabular-nums text-gray-500 max-sm:hidden">{row.id}</span>
+        </>
+      )}
+      facts={(
+        <>
+          <FactRow label="Parties">
+            <Cell className="font-medium text-gray-200 col-span-2 md:col-span-4">{`${s.owner || 'Owner not given'} → ${s.tenants || 'Tenant not given'}`}</Cell>
+          </FactRow>
+          <FactRow label="Filed by">
+            <span className="relative z-10 col-span-2 max-w-full justify-self-start truncate tabular-nums md:col-span-4" data-testid="requester-mobile">
+              {[row.requesterName, row.requesterMobile].filter(Boolean).join(' · ') || '—'}
+            </span>
+          </FactRow>
+          <FactRow label="Terms">
+            <Cell className="tabular-nums">{s.deposit ? `${fmtINR(s.deposit)} deposit` : 'No deposit given'}</Cell>
+            <Cell className="tabular-nums">{s.months ? `${s.months} months` : ''}</Cell>
+          </FactRow>
+          <FactRow label="Desk">
+            <Cell className={row.assignedToMe ? 'text-teal-200' : row.assignedTo ? undefined : 'text-gray-500'}>
+              {row.assignedToMe ? 'You' : row.assignedTo || 'Unassigned'}
+            </Cell>
+            <span className="min-w-0 truncate md:col-span-3"><AgeTone request={row} /></span>
+          </FactRow>
+        </>
+      )}
+      chips={(
+        <>
+          <span className={classNames('min-w-0 text-xs', NEXT_TONE[next.who])}>{next.text}</span>
+          {row.status === 'cancelled' ? null : <StageLine done={stagesDone(row)} />}
+        </>
+      )}
+      primary={(
+        <>
+          <span aria-hidden="true" className={heldByOther ? BTN.ghost : BTN.primary}>Open case <ChevronRight className="h-3.5 w-3.5" /></span>
+          <button type="button" onClick={onOpen} aria-label={`Open case ${s.flat || row.id}`} className="absolute inset-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-400" />
+        </>
+      )}
+      figure={s.rent ? (
+        <>
+          <div className="text-lg font-extrabold tabular-nums text-white">{fmtINR(s.rent)}<span className="text-sm font-normal text-gray-400">/mo</span></div>
+          <div className="mt-0.5 text-[11px] text-gray-400">rent</div>
+        </>
+      ) : null}
+    />
   );
 }

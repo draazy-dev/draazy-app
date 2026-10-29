@@ -46,6 +46,17 @@ export const acceptServiceRequestAmendment = async (id, amendmentId) =>
 export const withdrawServiceRequestAmendment = async (id, amendmentId) =>
   (await provider()).withdrawServiceRequestAmendment(id, amendmentId);
 
+export const askServiceRequestAttention = async (id, ask) =>
+  (await provider()).askServiceRequestAttention(id, ask);
+
+export const resolveServiceRequestAttention = async (id, note) =>
+  (await provider()).resolveServiceRequestAttention(id, note);
+
+export const editServiceRequestDetails = async (id, state, note) =>
+  (await provider()).editServiceRequestDetails(id, state, note);
+export const correctServiceRequestIdentities = async (id, parties) =>
+  (await provider()).correctServiceRequestIdentities(id, parties);
+
 export const getServiceRequestRefunds = async (id) => (await provider()).getServiceRequestRefunds(id);
 
 export const requestServiceRequestRefund = async (id, refund) =>

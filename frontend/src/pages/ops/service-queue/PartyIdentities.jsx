@@ -1,17 +1,105 @@
-import { useState } from 'react';
-import { Eye, EyeOff, ShieldAlert } from 'lucide-react';
-import { readServiceRequestIdentities } from '../../../services/serviceRequestService.js';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Eye, EyeOff, Pencil, ShieldAlert } from 'lucide-react';
+import { correctServiceRequestIdentities, readServiceRequestIdentities } from '../../../services/serviceRequestService.js';
+import { useToast } from '../../../context/ToastContext.jsx';
 import { classNames } from '../../../lib/format.js';
+import IdInput from '../../../components/IdInput.jsx';
+import { isAadhaar, isPan } from '../../consumer/services/rent-agreement/helpers.js';
 
 const PARTY_LABEL = { owner: 'Owner', tenant: 'Tenant', witness: 'Witness' };
+const field = 'mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 font-mono text-sm text-white';
 
-/** Identity numbers live only in this component's state. Callers key it by request id and holder,
- *  so switching matters or a change of holder discards any reveal. The server lets only the holder
- *  read them and audits allowed and refused reads alike. */
-export default function PartyIdentities({ requestId, className = 'rounded-2xl border border-white/10 p-4' }) {
+const formParties = (state = {}) => {
+  const list = (v) => (Array.isArray(v) ? v : []);
+  const tenants = list(state.tenants);
+  return [
+    { partyRole: 'owner', partyIndex: 0, partyName: state.owner?.oName },
+    ...list(state.coOwners).map((c, i) => ({ partyRole: 'owner', partyIndex: i + 1, partyName: c?.name })),
+    ...(tenants.length ? tenants : [{}]).map((t, i) => ({ partyRole: 'tenant', partyIndex: i, partyName: t?.name })),
+    { partyRole: 'witness', partyIndex: 0, partyName: state.wit?.w1Name },
+    { partyRole: 'witness', partyIndex: 1, partyName: state.wit?.w2Name },
+  ];
+};
+
+const keyOf = (p) => `${p.partyRole}-${p.partyIndex}`;
+
+const merged = (state, recorded) => {
+  const byKey = new Map(recorded.map((r) => [keyOf(r), r]));
+  const rows = formParties(state).map((p) => {
+    const r = byKey.get(keyOf(p));
+    return { ...p, ...r, partyName: p.partyName || r?.partyName || '' };
+  });
+  const seen = new Set(rows.map(keyOf));
+  return [...rows, ...recorded.filter((r) => !seen.has(keyOf(r)))];
+};
+
+function CorrectNumbers({ requestId, party, onSaved, onCancel }) {
+  const { toast } = useToast();
+  const [pan, setPan] = useState(party.pan || '');
+  const [aadhaar, setAadhaar] = useState(party.aadhaar || '');
+  const [busy, setBusy] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  const uid = useId();
+  const witness = party.partyRole === 'witness';
+  const error = (!pan && !aadhaar && 'Enter a PAN or an Aadhaar.')
+    || (pan && !isPan(pan) && 'PAN looks like ABCDE1234F.')
+    || (aadhaar && !isAadhaar(aadhaar) && 'That Aadhaar number is not valid.')
+    || '';
+
+  const save = async (event) => {
+    event.preventDefault();
+    if (busy || error) return;
+    setBusy(true);
+    try {
+      await correctServiceRequestIdentities(requestId, [{
+        partyRole: party.partyRole,
+        partyIndex: party.partyIndex,
+        partyName: String(party.partyName || '').slice(0, 120),
+        pan: witness ? '' : pan,
+        aadhaar,
+      }]);
+      toast('Saved. The customer has been told their ID was corrected.', 'success');
+      if (mounted.current) onSaved();
+    } catch (err) {
+      toast(err?.message || 'The numbers were not saved.', 'error');
+      if (mounted.current) setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={save} className="mt-2 space-y-2" aria-label={`Correct ${party.partyName || 'party'} ID numbers`}>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {witness ? null : (
+          <div>
+            <label htmlFor={`${uid}-pan`} className="text-xs text-gray-400">PAN</label>
+            <IdInput id={`${uid}-pan`} kind="pan" value={pan} onChange={setPan} className={field} />
+          </div>
+        )}
+        <div>
+          <label htmlFor={`${uid}-aadhaar`} className="text-xs text-gray-400">Aadhaar</label>
+          <IdInput id={`${uid}-aadhaar`} kind="aadhaar" value={aadhaar} onChange={setAadhaar} className={field} />
+        </div>
+      </div>
+      {error && (pan || aadhaar) ? <p className="text-xs text-amber-300" role="alert">{error}</p> : null}
+      <div className="flex gap-2">
+        <button type="submit" disabled={busy || !!error} className="dz-btn dz-btn-primary flex-1 disabled:opacity-40">
+          {busy ? 'Saving…' : 'Save numbers'}
+        </button>
+        <button type="button" onClick={onCancel} className="dz-btn dz-btn-ghost">Cancel</button>
+      </div>
+    </form>
+  );
+}
+
+export default function PartyIdentities({ requestId, state, editable = false, className = 'rounded-2xl border border-white/10 p-4' }) {
   const [identities, setIdentities] = useState(null);
   const [status, setStatus] = useState('idle');
   const [refusal, setRefusal] = useState('');
+  const [correcting, setCorrecting] = useState('');
 
   const reveal = async () => {
     if (status === 'loading') return;
@@ -31,7 +119,15 @@ export default function PartyIdentities({ requestId, className = 'rounded-2xl bo
     setIdentities(null);
     setStatus('idle');
     setRefusal('');
+    setCorrecting('');
   };
+
+  const saved = () => {
+    setCorrecting('');
+    reveal();
+  };
+
+  const rows = status === 'ready' ? (editable && state ? merged(state, identities) : identities) : [];
 
   return (
     <section className={className}>
@@ -60,20 +156,26 @@ export default function PartyIdentities({ requestId, className = 'rounded-2xl bo
       ) : null}
 
       {status === 'ready' ? (
-        identities.length === 0 ? (
-          // Blank means either not supplied or already purged, so the copy must not claim more.
+        rows.length === 0 ? (
           <p className="mt-3 text-sm text-gray-500">
             Nothing was recorded against this request. Ask the customer to add the parties&rsquo; details before drafting.
           </p>
         ) : (
           <ul className="mt-3 space-y-2">
-            {identities.map((p) => (
-              <li key={`${p.partyRole}-${p.partyIndex}`} className="rounded-xl border border-white/5 bg-white/5 p-3 text-sm">
-                <div className="flex flex-wrap items-baseline gap-x-2">
+            {rows.map((p) => (
+              <li key={keyOf(p)} className="rounded-xl border border-white/5 bg-white/5 p-3 text-sm">
+                <div className="flex flex-wrap items-center gap-x-2">
                   <span className="font-semibold">{p.partyName || `${PARTY_LABEL[p.partyRole] || 'Party'} ${p.partyIndex + 1}`}</span>
                   <span className="text-xs uppercase tracking-wide text-gray-500">{PARTY_LABEL[p.partyRole] || p.partyRole}</span>
+                  {editable && !p.purged && correcting !== keyOf(p) ? (
+                    <button type="button" onClick={() => setCorrecting(keyOf(p))} aria-label={`Correct ${p.partyName || `${PARTY_LABEL[p.partyRole] || 'Party'} ${p.partyIndex + 1}`} ID numbers`} className="ml-auto inline-flex min-h-[32px] items-center gap-1 rounded-lg px-2 text-xs font-semibold text-teal-300 hover:bg-white/5">
+                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Correct
+                    </button>
+                  ) : null}
                 </div>
-                {p.purged ? (
+                {correcting === keyOf(p) ? (
+                  <CorrectNumbers requestId={requestId} party={p} onSaved={saved} onCancel={() => setCorrecting('')} />
+                ) : p.purged ? (
                   <div className="mt-1 text-xs text-gray-500">Recorded, and since discarded — this request has closed.</div>
                 ) : (
                   <dl className="mt-1 grid grid-cols-1 gap-x-4 sm:grid-cols-2">

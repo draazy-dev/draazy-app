@@ -54,7 +54,7 @@ const EmiCalculator = lazy(() => import('./pages/consumer/EmiCalculator.jsx'));
 const ToolsHub = lazy(() => import('./pages/consumer/tools/ToolsHub.jsx'));
 const RentReceipt = lazy(() => import('./pages/consumer/tools/RentReceipt.jsx'));
 const StampDutyTool = lazy(() => import('./pages/consumer/tools/StampDutyTool.jsx'));
-const RentAgreementCost = lazy(() => import('./pages/consumer/tools/RentAgreementCost.jsx'));
+const RentAgreementCost = lazyPage(() => import('./pages/consumer/tools/RentAgreementCost.jsx'), 'services');
 const RentalYield = lazy(() => import('./pages/consumer/tools/RentalYield.jsx'));
 const TenantProfile = lazyPage(() => import('./pages/consumer/TenantProfile.jsx'), 'misc2', 'verify');
 const VerifyIdentity = lazyPage(() => import('./pages/consumer/VerifyIdentity.jsx'), 'verify-identity');
@@ -120,8 +120,8 @@ const OpsRefunds = lazy(() => import('./pages/ops/OpsRefunds.jsx'));
 const OpsFlatmateReview = lazyPage(() => import('./pages/ops/OpsFlatmateReview.jsx'), 'flatmates');
 const OpsIdentityReview = lazy(() => import('./pages/ops/OpsIdentityReview.jsx'));
 const OpsSupportQueue = lazy(() => import('./pages/ops/OpsSupportQueue.jsx'));
-const OpsDraftingDesk = lazy(() => import('./pages/ops/OpsDraftingDesk.jsx'));
-const RentAgreementDesk = lazy(() => import('./pages/ops/rent-agreement/RentAgreementDesk.jsx'));
+const OpsDraftingDesk = lazyPage(() => import('./pages/ops/OpsDraftingDesk.jsx'), 'services');
+const RentAgreementDesk = lazyPage(() => import('./pages/ops/rent-agreement/RentAgreementDesk.jsx'), 'services');
 
 function ScrollToTop() {
   const { pathname } = useLocation();

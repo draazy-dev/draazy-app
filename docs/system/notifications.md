@@ -122,7 +122,7 @@ Both are governed by the `matchAlerts` switch.
 
 | Type | Trigger | To | Title | Body | Link |
 |---|---|---|---|---|---|
-| `flatmate.interest` | Someone shows interest in a seeker post | Post owner | `{name} is interested in teaming up` | Open your request inbox to review their interest. | Post |
+| `flatmate.interest` | Someone with a room shows interest in a seeker post | Post owner | `{name} has a room for you` | Open your request inbox to review their interest. | Post |
 | `flatmate.interest.sent` | Same action | Requester | `Your message is with {name}` | If they accept, we will share your mobile number with them so they can reply. Nobody else on the board can see it. | Post |
 | `flatmate.{kind}.interest` | Interest in a room/group listing | Host | `{name} is interested in {target}` | Open your request inbox to review their interest. | Target |
 | `flatmate.request.accepted` / `.declined` | Host decides | Requester | Your flatmate request was accepted / declined | Good news — the host accepted your request. They have your number. / The host has declined this one. Plenty of other people are looking. | Target |

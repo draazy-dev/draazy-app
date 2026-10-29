@@ -7,9 +7,9 @@ const DESK_TURN = 'assigned,in-progress,changes-requested,approved';
 
 export const stageTabs = (noun) => [
   { key: 'pickup', label: 'To pick up', query: { status: 'new' }, count: (s) => s.toPickUp, empty: 'Nothing waiting to be picked up.' },
-  { key: 'mine', label: `My ${noun}s`, query: { mine: true, status: `${DESK_TURN},draft-shared` }, count: (s) => s.mine, empty: `You hold no open ${noun}s.` },
+  { key: 'mine', label: `My ${noun}s`, query: { mine: true, status: `${DESK_TURN},draft-shared,action-required` }, count: (s) => s.mine, empty: `You hold no open ${noun}s.` },
   { key: 'progress', label: 'In progress', query: { status: DESK_TURN }, count: (s) => s.inProgress, empty: `No ${noun} is waiting on the desk.` },
-  { key: 'customer', label: 'With customer', query: { status: 'draft-shared' }, count: (s) => s.withCustomer, empty: 'No draft is out with a customer.' },
+  { key: 'customer', label: 'With customer', query: { status: 'draft-shared,action-required' }, count: (s) => s.withCustomer, empty: 'Nothing is waiting on a customer.' },
   { key: 'closed', label: 'Closed', query: { status: 'completed,cancelled' }, count: (s) => s.closed, empty: `No closed ${noun}s yet.` },
 ];
 
