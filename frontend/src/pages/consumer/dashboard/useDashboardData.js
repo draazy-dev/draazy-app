@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useAsyncList from '../../../hooks/useAsyncList.js';
 import { MAX_PAGE_SIZE } from '../../../services/apiLimits.js';
+import { PAGE_LOAD_TTL, PUBLIC_READ_TTL, REVISIT_MAX_AGE } from '../../../services/http.js';
+import { primeMeDashboard } from '../../../services/meDashboardService.js';
 import { listPropertiesByIds, searchListings } from '../../../services/propertyService.js';
 import { listVisits, myVisitRequests, rescheduleVisit, updateVisitStatus } from '../../../services/visitService.js';
 import { myContactRequests } from '../../../services/contactService.js';
@@ -44,7 +46,7 @@ async function loadFeed(withRecommended) {
   try {
     const recent = await listPropertiesByIds(getRecentProps().slice(0, 6));
     if (recent.length || !withRecommended) return { recent, recommended: [] };
-    const { items } = await searchListings({ sort: 'createdAt,desc' }, { size: 6 });
+    const { items } = await searchListings({ sort: 'createdAt,desc' }, { size: 6, ttl: PUBLIC_READ_TTL });
     return { recent: [], recommended: items };
   } catch {
     return { recent: [], recommended: [] };
@@ -84,8 +86,9 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     !!user?.mobile,
   );
 
+  const serviceReqsCache = useRef({ ttl: PAGE_LOAD_TTL, maxAge: REVISIT_MAX_AGE });
   const [serviceReqs, , , , , refreshServiceReqs] = useAsyncList(
-    () => listServiceRequests('rental'),
+    () => listServiceRequests('rental', serviceReqsCache.current),
     [user],
     !!user?.mobile,
   );
@@ -204,6 +207,9 @@ export function useDashboardData({ user, toast, ownsProperty }) {
   }, [searches]);
 
   const refreshRequests = useCallback(() => {
+    // One /me/dashboard read seeds every section the refreshes below re-read.
+    primeMeDashboard();
+    serviceReqsCache.current = { ttl: PAGE_LOAD_TTL };
     refreshData();
     refreshFlatmateReqs();
     refreshServiceReqs();

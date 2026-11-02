@@ -1,9 +1,12 @@
 package com.draazy.api.leads.contact;
 
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.trust.ContactEnquiryLookup;
 import com.draazy.api.common.trust.ContactUsageLookup;
+import com.draazy.api.common.trust.ContactUse;
 import com.draazy.api.common.trust.VisitUsageLookup;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -21,18 +24,32 @@ public class ContactUsageService implements ContactUsageLookup, ContactEnquiryLo
     private final ContactRequestRepository requests;
     private final VisitUsageLookup visits;
     private final ContactReplyWindow window;
+    private final PropertyRepository properties;
 
-    ContactUsageService(ContactRequestRepository requests, VisitUsageLookup visits, ContactReplyWindow window) {
+    ContactUsageService(ContactRequestRepository requests, VisitUsageLookup visits, ContactReplyWindow window,
+            PropertyRepository properties) {
         this.requests = requests;
         this.visits = visits;
         this.window = window;
+        this.properties = properties;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Instant> contactTimes(UUID userId) {
-        return userId == null ? List.of()
-                : uses(userId, window.cutoff(Instant.now())).spentAt().values().stream().sorted().toList();
+    public List<ContactUse> contactUses(UUID userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        Map<UUID, Instant> spentAt = uses(userId, window.cutoff(Instant.now())).spentAt();
+        if (spentAt.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, String> deals = new HashMap<>();
+        properties.findDealsByIdIn(spentAt.keySet()).forEach(d -> deals.put(d.getId(), d.getDeal()));
+        return spentAt.entrySet().stream()
+                .map(e -> new ContactUse(e.getValue(), deals.get(e.getKey())))
+                .sorted(Comparator.comparing(ContactUse::at))
+                .toList();
     }
 
     Uses uses(UUID userId, Instant replyCutoff) {

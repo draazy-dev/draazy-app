@@ -14,6 +14,9 @@ import org.springframework.data.repository.query.Param;
 public interface OfferRepository extends JpaRepository<Offer, UUID> {
     Page<Offer> findByFromUserIdOrderByCreatedAtDesc(UUID fromUserId, Pageable pageable);
 
+    Page<Offer> findByFromUserIdAndPropertyIdOrderByCreatedAtDesc(UUID fromUserId, UUID propertyId,
+                                                                  Pageable pageable);
+
     Page<Offer> findByPropertyIdInOrderByCreatedAtDesc(Collection<UUID> propertyIds,
                                                        Pageable pageable);
 

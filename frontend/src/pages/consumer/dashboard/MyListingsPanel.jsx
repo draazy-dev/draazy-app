@@ -5,6 +5,8 @@ import { usePricing } from '../../../context/PricingContext';
 import Select from '../../../components/ui/Select.jsx';
 import Icon from '../../../components/Icon.jsx';
 import RefundGuarantee from '../../../components/billing/RefundGuarantee.jsx';
+import PassValueLine from '../../../components/billing/PassValueLine.jsx';
+import { passPriceKey, passSlug } from '../../../lib/dealPlans.js';
 import { confirmListingFresh, takeListingDown, pauseListing, resumeListing, myListingCard } from '../../../services/propertyService.js';
 import { deleteGroup, deletePost, deleteRoom, getOwnerHomes, renewFlatmate, splitProperty, unsplitProperty } from '../../../services/flatmateService.js';
 import { closeDeal, reopenDeal, reserveDeal } from '../../../services/dealService.js';
@@ -303,7 +305,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       setQuotaTick((n) => n + 1);
     } catch (err) {
       if (err?.code === 'listing_quota_exhausted') {
-        setResumeBlock({ id: l.uuid || l.id, message: err.message });
+        setResumeBlock({ id: l.uuid || l.id, deal: l.deal, message: err.message });
         return;
       }
       toast(err?.body?.message || err?.message || t('listingLifecycle.resumeError'), 'error');
@@ -427,9 +429,10 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
             <div className="space-y-1">
               <span>{resumeBlock.message || t('listingLifecycle.resumeError')}</span>
               <RefundGuarantee kind="pass" className="text-xs text-emerald-300" />
+              <PassValueLine deal={resumeBlock.deal} className="text-xs text-amber-100/80" />
             </div>
-            <Link to={`/checkout?plan=listing-pass&property=${encodeURIComponent(resumeBlock.id)}`} className="btn-teal inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-xs font-semibold text-white">
-              {t('listingLifecycle.goLive', { price: fee('listingPass') })}
+            <Link to={`/checkout?plan=${passSlug(resumeBlock.deal)}&property=${encodeURIComponent(resumeBlock.id)}`} className="btn-teal inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-xs font-semibold text-white">
+              {t('listingLifecycle.goLive', { price: fee(passPriceKey(resumeBlock.deal)) })}
             </Link>
           </div>
         )}
@@ -475,7 +478,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
                     onEditPost={flatmateEditing.editPost}
                     onRenew={handleRenew}
                     quota={quota}
-                    passPrice={fee('listingPass')}
+                    passPrice={fee(passPriceKey(l.deal))}
                     t={t}
                   />
                   {homes.byListing.get(String(l.uuid || l.id))?.rooms?.length > 0 && (

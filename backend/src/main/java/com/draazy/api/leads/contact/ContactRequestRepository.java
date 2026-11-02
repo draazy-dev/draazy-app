@@ -56,17 +56,6 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
                                    @Param("status") String status);
 
     @Query("""
-            select cr.propertyId from ContactRequest cr
-            where cr.requesterId = :requesterId
-              and cr.propertyId in :propertyIds
-              and cr.status = :status
-            """)
-    List<UUID> approvedPropertyIdsForRequester(
-            @Param("requesterId") UUID requesterId,
-            @Param("propertyIds") Collection<UUID> propertyIds,
-                                   @Param("status") String status);
-
-    @Query("""
             select cr.propertyId, count(cr) from ContactRequest cr
             where cr.propertyId in :propertyIds
               and cr.status = :status

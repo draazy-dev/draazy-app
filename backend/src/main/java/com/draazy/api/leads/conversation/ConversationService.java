@@ -10,6 +10,7 @@ import com.draazy.api.common.attachment.MessageAttachment;
 import com.draazy.api.common.attachment.MessageAttachmentDto;
 import com.draazy.api.common.attachment.MessageAttachmentRepository;
 import com.draazy.api.common.attachment.MessageAttachments;
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.common.trust.FlatmateGroupRoster;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.trust.PushNotifier;
@@ -286,7 +287,7 @@ public class ConversationService {
     }
 
     private void schedulePush(UUID recipient, Conversation conversation) {
-        events.afterCommit(() -> pushIfUnmuted(recipient, conversation));
+        AfterCommit.run(() -> pushIfUnmuted(recipient, conversation));
     }
 
     private void pushIfUnmuted(UUID recipient, Conversation conversation) {

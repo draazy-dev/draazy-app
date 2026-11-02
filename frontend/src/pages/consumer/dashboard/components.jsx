@@ -6,59 +6,34 @@ export const Card = ({ children, className = '', ...rest }) => (
   <div className={'glass-card rounded-2xl ' + className} {...rest}>{children}</div>
 );
 
-export function Stat({ icon, bg, fg, value, label, trend, onClick, ariaLabel }) {
-  const tIcon = trend ? (trend.dir === 'up' ? 'trending-up' : trend.dir === 'down' ? 'trending-down' : 'minus') : null;
-  const tChip = trend
-    ? (trend.dir === 'up'
-        ? 'bg-emerald-500/15 text-emerald-300'
-        : trend.dir === 'down'
-          ? 'bg-rose-500/15 text-rose-300'
-          : 'bg-white/[0.06] text-gray-400')
-    : '';
-  const body = (
-    <>
-      <div className="flex items-center gap-2.5">
-        <span className={'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ' + bg}>
-          <Icon name={icon} className={'h-4 w-4 ' + fg} />
-        </span>
-        <span className="text-2xl font-bold leading-none text-white">{value}</span>
-      </div>
-      <p className="mt-2 truncate text-xs font-medium text-gray-300">{label}</p>
-      {trend ? (
-        <span className={'dz-tag mt-2 max-w-full font-semibold ' + tChip}>
-          {tIcon ? <Icon name={tIcon} className="h-2.5 w-2.5 flex-shrink-0" /> : null}
-          <span className="truncate">{trend.text}</span>
-        </span>
-      ) : null}
-    </>
-  );
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        aria-label={ariaLabel || label}
-        className="glass-card group rounded-2xl p-3.5 sm:p-4 text-left w-full transition-all hover:border-teal-400/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
-      >
-        {body}
-      </button>
-    );
-  }
-  return <Card className="p-3.5 sm:p-4">{body}</Card>;
-}
-
-export function SubNav({ items, active, onChange, variant = 'pill', wrapClassName = 'mb-5' }) {
+export function SubNav({ items, active, onChange, variant = 'pill', wrapClassName = 'mb-5', label, panelId }) {
   if (!items || items.length < 2) return null;
 
   if (variant === 'underline') {
+    const focusable = items.some((it) => it.key === active) ? active : items[0].key;
+    const onKeyDown = (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const from = e.target.closest('[data-tab]')?.dataset.tab ?? focusable;
+      const at = items.findIndex((it) => it.key === from);
+      const to = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: items.length - 1 }[e.key];
+      if (to === undefined) return;
+      e.preventDefault();
+      const next = items[(to + items.length) % items.length].key;
+      onChange(next);
+      e.currentTarget.querySelector(`[data-tab="${next}"]`)?.focus();
+    };
     return (
-      <HScroll role="tablist" fadeColor="var(--brand-dark)" wrapClassName={wrapClassName} className="flex gap-1 sm:gap-2 border-b border-white/10">
+      <HScroll role="tablist" aria-label={label} onKeyDown={onKeyDown} fadeColor="var(--brand-dark)" wrapClassName={wrapClassName} className="flex gap-1 sm:gap-2 border-b border-white/10">
         {items.map((it) => (
           <button
             key={it.key}
             type="button"
             role="tab"
+            id={panelId ? `${panelId}-tab-${it.key}` : undefined}
+            aria-controls={panelId}
             aria-selected={active === it.key}
+            tabIndex={focusable === it.key ? 0 : -1}
+            data-tab={it.key}
             onClick={() => onChange(it.key)}
             className={'dz-detail-tab' + (active === it.key ? ' is-active' : '')}
           >
@@ -190,31 +165,3 @@ export const RequestEmpty = ({ icon = 'inbox', text, cta }) => (
     ) : null}
   </div>
 );
-
-export const StatusBadge = ({ status }) => {
-  const statusKey = String(status || '').toLowerCase();
-  const map = {
-    approved: 'bg-emerald-500/15 text-emerald-300',
-    pending: 'bg-amber-500/15 text-amber-300',
-    'under review': 'bg-amber-500/15 text-amber-300',
-    rejected: 'bg-white/5 text-gray-300',
-    scheduled: 'bg-indigo-500/15 text-indigo-300',
-    closed: 'bg-emerald-500/15 text-emerald-300',
-    responded: 'bg-indigo-500/15 text-indigo-300',
-    confirmed: 'bg-emerald-500/15 text-emerald-300',
-    cancelled: 'bg-rose-500/15 text-rose-300',
-    resolved: 'bg-emerald-500/15 text-emerald-300',
-    declined: 'bg-rose-500/15 text-rose-300',
-  };
-  const displayLabel = {
-    pending: 'Pending',
-    'under review': 'Pending',
-    rejected: 'Not approved',
-  };
-  const label = displayLabel[statusKey] || String(status || '').replace('_', ' ');
-  return (
-    <span className={'dz-tag font-semibold capitalize ' + (map[statusKey] || 'bg-white/10 text-gray-300')}>
-      {label}
-    </span>
-  );
-};

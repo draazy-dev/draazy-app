@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -44,8 +45,6 @@ class ConversationRealtimeTest extends AbstractApiTest {
     PropertyRepository properties;
     @Autowired
     ContactRequestRepository contactRequests;
-    @Autowired
-    MessageEvents events;
     @Autowired
     ConversationMessageRepository messageRepository;
     @Autowired
@@ -260,12 +259,12 @@ class ConversationRealtimeTest extends AbstractApiTest {
     void afterCommitCallbackWaitsForCommit() {
         AtomicInteger fired = new AtomicInteger();
 
-        events.afterCommit(fired::incrementAndGet);
+        AfterCommit.run(fired::incrementAndGet);
         assertThat(fired).hasValue(0);
 
         TransactionTemplate committing = new TransactionTemplate(transactionManager);
         committing.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        committing.executeWithoutResult(status -> events.afterCommit(fired::incrementAndGet));
+        committing.executeWithoutResult(status -> AfterCommit.run(fired::incrementAndGet));
 
         assertThat(fired).hasValue(1);
     }

@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -57,9 +58,10 @@ public class FinalizationController {
     @GetMapping(Routes.Finalization.ME_REQUESTS)
     public PageResponse<FinalizationRequestDto> myFinalizationRequests(
             @CurrentUser AuthPrincipal principal,
+            @RequestParam(required = false) UUID propertyId,
             @PageableDefault(size = 20) Pageable pageable) {
         return PageResponse.of(
-                finalizationService.myRequests(principal.userId(), Pageables.unsorted(pageable)),
+                finalizationService.myRequests(principal.userId(), propertyId, Pageables.unsorted(pageable)),
                 r -> r);
     }
 

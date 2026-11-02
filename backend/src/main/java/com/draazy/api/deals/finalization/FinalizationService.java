@@ -137,9 +137,10 @@ public class FinalizationService {
     }
 
     @Transactional(readOnly = true)
-    public Page<FinalizationRequestDto> myRequests(UUID callerId, Pageable pageable) {
-        Page<FinalizationRequest> rows =
-                finalizationRequests.findPendingByCounterparty(callerId, pageable);
+    public Page<FinalizationRequestDto> myRequests(UUID callerId, UUID propertyId, Pageable pageable) {
+        Page<FinalizationRequest> rows = propertyId == null
+                ? finalizationRequests.findPendingByCounterparty(callerId, pageable)
+                : finalizationRequests.findPendingByCounterpartyAndProperty(callerId, propertyId, pageable);
         if (rows.isEmpty()) {
             return new PageImpl<>(List.of(), rows.getPageable(), rows.getTotalElements());
         }

@@ -49,6 +49,17 @@ public interface FinalizationRequestRepository extends JpaRepository<Finalizatio
             @Param("counterpartyId") UUID counterpartyId,
             Pageable pageable);
 
+    @Query(value = "select fr from FinalizationRequest fr "
+                 + "where fr.counterpartyId = :counterpartyId and fr.propertyId = :propertyId "
+                 + "and fr.status = 'pending' order by fr.createdAt desc",
+           countQuery = "select count(fr) from FinalizationRequest fr "
+                      + "where fr.counterpartyId = :counterpartyId and fr.propertyId = :propertyId "
+                      + "and fr.status = 'pending'")
+    Page<FinalizationRequest> findPendingByCounterpartyAndProperty(
+            @Param("counterpartyId") UUID counterpartyId,
+            @Param("propertyId") UUID propertyId,
+            Pageable pageable);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update FinalizationRequest fr set fr.status = 'declined' " +
            "where fr.propertyId = :propertyId and fr.status = 'pending' " +

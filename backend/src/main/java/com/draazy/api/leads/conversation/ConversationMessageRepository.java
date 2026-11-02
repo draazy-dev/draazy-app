@@ -11,7 +11,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ConversationMessageRepository extends JpaRepository<ConversationMessage, UUID> {
-    List<ConversationMessage> findByConversationIdOrderByCreatedAtAsc(UUID conversationId);
 
     @Query(value = """
             select m.* from messages m

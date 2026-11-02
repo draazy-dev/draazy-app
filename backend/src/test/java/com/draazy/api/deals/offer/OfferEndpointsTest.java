@@ -119,7 +119,7 @@ class OfferEndpointsTest extends AbstractApiTest {
         assertThat(offer.getStatus()).isEqualTo(OfferStatuses.COUNTERED);
         assertThat(offer.getAmount()).isEqualTo(5500000L);
 
-        List<OfferHistory> trail = historyRepo.findByOfferIdOrderByAtAsc(offer.getId());
+        List<OfferHistory> trail = historyRepo.findByOfferIdInOrderByAtAsc(List.of(offer.getId()));
         assertThat(trail).hasSize(2);
         assertThat(trail.get(1).getBy()).isEqualTo("owner");
         assertThat(trail.get(1).getAmount()).isEqualTo(5500000L);
@@ -135,8 +135,7 @@ class OfferEndpointsTest extends AbstractApiTest {
         respond(owner, offerId, "counter", 5500000L, null);
         respond(buyer, offerId, "counter", 5200000L, null);
 
-        List<OfferHistory> trail = historyRepo.findByOfferIdOrderByAtAsc(
-                UUID.fromString(offerId));
+        List<OfferHistory> trail = historyRepo.findByOfferIdInOrderByAtAsc(List.of(UUID.fromString(offerId)));
         assertThat(trail).hasSize(3);
         assertThat(trail.get(2).getBy()).isEqualTo("buyer");
         assertThat(trail.get(2).getAmount()).isEqualTo(5200000L);
@@ -154,7 +153,7 @@ class OfferEndpointsTest extends AbstractApiTest {
         Offer offer = offerRepo.findById(UUID.fromString(offerId)).orElseThrow();
         assertThat(offer.getStatus()).isEqualTo(OfferStatuses.ACCEPTED);
 
-        List<OfferHistory> trail = historyRepo.findByOfferIdOrderByAtAsc(offer.getId());
+        List<OfferHistory> trail = historyRepo.findByOfferIdInOrderByAtAsc(List.of(offer.getId()));
         assertThat(trail).hasSize(1);
     }
 
@@ -204,6 +203,46 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].amount").value(5000000));
+    }
+
+    @Test
+    void myOffers_propertyIdNarrowsToThatListing() throws Exception {
+        User owner = user("9820100150", "owner");
+        User buyer = user("9820100151", "buyer");
+        Property p1 = listing(owner, "Mine narrow one");
+        Property p2 = listing(owner, "Mine narrow two");
+        submitOffer(buyer, p1, 5000000);
+        submitOffer(buyer, p2, 6000000);
+
+        mvc.perform(get(Routes.Offers.MINE).param("propertyId", p2.getId().toString())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].propertyId").value(p2.getId().toString()));
+    }
+
+    @Test
+    void offersOnMine_propertyIdNarrowsToThatListing_andNeverReachesAnotherOwners() throws Exception {
+        User owner = user("9820100152", "owner");
+        User other = user("9820100153", "owner");
+        User buyer = user("9820100154", "buyer");
+        Property p1 = listing(owner, "Ours narrow one");
+        Property p2 = listing(owner, "Ours narrow two");
+        Property theirs = listing(other, "Theirs narrow");
+        submitOffer(buyer, p1, 5000000);
+        submitOffer(buyer, p2, 6000000);
+        submitOffer(buyer, theirs, 7000000);
+
+        mvc.perform(get(Routes.Offers.ME).param("propertyId", p1.getId().toString())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].propertyId").value(p1.getId().toString()));
+
+        mvc.perform(get(Routes.Offers.ME).param("propertyId", theirs.getId().toString())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
     }
 
     @Test

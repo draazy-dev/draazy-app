@@ -288,6 +288,21 @@ class FinalizationEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void myFinalizationRequests_propertyIdNarrowsToThatListing() throws Exception {
+        User owner = user("9830100150", "owner");
+        Property p1 = listing(owner, "Fin narrow one");
+        Property p2 = listing(owner, "Fin narrow two");
+        requestFinalization(user("9830100151", "buyer"), p1, owner, 5000000L);
+        requestFinalization(user("9830100152", "buyer"), p2, owner, 5100000L);
+
+        mvc.perform(get(Routes.Finalization.ME_REQUESTS).param("propertyId", p2.getId().toString())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].propertyId").value(p2.getId().toString()));
+    }
+
+    @Test
     void myFinalizationRequests_isPaged_andTheTotalCountsOnlyPendingRows() throws Exception {
         User owner = user("9830100040", "owner");
         Property p1 = listing(owner, "Fin paging A");

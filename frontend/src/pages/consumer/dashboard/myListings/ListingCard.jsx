@@ -8,6 +8,8 @@ import { listingFreshness } from '../../../../lib/freshness.js';
 import { availabilityLabel } from '../../../../lib/availability.js';
 import { canSplitIntoRooms } from '../../../../lib/data/flatSplit.js';
 import { detailPath, roomEditHref } from '../../flatmates/helpers.js';
+import PassValueLine from '../../../../components/billing/PassValueLine.jsx';
+import { passSlug } from '../../../../lib/dealPlans.js';
 import StatChip from './StatChip.jsx';
 import CardActions from './CardActions.jsx';
 import {
@@ -72,7 +74,7 @@ export default function ListingCard({
         : { icon: 'edit', label: 'Edit', to: editHref };
   let primary = null;
   if (flatmateKind && l.status === 'expired') primary = { label: 'Renew for 30 days', icon: 'refresh-cw', tone: 'emerald', onClick: () => onRenew(flatmateKind, l) };
-  else if (needsPass) primary = { label: t('listingLifecycle.goLive', { price: passPrice }), icon: 'zap', tone: 'teal', to: `/checkout?plan=listing-pass&property=${encodeURIComponent(listingId)}` };
+  else if (needsPass) primary = { label: t('listingLifecycle.goLive', { price: passPrice }), icon: 'zap', tone: 'teal', to: `/checkout?plan=${passSlug(l.deal)}&property=${encodeURIComponent(listingId)}` };
   else if (!l.flatmate && l.status === 'paused') primary = { label: t('listingLifecycle.resume'), icon: 'play-circle', tone: 'emerald', onClick: () => onResume(l) };
   else if (fr && fr.owner.cta === 'confirm') primary = { label: 'Confirm available', icon: 'check-circle', tone: 'emerald', onClick: () => onConfirmFresh(l) };
   else if (fr && fr.owner.cta === 'reactivate') primary = { label: 'Reactivate', icon: 'refresh-cw', tone: 'emerald', onClick: () => onConfirmFresh(l) };
@@ -255,7 +257,12 @@ export default function ListingCard({
       )}
 
       <CardActions primary={l.archived ? null : primary} items={l.archived ? [] : cardActions} />
-      {needsPass && <p className="px-3 pb-3 text-[11px] text-gray-400 sm:px-4">{t('listingLifecycle.orPauseOther')}</p>}
+      {needsPass && (
+        <div className="space-y-1 px-3 pb-3 sm:px-4">
+          <PassValueLine deal={l.deal} />
+          <p className="text-[11px] text-gray-400">{t('listingLifecycle.orPauseOther')}</p>
+        </div>
+      )}
       {qScore !== null && qScore < 80 && (
         <div className="px-3 pb-3 sm:px-4 sm:pb-4">
           <div className="border-l-2 border-amber-500/40 pl-3">

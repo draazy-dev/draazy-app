@@ -53,10 +53,6 @@ export function buildDashboardGroups({ visibleTabs, isOwner, showRental, hasRent
   return groups.filter((g) => g && g.sections.length);
 }
 
-export const CAL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-export const CAL_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-export const CAL_HOURS = Array.from({ length: 13 }, (_, i) => i + 7);
-export const DOC_SALE = ['Sale Deed / Agreement', 'Index II', 'Property Tax Receipt', 'Encumbrance Certificate', 'Society NOC', 'Completion Certificate', 'Occupancy Certificate', 'Building Plan Approval'];
 export const REVIEW_STATUS_MAP = {
   in_review: { label: 'Under review', cls: 'text-amber-300 bg-amber-500/10 border-amber-500/20', icon: 'clock' },
   pending: { label: 'Under review', cls: 'text-amber-300 bg-amber-500/10 border-amber-500/20', icon: 'clock' },
@@ -65,17 +61,4 @@ export const REVIEW_STATUS_MAP = {
   approved: { label: 'Live', cls: 'text-brand-teal-3 bg-brand-teal/10 border-brand-teal/20', icon: 'check-circle' },
   verified: { label: 'Live', cls: 'text-brand-teal-3 bg-brand-teal/10 border-brand-teal/20', icon: 'check-circle' },
   rejected: { label: 'Not approved', cls: 'text-gray-300 bg-white/5 border-white/10', icon: 'x-circle' },
-};
-
-export const SAVED_SEED = [
-  { id: 'P5000', title: '3 BHK Flat, Baner', price: '₹1.25 Cr', bhk: '3 BHK', area: '1,850 sq.ft', img: null },
-  { id: 'P5008', title: '4 BHK Villa, Koregaon Park', price: '₹2.8 Cr', bhk: '4 BHK', area: '3,200 sq.ft', img: null },
-  { id: 'P5015', title: '4 BHK Penthouse, Kalyani Nagar', price: '₹3.5 Cr', bhk: '4 BHK', area: '4,500 sq.ft', img: null },
-];
-
-export const VISIT_STATUS_CLS = {
-  scheduled: 'bg-amber-500/15 text-amber-300',
-  confirmed: 'bg-emerald-500/15 text-emerald-300',
-  'no-show': 'bg-rose-500/15 text-rose-300',
-  rescheduled: 'bg-indigo-500/15 text-indigo-300',
 };

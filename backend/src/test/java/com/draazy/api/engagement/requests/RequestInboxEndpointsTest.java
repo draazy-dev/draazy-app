@@ -172,6 +172,24 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void pendingCount_countsOnlyPendingConnectionRequests() throws Exception {
+        User owner = user("9830000071", "owner");
+        User buyer = user("9830000072", "buyer");
+        contactRequest(buyer, listing(owner, "Contact flat"), null);
+        visit(buyer, listing(owner, "Visit flat"));
+        photoRequest(buyer, listing(owner, "Photo flat"));
+        flatmateInterest(buyer, owner);
+        UUID group = groupApplication(buyer, listing(owner, "Group flat"));
+        update("update flatmate_group_applications set status = 'declined', decided_at = now() where id = ?", group);
+
+        as(owner, get(Routes.MeRequests.PENDING_COUNT)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(3));
+        as(buyer, get(Routes.MeRequests.PENDING_COUNT)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(0));
+        mvc.perform(get(Routes.MeRequests.PENDING_COUNT)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void receivedBox_listsPendingRequestsOfEveryKind() throws Exception {
         User owner = user("9830000001", "owner");
         User buyer = user("9830000002", "buyer");

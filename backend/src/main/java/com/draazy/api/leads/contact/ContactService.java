@@ -1,5 +1,6 @@
 package com.draazy.api.leads.contact;
 
+import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.ListingClosed;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -145,11 +146,14 @@ public class ContactService {
             throw new ContactPendingLimitException("You already have " + open + " requests waiting for an owner's reply."
                     + " Wait for a reply or for a request to lapse, or cancel a visit you no longer need.");
         }
-        OptionalInt remaining = allowances.contactsRemaining(viewerId);
+        String deal = properties.findDealsByIdIn(List.of(propertyId)).stream()
+                .map(PropertyRepository.DealOf::getDeal).findFirst().orElse(null);
+        OptionalInt remaining = allowances.contactsRemaining(viewerId, deal);
         if (remaining.isPresent() && remaining.getAsInt() <= 0) {
             throw new ContactQuotaExhaustedException(
-                    "You have used all your owner contacts. "
-                            + "Buy a contact pack, or refer a friend to earn more.");
+                    "You have used all your owner contacts for " + (DealIntent.BUY.equals(deal) ? "sale" : "rent")
+                            + " listings. Buy a " + (DealIntent.BUY.equals(deal) ? "Buy" : "Rent")
+                            + " Contact Pack, or refer a friend to earn more.");
         }
     }
 

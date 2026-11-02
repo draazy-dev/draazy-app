@@ -184,14 +184,19 @@ public class OfferService {
     }
 
     @Transactional(readOnly = true)
-    public Page<OfferDto> myOffers(UUID callerId, Pageable pageable) {
-        Page<Offer> rows = offers.findByFromUserIdOrderByCreatedAtDesc(callerId, pageable);
+    public Page<OfferDto> myOffers(UUID callerId, UUID propertyId, Pageable pageable) {
+        Page<Offer> rows = propertyId == null
+                ? offers.findByFromUserIdOrderByCreatedAtDesc(callerId, pageable)
+                : offers.findByFromUserIdAndPropertyIdOrderByCreatedAtDesc(callerId, propertyId, pageable);
         return projectPage(rows, callerId);
     }
 
     @Transactional(readOnly = true)
-    public Page<OfferDto> offersOnMine(UUID callerId, Pageable pageable) {
+    public Page<OfferDto> offersOnMine(UUID callerId, UUID propertyId, Pageable pageable) {
         List<UUID> ownedPropertyIds = properties.findIdsByOwnerId(callerId);
+        if (propertyId != null) {
+            ownedPropertyIds = ownedPropertyIds.contains(propertyId) ? List.of(propertyId) : List.of();
+        }
         if (ownedPropertyIds.isEmpty()) {
             return Page.empty(pageable);
         }

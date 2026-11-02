@@ -127,36 +127,38 @@ export default function RequestsPanel({ initialTab, onChanged }) {
 
   return (
     <div className="pc-reqs" data-testid="requests-panel">
-      <SubNav items={tabs} active={tabKey} onChange={setTabKey} variant="underline" />
-      {loading && !shown.length ? Array.from({ length: 3 }, (_, i) => <div key={i} className="pc-skel pc-req-skel" />) : null}
-      {failed.length ? (
-        <div className="pc-empty-list">
-          <p>Couldn't load requests</p>
-          <button type="button" onClick={() => failed.forEach((b) => inbox.load(b))}>Retry</button>
-        </div>
-      ) : null}
-      {settled && !shown.length ? <Empty tab={tab} /> : null}
-      {open.map(renderCard)}
-      {settled && !open.length && past.length ? <p className="py-6 text-center text-sm text-gray-500" data-testid="requests-caught-up">Nothing waiting on you.</p> : null}
-      {past.length ? (
-        <button
-          type="button"
-          onClick={() => setShowPast((v) => !v)}
-          aria-expanded={showPast}
-          aria-controls="requests-past"
-          data-testid="requests-past-toggle"
-          className="mt-1 mb-2 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-white/10 text-sm font-semibold text-gray-300 hover:bg-white/5"
-        >
-          {showPast ? 'Hide past requests' : `Show past requests (${past.length})`}
-          <Icon name="chevron-down" className={'h-4 w-4 transition-transform' + (showPast ? ' rotate-180' : '')} />
-        </button>
-      ) : null}
-      {showPast && past.length ? (
-        <section id="requests-past" data-testid="requests-past">
-          <h2 className="mb-3 mt-3 px-1 text-[11px] font-bold uppercase tracking-wider text-gray-500">Past requests</h2>
-          {past.map(renderCard)}
-        </section>
-      ) : null}
+      <SubNav items={tabs} active={tabKey} onChange={setTabKey} variant="underline" label="Request types" panelId="requests-tabpanel" />
+      <div role="tabpanel" tabIndex={0} id="requests-tabpanel" aria-labelledby={`requests-tabpanel-tab-${tabKey}`}>
+        {loading && !shown.length ? Array.from({ length: 3 }, (_, i) => <div key={i} className="pc-skel pc-req-skel" />) : null}
+        {failed.length ? (
+          <div className="pc-empty-list">
+            <p>Couldn't load requests</p>
+            <button type="button" onClick={() => failed.forEach((b) => inbox.load(b))}>Retry</button>
+          </div>
+        ) : null}
+        {settled && !shown.length ? <Empty tab={tab} /> : null}
+        {open.map(renderCard)}
+        {settled && !open.length && past.length ? <p className="py-6 text-center text-sm text-gray-500" data-testid="requests-caught-up">Nothing waiting on you.</p> : null}
+        {past.length ? (
+          <button
+            type="button"
+            onClick={() => setShowPast((v) => !v)}
+            aria-expanded={showPast}
+            aria-controls="requests-past"
+            data-testid="requests-past-toggle"
+            className="mt-1 mb-2 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-white/10 text-sm font-semibold text-gray-300 hover:bg-white/5"
+          >
+            {showPast ? 'Hide past requests' : `Show past requests (${past.length})`}
+            <Icon name="chevron-down" className={'h-4 w-4 transition-transform' + (showPast ? ' rotate-180' : '')} />
+          </button>
+        ) : null}
+        {showPast && past.length ? (
+          <section id="requests-past" data-testid="requests-past">
+            <h2 className="mb-3 mt-3 px-1 text-[11px] font-bold uppercase tracking-wider text-gray-500">Past requests</h2>
+            {past.map(renderCard)}
+          </section>
+        ) : null}
+      </div>
       {confirmingItem && isPending(confirmingItem) ? (
         <ConfirmModal
           title="Withdraw request?"

@@ -192,6 +192,16 @@ test.describe('Dashboard → Requests', () => {
     await expect(page.getByRole('link', { name: 'Browse listings' })).toBeVisible();
     await typeTab(page, 'Number requests').click();
     await expect(card(page, flat.title)).toBeVisible();
+
+    await typeTab(page, 'Number requests').press('ArrowRight');
+    await expect(typeTab(page, 'Photo requests')).toBeFocused();
+    await expect(typeTab(page, 'Photo requests')).toHaveAttribute('aria-selected', 'true');
+    await expect(typeTab(page, 'Number requests')).toHaveAttribute('tabindex', '-1');
+    await page.keyboard.press('Home');
+    await expect(typeTab(page, 'All')).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
+    await expect(typeTab(page, 'Offers')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tabpanel', { name: /^Offers/ })).toContainText('No offers yet.');
   });
 
   test('received requests list first, sent ones follow, and a type tab counts only what awaits you', async ({ page }) => {

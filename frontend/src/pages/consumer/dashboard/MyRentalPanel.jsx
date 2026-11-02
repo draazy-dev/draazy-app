@@ -60,6 +60,7 @@ export default function MyRentalPanel({ user }) {
   const [rent, setRent] = useState({ profile: null, agreements: [] });
   const [invites, setInvites] = useState([]);
   const [tracked, setTracked] = useState([]);
+  const replaceTracked = (row) => setTracked((rows) => rows.map((x) => (x.id === row.id ? row : x)));
   useEffect(() => {
     let alive = true;
     Promise.all([
@@ -116,7 +117,7 @@ export default function MyRentalPanel({ user }) {
         <Hero headingRef={headingRef} />
         <PendingInvites invites={invites} />
         <PendingTenancies rows={pendingRows} busy={busy} onAnswer={answer} />
-        <TrackedRent homes={tracked} />
+        <TrackedRent homes={tracked} onChange={replaceTracked} />
         {pendingRows.length === 0 && tracked.length === 0 && (
         <Card className="p-8 text-center">
           <div className="w-14 h-14 rounded-2xl bg-brand-teal/10 flex items-center justify-center mx-auto mb-4">
@@ -147,7 +148,7 @@ export default function MyRentalPanel({ user }) {
       <Hero headingRef={headingRef} />
       <PendingInvites invites={invites} />
       <PendingTenancies rows={pendingRows} busy={busy} onAnswer={answer} />
-      <TrackedRent homes={tracked} />
+      <TrackedRent homes={tracked} onChange={replaceTracked} />
       {live.length > 1 && (
         <HScroll wrapClassName="-mx-1" className="flex gap-1.5 px-1">
           {live.map((x, i) => (

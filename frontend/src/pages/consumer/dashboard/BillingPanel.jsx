@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { fmtDate } from '../../../lib/format.js';
 import { getEntitlements } from '../../../services/entitlementService.js';
+import { REVISIT_MAX_AGE } from '../../../services/http.js';
 import { usePricing } from '../../../context/PricingContext';
 import Icon from '../../../components/Icon.jsx';
 import { freeContactsTill } from '../property/useEntitlements.js';
@@ -16,7 +17,7 @@ export default function BillingPanel({ isOwner, listings = [] }) {
 
   useEffect(() => {
     let live = true;
-    getEntitlements().then((e) => { if (live) setEnt(e); }).catch(() => {});
+    getEntitlements({ maxAge: REVISIT_MAX_AGE }).then((e) => { if (live) setEnt(e); }).catch(() => {});
     return () => { live = false; };
   }, []);
 
@@ -32,6 +33,8 @@ export default function BillingPanel({ isOwner, listings = [] }) {
       key: 'contacts', icon: 'phone-call', label: t('dash.billingContactsLeft'),
       value: c.unlimited ? t('dash.billingUnlimitedShort') : c.remaining,
       sub: c.unlimited ? t('dash.billingUsed', { used: c.used }) : usedOf(c.used, c.allowance),
+      note: !c.unlimited && Number.isFinite(c.remainingRent) && Number.isFinite(c.remainingBuy)
+        ? t('misc1.contactsRentBuy', { rent: c.remainingRent, buy: c.remainingBuy }) : '',
     },
     l && (isOwner || passes.length > 0 || l.used > 0) && {
       key: 'slots', icon: 'building-2', label: t('dash.billingSlotsLeft'),
@@ -69,10 +72,11 @@ export default function BillingPanel({ isOwner, listings = [] }) {
                   <p className="text-2xl font-bold leading-none text-white">{b.value}</p>
                   <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-gray-300"><Icon name={b.icon} className="h-3.5 w-3.5 flex-shrink-0 text-teal-400" />{b.label}</p>
                   {b.sub ? <p className="mt-0.5 text-xs text-gray-500">{b.sub}</p> : null}
+                  {b.note ? <p className="mt-0.5 text-xs text-gray-400" data-testid="contacts-rent-buy">{b.note}</p> : null}
                 </li>
               ))}
             </ul>
-            {held.length === 0 ? <p className="text-gray-500 text-xs mt-3">{isOwner ? t('dash.billingFreeOwner', { price: fee('listingPass') }) : t('dash.billingFreeSeeker')}</p> : null}
+            {held.length === 0 ? <p className="text-gray-500 text-xs mt-3">{isOwner ? t('dash.billingFreeOwner', { rent: fee('listingPass'), buy: fee('listingPassBuy') }) : t('dash.billingFreeSeeker')}</p> : null}
             {details.length > 0 ? (
               <details className="mt-4 border-t border-white/10">
                 <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-teal-400 pt-3 min-h-[44px]">{t('dash.billingDetails')}<Icon name="chevron-down" className="faq-chevron w-4 h-4 transition-transform flex-shrink-0" /></summary>
@@ -85,7 +89,7 @@ export default function BillingPanel({ isOwner, listings = [] }) {
         ) : (
           <div>
             <p className="text-white text-xl font-extrabold">{t('dash.billingFree')}</p>
-            <p className="text-gray-500 text-xs mt-0.5">{isOwner ? t('dash.billingFreeOwner', { price: fee('listingPass') }) : t('dash.billingFreeSeeker')}</p>
+            <p className="text-gray-500 text-xs mt-0.5">{isOwner ? t('dash.billingFreeOwner', { rent: fee('listingPass'), buy: fee('listingPassBuy') }) : t('dash.billingFreeSeeker')}</p>
           </div>
         )}
       </Card>

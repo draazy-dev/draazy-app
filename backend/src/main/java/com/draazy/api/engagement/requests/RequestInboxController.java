@@ -37,6 +37,11 @@ public class RequestInboxController {
         return PageResponse.of(inbox.list(principal.userId(), box, Pageables.unsorted(pageable)), item -> item);
     }
 
+    @GetMapping(Routes.MeRequests.PENDING_COUNT)
+    public RequestInboxService.PendingCount pendingCount(@CurrentUser AuthPrincipal principal) {
+        return inbox.pendingCount(principal.userId());
+    }
+
     @PostMapping(Routes.MeRequests.REMINDERS)
     @ResponseStatus(HttpStatus.CREATED)
     public RequestReminderResponse remind(@CurrentUser AuthPrincipal principal, @PathVariable String kind,

@@ -1,5 +1,6 @@
 package com.draazy.api.engagement.requests;
 
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ErrorCodes;
@@ -12,6 +13,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -27,6 +29,7 @@ public class RequestInboxService {
     static final String SENT = "sent";
     private static final Duration SENT_HISTORY = Duration.ofDays(30);
     private static final Duration RECEIVED_HISTORY = Duration.ofDays(90);
+    private static final Set<String> CONNECTION_KINDS = Set.of("contact", "visit", "offer", "flatmate", "group");
 
     private static final Comparator<RequestItem> NEWEST_FIRST = Comparator.comparing(RequestItem::createdAt).reversed();
 
@@ -43,11 +46,14 @@ public class RequestInboxService {
     private final RequestSources sources;
     private final RequestReminderRepository reminders;
     private final RequestHiddenRepository hidden;
+    private final PropertyRepository properties;
 
-    RequestInboxService(RequestSources sources, RequestReminderRepository reminders, RequestHiddenRepository hidden) {
+    RequestInboxService(RequestSources sources, RequestReminderRepository reminders, RequestHiddenRepository hidden,
+            PropertyRepository properties) {
         this.sources = sources;
         this.reminders = reminders;
         this.hidden = hidden;
+        this.properties = properties;
     }
 
     @Transactional(readOnly = true)
@@ -62,11 +68,25 @@ public class RequestInboxService {
         return new PageImpl<>(items.subList(from, to), pageable, items.size());
     }
 
+    @Transactional(readOnly = true)
+    public PendingCount pendingCount(UUID userId) {
+        Instant since = Instant.now().minus(RECEIVED_HISTORY);
+        List<UUID> owned = properties.findIdsByOwnerId(userId);
+        long count = sources.all().stream().filter(source -> CONNECTION_KINDS.contains(source.kind()))
+                .flatMap(source -> source.received(userId, owned, since).stream())
+                .filter(RequestView::pending).count();
+        return new PendingCount(count);
+    }
+
+    public record PendingCount(long count) {
+    }
+
     @Transactional
     public void remove(UUID userId, String box, String kind, UUID id) {
         var source = sources.of(kind);
         if (!isSent(box)) {
-            RequestView view = source.received(userId, Instant.now().minus(RECEIVED_HISTORY)).stream()
+            RequestView view = source.received(userId, properties.findIdsByOwnerId(userId),
+                            Instant.now().minus(RECEIVED_HISTORY)).stream()
                     .filter(v -> v.id().equals(id) && !RequestSource.WITHDRAWN.equals(v.state())).findFirst()
                     .orElseThrow(() -> NotFoundException.of("Request"));
             if (view.pending()) {
@@ -115,7 +135,8 @@ public class RequestInboxService {
     private List<RequestView> receivedViews(UUID userId) {
         Instant since = Instant.now().minus(RECEIVED_HISTORY);
         Map<String, Instant> cleared = clearedAt(userId);
-        return sources.all().stream().flatMap(source -> source.received(userId, since).stream())
+        List<UUID> owned = properties.findIdsByOwnerId(userId);
+        return sources.all().stream().flatMap(source -> source.received(userId, owned, since).stream())
                 .filter(view -> !RequestSource.WITHDRAWN.equals(view.state()))
                 .filter(view -> !clearedBefore(view, cleared.get(key(view.kind(), view.id())))).toList();
     }

@@ -56,12 +56,6 @@ public class DocumentRequest extends AuditedEntity {
         this.acknowledgedDisclaimer = acknowledgedDisclaimer;
     }
 
-    public void grant(String shareToken, Instant expiresAt) {
-        this.status = DocumentRequestStatuses.GRANTED;
-        this.shareToken = shareToken;
-        this.expiresAt = expiresAt;
-    }
-
     public void decline() {
         this.status = DocumentRequestStatuses.DECLINED;
         this.shareToken = null;

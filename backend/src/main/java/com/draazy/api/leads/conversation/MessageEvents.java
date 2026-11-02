@@ -1,5 +1,6 @@
 package com.draazy.api.leads.conversation;
 
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.common.trust.FlatmateGroupRoster;
 import com.draazy.api.common.trust.LiveUpdates;
 import com.draazy.api.identity.user.User;
@@ -15,8 +16,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -58,7 +57,7 @@ public class MessageEvents implements LiveUpdates {
     }
 
     public void messageCreated(Conversation conversation, UUID authorId) {
-        afterCommit(() -> {
+        AfterCommit.run(() -> {
             Event event = new Event(conversation.getId().toString());
             participants(conversation).forEach(userId -> hub.publish(userId, "message", event));
         });
@@ -66,7 +65,7 @@ public class MessageEvents implements LiveUpdates {
 
     @Override
     public void notificationsChanged(UUID userId) {
-        afterCommit(() -> hub.publish(userId, "notification", Map.of()));
+        AfterCommit.run(() -> hub.publish(userId, "notification", Map.of()));
     }
 
     public void read(Conversation conversation, UUID readerId) {
@@ -75,7 +74,7 @@ public class MessageEvents implements LiveUpdates {
         }
         UUID other = conversation.other(readerId);
         if (other != null && !conversations.blockedEitherWay(readerId, other) && shareReadReceipts(readerId, other)) {
-            afterCommit(() -> hub.publish(other, "read", new Event(conversation.getId().toString())));
+            AfterCommit.run(() -> hub.publish(other, "read", new Event(conversation.getId().toString())));
         }
     }
 
@@ -86,7 +85,7 @@ public class MessageEvents implements LiveUpdates {
         List<Conversation> direct = conversations.findAllById(conversationIds).stream()
                 .filter(conversation -> !conversation.isGroup())
                 .toList();
-        afterCommit(() -> direct.forEach(conversation -> hub.publish(conversation.other(readerId), "delivered",
+        AfterCommit.run(() -> direct.forEach(conversation -> hub.publish(conversation.other(readerId), "delivered",
                 new Event(conversation.getId().toString()))));
     }
 
@@ -101,19 +100,6 @@ public class MessageEvents implements LiveUpdates {
         participants(conversation).stream()
                 .filter(userId -> !userId.equals(authorId))
                 .forEach(userId -> hub.publish(userId, "typing", event));
-    }
-
-    public void afterCommit(Runnable callback) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            callback.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                callback.run();
-            }
-        });
     }
 
     @Scheduled(fixedDelayString = "PT25S")
