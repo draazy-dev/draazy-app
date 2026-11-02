@@ -8,7 +8,6 @@ export const ROOM_KINDS = {
   living: { key: 'living', label: 'Living room', attachedBath: false, icon: 'sofa' },
 };
 export const ROOM_KIND_ORDER = ['master', 'bedroom', 'living'];
-export const roomKindMeta = (k) => ROOM_KINDS[k] || null;
 export const roomKindOf = (r) => {
   if (!r) return null;
   if (r.roomKind && ROOM_KINDS[r.roomKind]) return r.roomKind;
@@ -35,15 +34,12 @@ export const occupancyOf = (item) => {
   return committed > 0 ? OCCUPANCY_FILLING : OCCUPANCY_EMPTY;
 };
 
-export const asKind = (kind) => (item) => ({ ...item, kind });
-
 export const PRICE_ROOM = 'room';
 export const PRICE_PERSON = 'person';
 export const priceBasisOf = (r) => (r?.priceBasis === PRICE_ROOM ? PRICE_ROOM : PRICE_PERSON);
 export const rentOf = (r) => Number(r?.budget) || 0;
 export const perPersonRent = (r, people) => Math.round(rentOf(r) / Math.max(1, Number(people) || 1));
 
-export { canSplitIntoRooms, maxRoomsForBhk, capBoundsFor } from '../../../lib/data/flatSplit.js';
 export { ROOM_SHARE_MAX };
 
 export const DEFAULT_MAX_OCCUPANTS = 3;

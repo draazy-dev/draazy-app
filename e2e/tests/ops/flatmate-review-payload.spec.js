@@ -78,11 +78,12 @@ test("the flatmate desk reads slim cards with the host's full mobile and true ta
   await page.getByTestId('flatmate-queue-card').filter({ hasText: society }).first().getByRole('button', { name: 'Review' }).click();
   const dialog = page.getByRole('dialog', { name: /^Review / });
   await expect(dialog.locator('.flatmate-badge-section')).toContainText(host.mobile);
-  await expect(dialog.locator('.view-agreement-btn')).toBeVisible();
+  await expect(dialog.getByTestId('view-review-document')).toBeVisible();
   const opened = calls.slice(before);
   expect(opened).toHaveLength(1);
   expect(opened[0].pathname).toContain(room.id);
-  expect(opened[0].body.review.agreementDoc.dataUrl).toBeTruthy();
+  expect(opened[0].body.review.agreementDoc.id).toBeTruthy();
+  expect(opened[0].body.review.agreementDoc).not.toHaveProperty('dataUrl');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
 
   await page.getByRole('tablist', { name: 'Flatmate queues' }).getByRole('tab', { name: 'Badge requests' }).click();

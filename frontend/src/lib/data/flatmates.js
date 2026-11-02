@@ -1,7 +1,6 @@
 import { digits as digitsOf, norm } from './identityNorm.js';
 import { readUser } from '../auth.js';
 
-const STORE_KEY = 'draazyFlatmatePosts';
 const GROUPS_KEY = 'draazyFlatmateGroups';
 const INTERESTS_KEY = 'draazyFlatmateInterests';
 
@@ -42,47 +41,7 @@ export const recordAskLocally = ({ request }) => {
   return true;
 };
 
-export const getFlatmatePosts = () => get(STORE_KEY, []);
-export const saveFlatmatePost = (req) => {
-  const arr = getFlatmatePosts();
-  arr.unshift(req);
-  return set(STORE_KEY, arr);
-};
-export const updateFlatmatePost = (id, patch) => {
-  const arr = getFlatmatePosts();
-  const idx = arr.findIndex((r) => r.id === id);
-  if (idx >= 0) {
-    arr[idx] = { ...arr[idx], ...patch };
-    set(STORE_KEY, arr);
-    return arr[idx];
-  }
-  return null;
-};
-export const deleteFlatmatePost = (id) => {
-  const arr = getFlatmatePosts().filter((r) => r.id !== id);
-  set(STORE_KEY, arr);
-};
-
 export const getFlatmateGroups = () => get(GROUPS_KEY, []);
-export const saveFlatmateGroup = (group) => {
-  const arr = getFlatmateGroups();
-  arr.unshift(group);
-  return set(GROUPS_KEY, arr);
-};
-export const updateFlatmateGroup = (id, patch) => {
-  const arr = getFlatmateGroups();
-  const idx = arr.findIndex((g) => g.id === id);
-  if (idx >= 0) {
-    arr[idx] = { ...arr[idx], ...patch };
-    set(GROUPS_KEY, arr);
-    return arr[idx];
-  }
-  return null;
-};
-export const deleteFlatmateGroup = (id) => {
-  const arr = getFlatmateGroups().filter((g) => g.id !== id);
-  set(GROUPS_KEY, arr);
-};
 
 export const MOD_PUBLIC = ['live', 'approved'];
 
@@ -157,67 +116,6 @@ export const evaluateHostEligibility = ({ mobile, tier, address } = {}) => {
   return { fingerprint, overCap, duplicate, flagForReview, blocked: overCap || duplicate, reason };
 };
 
-const CONSENT_KEY = 'draazyOwnerConsent';
-export const getOwnerConsents = () => get(CONSENT_KEY, {});
-export const setOwnerConsent = (ownerMobile, byMobile) => {
-  const map = getOwnerConsents();
-  map[digitsOf(ownerMobile)] = { at: Date.now(), by: digitsOf(byMobile) };
-  return set(CONSENT_KEY, map);
-};
-
-const REVIEW_KEY = 'draazyFlatmateReviews';
-const AGREEMENT_DOC_CAP = 3 * 1024 * 1024;
-const normalizeAgreementDoc = (doc) => {
-  if (!doc) return null;
-  const size = Math.max(0, parseInt(doc.size, 10) || 0);
-  const tooLarge = !!doc.tooLarge || size > AGREEMENT_DOC_CAP;
-  return {
-    name: String(doc.name || 'Agreement').slice(0, 200),
-    size,
-    mime: String(doc.mime || '').slice(0, 100),
-    dataUrl: tooLarge ? null : (doc.dataUrl || null),
-    tooLarge,
-  };
-};
-export const getFlatmateReviews = () => get(REVIEW_KEY, []);
-export const enqueueFlatmateReview = (rec) => {
-  const arr = getFlatmateReviews();
-  const key = rec.groupId || rec.roomId;
-  if (key && arr.some((r) => (r.groupId || r.roomId) === key)) return arr;
-  const { agreementDoc, ...rest } = rec;
-  arr.unshift({ id: 'rev' + Date.now(), status: 'pending', reason: '', createdAt: Date.now(), updatedAt: Date.now(), ...rest, agreementDoc: normalizeAgreementDoc(agreementDoc) });
-  try {
-    return set(REVIEW_KEY, arr);
-  } catch {
-    if (arr[0] && arr[0].agreementDoc && arr[0].agreementDoc.dataUrl) {
-      arr[0] = { ...arr[0], agreementDoc: { ...arr[0].agreementDoc, dataUrl: null, tooLarge: true } };
-    }
-    return set(REVIEW_KEY, arr);
-  }
-};
-export const decideFlatmateReview = (id, status, reason) => {
-  const arr = getFlatmateReviews();
-  const idx = arr.findIndex((r) => r.id === id);
-  if (idx < 0) return null;
-  arr[idx] = { ...arr[idx], status, reason: reason || '', updatedAt: Date.now() };
-  set(REVIEW_KEY, arr);
-  return arr[idx];
-};
-export const getFlatmateReviewStatusMap = () => {
-  const m = {};
-  getFlatmateReviews().forEach((r) => { m[r.groupId || r.roomId] = r.status; });
-  return m;
-};
-
-export const getMyRequest = (userMobile, userName) => {
-  return getFlatmatePosts().find((r) => {
-    if (userMobile && r.mobile && r.mobile === userMobile) return true;
-    if (userName && r.name && r.name.toLowerCase() === userName.toLowerCase()) return true;
-    return false;
-  });
-};
-
-export const getAskedInterests = (mobile) => (digitsOf(mobile) ? get(INTERESTS_KEY, {})[digitsOf(mobile)] || {} : {});
 export const rememberAsk = (mobile, key) => {
   const who = digitsOf(mobile);
   if (!who) return;

@@ -44,8 +44,7 @@ class GroupApplicationSource implements RequestSource {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RequestView> received(UUID recipientId, Instant since) {
-        List<UUID> owned = properties.findIdsByOwnerId(recipientId);
+    public List<RequestView> received(UUID recipientId, List<UUID> owned, Instant since) {
         if (owned.isEmpty()) {
             return List.of();
         }

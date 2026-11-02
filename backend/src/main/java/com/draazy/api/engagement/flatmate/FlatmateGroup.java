@@ -18,6 +18,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -178,6 +179,7 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true,
             fetch = FetchType.LAZY)
     @OrderBy("createdAt asc")
+    @BatchSize(size = 50)
     private List<FlatmateGroupMember> members = new ArrayList<>();
 
     protected FlatmateGroup() {

@@ -7,7 +7,6 @@ export const isPubliclyVisible = (modStatus) => MOD_PUBLIC.includes(modStatus ||
 
 export const CONFLICT_ALREADY_INTERESTED = 'already_interested';
 export const CONFLICT_GROUP_FULL = 'group_full';
-export const CONFLICT_GROUP_LIMIT = 'group_limit';
 
 export const CONFLICT_MARKER = /\s*\(([a-z_]+)\)\s*$/;
 

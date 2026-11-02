@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { API } from '../../../helpers/liveAuth.js';
+import { settle } from '../../../helpers/settle.js';
 
 // Staged totals distinguish server-wide counts from the seeded page, while untouched data proves filtering.
 
@@ -37,6 +38,9 @@ const stageTotals = (page, { totalElements, totalPages }) =>
     const body = await response.json();
     await route.fulfill({ response, json: { ...body, totalElements, totalPages } });
   });
+
+// A staged fetch still in flight at test end otherwise rejects inside the next test.
+test.afterEach(({ page }) => page.unrouteAll({ behavior: 'ignoreErrors' }));
 
 test('the header counts the whole result set, not the cards on screen', async ({ page }) => {
   await stageTotals(page, { totalElements: 137, totalPages: 6 });
@@ -142,7 +146,7 @@ test('one feed request draws the board, the other tab\'s count included', async 
   const feeds = [];
   page.on('request', (r) => { if (/\/flatmates\/feed\?/.test(r.url())) feeds.push(r.url()); });
   await openBoard(page);
-  await page.waitForLoadState('networkidle');
+  await settle(page);
   expect(feeds).toHaveLength(1);
 
   const moveIn = await feed(request, { tab: 'move-in', size: '1' });

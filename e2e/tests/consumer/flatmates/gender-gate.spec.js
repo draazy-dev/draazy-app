@@ -126,6 +126,13 @@ test.describe('women-only and men-only supply checks who is asking (live)', () =
       const res = await route.fetch();
       return route.fulfill({ response: res, json: { ...(await res.json()), gender: null } });
     });
+    // The signed-in profile is first read from /me/bootstrap, which primes /auth/me.
+    await page.route('**/me/bootstrap', async (route) => {
+      if (!stale) return route.continue();
+      const res = await route.fetch();
+      const doc = await res.json();
+      return route.fulfill({ response: res, json: { ...doc, me: doc.me && { ...doc.me, gender: null } } });
+    });
 
     await page.goto(`${BASE}/flatmates/group/${group.id}`);
     const ask = page.getByRole('button', { name: /Request to join/i }).filter({ visible: true }).first();

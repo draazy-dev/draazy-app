@@ -23,6 +23,7 @@ import com.draazy.api.identity.verification.IdentityVerificationService;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,6 +43,7 @@ public class FlatmateSupplyService {
     private static final Duration RATE_WINDOW = Duration.ofHours(1);
 
     private static final int MAX_MESSAGE = 4000;
+    private static final int MAX_DOC_FIELD = 200;
 
     private static final String ONE_PER_TARGET_INDEX = "uq_flatmate_requests_target_requester";
 
@@ -584,7 +586,7 @@ public class FlatmateSupplyService {
 
     private FlatmatePublication.AgreementClaim claimOf(AuthPrincipal caller,
             FlatmateRoomCreateRequest body, boolean ownerConsent) {
-        return new FlatmatePublication.AgreementClaim(body.agreementDoc(),
+        return new FlatmatePublication.AgreementClaim(storedDoc(body.agreementDoc()),
                 new AgreementRegistration(), ownerConsent,
                 Ids.parseUuid(body.propertyId()).orElse(null),
                 evidenceTypeOf(caller.userId(), body.agreementDoc()));
@@ -596,10 +598,27 @@ public class FlatmateSupplyService {
             return new FlatmatePublication.AgreementClaim(null,
                     new AgreementRegistration(), false, null, null);
         }
-        return new FlatmatePublication.AgreementClaim(body.agreementDoc(),
+        return new FlatmatePublication.AgreementClaim(storedDoc(body.agreementDoc()),
                 new AgreementRegistration(), ownerConsent,
                 Ids.parseUuid(body.propertyId()).orElse(null),
                 evidenceTypeOf(caller.userId(), body.agreementDoc()));
+    }
+
+    // Rebuilt from fixed keys: a client-sent dataUrl would let Ops open the host's bytes instead of the vault file.
+    static Map<String, Object> storedDoc(Map<String, Object> document) {
+        String id = agreementDocId(document);
+        if (id == null || id.length() > MAX_DOC_FIELD) {
+            return null;
+        }
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("id", id);
+        for (String key : List.of("name", AgreementPeriod.FROM, AgreementPeriod.TILL)) {
+            if (document.get(key) instanceof String value && !value.isBlank()) {
+                String kept = value.strip();
+                doc.put(key, kept.length() > MAX_DOC_FIELD ? kept.substring(0, MAX_DOC_FIELD) : kept);
+            }
+        }
+        return doc;
     }
 
     private String evidenceTypeOf(UUID hostId, Map<String, Object> document) {
@@ -721,17 +740,10 @@ public class FlatmateSupplyService {
     }
 
     public static class HostBlockedException extends ConflictException {
-        private final transient FlatmateGuardrails.HostEligibility eligibility;
-
         HostBlockedException(FlatmateGuardrails.HostEligibility eligibility) {
             super(FlatmateConflicts.mark(eligibility.reason(),
                     FlatmateConflicts.guardrailSubCode(eligibility.overCap(),
                             eligibility.duplicate())));
-            this.eligibility = eligibility;
-        }
-
-        public FlatmateGuardrails.HostEligibility eligibility() {
-            return eligibility;
         }
     }
 }

@@ -18,6 +18,7 @@ import { useFlatmateSupply } from './useFlatmateSupply.jsx';
 import { useGroupPickers } from './useGroupPickers.js';
 import { useGenderGate } from './useGenderGate.jsx';
 import { MAX_PAGE_SIZE } from '../../../services/apiLimits.js';
+import { REVISIT_MAX_AGE } from '../../../services/http.js';
 
 export { emptyFilters };
 export const MAP_MAX_AREAS = 3;
@@ -48,15 +49,15 @@ export function useFlatmates() {
   const { openPostChooser } = usePostChooser();
   const [viewMode, setViewMode] = useState('list');
   const [myPosts, myPostsStatus, setMyPosts] = useAsyncList(
-    () => user ? flatmateService.myFlatmatePosts({ size: MY_PAGE }).then((page) => page.items) : Promise.resolve([]),
+    () => user ? flatmateService.myFlatmatePosts({ size: MY_PAGE, maxAge: REVISIT_MAX_AGE }).then((page) => page.items) : Promise.resolve([]),
     [user?.mobile],
   );
   const [myGroups, , setMyGroups] = useAsyncList(
-    () => user ? flatmateService.myFlatmateGroups({ size: MY_PAGE }).then((page) => page.items) : Promise.resolve([]),
+    () => user ? flatmateService.myFlatmateGroups({ size: MY_PAGE, maxAge: REVISIT_MAX_AGE }).then((page) => page.items) : Promise.resolve([]),
     [user?.mobile],
   );
   const [myRooms, , setMyRooms] = useAsyncList(
-    () => user ? flatmateService.myFlatmateRooms({ size: MY_PAGE }).then((page) => page.items) : Promise.resolve([]),
+    () => user ? flatmateService.myFlatmateRooms({ size: MY_PAGE, maxAge: REVISIT_MAX_AGE }).then((page) => page.items) : Promise.resolve([]),
     [user?.mobile],
   );
   const searchRef = useRef({ refresh: () => {} });
@@ -64,7 +65,7 @@ export function useFlatmates() {
   useEffect(() => {
     let alive = true;
     if (!user) { setSaved({}); return () => { alive = false; }; }
-    flatmateService.listFlatmateSaveKeys()
+    flatmateService.listFlatmateSaveKeys({ maxAge: REVISIT_MAX_AGE })
       .then((rows) => {
         if (!alive) return;
         setSaved(Object.fromEntries(rows.map((row) => [savedKey(row.kind, row.id), true])));
@@ -81,7 +82,7 @@ export function useFlatmates() {
   useEffect(() => {
     let alive = true;
     if (!user) { setInterests({}); return () => { alive = false; }; }
-    flatmateService.myFlatmateInterestKeys()
+    flatmateService.myFlatmateInterestKeys({ maxAge: REVISIT_MAX_AGE })
       .then((rows) => {
         if (!alive) return;
         setInterests(Object.fromEntries(rows.map((row) => [interestKey(row), row])));

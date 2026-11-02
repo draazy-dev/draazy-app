@@ -306,9 +306,9 @@ export async function myFlatmateInterests() {
   return unwrapFullPage(res, 'flatmate');
 }
 
-export async function myFlatmateInterestKeys() {
+export async function myFlatmateInterestKeys({ maxAge } = {}) {
   if (!signedIn()) return [];
-  return get('/me/flatmate-interests/keys');
+  return get('/me/flatmate-interests/keys', undefined, { ttl: PAGE_LOAD_TTL, maxAge });
 }
 
 export async function decideRequest(id, decision) {
@@ -316,8 +316,8 @@ export async function decideRequest(id, decision) {
     await patch(`/me/flatmate-requests/${encodeURIComponent(id)}`, { decision }),
   ));
 }
-export async function myFlatmatePosts({ page = 0, size = 20 } = {}) {
-  const res = await get('/me/flatmate-posts', clean({ page, size }), { ttl: PAGE_LOAD_TTL });
+export async function myFlatmatePosts({ page = 0, size = 20, maxAge } = {}) {
+  const res = await get('/me/flatmate-posts', clean({ page, size }), { ttl: PAGE_LOAD_TTL, maxAge });
   const paged = unwrapPage(res, { page, size });
   return { ...paged, items: paged.items.map(toSeekerPostViewModel) };
 }
@@ -347,7 +347,7 @@ export async function flatmatePulse() {
   return (await bootstrapSection('flatmatePulse')) ?? null;
 }
 
-export async function feed(tab = 'move-in', filters = {}, page = 0, size = 24, { signal, auth = !!readAccessToken() } = {}) {
+export async function feed(tab = 'move-in', filters = {}, page = 0, size = 24, { signal, ttl, auth = !!readAccessToken() } = {}) {
   const [minBudget, maxBudget] = budgetRange(filters.budget);
   const res = await get('/flatmates/feed', clean({
     tab: vocab('tab', tab) || 'move-in',
@@ -370,7 +370,7 @@ export async function feed(tab = 'move-in', filters = {}, page = 0, size = 24, {
     ...meParams(filters.me),
     page,
     size,
-  }), { auth, signal });
+  }), { auth, signal, ttl });
   const { items, ...rest } = unwrapPage(res, { page, size });
   const matches = res?.matches || {};
   const withMatch = (vm, kind) => {
@@ -456,9 +456,9 @@ export async function listFlatmateSaves({ page = 0, size = MAX_PAGE_SIZE } = {})
   };
 }
 
-export async function listFlatmateSaveKeys() {
+export async function listFlatmateSaveKeys({ maxAge } = {}) {
   if (!signedIn()) return [];
-  const res = await get('/me/flatmate-saves/keys');
+  const res = await get('/me/flatmate-saves/keys', undefined, { ttl: PAGE_LOAD_TTL, maxAge });
   return Array.isArray(res) ? res.filter((r) => r?.kind && r?.id) : [];
 }
 
@@ -547,14 +547,14 @@ export async function moderateGroupApplication(id, modStatus, note) {
   );
 }
 
-export async function myFlatmateGroups({ page = 0, size = 20 } = {}) {
-  const res = await get('/me/flatmate-groups', clean({ page, size }), { ttl: PAGE_LOAD_TTL });
+export async function myFlatmateGroups({ page = 0, size = 20, maxAge } = {}) {
+  const res = await get('/me/flatmate-groups', clean({ page, size }), { ttl: PAGE_LOAD_TTL, maxAge });
   const paged = unwrapPage(res, { page, size });
   return { ...paged, items: paged.items.map(toGroupCardViewModel) };
 }
 
-export async function myFlatmateRooms({ page = 0, size = 20 } = {}) {
-  const res = await get('/me/flatmate-rooms', clean({ page, size }), { ttl: PAGE_LOAD_TTL });
+export async function myFlatmateRooms({ page = 0, size = 20, maxAge } = {}) {
+  const res = await get('/me/flatmate-rooms', clean({ page, size }), { ttl: PAGE_LOAD_TTL, maxAge });
   const paged = unwrapPage(res, { page, size });
   return { ...paged, items: paged.items.map(toRoomCardViewModel) };
 }

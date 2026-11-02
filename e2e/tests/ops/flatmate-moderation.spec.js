@@ -580,11 +580,13 @@ test.describe('Ops → flatmate desk (live)', () => {
     await expect(dialog.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
     await expect(dialog.getByRole('complementary', { name: 'Decision' }).locator('.flatmate-badge-section')).toBeVisible();
     await expect(dialog.locator('.flatmate-mod-photos img').first()).toHaveAttribute('src', UPLOADED);
-    const downloaded = new Promise((resolve) => {
-      page.context().once('page', (tab) => tab.once('download', (d) => resolve(d.url())));
-    });
+    const opened = page.waitForResponse((r) => r.url().endsWith('/document-url'));
+    const popup = page.waitForEvent('popup');
+    const file = page.context().waitForEvent('response', (r) => r.url().includes('/storage/'));
     await dialog.getByRole('button', { name: 'View agreement' }).click();
-    expect(await downloaded).toMatch(/^blob:http/);
+    expect((await opened).status(), 'the agreement opens through the signed, audited vault link').toBe(200);
+    expect((await file).headers()['content-type'], 'the vault file opens, not the PDF bytes the host sent inline').toBe('image/png');
+    await (await popup).close();
   });
 
   // This redirect guard protects the desk when the flatmates module is off.

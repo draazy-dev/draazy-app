@@ -134,7 +134,8 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.review.hostMobile").value("9813000001"))
-                .andExpect(jsonPath("$.review.agreementDoc.dataUrl").exists())
+                .andExpect(jsonPath("$.review.agreementDoc.id").exists())
+                .andExpect(jsonPath("$.review.agreementDoc.dataUrl").doesNotExist())
                 .andExpect(jsonPath("$.review.status").value("pending"));
     }
 

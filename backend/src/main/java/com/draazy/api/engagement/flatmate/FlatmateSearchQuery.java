@@ -89,11 +89,6 @@ public record FlatmateSearchQuery(
                         .limit(MAX_LIST_VALUES).toList();
     }
 
-    public static FlatmateSearchQuery emptyFor(String tab) {
-        return new FlatmateSearchQuery(tab, null, null, null, null, null, null, null, null,
-                false, null, Map.of(), null, null, null, List.of(), null, null);
-    }
-
     public boolean scoresAgainstMe() {
         return SORT_MATCH.equals(sort)
                 && (!meLocalities.isEmpty() || meBudget != null || meGender != null || meStyle.scorable());

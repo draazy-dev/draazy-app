@@ -52,8 +52,6 @@ public interface FlatmateRequestRepository extends JpaRepository<FlatmateRequest
 
     long countByRequesterIdAndCreatedAtAfter(UUID requesterId, Instant since);
 
-    long countByKindAndTargetIdAndStatus(String kind, UUID targetId, String status);
-
     @Query("""
             select count(r) from FlatmateRequest r
             where r.requesterId = :userId and r.kind = 'group' and r.status = 'pending'

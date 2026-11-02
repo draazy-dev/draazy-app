@@ -212,7 +212,7 @@ test.describe('Flatmates discovery (live)', () => {
   });
 
   test('an empty tab offers the other tab instead of a dead end', async ({ page }) => {
-    const localities = await fetch(`${API}/localities`).then((r) => r.json());
+    const localities = await fetch(`${API}/admin/localities`, { headers: await authHeaders(ACTORS.admin) }).then((r) => r.json());
     let loc;
     for (const { name } of localities) {
       const moveIn = await fetch(`${API}/flatmates/feed?tab=move-in&locality=${encodeURIComponent(name)}&size=1`).then((r) => r.json());

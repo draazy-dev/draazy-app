@@ -25,8 +25,6 @@ public interface FlatmateGroupApplicationRepository
     @Query("select a.listingId from FlatmateGroupApplication a where a.id = :id")
     Optional<UUID> findListingId(@Param("id") UUID id);
 
-    List<FlatmateGroupApplication> findByListingIdOrderByCreatedAtDesc(UUID listingId);
-
     Page<FlatmateGroupApplication> findByListingIdInAndModStatusInOrderByCreatedAtDesc(
             Collection<UUID> listingIds, Collection<String> modStatuses, Pageable pageable);
 

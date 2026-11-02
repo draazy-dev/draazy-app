@@ -195,7 +195,9 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     expect(mine.item.host.agreementDoc).not.toHaveProperty('dataUrl');
     const { accessToken: staffToken } = await apiLogin(STAFF);
     const ops = await (await fetch(`${API}/admin/flatmates/${room.id}`, { headers: auth(staffToken) })).json();
-    expect(ops.review.agreementDoc.dataUrl, 'Ops still opens the agreement after the host re-saves').toMatch(/^data:image\/png;base64,/);
+    expect(ops.review.agreementDoc, 'the review keeps the vault file id, never inline bytes').not.toHaveProperty('dataUrl');
+    const doc = await fetch(`${API}/admin/flatmate-reviews/${ops.review.id}/document-url`, { headers: auth(staffToken) });
+    expect(doc.status, 'Ops still opens the agreement after the host re-saves').toBe(200);
 
     expect(errors, `console errors: ${errors.join('\n')}`).toHaveLength(0);
   });

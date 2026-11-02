@@ -43,7 +43,7 @@ class FlatmateInterestSource implements RequestSource {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RequestView> received(UUID recipientId, Instant since) {
+    public List<RequestView> received(UUID recipientId, List<UUID> ownedPropertyIds, Instant since) {
         return toViews(requests.findReceivedSince(recipientId, since), true);
     }
 

@@ -83,7 +83,7 @@ const keyOf = (type, row) => {
   return row.id;
 };
 
-export function buildQueue(results, tab) {
+function buildQueue(results, tab) {
   const byKey = new Map();
   results.forEach(({ type, page }) => page.items.forEach((row) => {
     const key = keyOf(type, row);

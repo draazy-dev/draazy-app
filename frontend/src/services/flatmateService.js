@@ -2,7 +2,7 @@ import { createProvider } from './config.js';
 
 const provider = createProvider('flatmate');
 
-export { CONFLICT_ALREADY_INTERESTED, CONFLICT_GROUP_FULL, CONFLICT_GROUP_LIMIT } from './providers/http/flatmateMapper.js';
+export { CONFLICT_ALREADY_INTERESTED, CONFLICT_GROUP_FULL } from './providers/http/flatmateMapper.js';
 
 export const createRoom = async (room) => (await provider()).createRoom(room);
 export const updateRoom = async (id, room) => (await provider()).updateRoom(id, room);
@@ -38,7 +38,7 @@ export const postInterest = async (id, body) => (await provider()).postInterest(
 
 export const myRequests = async (status) => (await provider()).myRequests(status);
 export const myFlatmateInterests = async () => (await provider()).myFlatmateInterests();
-export const myFlatmateInterestKeys = async () => (await provider()).myFlatmateInterestKeys();
+export const myFlatmateInterestKeys = async (opts) => (await provider()).myFlatmateInterestKeys(opts);
 export const decideRequest = async (id, decision) => (await provider()).decideRequest(id, decision);
 
 export const splitProperty = async (propertyId, body) => (await provider()).splitProperty(propertyId, body);
@@ -48,7 +48,7 @@ export const feed = async (tab, filters, page, size, opts) => (await provider())
 export const flatmatePulse = async () => (await provider()).flatmatePulse();
 
 export const listFlatmateSaves = async (params) => (await provider()).listFlatmateSaves(params);
-export const listFlatmateSaveKeys = async () => (await provider()).listFlatmateSaveKeys();
+export const listFlatmateSaveKeys = async (opts) => (await provider()).listFlatmateSaveKeys(opts);
 export const saveFlatmatePost = async (kind, id) => (await provider()).saveFlatmatePost(kind, id);
 export const unsaveFlatmatePost = async (kind, id) => (await provider()).unsaveFlatmatePost(kind, id);
 

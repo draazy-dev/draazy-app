@@ -29,8 +29,6 @@ public final class FlatmateVocabulary {
 
     public static final Set<String> ATTACHED_BATH = Set.of("attached", "shared");
 
-    public static final Set<String> PRICE_BASIS = Set.of("room", "person");
-
     public static final Set<String> FURNISHING = Set.of("unfurnished", "semi", "furnished");
     public static final Set<String> PARKING = Set.of("bike", "car");
 
@@ -44,8 +42,6 @@ public final class FlatmateVocabulary {
             Set.of("Flat", "Independent House", "Villa", "Row House");
 
     public static final Set<String> HOST_ROLE = Set.of("owner", "tenant");
-
-    public static final Set<String> VERIFICATION_TIER = Set.of("identity", "tenant", "owner");
 
     public static final Set<String> MOD_STATUS =
             Set.of("pending", "live", "approved", "flagged", "removed", "rejected");
@@ -142,10 +138,5 @@ public final class FlatmateVocabulary {
             throw new ValidationException("Add your name to your profile before posting.");
         }
         return name;
-    }
-
-    public static String facetOrNull(String value) {
-        String trimmed = blankToNull(value);
-        return POLICY_OPEN.equals(trimmed) ? null : trimmed;
     }
 }

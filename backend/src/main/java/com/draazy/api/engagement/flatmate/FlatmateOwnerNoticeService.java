@@ -4,6 +4,7 @@ import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.trust.Notifier;
@@ -20,8 +21,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class FlatmateOwnerNoticeService {
@@ -112,7 +111,7 @@ public class FlatmateOwnerNoticeService {
         String tenant = firstName(room.getHostId());
         String place = placeOf(room);
         String link = baseUrl + "/owner-confirm#" + token;
-        afterCommit(() -> dispatch(mobile, tenant, place, link));
+        AfterCommit.run(() -> dispatch(mobile, tenant, place, link));
     }
 
     private boolean ownerTurnedWhatsAppOff(String mobile) {
@@ -125,19 +124,6 @@ public class FlatmateOwnerNoticeService {
                 && room.getOwnerConsentMobile() != null
                 && room.getAddressFingerprint() != null
                 && !room.isOwnerConsent();
-    }
-
-    private static void afterCommit(Runnable send) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            send.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                send.run();
-            }
-        });
     }
 
     private void dispatch(String mobile, String tenant, String place, String link) {

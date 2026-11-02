@@ -17,6 +17,8 @@ import { useLatest, useSignInGate } from '../../lib/useSignInGate.js';
 import { useScrollReveal } from '../../lib/useScrollReveal.js';
 import { recordAskLocally, rememberAsk } from '../../lib/data/flatmates.js';
 import * as flatmateService from '../../services/flatmateService.js';
+import { REVISIT_MAX_AGE } from '../../services/http.js';
+import { readAccessToken, readUser } from '../../lib/auth.js';
 import { inr, perHead, roomTitle, FLATMATE_IMG, FLATMATE_GROUP_IMG } from './flatmates/helpers.js';
 import { SHARE_OPENER, SEEKER_OPENER, GROUP_OPENER } from './flatmates/openers.js';
 import { useGenderGate } from './flatmates/useGenderGate.jsx';
@@ -71,16 +73,20 @@ export default function FlatmateDetail() {
 
   const load = useCallback(async () => {
     if (!KINDS.includes(kind)) { setState({ status: 'missing' }); return; }
+    const sentAsUser = !!readAccessToken() && !!readUser();
     try {
       const res = await flatmateService.getFlatmateDetail(kind, id);
       setState({ status: 'ready', owned: res.owned, item: res.item });
     } catch (err) {
+      // A stored session that can't be refreshed ends here; the guest reload follows from signedInAs.
+      if (err?.status === 401 && sentAsUser && !readAccessToken()) return;
       setState({ status: err?.status === 404 || err?.status === 400 ? 'missing' : 'error', error: err });
     }
   }, [kind, id]);
-  useEffect(() => { if (!authLoading) load(); }, [authLoading, signedInAs, load]);
+  const authKnown = !authLoading || (!!signedInAs && !!readAccessToken());
+  useEffect(() => { if (authKnown) load(); }, [authKnown, signedInAs, load]);
 
-  const loadMine = useCallback(() => flatmateService.myFlatmateInterestKeys()
+  const loadMine = useCallback(() => flatmateService.myFlatmateInterestKeys({ maxAge: REVISIT_MAX_AGE })
     .then((rows) => rows.find((r) => (r.kind === 'room' || r.kind === 'group' ? `${r.kind}-${r.targetId}` : r.targetId) === interestKey(kind, id)))
     .then((row) => row || null), [kind, id]);
 
