@@ -30,7 +30,7 @@ class QuietHoursTest {
     })
     void deferUntil(String label, boolean enabled, String start, String end, String at, String expected) {
         NotificationPreferencesDto prefs = new NotificationPreferencesDto(
-                true, false, true, true, new QuietHoursDto(enabled, start, end), "en");
+                true, false, true, true, new QuietHoursDto(enabled, start, end), "en", false);
 
         Optional<Instant> deferred = QuietHours.deferUntil(prefs, ist(at));
 

@@ -6,7 +6,8 @@ public record NotificationPreferencesDto(
         boolean whatsapp,
         boolean matchAlerts,
         QuietHoursDto quietHours,
-        String language) {
+        String language,
+        boolean marketingCalls) {
     static NotificationPreferencesDto of(NotificationPreference row) {
         return new NotificationPreferencesDto(
                 row.isEmail(),
@@ -14,6 +15,7 @@ public record NotificationPreferencesDto(
                 row.isWhatsapp(),
                 row.isMatchAlerts(),
                 new QuietHoursDto(row.isQuietHoursEnabled(), row.getQuietStart(), row.getQuietEnd()),
-                row.getLanguage());
+                row.getLanguage(),
+                row.getMarketingConsentAt() != null);
     }
 }

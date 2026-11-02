@@ -130,6 +130,22 @@
     "catSociety": "Society",
     "catApprovals": "Approvals & Plans",
     "catPurchase": "Purchase & Payments",
-    "catTax": "Tax & Utilities"
+    "catTax": "Tax & Utilities",
+    "catRentAgreement": "Rent Agreement",
+    "tenantSaysPaid": "{{tenant}} says {{month}} rent is paid",
+    "confirmReceived": "Confirm received",
+    "notReceived": "Not received",
+    "claimRejected": "{{tenant}} has been told it hasn't arrived.",
+    "claimRejectFailed": "Couldn't update. Try again.",
+    "saysPaid": "Says paid",
+    "landlordPan": "Your PAN (for HRA receipts)",
+    "errPan": "Enter a valid PAN, like ABCDE1234F",
+    "panHint": "Rent is above ₹1 lakh a year, so your tenant needs your PAN on receipts to claim HRA.",
+    "addPan": "Add PAN",
+    "leaseEndTitle": "Lease ends {{date}}",
+    "leaseEndHint": "Renew with the same tenant, or line up the next one before it ends.",
+    "leaseRenewCta": "Renew for {{price}}",
+    "leaseRelistCta": "Tenant moving out? List again",
+    "leaseListCta": "List it from {{date}}"
   }
 }

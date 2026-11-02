@@ -21,6 +21,7 @@ import com.draazy.api.security.JwtService;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -87,7 +88,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
         closeDeal(owner, p, tenant.getMobile(), 28000L);
 
         assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
-        assertThat(tenancies.findPendingByPropertyId(p.getId())).isPresent();
+        assertThat(pendingTenancy(p.getId())).isPresent();
 
         mvc.perform(get(Routes.Tenancies.MINE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
@@ -156,7 +157,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
         User next = user("9822200008", "buyer");
         closeDeal(owner, p, next.getMobile(), 30000L);
         assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
-        assertThat(tenancies.findPendingByPropertyId(p.getId())).isPresent();
+        assertThat(pendingTenancy(p.getId())).isPresent();
     }
 
     @Test
@@ -319,7 +320,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
         mvc.perform(post(url)).andExpect(status().isUnauthorized());
 
-        assertThat(tenancies.findPendingByPropertyId(p.getId())).isPresent();
+        assertThat(pendingTenancy(p.getId())).isPresent();
     }
 
     @Test
@@ -373,7 +374,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
     }
 
     private UUID pendingId(Property p) {
-        return tenancies.findPendingByPropertyId(p.getId()).orElseThrow().getId();
+        return pendingTenancy(p.getId()).orElseThrow().getId();
     }
 
     private void confirm(User tenant, UUID id) throws Exception {
@@ -467,5 +468,10 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .collect(Collectors.toSet());
 
         assertThat(mapped).doesNotContain("POST /tenancies");
+    }
+
+    private Optional<Tenancy> pendingTenancy(UUID propertyId) {
+        return tenancies.findByPropertyId(propertyId).stream()
+                .filter(t -> "pending".equals(t.getStatus())).findFirst();
     }
 }

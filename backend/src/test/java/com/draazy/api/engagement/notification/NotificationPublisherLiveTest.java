@@ -55,6 +55,6 @@ class NotificationPublisherLiveTest {
 
     private static NotificationPreferencesDto prefs(boolean quiet) {
         return new NotificationPreferencesDto(false, false, false, true,
-                new QuietHoursDto(quiet, "22:00", "07:00"), "en");
+                new QuietHoursDto(quiet, "22:00", "07:00"), "en", false);
     }
 }

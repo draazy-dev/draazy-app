@@ -167,7 +167,7 @@ class WaitingDigestServiceTest extends AbstractApiTest {
         User buyer = user("9810100062");
         contactRequest(listing(owner, "approved"), buyer, "pending", hoursAgo(3));
         NotificationPreference row = new NotificationPreference(owner.getId());
-        row.replace(true, false, false, true, false, "22:00", "07:00", "en");
+        row.replace(true, false, false, true, false, "22:00", "07:00", "en", false);
         preferences.saveAndFlush(row);
 
         assertThat(digest.sendDue(NOW)).isZero();

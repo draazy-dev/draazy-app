@@ -28,5 +28,7 @@ public record ManagedPropertyUpdateRequest(
         @IndianMobile String tenantMobile,
         @PositiveOrZero @Max(ManagedProperty.MAX_MONTHLY_RENT) Long monthlyRent,
         @Min(1) @Max(28) Integer dueDay,
-        Map<String, Object> valuation) {
+        Map<String, Object> valuation,
+        @Pattern(regexp = "^$|^[A-Z]{5}[0-9]{4}[A-Z]$", message = "Enter a valid PAN, like ABCDE1234F")
+        String landlordPan) {
 }

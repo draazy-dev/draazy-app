@@ -12,5 +12,10 @@ public record TrackedRentDto(
         int dueDay,
         String status,
         LocalDate dueOn,
+        LocalDate leaseEnd,
+        Long deposit,
+        String landlordPan,
+        String policeIntimation,
+        LocalDate policeIntimatedOn,
         List<ManagedRentReceiptDto> receipts) {
 }

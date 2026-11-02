@@ -23,10 +23,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class MeManagedPropertiesController {
     private final ManagedPropertyService service;
     private final PropertyMapper propertyMapper;
+    private final TrackedRentService trackedRent;
 
-    public MeManagedPropertiesController(ManagedPropertyService service, PropertyMapper propertyMapper) {
+    public MeManagedPropertiesController(ManagedPropertyService service, PropertyMapper propertyMapper,
+            TrackedRentService trackedRent) {
         this.service = service;
         this.propertyMapper = propertyMapper;
+        this.trackedRent = trackedRent;
     }
 
     @GetMapping(Routes.MeManagedProperties.BASE)
@@ -61,6 +64,13 @@ public class MeManagedPropertiesController {
     @DeleteMapping(Routes.MeManagedProperties.RENT_TRACKING)
     public ManagedPropertyDto stopRentTracking(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         return service.stopRentTracking(principal.userId(), id);
+    }
+
+    @DeleteMapping(Routes.MeManagedProperties.RENT_CLAIM)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void rejectRentClaim(@CurrentUser AuthPrincipal principal, @PathVariable String id,
+            @PathVariable String month) {
+        trackedRent.rejectClaim(principal.userId(), id, month);
     }
 
     @PostMapping(Routes.MeManagedProperties.PUBLISH)

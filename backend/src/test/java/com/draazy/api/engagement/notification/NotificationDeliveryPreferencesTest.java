@@ -77,7 +77,7 @@ class NotificationDeliveryPreferencesTest extends AbstractApiTest {
             User u, boolean quietEnabled, String start, String end, boolean matchAlerts) {
         NotificationPreference row = preferences.findById(u.getId())
                 .orElseGet(() -> new NotificationPreference(u.getId()));
-        row.replace(true, false, true, matchAlerts, quietEnabled, start, end, "en");
+        row.replace(true, false, true, matchAlerts, quietEnabled, start, end, "en", false);
         return row;
     }
 
@@ -172,7 +172,7 @@ class NotificationDeliveryPreferencesTest extends AbstractApiTest {
     void whatsappToggle() {
         User silent = user("9800000211");
         NotificationPreference row = new NotificationPreference(silent.getId());
-        row.replace(true, false, false, true, false, "22:00", "07:00", "en");
+        row.replace(true, false, false, true, false, "22:00", "07:00", "en", false);
         preferences.saveAndFlush(row);
 
         assertThat(notifier.allowsWhatsapp(silent.getId())).isFalse();

@@ -3,6 +3,7 @@ package com.draazy.api.catalog.managed;
 import com.draazy.api.catalog.listing.ListingCreate;
 import com.draazy.api.catalog.listing.ListingService;
 import com.draazy.api.catalog.locality.LocalityBinding;
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -18,6 +19,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
@@ -167,6 +169,9 @@ public class ManagedPropertyService {
         if (in.valuation() != null) {
             m.setValuation(in.valuation());
         }
+        if (in.landlordPan() != null) {
+            m.setLandlordPan(in.landlordPan().isEmpty() ? null : in.landlordPan());
+        }
         boolean rentTouched = in.rented() != null || in.tenantName() != null || in.tenantMobile() != null
                 || in.monthlyRent() != null || in.dueDay() != null;
         if (rentTouched && m.isRented()) {
@@ -230,7 +235,7 @@ public class ManagedPropertyService {
 
                 null, null, null, null, null, null, null,
 
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, availableOn(m), null, null, null);
 
         Set<ConstraintViolation<ListingCreate>> violations = validator.validate(listing);
         if (!violations.isEmpty()) {
@@ -254,6 +259,14 @@ public class ManagedPropertyService {
         m.markPublished(created.getId());
         records.saveAndFlush(m);
         return created;
+    }
+
+    // A tenanted home goes back on the market from the day the lease ends, within the rent horizon.
+    private static String availableOn(ManagedProperty m) {
+        LocalDate end = m.getLeaseEnd();
+        LocalDate today = AvailableOn.today();
+        return m.isRented() && end != null && end.isAfter(today)
+                && !end.isAfter(today.plusDays(AvailableOn.MAX_RENT_DAYS_AHEAD)) ? end.toString() : null;
     }
 
     // Row lock so two concurrent publishes of one record cannot both see it unpublished.

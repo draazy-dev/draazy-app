@@ -42,6 +42,9 @@ public class NotificationPreference {
     @Column(name = "language", nullable = false)
     private String language = "en";
 
+    @Column(name = "marketing_consent_at")
+    private Instant marketingConsentAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -58,7 +61,13 @@ public class NotificationPreference {
     }
 
     void replace(boolean email, boolean sms, boolean whatsapp, boolean matchAlerts,
-            boolean quietHoursEnabled, String quietStart, String quietEnd, String language) {
+            boolean quietHoursEnabled, String quietStart, String quietEnd, String language,
+            boolean marketingCalls) {
+        if (!marketingCalls) {
+            this.marketingConsentAt = null;
+        } else if (this.marketingConsentAt == null) {
+            this.marketingConsentAt = Instant.now();
+        }
         this.email = email;
         this.sms = sms;
         this.whatsapp = whatsapp;

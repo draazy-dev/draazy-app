@@ -11,5 +11,6 @@ public record NotificationPreferencesUpdateRequest(
         @NotNull Boolean matchAlerts,
         @NotNull @Valid QuietHoursUpdateRequest quietHours,
         @NotNull @Pattern(regexp = "^(en|hi|mr)$",
-                message = "must be one of en, hi, mr") String language) {
+                message = "must be one of en, hi, mr") String language,
+        @NotNull Boolean marketingCalls) {
 }

@@ -2,6 +2,8 @@ package com.draazy.api.catalog.managed;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 public record ManagedPropertyDto(
@@ -24,6 +26,12 @@ public record ManagedPropertyDto(
         String tenantMobile,
         Long monthlyRent,
         Integer dueDay,
+        LocalDate leaseEnd,
+        Long deposit,
+        String landlordPan,
+        String policeIntimation,
+        LocalDate policeIntimatedOn,
+        List<String> rentClaims,
         Map<String, Object> valuation,
         String publishedListingId,
         String sourceRoomId,

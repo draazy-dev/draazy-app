@@ -13,9 +13,6 @@ public interface TenancyRepository extends JpaRepository<Tenancy, UUID> {
     @Query("select t from Tenancy t where t.propertyId = :propertyId and t.status = 'active'")
     Optional<Tenancy> findActiveByPropertyId(@Param("propertyId") UUID propertyId);
 
-    @Query("select t from Tenancy t where t.propertyId = :propertyId and t.status = 'pending'")
-    Optional<Tenancy> findPendingByPropertyId(@Param("propertyId") UUID propertyId);
-
     // Status changes are conditional on the status the caller read, so a concurrent answer,
     // reopen or re-close updates 0 rows instead of clobbering the row.
     @Modifying(flushAutomatically = true, clearAutomatically = true)

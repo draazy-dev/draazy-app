@@ -21,6 +21,7 @@ const CAT_ICON = {
   'Approvals & Plans': 'ruler',
   'Purchase & Payments': 'receipt-indian-rupee',
   'Tax & Utilities': 'landmark',
+  'Rent Agreement': 'file-signature',
 };
 const catIcon = (c) => CAT_ICON[c] || 'file-text';
 

@@ -8,24 +8,29 @@ import { useToast } from '../../../context/ToastContext.jsx';
 import { fmtNum } from '../../../lib/format.js';
 import { isValidName } from '../../../lib/auth.js';
 import { digits, fmtPhone } from '../../../lib/contact.js';
-import { updateManaged, listRentReceipts, recordRentReceipt, stopRentTracking } from '../../../services/managedService.js';
+import { updateManaged, listRentReceipts, recordRentReceipt, rejectRentClaim, stopRentTracking } from '../../../services/managedService.js';
 import { currentDueStatus, recentMonths } from '../../../lib/data/rentReminders.js';
 import { generateSingle } from '../../../lib/rentReceipt.js';
+import LeaseFacts from '../../../components/LeaseFacts.jsx';
+import LeaseEndActions from './LeaseEndActions.jsx';
 import AmountInput from '../flatmates/AmountInput.jsx';
 import { FIELD_CLS } from './constants.js';
 
 const LEDGER_MONTHS = 6;
 const MAX_RENT = 10_000_000;
 const DUE_DAYS = Array.from({ length: 28 }, (_, i) => String(i + 1));
+// Above this annual rent the tenant's employer needs the landlord's PAN before allowing HRA.
+const PAN_NEEDED_ABOVE = 100_000;
 const invalid = (err) => (err ? ' dz-invalid' : '');
 const blankForm = (prop) => ({
   tenantName: prop.tenantName || '',
   tenantMobile: prop.tenantMobile || '',
   monthlyRent: String(prop.monthlyRent || (prop.deal === 'rent' ? prop.price : '') || ''),
   dueDay: String(prop.dueDay || 5),
+  landlordPan: prop.landlordPan || '',
 });
 
-export default function RentPanel({ prop, onChange }) {
+export default function RentPanel({ prop, onChange, onPublish }) {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const rentStr = (n) => t('ownerHub.rentPerMo', { amount: fmtNum(n) });
@@ -40,6 +45,7 @@ export default function RentPanel({ prop, onChange }) {
     tenantMobile: (v) => (!/^[6-9]\d{9}$/.test(v) ? t('ownerHub.errTenantMobile')
       : v === digits(prop.ownerMobile).slice(-10) ? t('ownerHub.errOwnMobile') : ''),
     monthlyRent: (v) => (!(Number(v) > 0) ? t('ownerHub.errRent') : Number(v) > MAX_RENT ? t('ownerHub.errRentMax') : ''),
+    landlordPan: (v) => (!v || /^[A-Z]{5}\d{4}[A-Z]$/.test(v) ? '' : t('ownerHub.errPan')),
   };
   const check = (k, v = form[k]) => setErrors((e) => ({ ...e, [k]: checks[k](v) }));
   const set = (k, v) => {
@@ -100,6 +106,7 @@ export default function RentPanel({ prop, onChange }) {
         tenantMobile: form.tenantMobile,
         monthlyRent: Number(form.monthlyRent),
         dueDay: Number(form.dueDay),
+        landlordPan: form.landlordPan,
       });
       setEditing(false);
       onChange?.();
@@ -162,11 +169,28 @@ export default function RentPanel({ prop, onChange }) {
     }
   };
 
+  const rejectClaim = async (ym) => {
+    if (busyRef.current) return;
+    busyRef.current = ym;
+    setBusyMonth(ym);
+    try {
+      await rejectRentClaim(prop.id, ym);
+      onChange?.();
+      toast(t('ownerHub.claimRejected', { tenant: prop.tenantName || t('ownerHub.tenant') }), 'success');
+    } catch {
+      toast(t('ownerHub.claimRejectFailed'), 'error');
+    } finally {
+      busyRef.current = '';
+      if (alive.current) setBusyMonth('');
+    }
+  };
+
   const download = (r) => generateSingle({
     tenant: r.tenantName || t('ownerHub.tenant'),
     landlord: r.landlordName || t('ownerHub.landlord'),
     address: r.propertyAddress || '',
     rent: r.amount,
+    pan: prop.landlordPan,
     mode: 'Cash / Bank',
     month: r.ym,
     txnRef: r.id,
@@ -210,6 +234,19 @@ export default function RentPanel({ prop, onChange }) {
               </NativeSelect>
             </div>
           </div>
+          <label className="block">
+            <span className="text-xs text-gray-400 mb-1.5 block">{t('ownerHub.landlordPan')}</span>
+            <IdInput
+              kind="pan"
+              value={form.landlordPan}
+              onChange={(v) => set('landlordPan', v)}
+              onBlur={() => check('landlordPan')}
+              placeholder="ABCDE1234F"
+              data-testid="rent-landlord-pan"
+              className={FIELD_CLS + ' uppercase' + invalid(errors.landlordPan)}
+            />
+            <FieldError>{errors.landlordPan}</FieldError>
+          </label>
           <div className="flex gap-2.5">
             <button onClick={saveDetails} disabled={saving} className="btn-teal flex-1 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"><Icon name={prop.rented ? 'check' : 'bell'} className="w-4 h-4" /> {prop.rented ? t('ownerHub.saveChanges') : t('ownerHub.startTracking')}</button>
             {prop.rented && <button onClick={() => { setEditing(false); setErrors({}); setConfirmStop(false); setForm(blankForm(prop)); }} className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-300 text-sm hover:bg-white/5">{t('ownerHub.cancel')}</button>}
@@ -235,6 +272,9 @@ export default function RentPanel({ prop, onChange }) {
   const s = currentDueStatus(prop, i18n.language);
   const thisMonth = byMonth.get(s.ym) || null;
   const paid = !!thisMonth;
+  const claims = new Set(prop.rentClaims || []);
+  const claimed = !paid && !pending && claims.has(s.ym);
+  const tenant = prop.tenantName || t('ownerHub.tenant');
   const months = recentMonths(LEDGER_MONTHS, i18n.language);
   return (
     <div className="glass-card rounded-2xl p-6">
@@ -243,17 +283,39 @@ export default function RentPanel({ prop, onChange }) {
         <button onClick={() => setEditing(true)} className="text-gray-400 text-xs hover:text-white flex items-center gap-1"><Icon name="pencil" className="w-3.5 h-3.5" /> {t('ownerHub.edit')}</button>
       </div>
 
-      <div className={'rounded-xl p-4 border mb-4 ' + (paid ? 'bg-emerald-500/10 border-emerald-500/25' : pending ? 'bg-white/[0.03] border-white/10' : s.overdue ? 'bg-rose-500/10 border-rose-500/25' : 'bg-amber-500/10 border-amber-500/25')}>
-        <p className="text-xs text-gray-300">{s.label} · {prop.tenantName || t('ownerHub.tenant')}{prop.tenantMobile && <> · <span className="whitespace-nowrap">{fmtPhone(prop.tenantMobile)}</span></>}</p>
+      <div className={'rounded-xl p-4 border mb-4 ' + (paid ? 'bg-emerald-500/10 border-emerald-500/25' : pending ? 'bg-white/[0.03] border-white/10' : claimed ? 'bg-sky-500/10 border-sky-500/25' : s.overdue ? 'bg-rose-500/10 border-rose-500/25' : 'bg-amber-500/10 border-amber-500/25')}>
+        <p className="text-xs text-gray-300">{s.label} · {tenant}{prop.tenantMobile && <> · <span className="whitespace-nowrap">{fmtPhone(prop.tenantMobile)}</span></>}</p>
         <p className="text-2xl font-extrabold text-white leading-tight mt-0.5">{rentStr(thisMonth ? thisMonth.amount : prop.monthlyRent)}</p>
-        <p className={'text-xs font-medium mt-1 flex items-center gap-1 ' + (paid ? 'text-emerald-300' : pending ? 'text-gray-400' : s.overdue ? 'text-rose-300' : 'text-amber-300')}>
-          <Icon name={paid ? 'check-circle' : s.overdue && !pending ? 'alert-circle' : 'clock'} className="w-3.5 h-3.5" />
-          {paid ? t('ownerHub.receivedThisMonth') : s.overdue && !pending ? t('ownerHub.overdueOn', { day: s.dueDay }) : t('ownerHub.dueBy', { day: s.dueDay })}
-        </p>
-        {!paid && (
-          <button onClick={() => markPaid(s.ym)} disabled={pending || !!busyMonth} aria-busy={busyMonth === s.ym} className="btn-teal w-full mt-3 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="check" className="w-4 h-4" /> {t('ownerHub.markReceived')}</button>
+        {claimed ? (
+          <>
+            <p className="text-xs font-medium mt-1 flex items-center gap-1 text-sky-300" data-testid="rent-claim">
+              <Icon name="hand-coins" className="w-3.5 h-3.5" /> {t('ownerHub.tenantSaysPaid', { tenant, month: s.label })}
+            </p>
+            <div className="flex gap-2 mt-3">
+              <button onClick={() => markPaid(s.ym)} disabled={!!busyMonth} aria-busy={busyMonth === s.ym} className="btn-teal flex-1 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"><Icon name="check" className="w-4 h-4" /> {t('ownerHub.confirmReceived')}</button>
+              <button onClick={() => rejectClaim(s.ym)} disabled={!!busyMonth} className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-300 text-sm hover:bg-white/5 disabled:opacity-50">{t('ownerHub.notReceived')}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className={'text-xs font-medium mt-1 flex items-center gap-1 ' + (paid ? 'text-emerald-300' : pending ? 'text-gray-400' : s.overdue ? 'text-rose-300' : 'text-amber-300')}>
+              <Icon name={paid ? 'check-circle' : s.overdue && !pending ? 'alert-circle' : 'clock'} className="w-3.5 h-3.5" />
+              {paid ? t('ownerHub.receivedThisMonth') : s.overdue && !pending ? t('ownerHub.overdueOn', { day: s.dueDay }) : t('ownerHub.dueBy', { day: s.dueDay })}
+            </p>
+            {!paid && (
+              <button onClick={() => markPaid(s.ym)} disabled={pending || !!busyMonth} aria-busy={busyMonth === s.ym} className="btn-teal w-full mt-3 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="check" className="w-4 h-4" /> {t('ownerHub.markReceived')}</button>
+            )}
+          </>
         )}
       </div>
+      <LeaseFacts home={prop} testId="rent" className="mb-4 -mt-1" />
+      <LeaseEndActions home={prop} onPublish={onPublish} />
+      {!prop.landlordPan && prop.monthlyRent * 12 > PAN_NEEDED_ABOVE && (
+        <div className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 flex items-start justify-between gap-3" data-testid="rent-pan-hint">
+          <p className="text-xs text-amber-200">{t('ownerHub.panHint')}</p>
+          <button onClick={() => setEditing(true)} className="shrink-0 text-xs font-semibold text-amber-200 hover:underline">{t('ownerHub.addPan')}</button>
+        </div>
+      )}
       {prop.tenantMobile && (
         <a
           href={`https://wa.me/91${prop.tenantMobile}?text=${encodeURIComponent(t('ownerHub.inviteTenantText', { name: prop.tenantName, home: prop.title, link: `${window.location.origin}/dashboard#rental` }))}`}
@@ -281,7 +343,10 @@ export default function RentPanel({ prop, onChange }) {
                   <button onClick={() => download(r)} aria-label={t('ownerHub.receiptFor', { month: m.label })} className="text-brand-teal-3 text-xs hover:underline flex items-center gap-1"><Icon name="download" className="w-3.5 h-3.5" /> {t('ownerHub.receipt')}</button>
                 </span>
               ) : (
-                <button onClick={() => markPaid(m.ym)} disabled={pending || !!busyMonth} aria-busy={busyMonth === m.ym} aria-label={t('ownerHub.markReceivedFor', { month: m.label })} className="text-gray-400 text-xs hover:text-white border border-white/10 rounded-lg px-2 py-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-400">{t('ownerHub.markReceived')}</button>
+                <span className="flex items-center gap-2">
+                  {claims.has(m.ym) && <span className="rounded-md bg-sky-500/15 px-1.5 py-0.5 text-[11px] font-medium text-sky-300">{t('ownerHub.saysPaid')}</span>}
+                  <button onClick={() => markPaid(m.ym)} disabled={pending || !!busyMonth} aria-busy={busyMonth === m.ym} aria-label={t('ownerHub.markReceivedFor', { month: m.label })} className="text-gray-400 text-xs hover:text-white border border-white/10 rounded-lg px-2 py-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-400">{t('ownerHub.markReceived')}</button>
+                </span>
               )}
             </li>
           );

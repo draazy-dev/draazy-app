@@ -38,12 +38,50 @@ class NotificationPreferencesEndpointTest extends AbstractApiTest {
 
     private static String body(boolean email, boolean sms, boolean whatsapp, boolean matchAlerts,
             boolean quietEnabled, String start, String end, String language) {
+        return body(email, sms, whatsapp, matchAlerts, quietEnabled, start, end, language, false);
+    }
+
+    private static String body(boolean email, boolean sms, boolean whatsapp, boolean matchAlerts,
+            boolean quietEnabled, String start, String end, String language, boolean marketingCalls) {
         return """
                 {"email":%s,"sms":%s,"whatsapp":%s,"matchAlerts":%s,
                  "quietHours":{"enabled":%s,"start":"%s","end":"%s"},
-                 "language":"%s"}
+                 "language":"%s","marketingCalls":%s}
                 """
-                .formatted(email, sms, whatsapp, matchAlerts, quietEnabled, start, end, language);
+                .formatted(email, sms, whatsapp, matchAlerts, quietEnabled, start, end, language, marketingCalls);
+    }
+
+    @Test
+    @DisplayName("a call-me opt-in is stamped once, kept on a repeat yes, and withdrawn by a no")
+    void marketingConsentIsStampedAndWithdrawable() throws Exception {
+        User u = user("9800000108");
+        mvc.perform(get(PATH).header(HttpHeaders.AUTHORIZATION, bearer(u)))
+                .andExpect(jsonPath("$.marketingCalls").value(false));
+
+        String yes = body(true, false, true, true, false, "22:00", "07:00", "en", true);
+        mvc.perform(put(PATH).header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON).content(yes))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.marketingCalls").value(true));
+        java.sql.Timestamp first = consentAt(u);
+        assertThat(first).isNotNull();
+
+        mvc.perform(put(PATH).header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON).content(yes))
+                .andExpect(status().isOk());
+        assertThat(consentAt(u)).as("a repeat yes must not move the date the user first agreed").isEqualTo(first);
+
+        mvc.perform(put(PATH).header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(true, false, true, true, false, "22:00", "07:00", "en", false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.marketingCalls").value(false));
+        assertThat(consentAt(u)).isNull();
+    }
+
+    private java.sql.Timestamp consentAt(User u) {
+        return jdbc.queryForObject("select marketing_consent_at from notification_preferences where user_id = ?",
+                java.sql.Timestamp.class, u.getId());
     }
 
     @Test

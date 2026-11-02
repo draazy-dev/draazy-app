@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -113,6 +114,24 @@ public class ManagedProperty extends AuditedEntity {
     @Column(name = "address_fingerprint", updatable = false)
     private String addressFingerprint;
 
+    // Written only by ManagedAgreementHomes, over JDBC.
+    @Column(name = "lease_end", insertable = false)
+    private LocalDate leaseEnd;
+
+    @Column(name = "deposit", insertable = false)
+    private Long deposit;
+
+    @Column(name = "agreement_request_id", insertable = false)
+    private UUID agreementRequestId;
+
+    @Setter
+    @Column(name = "police_intimated_on", insertable = false)
+    private LocalDate policeIntimatedOn;
+
+    @Column(name = "landlord_pan")
+    @Setter
+    private String landlordPan;
+
     protected ManagedProperty() {
     }
 
@@ -139,6 +158,11 @@ public class ManagedProperty extends AuditedEntity {
         }
         this.tenantMobile = mobile;
         this.tenantSince = mobile == null ? null : Instant.now();
+        // A tenant named by hand is not on the registered agreement these came from.
+        this.leaseEnd = null;
+        this.deposit = null;
+        this.agreementRequestId = null;
+        this.policeIntimatedOn = null;
         return mobile != null;
     }
 

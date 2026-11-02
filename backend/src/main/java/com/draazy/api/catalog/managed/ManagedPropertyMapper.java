@@ -6,6 +6,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ManagedPropertyMapper {
+    private final RentClaims claims;
+
+    ManagedPropertyMapper(RentClaims claims) {
+        this.claims = claims;
+    }
+
     public ManagedPropertyDto toDto(ManagedProperty m) {
         return new ManagedPropertyDto(
                 m.getId().toString(),
@@ -27,11 +33,24 @@ public class ManagedPropertyMapper {
                 m.getTenantMobile(),
                 m.getMonthlyRent(),
                 m.getDueDay(),
+                m.getLeaseEnd(),
+                m.getDeposit(),
+                m.getLandlordPan(),
+                policeIntimation(m),
+                m.getPoliceIntimatedOn(),
+                claims.pending(m),
                 m.getValuation(),
                 Objects.toString(m.getPublishedListingId(), null),
                 Objects.toString(m.getSourceRoomId(), null),
                 m.getCreatedAt(),
                 m.getUpdatedAt());
+    }
+
+    static String policeIntimation(ManagedProperty m) {
+        if (m.getAgreementRequestId() == null) {
+            return null;
+        }
+        return m.getPoliceIntimatedOn() == null ? "pending" : "done";
     }
 
     public List<ManagedPropertyDto> toDtos(List<ManagedProperty> records) {

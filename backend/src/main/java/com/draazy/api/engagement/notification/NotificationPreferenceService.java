@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class NotificationPreferenceService {
     static final NotificationPreferencesDto DEFAULTS = new NotificationPreferencesDto(
-            true, false, true, true, new QuietHoursDto(false, "22:00", "07:00"), "en");
+            true, false, true, true, new QuietHoursDto(false, "22:00", "07:00"), "en", false);
 
     private final NotificationPreferenceRepository preferences;
     private final NotificationRepository notifications;
@@ -35,7 +35,8 @@ public class NotificationPreferenceService {
                 body.quietHours().enabled(),
                 body.quietHours().start(),
                 body.quietHours().end(),
-                body.language());
+                body.language(),
+                body.marketingCalls());
         NotificationPreferencesDto saved = NotificationPreferencesDto.of(preferences.saveAndFlush(row));
         if (!saved.quietHours().enabled()) {
             notifications.releaseDeferred(userId);

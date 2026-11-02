@@ -12,6 +12,8 @@ import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import java.math.BigDecimal;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.hamcrest.Matchers;
@@ -51,7 +53,7 @@ class TenantVerifiedBatchTest extends AbstractApiTest {
                         .content("{\"agreedPrice\":26000,\"counterpartyMobile\":\""
                                 + tenant.getMobile() + "\"}"))
                 .andExpect(status().isOk());
-        String tenancyId = tenancies.findPendingByPropertyId(p.getId()).orElseThrow().getId().toString();
+        String tenancyId = pendingTenancy(p.getId()).orElseThrow().getId().toString();
         mvc.perform(post(Routes.Tenancies.CONFIRM.replace("{id}", tenancyId))
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
                 .andExpect(status().isOk());
@@ -248,5 +250,10 @@ class TenantVerifiedBatchTest extends AbstractApiTest {
                         .content(batchOf(tenant.getMobile())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].verified").value(true));
+    }
+
+    private Optional<Tenancy> pendingTenancy(UUID propertyId) {
+        return tenancies.findByPropertyId(propertyId).stream()
+                .filter(t -> "pending".equals(t.getStatus())).findFirst();
     }
 }

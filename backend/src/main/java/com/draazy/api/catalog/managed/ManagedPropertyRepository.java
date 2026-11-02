@@ -18,6 +18,8 @@ public interface ManagedPropertyRepository extends JpaRepository<ManagedProperty
 
     List<ManagedProperty> findByRentedTrueAndTenantMobileNotNull();
 
+    List<ManagedProperty> findByAgreementRequestId(UUID agreementRequestId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from ManagedProperty m where m.id = :id")
     Optional<ManagedProperty> findByIdForUpdate(@Param("id") UUID id);

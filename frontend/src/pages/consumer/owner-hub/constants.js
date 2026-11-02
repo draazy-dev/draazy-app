@@ -23,6 +23,7 @@ export const DOC_CAT_KEYS = {
   'Approvals & Plans': 'ownerHub.catApprovals',
   'Purchase & Payments': 'ownerHub.catPurchase',
   'Tax & Utilities': 'ownerHub.catTax',
+  'Rent Agreement': 'ownerHub.catRentAgreement',
   Other: 'ownerHub.catOther',
 };
 
