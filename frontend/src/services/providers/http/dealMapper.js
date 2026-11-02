@@ -1,6 +1,4 @@
 
-const LIVE_OFFER_STATUSES = ['pending', 'countered'];
-
 export function lastActorOf(history) {
   const entries = Array.isArray(history) ? history : [];
   return entries.length ? entries[entries.length - 1].by || 'buyer' : 'buyer';
@@ -32,8 +30,6 @@ export function toOfferViewModel(row) {
 
 export const mayRespond = (action, isOwner) => action === 'counter' || !!isOwner;
 
-export const isOfferLive = (status) => LIVE_OFFER_STATUSES.includes(status);
-
 export function toDealViewModel(row) {
   const status = row?.status || 'active';
   return {
@@ -49,9 +45,6 @@ export function toDealViewModel(row) {
     counterpartyId: row?.counterparty?.id || '',
   };
 }
-
-export const isClosed = (status) => status === 'closed';
-export const isReserved = (status) => status === 'reserved';
 
 export function toPartyViewModel(row) {
   return {
@@ -81,4 +74,3 @@ export function toFinalizationViewModel(row) {
   };
 }
 
-export const finalizeStatusOf = (row) => (row && row.id ? row.status || 'pending' : 'none');

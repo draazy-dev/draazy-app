@@ -4,10 +4,9 @@ const DOC_CATEGORIES = {
   'Approvals & Plans': ['Sanctioned Building Plan', 'Floor Plan', 'Commencement Certificate', 'Occupancy Certificate', 'Completion Certificate', 'RERA Certificate', 'NA Order (Non-Agricultural)'],
   'Purchase & Payments': ['Allotment Letter', 'Possession Letter', 'Builder Payment Receipts', 'Stamp Duty & Registration Receipt', 'Property Valuation Report'],
   'Tax & Utilities': ['Property Tax Receipt', 'Electricity Bill'],
+  'Rent Agreement': ['Rent Agreement'],
 };
 export { DOC_CATEGORIES };
-
-export const ALL_DOC_TYPES = Object.values(DOC_CATEGORIES).flat().concat(['Other']);
 
 export const DOC_INFO = {
   'Sale Deed': { title: 'Sale Deed', body: 'The core legal proof that ownership was transferred to you. Registered at the sub-registrar, it is the single most important document a buyer or bank will ask to see.' },
@@ -44,6 +43,7 @@ export const DOC_INFO = {
   'Property Tax Receipt': { title: 'Property Tax Receipt', body: 'Shows municipal property tax is paid up to date. Buyers check it to confirm no tax arrears carry over.' },
   'Electricity Bill': { title: 'Electricity Bill', body: 'A recent paid bill doubles as address proof and shows utility dues are clear. Often asked for during KYC and transfers.' },
 
+
   'Aadhaar Card': { title: 'Aadhaar Card', body: 'Your primary government identity and address proof. Needed for rent agreements, ownership verification and most transactions.' },
   'PAN Card': { title: 'PAN Card', body: 'Your tax identity. Mandatory for property purchases above set limits, TDS, and any transaction the tax department tracks.' },
   'Passport Photo': { title: 'Passport Photo', body: 'A recent passport-size photograph required on agreements, registration forms and KYC.' },
@@ -57,95 +57,6 @@ export const HOME_LOAN_CHECKLIST = [
   'Property Tax Receipt', 'Society NOC', 'Sanctioned Building Plan',
   'Occupancy Certificate', 'RERA Certificate', 'Possession Letter',
 ];
-
-const docsKey = (mobile) => `draazyDocs:${mobile || 'anon'}`;
-const docReqKey = (mobile) => `draazyDocReq:${mobile || 'anon'}`;
-
-function get(k, def) {
-  try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch { return def; }
-}
-function set(k, v) {
-  try { localStorage.setItem(k, JSON.stringify(v)); } catch { }
-  return v;
-}
-
-export function getAllDocs(mobile) { return get(docsKey(mobile), {}); }
-export function getDocsForProp(mobile, propId) { return getAllDocs(mobile)[propId] || []; }
-
-export function addDocument(mobile, propId, { category, name, size, mime, dataUrl }) {
-  const all = getAllDocs(mobile);
-  if (!all[propId]) all[propId] = [];
-  const doc = {
-    id: 'd' + Date.now(),
-    category: category || 'Other',
-    name: name || 'Document',
-    size: size || 0,
-    mime: mime || 'application/pdf',
-    dataUrl: dataUrl || null,
-    uploadedAt: Date.now(),
-  };
-  all[propId].unshift(doc);
-  set(docsKey(mobile), all);
-  return doc;
-}
-
-export function deleteDocument(mobile, propId, docId) {
-  const all = getAllDocs(mobile);
-  if (all[propId]) {
-    all[propId] = all[propId].filter((d) => d.id !== docId);
-    set(docsKey(mobile), all);
-  }
-  return all[propId] || [];
-}
-
-export function getDocRequests(mobile) { return get(docReqKey(mobile), []); }
-export function setDocRequests(mobile, reqs) { return set(docReqKey(mobile), reqs); }
-
-export function addDocRequest(mobile, {
-  propId, buyerName, buyerMobile, docType, categories, acknowledgedDisclaimer,
-}) {
-  const reqs = getDocRequests(mobile);
-  const requestedCategories = Array.isArray(categories) && categories.length
-    ? [...new Set(categories.filter(Boolean))]
-    : [docType || 'Sale Deed'];
-  const existing = reqs.find((r) =>
-    r.propId === propId && r.buyerMobile === buyerMobile && r.status === 'pending');
-  if (existing) return existing;
-  const req = {
-    id: `req-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`,
-    propId: propId || '',
-    buyerName: buyerName || 'Buyer',
-    buyerMobile: buyerMobile || '',
-    docType: requestedCategories[0],
-    categories: requestedCategories,
-    status: 'pending',
-    requestedAt: Date.now(),
-    acknowledgedDisclaimer: !!acknowledgedDisclaimer,
-    ackAt: acknowledgedDisclaimer ? Date.now() : null,
-  };
-  reqs.unshift(req);
-  setDocRequests(mobile, reqs);
-  return req;
-}
-
-export function respondDocRequest(mobile, reqId, decision) {
-  const reqs = getDocRequests(mobile);
-  const req = reqs.find((r) => r.id === reqId);
-  if (req) {
-    req.status = decision === 'granted' ? 'granted' : 'declined';
-    req.respondedAt = Date.now();
-    if (req.status === 'granted') {
-      const categories = new Set(req.categories || [req.docType]);
-      req.sharedDocIds = getDocsForProp(mobile, req.propId)
-        .filter((d) => categories.has(d.category))
-        .map((d) => d.id);
-    } else {
-      req.sharedDocIds = [];
-    }
-    setDocRequests(mobile, reqs);
-  }
-  return req;
-}
 
 export function checklistFromDocs(docs) {
   const uploadedCategories = new Set((docs || []).map((d) => d.category));

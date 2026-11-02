@@ -25,10 +25,11 @@ const SECTIONS = [
   ['entitlements', '/me/entitlements'],
 ];
 
-export function primeMeDashboard({ listingTools = false } = {}) {
+export function primeMeDashboard({ listingTools = false, maxAge } = {}) {
   if (!readAccessToken()) return undefined;
-  const doc = get('/me/dashboard', listingTools ? { listingTools: true } : undefined);
+  const doc = get('/me/dashboard', listingTools ? { listingTools: true } : undefined, { ttl: PAGE_LOAD_TTL, maxAge });
   for (const [name, path, query] of SECTIONS) {
+    if (name === 'entitlements' && !listingTools) continue;
     prime(path, query, doc.then((d) => d?.[name]), { ttl: PAGE_LOAD_TTL });
   }
   return doc;

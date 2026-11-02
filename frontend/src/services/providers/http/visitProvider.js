@@ -1,4 +1,4 @@
-import { get, patch, post, unwrapFullPage } from '../../http.js';
+import { PAGE_LOAD_TTL, get, patch, post, unwrapFullPage } from '../../http.js';
 import { MAX_PAGE_SIZE } from '../../apiLimits.js';
 import { slotFromParts, slotFromWhen, whenFromSlot } from '../../../lib/visitWhen.js';
 
@@ -28,8 +28,10 @@ function toViewModel(row) {
 
 const paged = () => ({ size: MAX_PAGE_SIZE });
 
-export async function listVisits({ propertyId } = {}) {
-  return unwrapFullPage(await get('/visits', propertyId ? { propertyId, ...paged() } : paged()), 'visit').map(toViewModel);
+export async function listVisits({ propertyId, maxAge } = {}) {
+  const query = propertyId ? { propertyId, ...paged() } : paged();
+  const page = await get('/visits', query, maxAge ? { ttl: PAGE_LOAD_TTL, maxAge } : undefined);
+  return unwrapFullPage(page, 'visit').map(toViewModel);
 }
 
 export async function myVisitRequests() {

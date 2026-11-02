@@ -3,7 +3,7 @@ import { createProvider } from './config.js';
 const provider = createProvider('property');
 
 export const listProperties = async (filters, sort) => (await provider()).listProperties(filters, sort);
-export const getProperty = async (id) => (await provider()).getProperty(id);
+export const getProperty = async (id, opts) => (await provider()).getProperty(id, opts);
 export const featuredProperties = async (limit) => (await provider()).featuredProperties(limit);
 
 export const trustStats = async () => (await provider()).trustStats();
@@ -14,7 +14,6 @@ export const ownerProfile = async (id) => (await provider()).ownerProfile(id);
 
 export const ownerListings = async (id) => (await provider()).ownerListings(id);
 
-export const countProperties = async (filters) => (await provider()).countProperties(filters);
 
 export const getPropertiesByIds = async (ids) => (await provider()).getPropertiesByIds(ids);
 
@@ -30,7 +29,6 @@ export const similarProperties = async (query) => (await provider()).similarProp
 
 export const searchListings = async (query, paging) => (await provider()).searchListings(query, paging);
 
-export const listForModeration = async (filters, sort, opts) => (await provider()).listForModeration(filters, sort, opts);
 
 export const searchForModeration = async (filters, sort, paging) =>
   (await provider()).searchForModeration(filters, sort, paging);
@@ -40,9 +38,10 @@ export const getModerationProperty = async (id) => (await provider()).getModerat
 
 export const moderationSummary = async () => (await provider()).moderationSummary();
 
-export const myListings = async (user) => (await provider()).myListings(user);
+export const myListings = async (user, opts) => (await provider()).myListings(user, opts);
 
 export const myListing = async (id, user) => (await provider()).myListing(id, user);
+export const prefetchMyListing = async (id) => (await provider()).prefetchMyListing(id);
 export const myListingCard = async (id) => (await provider()).myListingCard(id);
 
 export const addListing = async (listing, opts) => (await provider()).addListing(listing, opts);
@@ -72,7 +71,6 @@ export const flagListing = async (id, reason) => (await provider()).flagListing(
 
 export const clearFlag = async (id) => (await provider()).clearFlag(id);
 
-export const deleteListing = async (id) => (await provider()).deleteListing(id);
 export const updateListingFields = async (id, patch) => (await provider()).updateListingFields(id, patch);
 
 export const takeListingDown = async (id, user) => (await provider()).takeListingDown(id, user);

@@ -46,29 +46,6 @@ export function useFieldErrors(formRef) {
   return { errors, check, clear, clearAll, cx, has: (n) => !!errors[n], msg: (n) => errors[n] || '' };
 }
 
-export function useValidation() {
-  const [errors, setErrors] = useState({});
-
-  const validate = useCallback((rules) => {
-    const next = {};
-    for (const r of rules) {
-      if (!r.ok) next[r.name] = r.msg || 'Required';
-    }
-    setErrors(next);
-    return Object.keys(next).length === 0;
-  }, []);
-
-  const clearField = useCallback((name) => setErrors((e) => {
-    if (!e[name]) return e;
-    const { [name]: _, ...rest } = e;
-    return rest;
-  }), []);
-
-  const clearAll = useCallback(() => setErrors({}), []);
-
-  return { errors, validate, clearField, clearAll, hasError: (n) => !!errors[n] };
-}
-
 const IN_PATTERN = /^[6-9]\d{9}$/;
 export function useMobileInput(initial = '') {
   const [value, setRaw] = useState(() => cleanMobile(initial));
@@ -79,53 +56,6 @@ export function useMobileInput(initial = '') {
 }
 
 export const isValidMobile = (v) => IN_PATTERN.test(String(v || '').replace(/\D/g, ''));
-
-export function useAutosave(key, initialState, { debounce = 400 } = {}) {
-  const [restored, setRestored] = useState(false);
-  const [state, setState] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(key));
-      if (saved && typeof saved === 'object') return { ...initialState, ...saved };
-    } catch {
-    }
-    return initialState;
-  });
-  const timer = useRef(null);
-  const firstRun = useRef(true);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(key);
-      if (saved && saved !== JSON.stringify(initialState)) setRestored(true);
-    } catch {
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-
-  useEffect(() => {
-    if (firstRun.current) {
-      firstRun.current = false;
-      return undefined;
-    }
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      try {
-        localStorage.setItem(key, JSON.stringify(state));
-      } catch {
-      }
-    }, debounce);
-    return () => clearTimeout(timer.current);
-  }, [key, state, debounce]);
-
-  const clear = useCallback(() => {
-    localStorage.removeItem(key);
-    setRestored(false);
-  }, [key]);
-
-  const update = useCallback((patch) => setState((s) => ({ ...s, ...patch })), []);
-
-  return { state, setState, update, clear, restored };
-}
 
 function draftHasContent(obj, ignore) {
   return Object.keys(obj || {}).some((k) => {

@@ -4,7 +4,7 @@ import {
   articles as rawArticles,
   changelog as rawChangelog,
 } from 'virtual:help-content';
-import { staffHelpContent } from '../services/contentService.js';
+import { staffHelpContent, staffHelpIndex } from '../services/contentService.js';
 
 export const changelog = rawChangelog;
 
@@ -40,6 +40,26 @@ export function onStaffContent(notify) {
   return () => staffListeners.delete(notify);
 }
 
+let staffIndex = NO_STAFF_CONTENT;
+let indexRequest = null;
+
+// The console shell needs only article titles and modules; the bodies stay with the help pages.
+export function getStaffIndex() {
+  return staffContent.articles.length ? staffContent : staffIndex;
+}
+
+export function loadStaffIndex() {
+  if (staffRequest) return staffRequest;
+  indexRequest ??= staffHelpIndex()
+    .then((content) => { staffIndex = { ...content, loaded: true }; })
+    .catch(() => {
+      indexRequest = null;
+      staffIndex = { ...NO_STAFF_CONTENT, loaded: true };
+    })
+    .finally(() => staffListeners.forEach((notify) => notify()));
+  return indexRequest;
+}
+
 const byOrder = (items) => items.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
 export function helpTree(staff = NO_STAFF_CONTENT) {
@@ -52,10 +72,6 @@ export function helpTree(staff = NO_STAFF_CONTENT) {
     .filter((a) => categoryIds.has(a.category))
     .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
   return { sections, categories, articles };
-}
-
-export function getCategory(id, staff) {
-  return helpTree(staff).categories.find((c) => c.id === id) || null;
 }
 
 export function articlesInCategory(id, staff) {

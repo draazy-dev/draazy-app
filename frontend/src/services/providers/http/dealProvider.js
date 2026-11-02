@@ -1,4 +1,4 @@
-import { del, get, post, unwrapFullPage } from '../../http.js';
+import { PAGE_LOAD_TTL, del, get, post, unwrapFullPage } from '../../http.js';
 import { MAX_PAGE_SIZE } from '../../apiLimits.js';
 import { readAccessToken } from '../../../lib/auth.js';
 import {
@@ -13,7 +13,7 @@ const signedIn = () => !!readAccessToken();
 
 const toList = (rows, fn) => (Array.isArray(rows) ? rows : []).map(fn);
 
-const paged = () => ({ size: MAX_PAGE_SIZE });
+const paged = (propertyId) => ({ propertyId: propertyId || undefined, size: MAX_PAGE_SIZE });
 
 export async function getDeal(propId) {
   if (!signedIn() || !propId) return null;
@@ -67,14 +67,16 @@ export async function respondOffer(id, action, counterAmount, opts = {}) {
   });
 }
 
-export async function myOffers() {
+export async function myOffers({ propertyId, maxAge } = {}) {
   if (!signedIn()) return [];
-  return unwrapFullPage(await get('/offers/mine', paged()), 'offer').map(toOfferViewModel);
+  const page = await get('/offers/mine', paged(propertyId), { ttl: PAGE_LOAD_TTL, maxAge });
+  return unwrapFullPage(page, 'offer').map(toOfferViewModel);
 }
 
-export async function offersOnMine() {
+export async function offersOnMine({ propertyId, maxAge } = {}) {
   if (!signedIn()) return [];
-  return unwrapFullPage(await get('/me/offers', paged()), 'offer').map(toOfferViewModel);
+  const page = await get('/me/offers', paged(propertyId), { ttl: PAGE_LOAD_TTL, maxAge });
+  return unwrapFullPage(page, 'offer').map(toOfferViewModel);
 }
 
 export async function requestFinalization(propId, { counterpartyMobile, agreedPrice } = {}) {
@@ -96,9 +98,10 @@ export async function cancelFinalization(propId) {
   await del(`/finalization/${encodeURIComponent(propId)}/status`);
 }
 
-export async function myFinalizationRequests() {
+export async function myFinalizationRequests({ propertyId, maxAge } = {}) {
   if (!signedIn()) return [];
-  const rows = unwrapFullPage(await get('/me/finalization-requests', paged()), 'finalization');
+  const page = await get('/me/finalization-requests', paged(propertyId), { ttl: PAGE_LOAD_TTL, maxAge });
+  const rows = unwrapFullPage(page, 'finalization');
   return rows.map(toFinalizationViewModel).filter(Boolean);
 }
 

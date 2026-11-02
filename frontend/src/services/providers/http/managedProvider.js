@@ -1,10 +1,19 @@
 import { PAGE_LOAD_TTL, get, post, patch, del } from '../../http.js';
 import {
-  toManaged, toManagedList, toCreateRequest, toUpdateRequest, toRentReceiptList, toRentReceipt, toTrackedRentList,
+  toManaged, toManagedList, toCreateRequest, toUpdateRequest, toRentReceiptList, toRentReceipt, toTrackedRent,
+  toTrackedRentList,
 } from './managedMapper.js';
 
 export async function listTrackedRent() {
   return toTrackedRentList(await get('/me/tracked-rent'));
+}
+
+export async function claimRentPaid(id) {
+  return toTrackedRent(await post(`/me/tracked-rent/${encodeURIComponent(id)}/paid`, {}));
+}
+
+export async function rejectRentClaim(id, rentMonth) {
+  await del(`/me/managed-properties/${encodeURIComponent(id)}/rent-claims/${encodeURIComponent(rentMonth)}`);
 }
 
 export async function listManaged() {

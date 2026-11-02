@@ -32,7 +32,6 @@ export const CITY_GEO = {
 
 export const DEFAULT_CITY = 'Pune';
 
-export const PUNE_CENTER = CITY_GEO.Pune.center;
 export const PUNE_BOUNDS = CITY_GEO.Pune.bounds;
 export const PUNE_REGION_BOUNDS = { north: 18.95, south: 18.25, east: 74.35, west: 73.30 };
 

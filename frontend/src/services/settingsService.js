@@ -16,7 +16,9 @@ export const getGeo = async () => (await provider()).getGeo();
 
 export const PRICING_DEFAULTS = Object.freeze({
   listingPass: 999,
+  listingPassBuy: 1999,
   contactPack: 199,
+  contactPackBuy: 399,
   rentAgreementPlatform: 499,
   referral: Object.freeze({
     contactBonus: 15, seekerBonusContacts: 5, ownerFeaturedDays: 14, ownerRewardAgreements: 1,

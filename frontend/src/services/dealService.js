@@ -19,8 +19,8 @@ export const submitOffer = async (req) => (await provider()).submitOffer(req);
 export const respondOffer = async (id, action, counterAmount, opts) =>
   (await provider()).respondOffer(id, action, counterAmount, opts);
 
-export const myOffers = async () => (await provider()).myOffers();
-export const offersOnMine = async () => (await provider()).offersOnMine();
+export const myOffers = async (opts) => (await provider()).myOffers(opts);
+export const offersOnMine = async (opts) => (await provider()).offersOnMine(opts);
 
 export const requestFinalization = async (propId, body) => (await provider()).requestFinalization(propId, body);
 
@@ -28,7 +28,7 @@ export const finalizationStatus = async (propId) => (await provider()).finalizat
 
 export const cancelFinalization = async (propId) => (await provider()).cancelFinalization(propId);
 
-export const myFinalizationRequests = async () => (await provider()).myFinalizationRequests();
+export const myFinalizationRequests = async (opts) => (await provider()).myFinalizationRequests(opts);
 
 export const acceptFinalization = async (reqId) => (await provider()).acceptFinalization(reqId);
 export const declineFinalization = async (reqId) => (await provider()).declineFinalization(reqId);

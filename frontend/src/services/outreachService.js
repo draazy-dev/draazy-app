@@ -1,7 +1,5 @@
 import { createProvider } from './config.js';
 
-export { interpolateOutreachTemplate } from '../lib/outreachTemplate.js';
-
 const provider = createProvider('outreach');
 
 export async function listOutreachTemplates(channel = 'whatsapp') {

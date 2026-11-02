@@ -1,4 +1,5 @@
 import { getEntitlements } from '../../services/entitlementService.js';
+import { REVISIT_MAX_AGE } from '../../services/http.js';
 import { listingSlots } from '../../services/propertyService.js';
 
 function standing(listings) {
@@ -8,6 +9,6 @@ function standing(listings) {
   return { used, allowance, full: allowance != null && used >= allowance, passes };
 }
 
-export const loadListingQuota = () => getEntitlements().then((e) => standing(e?.listings), () => standing(null));
+export const loadListingQuota = () => getEntitlements({ maxAge: REVISIT_MAX_AGE }).then((e) => standing(e?.listings), () => standing(null));
 
 export const loadWizardQuota = () => listingSlots().then(standing, () => standing(null));

@@ -70,17 +70,41 @@ export function monthMeta(ym) {
   return { label: MN[m] + ' ' + y, startStr: dd(start), endStr: dd(end), receiptDate: dd(end) };
 }
 
-export async function generateSingle(d, filename) {
+const toReceipt = (d, no) => {
   const meta = monthMeta(d.month);
-  const { jsPDF } = await import('jspdf');
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  drawReceipt(doc, 15, 20, 180, 124, {
-    no: d.no || 1, tenant: d.tenant || '—', landlord: d.landlord || '—', address: d.address || '—',
+  return {
+    no: d.no || no, tenant: d.tenant || '—', landlord: d.landlord || '—', address: d.address || '—',
     rent: d.rent || 0, pan: (d.pan || '').toUpperCase(), mode: d.mode || 'UPI',
     label: meta.label, startStr: meta.startStr, endStr: meta.endStr, receiptDate: meta.receiptDate,
     txnRef: d.txnRef || '', paidOnline: d.paidOnline !== false,
-  });
-  const name = filename || ('Rent-Receipt-' + meta.label.replace(/\s+/g, '-') + '.pdf');
+  };
+};
+
+export async function generateSingle(d, filename) {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const receipt = toReceipt(d, 1);
+  drawReceipt(doc, 15, 20, 180, 124, receipt);
+  const name = filename || ('Rent-Receipt-' + receipt.label.replace(/\s+/g, '-') + '.pdf');
   doc.save(name);
   return name;
+}
+
+// Indian financial year runs April to March; returns the calendar year it starts in.
+export const fyOf = (ym) => {
+  const [y, m] = String(ym).split('-').map(Number);
+  return m >= 4 ? y : y - 1;
+};
+
+export const fyLabel = (start) => 'FY ' + start + '-' + String(start + 1).slice(-2);
+
+export async function generateMany(list, filename) {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  list.forEach((d, i) => {
+    if (i && i % 2 === 0) doc.addPage();
+    drawReceipt(doc, 15, i % 2 ? 153 : 15, 180, 124, toReceipt(d, i + 1));
+  });
+  doc.save(filename);
+  return filename;
 }

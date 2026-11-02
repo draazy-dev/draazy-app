@@ -17,8 +17,6 @@ export const fingerprintKeys = (fields = {}) => {
   return keys;
 };
 
-export const propertyFingerprint = (fields = {}) => fingerprintKeys(fields)[0] || '';
-
 export const evaluateListingDedup = ({ fields } = {}) => {
   const keys = fingerprintKeys(fields || {});
   return { fingerprint: keys[0] || '', fingerprintKeys: keys };

@@ -10,6 +10,8 @@ import {
   loadStaffContent,
   getStaffContent,
   onStaffContent,
+  loadStaffIndex,
+  getStaffIndex,
 } from './help.js';
 
 function useHelpAudience() {
@@ -31,6 +33,18 @@ export function useHelpTree() {
   const { staff, pending } = useHelpAudience();
   const tree = useMemo(() => helpTree(staff), [staff]);
   return { ...tree, pending };
+}
+
+export function useHelpIndex() {
+  const { user } = useAuth();
+  const index = useSyncExternalStore(onStaffContent, getStaffIndex, getStaffIndex);
+  const staffReader = isStaff(user);
+
+  useEffect(() => {
+    if (staffReader) loadStaffIndex();
+  }, [staffReader]);
+
+  return useMemo(() => helpTree(staffReader ? index : undefined), [staffReader, index]);
 }
 
 export function useHelpSearch(query, limit) {

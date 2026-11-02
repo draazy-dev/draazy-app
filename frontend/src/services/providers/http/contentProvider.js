@@ -51,8 +51,15 @@ export async function listHelpFeedbackComments({ slug, days, page = 0, size = 20
   return unwrapPage(await get('/admin/help-feedback/comments', query), { page, size });
 }
 
-export async function staffHelpContent() {
-  const body = await get('/admin/help/staff');
+const staffTree = (body) => {
   const list = (v) => (Array.isArray(v) ? v : []);
   return { sections: list(body?.sections), categories: list(body?.categories), articles: list(body?.articles) };
+};
+
+export async function staffHelpContent() {
+  return staffTree(await get('/admin/help/staff'));
+}
+
+export async function staffHelpIndex() {
+  return staffTree(await get('/admin/help/staff/index'));
 }

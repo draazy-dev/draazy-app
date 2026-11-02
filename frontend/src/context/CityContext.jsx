@@ -5,8 +5,6 @@ import { joinCityWaitlist } from '../services/cityService.js';
 const CityContext = createContext(null);
 const CKEY = 'draazyCity';
 
-export const isCityLive = (name) => getCityLive(name);
-
 export function CityProvider({ children }) {
   const [city, setCityState] = useState(() => {
     try {

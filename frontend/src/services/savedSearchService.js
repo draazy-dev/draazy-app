@@ -6,8 +6,6 @@ export const listSavedSearches = async () => (await provider()).listSavedSearche
 
 export const createSavedSearch = async (record) => (await provider()).createSavedSearch(record);
 
-export const updateSavedSearch = async (id, changes) => (await provider()).updateSavedSearch(id, changes);
-
 export const editSavedSearch = async (id, record) => (await provider()).editSavedSearch(id, record);
 
 export const deleteSavedSearch = async (id) => (await provider()).deleteSavedSearch(id);

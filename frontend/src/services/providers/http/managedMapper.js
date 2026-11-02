@@ -54,6 +54,12 @@ export function toManaged(dto) {
     tenantMobile: dto.tenantMobile || '',
     monthlyRent: Number(dto.monthlyRent) || 0,
     dueDay: Number(dto.dueDay) || 5,
+    leaseEnd: dto.leaseEnd || '',
+    deposit: Number(dto.deposit) || 0,
+    landlordPan: dto.landlordPan || '',
+    policeIntimation: dto.policeIntimation || '',
+    policeIntimatedOn: dto.policeIntimatedOn || '',
+    rentClaims: Array.isArray(dto.rentClaims) ? dto.rentClaims : [],
     valuation: dto.valuation || null,
     publishedListingId: dto.publishedListingId || '',
     sourceRoomId: dto.sourceRoomId || '',
@@ -80,7 +86,7 @@ export function toRentReceipt(dto) {
 export const toRentReceiptList = (rows) =>
   (Array.isArray(rows) ? rows.map(toRentReceipt).filter(Boolean) : []);
 
-export const toTrackedRentList = (rows) => (Array.isArray(rows) ? rows : []).map((dto) => ({
+export const toTrackedRent = (dto) => ({
   id: dto.id || '',
   title: dto.title || '',
   address: dto.address || '',
@@ -88,8 +94,15 @@ export const toTrackedRentList = (rows) => (Array.isArray(rows) ? rows : []).map
   monthlyRent: Number(dto.monthlyRent) || 0,
   status: dto.status || 'due',
   dueOn: dto.dueOn || '',
+  leaseEnd: dto.leaseEnd || '',
+  deposit: Number(dto.deposit) || 0,
+  landlordPan: dto.landlordPan || '',
+  policeIntimation: dto.policeIntimation || '',
+  policeIntimatedOn: dto.policeIntimatedOn || '',
   receipts: toRentReceiptList(dto.receipts),
-}));
+});
+
+export const toTrackedRentList = (rows) => (Array.isArray(rows) ? rows : []).map(toTrackedRent);
 
 export function toCreateRequest(data = {}) {
   const deal = toWireDeal(data.deal);
@@ -134,6 +147,7 @@ export function toUpdateRequest(patch = {}) {
   if ('tenantMobile' in patch) body.tenantMobile = patch.tenantMobile;
   if ('monthlyRent' in patch) body.monthlyRent = Number(patch.monthlyRent) || null;
   if ('dueDay' in patch) body.dueDay = Number(patch.dueDay) || null;
+  if ('landlordPan' in patch) body.landlordPan = (patch.landlordPan || '').toUpperCase();
   if ('valuation' in patch) body.valuation = patch.valuation;
   return body;
 }

@@ -41,8 +41,8 @@ export const mintSociety = async (body) => {
 
 export const listSocietyCandidates = async (opts) => (await provider()).listSocietyCandidates(opts);
 
-export const listSocietyCandidateDuplicates = async (slug, opts) =>
-  (await provider()).listSocietyCandidateDuplicates(slug, opts);
+export const listDuplicatesForCandidates = async (slugs, opts) =>
+  (await provider()).listDuplicatesForCandidates(slugs, opts);
 
 export const getSocietiesSummary = async () => (await provider()).getSocietiesSummary();
 

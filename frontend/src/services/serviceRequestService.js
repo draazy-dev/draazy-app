@@ -2,7 +2,7 @@ import { createProvider } from './config.js';
 
 const provider = createProvider('serviceRequest');
 
-export const listServiceRequests = async (typeFilter) => (await provider()).listServiceRequests(typeFilter);
+export const listServiceRequests = async (typeFilter, opts) => (await provider()).listServiceRequests(typeFilter, opts);
 
 export const getServiceRequest = async (id) => (await provider()).getServiceRequest(id);
 
@@ -76,14 +76,17 @@ export const createServiceRequest = async (data) => (await provider()).createSer
 export const createCoFillServiceRequest = async ({ request, role, mobile }) =>
   (await provider()).createCoFillServiceRequest({ request, role, mobile });
 
-export const listMyServiceRequestInvites = async () =>
-  (await provider()).listMyServiceRequestInvites();
+export const listMyServiceRequestInvites = async (opts) =>
+  (await provider()).listMyServiceRequestInvites(opts);
 
 export const decideServiceRequestInvite = async (partyId, decision) =>
   (await provider()).decideServiceRequestInvite(partyId, decision);
 
 export const submitServiceRequestPartyDetails = async (id, details) =>
   (await provider()).submitServiceRequestPartyDetails(id, details);
+
+export const updateServiceRequestDetails = async (id, details) =>
+  (await provider()).updateServiceRequestDetails(id, details);
 
 export const openServiceRequestCheckout = async (id, declaration) =>
   (await provider()).openServiceRequestCheckout(id, declaration);

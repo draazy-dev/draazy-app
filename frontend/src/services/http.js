@@ -43,6 +43,24 @@ export class NetworkError extends Error {
 
 export const isAbort = (err) => err?.name === 'AbortError';
 
+const READ_TIMEOUT_MS = 20_000;
+
+// A GET that never settles would otherwise pin its dedupe entry in `reads` for every later caller.
+// Writes and uploads stay unbounded: a timed-out write may still have landed, and a retry could repeat it.
+function readDeadline(signal) {
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const relay = () => ctrl.abort(signal.reason);
+  const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, READ_TIMEOUT_MS);
+  if (signal?.aborted) relay();
+  else signal?.addEventListener('abort', relay, { once: true });
+  return {
+    signal: ctrl.signal,
+    timedOut: () => timedOut,
+    clear: () => { clearTimeout(timer); signal?.removeEventListener('abort', relay); },
+  };
+}
+
 let reachabilityObserver = null;
 
 export function observeReachability(fn) {
@@ -86,7 +104,7 @@ async function exchange(path, opts) {
 
 const reads = new Map();
 let readGeneration = 0;
-function clearReads() {
+export function clearReads() {
   reads.clear();
   readGeneration += 1;
 }
@@ -114,6 +132,7 @@ function track(key, promise, { ttl = 0, once = false } = {}) {
   entry.promise = promise.then(
     (data) => {
       entry.settled = true;
+      entry.settledAt = Date.now();
       if (ttl > 0 && !entry.taken && generation === readGeneration) entry.until = Date.now() + ttl;
       else forget(key, entry);
       return data;
@@ -136,23 +155,27 @@ function abortable(promise, signal) {
 }
 
 export function get(path, query, opts = {}) {
-  const { ttl, signal, ...rest } = opts;
+  const { ttl, maxAge, signal, ...rest } = opts;
   if (rest.withStatus || rest.headers) return request(path, { ...rest, method: 'GET', query, signal });
   const key = readKey(path, query, rest.auth);
   const hit = reads.get(key);
-  if (!hit || hit.until <= Date.now()) {
+  const now = Date.now();
+  if (!hit || (hit.until <= now && !(now - hit.settledAt < maxAge))) {
     return abortable(track(key, request(path, { ...rest, method: 'GET', query }), { ttl }).promise, signal);
   }
   hit.read = true;
   if (hit.once) {
     hit.taken = true;
-    if (hit.settled) forget(key, hit);
+    // StrictMode's second effect run reads in the same tick and shares the seed; later reads refetch.
+    if (hit.settled) setTimeout(() => forget(key, hit), 0);
   }
   return abortable(hit.promise, signal);
 }
 
 export const PAGE_LOAD_TTL = 5_000;
 export const PUBLIC_READ_TTL = 30_000;
+export const REVISIT_MAX_AGE = 30_000;
+export const REVISIT_READ = Object.freeze({ ttl: PAGE_LOAD_TTL, maxAge: REVISIT_MAX_AGE });
 
 export function prime(path, query, value, { ttl } = {}) {
   let entry;
@@ -162,6 +185,13 @@ export function prime(path, query, value, { ttl } = {}) {
   entry = track(readKey(path, query), value.then((data) => data ?? fallback(), fallback), ttl ? { ttl } : { ttl: 10_000, once: true });
   entry.promise.catch(() => {});
 }
+
+// Single-use warm read for a page still waiting on auth; its own get() takes it within PAGE_LOAD_TTL.
+export function prefetch(path, query) {
+  const key = readKey(path, query);
+  if (reads.has(key)) return;
+  track(key, request(path, { method: 'GET', query }), { ttl: PAGE_LOAD_TTL, once: true }).promise.catch(() => {});
+}
 export const post = (path, body, opts) => request(path, { ...opts, method: 'POST', body });
 export const patch = (path, body, opts) => request(path, { ...opts, method: 'PATCH', body });
 export const put = (path, body, opts) => request(path, { ...opts, method: 'PUT', body });
@@ -169,7 +199,7 @@ export const del = (path, opts) => request(path, { ...opts, method: 'DELETE' });
 
 export const postMultipart = (path, form, opts) => request(path, { ...opts, method: 'POST', body: form });
 
-export async function openEventStream(path, { onEvent, onOpen, signal } = {}) {
+export async function openEventStream(path, { onEvent, onOpen, onActivity, signal } = {}) {
   let res = await stream(path, readAccessToken(), signal);
   if (res.status === 401 && readAccessToken()) {
     const token = await refreshAccessToken();
@@ -178,7 +208,7 @@ export async function openEventStream(path, { onEvent, onOpen, signal } = {}) {
   }
   if (!res.ok) return toResult(res);
   onOpen?.();
-  await readEventStream(res.body, onEvent);
+  await readEventStream(res.body, onEvent, onActivity);
   return null;
 }
 
@@ -192,8 +222,6 @@ export function unwrapPage(res, requested = {}) {
     totalPages: res?.totalPages ?? 0,
   };
 }
-
-export { MAX_PAGE_SIZE } from './apiLimits.js';
 
 export function unwrapFullPage(res, label) {
   if (Array.isArray(res)) return res;
@@ -216,7 +244,7 @@ function takeEarlyRead(url, token) {
   const early = name && globalThis[name];
   if (!early) return null;
   globalThis[name] = undefined;
-  return !isInternal(readUser()) && (early.token || null) === (token || null) ? early : null;
+  return (!isInternal(readUser()) || early.fresh) && (early.token || null) === (token || null) ? early : null;
 }
 
 async function send(path, { method = 'GET', body, query, headers: extra, signal }, token) {
@@ -226,6 +254,7 @@ async function send(path, { method = 'GET', body, query, headers: extra, signal 
   if (DEVICE_ID_PATH.test(path)) headers['X-Device-Id'] = deviceId();
   if (token) headers.Authorization = `Bearer ${token}`;
 
+  const deadline = method === 'GET' ? readDeadline(signal) : null;
   try {
     const early = method === 'GET' ? takeEarlyRead(path + buildQuery(query), token) : null;
     const res = (early && await early) || await fetch(API_BASE + path + buildQuery(query), {
@@ -234,17 +263,19 @@ async function send(path, { method = 'GET', body, query, headers: extra, signal 
       credentials: 'include',
       cache: isInternal(readUser()) ? 'no-cache' : 'default',
       body: body === undefined ? undefined : isFormData(body) ? body : JSON.stringify(body),
-      signal,
+      signal: deadline?.signal ?? signal,
     });
     reachabilityObserver?.(null);
     buildStampObserver?.(res.headers.get(BUILD_HEADER));
     lastBuild = res.headers.get(BUILD_HEADER) ?? lastBuild;
     return res;
   } catch (cause) {
-    if (isAbort(cause)) throw cause;
+    if (isAbort(cause) && !deadline?.timedOut()) throw cause;
     const err = new NetworkError(cause);
     reachabilityObserver?.(err);
     throw err;
+  } finally {
+    deadline?.clear();
   }
 }
 
@@ -269,7 +300,7 @@ async function stream(path, token, signal) {
     }
 }
 
-async function readEventStream(body, onEvent) {
+async function readEventStream(body, onEvent, onActivity) {
     if (!body?.getReader) return;
     const reader = body.getReader();
     const decoder = new TextDecoder();
@@ -303,6 +334,7 @@ async function readEventStream(body, onEvent) {
     for (;;) {
       const { value, done } = await reader.read();
       if (done) break;
+      onActivity?.();
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop() ?? '';

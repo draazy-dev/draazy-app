@@ -31,6 +31,7 @@ function load() {
           person_profiles: 'identified_only',
           capture_pageview: 'history_change',
           capture_pageleave: true,
+          capture_performance: { web_vitals: true },
           mask_all_text: true,
           mask_all_element_attributes: true,
           session_recording: {

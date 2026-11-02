@@ -26,3 +26,7 @@ export const recordRentReceipt = async (propertyId, rentMonth) =>
   (await provider()).recordRentReceipt(propertyId, rentMonth);
 
 export const listTrackedRent = async () => (await provider()).listTrackedRent();
+
+export const claimRentPaid = async (id) => (await provider()).claimRentPaid(id);
+
+export const rejectRentClaim = async (id, rentMonth) => (await provider()).rejectRentClaim(id, rentMonth);

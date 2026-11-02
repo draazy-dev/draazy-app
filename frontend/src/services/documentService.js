@@ -3,7 +3,7 @@ import { prepareUpload } from '../lib/uploads/prepareUpload.js';
 
 const provider = createProvider('document');
 
-export const listDocuments = async (mobile, propId) => (await provider()).listDocuments(mobile, propId);
+export const listDocuments = async (mobile, propId, opts) => (await provider()).listDocuments(mobile, propId, opts);
 
 export const uploadDocument = async (mobile, propId, upload) => {
   const file = upload.prepared ? upload.file : await prepareUpload(upload.file, { document: true });

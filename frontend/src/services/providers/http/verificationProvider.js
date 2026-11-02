@@ -36,8 +36,3 @@ export async function withdrawIdentityVerification() {
   await del('/me/verification/identity');
   return { ...NONE_VERIFICATION };
 }
-
-export async function simulateIdentityVerification(outcome = 'approve') {
-  const res = await post('/me/verification/identity/simulate', null, { query: { outcome } });
-  return toSubmissionResult(res);
-}

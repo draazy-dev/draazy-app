@@ -11,3 +11,5 @@ export const listHelpFeedbackArticles = async (opts) => (await provider()).listH
 export const listHelpFeedbackComments = async (opts) => (await provider()).listHelpFeedbackComments(opts);
 
 export const staffHelpContent = async () => (await provider()).staffHelpContent();
+
+export const staffHelpIndex = async () => (await provider()).staffHelpIndex();

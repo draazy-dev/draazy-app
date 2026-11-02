@@ -151,17 +151,6 @@ export async function addTransaction(propId, txn = {}) {
   );
 }
 
-export async function updateTransaction(propId, txnId, patchBody = {}) {
-  const body = {};
-  ['type', 'category', 'note', 'recurring', 'date'].forEach((k) => {
-    if (patchBody[k] !== undefined) body[k] = patchBody[k];
-  });
-  if (patchBody.amount !== undefined) body.amount = Number(patchBody.amount);
-  return toTransactionViewModel(
-    await patch(`/me/finances/${encodeURIComponent(propId)}/transactions/${encodeURIComponent(txnId)}`, body),
-  );
-}
-
 export async function deleteTransaction(propId, txnId) {
   await del(`/me/finances/${encodeURIComponent(propId)}/transactions/${encodeURIComponent(txnId)}`);
 }
@@ -206,8 +195,7 @@ export async function myRentAgreements() {
   return toList(await get('/me/rent-agreements'), toRentAgreementViewModel);
 }
 
-export async function rentAgreementRenewal(id) {
-  const r = await get(`/me/rent-agreements/${encodeURIComponent(id)}/renewal`);
+const toRenewal = (r) => {
   const party = (p) => ({ name: p?.name || '', mobile: String(p?.mobile || '') });
   return {
     rent: Number(r?.rent) || 0,
@@ -216,5 +204,14 @@ export async function rentAgreementRenewal(id) {
     startDate: r?.startDate || null,
     owner: r?.owner ? party(r.owner) : null,
     tenants: Array.isArray(r?.tenants) ? r.tenants.map(party) : [],
+    prop: r?.prop && typeof r.prop === 'object' ? r.prop : {},
   };
+};
+
+export async function rentAgreementRenewal(id) {
+  return toRenewal(await get(`/me/rent-agreements/${encodeURIComponent(id)}/renewal`));
+}
+
+export async function rentAgreementHomeRenewal(homeId) {
+  return toRenewal(await get(`/me/rent-agreements/homes/${encodeURIComponent(homeId)}/renewal`));
 }

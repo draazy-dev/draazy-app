@@ -4,8 +4,6 @@ export const GOOGLE_MAPS_MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DE
 
 export const GOOGLE_MAPS_HAS_DDS = !!GOOGLE_MAPS_MAP_ID && GOOGLE_MAPS_MAP_ID !== 'DEMO_MAP_ID';
 
-export const PUNE_CENTER = { lat: 18.553, lng: 73.86 };
-
 export const mapColorScheme = () => (document.documentElement.classList.contains('light') ? 'LIGHT' : 'DARK');
 
 let mapsRefused = false;

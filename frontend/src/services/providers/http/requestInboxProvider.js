@@ -8,6 +8,11 @@ export async function listRequests(box) {
   return Array.isArray(res?.content) ? res.content : [];
 }
 
+export async function pendingRequestCount() {
+  const res = await get('/me/requests/pending-count');
+  return Number(res?.count) || 0;
+}
+
 export async function remindRequest(kind, id) {
   return post(`${path(kind, id)}/reminders`);
 }

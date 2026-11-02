@@ -6,6 +6,7 @@ const SECTIONS = [
   ['saved', '/me/saved/keys'],
   ['notificationsUnread', '/notifications/unread-count'],
   ['messagesUnread', '/messages/unread-count'],
+  ['requestsPending', '/me/requests/pending-count'],
 ];
 
 export function primeMeBootstrap() {

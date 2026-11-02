@@ -20,7 +20,7 @@ function clearLegacyNotificationStorage() {
 
 export function NotificationProvider({ children }) {
   const { isIn } = useAuth();
-  const { subscribe, streamConnected } = useConversationUnread();
+  const { subscribe, streamConnected, freshWhileLive } = useConversationUnread();
   const [unread, setUnread] = useState(0);
   const [status, setStatus] = useState('loading');
 
@@ -64,7 +64,8 @@ export function NotificationProvider({ children }) {
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible' && Date.now() - lastRefreshAt.current >= 1_000) refresh();
+      if (document.visibilityState !== 'visible' || Date.now() - lastRefreshAt.current < 1_000) return;
+      if (!freshWhileLive(lastRefreshAt.current)) refresh();
     };
     const poll = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
@@ -78,7 +79,7 @@ export function NotificationProvider({ children }) {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [refresh]);
+  }, [refresh, freshWhileLive]);
 
   useEffect(() => subscribe((event) => {
     if (event.type === 'notification') refresh();

@@ -1,7 +1,6 @@
-import { lazy } from 'react';
-
+import { preloadable } from '../lib/preloadable.js';
 import { loadNamespaces } from './index.js';
 
 export function lazyPage(loader, ...namespaces) {
-  return lazy(() => Promise.all([loader(), loadNamespaces(namespaces)]).then(([mod]) => mod));
+  return preloadable(() => Promise.all([loader(), loadNamespaces(namespaces)]).then(([mod]) => mod));
 }

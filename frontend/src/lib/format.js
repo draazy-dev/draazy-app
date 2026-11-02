@@ -81,10 +81,6 @@ export function fmtAgo(ts) {
   return new Date(t).toLocaleDateString('en-IN');
 }
 
-export function esc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
 export function classNames(...xs) {
   return xs.filter(Boolean).join(' ');
 }

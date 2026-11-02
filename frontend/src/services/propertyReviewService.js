@@ -1,5 +1,4 @@
 import { createProvider } from './config.js';
-import { isInternal, readUser } from '../lib/auth.js';
 
 const provider = createProvider('propertyReview');
 
@@ -69,10 +68,4 @@ export async function decidePropertyReview(propertyId, decision, options) {
 
 export async function listMyPropertyReviews(params) {
   return (await provider()).listMyPropertyReviews(params);
-}
-
-export function unreadFrom(caseFile) {
-  const theirs = isInternal(readUser()) ? 'owner' : 'ops';
-  const messages = Array.isArray(caseFile?.messages) ? caseFile.messages : [];
-  return messages.filter((m) => m.from === theirs && !m.read).length;
 }

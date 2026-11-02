@@ -1,4 +1,4 @@
-import { get } from '../../http.js';
+import { PUBLIC_READ_TTL, get } from '../../http.js';
 
 const money = (v) => Number(v) || 0;
 
@@ -12,6 +12,6 @@ const toFeeBreakdown = (row) => ({
 });
 
 export async function listFees() {
-  const rows = await get('/fees');
+  const rows = await get('/fees', null, { auth: false, ttl: PUBLIC_READ_TTL });
   return (Array.isArray(rows) ? rows : []).map(toFeeBreakdown);
 }

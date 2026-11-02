@@ -8,10 +8,6 @@ function istParts(d = new Date()) {
   return { year: at('year'), month: at('month'), day: at('day') };
 }
 
-export function ymKey(d = new Date()) {
-  const { year, month } = istParts(d);
-  return year + '-' + ('0' + month).slice(-2);
-}
 export function ymLabel(ym, locale = 'en') {
   const [y, m] = ym.split('-');
   const month = new Intl.DateTimeFormat(locale, { month: 'short' }).format(new Date(Number(y), (Number(m) || 1) - 1, 1));

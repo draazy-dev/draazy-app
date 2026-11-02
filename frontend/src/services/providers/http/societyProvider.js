@@ -1,4 +1,4 @@
-import { del, get, patch, post, put, unwrapFullPage, unwrapPage } from '../../http.js';
+import { PUBLIC_READ_TTL, del, get, patch, post, put, unwrapFullPage, unwrapPage } from '../../http.js';
 import { toRatingIndex, toSociety, toSocietyBrief } from './societyMapper.js';
 
 const FOLLOW_PAGE_SIZE = 500;
@@ -21,7 +21,7 @@ export async function listSocietiesPage({
   };
 }
 
-export const topSocieties = () => get('/societies/top', null, { auth: false });
+export const topSocieties = () => get('/societies/top', null, { auth: false, ttl: PUBLIC_READ_TTL });
 
 const SEARCH_CANDIDATES = 20;
 
@@ -97,9 +97,9 @@ export async function listSocietyCandidates({ q = '', page = 0, size = 10 } = {}
   return unwrapPage(res, { page, size });
 }
 
-export async function listSocietyCandidateDuplicates(slug, { limit } = {}) {
-  const rows = await get(`/admin/society-candidates/${encodeURIComponent(slug)}/duplicates`, { limit });
-  return Array.isArray(rows) ? rows : [];
+export async function listDuplicatesForCandidates(slugs, { limit } = {}) {
+  const bySlug = await get('/admin/society-candidates/duplicates', { slugs, limit });
+  return bySlug && typeof bySlug === 'object' && !Array.isArray(bySlug) ? bySlug : {};
 }
 
 export async function getSocietiesSummary() {

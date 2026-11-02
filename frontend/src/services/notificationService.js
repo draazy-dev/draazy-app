@@ -17,6 +17,7 @@ export const NOTIFICATION_PREFERENCE_DEFAULTS = Object.freeze({
   sms: false,
   whatsapp: true,
   matchAlerts: true,
+  marketingCalls: false,
   quietHours: Object.freeze({ enabled: false, start: '22:00', end: '07:00' }),
   language: 'en',
 });

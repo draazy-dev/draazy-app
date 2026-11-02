@@ -69,7 +69,7 @@ export const deserializeF = (o) => {
   return f;
 };
 
-export const FILTER_PARAM_KEYS = [
+const FILTER_PARAM_KEYS = [
   'loc', 'soc', 'ptype', 'ctype', 'bhks', 'bhk', 'furn', 'facing', 'minBaths', 'amen', 'v',
   'postedBy', 'owneronly', 'postedByOwner', 'room', 'tenants', 'landuse', 'na', 'constr',
   'avail', 'availfrom', 'pets', 'food', 'shell', 'preLeased', 'budget', 'rent', 'area',

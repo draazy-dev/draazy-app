@@ -14,4 +14,3 @@ export const appealIdentityVerification = async (details) => (await provider()).
 
 export const withdrawIdentityVerification = async () => (await provider()).withdrawIdentityVerification();
 
-export const simulateIdentityVerification = async (outcome) => (await provider()).simulateIdentityVerification(outcome);

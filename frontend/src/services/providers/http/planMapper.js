@@ -2,9 +2,10 @@ const KINDS = new Set(['listing-pass', 'contact-pack']);
 
 export const toPlanCatalogueEntry = (row) => ({
   id: row.id,
-  slug: KINDS.has(row.kind) ? row.kind : null,
+  slug: KINDS.has(row.kind) ? row.kind + (row.deal === 'buy' ? '-buy' : '') : null,
   name: row.name,
   kind: row.kind ?? null,
+  deal: row.deal ?? null,
   audience: row.audience,
   price: row.price,
   billingCycle: row.billingCycle,

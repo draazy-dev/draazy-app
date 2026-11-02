@@ -1,5 +1,3 @@
-import { isFullMobile } from './contact.js';
-
 const DAY = 86400000;
 const now = () => Date.now();
 
@@ -28,10 +26,6 @@ export function relTime(at, fallback = '') {
   const d = Math.floor(h / 24); if (d === 1) return 'Yesterday';
   if (d < 7) return d + 'd';
   return new Date(at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-}
-
-export async function canRevealParty(conv) {
-  return !!conv && isFullMobile(conv.party?.mobile);
 }
 
 export const messagesLinkForProp = (p) => `/messages?openProp=${encodeURIComponent(String(p?.uuid || p?.id || ''))}`;

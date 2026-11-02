@@ -1,7 +1,7 @@
 import {
   BarChart3, BookOpen, Briefcase, Building2, Calculator, FileSignature, FileText, Gauge, Gift, Headset, Landmark, LayoutDashboard, LifeBuoy,
   Library, LineChart, MessageSquare, Paintbrush, Scale, Settings, ShieldCheck, Truck, Users, Flag, IndianRupee, UserPlus,
-  MapPin, Plug, UsersRound, Eraser, ThumbsUp, Undo2, Bug, Wallet,
+  MapPin, Plug, UsersRound, Eraser, ThumbsUp, Undo2, Bug, Wallet, Handshake, PhoneCall,
 } from 'lucide-react';
 
 export const SERVICE_DESKS = [
@@ -29,6 +29,7 @@ const DESK_MODULES = SERVICE_DESKS.map(({ atom = 'services:read', writeAtom = 's
 export const NAV_GROUPS = [
   { key: 'listings', label: 'Listings & Users', icon: Building2 },
   { key: 'desks', label: 'Service Desks', icon: Briefcase },
+  { key: 'sales', label: 'Sales', icon: Handshake },
   { key: 'support', label: 'Support', icon: Headset },
   { key: 'money', label: 'Money', icon: Wallet },
   { key: 'content', label: 'Content & Places', icon: Library },
@@ -45,6 +46,7 @@ export const ADMIN_MODULES = [
   { key: 'users', label: 'Users', path: '/admin/users', icon: Users, group: 'listings', atom: 'users:read' },
   { key: 'flatmates', label: 'Flatmates', path: '/admin/flatmates', icon: Users, group: 'listings', flagKey: 'flatmates', atom: 'flatmates:read', writeAtom: 'flatmates:write' },
   ...DESK_MODULES,
+  { key: 'leads', label: 'Leads', path: '/admin/leads', icon: PhoneCall, group: 'sales', atom: 'leads:read', writeAtom: 'leads:write' },
   { key: 'support', label: 'Support queue', path: '/admin/support', icon: LifeBuoy, group: 'support', flagKey: 'support', atom: 'tickets:read', writeAtom: 'tickets:write' },
   { key: 'enquiries', label: 'Enquiries', path: '/admin/enquiries', icon: MessageSquare, group: 'support', atom: 'enquiries:read' },
   { key: 'reports', label: 'Reports', path: '/admin/reports', icon: Flag, group: 'support', flagKey: 'reports', atom: ['reports:read', 'reviews:read'], writeAtom: 'reports:write' },
@@ -65,8 +67,6 @@ export const ADMIN_MODULES = [
 
 export const MODULE_BY_KEY = Object.fromEntries(ADMIN_MODULES.map((m) => [m.key, m]));
 export const MODULE_BY_PATH = Object.fromEntries(ADMIN_MODULES.map((m) => [m.path, m]));
-
-export const BASE_MODULE_KEYS = ADMIN_MODULES.filter((m) => m.base).map((m) => m.key);
 
 export const hasPermission = (user, atom) =>
   !!atom && Array.isArray(user?.permissions) && user.permissions.includes(atom);
@@ -107,20 +107,3 @@ export function moduleForPath(pathname) {
 
 export const runbooksFor = (articles, user) => articles.filter((a) => a.category === 'ops-playbook'
   && (!a.modules?.length || a.modules.some((key) => canAccessModule(user, key))));
-
-const ATOM_MODULE_LABELS = {
-  dashboard: 'Dashboard',
-  postOnBehalf: 'Post on Behalf',
-  audit: 'Team Activity',
-  tickets: 'Support Tickets',
-  users: 'Users',
-  identity: 'Identity Verification',
-  registrations: 'Rent Agreement Registration Check',
-};
-
-export function permissionLabel({ module, action }) {
-  const noun = ATOM_MODULE_LABELS[module]
-    || MODULE_BY_KEY[module]?.label
-    || module.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
-  return `${noun} · ${action === 'write' ? 'Edit' : 'View'}`;
-}

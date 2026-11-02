@@ -1,5 +1,3 @@
-export const TEAMS = ['rental', 'legal', 'loans', 'interior', 'packers', 'valuation'];
-
 export const TEAM_LABEL = {
   rental: 'Rent Agreement',
   legal: 'Property & Legal',

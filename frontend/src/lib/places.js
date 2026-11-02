@@ -154,10 +154,6 @@ export function fetchLocalitySuggestions(input, sessionToken, opts = {}) {
   return fetchSuggestions(input, sessionToken, { includedPrimaryTypes: LOCALITY_TYPES, crossCity: !!opts.crossCity, servedArea: !opts.crossCity });
 }
 
-export function fetchAreaSuggestions(input, sessionToken) {
-  return fetchSuggestions(input, sessionToken, { includedPrimaryTypes: ['geocode'] });
-}
-
 export function fetchAdminSuggestions(input, sessionToken) {
   return fetchSuggestions(input, sessionToken, { ignoreCityLimit: true });
 }

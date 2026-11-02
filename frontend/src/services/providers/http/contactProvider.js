@@ -3,11 +3,11 @@ import { MAX_PAGE_SIZE } from '../../apiLimits.js';
 import { readAccessToken } from '../../../lib/auth.js';
 import { NO_CONTACT_GATE } from '../../../lib/contact.js';
 
-export async function contactStatus(propertyId) {
+export async function contactStatus(propertyId, { maxAge } = {}) {
   if (!propertyId) return NO_CONTACT_GATE;
   if (!readAccessToken()) return NO_CONTACT_GATE;
   try {
-    return await get('/contacts/status', { propertyId }, { ttl: PAGE_LOAD_TTL });
+    return await get('/contacts/status', { propertyId }, { ttl: PAGE_LOAD_TTL, maxAge });
   } catch (err) {
     if (err?.status === 401 || err?.status === 404) return NO_CONTACT_GATE;
     throw err;

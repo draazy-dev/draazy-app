@@ -62,7 +62,3 @@ export function rankAnswers(query, { faqs = [], limit = 3 } = {}) {
 
 export const LOW_CONFIDENCE = 0.5;
 
-export function kbById(id) {
-  return KB.find((e) => e.id === id);
-}
-

@@ -39,11 +39,6 @@ export function formatWhen(dateIso, time, mode) {
   return `${displayDate(dateIso)}, ${time}${mode ? ` (${mode})` : ''}`;
 }
 
-export function isoFromWhen(when) {
-  const { date } = parseWhen(when);
-  return date ? `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` : '';
-}
-
 function parseSlotTime(timeLabel) {
   const m = /^(\d{1,2}):(\d{2})\s*([AP]M)$/i.exec(String(timeLabel || '').trim());
   if (!m) return null;

@@ -1,4 +1,4 @@
-import { PAGE_LOAD_TTL, PUBLIC_READ_TTL, del, get, patch, post } from '../../http.js';
+import { PAGE_LOAD_TTL, PUBLIC_READ_TTL, del, get, patch, post, prefetch } from '../../http.js';
 import {
   toEditForm,
   toListingCreate,
@@ -21,11 +21,11 @@ export async function listProperties(filters = {}, sort = 'newest') {
   return toViewModelList(page);
 }
 
-export async function searchListings(query = {}, { page = 1, size = 24, signal } = {}) {
+export async function searchListings(query = {}, { page = 1, size = 24, signal, ttl } = {}) {
   const res = await get(
     '/properties',
     { ...query, page: Math.max(0, page - 1), size },
-    { auth: false, signal },
+    { auth: false, signal, ttl },
   );
   return {
     items: toViewModelList(res),
@@ -34,12 +34,6 @@ export async function searchListings(query = {}, { page = 1, size = 24, signal }
     unstatedTotal: res?.unstatedElements ?? 0,
     pageCount: res?.totalPages ?? 0,
   };
-}
-
-export async function listForModeration(filters = {}, sort = 'newest', { capDisclosed = false } = {}) {
-  const page = await get('/admin/properties', { ...toModerationQuery(filters, sort), size: PAGE_SIZE });
-  if (!capDisclosed) warnIfTruncated(page);
-  return toViewModelList(page);
 }
 
 export async function searchForModeration(filters = {}, sort = 'newest', { page = 1, size = PAGE_SIZE } = {}) {
@@ -75,9 +69,10 @@ export async function getModerationProperty(id) {
   }
 }
 
-export async function getProperty(id) {
+export async function getProperty(id, { maxAge } = {}) {
   try {
-    return toViewModel(await get(`/properties/${encodeURIComponent(id)}`));
+    const opts = maxAge ? { ttl: PAGE_LOAD_TTL, maxAge } : undefined;
+    return toViewModel(await get(`/properties/${encodeURIComponent(id)}`, undefined, opts));
   } catch (err) {
     if (err?.status === 404) return null;
     throw err;
@@ -108,12 +103,6 @@ export async function ownerProfile(id) {
 export async function ownerListings(id) {
   const page = await get('/properties', { owner: id, sort: 'createdAt,desc', size: 12 }, { auth: false });
   return toViewModelList(page);
-}
-
-export async function countProperties(filters = {}) {
-  warnUnsupported(filters);
-  const page = await get('/properties', { ...toQuery(filters), size: 1 }, { auth: false });
-  return page?.totalElements ?? 0;
 }
 
 export async function getPropertiesByIds(ids = []) {
@@ -147,8 +136,8 @@ export async function similarProperties(query) {
   return (rows || []).map((r) => ({ ...toViewModel(r), _km: r.distanceKm }));
 }
 
-export async function myListings() {
-  const page = await get('/me/listings', { size: PAGE_SIZE }, { ttl: PAGE_LOAD_TTL });
+export async function myListings(user, { maxAge } = {}) {
+  const page = await get('/me/listings', { size: PAGE_SIZE }, { ttl: PAGE_LOAD_TTL, maxAge });
   warnIfTruncated(page);
   return toViewModelList(page);
 }
@@ -157,10 +146,16 @@ export async function myListingCard(id) {
   return toViewModel(await get(`/me/listings/${encodeURIComponent(id)}/card`));
 }
 
+const myListingPath = (id) => `/me/listings/${encodeURIComponent(id)}`;
+
+export function prefetchMyListing(id) {
+  if (id) prefetch(myListingPath(id));
+}
+
 export async function myListing(id) {
   if (!id) return null;
   try {
-    const vm = toViewModel(await get(`/me/listings/${encodeURIComponent(id)}`));
+    const vm = toViewModel(await get(myListingPath(id)));
     if (!vm) return vm;
     const form = toEditForm(vm);
     if (vm.societyId && vm.societyName) form.society = vm.societyName;
@@ -274,8 +269,6 @@ export async function updateListingAsModerator(id, patchBody) {
 export async function removeListingPhoto(id, photo, reason) {
   return toViewModel(await post(`/properties/${encodeURIComponent(id)}/photos/takedown`, { photo, reason }));
 }
-
-export const deleteListing = (id) => archiveListing(id);
 
 export async function confirmListingFresh(id) {
   return toViewModel(await post(`/me/listings/${encodeURIComponent(id)}/confirm-available`, {}));

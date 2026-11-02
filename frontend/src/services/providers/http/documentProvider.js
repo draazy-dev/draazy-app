@@ -2,8 +2,8 @@ import { get, del, patch, post, postMultipart, unwrapFullPage } from '../../http
 import { MAX_PAGE_SIZE } from '../../apiLimits.js';
 import { toDoc, toDocList, toRequest, toRequestList, toStatusUpdate } from './documentMapper.js';
 
-export async function listDocuments(_mobile, propId) {
-  const res = await get(`/me/documents/${encodeURIComponent(propId)}`);
+export async function listDocuments(_mobile, propId, { ttl, maxAge } = {}) {
+  const res = await get(`/me/documents/${encodeURIComponent(propId)}`, undefined, { ttl, maxAge });
   return toDocList(res?.content ?? (Array.isArray(res) ? res : []));
 }
 

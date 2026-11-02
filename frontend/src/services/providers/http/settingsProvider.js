@@ -32,10 +32,6 @@ export async function updateSettings(patch) {
   return doc && typeof doc === 'object' ? doc : {};
 }
 
-export async function getCustomRoles() {
-  return [];
-}
-
 export async function getAppFlags() {
   const flags = await bootstrapSection('flags');
   return flags && typeof flags === 'object' ? flags : {};

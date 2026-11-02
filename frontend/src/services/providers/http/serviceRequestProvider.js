@@ -3,9 +3,9 @@ import {
   toChecklist, toIdentityList, toViewModel, toViewModelList, toQueueRowPage, toCreate, toWireType,
 } from './serviceRequestMapper.js';
 
-export async function listServiceRequests(typeFilter) {
+export async function listServiceRequests(typeFilter, { ttl, maxAge } = {}) {
   const qs = typeFilter ? `?type=${encodeURIComponent(toWireType(typeFilter))}` : '';
-  const res = await get(`/service-requests${qs}`);
+  const res = await get(`/service-requests${qs}`, undefined, { ttl, maxAge });
   return toViewModelList(res?.content ?? (Array.isArray(res) ? res : []));
 }
 
@@ -167,8 +167,8 @@ export async function createCoFillServiceRequest({ request, role, mobile }) {
   }));
 }
 
-export async function listMyServiceRequestInvites() {
-  const rows = await get('/me/service-request-invites', undefined, { ttl: PAGE_LOAD_TTL });
+export async function listMyServiceRequestInvites({ maxAge } = {}) {
+  const rows = await get('/me/service-request-invites', undefined, { ttl: PAGE_LOAD_TTL, maxAge });
   return Array.isArray(rows) ? rows : [];
 }
 
@@ -178,6 +178,12 @@ export async function decideServiceRequestInvite(partyId, decision) {
 
 export async function submitServiceRequestPartyDetails(id, details) {
   return toViewModel(await put(`/service-requests/${encodeURIComponent(id)}/party-details`, {
+    details: details || {},
+  }));
+}
+
+export async function updateServiceRequestDetails(id, details) {
+  return toViewModel(await put(`/service-requests/${encodeURIComponent(id)}/details`, {
     details: details || {},
   }));
 }
@@ -224,14 +230,13 @@ const toUploadFile = (doc = {}) => {
 
 export async function addServiceRequestDoc(id, doc) {
   const file = toUploadFile(doc);
-  if (!file) return getServiceRequest(id);
+  if (!file) return;
   const { prepareUpload } = await import('../../../lib/uploads/prepareUpload.js');
   const prepared = await prepareUpload(file, { document: true });
   const form = new FormData();
   form.append('category', doc?.category || 'service-request');
   form.append('file', prepared);
   await postMultipart(`/service-requests/${encodeURIComponent(id)}/docs`, form);
-  return getServiceRequest(id);
 }
 
 export async function recordServiceRequestIdentities(id, parties) {

@@ -12,13 +12,6 @@ export function seedPosition(p) {
   ];
 }
 
-export function withPosition(p) {
-  if (!p) return p;
-  if (p.lat != null && p.lng != null) return p;
-  const [lat, lng] = seedPosition(p);
-  return { ...p, lat, lng };
-}
-
 export function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const toRad = (x) => (x * Math.PI) / 180;

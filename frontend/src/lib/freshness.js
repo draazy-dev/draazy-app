@@ -4,11 +4,6 @@ export const STALE_DAYS = 30;
 
 const DAY_MS = 86400000;
 
-export function createdMs(v) {
-  const t = new Date(v).getTime();
-  return Number.isNaN(t) ? 0 : t;
-}
-
 export function daysSinceFresh(listing, now = Date.now()) {
   const src = (listing && (listing.freshenedAt || listing.createdAt)) || null;
   if (!src) return 0;
@@ -23,14 +18,6 @@ export function freshnessState(listing, now = Date.now()) {
   if (d <= AGING_DAYS) return 'aging';
   if (d <= STALE_DAYS) return 'stale';
   return 'dormant';
-}
-
-export function isDormant(listing, now = Date.now()) {
-  return freshnessState(listing, now) === 'dormant';
-}
-
-export function needsAttention(listing, now = Date.now()) {
-  return freshnessState(listing, now) !== 'active';
 }
 
 function sinceLabel(days) {

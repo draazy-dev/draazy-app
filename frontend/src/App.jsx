@@ -1,5 +1,5 @@
-import { Navigate, Route, Routes, useLocation, useNavigationType, useRoutes } from 'react-router';
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { matchRoutes, Navigate, Route, Routes, useLocation, useNavigationType, useRoutes } from 'react-router';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 
 import ConsumerLayout from './components/layout/ConsumerLayout.jsx';
 import PreviewBanner from './components/pmf/PreviewBanner.jsx';
@@ -7,7 +7,10 @@ import { ProtectedRoute, RoleRoute, FlagRoute, AppFlagRoute, ModuleRoute } from 
 import { AppFlagsProvider } from './context/AppFlagsContext.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { lazyPage } from './i18n/lazyPage.js';
+import { preloadable } from './lib/preloadable.js';
 import { applyAppPrefs } from './lib/localPrefs.js';
+import { readAccessToken } from './lib/auth.js';
+import { prefetchMyListing } from './services/propertyService.js';
 import { DESK_BY_VALUE, portalBase, portalPath } from './lib/adminModules.js';
 import { recordPageView, startPageViewBeacon } from './lib/telemetry/pageViewBeacon.js';
 import usePageHead from './lib/usePageHead.js';
@@ -22,7 +25,7 @@ import useKeyboardOpen from './lib/useKeyboardOpen.js';
 import { installReducedMotionScroll } from './lib/motion.js';
 import LegacyHelpLangRedirect from './components/help/LegacyHelpLangRedirect.jsx';
 
-const AdminLayout = lazy(() => import('./components/layout/AdminLayout.jsx'));
+const AdminLayout = preloadable(() => import('./components/layout/AdminLayout.jsx'));
 const StaffLogin = lazy(() => import('./pages/consumer/StaffLogin.jsx'));
 
 import DashboardSkeleton from './pages/consumer/dashboard/DashboardSkeleton.jsx';
@@ -90,36 +93,44 @@ const Disclaimer = lazy(() => import('./pages/consumer/Disclaimer.jsx'));
 
 function ListPropertyRoute() {
   const location = useLocation();
-  const editing = new URLSearchParams(location.search).has('edit');
+  const params = new URLSearchParams(location.search);
+  const editing = params.has('edit');
+  const editId = params.get('edit');
+  useEffect(() => {
+    if (!editing || !readAccessToken()) return;
+    ListProperty.preload();
+    prefetchMyListing(editId).catch(() => {});
+  }, [editing, editId]);
   const page = <ListProperty />;
   return editing ? <ProtectedRoute>{page}</ProtectedRoute> : page;
 }
 
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard.jsx'));
-const AdminProperties = lazy(() => import('./pages/admin/AdminProperties.jsx'));
-const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics.jsx'));
-const AdminUsers = lazy(() => import('./pages/admin/AdminUsers.jsx'));
-const AdminServices = lazy(() => import('./pages/admin/AdminServices.jsx'));
-const AdminRunbooks = lazy(() => import('./pages/admin/AdminRunbooks.jsx'));
-const AdminEnquiries = lazy(() => import('./pages/admin/AdminEnquiries.jsx'));
-const AdminFinance = lazy(() => import('./pages/admin/AdminFinance.jsx'));
-const AdminContent = lazy(() => import('./pages/admin/AdminContent.jsx'));
-const AdminReports = lazy(() => import('./pages/admin/AdminReports.jsx'));
-const AdminSettings = lazy(() => import('./pages/admin/AdminSettings.jsx'));
-const AdminIntegrations = lazy(() => import('./pages/admin/AdminIntegrations.jsx'));
-const AdminErasureRequests = lazy(() => import('./pages/admin/AdminErasureRequests.jsx'));
-const AdminHelpFeedback = lazy(() => import('./pages/admin/AdminHelpFeedback.jsx'));
-const AdminErrorLog = lazy(() => import('./pages/admin/AdminErrorLog.jsx'));
+const AdminDashboard = preloadable(() => import('./pages/admin/AdminDashboard.jsx'));
+const AdminProperties = preloadable(() => import('./pages/admin/AdminProperties.jsx'));
+const AdminAnalytics = preloadable(() => import('./pages/admin/AdminAnalytics.jsx'));
+const AdminUsers = preloadable(() => import('./pages/admin/AdminUsers.jsx'));
+const AdminServices = preloadable(() => import('./pages/admin/AdminServices.jsx'));
+const AdminRunbooks = preloadable(() => import('./pages/admin/AdminRunbooks.jsx'));
+const AdminEnquiries = preloadable(() => import('./pages/admin/AdminEnquiries.jsx'));
+const AdminFinance = preloadable(() => import('./pages/admin/AdminFinance.jsx'));
+const AdminContent = preloadable(() => import('./pages/admin/AdminContent.jsx'));
+const AdminReports = preloadable(() => import('./pages/admin/AdminReports.jsx'));
+const AdminSettings = preloadable(() => import('./pages/admin/AdminSettings.jsx'));
+const AdminIntegrations = preloadable(() => import('./pages/admin/AdminIntegrations.jsx'));
+const AdminErasureRequests = preloadable(() => import('./pages/admin/AdminErasureRequests.jsx'));
+const AdminHelpFeedback = preloadable(() => import('./pages/admin/AdminHelpFeedback.jsx'));
+const AdminErrorLog = preloadable(() => import('./pages/admin/AdminErrorLog.jsx'));
 const AdminPostOnBehalf = lazyPage(() => import('./pages/admin/AdminPostOnBehalf.jsx'), 'list-property');
-const AdminStaffActivity = lazy(() => import('./pages/admin/AdminStaffActivity.jsx'));
-const AdminPlaces = lazy(() => import('./pages/admin/AdminPlaces.jsx'));
+const AdminStaffActivity = preloadable(() => import('./pages/admin/AdminStaffActivity.jsx'));
+const AdminPlaces = preloadable(() => import('./pages/admin/AdminPlaces.jsx'));
 const AdminTeam = lazyPage(() => import('./pages/admin/AdminTeam.jsx'), 'team');
 
-const OpsReferrals = lazy(() => import('./pages/ops/OpsReferrals.jsx'));
-const OpsRefunds = lazy(() => import('./pages/ops/OpsRefunds.jsx'));
+const OpsReferrals = preloadable(() => import('./pages/ops/OpsReferrals.jsx'));
+const OpsRefunds = preloadable(() => import('./pages/ops/OpsRefunds.jsx'));
+const AdminLeads = preloadable(() => import('./pages/admin/leads/AdminLeads.jsx'));
 const OpsFlatmateReview = lazyPage(() => import('./pages/ops/OpsFlatmateReview.jsx'), 'flatmates');
-const OpsIdentityReview = lazy(() => import('./pages/ops/OpsIdentityReview.jsx'));
-const OpsSupportQueue = lazy(() => import('./pages/ops/OpsSupportQueue.jsx'));
+const OpsIdentityReview = preloadable(() => import('./pages/ops/OpsIdentityReview.jsx'));
+const OpsSupportQueue = preloadable(() => import('./pages/ops/OpsSupportQueue.jsx'));
 const OpsDraftingDesk = lazyPage(() => import('./pages/ops/OpsDraftingDesk.jsx'), 'services');
 const RentAgreementDesk = lazyPage(() => import('./pages/ops/rent-agreement/RentAgreementDesk.jsx'), 'services');
 
@@ -214,6 +225,7 @@ const BACK_OFFICE_ROUTES = [{
     { path: 'enquiries', element: <ModuleRoute moduleKey="enquiries"><AdminEnquiries /></ModuleRoute> },
     { path: 'referrals', element: <ModuleRoute moduleKey="referrals"><OpsReferrals /></ModuleRoute> },
     { path: 'refunds', element: <ModuleRoute moduleKey="refunds"><OpsRefunds /></ModuleRoute> },
+    { path: 'leads', element: <ModuleRoute moduleKey="leads"><AdminLeads /></ModuleRoute> },
     { path: 'finance', element: <ModuleRoute moduleKey="finance"><FlagRoute flag="finance"><AdminFinance /></FlagRoute></ModuleRoute> },
     { path: 'content', element: <ModuleRoute moduleKey="content"><AdminContent /></ModuleRoute> },
     { path: 'reports', element: <ModuleRoute moduleKey="reports"><FlagRoute flag="reports"><AdminReports /></FlagRoute></ModuleRoute> },
@@ -239,6 +251,26 @@ function BackOffice() {
   const routes = useRoutes(BACK_OFFICE_ROUTES);
   const target = portalPath(user, pathname);
   return target === pathname ? routes : <Navigate to={`${target}${search}${hash}`} replace />;
+}
+
+function preloadablePage(element) {
+  let el = element;
+  while (el && !el.type?.preload) el = el.props?.children;
+  return el?.type;
+}
+
+// Holds the console until the shell and page chunks land: a page that suspends after auth makes
+// React 19 keep its fallback up for at least 300ms (see preloadable.js).
+function BackOfficeEntry({ base, children }) {
+  const { pathname } = useLocation();
+  const [ready, setReady] = useState(() => !readAccessToken());
+  useEffect(() => {
+    if (!readAccessToken()) return;
+    const matches = matchRoutes(BACK_OFFICE_ROUTES, pathname, base);
+    Promise.all([AdminLayout.preload(), preloadablePage(matches?.at(-1)?.route.element)?.preload()])
+      .then(() => setReady(true));
+  }, [base, pathname]);
+  return ready ? children : <LoadingFallback />;
 }
 
 export default function App() {
@@ -352,8 +384,8 @@ export default function App() {
           />
         </Route>
 
-        <Route path="/admin/*" element={<RoleRoute roles={['staff', 'manager', 'admin']}><BackOffice /></RoleRoute>} />
-        <Route path="/staff/*" element={<RoleRoute roles={['staff', 'manager', 'admin']}><BackOffice /></RoleRoute>} />
+        <Route path="/admin/*" element={<BackOfficeEntry base="/admin"><RoleRoute roles={['staff', 'manager', 'admin']}><BackOffice /></RoleRoute></BackOfficeEntry>} />
+        <Route path="/staff/*" element={<BackOfficeEntry base="/staff"><RoleRoute roles={['staff', 'manager', 'admin']}><BackOffice /></RoleRoute></BackOfficeEntry>} />
 
         <Route path="/ops" element={<LegacyRedirect to="/admin" />} />
         <Route path="/ops/support" element={<LegacyRedirect to="/admin/support" />} />
