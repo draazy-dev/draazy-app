@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { API } from '../../../helpers/liveAuth.js';
+import { ACTORS } from '../../../fixtures/live.js';
+import { API, authHeaders } from '../../../helpers/liveAuth.js';
 
 /* The oracle haversines the *unfiltered* catalogue in this process — asking the API for the same
    filtered count would compare the same wrong SQL to itself. Counts are derived, never hard-coded. */
@@ -128,10 +129,9 @@ test('commute mode reads the slider as minutes, not kilometres', async ({ page }
 
 test('a locality the registry knows but has no stock in says so, and offers a way out', async ({ page }) => {
   /* Anchor: an unrecognised slug also renders empty, so confirm it is a real locality with no stock. */
-  const res = await fetch(`${API}/localities`);
-  expect(res.ok, `GET /localities -> ${res.status}`).toBe(true);
-  const registry = await res.json();
-  const list = Array.isArray(registry) ? registry : registry.content || [];
+  const res = await fetch(`${API}/admin/localities`, { headers: await authHeaders(ACTORS.admin) });
+  expect(res.ok, `GET /admin/localities -> ${res.status}`).toBe(true);
+  const list = await res.json();
   expect(list.length, 'the locality registry is empty; the seed did not run').toBeGreaterThan(5);
 
   const empty = list.find((l) => !l.archived && Number(l.liveListings) === 0);

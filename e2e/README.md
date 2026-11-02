@@ -31,8 +31,8 @@ runner has two modes, and the second one stays the gate before a commit.
 | `.\run-fast.ps1 -Files frontend/src/pages/admin/AdminFinance.jsx` | The same, for files you name. Use it when the tree holds another session's changes. |
 | `.\run-fast.ps1 -Spec tests/consumer/property/alerts.spec.js` | Exactly the named specs. |
 | `.\run-fast.ps1 -Failed` | Only the tests that failed in the last run (by `file:line`, like Playwright's `--last-failed`). |
-| `.\run-fast.ps1 -Full` | **The whole suite** (both configs), split across `-Shards 4` isolated lanes. Run it before committing. |
-| `.\run-fast.ps1 -Full -Shards 6 -Build` | The same, with shards served from one build: 79 min on 2026-10-22 instead of ~3.4 h. Not yet the gate: 27 tests fail only there (see Shards). |
+| `.\run-fast.ps1 -Full` | **The whole suite** (both configs), split across `-Shards 4` isolated lanes, all but the shards holding `/src/` imports served from one build. Run it before committing. |
+| `.\run-fast.ps1 -Full -Dev` | The same with every shard on the dev server (~3x slower per spec). |
 | `.\run-fast.ps1 -DryRun` | Print the selection and test count, start nothing. |
 | `.\run-fast.ps1 -Stop` | Stop the shard JVMs. |
 
@@ -65,16 +65,17 @@ count), so a shard that dies in setup shows as `MISSING`, not as a pass. Missing
 `last-failed.txt`, so `-Failed` reruns them too. The no-backend specs get their own dev server on
 `:5210`. Shard 1 serves on `:1122`, an origin the Google Maps key admits, and every spec that
 `maps-specs.js` flags is pinned to it. The key also admits `:3322`, but that port belongs to the
-user's `run-dev.ps1`, and e2e never uses it. With `-Build` and more than one shard, every shard but shard 2
-serves one shared build (`scripts/build-app.mjs`, into `.shards/dist`, rebuilt only when `frontend/`
+user's `run-dev.ps1`, and e2e never uses it. With more than one shard (and no `-Dev`), every shard without a
+`/src/` import serves one shared build (`scripts/build-app.mjs`, into `.shards/dist`, rebuilt only when `frontend/`
 changes) through `vite preview`. A spec there takes about a third of its dev-server time, and editing
 `frontend/src` mid-run no longer reloads it. The build keeps `import.meta.env.DEV` true and has no
-service worker, as on the dev server. Shard 2 keeps the dev server, and the specs that
-`import('/src/...')` inside the page are pinned to it, since only a dev server serves those modules.
-`-Build` is opt-in because a faster page exposes a race: a signed-in page opens the
-`/api/messages/stream` SSE stream ~1 s after load, and `goto(..., { waitUntil: 'networkidle' })` only
-passes on the dev server because the page goes idle before the stream opens. On the build it never goes
-idle, so those specs time out (and would against production). Output goes to
+service worker, as on the dev server. The specs that `import('/src/...')` inside the page are pinned to
+shard 2 (or shard 1 when they also need Maps), and any shard holding one keeps the dev server, since only a
+dev server serves those modules.
+A signed-in page opens the `/api/messages/stream` SSE stream ~1 s after load, so Playwright's
+`networkidle` never fires on the build (or in production); wait with `helpers/settle.js`
+(`gotoSettled`, `reloadSettled`, `settle`), which waits for the same 500 ms quiet window but ignores
+event streams. Output goes to
 `.shards/` (git-ignored): `html/` (merged report, `npx playwright show-report .shards\html`),
 `report.json`, per-shard logs `shard-<i>.log`, and `last-failed.txt`. JVM logs are in
 `%TEMP%\draazy-shard-<i>.log`.

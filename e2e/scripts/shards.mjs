@@ -34,7 +34,8 @@ function plan(listFile, durationsFile, shardArg, outFile) {
   const shards = Array.from({ length: Math.max(1, Math.min(Number(shardArg), perFile.size)) }, () => ({ seconds: 0, files: [] }));
   const byWeight = [...perFile.keys()].sort((a, b) => weight(b) - weight(a) || a.localeCompare(b));
   const place = (shard, f) => { shard.files.push(f); shard.seconds += weight(f); };
-  // run-fast.ps1 serves shard 1 on the Maps origin and shard 2 from the dev server, the only one with `/src/` modules.
+  // run-fast.ps1 serves shard 1 on the Maps origin; a shard holding a `/src/` import is marked `dev` and served by the
+  // dev server, the only one with those modules. Gathering them on shard 2 keeps the other shards on the faster build.
   const importsSrc = (f) => /import\(\s*['"`]\/src\/|=\s*['"`]\/src\//.test(readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'));
   const pinned = (f) => needsMaps(f) || importsSrc(f);
   for (const f of byWeight.filter(needsMaps)) place(shards[0], f);
@@ -43,7 +44,7 @@ function plan(listFile, durationsFile, shardArg, outFile) {
     place(shards.reduce((min, s) => (s.seconds < min.seconds ? s : min)), f);
   }
   const used = shards.filter((s) => s.files.length);
-  writeFileSync(outFile, JSON.stringify(used.map((s) => ({ seconds: Math.round(s.seconds), files: s.files.sort() }))));
+  writeFileSync(outFile, JSON.stringify(used.map((s) => ({ seconds: Math.round(s.seconds), files: s.files.sort(), dev: s.files.some(importsSrc) }))));
 }
 
 function report(reportFile, lastFailedFile, durationsFile, ...listFiles) {

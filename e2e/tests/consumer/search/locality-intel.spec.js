@@ -1,6 +1,5 @@
 import { test, expect } from '../../../fixtures/live.js';
-import { API } from '../../../helpers/liveAuth.js';
-import { mintLocality, uniqueLocalityName } from '../../../helpers/locality.js';
+import { localityWithStock, mintLocality, uniqueLocalityName } from '../../../helpers/locality.js';
 
 const noindex = (page) => page.locator('meta[name="robots"][content="noindex"]');
 
@@ -51,8 +50,7 @@ test.describe('Locality guides — indexable before listings exist', () => {
 
 test.describe('Locality page — stats only where the data is real', () => {
   test('a locality with three or more live listings shows its stats and is indexable', async ({ page, consoleErrors }) => {
-    const all = await (await fetch(`${API}/localities`)).json();
-    const busy = all.find((l) => l.indexable && (l.avgRent != null || l.ratePerSqft != null));
+    const busy = await localityWithStock((l) => l.indexable && (l.avgRent != null || l.ratePerSqft != null));
     test.skip(!busy, 'no locality in this database has three live listings yet');
 
     await page.goto(`/locality/${busy.slug}`);

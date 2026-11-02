@@ -104,3 +104,15 @@ export async function stockBySlug(deal = 'buy') {
   }
   return stock;
 }
+
+// The first locality holding live listings whose public read satisfies `wanted`.
+export async function localityWithStock(wanted, deals = ['buy', 'rent']) {
+  const tallies = await Promise.all(deals.map((deal) => stockBySlug(deal)));
+  for (const slug of new Set(tallies.flatMap((t) => [...t.keys()]))) {
+    if (!slug) continue;
+    const res = await fetch(`${API}/localities/${slug}`);
+    const row = res.ok ? await res.json() : null;
+    if (row && wanted(row)) return row;
+  }
+  return undefined;
+}

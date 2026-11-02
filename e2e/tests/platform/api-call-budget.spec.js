@@ -46,6 +46,9 @@ const DASHBOARD_SECTIONS = [
 for (const [name, url] of [['dashboard', '/dashboard'], ['owner hub', '/owner-hub']]) {
   test(`the ${name} reads its inbox sections once, from /me/dashboard`, async ({ page, login, consoleErrors }) => {
     await login.asOwner();
+    // The post-login landing page can still be reading /me/bootstrap; leave it before counting.
+    // A same-origin static file, because about:blank denies the init scripts' storage access.
+    await page.goto('/robots.txt');
     const gets = countGets(page);
     const dashboardRead = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/me/dashboard');
     await page.goto(url);
@@ -80,9 +83,9 @@ test('a seeker dashboard carries rental flags, not tenancies, and never reads or
 
   // Past the seeds' 5s window, so the tab-return refresh goes to the network.
   await page.waitForTimeout(6000);
-  const visitsBefore = gets.timesPath('/api/visits');
+  const docsBefore = gets.timesPath('/api/me/dashboard');
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await expect.poll(() => gets.timesPath('/api/visits')).toBeGreaterThan(visitsBefore);
+  await expect.poll(() => gets.timesPath('/api/me/dashboard')).toBeGreaterThan(docsBefore);
   await page.waitForTimeout(1000);
   for (const path of OWNER_INBOXES) expect(gets.timesPath(path), path).toBe(0);
   expect(consoleErrors).toEqual([]);
@@ -157,7 +160,6 @@ test('the societies directory reads one filtered page, then the next on Show mor
   await page.getByRole('button', { name: /show more/i }).click();
   await expect.poll(() => gets.timesPath('/api/societies')).toBe(2);
   expect(gets.keys()).toContain('/api/societies?sort=relevance&page=1&size=24');
-  expect(gets.timesPath('/api/localities'), 'the locality filter searches; it never downloads the directory').toBe(0);
   expect(consoleErrors).toEqual([]);
 });
 

@@ -310,28 +310,31 @@ test('a failed flatmates read says so instead of showing zero posts', async ({ p
   await expect(page.getByTestId('flatmates-posts')).toHaveCount(0);
 });
 
-test('unmeasured values read as unmeasured and no tab presents generated numbers', async ({ page, login, request }) => {
+test('unmeasured values read as unmeasured and no tab presents generated numbers', async ({ page, login }) => {
   test.slow();
   await login.asAdmin();
+  // Other specs on the same database review listings within seconds, a real `0h`, so the SLA read is
+  // served with every turnaround unmeasured to pin how the tab renders one.
+  const unmeasured = (t) => t && { ...t, completedCount: 0, avgHours: null, medianHours: null, slaRatePct: null };
+  await page.route('**/admin/analytics/sla*', async (route) => {
+    const sla = await (await route.fetch()).json();
+    await route.fulfill({
+      json: {
+        ...sla, reviewedCount: 0, avgHoursToReview: null, medianHoursToReview: null, breachedCount: 0, slaRatePct: null,
+        ticketPickup: unmeasured(sla.ticketPickup), ticketDelivery: unmeasured(sla.ticketDelivery),
+        conciergeToLive: unmeasured(sla.conciergeToLive), flatmateReview: unmeasured(sla.flatmateReview),
+      },
+    });
+  });
   await test.step('SLA tab reports an unmeasured turnaround as unrecorded, not as zero', async () => {
-    // Missing turnaround renders as "not recorded"; `0h` would claim instant review.
-    const res = await request.get(`${API}/admin/analytics/sla`, { headers: await admin() });
-    expect(res.ok()).toBeTruthy();
-    const { avgHoursToReview } = await res.json();
-
     await openAnalytics(page, 'sla');
-    expect(
-      avgHoursToReview,
-      'the e2e seed records no review decisions, so this is expected to be null; if it is a number '
-        + 'the assertion below is the wrong one and the test needs rewriting, not relaxing',
-    ).toBeNull();
 
     // Scope to this card because unrelated panels can legitimately render `0h`.
     const reviewTile = page.locator('div.rounded-xl').filter({ hasText: 'Avg time to review' });
     await expect(reviewTile).toHaveCount(1);
     await expect(reviewTile).toContainText('not recorded');
-    // The specific wrong answer this guards against. A `|| 0` creeping back into `hours()` — whose
-    // own comment promises "Never `0h`" — reads as a real measurement of a review that was never timed.
+    // The specific wrong answer this guards against: a `|| 0` creeping back into `hours()` reads as a real
+    // measurement of a review that was never timed.
     await expect(reviewTile).not.toContainText('0h');
   });
   await test.step('nothing anywhere on the SLA tab claims a zero-hour turnaround', async () => {
@@ -339,6 +342,7 @@ test('unmeasured values read as unmeasured and no tab presents generated numbers
     await expect(page.getByRole('heading', { name: 'Concierge Pipeline' })).toBeVisible();
     await expect(page.getByText(/(^|[^\d.])0h\b/)).toHaveCount(0);
   });
+  await page.unroute('**/admin/analytics/sla*');
   await test.step('Pricing tab shows a dash, not an invented rate, where too few flats were measured', async () => {
     await openAnalytics(page, 'pricing');
     const table = page.locator('table').filter({ has: page.getByText('Asking ₹/sqft') });

@@ -11,6 +11,7 @@ const PLOT_WITH_PHOTOS = 'p5032';
 const RESIDENTIAL = /flat|studio|penthouse|independent house|row house|villa/i;
 const MIN_PHOTOS = 3;
 const MAX_PHOTOS = 5;
+const REELS_CAP = 24;
 
 async function catalogue() {
   const res = await fetch(`${API}/properties?sort=newest&size=100`);
@@ -27,9 +28,11 @@ async function withPhotoCounts(rows) {
   return rows.map((p, i) => ({ ...p, photoCount: details[i].images?.length ?? 0 }));
 }
 
+/* The server serves the newest REELS_CAP qualifying homes and the Rent/Buy chips filter those, so earlier specs that
+   publish listings on the shard push older homes out of the feed. `catalogue()` is newest-first, like the feed. */
 async function eligibleIn(rows) {
   const homes = await withPhotoCounts(rows.filter((p) => RESIDENTIAL.test(p.propertyType || '')));
-  return homes.filter((p) => p.photoCount >= MIN_PHOTOS);
+  return homes.filter((p) => p.photoCount >= MIN_PHOTOS).slice(0, REELS_CAP);
 }
 
 /* Cookie consent, seeded before boot so the global bottom banner never overlaps the bottom-of-reel
@@ -85,14 +88,11 @@ test('the feed is residential homes only — and a plot with six photos proves t
 });
 
 test('the feed is the catalogue, not a curated list — every qualifying home is offered', async ({ page }) => {
-  /* Guards over-filtering, which the homes-only test can't. The server caps the feed at 24;
-     relax to min(eligible, 24) if the seeded catalogue outgrows the cap. */
+  /* Guards over-filtering, which the homes-only test can't. */
   const rows = await catalogue();
   const eligible = await eligibleIn(rows);
   expect(eligible.length, 'no listing qualifies for a reel, so the feed proves nothing')
     .toBeGreaterThan(0);
-  expect(eligible.length, 'the catalogue outgrew the 24-reel cap; this assertion needs the cap applied')
-    .toBeLessThanOrEqual(24);
 
   await openFeed(page);
   const shown = await page.locator('.reel a[href^="/property/"]').evaluateAll(

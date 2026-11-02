@@ -94,7 +94,7 @@ test.describe('Dashboard settings', () => {
     const lightMode = page.getByRole('switch', { name: 'Light mode' });
     const bodyBg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     const favicon = page.locator('link[rel="icon"]');
-    const lightTile = /stop-color='%23a9d4cf'/;
+    const lightTile = /fill='%23f3f7f6'/;
     const darkTile = /fill='%230f0d1a'/;
 
     await expect(html).toHaveClass(/\blight\b/);
@@ -191,7 +191,7 @@ test.describe('Dashboard settings', () => {
     const sent = res.request().postDataJSON();
     expect(sent.email).toBe(false);
     // Every field present, because the contract requires it.
-    for (const key of ['email', 'sms', 'whatsapp', 'matchAlerts', 'language']) {
+    for (const key of ['email', 'sms', 'whatsapp', 'matchAlerts', 'marketingCalls', 'language']) {
       expect(sent[key], `PUT body is missing ${key}; the server would 422`).not.toBe(undefined);
     }
     expect(sent.quietHours).toMatchObject({ enabled: expect.anything(), start: expect.any(String), end: expect.any(String) });
@@ -326,6 +326,29 @@ test.describe('Dashboard settings', () => {
       ACTORS.owner,
     );
     expect(serialised, 'shared records identify the other party by reference').toContain('partyRef');
+  });
+
+  test('the marketing-calls consent switch is off by default and persists on the server', async ({ page, login, request }) => {
+    await login.asBuyer();
+    await page.goto('/dashboard#profile');
+    const consent = page.getByRole('switch', { name: 'Calls about homes and moving' });
+    await expect(consent).toHaveAttribute('aria-checked', 'false');
+
+    const flip = async () => {
+      const wrote = page.waitForResponse(
+        (r) => r.url().includes('/api/me/notification-preferences') && r.request().method() === 'PUT',
+        { timeout: 15_000 },
+      );
+      await consent.click();
+      expect((await wrote).status()).toBe(200);
+    };
+    await flip();
+    await expect(consent).toHaveAttribute('aria-checked', 'true');
+    const on = await request.get(`${API}/me/notification-preferences`, { headers: await authHeaders(SEEKER) });
+    expect((await on.json()).marketingCalls).toBe(true);
+
+    await flip();
+    await expect(consent).toHaveAttribute('aria-checked', 'false');
   });
 
 });

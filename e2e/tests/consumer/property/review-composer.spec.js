@@ -1,6 +1,7 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile, signedInAs, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 const PROP_ASPECTS = ['Locality', 'Condition', 'Value', 'Owner', 'Accuracy'];
 
@@ -84,7 +85,7 @@ test('every star in the property review composer names its value and its aspect'
   /* `?tab=amenities`: the reviews block is mounted by PropertyTabs only while that tab is current,
      so on the default Overview tab the "Rate this property" button does not exist at all. */
 
-  await page.goto(`/property/${ref}?tab=amenities`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${ref}?tab=amenities`);
   await page.evaluate(() => document.querySelectorAll('.reveal,.fade-up,.fade-in').forEach((el) => el.classList.add('visible')));
 
   const declarationResponse = await declarationsRead;

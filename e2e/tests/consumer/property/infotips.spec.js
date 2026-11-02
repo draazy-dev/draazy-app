@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { trackErrors } from '../../../helpers/console.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 const SALE_FLAT = 'p5013';      // 3 BHK Flat, Baner (buy)
 // No approved rent Flat is safe here; this approved rental exercises the same tip tiles.
@@ -29,7 +30,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function gotoProp(page, id) {
-  await page.goto(`/property/${id}`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${id}`);
   await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 15000 });
 }
 

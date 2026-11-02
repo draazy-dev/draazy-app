@@ -7,8 +7,8 @@ param(
     [string[]]$Files,
     [string]$Base = 'HEAD',
     [int]$Shards = 4,
-    # Serve every shard but shard 2 from one build: about 3x faster per spec. See e2e/README.md "Shards".
-    [switch]$Build,
+    # Shards without a /src/ import serve one build by default (about 3x faster per spec); -Dev serves all from the dev server. See e2e/README.md "Shards".
+    [switch]$Dev,
     [string]$Grep,
     [switch]$DryRun,
     [switch]$Stop,
@@ -283,7 +283,7 @@ if ($n -gt 0) {
 
     if ($starting.Count) { Write-Host "Booting backend shard(s) $($starting -join ', ')..." }
     $DIST = Join-Path $STATE 'dist'
-    $useBuild = $Build -and $n -gt 1
+    $useBuild = -not $Dev -and $n -gt 1
     if ($useBuild) {
         & node scripts/build-app.mjs $DIST | Out-Host
         if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
@@ -340,7 +340,7 @@ for ($i = 1; $i -le $n; $i++) {
         BASE_URL = "http://localhost:$(AppPort $i)"; API_PORT = "$(ApiPort $i)"; E2E_DB_NAME = (DbName $i)
         E2E_TIMEOUT_SCALE = $(if ($n -gt 1) { '2' } else { '1' })
     }
-    if ($useBuild -and $i -ne 2) { $vars['E2E_DIST'] = $DIST }
+    if ($useBuild -and -not $plan[$i - 1].dev) { $vars['E2E_DIST'] = $DIST }
     $runs += Start-Run "shard-$i" $a $vars
     if ($i -lt $n) { Start-Sleep -Seconds 4 }
 }

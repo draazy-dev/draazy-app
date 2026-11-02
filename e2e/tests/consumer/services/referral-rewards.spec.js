@@ -3,6 +3,7 @@
 import { expect, test, ACTORS } from '../../../fixtures/live.js';
 import { API, apiLogin, signedInAs, signIn, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ownersApproveAll } from '../../../helpers/monetisation.js';
+import { gotoSettled, reloadSettled } from '../../../helpers/settle.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
@@ -15,11 +16,11 @@ const entitlements = (token) =>
 /* Borrowed from the seeded catalogue rather than minted: this file has no opinion about the
  * listings beyond existing and belonging to somebody else. */
 async function someListings(count) {
-  const res = await fetch(`${API}/properties?size=${count}`);
+  const res = await fetch(`${API}/properties?size=100`);
   expect(res.status).toBe(200);
   const rows = (await res.json()).content;
   expect(rows.length, 'the seeded catalogue has listings to contact').toBeGreaterThanOrEqual(count);
-  return rows.map((r) => ({ id: r.id, ref: r.slug || r.id }));
+  return rows.map((r) => ({ id: r.id, ref: r.slug || r.id, deal: r.deal }));
 }
 
 const askFor = (token, propertyId) =>
@@ -37,7 +38,9 @@ async function exhaustedBuyer(page) {
     ownersApproveAll(mobile);
   }
   await signedInAs(page, mobile);
-  return { mobile, accessToken, untouched: listings[FREE_LIMIT] };
+  const untouched = listings.slice(FREE_LIMIT).find((l) => l.deal === 'rent');
+  expect(untouched, 'a rent listing is left to press on, so the upsell is the rent pack').toBeTruthy();
+  return { mobile, accessToken, untouched };
 }
 
 /* The button renders in both the desktop sidebar card and the contact sheet and this file has no
@@ -145,7 +148,7 @@ test.describe('referralRewards is a server document', () => {
     const summary = await fetch(`${API}/me/referrals`, { headers: auth(accessToken) }).then((r) => r.json());
 
     await signedInAs(page, mobile);
-    await page.goto('/refer', { waitUntil: 'networkidle' });
+    await gotoSettled(page, '/refer');
 
     await expect(page.getByTestId('refer-seeker-track')).toBeVisible();
     /* The number on screen is the server's, read from the same endpoint rather than pinned to a literal. */
@@ -153,7 +156,7 @@ test.describe('referralRewards is a server document', () => {
     await expect(page.getByTestId('refer-owner-track')).toBeVisible();
 
     await flags.disable('referralRewards');
-    await page.reload({ waitUntil: 'networkidle' });
+    await reloadSettled(page);
 
     /* Asserted **first**: `toHaveCount(0)` is satisfied the instant it is asked on a page that has
        not finished rendering, so the negatives below need something real to wait behind. */
@@ -177,7 +180,7 @@ test.describe('referralRewards is a server document', () => {
   test('Ops switching it off is a confirmed write that lands on the server', async ({ page, flags }) => {
     await flags.enable('referralRewards');
     await signIn(page, ACTORS.admin, { screen: 'staff' });
-    await page.goto('/admin/settings?tab=flags', { waitUntil: 'networkidle' });
+    await gotoSettled(page, '/admin/settings?tab=flags');
 
     await page.getByRole('button', { name: /Monetization & Payments/i }).click();
     const row = page.getByRole('switch', { name: 'Toggle Referral rewards' });

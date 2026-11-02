@@ -72,6 +72,7 @@ const WAIVED = new Map([
   ['request_hidden', 'written when a requester clears a finished request; `consumer/account/requests-inbox.spec.js` clears its own'],
   ['flatmate_interest_withdrawals', 'written when a seeker withdraws a pending flatmate interest; backend `RequestInboxEndpointsTest` covers it'],
   ['property_live_gaps', 'written when a listing leaves live and comes back; the pass-guarantee specs pause and resume their own'],
+  ['crm_lead_conversions', 'written when staff credit a paid request; `ops/leads-crm.spec.js` converts its own'],
 ]);
 
 // Pending tables need read fixtures; populated entries are reported stale.
@@ -95,6 +96,7 @@ const PENDING = new Map([
   ['personal_documents', 'vault: ditto'],
   ['managed_properties', 'managed: the managed console is empty'],
   ['managed_property_documents', 'managed: hangs off managed_properties'],
+  ['managed_property_rent_claims', 'managed: hangs off managed_properties'],
   ['property_reviews', 'review queue: nothing queued'],
   ['property_review_checklist', 'review queue: hangs off property_reviews'],
   ['rent_agreements', 'rent: no agreement to read'],

@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe';
@@ -42,7 +43,7 @@ test.describe('Identity numbers after a retention purge (D282)', () => {
     purge(request.id);
 
     await signedInAs(page, mobile);
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     const panel = page.getByTestId('identity-refill');
     await expect(panel).toBeVisible({ timeout: 15000 });
     await expect(panel).toContainText(OWNER);

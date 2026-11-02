@@ -55,7 +55,7 @@ test('an out-of-range or malformed page settles on a real one', async ({ page })
   await page.goto('/listings?deal=buy&page=99');
   await expect(current(page)).toHaveText('2');
   await expect.poll(() => urlPage(page)).toBe('2');
-  expect((await cards(page)).length).toBeGreaterThan(0);
+  await expect.poll(async () => (await cards(page)).length).toBeGreaterThan(0);
   for (const bad of ['0', '-1', 'abc', '2.5']) {
     await page.goto(`/listings?deal=buy&page=${bad}`);
     await expect(current(page)).toHaveText('1');

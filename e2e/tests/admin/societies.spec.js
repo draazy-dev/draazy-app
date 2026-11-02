@@ -217,7 +217,7 @@ test('a duplicate check that fails says so, instead of saying "No obvious match"
   const name = `Failcheck Manor ${String(Date.now()).slice(-7)}`;
   await mintSociety(name, { mobile: uniqueMobile() });
 
-  await page.route('**/admin/society-candidates/*/duplicates*', (route) => route.abort('failed'));
+  await page.route('**/admin/society-candidates/duplicates*', (route) => route.abort('failed'));
 
   await login.asAdmin();
   await openTab(page, 'duplicates', name);

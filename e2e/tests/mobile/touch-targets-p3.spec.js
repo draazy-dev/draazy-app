@@ -36,27 +36,20 @@ test.describe('Touch targets — controls the audit found under the floor', () =
     expect(painted, 'rail must still be drawn thin').toContain('6px');
   });
 
-  test('the plans carousel dots are hittable and unambiguous', async ({ page }) => {
+  test('the plans deal switch and "What\'s included" toggles are full-size taps', async ({ page }) => {
     await consent(page);
     await page.goto('/plans');
 
-    const dots = page.locator('button[aria-current], button:has(> span[aria-hidden="true"].rounded-full)');
-    const first = dots.first();
-    await expect(first).toBeVisible();
-
-    const a = await first.boundingBox();
-    // 24x44: the WCAG 2.5.8 AA floor on the axis that is constrained, full height on
-    // the axis that is free. See the comment in Plans.jsx for why not 44x44.
-    expect(a.width, 'dot target width').toBeGreaterThanOrEqual(24);
-    expect(a.height, 'dot target height').toBeGreaterThanOrEqual(40);
-
-    // Adjacent targets must not overlap — two dots sharing pixels is worse than two
-    // small dots, because neither tap goes where the user aimed.
-    const count = await dots.count();
-    if (count > 1) {
-      const b = await dots.nth(1).boundingBox();
-      expect(b.x, 'adjacent dots must not overlap').toBeGreaterThanOrEqual(a.x + a.width - 1);
+    const radios = page.getByTestId('plans-deal-switch').getByRole('radio');
+    await expect(radios.first()).toBeVisible();
+    for (const radio of await radios.all()) {
+      const box = await radio.boundingBox();
+      expect(box.height, 'deal switch tap height').toBeGreaterThanOrEqual(40);
+      expect(box.width, 'deal switch tap width').toBeGreaterThanOrEqual(44);
     }
+
+    const summary = page.locator('summary', { hasText: "What's included" }).first();
+    expect((await summary.boundingBox()).height, 'disclosure tap height').toBeGreaterThanOrEqual(44);
   });
 
   test('the property gallery dot rail meets the 24px its own comment promises', async ({ page }) => {

@@ -1,6 +1,7 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile, signedInAs, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 const created = new Set();
 
@@ -81,7 +82,7 @@ test.afterEach(async () => {
 });
 
 async function openListing(page, id) {
-  await page.goto(`/property/${id}`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${id}`);
   await page.evaluate(() => document.querySelectorAll('.reveal,.fade-up,.fade-in').forEach((el) => el.classList.add('visible')));
   await expect(page.getByRole('heading', { level: 1, name: '2 BHK Flat for Rent in Baner' })).toBeVisible({ timeout: 20000 });
 }

@@ -1,6 +1,7 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, E2E_OTP, authHeaders, uploadedListingPhotos, seedConsent, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 const WRONG_OTP = E2E_OTP === '111111' ? '222222' : '111111';
 const created = new Set();
@@ -64,7 +65,7 @@ async function openTheGate(buyer, owner, propertyId) {
 
 async function openListing(page, id) {
   await seedConsent(page);
-  await page.goto(`/property/${id}`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${id}`);
   await page.evaluate(() => document.querySelectorAll('.reveal,.fade-up,.fade-in').forEach((el) => el.classList.add('visible')));
   await expect(page.getByRole('heading', { level: 1, name: '2 BHK Flat for Rent in Baner' })).toBeVisible({ timeout: 20000 });
 }

@@ -189,7 +189,7 @@ test.describe('LIVE — unavailable listings and visit leads', () => {
     expect(await used()).toBe(1);
   });
 
-  test('with no owner contacts left, booking offers a referral or a Contact Pack', async ({ page, flags }) => {
+  test('with no owner contacts left, booking a sale listing offers a referral or the Buy Contact Pack', async ({ page, flags }) => {
     await flags.enable('scheduleVisit');
     await signedInAs(page, uniqueMobile());
     await page.route('**/api/visits', (route) => route.fulfill({
@@ -202,7 +202,7 @@ test.describe('LIVE — unavailable listings and visit leads', () => {
     await page.getByRole('dialog', { name: /schedule a visit/i }).getByRole('button', { name: /confirm visit/i }).click();
 
     await expect(page.getByTestId('contacts-exhausted')).toBeVisible();
-    await expect(page.getByTestId('contacts-exhausted-plan')).toHaveAttribute('href', /plan=contact-pack&next=%2Fproperty%2Fp5021/);
+    await expect(page.getByTestId('contacts-exhausted-plan')).toHaveAttribute('href', /plan=contact-pack-buy&next=%2Fproperty%2Fp5021/);
   });
 
   test('/schedule-visit opens the property booking popup, or offers to browse without a listing', async ({ page, flags }) => {

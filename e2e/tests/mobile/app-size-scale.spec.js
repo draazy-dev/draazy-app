@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures/live.js';
+import { settle } from '../../helpers/settle.js';
 
 /* Every page draws its chips, tags, counts and padded buttons from one token scale, so a height that drifts from the
  * token means a utility or route rule is overriding the shared class. */
@@ -17,7 +18,7 @@ test('chips, tags, counts and buttons on every public page take their height fro
   let seen = 0;
   for (const path of PAGES) {
     await page.goto(path);
-    await page.waitForLoadState('networkidle');
+    await settle(page);
     const off = await page.evaluate((sizes) => {
       const root = getComputedStyle(document.documentElement);
       return Object.entries(sizes).flatMap(([sel, token]) => {

@@ -68,7 +68,7 @@ test.afterEach(async ({ request }) => {
   created.clear();
 });
 
-// `listForModeration` fetches `size=100` and reports through `console.error` when the catalogue is larger than that.
+// `warnIfTruncated` reports through `console.error` when a 100-row catalogue read misses rows.
 const CATALOGUE_TRUNCATED = /^\[property\] \d+ listings matched but only \d+ were fetched/;
 const realErrors = (errors) => errors.filter((e) => !CATALOGUE_TRUNCATED.test(e));
 

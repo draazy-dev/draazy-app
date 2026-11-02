@@ -1,5 +1,6 @@
 import { test, expect } from '../../fixtures/live.js';
 import { signedInAsNew } from '../../helpers/liveAuth.js';
+import { gotoSettled } from '../../helpers/settle.js';
 
 const OWNER_ID = '3ad0171b-3206-53e2-b6dc-732bf4e1b44c';
 
@@ -145,7 +146,7 @@ test('owner: Edit pre-fills the composer and sends a PUT; Delete asks first and 
 
 test('property: Edit opens the composer pre-filled, and Delete sends a DELETE', async ({ page }) => {
   const writes = await injectOwnReview(page, '**/api/properties/*/reviews');
-  await page.goto('/property/p5013?tab=amenities', { waitUntil: 'networkidle' });
+  await gotoSettled(page, '/property/p5013?tab=amenities');
   await reveal(page);
   const bar = page.getByTestId('own-review-bar');
   await expect(bar).toBeVisible({ timeout: 15_000 });

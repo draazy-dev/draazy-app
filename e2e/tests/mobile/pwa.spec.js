@@ -59,7 +59,7 @@ test.describe('PWA installability', () => {
     }
   });
 
-  test('home-screen icons use the light mint tile, and the iOS icon is an opaque full square', async ({ page }) => {
+  test('home-screen icons use the light tile, and the iOS icon is an opaque full square', async ({ page }) => {
     await page.goto('/');
     const touch = await page.locator('link[rel="apple-touch-icon"]').getAttribute('href');
     const { icons } = await (await page.request.get('/manifest.webmanifest')).json();
@@ -72,19 +72,13 @@ test.describe('PWA installability', () => {
       const ctx = c.getContext('2d');
       ctx.drawImage(img, 0, 0);
       const px = (x, y) => [...ctx.getImageData(x, y, 1, 1).data];
-      return {
-        top: px(img.width >> 1, Math.round(img.height * 0.1)),
-        bottom: px(img.width >> 1, Math.round(img.height * 0.9)),
-        corner: px(0, 0),
-      };
+      return { tile: px(img.width >> 1, Math.round(img.height * 0.1)), corner: px(0, 0) };
     }, src);
-    const near = (actual, expected) => actual.every((v, i) => Math.abs(v - expected[i]) <= 6);
+    const LIGHT_TILE = [0xf3, 0xf7, 0xf6, 255];
     for (const src of [touch, ...icons.map((i) => i.src)]) {
-      const { top, bottom } = await probe(src);
-      expect(near(top, [240, 246, 242, 255]), `${src} top ${top} is not the near-white tile`).toBe(true);
-      expect(near(bottom, [177, 216, 211, 255]), `${src} bottom ${bottom} is not the mint tile`).toBe(true);
+      expect((await probe(src)).tile, `${src} is not on the light tile`).toEqual(LIGHT_TILE);
     }
-    expect((await probe(touch)).corner[3], 'iOS paints transparent corners black').toBe(255);
+    expect((await probe(touch)).corner, 'iOS paints transparent corners black').toEqual(LIGHT_TILE);
   });
 
   test('no service worker is active in dev, so the suite stays deterministic', async ({ page }) => {

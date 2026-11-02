@@ -1,5 +1,6 @@
 import { test, expect } from '../../../fixtures/live.js';
 import { API } from '../../../helpers/liveAuth.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 /* The Society section appears exactly when the listing is bound (`properties.society_slug`). The unbound half
    asserts the heading is ABSENT: that is the real guard against an invented society. */
@@ -19,7 +20,7 @@ async function json(path) {
 }
 
 async function openAmenities(page, id) {
-  await page.goto(`/property/${id}?tab=amenities`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${id}?tab=amenities`);
   // `.reveal` sits at opacity 0 until the observer fires, and it never fires for content Playwright
   // reaches instantly.
   await page.evaluate(() => document.querySelectorAll('.reveal,.fade-up,.fade-in').forEach((el) => el.classList.add('visible')));

@@ -48,7 +48,7 @@ test('signed-in home boots from a slim /me/bootstrap and defers screen-only read
 
   // index.html preloads this read, and Playwright reports that buffered body as empty: read the shape directly.
   const doc = await (await fetch(`${API}/me/bootstrap`, { headers: await authHeaders(ACTORS.buyer) })).json();
-  expect(Object.keys(doc).sort()).toEqual(['me', 'messagesUnread', 'notificationsUnread', 'saved', 'subscription']);
+  expect(Object.keys(doc).sort()).toEqual(['me', 'messagesUnread', 'notificationsUnread', 'requestsPending', 'saved', 'subscription']);
   expect(extraKeys(doc.saved, ['id', 'slug'])).toEqual([]);
   expect(doc.me.passwordHash).toBeUndefined();
   expect(doc.me.mobileVerified).toBeUndefined();

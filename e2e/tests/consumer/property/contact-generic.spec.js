@@ -1,11 +1,12 @@
 import { test, expect, MOBILE } from '../../../fixtures/live.js';
 import { API, authHeaders, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 /* `/contact` without a property must not fetch or render an owner; otherwise it bypasses the
    enquiry gate and leaks a personal number on a support page. */
 
 test('the generic support page shows no owner card and leaks no owner number', async ({ page, consoleErrors }) => {
-  await page.goto('/contact', { waitUntil: 'networkidle' });
+  await gotoSettled(page, '/contact');
 
   /* Positive assertions come first because the right rail mounts late; otherwise absence is
      indistinguishable from not-yet-rendered. */

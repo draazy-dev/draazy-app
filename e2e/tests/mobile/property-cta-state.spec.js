@@ -2,6 +2,7 @@ import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile, signedInAs, uploadedListingPhotos } from '../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../helpers/moderation.js';
 import { sql } from '../../helpers/monetisation.js';
+import { gotoSettled, reloadSettled } from '../../helpers/settle.js';
 
 const created = new Set();
 
@@ -50,7 +51,7 @@ async function listing() {
 async function openAsBuyer(page, id) {
   const buyer = await actor('Zztest CTA Buyer');
   await signedInAs(page, buyer.mobile);
-  await page.goto(`/property/${id}`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${id}`);
   const bar = page.locator('.dz-sticky-cta');
   await expect(bar).toBeVisible({ timeout: 20000 });
   return { buyer, bar };
@@ -89,7 +90,7 @@ test.describe('Property page — used CTAs say so', () => {
     const grant = await api('PATCH', `/me/contact-requests/${row.id}`, owner.headers, { status: 'approved' });
     expect(grant.status, 'the owner approving the request').toBe(200);
 
-    await page.reload({ waitUntil: 'networkidle' });
+    await reloadSettled(page);
     await expect(bar.getByRole('button', { name: /contacted/i })).toHaveAttribute('data-cta-state', 'approved');
     await expect(bar.getByRole('button', { name: /contact owner/i })).toHaveCount(0);
     expect(consoleErrors).toEqual([]);
@@ -122,13 +123,13 @@ test.describe('Property page — used CTAs say so', () => {
     expect(res.status, `booking the visit (${JSON.stringify(res.body)})`).toBe(201);
     sql(`UPDATE visits SET slot = now() - interval '4 days' WHERE id = '${res.body.id}'`);
 
-    await page.reload({ waitUntil: 'networkidle' });
+    await reloadSettled(page);
     const bar = page.locator('.dz-sticky-cta');
     await expect(bar.getByRole('link', { name: /^visit · /i })).toHaveAttribute('data-cta-state', 'scheduled');
     await expect(bar.getByRole('button', { name: /^visit$/i })).toHaveCount(0);
     expect(consoleErrors).toEqual([]);
 
-    await page.goto(`/property/${id}?visit=1`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `/property/${id}?visit=1`);
     const dialog = page.getByRole('dialog', { name: /schedule a visit/i });
     await dialog.getByRole('button', { name: /confirm visit/i }).click();
     await expect(dialog.getByText(/already have a visit booked/i)).toBeVisible();

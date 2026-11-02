@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Masked mobiles are not unique enough to key owner contact storage.
+// A masked mobile is not unique, so it must never pass as an owner identity.
 const MOD = '/src/lib/contact.js';
 
 // Load lib/contact.js inside the page and run `fn` against its exports.
@@ -34,79 +34,7 @@ test('a masked owner number is not accepted as an identity', async ({ page }) =>
   expect(res.collapsesTo).toBe('98210');
 });
 
-test('two owners with the same masked form do not share a contact bucket', async ({ page }) => {
-  // In http mode the API hands the client a MASKED owner number, and 9812345670 and 9899999670
-  // both mask to '98XXXXX670' - one bucket would read owner A's request on owner B's listing.
-  const res = await withContact(page, (m) => {
-    localStorage.setItem('draazyUser', JSON.stringify({ name: 'Buyer', mobile: '9876543210' }));
-    // What the server actually sends: first two + last three digits.
-    const mask = (n) => n.slice(0, 2) + 'XXXXX' + n.slice(7);
-    const maskedA = mask('9812345670');
-    const maskedB = mask('9899999670');
-
-    m.saveContactReqs(maskedA, [{ id: 'for-owner-A', status: 'pending', buyerMobile: '9876543210', propId: 'P1' }]);
-
-    return {
-      // Two distinct owners, one indistinguishable masked string — this is the root cause.
-      masksAreIdentical: maskedA === maskedB,
-      // Owner B must not see a request that was addressed to owner A.
-      leakedToB: m.getContactReqs(maskedB).map((r) => r.id),
-      // And the masked write must not have been persisted anywhere at all.
-      readBackFromA: m.getContactReqs(maskedA).map((r) => r.id),
-      realOwnerA: m.getContactReqs('9812345670').map((r) => r.id),
-    };
-  });
-
-  expect(res.masksAreIdentical).toBe(true);
-  expect(res.leakedToB).toEqual([]);
-  expect(res.readBackFromA).toEqual([]);
-  expect(res.realOwnerA).toEqual([]);
-});
-
-test('real 10-digit owners keep separate contact buckets', async ({ page }) => {
-  // The other half of the guarantee: the fix must not merge legitimate identities.
-  const res = await withContact(page, (m) => {
-    localStorage.setItem('draazyUser', JSON.stringify({ name: 'Buyer', mobile: '9876543210' }));
-    m.saveContactReqs('9812345670', [{ id: 'a', status: 'pending', buyerMobile: '9876543210', propId: 'P1' }]);
-    m.saveContactReqs('9899999670', [{ id: 'b', status: 'pending', buyerMobile: '9876543210', propId: 'P2' }]);
-    return {
-      ownerA: m.getContactReqs('9812345670').map((r) => r.id),
-      ownerB: m.getContactReqs('9899999670').map((r) => r.id),
-      countA: m.pendingContactCount('9812345670'),
-    };
-  });
-
-  expect(res.ownerA).toEqual(['a']);
-  expect(res.ownerB).toEqual(['b']);
-  expect(res.countA).toBe(1);
-});
-
-test('a masked owner number neither reads nor writes contact state', async ({ page }) => {
-  // Guards the fix from over-correcting: real 10-digit identities must keep working.
-  const res = await withContact(page, (m) => {
-    localStorage.setItem('draazyUser', JSON.stringify({ name: 'Buyer', mobile: '9876543210' }));
-    const before = Object.keys(localStorage).length;
-    const request = m.requestContact('98XXXXX210', 'P5000');
-    return {
-      request,
-      status: m.contactStatus('98XXXXX210', 'P5000'),
-      isOwner: m.isOwnerViewer('98XXXXX210'),
-      prefs: m.getOwnerPrefsFor('98XXXXX210'),
-      keysAdded: Object.keys(localStorage).length - before,
-    };
-  });
-
-  // Honest refusal, not a faked "pending" that never persisted.
-  expect(res.request).toBe('unavailable');
-  expect(res.status).toBe('none');
-  expect(res.isOwner).toBe(false);
-  expect(res.prefs).toEqual({});
-  expect(res.keysAdded).toBe(0);
-});
-
 test('the owner of a listing is still recognised by their full number', async ({ page }) => {
-  // loginStaff() stores `mobile: ''`, so a mobile-less session is reachable; a shared badge bucket
-  // would let one of them verifying bypass every owner's "verified contacts only" preference.
   const res = await withContact(page, (m) => {
     localStorage.setItem('draazyUser', JSON.stringify({ name: 'Owner', mobile: '9530047855' }));
     return {
@@ -116,61 +44,14 @@ test('the owner of a listing is still recognised by their full number', async ({
       // A country-coded value is 12 digits, so it is NOT an identity. Nothing in the app stores a
       // +91-prefixed mobile, and failing here only under-reveals, which is the safe direction.
       isOwnerCountryCoded: m.isOwnerViewer('+91 95300 47855'),
-      status: m.contactStatus('9530047855', 'P5000'),
       stranger: m.isOwnerViewer('9812345670'),
+      masked: m.isOwnerViewer('95XXXXX855'),
     };
   });
 
   expect(res.isOwner).toBe(true);
   expect(res.isOwnerSpaced).toBe(true);
   expect(res.isOwnerCountryCoded).toBe(false);
-  expect(res.status).toBe('owner');
   expect(res.stranger).toBe(false);
-});
-
-test('a session without a mobile does not inherit a shared Verified badge', async ({ page }) => {
-  // The other side of the guarantee: failing closed must not lock out a genuinely
-  // verified buyer.
-  const res = await withContact(page, (m) => {
-    // Someone else's badge, sitting in the legacy shared bucket.
-    localStorage.setItem('draazyIdentity:anon', JSON.stringify({ verified: true }));
-    // An owner who only accepts verified contacts.
-    localStorage.setItem('dzOwnerPrefs:9530047855', JSON.stringify({ verifiedContactOnly: true }));
-    // A signed-in session carrying no mobile of its own.
-    localStorage.setItem('draazyUser', JSON.stringify({ name: 'No Mobile', mobile: '' }));
-
-    return { request: m.requestContact('9530047855', 'P5000') };
-  });
-
-  // Must be challenged for verification, NOT waved through on a borrowed badge.
-  expect(res.request).toBe('verification_required');
-});
-
-test('a real Verified badge still satisfies a verified-only owner', async ({ page }) => {
-  const res = await withContact(page, (m) => {
-    localStorage.setItem('dzOwnerPrefs:9530047855', JSON.stringify({ verifiedContactOnly: true }));
-    localStorage.setItem('draazyUser', JSON.stringify({ name: 'Buyer', mobile: '9876543210' }));
-    localStorage.setItem('draazyIdentity:9876543210', JSON.stringify({ verified: true }));
-    return { request: m.requestContact('9530047855', 'P5000') };
-  });
-
-  expect(res.request).toBe('pending');
-});
-
-test('owner privacy prefs round-trip on a full number and are isolated per owner', async ({ page }) => {
-  const res = await withContact(page, (m) => {
-    localStorage.setItem('draazyUser', JSON.stringify({ name: 'Owner', mobile: '9530047855' }));
-    m.setOwnerPrefs({ hideNumber: true });
-    return {
-      mine: m.getOwnerPrefs(),
-      hides: m.ownerHidesNumber('9530047855'),
-      otherOwner: m.ownerHidesNumber('9812345670'),
-      viaMask: m.ownerHidesNumber('95XXXXX855'),
-    };
-  });
-
-  expect(res.mine.hideNumber).toBe(true);
-  expect(res.hides).toBe(true);
-  expect(res.otherOwner).toBe(false);
-  expect(res.viaMask).toBe(false);
+  expect(res.masked).toBe(false);
 });

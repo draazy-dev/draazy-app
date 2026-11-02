@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 /* The card must describe the check Draazy performs (documents sighted by ops), not claim a registry search. */
 
@@ -6,7 +7,7 @@ const VERIFIED_SALE = 'p5013';   // 3 BHK Flat in Baner (buy), approved, ownersh
 const UNVERIFIED_SALE = 'p5008'; // 2 BHK Flat in Baner (buy), approved, ownership_verified = false
 
 async function verificationTabText(page, id) {
-  await page.goto(`/property/${id}`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${id}`);
   await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 15000 });
 
   const tabs = page.getByRole('tab');

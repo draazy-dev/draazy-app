@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { trackErrors } from '../../../helpers/console.js';
 import { API } from '../../../helpers/liveAuth.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 /* The benchmark is the server's listing-derived locality stats (null below three live listings), so
    each assertion follows what `GET /localities/<slug>` says rather than a fixed figure. */
@@ -22,7 +23,7 @@ const statsOf = async (slug) => (await fetch(`${API}/localities/${slug}`)).json(
 const RETIRED_INTEL = ['appreciation', 'livability', "what's nearby", 'market rate'];
 
 async function gotoProp(page, id) {
-  await page.goto(`/property/${id}`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${id}`);
   await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 15000 });
   const reveal = async () => {
     await page.evaluate(() => document.querySelectorAll('.reveal,.fade-up,.fade-in').forEach((el) => el.classList.add('visible')));

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { trackErrors } from '../../../helpers/console.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 /* SALE pages must never show RENT-only blocks, and land/plot listings hide apartment-only sections. */
 
@@ -17,7 +18,7 @@ function relevant(errors) {
 }
 
 async function gotoProp(page, id) {
-  await page.goto(`/property/${id}`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${id}`);
   // The mock API resolves via setTimeout after networkidle, so wait for the tab bar, not a fixed delay.
   await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 15000 });
   // Content is now grouped into tabs — click through every tab and accumulate the

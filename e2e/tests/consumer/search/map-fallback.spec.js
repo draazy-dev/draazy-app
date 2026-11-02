@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API } from '../../../helpers/liveAuth.js';
+import { localityWithStock } from '../../../helpers/locality.js';
 
 // What Google serves when it refuses the key (referrer, billing, quota): the script loads, then calls gm_authFailure.
 const refuseMapsKey = (page) => page.route(/maps\.googleapis\.com\/maps\/api\/js/, (route) => route.fulfill({
@@ -24,8 +24,7 @@ test('the map gate does not claim a search is running', async ({ page }) => {
 });
 
 test('a refusal after the locality map mounted swaps in the fallback and leaving the page does not crash it', async ({ page }) => {
-  const localities = await (await fetch(`${API}/localities`)).json();
-  const busy = localities.find((l) => l.forSale > 0 && l.lat != null);
+  const busy = await localityWithStock((l) => l.forSale > 0 && l.lat != null, ['buy']);
   await page.goto(`/locality/${busy.slug}`);
   await page.locator('footer').scrollIntoViewIfNeeded();
   await page.evaluate(() => window.gm_authFailure?.());

@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures/live.js';
+import { settle } from '../../helpers/settle.js';
 
 const CONSENT_KEY = 'dz_cookie_consent_v1';
 const POSTHOG = /^https:\/\/[a-z-]+\.i\.posthog\.com\//;
@@ -70,7 +71,7 @@ test.describe('Analytics follow the cookie choice', () => {
     const seen = await stubPostHog(page);
     await seedConsent(page, true);
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await settle(page);
     await page.waitForTimeout(1500);
     expect(seen).toEqual([]);
     expect(consoleErrors).toEqual([]);

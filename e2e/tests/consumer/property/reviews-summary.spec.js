@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 /* Guards the summary shapes: string-keyed star distribution (off-by-one), sparse category averages (absent, not 0)
    and % would recommend, derived from the list. Failed summary: property-integration (COVERAGE.md). */
@@ -19,7 +20,7 @@ const SEED = [
 async function openReviews(page, id) {
   /* Deep-link `?tab=amenities`: PropertyTabs mounts the reviews block only while that tab is current,
      so on the default tab the summary read never fires. */
-  await page.goto(`/property/${id}?tab=amenities`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${id}?tab=amenities`);
   await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 15000 });
   const section = page.locator('section').filter({ has: page.getByRole('heading', { name: /ratings/i }) });
   // The block sits behind a `.fade-in`, which is at `opacity: 0` until scrolled into view;

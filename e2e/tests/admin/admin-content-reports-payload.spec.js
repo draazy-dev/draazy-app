@@ -75,7 +75,6 @@ test('the localities console reads the slim admin list', async ({ page, login, c
   await page.goto('/admin/places?tab=areas');
   await expect(page.getByRole('table').locator('tbody tr').first()).toBeVisible();
   await expect.poll(() => gets.withPath('/api/admin/localities').length).toBe(1);
-  expect(gets.withPath('/api/localities')).toEqual([]);
   expect(consoleErrors).toHaveLength(0);
 });
 

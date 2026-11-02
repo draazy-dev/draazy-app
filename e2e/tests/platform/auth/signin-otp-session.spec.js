@@ -455,7 +455,7 @@ test('an OTP delivery refusal is announced through the form alert', async ({ pag
 /* The host memoises a rejected module specifier, so retrying cannot help; aborting simulates a redeploy
    whose hashed chunks the cached shell still names, and the remedy is a new document. */
 test('a shell that can no longer load its own code reloads itself, and only once', async ({ page }) => {
-  await page.route('**/authProvider.js*', (route) => route.abort());
+  await page.route(/\/authProvider(-[\w-]+)?\.js(\?|$)/, (route) => route.abort());
 
   await page.goto('/signin');
   const mobile = page.locator('#signin-mobile');

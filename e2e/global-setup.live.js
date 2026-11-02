@@ -23,6 +23,7 @@ const SEEDS = [
   path.join(RESOURCES, 'seed', 'R__zz_DML_dev_demo_data.sql'),
   path.join(RESOURCES, 'seed', 'R__zz_DML_dev_live_localities.sql'),
   path.join(RESOURCES, 'seed', 'R__zz_DML_dev_living_style.sql'),
+  path.join(RESOURCES, 'seed', 'R__zz_DML_dev_crm_leads.sql'),
   path.join(RESOURCES, 'seed-staff', 'R__zz_DML_dev_staff_credentials.sql'),
 ];
 

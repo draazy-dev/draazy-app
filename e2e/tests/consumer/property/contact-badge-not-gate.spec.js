@@ -1,6 +1,7 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile, signedInAs, grantIdentityBadge, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 /* ADR-019 badge-not-gate: the identity badge is offered, never demanded. "Required nowhere else"
  * is the half that decays silently, so the first two tests here are deliberately dull. */
 const created = new Set();
@@ -69,7 +70,7 @@ test.afterEach(async () => {
 const requestBtn = (page) => page.getByRole('button', { name: /Request number/i }).first();
 
 async function openListing(page, ref) {
-  await page.goto(`/property/${ref}`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${ref}`);
   await page.evaluate(() => document.querySelectorAll('.reveal,.fade-up,.fade-in').forEach((el) => el.classList.add('visible')));
   await requestBtn(page).waitFor({ timeout: 20000 });
 }

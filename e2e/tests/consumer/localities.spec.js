@@ -1,31 +1,21 @@
-/* Locality directory against the live API: `liveListings` counts bound listings, which cannot exceed what the
+/* A locality read against the live API: `liveListings` counts bound listings, which cannot exceed what the
  * slug's property search finds (it also matches pins within 2 km). Fixtures: `R__zz_DML_dev_live_localities.sql`. */
 import { test, expect } from '../../fixtures/live.js';
 import { API } from '../../helpers/liveAuth.js';
 
 const ANCHOR = 'wakad';
 
-test('the locality list is a public read with computed counts that fit inside a search for the same slug', async () => {
-  const res = await fetch(`${API}/localities`);
-  expect(res.status, 'the locality directory is public').toBe(200);
+test('a locality is a public read with computed counts that fit inside a search for the same slug', async () => {
+  const res = await fetch(`${API}/localities/${ANCHOR}`);
+  expect(res.status, 'a locality is public').toBe(200);
 
-  const rows = await res.json();
-  expect(Array.isArray(rows)).toBe(true);
-  expect(rows.length, 'the dev seed revives the curated areas').toBeGreaterThan(100);
+  const anchor = await res.json();
+  expect(anchor.slug).toBe(ANCHOR);
+  expect(anchor.name).toBeTruthy();
+  expect(typeof anchor.liveListings, 'a locality carries a live-listing count').toBe('number');
+  expect(typeof anchor.archived, 'a locality says whether it is retired').toBe('boolean');
+  expect(anchor.forSale + anchor.forRent).toBe(anchor.liveListings);
 
-  for (const row of rows) {
-    expect(row.slug, 'every locality is identified by its slug').toBeTruthy();
-    expect(row.name, `${row.slug} should have a name`).toBeTruthy();
-    expect(typeof row.liveListings, `${row.slug} should carry a live-listing count`).toBe('number');
-    expect(typeof row.archived, `${row.slug} should say whether it is retired`).toBe('boolean');
-  }
-  expect(rows.filter((r) => r.archived).every((r) => r.liveListings > 0), 'a retired locality is listed only while it still holds listings').toBe(true);
-
-  const names = rows.map((r) => r.name);
-  expect(names, 'the directory is alphabetical').toEqual([...names].sort((a, b) => a.localeCompare(b, 'en')));
-
-  const anchor = rows.find((r) => r.slug === ANCHOR);
-  expect(anchor, `${ANCHOR} should be in the directory`).toBeTruthy();
   const search = await fetch(`${API}/properties?locality=${ANCHOR}&size=1`);
   expect(search.status).toBe(200);
   expect(anchor.liveListings, 'a search for the slug also matches nearby pins, so it finds at least the bound listings')
@@ -38,14 +28,4 @@ test('the search endpoint answers with live rows only', async () => {
   const rows = await res.json();
   expect(rows.map((r) => r.slug)).toContain(ANCHOR);
   for (const row of rows) expect(Object.keys(row).sort()).toEqual(['city', 'lat', 'lng', 'name', 'slug']);
-});
-
-test('the listings page never downloads the whole locality directory', async ({ page }) => {
-  const full = [];
-  page.on('request', (r) => { if (new URL(r.url()).pathname === '/api/localities') full.push(r.url()); });
-
-  const results = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/properties' && r.status() === 200);
-  await page.goto('/listings');
-  await results;
-  expect(full).toEqual([]);
 });

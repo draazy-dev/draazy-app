@@ -1,6 +1,7 @@
 import { test, expect } from '../../../fixtures/live.js';
 import { seedStorage } from '../../../helpers/seed.js';
 import { API, signedInAsNew } from '../../../helpers/liveAuth.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 /* Exact values from the seeded row catch fabricated society pages; presence checks pass even when
    the async catalogue has not loaded. */
@@ -122,7 +123,7 @@ test('property page and directory cards report real reviews for a reviewed socie
 
   await test.step('the property page society block reports reviews written against that society', async () => {
     // The Society block lives on the Amenities & Society tab, not the overview.
-    await page.goto(`/property/${REVIEWED_PROP}?tab=amenities`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `/property/${REVIEWED_PROP}?tab=amenities`);
     await reveal(page);
 
     await expect(propBlock()).toContainText('4.5', { timeout: 15_000 });
@@ -132,7 +133,7 @@ test('property page and directory cards report real reviews for a reviewed socie
   await test.step('the property page society block invents no rating for a society nobody has reviewed', async () => {
     /* The literal 4.2 is the old fake rating; structural checks alone would miss it returning under
        another constant name. */
-    await page.goto(`/property/${UNRATED_PROP}?tab=amenities`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `/property/${UNRATED_PROP}?tab=amenities`);
     await reveal(page);
 
     await expect(propBlock()).toContainText('Not rated yet', { timeout: 15_000 });

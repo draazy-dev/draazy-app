@@ -1,7 +1,9 @@
 // Live drafting-desk checks cover behaviour the mock desks could not prove.
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { test, expect, ACTORS, STAFF } from '../../fixtures/live.js';
 import { API, apiLogin, authHeaders, signIn, signedInAsNew, uniqueMobile } from '../../helpers/liveAuth.js';
+import { sql } from '../../helpers/monetisation.js';
 
 const DOCUMENT = {
   name: 'agreement.png',
@@ -143,7 +145,7 @@ test.describe('Ops → Drafting desk (live)', () => {
 
       await expect(page.getByLabel('Filter by desk')).toHaveCount(0);
       await expect(page.getByRole('tab', { name: /^To pick up/ })).toHaveAttribute('aria-selected', 'true');
-      for (const name of ['My requests', 'In progress', 'With customer', 'Closed']) {
+      for (const name of ['My requests', 'In progress', 'With customer', 'Closed', 'Cancelled']) {
         await expect(page.getByRole('tab', { name: new RegExp(`^${name}`) })).toBeVisible();
       }
       await expect(page.getByPlaceholder('Name, mobile or request id')).toBeVisible();
@@ -270,9 +272,13 @@ test.describe('Ops → Drafting desk (live)', () => {
 
     await dialog.getByRole('button', { name: 'Cancel request' }).click();
     const cancellation = page.getByRole('dialog').filter({ hasText: 'Reason for cancellation' });
-    await expect(cancellation.getByRole('button', { name: 'Cancel and notify' })).toBeDisabled();
-    await cancellation.getByLabel('Reason for cancellation').fill(reason);
-    await cancellation.getByRole('button', { name: 'Cancel and notify' }).click();
+    const confirm = cancellation.getByRole('button', { name: 'Cancel and notify' });
+    await expect(confirm).toBeDisabled();
+    await expect(confirm, 'the confirm button has a visible fill, not a transparent one').not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    const field = cancellation.getByLabel('Reason for cancellation');
+    await field.fill(reason);
+    await expect(confirm).toBeEnabled();
+    await field.press('Enter');
 
     await expect(page.getByRole('alert').filter({ hasText: 'customer was notified' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Cancel request' })).toHaveCount(0);
@@ -441,7 +447,7 @@ test.describe('Ops → Drafting desk (live)', () => {
     await expect(card.getByTestId('requester-mobile')).toContainText(request.mobile);
     await expect(card.getByText('Unassigned', { exact: true })).toBeVisible();
     await expect(card.getByText(/Step 1 of 7 · Paid/)).toBeVisible();
-    await card.click();
+    await card.getByRole('button', { name: /^Open case/ }).click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('list', { name: 'Case stages' })).toBeVisible();
@@ -499,5 +505,37 @@ test.describe('Ops → Drafting desk (live)', () => {
     await page.goto('/ops/rent-agreement');
     await expect(page).toHaveURL(/\/admin\/rent-agreement$/);
     await expect(page.getByRole('heading', { name: 'Rent Agreement', level: 1 })).toBeVisible();
+  });
+
+  test('a desk notification opens the case it is about on that case\'s desk', async ({ page, login, consoleErrors }) => {
+    const rental = await seedRentAgreement();
+    const valuation = await seedRequest();
+    const tag = `Zzdesk ${Date.now()}`;
+    sql(`INSERT INTO notifications (user_id, type, title, body, read, link)
+      SELECT id, 'service.attention-resolved', '${tag} ' || t.kind, 'Back to you', false, t.link FROM users,
+      (VALUES ('rental', '/admin/rent-agreement?request=${rental.id}'),
+              ('valuation', '/admin/valuation?request=${valuation.id}')) AS t(kind, link)
+      WHERE mobile = '${ACTORS.admin}'`);
+
+    await login.asAdmin();
+    await page.goto('/admin/notifications');
+    await page.locator('.notif', { hasText: `${tag} rental` }).click();
+    await expect(page).toHaveURL(/\/admin\/rent-agreement(\?(?!.*request=).*)?$/);
+    const rentCase = page.getByRole('dialog');
+    await expect(rentCase.getByRole('heading', { name: /Queue Count Owner/ })).toBeVisible();
+    await expect(rentCase.getByRole('list', { name: 'Case stages' })).toBeVisible();
+    await rentCase.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(rentCase).toBeHidden();
+
+    await page.goto('/admin/notifications');
+    await page.locator('.notif', { hasText: `${tag} valuation` }).click();
+    await expect(page).toHaveURL(/\/admin\/valuation(\?(?!.*request=).*)?$/);
+    await expect(page.getByRole('dialog').getByRole('heading', { name: new RegExp(valuation.id) })).toBeVisible();
+    expect(consoleErrors).toHaveLength(0);
+
+    await page.goto(`/admin/valuation?request=${randomUUID()}`);
+    await expect(page.getByText('That case could not be opened. It may have moved to another desk.')).toBeVisible();
+    await expect(page).toHaveURL(/\/admin\/valuation(\?(?!.*request=).*)?$/);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 });

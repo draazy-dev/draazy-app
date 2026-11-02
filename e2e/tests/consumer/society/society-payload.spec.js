@@ -1,5 +1,6 @@
 import { test, expect } from '../../../fixtures/live.js';
 import { API } from '../../../helpers/liveAuth.js';
+import { localityWithStock } from '../../../helpers/locality.js';
 
 const DETAIL = ['slug', 'name', 'builder', 'localitySlug', 'lat', 'lng', 'placeId', 'year', 'towers', 'units', 'occupancy',
   'maintenancePerSqft', 'parkingRatio', 'lifts', 'security', 'water', 'power', 'petPolicy', 'vegPolicy', 'rera', 'amenities',
@@ -59,8 +60,7 @@ test('the owner page reads a seller card without an id and one rail of listings'
 });
 
 test('the locality page splits its inventory line into a sale and a rent link that each land on matching results', async ({ page, consoleErrors }) => {
-  const localities = await (await fetch(`${API}/localities`, { headers: { 'Cache-Control': 'no-cache' } })).json();
-  const busy = localities.find((l) => l.forSale > 0 && l.forRent > 0);
+  const busy = await localityWithStock((l) => l.forSale > 0 && l.forRent > 0);
   expect(busy, 'a locality with sale and rent stock').toBeTruthy();
   expect(busy.forSale + busy.forRent).toBe(busy.liveListings);
   await page.goto(`/locality/${busy.slug}`);
@@ -80,8 +80,7 @@ test('the locality page splits its inventory line into a sale and a rent link th
 });
 
 test('the locality strip keeps its from-price on one line on a phone', async ({ page }) => {
-  const localities = await (await fetch(`${API}/localities`)).json();
-  const busy = localities.find((l) => l.forSale > 0 && l.fromSale != null);
+  const busy = await localityWithStock((l) => l.forSale > 0 && l.fromSale != null, ['buy']);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/locality/${busy.slug}`);
   const price = page.locator(`a[href="/listings?deal=buy&loc=${busy.slug}"] span.font-semibold`).first();

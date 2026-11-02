@@ -2,6 +2,7 @@
 // completes the real OTP form, so the session is a genuine JWT. Actors: `docs/system/fixture-registry.md`.
 import { test as base, expect } from '@playwright/test';
 import { trackErrors } from '../helpers/console.js';
+import { tracker } from '../helpers/settle.js';
 import { API, authHeaders, signedInAs, signedInAsNew, signIn } from '../helpers/liveAuth.js';
 
 // Named actors are read roles; an owner with no listings is not useful here.
@@ -31,13 +32,19 @@ export const STAFF = {
 export const BASELINE_STAFF = [
   'kyc', 'propertyVerification', 'listingModeration', 'postOnBehalf', 'flatmates', 'localities', 'reviews',
   'desk:rental', 'desk:legal', 'desk:loans', 'desk:interior', 'desk:packers', 'desk:valuation',
-  'support', 'enquiries', 'users', 'reports', 'referrals', 'content', 'societies',
+  'support', 'enquiries', 'users', 'reports', 'referrals', 'content', 'societies', 'leads',
 ];
 
 // An Indian mobile, and *only* a whole one — the lookarounds pin the match to a complete digit run.
 export const MOBILE = /(?<!\d)(?:\+91[\s-]?)?[6-9]\d{9}(?!\d)/;
 
 export const test = base.extend({
+  // Installed before the first navigation so settle() also waits on requests already in flight.
+  page: async ({ page }, use) => {
+    tracker(page);
+    await use(page);
+  },
+
   consoleErrors: async ({ page }, use) => {
     const errors = trackErrors(page);
     await use(errors);
@@ -149,6 +156,8 @@ export const test = base.extend({
           mapped.add('reports');
         } else if (['referrals:read', 'referrals:write'].includes(name)) {
           mapped.add('referrals');
+        } else if (['leads:read', 'leads:write'].includes(name)) {
+          mapped.add('leads');
         } else if (['reviews:read', 'reviews:write'].includes(name)) {
           mapped.add('reviews');
         } else if (['localities:read', 'localities:write'].includes(name)) {

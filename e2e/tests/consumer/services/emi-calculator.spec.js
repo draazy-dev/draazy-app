@@ -1,10 +1,11 @@
 import { test, expect } from '../../../fixtures/live.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
 test.describe('EMI calculator', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${BASE}/emi-calculator`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/emi-calculator`);
     // The route is lazy, so `networkidle` can land before the controls mount.
     await expect(page.locator('input[type=range]')).toHaveCount(3);
   });

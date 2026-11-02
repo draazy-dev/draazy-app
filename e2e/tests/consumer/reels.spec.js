@@ -2,6 +2,7 @@
  * so the feed opens no detail request; `/properties` cards carry neither the gallery nor a count. */
 import { test, expect } from '../../fixtures/live.js';
 import { API } from '../../helpers/liveAuth.js';
+import { settle } from '../../helpers/settle.js';
 
 const MIN_PHOTOS = 3;
 const MAX_PHOTOS = 5;
@@ -36,7 +37,7 @@ test('the feed is one reels read and no detail reads, and the reel in view holds
   await expect
     .poll(() => page.locator('.reel').first().locator('.reel-slide').count())
     .toBeGreaterThanOrEqual(MIN_PHOTOS);
-  await page.waitForLoadState('networkidle');
+  await settle(page);
 
   expect(reads.filter((p) => p.endsWith('/properties/reels')), reads.join('\n')).toHaveLength(1);
   expect(reads.filter((p) => /\/properties\/[^/]+$/.test(p) && !p.endsWith('/reels')), reads.join('\n')).toEqual([]);
