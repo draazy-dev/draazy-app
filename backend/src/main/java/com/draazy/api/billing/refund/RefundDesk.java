@@ -46,7 +46,7 @@ public class RefundDesk {
     public record Row(String id, String status, String kind, String label, String customerId, String customerName,
             String customerMobile, String orderRef, long amount, String basis, String customerReason,
             Instant requestedAt, Instant decidedAt, String decisionReason, String propertyId, String creditNoteNo,
-            Signals signals, Transaction transaction) {
+            Signals signals, Transaction transaction, String serviceRequestId) {
     }
 
     private record Lookup(Map<UUID, Subscription> orders, Map<UUID, Plan> plans, Map<UUID, User> people,
@@ -70,10 +70,12 @@ public class RefundDesk {
     private final CreditNoteRepository creditNotes;
     private final InvoiceRepository invoices;
     private final RefundAssessor assessor;
+    private final RentAgreementRefundSource rentAgreements;
 
     public RefundDesk(RefundRequestRepository requests, PaymentDisputeRepository disputes,
             SubscriptionRepository subscriptions, PlanRepository plans, UserRepository users,
-            CreditNoteRepository creditNotes, InvoiceRepository invoices, RefundAssessor assessor) {
+            CreditNoteRepository creditNotes, InvoiceRepository invoices, RefundAssessor assessor,
+            RentAgreementRefundSource rentAgreements) {
         this.requests = requests;
         this.disputes = disputes;
         this.subscriptions = subscriptions;
@@ -82,15 +84,20 @@ public class RefundDesk {
         this.creditNotes = creditNotes;
         this.invoices = invoices;
         this.assessor = assessor;
+        this.rentAgreements = rentAgreements;
     }
 
     @Transactional(readOnly = true)
-    public Page<Row> list(String status, Integer days, Pageable pageable) {
+    public Page<Row> list(String status, String feature, Integer days, Pageable pageable) {
         String filter = status == null || status.isBlank() ? RefundStatuses.PENDING_REVIEW : status;
         if (!RefundStatuses.DESK_FILTERS.contains(filter)) {
             throw new BadRequestException("status must be one of " + RefundStatuses.DESK_FILTERS.stream().sorted().toList());
         }
+        boolean passes = includes(feature, RefundStatuses.FEATURE_PASS);
         Instant since = since(days);
+        if (!passes && (RefundStatuses.AUTO.equals(filter) || RefundStatuses.DISPUTED.equals(filter))) {
+            return Page.empty(pageable);
+        }
         return switch (filter) {
             case RefundStatuses.AUTO -> {
                 Page<Subscription> page = requests.findAutoRefunds(since, pageable);
@@ -107,14 +114,33 @@ public class RefundDesk {
                 yield page.map(dispute -> disputeRow(dispute, lookup));
             }
             default -> {
-                Page<RefundRequest> page = requests.findByStatusSince(filter, since,
-                        PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
-                                Sort.by(Sort.Direction.DESC, "createdAt")));
-                Lookup lookup = lookup(page.getContent().stream().map(RefundRequest::getSubscriptionId).toList(),
-                        page.getContent().stream().map(RefundRequest::getUserId).toList());
-                yield page.map(request -> requestRow(request, lookup));
+                Page<RefundRequestRepository.DeskEntry> page = requests.findDeskEntries(passes, filter,
+                        includes(feature, RefundStatuses.KIND_RENT_AGREEMENT), rentAgreements.statusesFor(filter),
+                        since, PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
+                Map<UUID, RefundRequest> passRows = requests.findAllById(idsOf(page, RefundStatuses.FEATURE_PASS))
+                        .stream().collect(Collectors.toMap(RefundRequest::getId, Function.identity()));
+                Map<UUID, Row> rentAgreementRows = rentAgreements.rows(idsOf(page, RefundStatuses.KIND_RENT_AGREEMENT));
+                Lookup lookup = lookup(passRows.values().stream().map(RefundRequest::getSubscriptionId).toList(),
+                        passRows.values().stream().map(RefundRequest::getUserId).toList());
+                yield page.map(entry -> RefundStatuses.FEATURE_PASS.equals(entry.getKind())
+                        ? requestRow(passRows.get(entry.getId()), lookup) : rentAgreementRows.get(entry.getId()));
             }
         };
+    }
+
+    private static List<UUID> idsOf(Page<RefundRequestRepository.DeskEntry> page, String kind) {
+        return page.getContent().stream().filter(entry -> kind.equals(entry.getKind()))
+                .map(RefundRequestRepository.DeskEntry::getId).toList();
+    }
+
+    private static boolean includes(String feature, String wanted) {
+        if (feature == null || feature.isBlank()) {
+            return true;
+        }
+        if (!RefundStatuses.FEATURES.contains(feature)) {
+            throw new BadRequestException("feature must be one of " + RefundStatuses.FEATURES.stream().sorted().toList());
+        }
+        return feature.equals(wanted);
     }
 
     private static Instant since(Integer days) {
@@ -123,13 +149,17 @@ public class RefundDesk {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Long> counts() {
+    public Map<String, Long> counts(String feature) {
+        boolean passes = includes(feature, RefundStatuses.FEATURE_PASS);
+        boolean rentAgreementsToo = includes(feature, RefundStatuses.KIND_RENT_AGREEMENT);
         Map<String, Long> totals = new LinkedHashMap<>();
         for (String status : List.of(RefundStatuses.PENDING_REVIEW, RefundStatuses.APPROVED, RefundStatuses.REJECTED)) {
-            totals.put(status, requests.countByStatus(status));
+            totals.put(status, (passes ? requests.countByStatus(status) : 0)
+                    + (rentAgreementsToo ? rentAgreements.count(status) : 0));
         }
-        totals.put(RefundStatuses.AUTO, requests.findAutoRefunds(Instant.EPOCH, PageRequest.of(0, 1)).getTotalElements());
-        totals.put(RefundStatuses.DISPUTED, disputes.countByStatus(PaymentDispute.OPEN));
+        totals.put(RefundStatuses.AUTO, passes
+                ? requests.findAutoRefunds(Instant.EPOCH, PageRequest.of(0, 1)).getTotalElements() : 0);
+        totals.put(RefundStatuses.DISPUTED, passes ? disputes.countByStatus(PaymentDispute.OPEN) : 0);
         return totals;
     }
 
@@ -148,7 +178,7 @@ public class RefundDesk {
                 order.getPaymentRef(),
                 request.getAmount(), request.getBasis(), request.getCustomerReason(), request.getCreatedAt(),
                 request.getDecidedAt(), request.getDecisionReason(), idOf(order.getPropertyId()),
-                lookup.notes().get(order.getId()), signals, transaction(order, lookup));
+                lookup.notes().get(order.getId()), signals, transaction(order, lookup), null);
     }
 
     private Row autoRow(Subscription order, Lookup lookup) {
@@ -158,7 +188,7 @@ public class RefundDesk {
                 order.getPaymentRef(),
                 order.getRefundAmount() != null ? order.getRefundAmount() : order.getAmount(), null, null,
                 order.getRefundDueAt(), null, null, idOf(order.getPropertyId()), lookup.notes().get(order.getId()),
-                null, transaction(order, lookup));
+                null, transaction(order, lookup), null);
     }
 
     private static Transaction transaction(Subscription order, Lookup lookup) {
@@ -199,7 +229,7 @@ public class RefundDesk {
                 lookup.name(customer), lookup.mobile(customer), dispute.getOrderRef(),
                 dispute.getAmount() != null ? dispute.getAmount() : order == null ? 0L : order.getAmount(), null,
                 dispute.getReason(), dispute.getOpenedAt(), dispute.getClosedAt(), null,
-                order == null ? null : idOf(order.getPropertyId()), null, null, transaction(order, lookup));
+                order == null ? null : idOf(order.getPropertyId()), null, null, transaction(order, lookup), null);
     }
 
     private Signals signals(Subscription order, Plan plan, String device, Instant asOf) {

@@ -21,9 +21,31 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, UU
 
     List<RefundRequest> findBySubscriptionIdIn(Collection<UUID> subscriptionIds);
 
-    @Query("select r from RefundRequest r where r.status = :status and r.createdAt >= :since")
-    Page<RefundRequest> findByStatusSince(@Param("status") String status, @Param("since") Instant since,
-            Pageable pageable);
+    interface DeskEntry {
+        UUID getId();
+
+        String getKind();
+    }
+
+    // Rent-agreement refunds live in service_request_refunds; one union keeps both on a single newest-first page.
+    @Query(value = """
+            select q.id as id, q.kind as kind from (
+              select r.id, 'pass' as kind, r.created_at from refund_requests r
+              where :passes and r.status = :status and r.created_at >= :since
+              union all
+              select s.id, 'rent_agreement', s.created_at from service_request_refunds s
+              where :rentAgreements and s.status in (:rentAgreementStatuses) and s.created_at >= :since
+            ) q order by q.created_at desc, q.id""",
+            countQuery = """
+            select (select count(*) from refund_requests r
+                    where :passes and r.status = :status and r.created_at >= :since)
+                 + (select count(*) from service_request_refunds s
+                    where :rentAgreements and s.status in (:rentAgreementStatuses) and s.created_at >= :since)""",
+            nativeQuery = true)
+    Page<DeskEntry> findDeskEntries(@Param("passes") boolean passes, @Param("status") String status,
+            @Param("rentAgreements") boolean rentAgreements,
+            @Param("rentAgreementStatuses") Collection<String> rentAgreementStatuses,
+            @Param("since") Instant since, Pageable pageable);
 
     long countByStatus(String status);
 

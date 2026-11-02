@@ -9,8 +9,10 @@ const TEXT_MAX = 300;
 const GRN = /^MH[0-9A-Z]{8,23}$/;
 const field = 'mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white';
 
-function OpenRefund({ refund, busy, onDecide }) {
+function OpenRefund({ refund, canDecide, cancelled, busy, onDecide }) {
   const [note, setNote] = useState('');
+  const approves = canDecide;
+  const acts = canDecide || (refund.mine && !cancelled);
   return (
     <div className="mt-3 space-y-2 rounded-xl border border-amber-300/20 p-3 text-sm" data-testid="refund-open">
       <p className="text-amber-200">
@@ -18,21 +20,25 @@ function OpenRefund({ refund, busy, onDecide }) {
       </p>
       <p className="text-xs text-gray-400">Reason: {refund.reason}</p>
       {refund.dutyPaid ? <p className="text-xs text-gray-400">Stamp duty paid on GRAS, challan {refund.grn}.</p> : null}
-      <label className="block text-xs text-gray-400">
-        {refund.mine ? 'Why you are withdrawing it' : 'Note (needed to reject)'}
-        <textarea rows={2} maxLength={TEXT_MAX} value={note} onChange={(e) => setNote(e.target.value)} className={field} />
-      </label>
+      {acts ? (
+        <label className="block text-xs text-gray-400">
+          {refund.mine ? 'Why you are withdrawing it' : 'Note (needed to reject)'}
+          <textarea rows={2} maxLength={TEXT_MAX} value={note} onChange={(e) => setNote(e.target.value)} className={field} />
+        </label>
+      ) : null}
       <div className="flex flex-wrap gap-2">
-        {refund.mine ? (
-          <span className="self-center text-xs text-gray-400">You asked for it, so a colleague has to approve it.</span>
-        ) : (
+        {approves ? (
           <button type="button" disabled={busy} onClick={() => onDecide('approve', note)} className="dz-btn dz-btn-primary px-3 py-1.5 text-xs disabled:opacity-40">
             Approve and refund
           </button>
+        ) : (
+          <span className="self-center text-xs text-gray-400">Waiting for a manager to approve it.</span>
         )}
-        <button type="button" disabled={busy || !note.trim()} onClick={() => onDecide('reject', note)} className="dz-btn dz-btn-ghost px-3 py-1.5 text-xs disabled:opacity-40">
-          {refund.mine ? 'Withdraw' : 'Reject'}
-        </button>
+        {acts ? (
+          <button type="button" disabled={busy || !note.trim()} onClick={() => onDecide('reject', note)} className="dz-btn dz-btn-ghost px-3 py-1.5 text-xs disabled:opacity-40">
+            {refund.mine ? 'Withdraw' : 'Reject'}
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -98,7 +104,7 @@ export default function Refunds({ request }) {
       .then((next) => { if (current) setSummary(next); })
       .catch((err) => { if (current) setFailure(err?.message || 'The refunds on this request could not be read.'); });
     return () => { current = false; };
-  }, [request.id]);
+  }, [request.id, request.status]);
 
   const run = async (call, success) => {
     if (busy) return;
@@ -136,6 +142,8 @@ export default function Refunds({ request }) {
             <OpenRefund
               key={open.id}
               refund={open}
+              canDecide={summary.canDecide}
+              cancelled={request.status === 'cancelled'}
               busy={busy}
               onDecide={(decision, note) => run(
                 () => decideServiceRequestRefund(request.id, open.id, decision, note.trim()),
@@ -151,7 +159,7 @@ export default function Refunds({ request }) {
             <AskRefund
               summary={summary}
               busy={busy}
-              onAsk={(body) => run(() => requestServiceRequestRefund(request.id, body), 'Refund asked for. A colleague must approve it.')}
+              onAsk={(body) => run(() => requestServiceRequestRefund(request.id, body), 'Refund asked for. A manager must approve it.')}
             />
           ) : null}
 

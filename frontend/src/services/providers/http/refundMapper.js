@@ -46,6 +46,7 @@ export function toRefundRow(dto) {
     decisionReason: dto.decisionReason || '',
     creditNoteNo: dto.creditNoteNo || '',
     propertyId: dto.propertyId ?? null,
+    serviceRequestId: dto.serviceRequestId ?? null,
     transaction: dto.transaction
       ? {
         paid: num(dto.transaction.paid),

@@ -30,8 +30,8 @@ export default function RefundPolicy() {
       <h2>1. Scope</h2>
       <p>This policy covers:</p>
       <ul>
-        <li>Listing Passes ({fee('listingPass')}, one per extra live listing).</li>
-        <li>Contact Packs ({fee('contactPack')}).</li>
+        <li>Listing Passes (rent {fee('listingPass')}, sale {fee('listingPassBuy')}; one per extra live listing).</li>
+        <li>Contact Packs (rent {fee('contactPack')}, buy {fee('contactPackBuy')}).</li>
         <li>Rent agreements.</li>
       </ul>
       <p>

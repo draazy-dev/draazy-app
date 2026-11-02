@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, RefreshCw, ShieldAlert, X } from 'lucide-react';
+import { Link } from 'react-router';
+import { Check, ExternalLink, RefreshCw, ShieldAlert, X } from 'lucide-react';
 import { approveRefund, listRefunds, rejectRefund } from '../../services/refundService.js';
+import { decideServiceRequestRefund } from '../../services/serviceRequestService.js';
 import { classNames, fmtINR } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -22,8 +24,13 @@ const TABS = [
   { key: 'disputes', label: 'Disputes', status: 'disputed' },
 ];
 const TAB_KEYS = TABS.map((t) => t.key);
-const STATUS_LABEL = { pending_review: 'Pending', approved: 'Approved', rejected: 'Rejected', auto: 'Automatic', disputed: 'Dispute' };
-const STATUS_TONE = { pending_review: CHIP_TONE.amber, approved: CHIP_TONE.green, rejected: CHIP_TONE.red, auto: CHIP_TONE.teal, disputed: CHIP_TONE.red };
+const FEATURE_CHIPS = [
+  { value: '', label: 'All' },
+  { value: 'pass', label: 'Passes' },
+  { value: 'rent_agreement', label: 'Rent agreement' },
+];
+const STATUS_LABEL = { pending_review: 'Pending', approved: 'Approved', rejected: 'Rejected', auto: 'Automatic', disputed: 'Dispute', failed: 'Payout failed' };
+const STATUS_TONE = { pending_review: CHIP_TONE.amber, approved: CHIP_TONE.green, rejected: CHIP_TONE.red, auto: CHIP_TONE.teal, disputed: CHIP_TONE.red, failed: CHIP_TONE.red };
 const NOTE = 'Decide within 2 business days. Approving pays back to the original method; rejecting needs a reason the customer will see.';
 const REASON_LABEL = {
   paid_after_cancel: 'Paid after the order was cancelled or expired',
@@ -121,10 +128,13 @@ export default function OpsRefunds() {
   const [tab, setTab] = useTabParam(TAB_KEYS, 'pending');
   const [page, setPage] = useState(0);
   const [days, setDays] = useState('');
+  const [feature, setFeature] = useState('');
   const [reloading, setReloading] = useState(false);
   const [nonce, setNonce] = useState(0);
   const { user } = useAuth();
   const canWrite = canWriteModule(user, 'refunds');
+  // A rent-agreement refund is a manager's call; the service-request endpoint refuses everyone else.
+  const decidesRentAgreements = canWrite && (user?.role === 'admin' || user?.role === 'manager');
   const [rejecting, setRejecting] = useState(null);
   const [approving, setApproving] = useState(null);
   const busy = useRef(false);
@@ -134,7 +144,7 @@ export default function OpsRefunds() {
     const { status } = TABS.find((t) => t.key === tab);
     let live = true;
     setReloading(true);
-    listRefunds({ status, days, page, size: PAGE_SIZE, counts: true })
+    listRefunds({ status, feature, days, page, size: PAGE_SIZE, counts: true })
       .then((res) => {
         if (!live) return;
         if (res.counts) setCounts(res.counts);
@@ -151,20 +161,24 @@ export default function OpsRefunds() {
         setReloading(false);
       });
     return () => { live = false; };
-  }, [tab, page, days]);
+  }, [tab, page, days, feature]);
 
   useEffect(load, [load, nonce]);
 
   const reload = () => setNonce((n) => n + 1);
   const switchTab = (key) => { setTab(key); setPage(0); };
   const changeDays = (value) => { setDays(value); setPage(0); };
+  const changeFeature = (value) => { setFeature(value); setPage(0); };
 
   const decide = async (r, act, reason) => {
     if (!canWrite || busy.current) return;
     busy.current = true;
     setBusyId(r.id);
     try {
-      if (act === 'approve') {
+      if (r.serviceRequestId) {
+        await decideServiceRequestRefund(r.serviceRequestId, r.id, act, reason);
+        toast(act === 'approve' ? 'Refund approved' : 'Refund rejected', act === 'approve' ? undefined : 'error');
+      } else if (act === 'approve') {
         await approveRefund(r.id);
         toast('Refund approved');
       } else {
@@ -201,7 +215,7 @@ export default function OpsRefunds() {
   if (state.status === 'error') {
     return (
       <div>
-        <PageHeader title="Refunds" subtitle="Review refund requests, automatic refunds and disputes." />
+        <PageHeader title="Refunds" subtitle="Review pass and rent-agreement refunds, automatic refunds and disputes." />
         <div className="dz-card flex items-start gap-3 p-6 text-sm text-gray-300">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
           <div>
@@ -232,7 +246,13 @@ export default function OpsRefunds() {
   };
 
   const decisions = (r) => {
-    if (!canWrite || r.status !== 'pending_review') return null;
+    const caseLink = r.serviceRequestId ? (
+      <Link to={`/admin/rent-agreement?request=${encodeURIComponent(r.serviceRequestId)}`} className={BTN.ghost} data-testid="refund-open-case">
+        <ExternalLink className="h-3.5 w-3.5" />Open case
+      </Link>
+    ) : null;
+    const allowed = r.serviceRequestId ? decidesRentAgreements : canWrite;
+    if (!allowed || r.status !== 'pending_review') return caseLink;
     const off = busyId === r.id;
     return (
       <>
@@ -242,13 +262,14 @@ export default function OpsRefunds() {
         <button type="button" disabled={off} onClick={() => setRejecting(r)} className={classNames(BTN.ghost, off && 'opacity-50')} data-testid="refund-reject">
           <X className="h-3.5 w-3.5" />Reject
         </button>
+        {caseLink}
       </>
     );
   };
 
   return (
     <div>
-      <PageHeader title="Refunds" subtitle="Review refund requests, automatic refunds and disputes." />
+      <PageHeader title="Refunds" subtitle="Review pass and rent-agreement refunds, automatic refunds and disputes." />
 
       <QueueTabs
         label="Refund queues"
@@ -262,6 +283,7 @@ export default function OpsRefunds() {
         note={NOTE}
         toolbar={(
           <>
+            <Chips label="Feature" options={FEATURE_CHIPS} value={feature} onChange={changeFeature} />
             <Chips label="Date" options={DATE_CHIPS} value={days} onChange={changeDays} />
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <button type="button" onClick={reload} className={BTN.ghost}><RefreshCw className="h-3.5 w-3.5" />Refresh</button>

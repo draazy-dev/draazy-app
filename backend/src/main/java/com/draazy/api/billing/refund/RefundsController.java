@@ -35,11 +35,13 @@ public class RefundsController {
     @GetMapping(Routes.Refunds.DESK)
     @PreAuthorize(READ)
     public PageResponse<RefundDesk.Row> list(@RequestParam(required = false) String status,
+            @RequestParam(required = false) String feature,
             @RequestParam(required = false) Integer days,
             @RequestParam(defaultValue = "false") boolean counts,
             @PageableDefault(size = 20) Pageable pageable) {
-        PageResponse<RefundDesk.Row> page = PageResponse.of(desk.list(status, days, Pageables.unsorted(pageable)), row -> row);
-        return counts ? page.withCounts(desk.counts()) : page;
+        PageResponse<RefundDesk.Row> page = PageResponse.of(
+                desk.list(status, feature, days, Pageables.unsorted(pageable)), row -> row);
+        return counts ? page.withCounts(desk.counts(feature)) : page;
     }
 
     @PostMapping(Routes.Refunds.APPROVE)

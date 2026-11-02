@@ -13,8 +13,9 @@ export async function requestRefund(id, { reason, attemptId } = {}) {
   return toPayment(row);
 }
 
-export async function listRefunds({ status, days, page = 0, size = 20, counts = false } = {}) {
+export async function listRefunds({ status, feature, days, page = 0, size = 20, counts = false } = {}) {
   const query = { status, page, size };
+  if (feature) query.feature = feature;
   if (days) query.days = days;
   if (counts) query.counts = true;
   return toRefundPage(await get('/admin/refunds', query));

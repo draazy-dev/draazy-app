@@ -17,6 +17,10 @@ public final class RefundStatuses {
 
     public static final String KIND_LISTING_PASS = "listing_pass";
     public static final String KIND_CONTACT_PACK = "contact_pack";
+    public static final String KIND_RENT_AGREEMENT = "rent_agreement";
+
+    public static final String FEATURE_PASS = "pass";
+    public static final Set<String> FEATURES = Set.of(FEATURE_PASS, KIND_RENT_AGREEMENT);
 
     public static final String BASIS_PACK_UNUSED = "pack_unused";
     public static final String BASIS_PASS_NO_ENQUIRIES = "pass_no_enquiries";

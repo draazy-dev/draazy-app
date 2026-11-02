@@ -16,7 +16,7 @@ modules: [refunds]
 
 ## What the desk is
 
-Customers ask for a refund on a Listing Pass or Contact Pack from **Plan & Billing**. Eligible requests wait on the **Pending** tab for a person to decide. A payment taken in error is refunded automatically and lands on **Automatic**. Rent-agreement refunds stay in the rent-agreement desk.
+Customers ask for a refund on a Listing Pass or Contact Pack from **Plan & Billing**. Eligible requests wait on the **Pending** tab for a person to decide. A payment taken in error is refunded automatically and lands on **Automatic**. Rent-agreement refunds, including those raised by a desk cancel, are on **Pending**, **Approved** and **Rejected** too. Use the **Feature** filter (**All**, **Passes**, **Rent agreement**) to see one kind. Only a manager or admin can approve or reject a rent-agreement refund, including one they raised themselves; **Open case** goes to the case on the Rent Agreement desk. A rent-agreement payout the gateway refused shows on **Approved** as **Payout failed**.
 
 ## Daily checklist
 

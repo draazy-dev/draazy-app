@@ -110,7 +110,7 @@ test.describe('LIVE: the staff Refunds desk', () => {
 
     await row.getByTestId('refund-approve').click();
     const modal = page.getByRole('dialog', { name: 'Approve refund' });
-    await expect(modal).toContainText(`Desk Chitra · ${buyer.mobile} · Contact Pack · ₹199`);
+    await expect(modal).toContainText(`Desk Chitra · ${buyer.mobile} · Rent Contact Pack · ₹199`);
     await expect(modal).toContainText('This pays ₹199 back to the original payment method.');
     await page.keyboard.press('Escape');
     await expect(modal).toHaveCount(0);

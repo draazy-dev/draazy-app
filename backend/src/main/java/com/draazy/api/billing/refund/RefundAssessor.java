@@ -118,7 +118,8 @@ public class RefundAssessor {
     }
 
     private static ContactPackTerm term(Subscription order, Plan plan) {
-        return new ContactPackTerm(order.getId(), order.getStartedAt(), order.getRenewsAt(), plan.getContactLimit());
+        return new ContactPackTerm(order.getId(), order.getStartedAt(), order.getRenewsAt(), plan.getContactLimit(),
+                null, plan.getDeal());
     }
 
     private static String orNone(String signal) {
