@@ -7,9 +7,12 @@ prompt: the only prompt edits allowed are the fixes listed under IF REJECTED in 
 Folder: <repo root>\ugc-flow\   (start with 00-HANDOFF-state.txt: what is already done in Flow)
   characters\*.txt            image prompts + Flow Character setup (name, images, voice)
   reels\00-test-voice-and-name.txt   4 s test, run before any reel clip
-  reels\00-end-card-door.txt  shared end card
-  reels\reel-NN-*\clip-N.txt  one job per file: settings header, PROMPT START/END, checks, retry fixes
-  reels\reel-NN-*\script.txt  for the human editor; you don't need it
+  reels\00-CONTINUITY-RULES.txt  READ FIRST: per-reel workflow, prompt rules, accept checks, fixes
+  reels\00-end-card-door.txt  NOT USED (the end card is local HTML)
+  reels\00-signoff.txt        reel 1 only; reels 2-7 say the sign-off inside their last clip
+  reels\reel-NN-*\set.txt     the reel's set image (0 credits), made before clip 1
+  reels\reel-NN-*\clip-N.txt  one job per file: settings header, PROMPT START/END, clip checks
+  reels\reel-NN-*\script.txt  dialogue, overlays, caption, hashtags (for the editor)
   flow-ledger.csv             append one row per generation (you create nothing else in this folder
                               except renders\)
   renders\                    downloaded approved takes
@@ -30,6 +33,8 @@ HARD RULES
   9. If the UI differs from this file (a model or option is missing, or a dialog you don't understand
      appears), take a screenshot, stop, and ask. Don't guess with credits.
  10. Prompts are English with Hinglish dialogue on purpose. Never translate the dialogue.
+ 11. Continuity is the expensive failure (20 of reel 1's credits went on fixing a missing window). Follow
+     reels\00-CONTINUITY-RULES.txt: one set per reel, the look lock, the anchor frame for clips 2+.
 
 
 REAL FLOW UI (learned the hard way, Oct 2026; trust this over the phase notes below)
@@ -93,24 +98,33 @@ PHASE 2: FLOW CHARACTERS + VOICES
   Create Ishaan, IshaanOutdoor, Sana and BrokerBhaiya exactly as each character file's
   "FLOW CHARACTER(S)" section says. For each voice: list the preset voice names on screen for the user,
   let them pick, enter the voice performance text and sample dialogue, click Sync, and WAIT for the
-  user to listen and approve before Save New Voice. IshaanOutdoor reuses "Ishaan Voice".
+  user to listen and approve before Save New Voice. IshaanOutdoor reuses "Rasalgethi custom".
+  A saved custom voice won't preview new sample text; to audition a line, select a preset and refill both
+  boxes. Never click "Delete custom voice".
   Region note: if custom voices are unavailable, tell the user and let them pick a preset.
 
 PHASE 3: TEST CLIP (reels\00-test-voice-and-name.txt)
   Generate it, run the visual check, then ask the user to listen. Don't continue to Phase 4 until the
-  user passes it. Every spoken "Draazy" is already written as ड्राज़ी (it won the voice audition), so
-  if the test still says it wrong, stop and ask the user rather than editing the clips.
+  user passes it (PASSED: take 3). Lessons:
+  - Never add a pronunciation hint or respelling for "Draazy"; the "as in drama" hint caused "Drauzzy".
+  - After "Add to prompt", check the Ingredient thumbnails: the room must be image 5e69b632; a timed-out
+    picker click silently attaches the first asset instead.
+  - The user judges audio from the downloaded file; the in-browser player lags.
+  - A failed generation shows Retry / Reuse prompt / Delete; Flow refunds failed jobs. Ask before Retry.
+  - Voice varies between takes of the same prompt; keep the proven voice wording in every clip.
 
-PHASE 4: END CARD (reels\00-end-card-door.txt)
+PHASE 4: END CARD - local HTML in the assembly (real logo, Outfit), 0 credits. No Flow clip.
 
-PHASE 5: REELS, in order
-  r01-c1 r01-c2 r01-c3 | r02-c1 r02-c2 r02-c3 | r03-c1 r03-c2 r03-c3 | r04-c1 r04-c2 r04-c3 |
-  r05-c1 r05-c2 r05-c3 | r06-c1 r06-c2 r06-c3 | r07-c1 r07-c2
-  Pause for the user to listen after the FIRST clip of each reel (a voice problem there would repeat in
-  the next two). The other clips of the reel can be batched: generate, check visually, then ask the
-  user to listen to the batch.
+PHASE 5: REELS, in order (reel 1 done)
+  r02-set r02-c1 [user approves, save r02-anchor] r02-c2 r02-c3 | r03-... | r04-... | r05-... | r06-... |
+  r07-set r07-c1 [approve, anchor] r07-c2
+  Clip 1 of each reel gates the rest: the user approves it (sound AND set), then save its anchor frame
+  (00-CONTINUITY-RULES.txt step 3) before clips 2-3. Clips 2-3 can then be batched: generate, compare
+  each against the anchor, then ask the user to listen to both.
 
   For every job:
+    0. Settings check (00-CONTINUITY-RULES.txt step 0) and the ingredient thumbnails, then ask the user
+       with the settings, the cost shown and the credits left.
     1. Enter the prompt (HOW TO ENTER A PROMPT). Generate once.
     2. Wait. Check every 20 s; give up after 8 minutes and report.
     3. If Flow returns an error or a policy block: screenshot, ledger row, stop and ask. Don't resubmit
@@ -118,7 +132,9 @@ PHASE 5: REELS, in order
     4. Rename the output "<JOB ID>-t<take>" (e.g. r01-c3-t1) if Flow allows; move it to its collection.
     5. VISUAL CHECK: play it, pause and screenshot at the times in ACCEPT CHECK, VISUAL. Tick each box
        with a one-line reason.
-    6. Visual fail: apply the matching IF REJECTED fix (one retry). Visual pass: status "audio pending".
+    6. Visual fail: apply the matching fix in WHEN A TAKE FAILS (00-CONTINUITY-RULES.txt; one retry).
+       Set drift with good audio -> the 10-credit continuity edit, never a regenerate.
+       Visual pass: status "audio pending".
     7. Write the ledger row.
 
 PHASE 6: UPSCALE + DOWNLOAD (only user-approved takes)

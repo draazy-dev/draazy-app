@@ -1,44 +1,66 @@
 REEL 05 - COMMUTE  ("Cheap rent. 90-minute commute.")
 =====================================================
 
-PAIN          You save on rent by living far away, then lose 3 hours a day and the savings to traffic and cabs.
-DRAAZY TRUTH  You see your travel time to your office alongside each flat, not just a map pin.
-              (Teased, not shown.)
-CAST          Ishaan (outdoor variant in clips 1-2, hoodie in clip 3)
-LENGTH        about 24 s  =  clip 1 (7 s) + clip 2 (6 s) + clip 3 (8 s) + end card (3 s)
-SETS          Clips 1-2: back seat of a cab stuck in evening traffic on the road to Hinjawadi.
-              Clip 3: Ishaan's PG room, night.
+PAIN ............... You can't find a flat near your office, so you take a cheap one far away, then lose 3 hours a day and the savings to traffic and cabs.
+DRAAZY TRUTH ....... "Near a place": search around your office by distance or travel time; each property shows drive times to the IT hubs. (Teased, not shown.)
+CAST ............... IshaanOutdoor
+DESIGN ............. one set, one time of day, one outfit, one framing (00-CONTINUITY-RULES.txt R1).
+                     The tease and the spoken sign-off are inside the last clip; no separate sign-off clip.
+ORDER .............. set.txt (0 cr) -> clip-1 -> user approves -> save r05-anchor -> clip-2, clip-3 -> download 720p
+CREDITS ............ 18 base (3 x 6); one retake 6, one continuity edit 10 in reserve
+LENGTH ............. about 25 s = 3 clips trimmed to about 7.7 s + HTML end card (about 2 s). Trim points come from the audio envelope.
+
+SET (byte-identical in every clip prompt)
+  the back seat of a cab stuck in slow evening traffic on the road to Kharadi, Pune, just after sunset. On the
+  left side of the frame, the cab's rear side window showing blurred traffic with red brake lights and orange
+  streetlights. On the right side of the frame, the grey fabric back seat and the dark rear pillar of the car. A
+  light grey roof lining at the top of the frame. No signs or number plates readable anywhere. The traffic outside
+  barely crawls.
+  Landmarks to check: rear side window with red brake lights + orange streetlights on the LEFT; grey fabric seat + dark pillar on the RIGHT; grey roof lining at the top; dusk, not night
 
 HOOK
-  On screen (0.0-2.5 s):   Cheap rent. 90-minute commute.         ("90-minute" in Coral #FB923C)
-  Spoken:                  "Rent bachane ke liye flat Wagholi mein liya."
+  On screen (0.0-2.5 s): Cheap rent. 90-minute commute.   ("90-minute" in Coral #FB923C)
 
-SCRIPT
-  TIME        SHOT                                         DIALOGUE (Hinglish)                              OVERLAY
-  0.0-7.0     CLIP 1. Selfie in a cab stuck in a jam,       ISHAAN: "Rent bachane ke liye flat Wagholi        Hook card
-              horns everywhere.                             mein liya." (beat) "Office? Hinjawadi."
-  7.0-13.0    CLIP 2. Same cab, now dark outside, him       ISHAAN: "Roz dedh ghanta jaana, dedh ghanta       9.0: "3 hrs/day in traffic 🫠"
-              slumped, the meter ticking.                   aana. Bachat sab cab mein chali gayi."
-  13.0-21.0   CLIP 3. Home. He collapses on the bed, then  ISHAAN: "Socho, ek app jo har flat ke saath      16.0: "Pick flats by commute time."
-              rolls over to the camera.                    office tak ka asli time dikhaye."                ("commute time" in Teal light)
-                                                           (half-smile) "Draazy aa raha hai, Pune."         19.0: pill "Draazy · Pune ka rental app"
-  21.0-24.0   END CARD                                     (latch click + whoosh)                           Logo + "Draazy" + "Pune ka rental app"
-                                                                                                            + "Coming soon"
+DIALOGUE (the timed lines in the clip prompts; Hinglish)
+  CLIP 1
+    0.3-3.6 s: "Office ke paas flat mila hi nahi, toh वाघोली mein sasta le liya."
+    4.0-5.8 s, after a beat, flat: "Aur office? Kharadi."
+    5.8-8.0 s: silent, lips closed, a slow blink and a wry half-smile into the lens while a horn honks outside.
+  CLIP 2
+    0.3-4.3 s: "Roz dedh ghanta jaana, aur dedh ghanta aana."
+    4.7-7.0 s, flat: "Bachat sab cab mein chali gayi."
+    7.0-8.0 s: silent, lips closed, a slow blink and a wry half-smile into the lens.
+  CLIP 3
+    0.3-3.4 s, leaning slightly closer, voice lower and hopeful: "Socho, office daalo, aur uske paas wale flats dikhe."
+    3.6-7.6 s, Ishaan into the lens with a confident half-smile, eyebrows raised once on "Draazy", a tiny nod on "Bahut jald", slowly and clearly: "Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai."
+    7.6-8.0 s: silent, lips closed, Ishaan holds the half-smile into the lens.
+
+CLIPS
+  clip-1.txt  THE HOOK                   chips @IshaanOutdoor               use 0.0-7.7 s (reel 0.0-7.7 s)
+  clip-2.txt  THE MATHS                  chips @IshaanOutdoor               use 0.0-7.7 s (reel 7.7-15.4 s)
+  clip-3.txt  TEASE + SIGN-OFF           chips @IshaanOutdoor               use 0.0-7.7 s (reel 15.4-23.1 s); the HTML end card follows
+
+OVERLAYS (reel time, added at local assembly; approximate until trims are measured)
+  0.0-2.5 hook card
+  9.0 "3 hrs/day in traffic 🫠"
+  16.0 "Search flats near your office." ("near your office" in Teal light)
+  ~19.0 pill "Draazy · Rent · Buy · Sell · Agreements" on the spoken "Draazy"
+  end card: local HTML (logo + "Draazy" + "Direct hai, easy hai, Draazy hai" + "Rent · Buy · Sell · Agreements" + "Coming soon"), 0 credits; template
+  brag-output\work\reels\ugc-r04. The Flow door clip (00-end-card-door.txt) is not used.
 
 CAPTION
+  Office ke paas flat dhoondhna sabse mushkil kaam hai.
   Rent pe ₹4k bachaye. Roz 3 ghante traffic mein gaye. 🚕
   Maths kisi ne nahi sikhaya tha yeh wala.
-  Draazy aa raha hai, Pune ka apna rental app. Follow karo, launch pe sabse pehle pata chalega.
+  Direct hai, easy hai, Draazy hai. Pune ka apna property app (rent, buy, sell, aur agreements), bahut jald launch ho raha hai. Follow karo, launch pe sabse pehle pata chalega.
   Tumhara daily commute kitna lamba hai? Comment karo 👇
 
 HASHTAGS
-  #Pune #Hinjawadi #Wagholi #PuneTraffic #PuneRent #ITLife #CommuteLife #PuneLife #Draazy #ComingSoon
+  Instagram (max 5): #Wagholi #Kharadi #PuneTraffic #PuneRent #Draazy
+  Facebook: #Pune #PuneRent #Draazy
 
 EDIT NOTES
-  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
-    holds into the end card. "Draazy" in captions is always Teal light.
-  - Wagholi to Hinjawadi is across the city (about 35-40 km), so a 90-minute peak-hour ride is the
-    skit's realistic case, not a statistic. "₹4k" in the caption is Ishaan's own number in the skit.
-  - Clip 1 to clip 2 needs a time jump. Add a quick "1 ghanta baad..." text flash (Outfit, 0.6 s) at the cut.
-
-QA  hook opens with a fact | 2 beats | no stated conclusion | about 24 s
+  - The "Draazy · Rent · Buy · Sell · Agreements" pill appears on the spoken "Draazy" and holds into the end card.
+    "Draazy" in captions is always Teal light.
+  - Wagholi to Kharadi is only about 10 km, but Nagar Road crawls at peak hour, so 90 minutes is the skit's case, not a statistic; "₹4k" is Ishaan's own number.
+  - No time jump: all three clips are the same ride.

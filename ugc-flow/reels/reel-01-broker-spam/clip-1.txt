@@ -11,59 +11,38 @@ FLOW SETTINGS (check every line on screen before clicking Generate)
 CHARACTER CHIPS .... @Ishaan   (each [@Name] token in the prompt becomes a chip)
 EXTRA INGREDIENTS .. ishaan-room
 START FRAME ........ none
-USE IN EDIT ........ 0.0-6.0 s of the 8 s take
+USE IN EDIT ........ the full 8 s (0.0-8.0 s of the reel); add the phone-buzz SFX at about 7.6 s, leading into clip 2's call
+NOTE ............... never fix a take with Flow's "edit" box: it keeps the source length and lost the context (take 3).
 
 PROMPT START
-Vertical 9:16 smartphone video, medium close-up, eye level, from a phone propped on a desk about one metre
-away, framing Ishaan from mid-chest up with a little headroom, slightly off-centre to the left.
+Vertical 9:16 smartphone selfie video, a close-up from a phone held at arm's length, framing [@Ishaan]
+Ishaan from mid-chest up in his rented room in Wakad, Pune (the attached room image), in the evening, with a white shelf
+lit by a thin indigo (#4F46E5) LED strip softly out of focus behind him. He talks to the lens like venting
+to a friend, with dry, exasperated disbelief: raised eyebrows, a wry unamused look. Not laughing, not
+grinning, not sad. He speaks three connected sentences in one natural flow, each spoken exactly once,
+nothing repeated, no other words.
+0.3-3.0 s, matter-of-fact: "Kal maine sirf ek flat pe enquiry ki thi, bas ek."
+3.0-6.0 s, eyebrows up in disbelief: "Aur aaj subah se barah brokers ke call aa chuke hain."
+6.2-7.6 s, a slow shake of the head: "Aur yeh ginti abhi ruki nahi hai."
+7.6-8.0 s: silent, lips closed, an unimpressed look into the lens.
 
-Composition: keep the top fifth of the frame as calm, uncluttered background (a text card is added
-there later) and keep the faces in the middle third of the frame.
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking
+casual Hinglish with a natural Indian accent, clearly male and mid-pitched, conversational and fluent,
+with a dry, exasperated tone.
 
-Subject: [@Ishaan] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
-jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
-neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears his signature teal (#14B8A6) oversized heavyweight cotton hoodie over a
-plain white crew-neck t-shirt, black joggers, and a thin black digital watch on his left wrist. His phone
-has a matte teal case.
+Lighting and colour: a warm ceiling bulb from above-left, a soft indigo glow behind him, a subtle cool
+teal tint in the shadows, true warm skin tones. Authentic Instagram UGC, natural skin texture, no beauty
+filter.
 
-Action: Ishaan sits on the edge of his bed, holding his phone in his right hand. The phone vibrates
-repeatedly in his hand. From 0 to 3 seconds he looks straight into the lens, tired and deadpan, and speaks.
-At about 3 seconds the phone buzzes again; he lifts it up beside his face towards the camera, with the
-screen facing away from the lens, raises his eyebrows, and speaks the second line flatly. From 5 to 8
-seconds he holds a deadpan stare into the lens while the phone keeps buzzing, then gives a tiny slow
-blink.
+Audio: quiet room tone. No music.
 
-Dialogue, lip-synced, spoken only once and with no extra words:
-Ishaan says, flat and tired: "Ek flat pe enquiry ki thi. Bas ek."
-Then, lifting the buzzing phone: "Yeh barahwa broker hai."
-
-Voice: every on-screen character uses their saved Flow character voice, which matches this description. Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
-mid-pitched, slightly husky, relaxed and conversational, a quick pace with small deadpan pauses, close
-to the microphone like a phone's front-camera recording.
-
-Setting: a small rented PG room in Wakad, Pune, in the evening. Behind him, a cream wall, a grey
-steel almirah, a white floating shelf lit by a thin indigo (#4F46E5) LED strip, a small plant, and a
-coral (#FB923C) cushion on the bed beside him. A window shows the blue-hour sky and the lit windows of
-neighbouring buildings.
-
-Lighting and colour: a warm ceiling bulb as the key light from above-left, the soft indigo LED glow as a
-rim on his right shoulder, and the phone's faint light on his chin. Natural, lived-in, slightly moody.
-Subtle cool teal tint in the shadows, true warm skin tones.
-
-Camera feel: authentic Instagram UGC, a static phone on a desk with a tiny natural wobble, phone
-autofocus, realistic exposure, natural skin texture with no beauty filter, 30 fps.
-
-Audio: SFX: a loud, repeated phone vibration buzzing against his palm, in short double-pulses. Ambient
-noise: a quiet room tone, a distant ceiling fan, faint evening traffic outside the window. No music.
-
-No subtitles, no captions, no on-screen text or graphics. The phone screen faces away from the camera
-and is never readable. No readable signs, no brand logos, no watermark.
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
 PROMPT END
 
 ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
   [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
   [ ] Ishaan matches @Ishaan: teal hoodie, taper fade, light stubble, clear skin with no moles
-  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
+  [ ] framing like test take 4 (3f1741fb): no phone or hand holding a phone in frame; never a sad face
   [ ] the action in the prompt happens, in order, and nothing extra happens
 
 ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)

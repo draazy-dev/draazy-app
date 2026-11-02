@@ -1,72 +1,65 @@
-REEL 05 / CLIP 2 of 3 - STILL STUCK
-===================================
+REEL 05 / CLIP 2 of 3 - THE MATHS
+=================================
 JOB ID ............. r05-c2
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r05-c1 approved by the user AND r05-anchor saved
 FLOW SETTINGS (check every line on screen before clicking Generate)
   Type ............. Video > Ingredients
   Model ............ Gemini Omni Flash 1.1
-  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Resolution ....... 720p (user-approved; download "720p Original size")
   Aspect ratio ..... 9:16 portrait
   Length ........... 8 s
   Outputs .......... 1
-CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token in the prompt becomes a chip)
-EXTRA INGREDIENTS .. none
-START FRAME ........ none
-USE IN EDIT ........ 0.0-6.0 s
+  Cost shown ....... 12 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r05-set (image) + r05-anchor (saved frame of the approved clip 1)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 7.7-15.4 s)
 
 PROMPT START
-Vertical 9:16 selfie video, shot on the front camera of a smartphone held loosely at arm's length by
-Ishaan, slumped low in the back seat of the same cab. A close-up of his face from slightly below, with
-the dark window and traffic lights behind him.
+Vertical 9:16 phone video recorded from the driver's seat of the cab, the camera fixed at eye level and turned
+diagonally back towards the rear-left seat. [@IshaanOutdoor] Ishaan sits on the rear-left seat, on the right half
+of the frame next to the side window, framed from mid-chest up, turned slightly towards the lens. His back rests
+against the cream fabric seatback with the rear headrest behind his head. Both his hands
+stay low, out of frame. Nobody else is in the frame; the driver is never seen. The camera distance and angle stay
+the same for the whole clip.
 
-Subject: [@IshaanOutdoor] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
-jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
-neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears a teal (#14B8A6) cotton overshirt open over a plain white crew-neck
-t-shirt, with wired white earphones around his neck. His hair is now a little more messed up, and he
-looks exhausted.
+Set (the attached set image r05-set; the same in every clip of this reel): the back seat of a cab stuck in slow
+evening traffic on the road to Kharadi, Pune, just after sunset, seen diagonally from the driver's seat. Ishaan
+sits on the cream fabric back seat. On the right side of the frame, beside him, the rear-left door and its side
+window showing an orange streetlight glow and a blurred roadside, no people in it. At the top left of the frame,
+the rear windscreen shows the traffic queued behind, the cars facing the camera with soft white headlights under
+orange streetlights, no red lights. A beige roof lining at the top of the frame, the edges of the front seats at
+the bottom corners. No signs or number plates readable anywhere. The traffic outside barely crawls. The background stays
+exactly the same for the whole clip. Match the attached reference frame exactly: the same camera distance and
+angle, the same background with every object in the same place, the same light and colour grade.
 
-Action: Ishaan is slumped sideways against the window, totally drained, the phone held lazily. He talks
-to the lens in a slow, flat, exhausted voice, counting on his fingers on "jaana" and "aana". On "Bachat
-sab cab mein chali gayi" he lifts his hand weakly and lets it flop down. From 5 to 8 seconds he closes
-his eyes and lets his head rest on the window glass while the cab inches forward.
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. Clear, even skin with no moles, beauty
+marks or dark spots, taper fade,
+light stubble. The outfit stays the same for the whole clip.
 
-Dialogue, lip-synced, spoken once with no extra words:
-Ishaan, exhausted: "Roz dedh ghanta jaana, dedh ghanta aana. Bachat sab cab mein chali gayi."
+He sinks a little lower in the seat and talks to the lens with dry, wry humour: a relaxed face and a small
+knowing half-smile after each line. Not laughing, not grinning, never sad, tired or frowning. Each line is spoken exactly once, nothing repeated, no other words.
+0.3-4.3 s: "Roz dedh ghanta jaana, aur dedh ghanta aana."
+4.7-7.0 s, flat: "Bachat sab cab mein chali gayi."
+7.0-8.0 s: silent, lips closed, a slow blink and a wry half-smile into the lens.
 
-Voice: every on-screen character uses their saved Flow character voice, which matches this description. Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
-mid-pitched, slightly husky, here slow, flat and drained, close to the phone's microphone.
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking casual Hinglish
+with a natural Indian accent, clearly male and mid-pitched, conversational and fluent.
 
-Setting: the back seat of a white hatchback cab, now after dark, crawling through traffic on a Pune
-arterial road. Through the window: a blur of red tail lights, white headlights, orange street lights
-and the glow of shop fronts. No readable signs, number plates or logos.
+Lighting and colour: dusk after sunset, not daytime: the sky outside is deep blue, the streetlights and headlights
+are on, and the cab interior is dim, lit by the orange glow of streetlights through the side window and the
+soft white headlights behind, a cool blue dusk sky, true warm skin tones, slight phone-camera grain. Authentic Instagram UGC shot on a
+phone, natural skin texture, no beauty filter.
 
-Lighting and colour: dark cab interior, his face lit by passing orange street lights and red brake-light
-glow sweeping across it, plus the faint cool glow of the phone. Tired, moody night. Subtle cool teal tint
-in the shadows, true warm skin tones.
+Audio: muffled traffic outside the cab, an idling engine, distant honking. No music.
 
-Camera feel: authentic Instagram UGC front-camera selfie, lazy handheld shake, phone autofocus,
-low-light grain, no beauty filter, 30 fps.
-
-Audio: Ambient noise: a night traffic jam, horns, the cab's indicator ticking, an engine idling and
-creeping forward. No music.
-
-No subtitles, no captions, no on-screen text or graphics, no readable signs, number plates or logos, no
-watermark.
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
 PROMPT END
 
-ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
-  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
-  [ ] Ishaan matches @IshaanOutdoor: open teal overshirt on a white tee, taper fade, stubble, no moles
-  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
-  [ ] the action in the prompt happens, in order, and nothing extra happens
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match r05-anchor side by side: seen diagonally from the driver's seat; Ishaan on the cream seat, right half of the frame; rear-left door + side window (orange glow, no people) on the RIGHT; rear windscreen top LEFT with cars FACING the camera (white headlights, no red lights); beige roof lining at the top; dusk, not night
+  [ ] same dusk light as the anchor; no jump to night
 
-ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
-  [ ] every line spoken once, in order, with no added words
-  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
-  [ ] the voice matches the character's saved voice; no music
-
-IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
-  - words dropped, added or swapped: regenerate unchanged once
-  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
-  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
-  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
-  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

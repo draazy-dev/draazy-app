@@ -11,66 +11,46 @@ FLOW SETTINGS (check every line on screen before clicking Generate)
 CHARACTER CHIPS .... @Ishaan   (each [@Name] token in the prompt becomes a chip)
 EXTRA INGREDIENTS .. ishaan-room
 START FRAME ........ none
-USE IN EDIT ........ 0.0-8.0 s (trim any silence after the last word)
+USE IN EDIT ........ the full 8 s (16.0-24.0 s of the reel); the sign-off clip follows
 
 PROMPT START
-Vertical 9:16 smartphone video. It opens as a medium close-up from a phone propped on a desk, framing
-Ishaan from mid-chest up. Over the first 2 seconds he leans towards the lens until the framing becomes a
-close-up of his face and shoulders, as if telling the viewer a secret.
+Vertical 9:16 smartphone selfie video, a close-up from a phone held at arm's length, framing [@Ishaan]
+Ishaan from mid-chest up in his rented room in Wakad, Pune (the attached room image), in the evening, with a white shelf
+lit by a thin indigo (#4F46E5) LED strip softly out of focus behind him. He wears exactly the same teal pullover hoodie as his character image, closed all the way up to the neck: a
+pullover with no zip and no opening at the front, two white drawstrings hanging down, only a thin edge of white tee
+collar visible at the neckline. The hoodie stays closed for the whole clip. Both his hands are out of frame. He talks to the
+lens like telling a friend an idea: calm and sincere, a small hopeful look. Not laughing, not grinning, not sad. He
+speaks two connected sentences in one natural flow, each spoken exactly once, nothing repeated, no other words.
+0.3-3.3 s, flat and matter-of-fact, a small shrug: "Ek flat dhoondhne ke liye poore Pune ko apna number dena padta hai."
+3.5-7.3 s, leaning slightly closer to the lens, voice lower and softer, hopeful: "Socho, ek app jahan owner se seedha baat ho, aur number broker tak pahunche hi na."
+7.3-8.0 s: silent, lips closed, a confident half-smile and one raise of the eyebrows into the lens.
 
-Subject: [@Ishaan] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
-jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
-neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears his signature teal (#14B8A6) oversized heavyweight cotton hoodie over a
-plain white crew-neck t-shirt and a thin black digital watch on his left wrist.
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking
+casual Hinglish with a natural Indian accent, clearly male and mid-pitched, conversational and fluent,
+quieter and more intimate in the second sentence.
 
-Action: At 0 seconds Ishaan casually tosses his phone, which has a matte teal case, face-down onto the
-bed beside the coral cushion; it keeps vibrating there. He ignores it completely, rests his forearms on
-his knees and leans in towards the lens. He lowers his voice and speaks calmly and sincerely, with a small
-hopeful look. After a brief pause, at about 6 seconds, he gives a confident half-smile, raises his
-eyebrows once and says the last line. He holds the half-smile until 8 seconds.
+Lighting and colour: a warm ceiling bulb from above-left, a soft indigo glow behind him, a subtle cool
+teal tint in the shadows, true warm skin tones. Authentic Instagram UGC, natural skin texture, no beauty
+filter.
 
-Dialogue, lip-synced, spoken once with no extra words:
-Ishaan, leaning in, lower and softer: "Socho, ek app jahan owner se seedha baat ho, aur number broker tak pahunche hi na."
-Then, with a half-smile, slowly and clearly: "ड्राज़ी aa raha hai, Pune."
-Pronunciation: "ड्राज़ी" is the brand name Draazy, said DRAA-zee: two syllables, a long open "aa" as in "drama", stress on
-the first syllable, then a soft "zee". It is the clearest, most deliberate word in the clip.
+Audio: quiet room tone. No music.
 
-Voice: every on-screen character uses their saved Flow character voice, which matches this description. Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
-mid-pitched, slightly husky, relaxed and conversational. Here he is quieter and more intimate, close to
-the microphone like a phone's front-camera recording.
-
-Setting: a small rented PG room in Wakad, Pune, in the evening. A cream wall, a white floating shelf lit
-by a thin indigo (#4F46E5) LED strip, a small plant, a coral (#FB923C) cushion on the bed, and a softly
-out-of-focus window showing the blue-hour sky.
-
-Lighting and colour: a warm ceiling bulb from above-left; as he leans in, his face catches more of the
-warm light, and the indigo LED glow sits softly behind him. Hopeful, warm, intimate. Subtle cool teal tint
-in the shadows, true warm skin tones, shallow depth of field on the background.
-
-Camera feel: authentic Instagram UGC, a static phone with a tiny natural wobble, phone autofocus
-re-focusing smoothly as he leans in, natural skin texture with no beauty filter, 30 fps.
-
-Audio: SFX: a soft thud as the phone lands on the mattress, then muffled vibration from the bed that
-continues quietly under his voice. Ambient noise: a quiet room tone, a distant ceiling fan. No music.
-
-No subtitles, no captions, no on-screen text or graphics, no readable phone screen, no logos, no
-watermark.
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
 PROMPT END
 
 ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
   [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
   [ ] Ishaan matches @Ishaan: teal hoodie, taper fade, light stubble, clear skin with no moles
-  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
+  [ ] hoodie is a closed pullover with drawstrings, same as clips 1, 2 and the sign-off (take 1 failed: open hoodie)
+  [ ] framing like clip 1 take 4 (d8151d6e): no phone in frame; never a sad face
   [ ] the action in the prompt happens, in order, and nothing extra happens
 
 ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
   [ ] every line spoken once, in order, with no added words
   [ ] lip-sync is tight and the Hinglish sounds natural, not translated
-  [ ] "Draazy" is clearly DRAA-zee (long "aa", two syllables), not "Dray-zee" or "Drazzy"
   [ ] the voice matches the character's saved voice; no music
 
 IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
-  - "Draazy" mispronounced: regenerate unchanged once (ड्राज़ी already won the voice audition), then ask the user
   - words dropped, added or swapped: regenerate unchanged once
   - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
   - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line

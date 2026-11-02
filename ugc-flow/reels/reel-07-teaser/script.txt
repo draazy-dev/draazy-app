@@ -1,51 +1,65 @@
-REEL 07 - TEASER RECAP  ("Renting in Pune is broken.")
-======================================================
+REEL 07 - TEASER  ("Pune mein ghar ka har kaam? Broken.")
+===========================================================
 
-PURPOSE       Close the series: every pain in one reel, both characters, the strongest Draazy name drop.
-              Post it last (or the week before launch). It reuses hook shots from reels 1-6.
-CAST          Ishaan, Sana
-LENGTH        about 21 s  =  clip 1 (8 s, intercut with a montage) + clip 2 (8 s) + end card (4-5 s)
-SET           A residential rooftop terrace in Pune at dusk.
+PAIN ............... Every pain from reels 1-6 in one reel; the strongest Draazy name drop. Post it last.
+DRAAZY TRUTH ....... Draazy is coming: one property app for rent, buy, sell and agreements. (No feature claims beyond
+                     reels 1-6 and that positioning; no prices.)
+CAST ............... IshaanOutdoor (left), Sana (right); both on screen in both clips
+DESIGN ............. one set, one time of day, one outfit, one framing (00-CONTINUITY-RULES.txt R1).
+                     The tease and the spoken sign-off are inside the last clip; no separate sign-off clip.
+ORDER .............. set.txt (0 cr) -> clip-1 -> user approves -> save r07-anchor -> clip-2 -> download 720p
+CREDITS ............ 24 base (2 x 12, native 720p, the user's choice); one retake per clip 24 and one continuity edit 10 in reserve
+LENGTH ............. about 19 s = clip 1 (7.9) + clip 2 (7.7) + HTML end card (3.5)
+
+SET (byte-identical in every clip prompt)
+  a residential rooftop terrace in Pune at dusk. On the left side of the frame, the Pune skyline of mid-rise
+  apartment buildings under an orange-pink sky. On the right side of the frame, a white water tank and a string of
+  warm fairy lights along the terrace parapet. A low parapet wall at waist height behind them. Nothing readable
+  anywhere.
+  Landmarks to check: skyline + orange-pink sky on the LEFT; white water tank + fairy lights on the RIGHT; low parapet behind them; Ishaan left, Sana right
 
 HOOK
-  On screen (0.0-2.5 s):   Renting in Pune is broken.             ("broken" in Coral #FB923C)
-  Spoken:                  "Broker ke calls... brokerage... fake photos..."
+  On screen (0.0-2.5 s): Pune mein ghar ka har kaam? Broken.   ("Broken" in Coral #FB923C)
 
-SCRIPT
-  TIME        SHOT                                         DIALOGUE (Hinglish)                              OVERLAY
-  0.0-8.0     CLIP 1, intercut. The terrace two-shot is     ISHAAN: "Broker ke calls... brokerage...          Hook card, then each pain word
-              the base. On each pain word, cut away for     fake photos..."                                   flashes in Coral as its shot plays
-              0.6-0.8 s to that reel's hook shot (use      SANA: "...random flatmates... do ghante ka
-              the audio from clip 1 underneath):            commute... agreement ki line."
-                calls       > reel 1, clip 1 (phone buzzing)
-                brokerage   > reel 2, clip 2 (light switch)
-                fake photos > reel 3, clip 2 (damp wall)
-                flatmates   > reel 4, clip 1 (scrolling)
-                commute     > reel 5, clip 1 (jam)
-                agreement   > reel 6, clip 2 (queue)
-  8.0-16.0    CLIP 2. Both turn to the camera, closer.     ISHAAN: "Hum sab ne jhela hai."                  12.0: "Draazy is coming."
-                                                           SANA: "Ab ek app yeh sab aasaan karega."         ("Draazy" in Teal light)
-                                                           ISHAAN (half-smile): "Draazy aa raha hai,        14.5: pill "Draazy · Pune ka rental app"
-                                                           Pune."
-  16.0-21.0   END CARD, held longer (4-5 s)                (latch click + whoosh)                           Logo + "Draazy" + "Pune ka rental app"
-                                                                                                            + "Coming soon"
-                                                                                                            + "Follow for launch"
+DIALOGUE (the timed lines in the clip prompts; Hinglish)
+  CLIP 1
+    0.3-3.6 s, Ishaan, a small shake of the head: "Broker ke calls... phir brokerage... aur upar se fake owners."
+    3.9-7.5 s, Sana, an eye-roll: "Random flatmates... दो ghante ka commute... aur agreement ki moti fees."
+    7.5-8.0 s: both silent, lips closed, a deadpan look into the lens.
+  CLIP 2
+    0.3-1.6 s, Ishaan: "Hum sab ne jhela hai."
+    1.9-3.4 s, Sana: "Rent, buy, sell, sab ek jagah."
+    3.6-5.5 s, Ishaan into the lens with a confident half-smile, eyebrows raised once on "Draazy", slowly and clearly: "Direct hai, easy hai, Draazy hai."
+    5.5-5.9 s: a short silent beat, lips closed, the half-smile stays (R14; widen in assembly with a SEGS rate if needed).
+    5.9-7.6 s, Ishaan, as a separate sentence, a tiny nod on "Bahut jald": "Bahut jald launch ho raha hai."
+    7.6-8.0 s: silent, lips closed, Ishaan holds the half-smile into the lens.
+
+CLIPS
+  clip-1.txt  THE RECAP (montage base)   chips @IshaanOutdoor, @Sana        use 0.0-7.9 s (reel 0.0-7.9 s), intercut with the montage
+  clip-2.txt  THE NAME DROP              chips @IshaanOutdoor, @Sana        use 0.0-7.7 s (reel 7.9-15.6 s); the long HTML end card follows
+
+OVERLAYS (reel time, added at local assembly; approximate until trims are measured)
+  0.0-2.5 hook card at the top (y≈170); each pain word flashes in Coral at y≈1380 as its montage shot plays
+  montage 0.6-0.8 s cut-aways over clip 1 audio: calls > r01 c1, brokerage > r02 c2, fake owners > r03 c1, flatmates > r04 c1, commute > r05 c1, agreement fees > r06 c1
+  10.0 "Draazy is coming." ("Draazy" in Teal light)
+  ~12.8 pill "Draazy · Rent · Buy · Sell · Agreements" on the spoken "Draazy"
+  15.6-19.1 end card held ~3.5 s with "Follow for launch" and a 0.3 s logo zoom
+  end card: local HTML (logo + "Draazy" + "Direct hai, easy hai, Draazy hai" + "Rent · Buy · Sell · Agreements" + "Coming soon"), 0 credits; template
+  brag-output\work\reels\ugc-r02. The Flow door clip (00-end-card-door.txt) is not used.
 
 CAPTION
-  Broker calls. Brokerage. Fake photos. Random flatmates. 2 ghante ka commute. Agreement ki line.
-  Pune mein ghar dhoondhna basically ek boss level hai. 🎮
-  Ab ek app yeh sab aasaan karega. Draazy aa raha hai, Pune.
+  Broker calls. Brokerage. Fake owners. Random flatmates. 2 ghante ka commute. Agreement ki fees.
+  Pune mein ghar ka koi bhi kaam basically ek boss level hai. 🎮
+  Rent, buy, sell, sab ek jagah. Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai.
   Follow karo, launch pe sabse pehle pata chalega. 🚪✨
   In 6 mein se tumhara sabse bada dard kaunsa hai? Number comment karo 👇
 
 HASHTAGS
-  #Pune #PuneRent #FlatHuntingPune #PuneLife #RentInPune #BrokerFree #Flatmates #Hinjawadi #Draazy #ComingSoon
+  Instagram (max 5): #PuneRealEstate #FlatHuntingPune #PuneLife #ComingSoon #Draazy
+  Facebook: #Pune #PuneRent #Draazy
 
 EDIT NOTES
-  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
-    holds into the end card. "Draazy" in captions is always Teal light.
-  - Build this reel only after reels 1-6 exist (it needs their clips).
-  - Montage cuts land exactly on each spoken pain word. Use a short whoosh SFX on every cut.
-  - The end card is held longer here: add a gentle 0.3 s zoom on the logo.
-
-QA  hook is a statement | the recap counts as one beat, the tease as the second | no stats | about 21 s
+  - The "Draazy · Rent · Buy · Sell · Agreements" pill appears on the spoken "Draazy" and holds into the end card.
+    "Draazy" in captions is always Teal light.
+  - Build only after reels 1-6 exist (montage).
+  - Montage cuts land exactly on each spoken pain word, a short whoosh on every cut.

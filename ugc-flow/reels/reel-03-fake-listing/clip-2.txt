@@ -1,81 +1,60 @@
-REEL 03 / CLIP 2 of 3 - THE REALITY
-===================================
+REEL 03 / CLIP 2 of 3 - THE REVEAL
+==================================
 JOB ID ............. r03-c2
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r03-c1 approved by the user AND r03-anchor saved
 FLOW SETTINGS (check every line on screen before clicking Generate)
   Type ............. Video > Ingredients
   Model ............ Gemini Omni Flash 1.1
-  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Resolution ....... 360p (download the approved take at 720p for 0 credits)
   Aspect ratio ..... 9:16 portrait
   Length ........... 8 s
   Outputs .......... 1
-CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token in the prompt becomes a chip)
-EXTRA INGREDIENTS .. none
-START FRAME ........ none
-USE IN EDIT ........ 0.0-6.0 s
+  Cost shown ....... 6 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r03-set (image) + r03-anchor (saved frame of the approved clip 1)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 7.7-15.4 s)
 
 PROMPT START
-Vertical 9:16 selfie video, shot on the front camera of a smartphone held at arm's length by Ishaan,
-inside a dim, empty flat. It starts as a close-up of his unimpressed face; at about 3 seconds he swings
-the phone round to show the room's damp wall for 1.5 seconds, then swings back to his face.
+Vertical 9:16 smartphone selfie video, a close-up from a phone held at arm's length at eye level, framing
+[@IshaanOutdoor] Ishaan from mid-chest up in the centre of the frame. Both his hands are out of frame. The
+camera distance and angle stay the same for the whole clip.
 
-Subject: [@IshaanOutdoor] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
-jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
-neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears a teal (#14B8A6) cotton overshirt worn open over a plain white crew-neck
-t-shirt, with a black backpack strap on his shoulder.
+Set (the attached set image r03-set; the same in every clip of this reel): a clean, quiet road just outside the
+entrance of a premium township in Pune, on a bright sunny morning. On the left side of the
+frame, the closed modern entrance gate in brushed steel and glass, set in a light stone entrance wall that
+is completely plain, with no sign, no letters and no logo, with a small white security cabin beside the
+gate, the cabin empty. Behind the gate, tall slender white residential towers with white balcony bands and thin
+bronze vertical strips rise into a clear blue sky above a landscaped podium, with palms and dense green trees at
+their base. On the right side of the frame, a neat row of parked two-wheelers along a clean footpath lined with
+mature trees. There is no readable text anywhere: no signs, no number plates readable, no text. The background stays exactly the same for the whole clip. Match the
+attached reference frame exactly: the same camera distance and angle, the same background with every object in
+the same place, the same light and colour grade.
 
-Action: At 0 seconds Ishaan stands in the dim room with a completely flat, unimpressed face, holding his
-other phone, in a matte teal case, flat near his chin on speakerphone. A cheerful male voice speaks from
-the phone speaker. At about 3 seconds Ishaan swings his selfie camera across to show a large patch of
-grey-green damp and peeling paint on the wall beside a small barred window, then swings back to his
-face. At about 5 seconds he says one word, totally deadpan, eyebrows raised, then stares into the lens
-without blinking.
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. Clear skin with no moles, taper fade,
+light stubble. The outfit stays the same for the whole clip.
 
-Dialogue; the broker is heard only from the phone speaker; Ishaan's line is lip-synced; spoken once with
-no extra words:
-The broker, from the phone speaker, sweet and casual: "Sir, woh wala toh kal hi chala gaya. Yeh bhi same hai sir."
-Ishaan, deadpan: "Same?"
+He talks to the lens, tired and deadpan, then genuinely asking. Not laughing, not grinning, not sad. Each line
+is spoken exactly once, nothing repeated, no other words.
+0.3-3.6 s, flatly: "Pata chala, woh owner tha hi nahi, flat kisi aur ka hai."
+4.0-7.2 s, slower: "Asli owner kaun hai, yeh pehle kaise pata chale?"
+7.2-8.0 s: silent, lips closed, one slow blink into the lens.
 
-Voices: every on-screen character uses their saved Flow character voice, which matches this description.
-The broker speaks fast, overly sweet salesman Hinglish with a Marathi-tinged Pune Hindi accent: a deep,
-slightly raspy male voice in his mid-40s, smiling through the voice, with a thin, slightly compressed
-phone-speaker sound quality.
-Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
-mid-pitched, slightly husky, flat and deadpan here.
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking casual Hinglish
+with a natural Indian accent, clearly male and mid-pitched, conversational and fluent.
 
-Setting: a small, dim, unfurnished flat in an old Pune building. Patchy off-white walls with a large
-grey-green damp stain and peeling paint near the ceiling corner, a cracked tile floor, a small window
-with a rusty grille facing a wall a metre away, a bare bulb holder hanging from a wire. Tired and
-gloomy, no furniture.
+Lighting and colour: soft, bright morning sunlight from the side, clear blue sky, true skin tones.
+Authentic Instagram UGC shot on a phone, natural skin texture, no beauty filter.
 
-Lighting and colour: dim, flat, greyish daylight from the small window, slightly underexposed.
-Desaturated, cool and gloomy, in deliberate contrast to a bright previous shot. True skin tones, no teal
-glow here.
+Audio: a quiet morning lane, a distant scooter passing, birds chirping in the trees. No music.
 
-Camera feel: authentic Instagram UGC front-camera selfie, natural handheld shake with a quick, slightly
-clumsy swing to the wall and back, phone autofocus hunting briefly, no beauty filter, 30 fps.
-
-Audio: the broker's voice clearly from a small phone speaker. Ambient noise: a hollow, echoey empty
-room, a dripping tap somewhere, faint traffic outside. No music.
-
-No subtitles, no captions, no on-screen text or graphics, no readable phone screen, no readable signs,
-no logos, no watermark. The broker is never seen, only heard.
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
 PROMPT END
 
-ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
-  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
-  [ ] Ishaan matches @IshaanOutdoor: open teal overshirt on a white tee, taper fade, stubble, no moles
-  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
-  [ ] the action in the prompt happens, in order, and nothing extra happens
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match r03-anchor side by side: closed steel-and-glass gate in a plain light stone wall (no sign) + empty white security cabin on the LEFT; tall white towers with bronze vertical strips behind it; parked two-wheelers + footpath trees on the RIGHT; bright morning sun, clear blue sky; no readable text anywhere
+  [ ] no second person appears; no readable text anywhere
 
-ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
-  [ ] every line spoken once, in order, with no added words
-  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
-  [ ] each line comes from the right person (speakers not swapped)
-  [ ] the voice matches the character's saved voice; no music
-
-IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
-  - words dropped, added or swapped: regenerate unchanged once
-  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
-  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
-  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
-  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

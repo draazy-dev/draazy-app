@@ -1,86 +1,70 @@
-REEL 04 / CLIP 3 of 3 - THE TEASE (TWO-SHOT)
-============================================
+REEL 04 / CLIP 3 of 3 - TEASE + SIGN-OFF
+========================================
 JOB ID ............. r04-c3
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r04-c1 approved by the user AND r04-anchor saved
 FLOW SETTINGS (check every line on screen before clicking Generate)
   Type ............. Video > Ingredients
   Model ............ Gemini Omni Flash 1.1
-  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Resolution ....... 720p (user-approved; download "720p Original size")
   Aspect ratio ..... 9:16 portrait
   Length ........... 8 s
   Outputs .......... 1
-CHARACTER CHIPS .... @IshaanOutdoor, @Sana   (each [@Name] token in the prompt becomes a chip)
-EXTRA INGREDIENTS .. none
-START FRAME ........ none
-USE IN EDIT ........ 0.0-8.0 s
+  Cost shown ....... 12 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor, @Sana   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r04-set (image) + r04-anchor (saved frame of the approved clip 1)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 15.4-23.1 s); the HTML end card follows
 
 PROMPT START
-Vertical 9:16 smartphone video, a medium two-shot from a phone propped against a sugar jar on a small café
-table, slightly below eye level. Ishaan sits on the left and Sana on the right, side by side, both facing
-the lens, framed from the waist up.
+Absolutely no text of any kind appears on screen at any moment: no subtitles, no captions, no title, no brand
+name written anywhere. The word Draazy is only spoken, never shown. A clean raw phone video like the previous
+clips.
 
-Subjects:
-[@IshaanOutdoor] Ishaan (left), a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined jawline,
-short black hair that is textured and slightly messy on top with a low taper fade on the sides, neat
-light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears a teal (#14B8A6) cotton overshirt open over a plain white crew-neck
-t-shirt and a thin black digital watch.
-[@Sana] Sana (right), a 22-year-old Indian woman with a light-medium wheatish skin tone, a heart-shaped face,
-shoulder-length dark brown curly hair worn loose, round thin gold-wire glasses, expressive dark eyes, a
-tiny silver nose stud on the left side, slim build. She wears her coral (#FB923C) relaxed linen
-overshirt with rolled sleeves, open over a cream ribbed tank top.
+Vertical 9:16 video from a smartphone propped up on a café table at chest height, a static, locked-off shot. The
+camera does not move. [@IshaanOutdoor] Ishaan sits on the left and [@Sana] Sana sits on the right, side by side
+on the far side of the table, both framed from the waist up and facing the lens. Their hands rest on the table.
+No phone, phone stand or tripod anywhere on the table or in the frame.
 
-Action: The two friends sit with two glasses of cutting chai and a plate of bun maska on the table. Sana
-speaks first: she leans towards the lens and points at the camera on "Socho", sincere with a little
-smile. Ishaan finishes her sentence, nodding, then turns to the lens. At about 6 seconds Ishaan gives a
-confident half-smile and raises his eyebrows once on the final line, and Sana grins and lifts her chai
-glass slightly. Both hold their smiles until 8 seconds.
+Set (the attached set image r04-set; the same in every clip of this reel): a small café on FC Road, Pune, on a
+sunny afternoon. A light wooden table in the foreground with two white ceramic coffee cups. On the left side of
+the frame, a large glass window onto a tree-lined street with soft sunlight and blurred passers-by. On the right
+side of the frame, an exposed red-brick wall with a hanging green plant. A warm pendant lamp at the top of the
+frame. No menu boards, no signs, nothing readable anywhere. The background stays exactly the same for the whole
+clip. Match the attached reference frame exactly: the same camera distance and angle, the same background with
+every object in the same place, the same light and colour grade.
 
-Dialogue, lip-synced to the correct speaker, spoken once with no extra words:
-Sana (right), pointing at the lens: "Socho, ek app jo pehle dikha de ki lifestyle match hoti hai ya nahi..."
-Ishaan (left), finishing her thought: "...aur kaun verified hai. ड्राज़ी aa raha hai, Pune."
-Pronunciation: "ड्राज़ी" is the brand name Draazy, said DRAA-zee: two syllables, a long open "aa" as in "drama", stress on
-the first syllable, then a soft "zee". Ishaan says it slowly and clearly; it is the clearest word in the clip.
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. His face has clear, even skin with no moles, no beauty spots and no dark spots on his cheeks, taper fade,
+light stubble. The outfit stays the same for the whole clip. Sana looks exactly like her character image:
+shoulder-length dark brown curly hair worn loose, round thin gold-wire glasses, a tiny silver nose stud, a coral
+(#FB923C) linen overshirt with the sleeves rolled to the elbows, open over a cream ribbed tank top. Her outfit
+stays the same for the whole clip.
 
-Voices: every on-screen character uses their saved Flow character voice, which matches this description.
-Sana speaks in casual Hinglish with a soft Lucknowi Hindi accent: a young female voice, bright and
-clear, a medium-high pitch, confident and witty.
-Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
-mid-pitched, slightly husky, relaxed and conversational.
+Sana delivers the idea to the lens, pointing at the camera on "Socho". Then Ishaan says the sign-off while Sana
+smiles and nods along, silent. Both calm and hopeful, then confident. Not laughing, not grinning, not sad. Each
+line is spoken exactly once, nothing repeated, no other words.
+0.3-3.4 s, Sana, pointing at the lens: "Socho, vibe match aur KYC, milne se pehle."
+3.6-7.6 s, Ishaan into the lens with a confident half-smile, eyebrows raised once on "Draazy", a tiny nod on "Bahut jald", slowly and clearly: "Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai."
+7.6-8.0 s: silent, lips closed, Ishaan holds the half-smile into the lens.
 
-Setting: a busy, youthful café on FC Road, Pune, in the afternoon. A small wooden table, metal chairs,
-exposed brick and plants behind them, other young people softly out of focus, warm Edison bulbs, and a
-window letting in daylight. No readable menus, signs or café branding.
+Voice: Sana uses her saved Flow character voice: casual Hinglish with a soft Lucknowi Hindi accent, a young
+female voice, bright and clear, medium-high pitch, confident and witty. Ishaan uses his saved Flow character
+voice: a 22-year-old Indian college student speaking casual Hinglish with a natural Indian accent, clearly male
+and mid-pitched, conversational and fluent.
 
-Lighting and colour: soft daylight from the window on their faces, warm Edison bulbs in the background
-bokeh. Friendly, upbeat, warm. Subtle cool teal tint in the shadows, true warm skin tones, shallow depth
-of field.
+Lighting and colour: warm afternoon sunlight through the window on the left, soft fill from the brick wall, true
+warm skin tones. Authentic Instagram UGC shot on a phone, natural skin texture, no beauty filter.
 
-Camera feel: authentic Instagram UGC, a propped phone with a tiny natural wobble, phone autofocus,
-natural skin texture with no beauty filter, 30 fps.
+Audio: quiet café ambience, soft clinks of cups and a low murmur. No music.
 
-Audio: Ambient noise: café chatter, cups clinking, a coffee machine hissing faintly. No music.
-
-No subtitles, no captions, no on-screen text or graphics, no readable signs or menus, no logos, no
-watermark.
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
 PROMPT END
 
-ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
-  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
-  [ ] Ishaan matches @IshaanOutdoor: open teal overshirt on a white tee, taper fade, stubble, no moles
-  [ ] Sana matches @Sana: coral overshirt, curly shoulder-length hair, thin gold glasses, nose stud
-  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
-  [ ] the action in the prompt happens, in order, and nothing extra happens
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match r04-anchor side by side: wooden table + two white cups in the foreground; big street window on the LEFT; red-brick wall + hanging plant on the RIGHT; pendant lamp at the top; Ishaan left, Sana right
+  [ ] Sana says the tease, Ishaan says the sign-off; no swap (if swapped, regenerate, never edit)
+  [ ] "KYC" is spoken as the letters K-Y-C; "vibe match" as English words
+  [ ] no text on screen; "Draazy" said plainly, once, at about 5.5 s
 
-ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
-  [ ] every line spoken once, in order, with no added words
-  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
-  [ ] each line comes from the right person (speakers not swapped)
-  [ ] "Draazy" is clearly DRAA-zee (long "aa", two syllables), not "Dray-zee" or "Drazzy"
-  [ ] the voice matches the character's saved voice; no music
-
-IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
-  - "Draazy" mispronounced: regenerate unchanged once (ड्राज़ी already won the voice audition), then ask the user
-  - words dropped, added or swapped: regenerate unchanged once
-  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
-  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
-  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
-  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

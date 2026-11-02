@@ -1,3 +1,6 @@
+STATUS: NOT USED. The end card is local HTML with the real logo (brag-output\work\reels\ugc-r01), 0 credits.
+Do not generate this clip.
+
 REUSABLE END CARD: "THE DOOR OPENS" (generate once, use as the last 3 s of every reel)
 =====================================================================================
 JOB ID ............. end-card
@@ -42,6 +45,6 @@ IF REJECTED: regenerate unchanged once, then stop and ask the user.
 EDIT OVERLAY (CapCut)
   0.6 s after the door opens: the teal Draazy logo fades and scales in at centre (y around 820).
   "Draazy" in Outfit Bold 700, white, 96 pt, at y around 1050.
-  "Pune ka rental app" in Outfit Medium 500, white, 44 pt, at y around 1135.
+  "Rent · Buy · Sell · Agreements" in Outfit Medium 500, white, 44 pt, at y around 1135.
   "Coming soon" in Outfit SemiBold 600, Teal light #2DD4BF, 44 pt, at y around 1200.
   Optional: "Follow for launch" in Outfit Medium, white at 70%, 34 pt, at y around 1450.

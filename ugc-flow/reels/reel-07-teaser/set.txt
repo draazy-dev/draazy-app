@@ -1,0 +1,38 @@
+REEL 07 / SET IMAGE (0 credits)
+==========================
+JOB ID ............. r07-set
+WHY ................ every clip of the reel attaches this image so the place is the same in every clip (rule R1)
+FLOW SETTINGS
+  Type ............. Image
+  Model ............ Nano Banana 2 Lite
+  Aspect ratio ..... 9:16 portrait
+  Outputs .......... 2
+  Cost shown ....... 0 credits (anything else: stop and ask the user)
+INGREDIENTS ........ none (no character chips: the set must be empty)
+AFTER .............. the user picks one; rename it r07-set (or note its title in the ledger)
+
+PROMPT START
+Vertical 9:16 photorealistic photo, the eye-level view of a standing adult, looking straight across the empty
+terrace at the far parapet: a clean, well-kept rooftop terrace of a premium modern residential society in Pune at dusk: smooth
+freshly painted light-grey parapet, clean light-beige floor tiles, no stains, no damp patches, no clutter, no
+wires or hoses. A few large green plants in neat modern planters and two wooden deck chairs set back along the
+far parapet, the middle of the terrace open and empty. On the left side of the frame, the Pune skyline of
+mid-rise apartment buildings under an orange-pink sky. On the right side of the frame, a clean white water tank
+and a string of warm fairy lights along the terrace parapet. A low parapet wall at waist height behind them. Nothing
+readable anywhere. There are no people in the photo. Natural, slightly imperfect phone-camera look, true
+colours, everything in sharp focus.
+
+Lighting and colour: warm golden dusk light from the left, the fairy lights glowing softly, a cool blue sky
+turning darker, true warm colours.
+
+No phone, no phone stand, no tripod anywhere. No text, no signs, no logos, no watermark.
+PROMPT END
+
+CHECK BEFORE THE USER PICKS
+  [ ] skyline + orange-pink sky on the LEFT
+  [ ] white water tank + fairy lights on the RIGHT
+  [ ] clean, premium: fresh paint, clean tiles, no stains/clutter/hoses; planters + deck chairs at the far parapet
+  [ ] low parapet behind them
+  [ ] no phone, phone stand or tripod anywhere
+  [ ] Ishaan left, Sana right
+  [ ] empty of people, nothing readable; room left in the centre for the character(s)

@@ -1,75 +1,66 @@
-REEL 04 / CLIP 1 of 3 - HOOK
-============================
+REEL 04 / CLIP 1 of 3 - THE SCROLL
+==================================
 JOB ID ............. r04-c1
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r04-set picked by the user
 FLOW SETTINGS (check every line on screen before clicking Generate)
   Type ............. Video > Ingredients
   Model ............ Gemini Omni Flash 1.1
-  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Resolution ....... 720p (user-approved; download "720p Original size")
   Aspect ratio ..... 9:16 portrait
   Length ........... 8 s
   Outputs .......... 1
-CHARACTER CHIPS .... @Ishaan   (each [@Name] token in the prompt becomes a chip)
-EXTRA INGREDIENTS .. ishaan-room
-START FRAME ........ none
-USE IN EDIT ........ 0.0-7.0 s
+  Cost shown ....... 12 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor, @Sana   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r04-set (image)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 0.0-7.7 s)
 
 PROMPT START
-Vertical 9:16 smartphone video, a medium close-up from a phone propped on a desk about one metre away,
-framing Ishaan from mid-chest up as he lies propped against pillows on his bed, slightly off-centre.
+Vertical 9:16 video from a smartphone propped up on a café table at chest height, a static, locked-off shot. The
+camera does not move. [@IshaanOutdoor] Ishaan sits on the left and [@Sana] Sana sits on the right, side by side
+on the far side of the table, both framed from the waist up and facing the lens. Their hands rest on the table.
+No phone, phone stand or tripod anywhere on the table or in the frame.
 
-Composition: keep the top fifth of the frame as calm, uncluttered background (a text card is added
-there later) and keep the faces in the middle third of the frame.
+Set (the attached set image r04-set; the same in every clip of this reel): a small café on FC Road, Pune, on a
+sunny afternoon. A light wooden table in the foreground with two white ceramic coffee cups. On the left side of
+the frame, a large glass window onto a tree-lined street with soft sunlight and blurred passers-by. On the right
+side of the frame, an exposed red-brick wall with a hanging green plant. A warm pendant lamp at the top of the
+frame. No menu boards, no signs, nothing readable anywhere. The background stays exactly the same for the whole
+clip.
 
-Subject: [@Ishaan] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
-jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
-neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears his signature teal (#14B8A6) oversized heavyweight cotton hoodie over a
-plain white crew-neck t-shirt and a thin black digital watch. His phone has a matte teal case.
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. His face has clear, even skin with no moles, no beauty spots and no dark spots on his cheeks, taper fade,
+light stubble. The outfit stays the same for the whole clip. Sana looks exactly like her character image:
+shoulder-length dark brown curly hair worn loose, round thin gold-wire glasses, a tiny silver nose stud, a coral
+(#FB923C) linen overshirt with the sleeves rolled to the elbows, open over a cream ribbed tank top. Her outfit
+stays the same for the whole clip.
 
-Action: Ishaan holds his phone above his face with one hand, its screen facing him and away from the
-lens, thumb-scrolling endlessly and fast, his face lit by the screen. He looks from the phone to the
-lens with a dead, tired expression and speaks. On "Chaar sau log" he holds up four fingers of his free
-hand. On "'DM me'" he does slow, sarcastic air quotes with two fingers and lets his head drop back onto
-the pillow. From 6 to 8 seconds he stares at the ceiling, still scrolling, completely defeated.
+Ishaan talks to the lens, mildly let down and wry, like telling a friend a slightly annoying story: relaxed face,
+a small eye-roll and a faint wry half-smile. Only a little disappointed: not sad, not gloomy, not frowning, not
+laughing. Sana listens with a small knowing smirk and does not speak. Each line is spoken exactly once, nothing
+repeated, no other words. "दस" is the Hindi word for ten, said short and quick ("dus"), never stretched.
+0.3-3.4 s, Ishaan: "Flatmate ke liye maine दस groups join kiye."
+3.8-6.9 s, Ishaan, a tiny pause before the last words: "Teen hafte scroll kiya... ek bhi kaam ka nahi mila."
+6.9-8.0 s: silent, lips closed, Ishaan gives the lens a wry look with a faint half-smile; Sana presses her lips
+together to hide a smile.
 
-Dialogue, lip-synced, spoken once with no extra words:
-Ishaan, flat and tired: "'Pune Flatmates' group. Chaar sau log. Sabka message ek hi... 'DM me.'"
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking casual Hinglish
+with a natural Indian accent, clearly male and mid-pitched, conversational and fluent.
 
-Voice: every on-screen character uses their saved Flow character voice, which matches this description. Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
-mid-pitched, slightly husky, relaxed and conversational, with small deadpan pauses, close to the
-microphone like a phone recording.
+Lighting and colour: warm afternoon sunlight through the window on the left, soft fill from the brick wall, true
+warm skin tones. Authentic Instagram UGC shot on a phone, natural skin texture, no beauty filter.
 
-Setting: a small rented PG room in Wakad, Pune, at night. A cream wall, a white floating shelf lit by a
-thin indigo (#4F46E5) LED strip, a small plant, grey sheets, a crumpled teal throw, and a coral (#FB923C)
-cushion behind his head. A dark window shows the lit windows of neighbouring buildings.
+Audio: quiet café ambience, soft clinks of cups and a low murmur. No music.
 
-Lighting and colour: low, cosy night light. The indigo LED glow behind him, a warm bedside lamp, and the
-cool white glow of his phone screen lighting his face from below. Subtle cool teal tint in the shadows,
-true warm skin tones.
-
-Camera feel: authentic Instagram UGC, a static propped phone with a tiny natural wobble, phone
-autofocus, natural skin texture with no beauty filter, 30 fps.
-
-Audio: SFX: a stream of rapid phone notification pings and WhatsApp-style message pops, about one every
-half second, quiet but relentless. Ambient noise: a quiet room tone, a ceiling fan. No music.
-
-No subtitles, no captions, no on-screen text or graphics. The phone screen is never visible to the
-lens. No readable signs, no app logos, no watermark.
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
 PROMPT END
 
-ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
-  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
-  [ ] Ishaan matches @Ishaan: teal hoodie, taper fade, light stubble, clear skin with no moles
-  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
-  [ ] the action in the prompt happens, in order, and nothing extra happens
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match the set image: wooden table + two white cups in the foreground; big street window on the LEFT; red-brick wall + hanging plant on the RIGHT; pendant lamp at the top; Ishaan left, Sana right
+  [ ] only Ishaan speaks
+  [ ] "scroll" and "groups" are spoken as English words; "दस" is a short Hindi "dus", not a drawn-out "daaas"
+  [ ] Ishaan looks mildly let down and wry, not sad
+  [ ] after approval: save the anchor frame from the silent hold at the end (lips closed) as r04-anchor
 
-ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
-  [ ] every line spoken once, in order, with no added words
-  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
-  [ ] the voice matches the character's saved voice; no music
-
-IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
-  - words dropped, added or swapped: regenerate unchanged once
-  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
-  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
-  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
-  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

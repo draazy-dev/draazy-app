@@ -1,45 +1,75 @@
-REEL 04 - FLATMATES  ("Flatmate search = 400 strangers")
-=========================================================
+REEL 04 - FLATMATES  ("10 groups. Zero flatmates.")
+====================================================
 
-PAIN          Finding a flatmate means a 400-person WhatsApp group full of "DM me", and deposits sent to
-              people you've never met.
-DRAAZY TRUTH  Flatmate profiles show a living-style match, and people can carry a Verified badge.
-              (Verification is optional, so we say "kaun verified hai", not "sab verified".)
-CAST          Ishaan, Sana
-LENGTH        about 25 s  =  clip 1 (7 s) + clip 2 (7 s) + clip 3 (8 s) + end card (3 s)
-SETS          Clip 1: Ishaan's PG room. Clip 2: Sana's room. Clip 3: a café table on FC Road, afternoon.
+PAIN ............... Three pains, in order: (1) endless scrolling through Telegram/Facebook/WhatsApp flatmate
+                     groups with nothing useful; (2) the people you do find are total strangers, nothing verified;
+                     (3) you only learn after moving in that your habits don't match.
+DRAAZY TRUTH ....... Flatmates "vibe check": 12 quick taps on living habits (tidy, food, sleep, WFH, guests,
+                     visitors, smoking, drinks, pets, bills, family, quiet) give a match % on every post (frontend
+                     flatmates.json "12 quick taps · match % on every post"). People can carry a "KYC done" badge
+                     (optional, so "KYC-done log dikhte hain", never "sab verified"). Never name Telegram/Facebook/
+                     WhatsApp in a video prompt (Flow policy, lesson 261); only in the local overlay and caption.
+CAST ............... IshaanOutdoor (left), Sana (right); both on screen in every clip
+DESIGN ............. one set, one time of day, one outfit, one framing (00-CONTINUITY-RULES.txt R1).
+                     The tease and the spoken sign-off are inside the last clip; no separate sign-off clip.
+ORDER .............. set.txt (0 cr) -> clip-1 -> user approves -> save r04-anchor -> clip-2, clip-3 -> download 720p
+CREDITS ............ 18 base (3 x 6); one retake 6, one continuity edit 10 in reserve
+LENGTH ............. about 25 s = 3 clips trimmed to about 7.7 s + HTML end card (about 2 s). Trim points come from the audio envelope.
+
+SET (byte-identical in every clip prompt)
+  a small café on FC Road, Pune, on a sunny afternoon. A light wooden table in the foreground with two white
+  ceramic coffee cups. On the left side of the frame, a large glass window onto a tree-lined street with soft
+  sunlight and blurred passers-by. On the right side of the frame, an exposed red-brick wall with a hanging green
+  plant. A warm pendant lamp at the top of the frame. No menu boards, no signs, nothing readable anywhere.
+  Landmarks to check: wooden table + two white cups in the foreground; big street window on the LEFT; red-brick wall + hanging plant on the RIGHT; pendant lamp at the top; Ishaan left, Sana right
 
 HOOK
-  On screen (0.0-2.5 s):   Flatmate search = 400 strangers         ("strangers" in Coral #FB923C)
-  Spoken:                  "'Pune Flatmates' group. Chaar sau log."
+  On screen (0.0-2.5 s): 10 groups. Zero flatmates.   ("Zero" in Coral #FB923C)
 
-SCRIPT
-  TIME        SHOT                                         DIALOGUE (Hinglish)                              OVERLAY
-  0.0-7.0     CLIP 1. Ishaan on his bed, thumb-scrolling   ISHAAN: "'Pune Flatmates' group. Chaar sau        Hook card
-              endlessly, deadpan to camera.                 log. Sabka message ek hi... 'DM me.'"
-  7.0-14.0    CLIP 2. Sana in her room, selfie, like a      SANA: "Pichli baar maine bina mile deposit        9.0: "Deposit sent. Flatmate: gone 👻"
-              reply to his video.                           bhej diya tha. Banda aaj tak offline hai."
-  14.0-22.0   CLIP 3. Caf? two-shot, both to camera.       SANA: "Socho, ek app jo pehle dikha de ki        17.0: "Lifestyle match. Verified badge."
-                                                           lifestyle match hoti hai ya nahi..."             ("match" in Teal light)
-                                                           ISHAAN: "...aur kaun verified hai. Draazy aa     20.0: pill "Draazy · Pune ka rental app"
-                                                           raha hai, Pune."
-  22.0-25.0   END CARD                                     (latch click + whoosh)                           Logo + "Draazy" + "Pune ka rental app"
-                                                                                                            + "Coming soon"
+DIALOGUE (the timed lines in the clip prompts; Hinglish)
+  CLIP 1  (pain 1: endless scrolling)
+    Tone: mildly let down and wry (faint half-smile, small eye-roll), never sad.
+    0.3-3.4 s, Ishaan: "Flatmate ke liye maine दस groups join kiye."   (दस = Hindi ten, short "dus")
+    3.8-6.9 s, Ishaan, a tiny pause before the last words: "Teen hafte scroll kiya... ek bhi kaam ka nahi mila."
+    6.9-8.0 s: silent, lips closed, Ishaan gives the lens a wry look with a faint half-smile; Sana presses her lips together to hide a smile.
+  CLIP 2  (pains 2 + 3: strangers, habits)
+    0.3-3.6 s, Sana: "Aur jo mile, sab anjaan log, kuch bhi verified nahi."
+    4.0-6.8 s, Sana, a flat shrug: "Upar se, woh early bird, main night owl."
+    6.8-8.0 s: silent, lips closed; Sana raises one eyebrow, Ishaan gives a deadpan stare into the lens.
+  CLIP 3  (the fix + standard sign-off)
+    0.3-3.4 s, Sana, pointing at the lens: "Socho, vibe match aur KYC, milne se pehle."
+    3.6-7.6 s, Ishaan into the lens with a confident half-smile, eyebrows raised once on "Draazy", a tiny nod on "Bahut jald", slowly and clearly: "Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai."
+    7.6-8.0 s: silent, lips closed, Ishaan holds the half-smile into the lens.
+
+CLIPS
+  clip-1.txt  THE SCROLL                 chips @IshaanOutdoor, @Sana        use 0.0-7.7 s (reel 0.0-7.7 s)
+  clip-2.txt  STRANGERS + HABITS         chips @IshaanOutdoor, @Sana        use 0.0-7.7 s (reel 7.7-15.4 s)
+  clip-3.txt  TEASE + SIGN-OFF           chips @IshaanOutdoor, @Sana        use 0.0-7.7 s (reel 15.4-23.1 s); the HTML end card follows
+
+OVERLAYS (reel time, added at local assembly; approximate until trims are measured)
+  0.0-2.5 hook card
+  3.5 "Telegram. Facebook. WhatsApp. 🔁" (scroll fatigue, while Ishaan says "Teen hafte scroll kiya")
+  7.7 "Anjaan log. Zero verified. ❌" ("Zero" in Coral)
+  11.3 "🌅 Early bird  vs  🦉 Night owl"
+  15.6 two chips, one after the other: "🎯 Vibe match on 12 habits" then "✔ KYC done" ("Vibe" and "KYC" in Teal light)
+  ~19.0 pill "Draazy · Rent · Buy · Sell · Agreements" on the spoken "Draazy"
+  end card: local HTML (logo + "Draazy" + "Direct hai, easy hai, Draazy hai" + "Rent · Buy · Sell · Agreements" + "Coming soon"), 0 credits; template
+  brag-output\work\reels\ugc-r02. The Flow door clip (00-end-card-door.txt) is not used.
 
 CAPTION
-  400 log. 400 "DM me". Zero info. 😵‍💫
-  Aur kabhi kabhi deposit bhi gayab, flatmate bhi.
-  Draazy aa raha hai, Pune ka apna rental app. Follow karo, launch pe sabse pehle pata chalega.
-  Apne flatmate ko tag karo jo "vibe match" test pass karta 👇
+  10 groups. 3 hafte scroll. Zero kaam ka flatmate. 😵‍💫
+  Jo mile, sab anjaan. Aur habits ka pata shift karne ke baad chalta hai.
+  Draazy pe 12 quick taps ka vibe check, har post pe match %, aur KYC-done log alag dikhte hain.
+  Direct hai, easy hai, Draazy hai. Pune ka apna property app (rent, buy, sell, aur agreements), bahut jald launch ho raha hai. Follow karo, launch pe sabse pehle pata chalega.
+  Tag karo us flatmate ko jo early bird hai ya night owl 👇
 
 HASHTAGS
-  #Pune #FlatmatesPune #FlatmateWanted #PuneRent #RoommateLife #PG #PuneLife #Baner #Draazy #ComingSoon
+  Instagram (max 5): #FlatmatesPune #PuneRent #RoommateLife #PuneLife #Draazy
+  Facebook: #Pune #PuneRent #Draazy
 
 EDIT NOTES
-  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
-    holds into the end card. "Draazy" in captions is always Teal light.
-  - Clip 2 works best styled like a stitch/reply: put a small rounded 20% opacity card of clip 1's last
-    frame in the top-left for the first 1 s.
-  - Clip 3 has two speakers. If Flow swaps who speaks, regenerate rather than fix it in the edit.
-
-QA  hook opens with a fact | 2 beats (strangers, the fix) | no overclaim on verification | about 25 s
+  - The "Draazy · Rent · Buy · Sell · Agreements" pill appears on the spoken "Draazy" and holds into the end card.
+    "Draazy" in captions is always Teal light.
+  - Two speakers per clip is the main risk: check who speaks before anything else.
+  - Both characters are in every clip, so the set never changes.
+  - One speaker in clips 1 and 2; the only hand-over is in clip 3 (Sana, then Ishaan).

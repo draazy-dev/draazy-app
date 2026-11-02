@@ -42,16 +42,17 @@ PROMPT END
 
 FLOW CHARACTER (left panel > Characters > New Character)
   Name ........... BrokerBhaiya
-  Images ......... broker-hero
+  Images ......... broker-hero, tile 1 "Man holding keys" (image 9a2d3a22); saved as the character
+                   image f9e208e8. SAVED in Flow.
   Character info . Mid-40s Pune property broker. Charming, pushy, harmless; says "sir" in every sentence.
-  Voice: Create New Voice
-    Base voice ......... the user picks a deep, middle-aged male preset.
-    Name ............... Broker Voice
-    Voice performance .. A man in his mid-40s from Pune, India, speaking fast, overly sweet salesman
-                         Hinglish with a Marathi-tinged Hindi accent. Deep, slightly raspy, always smiling
-                         through the voice, confident and unbothered. Never an American or British accent.
-    Sample dialogue .... Sir, ekdum mast option hai sir. Bas aaj hi dekh lo, kal nahi milega.
-    Sync, the USER approves, Save New Voice > Add to Character.
+  Voice: "Sadachbia custom" (made and approved by the user, attached)
+    Voice performance .. A 45-year-old Indian man from Pune, a property broker, speaking fast, overly
+                         sweet salesman Hinglish with a Marathi-tinged Hindi accent. A deep, slightly
+                         raspy, mature male voice, always smiling through the voice, confident and
+                         unbothered, saying "sir" warmly in every sentence. Never an American or British
+                         accent.
+    Sample dialogue .... Sir, Wakad mein ekdum mast 1BHK hai sir! Bas aaj hi dekh lo sir, kal tak chala
+                         jayega.
   The chip is used only where he is on camera (reel 2). In reels 1 and 3 he is only a voice on
   speakerphone, so those prompts describe his voice in text and do NOT use the chip (a chip could put
   him in the frame).

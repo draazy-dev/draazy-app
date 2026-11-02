@@ -1,48 +1,79 @@
-REEL 03 - FAKE LISTING  ("Photo vs reality: Pune edition")
-==========================================================
+REEL 03 - FAKE OWNER  ("Owner asli tha... ya nahi?")
+====================================================
 
-PAIN          The bright flat in the photos "just got rented". You travelled an hour to be shown a damp one.
-DRAAZY TRUTH  Owners are KYC-checked, and their ownership papers are checked before a listing goes live.
-              (Teased, not shown.)
-CAST          Ishaan (outdoor variant), Broker Bhaiya (voice only, on speakerphone)
-LENGTH        about 24 s  =  clip 1 (7 s) + clip 2 (6 s) + clip 3 (8 s) + end card (3 s)
-SETS          Clip 1: back seat of an auto-rickshaw in Pune traffic, daytime. Clip 2: a dim, damp, bare
-              flat. Clip 3: a Pune street at dusk.
+PAIN ............... A so-called owner shows the flat, promises the agreement tomorrow, then goes silent. He was never the
+                     owner. You can't tell a real owner from a fake one before you commit.
+DRAAZY TRUTH ....... Two separate checks, both done by a Draazy reviewer (frontend home FAQ, OwnershipEvidenceTypes):
+                     1. KYC done: the owner photographs a government ID (Aadhaar, PAN or driving licence) with a live
+                        selfie, and a reviewer decides.
+                     2. Verified property: the owner uploads ownership papers (Index II, 7/12, property card or share
+                        certificate; for rentals also a tax receipt or electricity bill), and a reviewer checks them.
+                     Never claim: photos checked against the real flat, "100% genuine", guaranteed title, or that
+                     Draazy stops every scam. The badges mean a reviewer checked the ID and sighted the papers.
+CAST ............... IshaanOutdoor
+DESIGN ............. one set, one time of day, one outfit, one framing (00-CONTINUITY-RULES.txt R1).
+                     The tease and the spoken sign-off are inside the last clip; there is no separate sign-off clip.
+ORDER .............. set.txt (0 cr) -> clip-1 -> user approves -> save r03-anchor -> clip-2, clip-3 -> download 720p
+CREDITS ............ 18 base (3 x 6); one retake (6) and one continuity edit (10) in reserve
+LENGTH ............. about 25 s = 3 clips trimmed to about 7.7 s, plus the HTML end card (about 2 s). Trim points come from
+                     the audio envelope.
+
+SET (byte-identical in every clip prompt)
+  a clean, quiet road just outside the entrance of a premium township in Pune, on a bright
+  sunny morning. On the left side of the frame, the closed modern entrance gate in brushed steel and glass, set
+  in a light stone entrance wall that is completely plain, with no sign, no letters and no logo, with a
+  small white security cabin beside the gate, the cabin empty. Behind the gate, tall slender white residential
+  towers with white balcony bands and thin bronze vertical strips rise into a clear blue sky above a landscaped
+  podium, with palms and dense green trees at their base. On the right side of the frame, a neat row of parked
+  two-wheelers along a clean footpath lined with mature trees. There is no readable text anywhere: no signs, no number plates readable, no text.
+  Landmarks to check: closed steel-and-glass gate in a plain light stone wall (no sign) + empty white security cabin on the LEFT; tall white towers with bronze vertical strips behind it; parked two-wheelers + footpath trees on the RIGHT; bright morning sun, clear blue sky; no readable text anywhere
 
 HOOK
-  On screen (0.0-2.5 s):   Photo vs reality: Pune edition         ("reality" in Coral #FB923C)
-  Spoken:                  "Yeh flat dekho. Balcony, sunlight, ekdum mast."
+  On screen (0.0-2.5 s): Owner asli tha... ya nahi?   ("asli" in Coral #FB923C)
 
-SCRIPT
-  TIME        SHOT                                         DIALOGUE (Hinglish)                              OVERLAY
-  0.0-7.0     CLIP 1. Selfie in an auto, excited. He       ISHAAN: "Yeh flat dekho. Balcony, sunlight,       Hook card
-              shows his phone to the lens (screen just      ekdum mast. Ek ghanta auto mein, dekhne ja
-              a bright blur).                               raha hoon."
-  7.0-13.0    CLIP 2. Inside a damp, dim flat. Phone on     BROKER (speaker): "Sir, woh wala toh kal hi       9.0: "Expectation: balcony. Reality: seelan."
-              speaker. He pans to a damp wall and back.     chala gaya. Yeh bhi same hai sir."
-                                                           ISHAAN (deadpan): "Same?"
-  13.0-21.0   CLIP 3. Walking on the street at dusk,       ISHAAN: "Socho, ek app jahan har listing ke      16.0: "Verified owners. Real papers."
-              to camera.                                   peeche KYC wala asli owner ho, aur papers        ("Verified" in Teal light)
-                                                           checked." (half-smile) "Draazy aa raha hai,      19.0: pill "Draazy · Pune ka rental app"
-                                                           Pune."
-  21.0-24.0   END CARD                                     (latch click + whoosh)                           Logo + "Draazy" + "Pune ka rental app"
-                                                                                                            + "Coming soon"
+DIALOGUE (the timed lines in the clip prompts; Hinglish)
+  CLIP 1
+    0.3-3.6 s, flatly: "Owner ne flat dikhaya, bola kal agreement karte hain."
+    4.0-7.0 s, one eyebrow raised: "Kal gaya. Ab us owner ka number hi bandhh hai."
+    7.0-8.0 s: silent, lips closed, a deadpan stare into the lens.
+  CLIP 2
+    0.3-3.6 s, flatly: "Pata chala, woh owner tha hi nahi, flat kisi aur ka hai."
+    4.0-7.2 s, slower: "Asli owner kaun hai, yeh pehle kaise pata chale?"
+    7.2-8.0 s: silent, lips closed, one slow blink into the lens.
+  CLIP 3
+    0.3-3.4 s, leaning slightly closer, voice lower and hopeful: "Socho, owner ka KYC done, aur property ke papers checked."
+    3.6-7.6 s, Ishaan into the lens with a confident half-smile, eyebrows raised once on "Draazy", a tiny nod on "Bahut jald", slowly and clearly: "Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai."
+    7.6-8.0 s: silent, lips closed, Ishaan holds the half-smile into the lens.
+
+CLIPS
+  clip-1.txt  THE HOOK                   chips @IshaanOutdoor               use 0.0-7.7 s (reel 0.0-7.7 s)
+  clip-2.txt  THE REVEAL                 chips @IshaanOutdoor               use 0.0-7.7 s (reel 7.7-15.4 s)
+  clip-3.txt  TEASE + SIGN-OFF           chips @IshaanOutdoor               use 0.0-7.7 s (reel 15.4-23.1 s); the HTML end card follows
+
+OVERLAYS (reel time, added at local assembly; approximate until trims are measured)
+  0.0-2.5 hook card
+  4.4 "Flat dekha ✅  Owner gayab ❌"
+  11.8 "Asli owner kaun? 🤔"
+  15.8 two badge chips, one after the other: "✔ KYC done" then "✔ Verified property" ("KYC" and "Verified" in Teal light)
+  ~19.0 pill "Draazy · Rent · Buy · Sell · Agreements" on the spoken "Draazy"
+  end card: local HTML (logo + "Draazy" + "Direct hai, easy hai, Draazy hai" + "Rent · Buy · Sell · Agreements" + "Coming soon"), 0 credits; template
+  brag-output\work\reels\ugc-r02. The Flow door clip (00-end-card-door.txt) is not used.
 
 CAPTION
-  Photo mein balcony, sunlight, sab kuch. 🌤️
-  Reality mein "sir woh toh kal chala gaya, yeh dekh lo". 🫥
-  Ek ghanta auto ka, aur ek aur weekend gaya.
-  Draazy aa raha hai, Pune ka apna rental app. Follow karo, launch pe pata chalega.
-  Tumhara worst "photo vs reality" kya tha? Comment karo 👇
+  "Kal agreement karte hain." Kal gaya. Owner gayab. 🫥
+  Baad mein pata chala, woh owner tha hi nahi.
+  Draazy pe har owner ka KYC hota hai, aur property ke papers bhi check hote hain.
+  Direct hai, easy hai, Draazy hai. Pune ka apna property app (rent, buy, sell, aur agreements), bahut jald launch ho raha hai. Follow karo, launch pe sabse pehle pata chalega.
+  Kabhi kisi "owner" ne tumhe bhi aise ghost kiya? Comment karo 👇
 
 HASHTAGS
-  #Pune #PuneRent #FakeListing #FlatHuntingPune #PhotoVsReality #PuneLife #RentInPune #Draazy #ComingSoon
+  Instagram (max 5): #PuneRent #RentalScam #FlatHuntingPune #PuneRealEstate #Draazy
+  Facebook: #Pune #PuneRent #Draazy
 
 EDIT NOTES
-  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
-    holds into the end card. "Draazy" in captions is always Teal light.
-  - Clip 1 is bright and saturated; clip 2 is dim and desaturated. Let the colour change sell the joke.
-  - Optional: a 0.3 s record-scratch SFX at the cut from clip 1 to clip 2.
-  - Hold 0.5 s on "Same?" before cutting.
-
-QA  hook opens with "Yeh", not "I" | 2 beats | no stated conclusion | no invented stats | about 24 s
+  - The "Draazy · Rent · Buy · Sell · Agreements" pill appears on the spoken "Draazy" and holds into the end card.
+    "Draazy" in captions is always Teal light.
+  - Badge chip wording matches the app exactly: "KYC done" and "Verified property".
+  - No money in the story: no token, advance or payment is spoken or shown (three r03-c1 takes with the
+    token-advance lines were blocked by Flow's policy filter). No prices in the series.
+  - No phone, money or second person on screen; the scam is told, not shown.

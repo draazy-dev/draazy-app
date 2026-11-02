@@ -1,79 +1,70 @@
-REEL 02 / CLIP 2 of 3 - THE FEE
-===============================
+REEL 02 / CLIP 2 of 3 - THE LIGHT SWITCH
+========================================
 JOB ID ............. r02-c2
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r02-c1 approved by the user AND r02-anchor saved
 FLOW SETTINGS (check every line on screen before clicking Generate)
   Type ............. Video > Ingredients
   Model ............ Gemini Omni Flash 1.1
-  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Resolution ....... 360p (download the approved take at 720p for 0 credits)
   Aspect ratio ..... 9:16 portrait
   Length ........... 8 s
   Outputs .......... 1
-CHARACTER CHIPS .... @IshaanOutdoor, @BrokerBhaiya   (each [@Name] token in the prompt becomes a chip)
-EXTRA INGREDIENTS .. none
-START FRAME ........ none
-USE IN EDIT ........ 0.0-7.0 s
+  Cost shown ....... 6 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor, @BrokerBhaiya   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r02-set (image) + r02-anchor (saved frame of the approved clip 1)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 7.7-15.4 s)
 
 PROMPT START
-Vertical 9:16 selfie video, shot on the front camera of a smartphone held at arm's length by Ishaan. A
-medium two-shot: Ishaan's face in the lower left of the frame, close to the lens, and Broker Bhaiya
-standing one step behind him to the right, in sharp focus, in the doorway of an empty flat.
+Vertical 9:16 smartphone selfie video, a close-up from a phone held at arm's length at eye level, framing
+[@IshaanOutdoor] Ishaan from mid-chest up in the centre of the frame. Both his hands are out of frame. The
+camera distance and angle stay the same for the whole clip.
 
-Subject: [@IshaanOutdoor] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
-jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
-neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build, wearing a teal (#14B8A6) cotton overshirt open over a plain white crew-neck
-t-shirt.
+Set (the attached set image r02-set; the same in every clip of this reel): the common corridor of a residential
+society building in Wakad, Pune, on a weekday afternoon. On the left side of the frame, the doorway of an empty
+flat with its brown wooden door swung fully open inward, a white plastic switchboard on the wall just inside the
+doorway, and a bare, empty room beyond. On the right side of the frame, the corridor continues past
+cream-painted walls to a window at its far end, bright with daylight. Grey speckled floor tiles. A green potted
+plant beside the next flat's closed door on the right. No signs, no nameplates, nothing readable anywhere. The
+background stays exactly the same for the whole clip. Match the attached reference frame exactly: the same
+camera distance and angle, the same background with every object in the same place, the same light and colour
+grade.
 
-Second character: [@BrokerBhaiya] Broker Bhaiya, an Indian man in his mid-40s with a medium-brown skin tone, a round
-friendly face, a thick neatly trimmed black moustache, short black hair combed back with a receding
-hairline and grey at the temples, a slightly heavy build, wearing a half-sleeve blue-and-white checked
-cotton shirt tucked into dark grey trousers, with a black Bluetooth earpiece in his right ear, holding a
-large ring of keys.
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. Clear skin with no moles, taper fade,
+light stubble. The outfit stays the same for the whole clip. Broker Bhaiya looks exactly like his character
+image: a half-sleeve blue-and-white checked shirt, a thick black moustache, short hair with grey at the temples,
+a black Bluetooth earpiece in his right ear, and a big ring of keys in one hand.
 
-Action: At 0 seconds Broker Bhaiya reaches to the wall switchboard and flicks the light on; a plain tube
-light flickers and comes on over the bare room. He turns to Ishaan's camera with a big, satisfied,
-salesy smile, gestures grandly at the empty room with the keys, and speaks cheerfully as if it's
-nothing. While he talks, Ishaan stays in the foreground, slowly forcing a polite, frozen half-smile and
-then looking straight into the lens with dead eyes. From 5.5 to 8 seconds the broker keeps smiling and
-nodding while Ishaan holds his frozen, awkward smile at the camera.
+Behind him on the left, [@BrokerBhaiya] Broker Bhaiya steps into the doorway, flicks the white switchboard so
+the ceiling light of the empty room turns on, then turns to Ishaan's camera with a big salesman smile and
+speaks. Ishaan stays in the foreground, silent, with a frozen polite half-smile while the broker talks, then
+looks back into the lens and whispers. Ishaan: Not laughing, not grinning, not sad. Each line is spoken exactly
+once, nothing repeated, no other words.
+0.3-1.2 s: the broker flicks the switch; the room light comes on.
+1.3-4.8 s, Broker Bhaiya, loud and sweet: "Sir, dekh liya na? Brokerage ek mahine ka rent, sir. Standard hai."
+5.1-7.2 s, Ishaan, whispering, deadpan into the lens: "Light on karne ke pachees hazaar?"
+7.2-8.0 s: silent, lips closed, Ishaan's frozen half-smile into the lens.
 
-Dialogue, lip-synced for Broker Bhaiya, spoken once with no extra words; Ishaan says nothing:
-Broker Bhaiya, warm and fast: "Sir, dekh liya na? Brokerage ek mahine ka rent. Standard hai sir."
+Voice: Broker Bhaiya uses his saved Flow character voice: fast, overly sweet salesman Hinglish with a
+Marathi-tinged Pune Hindi accent, a deep, slightly raspy male voice in his mid-40s, smiling through the voice,
+saying "sir" a lot. Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking
+casual Hinglish with a natural Indian accent, clearly male and mid-pitched, conversational and fluent. He
+whispers close to the microphone, every word still clear.
 
-Voice: every on-screen character uses their saved Flow character voice, which matches this description. Broker Bhaiya speaks fast, overly sweet salesman Hinglish with a Marathi-tinged Pune Hindi accent:
-a deep, slightly raspy male voice in his mid-40s, saying "sir" with a smile, confident and unbothered.
+Lighting and colour: soft, even daylight from the corridor window on the right, a slightly cool white tube light
+overhead, true warm skin tones, clean whites. Authentic Instagram UGC shot on a phone, natural skin texture, no
+beauty filter.
 
-Setting: the doorway and living room of an empty, unfurnished 2BHK flat in a Wakad society. Bare white
-walls, a beige vitrified-tile floor, a plain switchboard by the door, one tube light, a sliding window
-with a grille showing other buildings outside. Clean but completely empty.
+Audio: a quiet residential corridor, faint distant traffic. No music.
 
-Lighting and colour: soft daylight from the window, then the cool white tube light flickering on and
-adding a flat overhead light. Slightly harsh and ordinary. Subtle cool teal tint in the shadows, true
-warm skin tones.
-
-Camera feel: authentic Instagram UGC front-camera selfie, slight wide-angle look, natural handheld
-micro-shake, phone autofocus, no beauty filter, 30 fps.
-
-Audio: SFX: a loud plastic switch click, a tube light humming and ticking as it flickers on, keys
-jangling as he gestures. Ambient noise: an echoey empty room, faint traffic outside. No music.
-
-No subtitles, no captions, no on-screen text or graphics, no readable signs, no logos, no watermark.
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
 PROMPT END
 
-ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
-  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
-  [ ] Ishaan matches @IshaanOutdoor: open teal overshirt on a white tee, taper fade, stubble, no moles
-  [ ] Broker Bhaiya matches @BrokerBhaiya
-  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
-  [ ] the action in the prompt happens, in order, and nothing extra happens
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match r02-anchor side by side: open brown wooden door + doorway on the LEFT; white switchboard just inside the doorway; corridor + bright window at the far end on the RIGHT; green potted plant on the right; grey speckled floor tiles
+  [ ] the room light visibly turns on
+  [ ] the broker speaks first, Ishaan second; no voice swap
 
-ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
-  [ ] every line spoken once, in order, with no added words
-  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
-  [ ] the voice matches the character's saved voice; no music
-
-IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
-  - words dropped, added or swapped: regenerate unchanged once
-  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
-  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
-  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
-  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

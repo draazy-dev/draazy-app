@@ -2,23 +2,27 @@ DRAAZY PRE-LAUNCH UGC REELS (GOOGLE FLOW) - BRAND KIT + HOW TO USE
 =====================================================================
 
 GOAL
-Seven 9:16 hype reels, 22-25 s each, for Pune renters aged 15-30. They show the pain of renting in
-Pune and tease that a fix is coming. No app screens, no product demo, no "I used Draazy" testimonials
+Seven 9:16 hype reels, 22-25 s each, for Pune renters, buyers and owners aged 15-30. Draazy is Pune's
+property app for the whole journey: rent, buy, sell and services such as the rent agreement. The reels
+show the pain of finding and managing a home in Pune and tease that a fix is coming. No app screens, no product demo, no "I used Draazy" testimonials
 (the app is not live yet). Each reel names Draazy and says what it fixes, in words only.
 Every reel ends with the same line and the same end card so the series
 feels like one campaign.
 
-Series sign-off line (spoken by the character):  "Draazy aa raha hai, Pune."   (Draazy = DRAA-zee)
-End card text:                                    Draazy  |  Pune ka rental app  |  Coming soon
+Tagline:                                          "Direct hai, easy hai, Draazy hai"
+Series sign-off line (spoken by the character):  "Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai."
+                                                  Reels 1-2 (done) said "Draazy. Pune ka apna rental app. Bahut jald launch ho raha hai."
+                                                  Reel 1: the shared clip reels\00-signoff.txt. Reels 2-7: inside the last clip. Never add a pronunciation hint.
+End card text:                                    Draazy  |  Direct hai, easy hai, Draazy hai  |  Rent · Buy · Sell · Agreements  |  Coming soon
 
 
 HOW DRAAZY IS INTRODUCED (without showing a single app screen)
   1. The "socho" line: every reel's last clip says "Socho, ek app jahan..." plus the one real feature
      that fixes that reel's pain. Viewers learn it's an app and what it does.
-  2. The name, spoken: the sign-off "Draazy aa raha hai, Pune." Same line, every reel.
-  3. Lower-third pill under the sign-off: "Draazy · Pune ka rental app", Outfit SemiBold 600, 40 pt,
+  2. The name, spoken: the sign-off "Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai." Same line, reels 3-7.
+  3. Lower-third pill under the sign-off: "Draazy · Rent · Buy · Sell · Agreements", Outfit SemiBold 600, 40 pt,
      white on an Ink #0F0D1A pill at 85%, "Draazy" in Teal light #2DD4BF, at y around 1380.
-  4. The end card: the door opening plus the real logo (see reels\00-end-card-door.txt).
+  4. The end card: local HTML with the real logo (about 2 s; template brag-output\work\reels\ugc-r02).
   5. Captions write "Draazy" in Teal light every time it's said.
   6. Post caption ends with the handle: @<draazy-handle> (fill in the real handle; don't invent one).
   No app screens, mock-ups or UI in any shot: a phone screen is either turned away or an unreadable blur.
@@ -32,7 +36,9 @@ FOLDER MAP
   characters\02-sana.txt            Supporting character (reels 4 and 7)
   characters\03-broker-bhaiya.txt   Comic antagonist (reels 1, 2, 3; on camera only in reel 2)
   reels\00-test-voice-and-name.txt  4 s test clip: checks the face, voice and "Draazy" before any spend
-  reels\00-end-card-door.txt        Reusable end-card clip (generate once, use in all 7 reels)
+  reels\00-CONTINUITY-RULES.txt     READ FIRST before any generation: one set per reel, look lock, anchor frame
+  reels\00-end-card-door.txt        NOT USED (the end card is local HTML)
+  reels\reel-NN-<topic>\set.txt     The reel's set image (0 credits), attached to every clip of the reel
   reels\reel-NN-<topic>\script.txt  Full script, timings, overlays, caption, hashtags, edit notes
   reels\reel-NN-<topic>\clip-N.txt  One Google Flow job per clip: settings, prompt, accept checks
   renders\                          approved 720p downloads (created by the runbook)
@@ -64,15 +70,14 @@ FONT
   CapCut desktop: Text > Font > Upload, install Outfit 500, 600 and 700.
   Hook text:      Outfit SemiBold 600, 64-72 pt, sentence case, max 2 lines, max 40 characters a line
   Captions:       Outfit Medium 500, 44-48 pt, white, key word in Teal light #2DD4BF
-  End card:       Outfit Bold 700 for "Draazy", Outfit Medium 500 for "Pune ka rental app",
+  End card:       Outfit Bold 700 for "Draazy", Outfit SemiBold 600 for "Direct hai, easy hai, Draazy hai",
+                  Outfit Medium 500 for "Rent · Buy · Sell · Agreements",
                   Outfit SemiBold 600 for "Coming soon"
 
 LOGO
   An outlined, rounded "D" with an open door standing inside it (frontend/src/components/brand/LogoMark.jsx).
   Export it as a teal #14B8A6 PNG/SVG for the end card. Never ask Flow to draw the logo; AI video
   garbles logos and text. Always overlay the real logo in the edit.
-  The end-card clip (a door swinging open into teal light) is a live-action echo of the logo,
-  so viewers connect "door opening" with Draazy.
 
 
 BRAND VIBE INSIDE THE AI FOOTAGE (already written into every prompt)
@@ -94,14 +99,14 @@ EDIT RULES (CapCut or Instagram editor)
   Captions (whole reel): auto-captions in Hinglish, Roman script, edited by hand for spelling.
     Outfit Medium, white with a soft 40% black shadow, max 2 lines, centred at y 1250-1450.
     Highlight one word a line in Teal light.
-  End card (last 3 s): the door clip, plus the real teal logo fading in at centre (scale 0.9 to 1.0,
-    0.4 s), "Draazy" in Outfit Bold white 96 pt under it, "Pune ka rental app" in Outfit Medium
-    white 44 pt, "Coming soon" in Teal light 44 pt. Optional small line at y 1450: "Follow for launch".
-  Sign-off: the "Draazy · Pune ka rental app" lower-third pill (see HOW DRAAZY IS INTRODUCED) appears
+  End card (last ~2 s, local HTML on Ink #0F0D1A): the real teal logo fading in at centre (scale 0.9 to 1.0,
+    0.4 s), "Draazy" in Outfit Bold white 96 pt under it, "Direct hai, easy hai, Draazy hai" in Outfit SemiBold white
+    52 pt, "Rent · Buy · Sell · Agreements" in Outfit Medium white 40 pt, "Coming soon" in Teal light 44 pt. Optional small line at y 1450: "Follow for launch".
+  Sign-off: the "Draazy · Rent · Buy · Sell · Agreements" lower-third pill (see HOW DRAAZY IS INTRODUCED) appears
     as Ishaan says "Draazy" and stays until the end card.
   Sound: keep Flow's native dialogue and ambience (every prompt says "no music").
     Add one trending, low-volume track in Instagram, ducked to about -18 dB under the voice.
-    End card: a soft whoosh plus a latch click (the door clip already makes them).
+    End card: send-whoosh-up, impact-soft-1 and pop-1 (brag-output\work\reels\ugc-r01\sfx-cues.json).
   Cut tight: drop every frame of silence before the first word. The first spoken word should land by 0.3 s.
 
 
@@ -120,9 +125,8 @@ GOOGLE FLOW WORKFLOW (credit-saving plan, Google AI Pro)
 
   If Hinglish words come out wrong: rewrite only those words in Devanagari inside the same quotes,
   e.g. "Ek flat pe enquiry ki thi" becomes "एक flat पे enquiry की थी".
-  Spoken brand name: every dialogue line writes it as ड्राज़ी (Devanagari). In the voice audition Flow said
-  that DRAA-zee correctly, while "Draazy", "Draa-zee", "Drah-zee", "Drahzee" and "Dra-zee" all came out wrong.
-  Captions, the pill and the end card still read "Draazy".
+  Spoken brand name: dialogue writes plain "Draazy" with no pronunciation hint (a hint made it
+  "Drauzzy"). With "Rasalgethi custom" it comes out right (user-checked). Captions always read "Draazy".
   If Flow burns in subtitles anyway: regenerate. The prompts already ask for no text on screen.
   If the voice drifts: fix the saved character voice, not the prompt.
 
@@ -131,8 +135,13 @@ CONTENT RULES (pre-launch honesty)
   - Never show app screens or claim anyone has used Draazy. It's a teaser, not a testimonial.
   - Pain points are relatable skits, not statistics. Never put invented percentages on screen.
   - Every "socho..." line matches a real Draazy feature (masked numbers, owner-direct, KYC-checked
-    owners and papers, flatmate living-style match, commute time, doorstep agreements and renewal
-    reminders). Don't add promises the app doesn't keep.
+    owners and papers, flatmate living-style match, commute time, rent agreement with doorstep
+    biometrics, rent-due and renewal reminders, one-tap prefilled renewal, buying and selling).
+    Don't add promises the app doesn't keep. Never say "auto-renew": each renewal needs fresh
+    registration and biometrics.
+  - No prices anywhere (user's call): no Draazy price, no agent fee figures. Talk pain points and services.
+  - The rent agreement is done online; nobody queues at a registration office. The pain is agents charging
+    a lot for it and the extra trip for biometrics.
   - Don't name competitors or real brokers, societies or offices.
   - Instagram requires a label on photorealistic AI video: turn on "AI info" (Add AI label) when posting.
     All Flow output also carries Google's invisible SynthID watermark.

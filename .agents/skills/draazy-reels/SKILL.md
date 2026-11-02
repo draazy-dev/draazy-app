@@ -1,6 +1,6 @@
 ---
 name: draazy-reels
-description: Make Draazy SaaS demo videos — 9:16 Instagram Reels (and the 16:9 launch film) — from the real app UI, with an Indian-English voice-over, synced captions, music and UI sound effects, using only tools already on this machine (Playwright Chromium, Node, Edge TTS, Windows Media Foundation). Use when asked to create, revise, re-voice, re-time or re-zoom a Draazy reel, promo, demo or launch video, add captions/voice/SFX to one, or explain how the reel pipeline works. Encodes the layout spec, voice and script rules, sound-effect levels, capture safety rules and Windows gotchas learned building brag-reel v1–v3.
+description: Make Draazy SaaS demo videos — 9:16 Instagram Reels (and the 16:9 launch film) — from the real app UI, with an Indian-English voice-over, synced captions, music and UI sound effects, using only tools already on this machine (Playwright Chromium, Node, Edge TTS, Windows Media Foundation). Use when asked to create, revise, re-voice, re-time or re-zoom a Draazy reel, promo, demo or launch video, add captions/voice/SFX to one, or explain how the reel pipeline works. Encodes the layout spec, voice and script rules, sound-effect levels, capture safety rules and Windows gotchas learned building brag-reel v1–v3. Also covers the pre-launch Hinglish UGC reels generated in Google Flow (characters Ishaan, Sana, Broker Bhaiya; `ugc-flow\`): credit-safe generation, clip-to-clip visual continuity, and assembling Flow clips locally with overlays and the HTML end card.
 ---
 
 # Draazy reels
@@ -149,6 +149,45 @@ no real PII. Delete the stills and sheets afterwards.
   `kmilo93sd/agent-video-editor` (pacing, captions, audio levels, CC0 SFX/music),
   `Avijit07x/cursorcam` / `AbubakrChan/product-launch-motion` (cursor-driven auto-zoom),
   `hamen/app-promo-reel` (beat-synced 9:16 app reels). Read their SKILL.md and port the idea into this pipeline.
+
+## UGC reels in Google Flow (`ugc-flow\`)
+
+Pre-launch hype reels: AI-generated Hinglish selfie skits, no app screens, every reel ends with Ishaan's
+sign-off "Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai." (tagline "Direct hai, easy hai, Draazy hai"; reels 1-2 said "Pune ka apna rental app";
+Draazy covers rent, buy, sell and agreements, and reels never mention prices.) Flow credits are paid and
+scarce; the source of truth is `ugc-flow\reels\00-CONTINUITY-RULES.txt` (workflow, prompt rules, checks,
+fixes), then `00-RUNBOOK-claude-code.txt` (driving Flow via the chrome MCP) and `00-HANDOFF-state.txt`.
+
+**Ask the user before every Generate**, quoting the settings, ingredients, the cost Flow shows and the
+credits left. One automatic retry per job, then ask. The user judges audio from the downloaded file.
+Never buy, upgrade or delete. Log every generation in `ugc-flow\flow-ledger.csv`.
+
+Reel 1 cost 91 credits; ~56 were retakes and fixes. What each loss taught:
+
+| Loss | Rule |
+|---|---|
+| Window/background different in later clips (2 edits, 20 cr) | **One set per reel** (place, time of day, outfit, framing). A free **set image** (Nano Banana 2 Lite) attached to every clip. A **look lock** (camera, set with 3-4 landmarks *and their frame positions*, wardrobe, light) copied byte-identical into every clip. After clip 1 is approved, **Save frame** from its silent hold → `rNN-anchor`, attached to clips 2+ with "Match the attached reference frame exactly". The set image alone did not hold the window. |
+| Sign-off shot as a separate clip in a different-looking room | Reels 2-7 say the tease + sign-off **inside the last clip** (tease 0.3-3.4 s, sign-off 3.6-7.6 s). |
+| Hoodie drifted open | Wardrobe spelled out exactly as the character image + "stays the same for the whole clip". |
+| Phone in frame | Never mention a phone in the action; "both his hands are out of frame". |
+| Sad face, laughing, repeated words | "Not laughing, not grinning, not sad."; timed lines filling 8 s ending in a silent hold; "each line is spoken exactly once". |
+| Brand line burned in as a caption | Prompts that say Draazy open with "Absolutely no text of any kind appears on screen…". |
+| "Drauzzy" | Plain "Draazy", never a respelling or "as in" hint. |
+| Edit box used to fix acting (kept 6.2 s length) | Never fix words/acting in the edit box; regenerate. Only allowed edit: background-only. |
+| Length changed after a take existed | Fix length and trims in the file before generating. |
+
+**Which fix:** audio and acting good but the set drifted → **continuity edit** (Video > Ingredients, the
+drifted video + anchor frame, "background-only edit… keep the person, lips, timing and audio", 10 credits,
+keeps the audio). Words, voice or acting wrong → regenerate unchanged once (6 credits).
+**Settings reset:** Flow can flip back to Veo 3.1 Lite / 720p (10 credits); verify Video > Ingredients,
+Gemini Omni Flash 1.1, 9:16, 360p, 8 s, x1, **6 credits** before every Generate. A timed-out ingredient
+picker click attaches the first asset: check the thumbnails. "Extend" is Veo-only.
+
+**Assembly (0 credits):** download approved takes at 720p (free) and copy
+`brag-output\work\reels\ugc-r01\` (hard cuts via `SEGS`, hook card at y≈170, overlays clear of the face,
+"Draazy · Rent · Buy · Sell · Agreements" pill at y≈1380 on the spoken "Draazy", ~2 s HTML end card with the real
+logo; `build-audio.cjs` concatenates each clip's own audio with 8 ms fades; then `sfx.cjs`, `render.cjs`,
+`encode.ps1`, `verify.cjs`). Probe each clip's audio envelope for trim points. Instagram allows 5 hashtags.
 
 ## Deliverables checklist
 

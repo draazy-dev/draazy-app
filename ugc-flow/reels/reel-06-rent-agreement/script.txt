@@ -1,46 +1,74 @@
-REEL 06 - RENT AGREEMENT  ("Chhutti li... rent agreement ke liye?")
+REEL 06 - RENT AGREEMENT  ("Sab online... phir bhi agent ki fees?")
 ===================================================================
 
-PAIN          Taking leave to queue for hours to sign a rent agreement, and knowing you'll do it all again
-              in 11 months.
-DRAAZY TRUTH  The agreement is drafted and registered at your doorstep, and both sides get a renewal
-              reminder before it ends. (Renewal is NOT automatic: we say "reminder khud aa jaaye",
-              never "auto-renew".)
-CAST          Ishaan
-LENGTH        about 25 s  =  clip 1 (7 s) + clip 2 (7 s) + clip 3 (8 s) + end card (3 s)
-SETS          Clip 1: Ishaan's PG room desk, morning. Clip 2: a crowded, generic documentation-office
-              waiting area. Clip 3: Ishaan's PG room, night.
+PAIN ............... The rent agreement is all online now, yet the agent still takes a fat fee. On top of that comes an extra
+                     trip for biometrics, and you have to remember the rent date and the renewal yourself.
+DRAAZY TRUTH ....... Draazy prepares the Leave & Licence agreement and handles e-registration, and biometrics happen at your
+                     doorstep. Two kinds of reminder arrive on their own: a monthly rent-pay reminder to the tenant, and a
+                     reminder to renew the agreement before it expires. Renewal is one tap, prefilled from the last
+                     agreement.
+                     NEVER say "auto-renew" or "auto renewal": every renewal needs fresh registration and biometrics.
+                     NO PRICES anywhere (the user's call): no agent fee figure, no Draazy price.
+                     Never say "registration office" or "line": nobody queues for this any more.
+CAST ............... Ishaan, the indoor character (teal pullover hoodie), on the sofa of the 1BHK he has just moved into
+DESIGN ............. one set, one time of day, one outfit, one framing (00-CONTINUITY-RULES.txt R1).
+                     The tease and the spoken sign-off are inside the last clip; there is no separate sign-off clip.
+ORDER .............. set.txt (0 cr) -> clip-1 -> user approves -> save r06-anchor -> clip-2, clip-3 -> download 720p
+CREDITS ............ 36 base (3 x 12, native 720p, user-approved); one retake (12) and one continuity edit (10) in reserve
+LENGTH ............. about 25 s = 3 clips trimmed to about 7.7 s, plus the HTML end card (about 2 s). Trim points come from
+                     the audio envelope.
+
+SET (byte-identical in every clip prompt)
+  Ishaan sits on a light-grey fabric sofa still wrapped in clear plastic film, in the living room of the modern 1BHK he has just moved into, in a new building in Pune, on a weekday night, in the middle of unpacking. On the left side of the frame, a small round wooden side table with a switched-on table lamp with a warm linen shade and, behind it, a large window with a sheer white curtain and distant lit apartment towers at night. On the right side of the frame, a stack of three plain brown cardboard moving boxes. Behind him, a smooth warm-white wall. More plain brown boxes are scattered on the floor around the sofa. Clean, new and modern: no posters, no papers, no screens, no labels or writing on any box, nothing readable anywhere.
+  Landmarks to check: lit table lamp with a warm linen shade on a round wooden side table + night window with a sheer white curtain on the LEFT; stack of three plain brown boxes on the RIGHT; plastic-wrapped light-grey sofa against a warm-white wall behind; boxes scattered on the floor; nothing readable
 
 HOOK
-  On screen (0.0-2.5 s):   Chhutti li... rent agreement ke liye?   ("Chhutti" in Coral #FB923C)
-  Spoken:                  "Office se chhutti li hai. Kyun?"
+  On screen (0.0-2.5 s): Sab online... phir bhi agent ki fees?   ("fees" in Coral #FB923C)
 
-SCRIPT
-  TIME        SHOT                                         DIALOGUE (Hinglish)                              OVERLAY
-  0.0-7.0     CLIP 1. At his desk, laptop open (screen      ISHAAN: "Office se chhutti li hai. Kyun?"         Hook card
-              unreadable), he hits send, then turns.        (beat) "Rent agreement sign karne ke liye."
-  7.0-14.0    CLIP 2. Whisper-selfie in a crowded waiting   ISHAAN (whispering): "Teen ghante se line mein    9.5: "Repeat every 11 months 🔁"
-              room, a token in his hand.                    hoon. Aur gyarah mahine baad... phir se yahi."
-  14.0-22.0   CLIP 3. Home at night, relaxed, to camera.   ISHAAN: "Socho, ek app jahan agreement ghar      17.0: "Doorstep agreement. Renewal reminders."
-                                                           baithe ban jaaye, aur renewal ka reminder        ("Doorstep" in Teal light)
-                                                           time pe aaye." (half-smile) "Draazy aa raha      20.0: pill "Draazy · Pune ka rental app"
-                                                           hai, Pune."
-  22.0-25.0   END CARD                                     (latch click + whoosh)                           Logo + "Draazy" + "Pune ka rental app"
-                                                                                                            + "Coming soon"
+DIALOGUE (the timed lines in the clip prompts; Hinglish)
+  CLIP 1
+    0.3-3.6 s, flatly: "Naya flat, naya agreement, aur sab kuch online, ghar baithe ho gaya."
+    4.0-6.6 s, after a beat, one eyebrow raised: "Phir bhi agent ne itni moti fees kyun li?"
+    6.6-8.0 s: silent, lips closed, a wry half-smile into the lens.
+  CLIP 2
+    0.3-3.4 s, flatly: "Upar se biometric ke liye, phir se unke office ka ek aur chakkar."
+    3.8-7.3 s, slower: "Har mahine rent, aur expiry se pehle renewal, sab khud yaad rakho."
+    7.3-8.0 s: silent, lips closed, a slow blink and a wry half-smile into the lens.
+  CLIP 3
+    0.3-3.6 s, leaning slightly closer, voice lower and hopeful: "Socho, biometric ghar pe, rent reminder har mahine, renewal reminder expiry se pehle."
+    3.8-5.4 s, Ishaan into the lens with a confident half-smile, a tiny nod on "bahut jald": "Aur yeh sab, bahut jald, Draazy pe."
+    5.4-5.9 s: a short silent beat, lips closed, the half-smile stays.
+    5.9-7.7 s, slowly and clearly, as a separate sign-off, eyebrows raised once on the last "Draazy": "Direct hai, easy hai, Draazy hai."
+    7.7-8.0 s: silent, lips closed, Ishaan holds the half-smile into the lens.
+
+CLIPS
+  clip-1.txt  THE HOOK                   chips @Ishaan                      use 0.0-7.7 s (reel 0.0-7.7 s)
+  clip-2.txt  THE HASSLE                 chips @Ishaan                      use 0.0-7.7 s (reel 7.7-15.4 s)
+  clip-3.txt  TEASE + SIGN-OFF           chips @Ishaan                      use 0.0-7.7 s (reel 15.4-23.1 s); the HTML end card follows
+
+OVERLAYS (reel time, added at local assembly; approximate until trims are measured)
+  0.0-2.5 hook card
+  4.0 "Kaam online. Fees full. 🤷"
+  8.2 "Biometric = ek aur chakkar 🛵"
+  11.8 "Monthly rent? Agreement expiry? Khud yaad rakho 📅"
+  15.8 stacked card: "Doorstep biometrics" / "Monthly rent reminders" / "Renewal reminder before expiry" / "One-tap renewal" ("Doorstep" in Teal light)
+  ~19.0 pill "Draazy · Rent · Buy · Sell · Agreements" on the spoken "Draazy"
+  end card: local HTML (logo + "Draazy" + "Direct hai, easy hai, Draazy hai" + "Rent · Buy · Sell · Agreements" + "Coming soon"), 0 credits; template
+  brag-output\work\reels\ugc-r02. The Flow door clip (00-end-card-door.txt) is not used.
 
 CAPTION
-  Ek chhutti. Teen ghante ki line. Aur 11 mahine baad, same scene repeat. 🔁
-  Adulting ka sabse boring level: rent agreement.
-  Draazy aa raha hai, Pune ka apna rental app. Follow karo, launch pe sabse pehle pata chalega.
-  Agreement ke liye tumne kitni chhutti li hai? Comment karo 👇
+  Agreement poora online. Biometric ke liye phir bhi chakkar. Aur fees? Agent wali. 🤷
+  Upar se har mahine rent ki date, aur 11 mahine baad renewal bhi khud yaad rakho.
+  Direct hai, easy hai, Draazy hai. Pune ka apna property app (rent, buy, sell, aur agreements), bahut jald launch ho raha hai. Follow karo, launch pe sabse pehle pata chalega.
+  Tumhare rent agreement mein sabse bada headache kya tha? Comment karo 👇
 
 HASHTAGS
-  #Pune #RentAgreement #PuneRent #Adulting #PuneLife #FlatHuntingPune #RentInPune #Draazy #ComingSoon
+  Instagram (max 5): #RentAgreement #PuneRent #PuneRealEstate #PuneLife #Draazy
+  Facebook: #Pune #PuneRent #Draazy
 
 EDIT NOTES
-  - Sign-off: the "Draazy · Pune ka rental app" pill (README, HOW DRAAZY IS INTRODUCED) appears on "Draazy" and
-    holds into the end card. "Draazy" in captions is always Teal light.
-  - Clip 2 must not show any real government office, emblem, seal or signage. The prompt keeps it generic.
-  - "Teen ghante" is the skit's number, not a statistic.
-
-QA  hook opens with a fact | 2 beats | renewal worded as a reminder, not auto-renew | about 25 s
+  - The "Draazy · Rent · Buy · Sell · Agreements" pill appears on the spoken "Draazy" and holds into the end card.
+    "Draazy" in captions is always Teal light.
+  - No prices in overlays, caption or end card.
+  - No real agent, firm, office, portal or government emblem is named or shown.
+  - "Moti fees" is the skit's complaint, not a statistic.

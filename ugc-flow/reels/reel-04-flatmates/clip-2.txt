@@ -1,72 +1,62 @@
-REEL 04 / CLIP 2 of 3 - SANA'S STORY
-====================================
+REEL 04 / CLIP 2 of 3 - STRANGERS + HABITS
+==========================================
 JOB ID ............. r04-c2
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r04-c1 approved by the user AND r04-anchor saved
 FLOW SETTINGS (check every line on screen before clicking Generate)
   Type ............. Video > Ingredients
   Model ............ Gemini Omni Flash 1.1
-  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Resolution ....... 720p (user-approved; download "720p Original size")
   Aspect ratio ..... 9:16 portrait
   Length ........... 8 s
   Outputs .......... 1
-CHARACTER CHIPS .... @Sana   (each [@Name] token in the prompt becomes a chip)
-EXTRA INGREDIENTS .. none
-START FRAME ........ none
-USE IN EDIT ........ 0.0-7.0 s
+  Cost shown ....... 12 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor, @Sana   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r04-set (image) + r04-anchor (saved frame of the approved clip 1)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 7.7-15.4 s)
 
 PROMPT START
-Vertical 9:16 selfie video, shot on the front camera of a smartphone held at arm's length by Sana, a
-close-up to medium close-up of her face as she sits cross-legged on her bed. It feels like a reply video
-to a friend's reel.
+Vertical 9:16 video from a smartphone propped up on a café table at chest height, a static, locked-off shot. The
+camera does not move. [@IshaanOutdoor] Ishaan sits on the left and [@Sana] Sana sits on the right, side by side
+on the far side of the table, both framed from the waist up and facing the lens. Their hands rest on the table.
+No phone, phone stand or tripod anywhere on the table or in the frame.
 
-Subject: [@Sana] Sana, a 22-year-old Indian woman with a light-medium wheatish skin tone, a heart-shaped face,
-shoulder-length dark brown curly hair worn loose, round thin gold-wire glasses, expressive dark eyes, a
-tiny silver nose stud on the left side, slim build. She wears her signature coral (#FB923C) relaxed
-linen overshirt with the sleeves rolled to the elbows, open over a cream ribbed tank top.
+Set (the attached set image r04-set; the same in every clip of this reel): a small café on FC Road, Pune, on a
+sunny afternoon. A light wooden table in the foreground with two white ceramic coffee cups. On the left side of
+the frame, a large glass window onto a tree-lined street with soft sunlight and blurred passers-by. On the right
+side of the frame, an exposed red-brick wall with a hanging green plant. A warm pendant lamp at the top of the
+frame. No menu boards, no signs, nothing readable anywhere. The background stays exactly the same for the whole
+clip. Match the attached reference frame exactly: the same camera distance and angle, the same background with
+every object in the same place, the same light and colour grade.
 
-Action: Sana starts mid-thought, nodding as if she has just watched a friend's video and has to reply.
-She raises one eyebrow, pushes her glasses up with one finger, and tells her story with dramatic
-disbelief. On "deposit bhej diya tha" she slaps her forehead lightly. On "Banda aaj tak offline hai"
-she spreads her hand in a "poof, gone" gesture and gives a big, exasperated laugh. From 6 to 8 seconds
-she shakes her head, still half-laughing, looking into the lens.
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. His face has clear, even skin with no moles, no beauty spots and no dark spots on his cheeks, taper fade,
+light stubble. The outfit stays the same for the whole clip. Sana looks exactly like her character image:
+shoulder-length dark brown curly hair worn loose, round thin gold-wire glasses, a tiny silver nose stud, a coral
+(#FB923C) linen overshirt with the sleeves rolled to the elbows, open over a cream ribbed tank top. Her outfit
+stays the same for the whole clip.
 
-Dialogue, lip-synced, spoken once with no extra words:
-Sana, dramatic and funny: "Pichli baar maine bina mile deposit bhej diya tha. Banda aaj tak offline hai."
+Sana leans in and tells the lens her story, witty and exasperated. Ishaan turns to look at her, then slowly back
+at the lens, silent. Neither is sad. Each line is spoken exactly once, nothing repeated, no other words.
+0.3-3.6 s, Sana: "Aur jo mile, sab anjaan log, kuch bhi verified nahi."
+4.0-6.8 s, Sana, a flat shrug: "Upar se, woh early bird, main night owl."
+6.8-8.0 s: silent, lips closed; Sana raises one eyebrow, Ishaan gives a deadpan stare into the lens.
 
-Voice: every on-screen character uses their saved Flow character voice, which matches this description. Sana speaks in casual Hinglish with a soft Lucknowi Hindi accent: a young female voice, bright and
-clear, a medium-high pitch, confident and witty, a quick pace that slows for the punchline, close to the
-phone's microphone.
+Voice: Sana uses her saved Flow character voice: casual Hinglish with a soft Lucknowi Hindi accent, a young
+female voice, bright and clear, medium-high pitch, confident and witty.
 
-Setting: Sana's small rented room in Baner, Pune, in the evening. A white wall behind her with a string
-of warm fairy lights, a cork board with sketches and colour swatches (nothing readable), a stack of
-design books, a plant, and a teal (#14B8A6) throw cushion on her bed. Cosy and creative.
+Lighting and colour: warm afternoon sunlight through the window on the left, soft fill from the brick wall, true
+warm skin tones. Authentic Instagram UGC shot on a phone, natural skin texture, no beauty filter.
 
-Lighting and colour: warm fairy-light glow and a soft desk lamp, the cool glow of the phone on her face.
-Cosy, warm, intimate. Subtle cool teal tint in the shadows, true warm skin tones.
+Audio: quiet café ambience, soft clinks of cups and a low murmur. No music.
 
-Camera feel: authentic Instagram UGC front-camera selfie, natural handheld micro-shake, phone autofocus,
-slight wide-angle look, no beauty filter, natural skin texture, 30 fps.
-
-Audio: Ambient noise: a quiet room, a distant ceiling fan, faint evening traffic. No SFX on her line.
-No music.
-
-No subtitles, no captions, no on-screen text or graphics, no readable text on the cork board or books,
-no logos, no watermark.
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
 PROMPT END
 
-ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
-  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
-  [ ] Sana matches @Sana: coral overshirt, curly shoulder-length hair, thin gold glasses, nose stud
-  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
-  [ ] the action in the prompt happens, in order, and nothing extra happens
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match r04-anchor side by side: wooden table + two white cups in the foreground; big street window on the LEFT; red-brick wall + hanging plant on the RIGHT; pendant lamp at the top; Ishaan left, Sana right
+  [ ] only Sana speaks; "verified", "early bird" and "night owl" are spoken as English words
+  [ ] Sana's voice matches Achernar custom
 
-ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
-  [ ] every line spoken once, in order, with no added words
-  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
-  [ ] the voice matches the character's saved voice; no music
-
-IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
-  - words dropped, added or swapped: regenerate unchanged once
-  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
-  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
-  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
-  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

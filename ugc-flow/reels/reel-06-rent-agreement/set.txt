@@ -1,0 +1,40 @@
+REEL 06 / SET IMAGE (0 credits)
+==========================
+JOB ID ............. r06-set
+WHY ................ every clip of the reel attaches this image so the place is the same in every clip (rule R1)
+FLOW SETTINGS
+  Type ............. Image
+  Model ............ Nano Banana 2 Lite
+  Aspect ratio ..... 9:16 portrait
+  Outputs .......... 2
+  Cost shown ....... 0 credits (anything else: stop and ask the user)
+INGREDIENTS ........ none (no character chips: the set must be empty)
+AFTER .............. the user picks one; rename it r06-set (or note its title in the ledger)
+
+PROMPT START
+Vertical 9:16 photorealistic photo, the view towards a sofa from the eye level of a seated person about one metre
+in front of it: the living room of a modern 1BHK rented flat in a new building in Pune on a weekday night, in the
+middle of unpacking on moving day. A light-grey three-seat fabric sofa, still wrapped in clear plastic film, stands
+against a smooth warm-white wall across the centre. On the left side of the frame, a small round wooden side table
+beside the sofa with a switched-on table lamp with a warm linen shade and, behind it, a large window with a sheer
+white curtain and distant lit apartment towers at night. On the right side of the frame, beside the sofa, a stack of
+three plain brown cardboard moving boxes. On the floor in front of the sofa, three or four plain brown cardboard
+boxes scattered around, a couple of them open with the flaps up and plain white packing paper spilling out. Smooth
+light-grey large-format floor tiles. Clean, new and modern: no stains, no cracks, no damp patches, no posters, no
+screens, no labels or writing on any box, nothing readable anywhere. There are no people in the photo. Natural,
+slightly imperfect phone-camera look, true colours, everything in sharp focus.
+
+Lighting and colour: night, not daytime: the window is dark with distant city lights and the table lamp is on. Warm
+table-lamp glow from the left and soft warm ceiling downlights, true colours.
+
+No text, no signs, no logos, no watermark.
+PROMPT END
+
+CHECK BEFORE THE USER PICKS
+  [ ] lit table lamp on a round wooden side table + night window with a sheer white curtain on the LEFT
+  [ ] stack of three plain brown boxes beside the sofa on the RIGHT
+  [ ] light-grey sofa still in clear plastic wrap, against a smooth warm-white wall
+  [ ] three or four boxes scattered on the floor in front of the sofa, some open with plain packing paper
+  [ ] clean, new, modern: no stains, cracks, damp or old flooring
+  [ ] no labels, writing, posters, screens or readable text
+  [ ] empty of people

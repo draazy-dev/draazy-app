@@ -1,4 +1,4 @@
-REEL 01 / CLIP 2 of 3 - THE CALL
+﻿REEL 01 / CLIP 2 of 3 - THE CALL
 ================================
 JOB ID ............. r01-c2
 FLOW SETTINGS (check every line on screen before clicking Generate)
@@ -12,63 +12,37 @@ CHARACTER CHIPS .... @Ishaan   (each [@Name] token in the prompt becomes a chip)
 EXTRA INGREDIENTS .. ishaan-room
 START FRAME ........ none
 USE IN EDIT ........ the full 8 s
-CONTINUITY OPTION .. for perfect continuity, use Frames to Video with the last frame of clip 1 as the start frame. Only on a retry, and only if Flow
-                     allows a start frame together with the character chips.
 
 PROMPT START
-Vertical 9:16 smartphone video, medium close-up, eye level, from a phone propped on a desk about one metre
-away, framing Ishaan from mid-chest up, slightly off-centre to the left. The same framing as the previous
-shot.
+Vertical 9:16 smartphone selfie video, a close-up from a phone held at arm's length, framing [@Ishaan]
+Ishaan from mid-chest up in his rented room in Wakad, Pune (the attached room image), in the evening, with a white shelf
+lit by a thin indigo (#4F46E5) LED strip softly out of focus behind him. The same framing and look as the
+previous shot. A speakerphone call plays from off-screen, below the frame; the caller is never seen.
+Ishaan reacts with dry, exasperated disbelief: raised eyebrows, a wry unamused look. Not laughing, not
+grinning, not sad. Each line is spoken exactly once, nothing repeated, no other words.
+0.0-2.8 s, a male voice from the off-screen speakerphone, overly sweet and fast: "Hello sir! Wakad mein ek ekdum mast 1BHK hai, aapke budget mein."
+2.8-5.0 s, Ishaan cuts in, irritated but polite, glancing down towards the speaker: "Bhaiya, pehle yeh batao, mera number mila kahan se?"
+5.0-6.6 s, the speakerphone voice, casual and unbothered: "Sir, woh toh WhatsApp group mein aaya tha."
+6.6-8.0 s: silent; Ishaan slowly looks back up into the lens, completely deadpan, eyebrows raised, lips closed.
 
-Subject: [@Ishaan] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
-jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
-neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He wears his signature teal (#14B8A6) oversized heavyweight cotton hoodie over a
-plain white crew-neck t-shirt, black joggers, and a thin black digital watch on his left wrist. His phone
-has a matte teal case.
+Voices: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking
+casual Hinglish with a natural Indian accent, clearly male and mid-pitched, irritated but polite. The
+caller is a different man: a deep, slightly raspy mid-40s male voice, fast, overly sweet salesman Hinglish
+with a Pune Marathi-tinged accent, with a thin, compressed phone-speaker sound.
 
-Action: Ishaan, sitting on the edge of his bed, taps to answer the call on speakerphone and holds the
-phone flat just below his chin, the screen facing up and away from the lens. A cheerful male voice
-blasts out of the phone speaker. At about 3 seconds Ishaan cuts in, irritated but polite, leaning
-towards the phone. The voice on the phone answers casually. From 6.5 to 8 seconds Ishaan slowly turns
-his head from the phone to stare straight into the lens, completely deadpan, eyebrows slightly raised,
-saying nothing.
+Lighting and colour: a warm ceiling bulb from above-left, a soft indigo glow behind him, a subtle cool
+teal tint in the shadows, true warm skin tones. Authentic Instagram UGC, natural skin texture, no beauty
+filter.
 
-Dialogue, lip-synced for Ishaan; the broker is heard only through the phone speaker; spoken once, no
-extra words:
-The broker, from the phone speaker, overly sweet and fast: "Hello sir! Wakad mein ek ekdum mast 1BHK hai sir..."
-Ishaan, cutting in: "Bhaiya, mera number mila kahan se?"
-The broker, from the phone speaker, unbothered: "Sir, woh group mein aaya tha."
-Then silence while Ishaan stares at the camera.
+Audio: the caller's voice clearly from a small phone speaker; quiet room tone. No music.
 
-Voices: every on-screen character uses their saved Flow character voice, which matches this description.
-Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
-mid-pitched, slightly husky, relaxed and conversational, close to the microphone.
-The broker speaks fast, overly sweet salesman Hinglish with a Marathi-tinged Pune Hindi accent: a deep,
-slightly raspy male voice in his mid-40s, smiling through the voice, with a thin, slightly compressed
-phone-speaker sound quality.
-
-Setting: a small rented PG room in Wakad, Pune, in the evening. Behind him, a cream wall, a grey
-steel almirah, a white floating shelf lit by a thin indigo (#4F46E5) LED strip, a small plant, and a
-coral (#FB923C) cushion on the bed beside him. A window shows the blue-hour sky.
-
-Lighting and colour: a warm ceiling bulb as the key light from above-left, the soft indigo LED glow as a
-rim on his right shoulder, and the phone screen's faint cool light on his chin. Subtle cool teal tint in
-the shadows, true warm skin tones.
-
-Camera feel: authentic Instagram UGC, a static phone on a desk with a tiny natural wobble, phone
-autofocus, natural skin texture with no beauty filter, 30 fps.
-
-Audio: the broker's voice clearly from a small phone speaker, a soft call-connect beep at the start.
-Ambient noise: a quiet room tone, a distant ceiling fan. No music.
-
-No subtitles, no captions, no on-screen text or graphics. The phone screen is never readable. No
-readable signs, no brand logos, no watermark. The broker is never seen, only heard.
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
 PROMPT END
 
 ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
   [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
   [ ] Ishaan matches @Ishaan: teal hoodie, taper fade, light stubble, clear skin with no moles
-  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
+  [ ] framing like clip 1 take 4 (d8151d6e): no phone in frame; caller never seen; never a sad face
   [ ] the action in the prompt happens, in order, and nothing extra happens
 
 ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)

@@ -56,18 +56,18 @@ PROMPT END
 
 FLOW CHARACTER (left panel > Characters > New Character)
   Name ........... Sana
-  Images ......... sana-hero, sana-sheet
+  Images ......... sana-hero, tile 1 "Woman posing for portrait" (image 4ff07f7f); saved as the
+                   character image ce12ec04. SAVED in Flow.
   Character info . 22, design student and UX intern in Baner, from Lucknow. Sharp, witty, quick,
                    laughs easily. Speaks casual Hinglish.
-  Voice: Create New Voice
-    Base voice ......... the user picks a young adult female preset that sounds Indian or neutral.
-    Name ............... Sana Voice
-    Voice performance .. A 22-year-old woman from Lucknow, India, speaking casual Hinglish with a soft
-                         Lucknowi Hindi accent. Bright and clear, a medium-high pitch, confident and
-                         witty, a quick pace that slows down for the punchline, close to the microphone
-                         like a front-camera phone video. Never an American or British accent.
-    Sample dialogue .... Maine bhi random flatmate ke saath rehke dekha hai. Kabhi mat karna.
-    Sync, the USER approves, Save New Voice > Add to Character.
+  Voice: "Achernar custom" (made and approved by the user, attached)
+    Voice performance .. A 22-year-old Indian woman from Lucknow, a design student in Pune, speaking
+                         casual Hinglish with a soft Lucknowi Hindi accent. Bright and clear, a
+                         medium-high pitch, confident and witty, a quick pace that slows down for the
+                         punchline, close to the microphone like a front-camera phone video. Never an
+                         American or British accent.
+    Sample dialogue .... Maine bhi random flatmate ke saath rehke dekha hai. Deposit gaya, sukoon gaya.
+                         Kabhi mat karna!
 
 
 CONSISTENCY CHECKLIST

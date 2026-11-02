@@ -1,76 +1,70 @@
-REEL 05 / CLIP 3 of 3 - THE TEASE
-=================================
+REEL 05 / CLIP 3 of 3 - TEASE + SIGN-OFF
+========================================
 JOB ID ............. r05-c3
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r05-c1 approved by the user AND r05-anchor saved
 FLOW SETTINGS (check every line on screen before clicking Generate)
   Type ............. Video > Ingredients
   Model ............ Gemini Omni Flash 1.1
-  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Resolution ....... 720p (user-approved; download "720p Original size")
   Aspect ratio ..... 9:16 portrait
   Length ........... 8 s
   Outputs .......... 1
-CHARACTER CHIPS .... @Ishaan   (each [@Name] token in the prompt becomes a chip)
-EXTRA INGREDIENTS .. ishaan-room
-START FRAME ........ none
-USE IN EDIT ........ 0.0-8.0 s
+  Cost shown ....... 12 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r05-set (image) + r05-anchor (saved frame of the approved clip 1)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 15.4-23.1 s); the HTML end card follows
 
 PROMPT START
-Vertical 9:16 smartphone video from a phone propped on a desk about one metre away, a medium shot of
-Ishaan's bed. Ishaan falls face-first onto the bed at 0 seconds; at about 1.5 seconds he rolls onto his
-side towards the lens and the framing settles into a medium close-up of his face and shoulders resting
-on the pillow.
+Absolutely no text of any kind appears on screen at any moment: no subtitles, no captions, no title, no brand
+name written anywhere. The word Draazy is only spoken, never shown. A clean raw phone video like the previous
+clips.
 
-Subject: [@Ishaan] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
-jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
-neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build. He has changed into his signature teal (#14B8A6) oversized heavyweight cotton
-hoodie over a white t-shirt, with a thin black digital watch.
+Vertical 9:16 phone video recorded from the driver's seat of the cab, the camera fixed at eye level and turned
+diagonally back towards the rear-left seat. [@IshaanOutdoor] Ishaan sits on the rear-left seat, on the right half
+of the frame next to the side window, framed from mid-chest up, turned slightly towards the lens. His back rests
+against the cream fabric seatback with the rear headrest behind his head. Both his hands
+stay low, out of frame. Nobody else is in the frame; the driver is never seen. The camera distance and angle stay
+the same for the whole clip.
 
-Action: Ishaan drops onto the bed with a tired groan, rolls onto his side to face the lens, his head on
-the coral cushion, and speaks calmly and sincerely, as if sharing an idea with a friend. On "office tak
-ke time ke saath" he draws a small line in the air with one finger. At about 6 seconds he gives a
-sleepy, confident half-smile and raises his eyebrows once on the final line, then holds the half-smile
-until 8 seconds.
+Set (the attached set image r05-set; the same in every clip of this reel): the back seat of a cab stuck in slow
+evening traffic on the road to Kharadi, Pune, just after sunset, seen diagonally from the driver's seat. Ishaan
+sits on the cream fabric back seat. On the right side of the frame, beside him, the rear-left door and its side
+window showing an orange streetlight glow and a blurred roadside, no people in it. At the top left of the frame,
+the rear windscreen shows the traffic queued behind, the cars facing the camera with soft white headlights under
+orange streetlights, no red lights. A beige roof lining at the top of the frame, the edges of the front seats at
+the bottom corners. No signs or number plates readable anywhere. The traffic outside barely crawls. The background stays
+exactly the same for the whole clip. Match the attached reference frame exactly: the same camera distance and
+angle, the same background with every object in the same place, the same light and colour grade.
 
-Dialogue, lip-synced, spoken once with no extra words:
-Ishaan, calm and sincere: "Socho, ek app jo har flat ke saath office tak ka asli time dikhaye."
-Then, with a half-smile, slowly and clearly: "ड्राज़ी aa raha hai, Pune."
-Pronunciation: "ड्राज़ी" is the brand name Draazy, said DRAA-zee: two syllables, a long open "aa" as in "drama", stress on
-the first syllable, then a soft "zee". It is the clearest, most deliberate word in the clip.
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. Clear, even skin with no moles, beauty
+marks or dark spots, taper fade,
+light stubble. The outfit stays the same for the whole clip.
 
-Voice: every on-screen character uses their saved Flow character voice, which matches this description. Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
-mid-pitched, slightly husky, here relaxed and a little sleepy, intimate and close to the microphone.
+He sits up and talks to the lens in a clear voice, calm and hopeful, then confident. Not laughing, not grinning,
+not sad. Each line is spoken exactly once, nothing repeated, no other words.
+0.3-3.4 s, leaning slightly closer, voice lower and hopeful: "Socho, office daalo, aur uske paas wale flats dikhe."
+3.6-7.6 s, Ishaan into the lens with a confident half-smile, eyebrows raised once on "Draazy", a tiny nod on "Bahut jald", slowly and clearly: "Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai."
+7.6-8.0 s: silent, lips closed, Ishaan holds the half-smile into the lens.
 
-Setting: Ishaan's small rented PG room in Wakad, Pune, at night. Grey sheets, a crumpled teal throw, a
-coral (#FB923C) cushion under his head, a white floating shelf lit by a thin indigo (#4F46E5) LED strip
-behind the bed, a small plant, and his backpack dropped on the floor.
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking casual Hinglish
+with a natural Indian accent, clearly male and mid-pitched, conversational and fluent.
 
-Lighting and colour: soft indigo LED glow behind him and a warm bedside lamp lighting his face. Calm,
-cosy, relieved to be home. Subtle cool teal tint in the shadows, true warm skin tones.
+Lighting and colour: dusk after sunset, not daytime: the sky outside is deep blue, the streetlights and headlights
+are on, and the cab interior is dim, lit by the orange glow of streetlights through the side window and the
+soft white headlights behind, a cool blue dusk sky, true warm skin tones, slight phone-camera grain. Authentic Instagram UGC shot on a
+phone, natural skin texture, no beauty filter.
 
-Camera feel: authentic Instagram UGC, a static propped phone with a tiny natural wobble, phone autofocus
-re-focusing as he rolls over, natural skin texture with no beauty filter, 30 fps.
+Audio: muffled traffic outside the cab, an idling engine, distant honking. No music.
 
-Audio: SFX: a soft mattress thump and a tired groan as he lands. Ambient noise: a quiet room tone, a
-ceiling fan, very faint distant traffic. No music.
-
-No subtitles, no captions, no on-screen text or graphics, no readable signs, no logos, no watermark.
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
 PROMPT END
 
-ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
-  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
-  [ ] Ishaan matches @Ishaan: teal hoodie, taper fade, light stubble, clear skin with no moles
-  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
-  [ ] the action in the prompt happens, in order, and nothing extra happens
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match r05-anchor side by side: seen diagonally from the driver's seat; Ishaan on the cream seat, right half of the frame; rear-left door + side window (orange glow, no people) on the RIGHT; rear windscreen top LEFT with cars FACING the camera (white headlights, no red lights); beige roof lining at the top; dusk, not night
+  [ ] nobody else speaks; the driver is never seen
+  [ ] no text on screen; "Draazy" said plainly, once, at about 5.5 s
 
-ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
-  [ ] every line spoken once, in order, with no added words
-  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
-  [ ] "Draazy" is clearly DRAA-zee (long "aa", two syllables), not "Dray-zee" or "Drazzy"
-  [ ] the voice matches the character's saved voice; no music
-
-IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
-  - "Draazy" mispronounced: regenerate unchanged once (ड्राज़ी already won the voice audition), then ask the user
-  - words dropped, added or swapped: regenerate unchanged once
-  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
-  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
-  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
-  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

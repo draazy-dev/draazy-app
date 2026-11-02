@@ -19,13 +19,13 @@ LOOK - LOCKED (paste this block, word for word, into every prompt he appears in)
   sentence; never change the face description.
 
 VOICE - LOCKED (paste into every prompt where he speaks)
-  Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
-  mid-pitched, slightly husky, relaxed and conversational, a quick pace with small deadpan pauses,
+  Ishaan speaks in casual Hinglish with a natural Indian accent: a youthful early-20s voice,
+  clearly male and mid-pitched, never high or older-sounding, relaxed and conversational, a quick pace with small deadpan pauses,
   close to the microphone like a phone's front-camera recording.
 
 PERSONALITY ON CAMERA
   Deadpan stare at the lens after a punchline. Small eye-roll. Leans in and lowers his voice for the
-  "socho..." line, as if sharing a secret. A half-smile on "Draazy aa raha hai, Pune".
+  "socho..." line, as if sharing a secret. A half-smile on the sign-off "Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai."
 
 
 IMAGE PROMPTS FOR FLOW (create these first; rename each saved image to its [name])
@@ -86,17 +86,26 @@ PROMPT END
 
 [ishaan-room]   Aspect 9:16   (set ingredient, no person)
 PROMPT START
-Photorealistic interior of a small rented single room in a paying-guest building in Wakad, Pune, in the
-evening, shot from a phone propped at chest height near the door. A single bed against a pale cream wall,
-with grey sheets, a crumpled teal throw, and one coral (#FB923C) cushion. Beside the bed, a small
-wooden study desk with an open laptop, a steel water bottle, a half-finished cup of cutting chai and a
-tangle of charging cables. Above the desk, a thin indigo (#4F46E5) LED strip glows softly along a white
-floating shelf with a few books and a small plant. A grey steel almirah in the corner, a backpack on
-a hook. A window on the right shows the blue-hour sky and the lit windows of neighbouring buildings.
-Lighting: one warm ceiling bulb plus the indigo LED glow, slightly mixed and lived-in. Realistic,
-slightly cluttered, middle-class Indian PG vibe, no people. No readable text, no posters with words,
-no brand logos.
+Photorealistic interior of a rented single room in a modern paying-guest building in Wakad, Pune, in the
+evening, shot from a phone propped at chest height near the door, a slightly wide view that shows the
+whole room. The room is roomy, about 12 by 12 feet, freshly painted warm off-white with clean walls and a
+light wood-laminate floor. A single bed with a low wooden frame, neatly made with light grey sheets, a
+soft teal (#14B8A6) throw folded at the foot and one coral (#FB923C) cushion. Beside the bed, a clean
+white study desk with an open laptop, a steel water bottle, a cup of cutting chai and a small desk lamp.
+Above the desk, a white floating shelf lit from underneath by a thin indigo (#4F46E5) LED strip, holding
+a few books, a small succulent and a mini speaker. A tall money plant in a pot in the corner, warm fairy
+lights along the curtain rail, a backpack on a hook, a pair of white sneakers by the wall. A large window
+on the right with sheer white curtains shows the blue-hour sky and the lit windows of neighbouring
+towers. Lighting: a warm ceiling light plus the indigo LED glow and the fairy lights, cosy and inviting.
+A clean, aesthetic, Gen Z Pinterest-style student room that still feels real and lived-in, not a
+showroom. No people. No readable text, no posters with words, no brand logos.
 PROMPT END
+(Take 1, the cluttered older PG room, was rejected by the user as dull and cramped.)
+
+ROOM CLIP FRAMING (user decision): no start-frame image. Room clips use the framing and proportions
+of test take 4 ("Man speaking selfie video"): a phone-at-arm's-length selfie, Ishaan from mid-chest up,
+the indigo LED shelf softly out of focus behind him. Three "Ishaan in room" image attempts were rejected
+(standing wide shot, ultra-wide selfie, medium selfie).
 
 
 FLOW CHARACTERS (left panel > Characters > New Character)
@@ -106,29 +115,31 @@ its outfit too.
 
   Name ........... Ishaan
   Images ......... ishaan-hero, ishaan-sheet
-  Voice .......... "Ishaan Voice" (create once, below)
+  Voice .......... "Rasalgethi custom" (saved and attached to Ishaan; details below)
   Character info . 23, software engineer in Hinjawadi, from Indore. Dry, deadpan humour; talks to the
                    camera like texting a close friend. Speaks casual Hinglish.
 
   Name ........... IshaanOutdoor
   Images ......... ishaan-outdoor-hero
-  Voice .......... "Ishaan Voice" (the same saved voice)
+  Voice .......... "Rasalgethi custom" (the same saved voice)
   Character info . same as Ishaan.
 
-  Create the voice: Select a voice > Create New Voice (an Omni Flash feature)
-    Base voice ......... the user picks: a young adult male preset that sounds Indian or neutral, not
-                         American. Claude lists the preset names on screen and asks; it cannot hear them.
-    Name ............... Ishaan Voice
-    Voice performance .. A 23-year-old man from Indore, India, speaking casual Hinglish (a natural mix of
-                         Hindi and English) with a natural North-Indian accent. Mid-pitched, slightly
-                         husky, relaxed and conversational, a quick pace with small deadpan pauses, close
-                         to the microphone like a front-camera phone video. Never an American or British
-                         accent. He says the brand name Draazy as DRAA-zee, with a long "aa" as in "drama".
-    Sample dialogue .... Ek flat pe enquiry ki thi. Bas ek. ड्राज़ी aa raha hai, Pune.
-                         (Write the brand name in Devanagari: Flow's voice says "Draazy" wrong in Latin.)
-    Then Sync (preview). The USER listens and approves before Save New Voice > Add to Character.
-  If Flow says custom voices aren't available in this region: pick the closest preset voice instead. The
-  voice description inside every clip prompt still steers the delivery.
+  The voice (DONE: "Rasalgethi custom", locked by the user for all reels)
+    Base voice ......... Rasalgethi, with the performance text below. "Puck custom" (same text on Puck)
+                         also exists but is unreliable in video: one take sounded right, another sounded
+                         like a ~40-year-old with a high pitch. Don't use it.
+    Voice performance .. (The "college student" wording only shapes the sound of the voice. Ishaan himself
+                         stays a 23-year-old IT employee in Hinjawadi; the audience is Pune IT employees.)
+                         A 22-year-old Indian man, a final-year college student in Pune, speaking casual
+                         Hinglish with a natural Indian accent. A clearly male, mid-pitched voice, never
+                         high or childish. Relaxed, friendly and upbeat, a quick conversational pace with a
+                         slight playful smirk, like a friend talking in an Instagram story. Never an
+                         American or British accent.
+    Sample dialogue .... Ek flat pe enquiry ki thi. Bas ek. Aur ab din bhar broker ke calls. Draazy aa raha hai, Pune.
+    Brand name ......... Plain "Draazy" with NO pronunciation hint comes out right (test take 3,
+                         user-checked). The "as in drama" hint made it "Drauzzy".
+  Voice dialog quirk: clicking a preset clears the sample and performance boxes about a second later.
+  Type them again after selecting, and never click a preset with the sample empty (that attaches it).
 
 
 CONSISTENCY CHECKLIST (before accepting any take)
@@ -136,4 +147,4 @@ CONSISTENCY CHECKLIST (before accepting any take)
   [ ] Teal hoodie (or teal overshirt outdoors), never another colour
   [ ] Taper fade and messy top, no beard growth or shave change
   [ ] Phone case teal
-  [ ] Voice matches the previous clip (young, husky, relaxed, North-Indian Hinglish)
+  [ ] Voice matches the previous clip (young, clearly male, mid-pitched, relaxed Indian Hinglish)

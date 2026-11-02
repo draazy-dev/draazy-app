@@ -1,78 +1,67 @@
-REEL 02 / CLIP 3 of 3 - THE TEASE
-=================================
+REEL 02 / CLIP 3 of 3 - TEASE + SIGN-OFF
+========================================
 JOB ID ............. r02-c3
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r02-c1 approved by the user AND r02-anchor saved
 FLOW SETTINGS (check every line on screen before clicking Generate)
   Type ............. Video > Ingredients
   Model ............ Gemini Omni Flash 1.1
-  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Resolution ....... 360p (download the approved take at 720p for 0 credits)
   Aspect ratio ..... 9:16 portrait
   Length ........... 8 s
   Outputs .......... 1
-CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token in the prompt becomes a chip)
-EXTRA INGREDIENTS .. none
-START FRAME ........ none
-USE IN EDIT ........ 0.0-8.0 s
+  Cost shown ....... 6 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r02-set (image) + r02-anchor (saved frame of the approved clip 1)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 15.4-23.1 s); the HTML end card follows
 
 PROMPT START
-Vertical 9:16 smartphone video, a medium close-up of Ishaan sitting on the front steps of a residential
-building, filmed from a phone propped on his backpack one step below him, a slightly low angle, framing
-him from the waist up.
+Absolutely no text of any kind appears on screen at any moment: no subtitles, no captions, no title, no brand
+name written anywhere. The word Draazy is only spoken, never shown. A clean raw phone video like the previous
+clips.
 
-Subject: [@IshaanOutdoor] Ishaan, a 23-year-old Indian man with warm medium-brown skin, an oval face with a defined
-jawline, short black hair that is textured and slightly messy on top with a low taper fade on the sides,
-neat light stubble, thick dark expressive eyebrows, dark brown eyes, clear even skin with no moles or spots, lean build, wearing a teal (#14B8A6) cotton overshirt open over a plain white crew-neck
-t-shirt, black joggers and white sneakers, with a thin black digital watch.
+Vertical 9:16 smartphone selfie video, a close-up from a phone held at arm's length at eye level, framing
+[@IshaanOutdoor] Ishaan from mid-chest up in the centre of the frame. Both his hands are out of frame. The
+camera distance and angle stay the same for the whole clip.
 
-Action: Ishaan sits with his elbows on his knees, shaking his head in disbelief, and says the first line
-to the lens with a sarcastic little laugh. A short pause. Then he leans forward, becomes calm and
-sincere, and speaks the second line, counting on two fingers on "owner se seedha deal" and "beech mein
-koi nahi". At about 6.5 seconds he gives a confident half-smile and raises his eyebrows once for the
-final line. He holds the half-smile until 8 seconds.
+Set (the attached set image r02-set; the same in every clip of this reel): the common corridor of a residential
+society building in Wakad, Pune, on a weekday afternoon. On the left side of the frame, the doorway of an empty
+flat with its brown wooden door swung fully open inward, a white plastic switchboard on the wall just inside the
+doorway, and a bare, empty room beyond. On the right side of the frame, the corridor continues past
+cream-painted walls to a window at its far end, bright with daylight. Grey speckled floor tiles. A green potted
+plant beside the next flat's closed door on the right. No signs, no nameplates, nothing readable anywhere. The
+background stays exactly the same for the whole clip. Match the attached reference frame exactly: the same
+camera distance and angle, the same background with every object in the same place, the same light and colour
+grade. The only difference: the doorway is now empty.
 
-Dialogue, lip-synced, spoken once with no extra words:
-Ishaan, sarcastic: "Light on karne ke pachees hazaar?"
-Then calm, leaning in: "Socho, ek app jahan owner se seedha deal ho, beech mein koi nahi."
-Then, with a half-smile, slowly and clearly: "ड्राज़ी aa raha hai, Pune."
-Pronunciation: "ड्राज़ी" is the brand name Draazy, said DRAA-zee: two syllables, a long open "aa" as in "drama", stress on
-the first syllable, then a soft "zee". It is the clearest, most deliberate word in the clip.
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. Clear skin with no moles, taper fade,
+light stubble. The outfit stays the same for the whole clip.
 
-Voice: every on-screen character uses their saved Flow character voice, which matches this description. Ishaan speaks in casual Hinglish with a natural North-Indian Hindi accent: a young male voice,
-mid-pitched, slightly husky, relaxed and conversational, close to the microphone like a phone recording.
+Inside the doorway behind him the ceiling light is on and the room is empty; Broker Bhaiya has gone inside, out
+of view, and is not seen or heard. Ishaan talks to the lens in a normal, clear voice, calm and hopeful, then
+confident. Not laughing, not grinning, not sad. Each line is spoken exactly once, nothing repeated, no other
+words.
+0.3-3.4 s, leaning slightly closer, voice lower and hopeful: "Socho, owner se seedha deal, aur brokerage zero."
+3.6-7.6 s, Ishaan into the lens with a confident half-smile, eyebrows raised once on "Draazy", a tiny nod on "Bahut jald", slowly and clearly: "Draazy. Pune ka apna rental app. Bahut jald launch ho raha hai."
+7.6-8.0 s: silent, lips closed, Ishaan holds the half-smile into the lens.
 
-Setting: the front entrance steps of a typical Pune residential society building in the afternoon.
-Grey stone steps, a cream building wall with a steel grille gate partly visible, a few two-wheelers
-parked in the background, a gulmohar tree with green leaves, a security cabin softly out of focus.
-No readable signs or society name boards.
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking casual Hinglish
+with a natural Indian accent, clearly male and mid-pitched, conversational and fluent.
 
-Lighting and colour: warm late-afternoon sunlight raking from the left, soft shade on the steps, a
-golden rim on his hair. Hopeful and warm. Subtle cool teal tint in the shadows, true warm skin tones,
-shallow depth of field on the background.
+Lighting and colour: soft, even daylight from the corridor window on the right, a slightly cool white tube light
+overhead, true warm skin tones, clean whites. Authentic Instagram UGC shot on a phone, natural skin texture, no
+beauty filter.
 
-Camera feel: authentic Instagram UGC, a propped phone with a tiny natural wobble, phone autofocus,
-natural skin texture with no beauty filter, 30 fps.
+Audio: a quiet residential corridor, faint distant traffic. No music.
 
-Audio: Ambient noise: birds in the tree, a scooter starting in the distance, a faint society-gate
-chatter, light traffic. No SFX on his lines. No music.
-
-No subtitles, no captions, no on-screen text or graphics, no readable signs, no logos, no watermark.
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
 PROMPT END
 
-ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
-  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
-  [ ] Ishaan matches @IshaanOutdoor: open teal overshirt on a white tee, taper fade, stubble, no moles
-  [ ] hands, fingers, phone and props look physically normal; no readable phone screen
-  [ ] the action in the prompt happens, in order, and nothing extra happens
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match r02-anchor side by side: open brown wooden door + doorway on the LEFT; white switchboard just inside the doorway; corridor + bright window at the far end on the RIGHT; green potted plant on the right; grey speckled floor tiles
+  [ ] no broker in frame; nobody else speaks
+  [ ] no text on screen; "Draazy" said plainly, once, at about 3.6 s
 
-ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
-  [ ] every line spoken once, in order, with no added words
-  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
-  [ ] "Draazy" is clearly DRAA-zee (long "aa", two syllables), not "Dray-zee" or "Drazzy"
-  [ ] the voice matches the character's saved voice; no music
-
-IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
-  - "Draazy" mispronounced: regenerate unchanged once (ड्राज़ी already won the voice audition), then ask the user
-  - words dropped, added or swapped: regenerate unchanged once
-  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
-  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
-  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
-  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).
