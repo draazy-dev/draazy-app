@@ -25,9 +25,9 @@ The Draazy service fee is shown in the cost breakdown before you pay, with Artic
 
 ## The process
 
-1. **Enter details** — Property, Owner, Tenant, Terms, Witnesses and Review are the six form steps. Property is open to everyone; the later steps ask for PAN numbers, so you need to sign in. The term can be up to 60 months, and the deed is in English or Marathi.
+1. **Enter details** — Property, Owner, Tenant, Terms and Review are the five form steps. Property is open to everyone; the later steps ask for PAN numbers, so you need to sign in. The term can be up to 60 months, and the deed is in English or Marathi.
 2. **Invite the other side** — tenant or owner can co-fill their own details from a secure invite.
-3. **File documents** — PAN numbers, the owner's Index II and witness details are checked before checkout. Keep your Aadhaar and its registered mobile handy: our staff collect them at the doorstep visit for the OTP and biometric.
+3. **File documents** — PAN numbers and the owner's Index II are checked before checkout. You don't provide witness details: our staff record the witnesses at the visit. Keep your Aadhaar and its registered mobile handy: our staff collect them at the doorstep visit for the OTP and biometric.
 4. **Pay** — service fee plus government charges, itemised. Your request reaches our team only after payment, and once it is submitted the details are locked — changes go through the tracker.
 5. **Review the draft** — Draazy shares a versioned draft. Every party — owner, tenant and each co-owner — must open it and approve it; any party can ask for changes instead.
 6. **Register** — after approval, the registered copy is uploaded back to the request tracker. If a party is an NRI or foreign national, Aadhaar e-registration is not available: we book a Sub-Registrar Office appointment instead, and that party attends with a passport or signs through a registered Power of Attorney.

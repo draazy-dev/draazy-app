@@ -76,26 +76,108 @@ class RentAgreementReadiness {
         this.ownerSide = ownerSide;
     }
 
+    private static final Set<ServiceRequestStatus> BEFORE_DRAFT = Set.of(ServiceRequestStatus.AWAITING_PAYMENT,
+            ServiceRequestStatus.NEW, ServiceRequestStatus.ASSIGNED, ServiceRequestStatus.IN_PROGRESS);
+
+    static boolean tenantFillsLater(ServiceRequest request) {
+        if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())) {
+            return false;
+        }
+        Map<String, Object> state = ServiceRequestPricing.childObject(request.getDetails() == null
+                ? Map.of() : request.getDetails(), "_state");
+        return "invite".equals(String.valueOf(state.get("tenantMode")))
+                && !"invite".equals(String.valueOf(state.get("ownerMode")));
+    }
+
+    static boolean ownerHoldsAll(ServiceRequest request) {
+        if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())) {
+            return false;
+        }
+        Map<String, Object> state = ServiceRequestPricing.childObject(request.getDetails() == null
+                ? Map.of() : request.getDetails(), "_state");
+        return "fill".equals(String.valueOf(state.get("tenantMode")))
+                && !"invite".equals(String.valueOf(state.get("ownerMode")));
+    }
+
+    static boolean tenantCanStillFill(ServiceRequest request) {
+        return tenantFillsLater(request) && BEFORE_DRAFT.contains(request.getStatus());
+    }
+
+    // Once staff pick a case up, only a tenant invited to fill in after payment may still finish their side.
+    boolean sideEditable(ServiceRequest request, boolean requester, String side) {
+        boolean tenantLater = !requester && "tenant".equals(side) && tenantFillsLater(request);
+        return switch (request.getStatus()) {
+            case AWAITING_PAYMENT -> requester || request.getPaymentRef() == null || tenantLater;
+            case NEW -> ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType());
+            case ASSIGNED, IN_PROGRESS -> tenantLater && waitingOnTenant(request);
+            default -> false;
+        };
+    }
+
+    static ConflictException editLocked(ServiceRequest request) {
+        return new ConflictException(request.getStatus() == ServiceRequestStatus.AWAITING_PAYMENT
+                ? "Checkout is already open for this request. Ask the requester to reopen it if edits are needed."
+                : "Our team has started on this agreement. Message our team on the request to change your details.");
+    }
+
     void require(ServiceRequest request) {
         if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())) {
             return;
         }
         requireOwnerSide(request);
-        List<String> missingDocuments = missingDocuments(request);
+        boolean tenantLater = tenantFillsLater(request);
+        List<String> missingDocuments = missingDocumentItems(request).entrySet().stream()
+                .filter(item -> !tenantLater || !"tenant".equals(sideOf(item.getKey())))
+                .map(Map.Entry::getValue).toList();
         if (!missingDocuments.isEmpty()) {
             throw new ConflictException("Upload required documents before checkout: "
                     + summarise(missingDocuments) + ".");
         }
-        List<String> missingIdentities = missingIdentities(request);
+        List<String> missingIdentities = withoutTenant(missingIdentities(request), tenantLater);
         if (!missingIdentities.isEmpty()) {
             throw new ConflictException("Record PAN numbers before checkout: "
                     + summarise(missingIdentities) + ".");
         }
-        List<String> missingParticulars = missingParticulars(request);
+        List<String> missingParticulars = withoutTenant(missingParticulars(request), tenantLater);
         if (!missingParticulars.isEmpty()) {
             throw new ConflictException("Complete the agreement before checkout: "
                     + summarise(missingParticulars) + ".");
         }
+    }
+
+    void requireTenantSide(ServiceRequest request) {
+        if (!tenantFillsLater(request)) {
+            return;
+        }
+        List<String> missing = missingTenantSide(request);
+        if (!missing.isEmpty()) {
+            throw new ConflictException("Waiting for the tenant to fill their part: " + summarise(missing) + ".");
+        }
+    }
+
+    boolean waitingOnTenant(ServiceRequest request) {
+        return tenantCanStillFill(request) && !missingTenantSide(request).isEmpty();
+    }
+
+    private List<String> missingTenantSide(ServiceRequest request) {
+        List<String> missing = new ArrayList<>();
+        missingParticulars(request).stream().filter(RentAgreementReadiness::isTenantLabel).forEach(missing::add);
+        missingIdentities(request).stream().filter(RentAgreementReadiness::isTenantLabel)
+                .map(label -> label + " PAN").forEach(missing::add);
+        missingDocumentItems(request).forEach((key, label) -> {
+            if ("tenant".equals(sideOf(key))) {
+                missing.add(label);
+            }
+        });
+        return missing;
+    }
+
+    private static boolean isTenantLabel(String label) {
+        return label.startsWith("Tenant ");
+    }
+
+    private static List<String> withoutTenant(List<String> labels, boolean tenantLater) {
+        return tenantLater ? labels.stream().filter(label -> !isTenantLabel(label)).toList() : labels;
     }
 
     void requireOwnerSide(ServiceRequest request) {
@@ -163,11 +245,6 @@ class RentAgreementReadiness {
             need(missing, tenant.get("age"), "Tenant " + (j + 1) + " age");
             offlinePapers(missing, tenant, "Tenant " + (j + 1));
         }
-        Map<String, Object> wit = ServiceRequestPricing.childObject(state, "wit");
-        for (int w = 1; w <= 2; w++) {
-            need(missing, wit.get("w" + w + "Name"), "Witness " + w + " name");
-            need(missing, wit.get("w" + w + "Age"), "Witness " + w + " age");
-        }
         return missing;
     }
 
@@ -196,10 +273,6 @@ class RentAgreementReadiness {
         if ("foreign".equals(residency)) {
             need(missing, party.get("visaOci"), label + " visa / OCI details");
         }
-    }
-
-    List<String> missingDocuments(ServiceRequest request) {
-        return List.copyOf(missingDocumentItems(request).values());
     }
 
     private Map<String, String> missingDocumentItems(ServiceRequest request) {

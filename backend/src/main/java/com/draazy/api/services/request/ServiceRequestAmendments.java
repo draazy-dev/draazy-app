@@ -272,7 +272,7 @@ public class ServiceRequestAmendments {
             notifier.notify(request.getAssigneeId(), "service.amendment-credit",
                     "Refund due on a withdrawn amendment",
                     Notifier.rupees(amendment.delta()) + " was paid for terms that are no longer open.",
-                    "/ops/drafting-desk");
+                    ServiceRequestTypes.deskFor(request));
         }
     }
 
@@ -317,7 +317,7 @@ public class ServiceRequestAmendments {
         if (request.getAssigneeId() != null) {
             notifier.notify(request.getAssigneeId(), "service.amendment-applied",
                     "Revised terms accepted", "The customer accepted the revised terms. Share the revised draft.",
-                    "/ops/drafting-desk");
+                    ServiceRequestTypes.deskFor(request));
         }
     }
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { openCashfreeCheckout } from '../../../../lib/cashfree.js';
 import { getServiceRequest, simulateServiceRequestPayment } from '../../../../services/serviceRequestService.js';
+import { clearReads } from '../../../../services/http.js';
 import { fmt } from './helpers.js';
 
 const PAYMENT_POLL_BACKOFF_MS = [500, 1000, 2000, 3000, 3000];
@@ -58,6 +59,8 @@ export function useRaPayment({ tr, toast }) {
       if (settled?.status) status = settled.status;
       if (!mountedRef.current || status !== 'awaiting_payment') break;
     }
+    // The gateway webhook settles payment server-side, so no http write has cleared cached reads.
+    clearReads();
     if (mountedRef.current) {
       setPaymentConfirming(false);
       setPaymentPending(status === 'awaiting_payment');

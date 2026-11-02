@@ -14,7 +14,7 @@ public final class CheckoutFixture {
         }
         AuthPrincipal requester = new AuthPrincipal(request.getRequesterId(), "owner", null, true, false);
         String ref = service.openOrderFor(requester, request).orderId();
-        request.attachOrder(ref);
+        request.attachOrder(ref, request.getRequesterId());
         repo.saveAndFlush(request);
         return ref;
     }

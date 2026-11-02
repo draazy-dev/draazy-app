@@ -1,5 +1,6 @@
 package com.draazy.api.services.request;
 
+import com.draazy.api.catalog.managed.ManagedAgreementHomes;
 import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
@@ -16,15 +17,18 @@ public class ServiceRequestPoliceIntimations {
     private final ServiceRequestPoliceIntimationRepository intimations;
     private final ServiceRequestMapper mapper;
     private final AuditService audit;
+    private final ManagedAgreementHomes homes;
 
     public ServiceRequestPoliceIntimations(ServiceRequestService requests,
             ServiceRequestPoliceIntimationRepository intimations,
             ServiceRequestMapper mapper,
-            AuditService audit) {
+            AuditService audit,
+            ManagedAgreementHomes homes) {
         this.requests = requests;
         this.intimations = intimations;
         this.mapper = mapper;
         this.audit = audit;
+        this.homes = homes;
     }
 
     @Transactional
@@ -46,6 +50,7 @@ public class ServiceRequestPoliceIntimations {
         ServiceRequestPoliceIntimation row = intimations.findByServiceRequestId(request.getId()).orElseGet(() -> new ServiceRequestPoliceIntimation(request.getId()));
         row.confirm(caller.userId(), ref, submitted);
         intimations.saveAndFlush(row);
+        homes.policeIntimated(request.getId(), submitted == null ? LocalDate.now(PlatformTime.IST) : submitted);
         requests.record(request, "police-intimation.confirmed", requests.displayName(caller.userId()));
         audit.record(caller, "service-request.police-intimation-confirmed", "service_request", id,
                 "reference", ref, "submittedOn", submitted == null ? null : submitted.toString());

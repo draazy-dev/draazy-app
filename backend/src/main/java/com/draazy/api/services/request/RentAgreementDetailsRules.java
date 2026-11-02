@@ -14,7 +14,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 final class RentAgreementDetailsRules {
-    static final int START_DATE_PAST_DAYS = 30;
+    // No published IGR back-dating limit; mirrors the Registration Act s.23 four-month window.
+    static final int START_DATE_PAST_DAYS = 120;
     static final int START_DATE_FUTURE_DAYS = 180;
 
     static final Set<String> CAPACITIES = Set.of("owner", "co-owner", "poa");
@@ -67,7 +68,7 @@ final class RentAgreementDetailsRules {
         }
     }
 
-    static void check(Map<String, Object> details, LocalDate today, boolean requireWitnessNames) {
+    static void check(Map<String, Object> details, LocalDate today, boolean filing) {
         if (details == null) {
             return;
         }
@@ -75,7 +76,7 @@ final class RentAgreementDetailsRules {
         List<String> problems = new ArrayList<>();
         Map<String, Object> terms = ServiceRequestPricing.childObject(state, "terms");
         terms(terms, today, problems);
-        visit(terms, today, requireWitnessNames, problems);
+        visit(terms, today, filing, problems);
         pricedTerms(details, terms, problems);
         Map<String, Object> prop = ServiceRequestPricing.childObject(state, "prop");
         Object pincode = prop.get("pincode");
@@ -101,7 +102,6 @@ final class RentAgreementDetailsRules {
         PartyIdentityRules.check(state, coOwners, tenants, today, problems);
         TenantPoliceRecordRules.check(tenants, problems);
         partyTypesAndResidency(state, coOwners, tenants, problems);
-        witnesses(state, requireWitnessNames, problems);
         capacities(state, coOwners, today, problems);
         distinctMobiles(state, coOwners, tenants, problems);
         if (!problems.isEmpty()) {
@@ -123,7 +123,8 @@ final class RentAgreementDetailsRules {
             LocalDate date = LocalDate.parse(start.toString());
             if (date.isBefore(today.minusDays(START_DATE_PAST_DAYS))
                     || date.isAfter(today.plusDays(START_DATE_FUTURE_DAYS))) {
-                problems.add("_state.terms.startDate must be within 30 days before and 180 days after today");
+                problems.add("_state.terms.startDate must be within " + START_DATE_PAST_DAYS + " days before and "
+                        + START_DATE_FUTURE_DAYS + " days after today");
             }
         } catch (DateTimeParseException malformed) {
             problems.add("_state.terms.startDate must be an ISO date yyyy-MM-dd");
@@ -233,18 +234,6 @@ final class RentAgreementDetailsRules {
             problems.add(path + " must be a number from " + min + " to " + max
                     + " with at most two decimals");
         }
-    }
-
-    private static void witnesses(Map<String, Object> state, boolean requireWitnessNames,
-            List<String> problems) {
-        Object witRaw = state.get("wit");
-        Map<String, Object> wit = ServiceRequestPricing.childObject(state, "wit");
-        if (witRaw instanceof Map<?, ?> && requireWitnessNames) {
-            required(wit.get("w1Name"), "_state.wit.w1Name", problems);
-            required(wit.get("w2Name"), "_state.wit.w2Name", problems);
-        }
-        whole(wit.get("w1Age"), "_state.wit.w1Age", 18, 150, problems);
-        whole(wit.get("w2Age"), "_state.wit.w2Age", 18, 150, problems);
     }
 
     private static void adults(Map<String, Object> state, List<Map<?, ?>> coOwners,
@@ -360,9 +349,6 @@ final class RentAgreementDetailsRules {
         if (!"invite".equals(String.valueOf(state.get("tenantMode")))) {
             tenants.forEach(row -> mobiles.add(row.get("mobile")));
         }
-        Map<String, Object> wit = ServiceRequestPricing.childObject(state, "wit");
-        mobiles.add(wit.get("w1Mobile"));
-        mobiles.add(wit.get("w2Mobile"));
         for (Object raw : mobiles) {
             String mobile = normaliseMobile(raw);
             if (mobile != null && !seen.add(mobile)) {

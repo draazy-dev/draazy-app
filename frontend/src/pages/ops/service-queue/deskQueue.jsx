@@ -1,7 +1,27 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { Clock } from 'lucide-react';
-import { listServiceRequestQueue } from '../../../services/serviceRequestService.js';
+import { getServiceRequest, listServiceRequestQueue } from '../../../services/serviceRequestService.js';
 import { classNames, fmtNum } from '../../../lib/format.js';
+import { useToast } from '../../../context/ToastContext.jsx';
+
+export function useLinkedCase(open) {
+  const { toast } = useToast();
+  const [params, setParams] = useSearchParams();
+  const id = params.get('request');
+  useEffect(() => {
+    if (!id) return undefined;
+    let live = true;
+    const settle = (request) => {
+      if (!live) return;
+      if (request) open(request);
+      else toast('That case could not be opened. It may have moved to another desk.', 'error');
+      setParams((p) => { const next = new URLSearchParams(p); next.delete('request'); return next; }, { replace: true });
+    };
+    getServiceRequest(id).then(settle, () => settle(null));
+    return () => { live = false; };
+  }, [id, open, setParams, toast]);
+}
 
 const DESK_TURN = 'assigned,in-progress,changes-requested,approved';
 
@@ -10,7 +30,8 @@ export const stageTabs = (noun) => [
   { key: 'mine', label: `My ${noun}s`, query: { mine: true, status: `${DESK_TURN},draft-shared,action-required` }, count: (s) => s.mine, empty: `You hold no open ${noun}s.` },
   { key: 'progress', label: 'In progress', query: { status: DESK_TURN }, count: (s) => s.inProgress, empty: `No ${noun} is waiting on the desk.` },
   { key: 'customer', label: 'With customer', query: { status: 'draft-shared,action-required' }, count: (s) => s.withCustomer, empty: 'Nothing is waiting on a customer.' },
-  { key: 'closed', label: 'Closed', query: { status: 'completed,cancelled' }, count: (s) => s.closed, empty: `No closed ${noun}s yet.` },
+  { key: 'closed', label: 'Closed', query: { status: 'completed' }, count: (s) => s.closed, empty: `No completed ${noun}s yet.` },
+  { key: 'cancelled', label: 'Cancelled', query: { status: 'cancelled' }, count: (s) => s.cancelled, empty: `No cancelled or withdrawn ${noun}s.` },
 ];
 
 export function useQueue(query, reloadToken) {

@@ -11,6 +11,7 @@ import { COMMERCIAL_ROUTE } from './constants.js';
 import PoaFields from './PoaFields.jsx';
 import UploadBox from './UploadBox.jsx';
 import PartyIdentityFields from './PartyIdentityFields.jsx';
+import PartyAddressFields from './PartyAddressFields.jsx';
 
 export default function CoOwnerBlock({ index, row, set, remove, errors, fc, clearErr, ownerDocs, setOwnerDocs, today, masked, held }) {
   const { t } = useTranslation();
@@ -49,7 +50,7 @@ export default function CoOwnerBlock({ index, row, set, remove, errors, fc, clea
         )}
         {offline && <div className="sm:col-span-2 rounded-xl border border-sky-400/20 bg-sky-500/10 p-3 text-xs text-sky-100 leading-relaxed">{t('services.ra.party.offlineNote')}</div>}
         <Field label={t('services.ra.owner.fullName')} required error={errors[p + 'name'] && t('services.ra.owner.coOwners.nameErr')}><input {...input('name')} placeholder={t('services.ra.owner.fullNamePlaceholder')} /></Field>
-        <PartyIdentityFields dob={row.dob} setDob={(v) => set('dob', v)} setAge={(v) => set('age', v)} keys={{ dob: p + 'dob', age: p + 'age' }} errors={errors} clearErr={clearErr} />
+        <PartyIdentityFields dob={row.dob} setDob={(v) => set('dob', v)} setAge={(v) => set('age', v)} mother={row.mother} setMother={(v) => set('mother', v)} gender={row.gender} setGender={(v) => set('gender', v)} keys={{ dob: p + 'dob', age: p + 'age', mother: p + 'mother', gender: p + 'gender' }} errors={errors} clearErr={clearErr} />
         <Field label={t('services.ra.owner.pan')} required error={errors[p + 'pan'] && why('pan', 'services.ra.owner.panErr')}><PartyIdInput masked={masked?.pan} held={held} kind="pan" value={row.pan || ''} onChange={(v) => { set('pan', v); clearErr(p + 'pan'); }} className={fc(p + 'pan')} placeholder="ABCDE1234F" /></Field>
         {offline && (
           <>
@@ -59,6 +60,7 @@ export default function CoOwnerBlock({ index, row, set, remove, errors, fc, clea
           </>
         )}
         <Field label={t('services.ra.owner.mobile')} required error={errors[p + 'mobile'] && why('mobile', 'services.ra.owner.mobileErr')}><MobileField value={row.mobile} onChange={(v) => { set('mobile', v); clearErr(p + 'mobile'); }} error={!!errors[p + 'mobile']} placeholder={t('services.ra.owner.mobilePlaceholder')} inputClassName="px-4 py-3" /></Field>
+        <PartyAddressFields value={row.addr} onChange={(k, v) => set('addr', { ...row.addr, [k]: v })} errPrefix={p + 'addr'} errors={errors} clearErr={clearErr} />
         <Field label={t('services.ra.owner.capacity')}>
           <NativeSelect value={row.capacity} onChange={(e) => set('capacity', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm">
             {['co-owner', 'poa'].map((c) => <option key={c} value={c}>{t(`services.ra.owner.capacityOpt.${c}`)}</option>)}

@@ -4,12 +4,13 @@ import { API, signedInAsNew } from '../../../helpers/liveAuth.js';
 import { isolatedPin, pickGoogleSociety } from '../../../helpers/places.js';
 import { pickGoogleLocality } from '../../../helpers/locality.js';
 import { SOCIETY_PLACEHOLDER, active } from '../../../helpers/rentAgreementWizard.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
 test('picking the society fills the locality and pincode it knows, and a later locality pick still corrects it', async ({ page }) => {
   await signedInAsNew(page, { api: API });
-  await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `${BASE}/services/rent-agreement`);
   const p = active(page);
   const locality = p.locator('[data-err="locality"]');
 

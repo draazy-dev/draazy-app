@@ -1,0 +1,1 @@
+ALTER TABLE service_request_parties ADD COLUMN details_submitted_at timestamptz;

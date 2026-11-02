@@ -1,7 +1,8 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, uploadedListingPhotos, signedInAsNew } from '../../../helpers/liveAuth.js';
-import { SOCIETY_PLACEHOLDER, active, fillOwner, fillProperty, fillTenant, fillTerms, fillWitnesses, payAndSubmit } from '../../../helpers/rentAgreementWizard.js';
+import { SOCIETY_PLACEHOLDER, active, fillOwner, fillProperty, fillTenant, fillTerms, payAndSubmit } from '../../../helpers/rentAgreementWizard.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 // Settlement stays out of reach — only the signature-verified webhook moves the request to `new` —
 // so the paid half is owned by `ServiceRequestFlowTest.PaidGate` on the backend.
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
@@ -61,13 +62,12 @@ test.describe('Rent Agreement — the priced desk, live', () => {
     const { accessToken: ownerToken } = await apiLogin(mobile, { api: API });
     const propertyId = await createOwnListing(ownerToken);
     expect(propertyId, 'a listing of this owner to open the wizard from').toBeTruthy();
-    await page.goto(`${BASE}/services/rent-agreement?listing=${propertyId}`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement?listing=${propertyId}`);
 
     await fillProperty(page);
     await fillOwner(page);
     await fillTenant(page);
     await fillTerms(page, { deposit: '1,50,000' });
-    await fillWitnesses(page);
 
     const review = active(page);
     await review.getByRole('checkbox').check();
@@ -155,7 +155,7 @@ test.describe('Rent Agreement — the priced desk, live', () => {
       expect(rows.filter((r) => r.type === 'rent-agreement')).toHaveLength(1);
     });
 
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
 
     await expect(page.getByText(LOCKED)).toBeVisible({ timeout: 20000 });
     await expect(page.getByPlaceholder(SOCIETY_PLACEHOLDER)).toHaveCount(0);

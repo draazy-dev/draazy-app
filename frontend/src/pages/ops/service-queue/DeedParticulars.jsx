@@ -29,8 +29,13 @@ const poa = (p) => (text(p.poaRegNo)
   ? `for ${text(p.poaPrincipal) || '—'}, reg. ${text(p.poaRegNo)} (${[text(p.poaSro), text(p.poaDate)].filter(Boolean).join(', ')})`
   : '');
 
+const GENDER = { male: 'Male', female: 'Female', other: 'Other' };
+const identity = (p) => [['Gender', GENDER[text(p.gender)] || p.gender], ["Mother's name", p.mother]];
+const residence = (a) => [text(a.address), text(a.village), text(a.pincode)].filter(Boolean).join(', ');
+
 const licensor = (p, k) => [
-  ['Date of birth', p[k.dob]], ['Age', p[k.age]], ['Capacity', CAPACITY[p.capacity] || p.capacity], ['Mobile', text(p[k.mobile])],
+  ['Date of birth', p[k.dob]], ['Age', p[k.age]], ...identity(p), ['Capacity', CAPACITY[p.capacity] || p.capacity], ['Mobile', text(p[k.mobile])],
+  ['Address', residence(obj(p.addr))],
   ['Residency', RESIDENCY[p.residency] || 'Resident / Aadhaar e-registration'], ['Passport', maskId(p.passport)],
   ['SRO route', p.residency === 'nri' || p.residency === 'foreign' ? 'Yes — staff appointment required' : ''],
   ['Power of attorney', poa(p)],
@@ -64,7 +69,6 @@ export function deedGroups(details) {
   const prop = obj(state.prop);
   const terms = obj(state.terms);
   const owner = obj(state.owner);
-  const wit = obj(state.wit);
   const flatArea = area(prop.area, prop.areaUnit);
   const increment = text(terms.increment) ? `${text(terms.increment)}% every ${text(terms.incrementEvery) || 11} months` : '';
   const furniture = list(state.furnItems).map((f) => text(f.name) + (Number(f.qty) > 1 ? ` ×${f.qty}` : '')).filter(Boolean).join(', ');
@@ -92,14 +96,11 @@ export function deedGroups(details) {
     ...list(state.coOwners).map((c, i) => group(`licensor-${i + 1}`, 'licensor', `Licensor ${i + 2}`,
       licensor(c, { dob: 'dob', age: 'age', mobile: 'mobile' }), c.name)),
     ...list(state.tenants).map((t, i) => group(`tenant-${i}`, 'licensee', `Licensee ${i + 1}`, [
-      ['Date of birth', t.dob], ['Age', t.age], ['Occupation', t.occupation], ['Mobile', text(t.mobile)],
+      ['Date of birth', t.dob], ['Age', t.age], ...identity(t), ['Occupation', t.occupation], ['Mobile', text(t.mobile)],
       ['Residency', RESIDENCY[t.residency] || 'Resident / Aadhaar e-registration'], ['Passport', maskId(t.passport)],
       ['SRO route', t.residency === 'nri' || t.residency === 'foreign' ? 'Yes — staff appointment required' : ''],
       ...policeRows(t),
     ], t.name)),
-    ...[1, 2].map((n) => group(`witness-${n}`, 'witness', `Witness ${n}`, [
-      ['Age', wit[`w${n}Age`]], ['Mobile', text(wit[`w${n}Mobile`])],
-    ], wit[`w${n}Name`])),
   ].filter((g) => g.rows.length || g.name);
 }
 

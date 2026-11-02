@@ -45,10 +45,7 @@ class ServiceRequestSelfDealing {
         Set<String> out = new HashSet<>(RentAgreementRegistration.formTenants(request).keySet());
         Map<String, Object> details = request.getDetails() == null ? Map.of() : request.getDetails();
         Map<String, Object> state = ServiceRequestPricing.childObject(details, "_state");
-        Map<String, Object> wit = ServiceRequestPricing.childObject(state, "wit");
         addMobile(out, ServiceRequestPricing.childObject(state, "owner").get("oMobile"));
-        addMobile(out, wit.get("w1Mobile"));
-        addMobile(out, wit.get("w2Mobile"));
         if (state.get("coOwners") instanceof List<?> rows) {
             rows.forEach(row -> {
                 if (row instanceof Map<?, ?> coOwner) {

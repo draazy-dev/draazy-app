@@ -39,7 +39,7 @@ Costs are calculated under Maharashtra Article 36A. As a rough guide:
 - Maintenance responsibility, itemised
 - Escalation on renewal
 - Permitted use, and any restriction on subletting
-- Two witnesses, with their names, ages and mobile numbers
+- Two witnesses (Draazy records them at the doorstep visit, so you don't provide their details)
 
 ## Common mistakes
 

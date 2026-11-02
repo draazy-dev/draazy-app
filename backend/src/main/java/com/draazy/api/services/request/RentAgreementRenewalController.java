@@ -20,4 +20,10 @@ public class RentAgreementRenewalController {
             @PathVariable("id") String id) {
         return prefill.forCaller(principal.userId(), id);
     }
+
+    @GetMapping(Routes.MeRentAgreements.HOME_RENEWAL)
+    public RentAgreementRenewalPrefill.Prefill homeRenewal(@CurrentUser AuthPrincipal principal,
+            @PathVariable("homeId") String homeId) {
+        return prefill.forHome(principal.userId(), homeId);
+    }
 }

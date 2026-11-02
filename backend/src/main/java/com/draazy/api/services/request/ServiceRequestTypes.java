@@ -72,6 +72,12 @@ public final class ServiceRequestTypes {
         return team;
     }
 
+    // The back office routes each desk at /admin/<type> and opens the case named by ?request=.
+    public static String deskFor(ServiceRequest request) {
+        teamFor(request.getType());
+        return "/admin/" + request.getType() + "?request=" + request.getId();
+    }
+
     public static Map<String, String> teams() {
         return TEAM_BY_TYPE;
     }

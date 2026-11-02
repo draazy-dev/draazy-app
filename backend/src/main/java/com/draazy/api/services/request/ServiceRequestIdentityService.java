@@ -27,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ServiceRequestIdentityService {
     private static final Logger log = LoggerFactory.getLogger(ServiceRequestIdentityService.class);
 
-    private static final Set<String> ALL_ROLES = Set.of("owner", "tenant", "witness");
 
     static final String PURGED = "identities.purged";
     static final String RERECORDED = "identities.recorded";
@@ -40,11 +39,13 @@ public class ServiceRequestIdentityService {
     private final AuditService audit;
     private final AccountPermissions accountPermissions;
     private final RentAgreementOwnerSide ownerSide;
+    private final RentAgreementReadiness readiness;
 
     public ServiceRequestIdentityService(ServiceRequestIdentityRepository identities,
             ServiceRequestRepository requests, ServiceRequestPartyRepository parties,
             ServiceRequestEventRepository events, AuditService audit,
-            AccountPermissions accountPermissions, RentAgreementOwnerSide ownerSide) {
+            AccountPermissions accountPermissions, RentAgreementOwnerSide ownerSide,
+            RentAgreementReadiness readiness) {
         this.identities = identities;
         this.requests = requests;
         this.parties = parties;
@@ -52,6 +53,7 @@ public class ServiceRequestIdentityService {
         this.audit = audit;
         this.accountPermissions = accountPermissions;
         this.ownerSide = ownerSide;
+        this.readiness = readiness;
     }
 
     @Transactional
@@ -62,7 +64,7 @@ public class ServiceRequestIdentityService {
                     + " — identity numbers cannot be recorded against it.");
         }
         boolean afterPurge = latestIdentityEventIsPurge(request.getId());
-        Set<Slot> replaceSlots = slotsToReplace(caller, request, body.parties());
+        Set<Slot> replaceSlots = slotsToReplace(caller, request, body.parties(), afterPurge);
         validateDistinctNumbers(body.parties());
 
         deleteSlots(request.getId(), replaceSlots);
@@ -144,43 +146,8 @@ public class ServiceRequestIdentityService {
         return purged;
     }
 
-    private Set<String> writableRoles(AuthPrincipal caller, ServiceRequest request) {
-        if (caller.userId().equals(request.getRequesterId())) {
-            return ALL_ROLES;
-        }
-        Set<String> own = acceptedRoles(request.getId(), caller.userId());
-        if (!own.isEmpty()) {
-            if (request.getStatus() != ServiceRequestStatus.AWAITING_PAYMENT
-                    || request.getPaymentRef() != null) {
-                throw new ConflictException("Checkout is already open for this request. Ask the"
-                        + " requester to correct your identity numbers if they are wrong.");
-            }
-            return own;
-        }
-        if (Roles.isBackOffice(caller.role())) {
-            throw new ForbiddenException(
-                    "Only the parties to this agreement can record their identity numbers.");
-        }
-        throw NotFoundException.of("Service request");
-    }
-
     Set<String> acceptedRoles(UUID requestId, UUID userId) {
         return parties.findByRequestId(requestId).stream().filter(p -> userId.equals(p.getUserId()) && CoFillParties.ACCEPTED.equals(p.getStatus())).map(ServiceRequestParty::getRole).collect(Collectors.toSet());
-    }
-
-    private Set<String> rolesToReplace(AuthPrincipal caller, ServiceRequest request, Set<String> bodyRoles) {
-        if (!caller.userId().equals(request.getRequesterId())) {
-            return bodyRoles;
-        }
-        Set<String> coFillRoles = acceptedCoFillRoles(request.getId());
-        if (bodyRoles.stream().anyMatch(coFillRoles::contains)) {
-            throw new ConflictException("the invited party records their own identity numbers");
-        }
-        return ALL_ROLES.stream().filter(role -> !coFillRoles.contains(role)).collect(Collectors.toSet());
-    }
-
-    Set<String> acceptedCoFillRoles(UUID requestId) {
-        return parties.findByRequestId(requestId).stream().filter(p -> CoFillParties.ACCEPTED.equals(p.getStatus())).map(ServiceRequestParty::getRole).collect(Collectors.toSet());
     }
 
     private Set<Slot> acceptedSlots(UUID requestId, UUID userId) {
@@ -189,10 +156,6 @@ public class ServiceRequestIdentityService {
 
     private Set<Slot> acceptedCoFillSlots(UUID requestId) {
         return parties.findByRequestId(requestId).stream().filter(p -> CoFillParties.ACCEPTED.equals(p.getStatus())).map(p -> new Slot(p.getRole(), p.getPartyIndex())).collect(Collectors.toSet());
-    }
-
-    Set<String> liveCoFillRoles(UUID requestId) {
-        return parties.findByRequestId(requestId).stream().filter(p -> !CoFillParties.DECLINED.equals(p.getStatus())).map(ServiceRequestParty::getRole).collect(Collectors.toSet());
     }
 
     boolean hasAcceptedSlot(UUID requestId, UUID userId, String role, int index) {
@@ -209,7 +172,7 @@ public class ServiceRequestIdentityService {
     }
 
     private Set<Slot> slotsToReplace(AuthPrincipal caller, ServiceRequest request,
-            List<ServiceRequestIdentitiesRequest.Party> body) {
+            List<ServiceRequestIdentitiesRequest.Party> body, boolean afterPurge) {
         Set<Slot> bodySlots = slots(body);
         if (!caller.userId().equals(request.getRequesterId())) {
             Set<Slot> own = acceptedSlots(request.getId(), caller.userId());
@@ -224,22 +187,29 @@ public class ServiceRequestIdentityService {
                 throw new ForbiddenException(
                         "You can record identity numbers only for your own side of this agreement.");
             }
-            if ((request.getStatus() != ServiceRequestStatus.AWAITING_PAYMENT || request.getPaymentRef() != null)
-                    && !purgedSlots(request.getId()).containsAll(bodySlots)) {
-                throw new ConflictException("Checkout is already open for this request. Ask the"
-                        + " requester to correct your identity numbers if they are wrong.");
+            boolean editable = bodySlots.stream().map(Slot::role).distinct()
+                    .allMatch(role -> readiness.sideEditable(request, false, role));
+            if (!editable && !purgedSlots(request.getId()).containsAll(bodySlots)) {
+                throw RentAgreementReadiness.editLocked(request);
             }
             return bodySlots;
         }
-        boolean ownsOwnerSide = !ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType()) || ownerSide.requesterIsOwner(request);
+        boolean rentAgreement = ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType());
+        if (rentAgreement && !afterPurge && !readiness.sideEditable(request, true, null)) {
+            throw RentAgreementReadiness.editLocked(request);
+        }
+        boolean ownsOwnerSide = !rentAgreement || ownerSide.requesterIsOwner(request);
         if (!ownsOwnerSide && bodySlots.stream().anyMatch(slot -> "owner".equals(slot.role()))) {
             throw RentAgreementOwnerSide.refusal();
         }
-        Set<Slot> coFillSlots = acceptedCoFillSlots(request.getId());
+        Set<Slot> coFillSlots = acceptedCoFillSlots(request.getId()).stream()
+                .filter(slot -> !(rentAgreement && "tenant".equals(slot.role())
+                        && RentAgreementReadiness.ownerHoldsAll(request)))
+                .collect(Collectors.toSet());
         if (bodySlots.stream().anyMatch(coFillSlots::contains)) {
             throw new ConflictException("the invited party records their own identity numbers");
         }
-        Map<String, String> onForm = ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType()) ? formParties(request) : Map.of();
+        Map<String, String> onForm = rentAgreement ? formParties(request) : Map.of();
         return identities.findByServiceRequestIdOrderByPartyRoleAscPartyIndexAsc(request.getId()).stream()
                 .filter(row -> bodySlots.contains(new Slot(row.getPartyRole(), row.getPartyIndex()))
                         || !samePerson(onForm.get(row.getPartyRole() + "-" + row.getPartyIndex()), row.getPartyName()))
@@ -257,9 +227,6 @@ public class ServiceRequestIdentityService {
         Map<String, Object> state = ServiceRequestPricing.childObject(request.getDetails() == null ? Map.of() : request.getDetails(), "_state");
         Map<String, String> slots = new HashMap<>();
         slots.put("owner-0", text(ServiceRequestPricing.childObject(state, "owner").get("oName")));
-        Map<String, Object> wit = ServiceRequestPricing.childObject(state, "wit");
-        slots.put("witness-0", text(wit.get("w1Name")));
-        slots.put("witness-1", text(wit.get("w2Name")));
         slots.put("tenant-0", "");
         List<?> coOwners = state.get("coOwners") instanceof List<?> rows ? rows : List.of();
         List<?> tenants = state.get("tenants") instanceof List<?> rows ? rows : List.of();

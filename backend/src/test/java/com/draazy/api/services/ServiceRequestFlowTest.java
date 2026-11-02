@@ -22,6 +22,7 @@ import com.draazy.api.services.request.CoFillInviteRetention;
 import com.draazy.api.services.request.ServiceRequestEventRepository;
 import com.draazy.api.services.request.ServiceRequestMessageRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -220,7 +221,7 @@ class ServiceRequestFlowTest extends ServiceFixtures {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("cancelled"));
 
-            assertThat(messages.findByRequestIdOrderByCreatedAtAsc(UUID.fromString(id)))
+            assertThat(messages.findByRequestIdInOrderByCreatedAtAsc(List.of(UUID.fromString(id))))
                 .extracting(message -> message.getBody())
                 .contains("The owner withdrew consent");
             assertThat(notifications.findAll())

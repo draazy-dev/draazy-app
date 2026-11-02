@@ -35,8 +35,6 @@ class RentAgreementReadinessTest extends ServiceFixtures {
     private static final String OWNER_AADHAAR = "211122223335";
     private static final String CO_OWNER_AADHAAR = "555566667771";
     private static final String TENANT_AADHAAR = "444455556666";
-    private static final String WITNESS_1_AADHAAR = "666677778888";
-    private static final String WITNESS_2_AADHAAR = "234567890124";
 
     @AfterEach
     void clearAuditRows() {
@@ -63,15 +61,14 @@ class RentAgreementReadinessTest extends ServiceFixtures {
             upload(owner, id, "ownership-proof");
             checkout(owner, id, 409)
                     .andExpect(jsonPath("$.message", allOf(
-                            containsString("Record PAN numbers before checkout: Licensor 1, Tenant 1"),
-                            not(containsString("Witness")))));
+                            containsString("Record PAN numbers before checkout: Licensor 1, Tenant 1"))));
 
             identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             checkout(owner, id, 200).andExpect(jsonPath("$.paymentSessionId").isNotEmpty());
         }
 
         @Test
-        @DisplayName("opens on a PAN for every licensor and tenant, with no Aadhaar, witness rows or person scans")
+        @DisplayName("opens on a PAN for every licensor and tenant, with no Aadhaar or person scans")
         void opensOnPanRowsAlone() throws Exception {
             User owner = customer("9820000771");
             String coOwners = "[{\"name\":\"Vikram Patil\",\"age\":\"48\",\"mobile\":\"9820000773\","
@@ -84,8 +81,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                     containsString("Record PAN numbers before checkout"),
                     containsString("Licensor 2"),
                     not(containsString("Licensor 1")),
-                    not(containsString("Tenant 1")),
-                    not(containsString("Witness")))));
+                    not(containsString("Tenant 1")))));
 
             identities(owner, id, parties(panOnly("owner", 0, "ABCDE1234F"), panOnly("owner", 1, "KLMNO9012P"),
                     panOnly("tenant", 0, "FGHIJ5678K")), 204);
@@ -100,7 +96,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                     + "\"residency\":\"nri\",\"passport\":\"Z1234567\"}";
             String id = create(owner, "{\"owner\":{\"oName\":\"Asha Patil\",\"oAge\":\"52\","
                     + "\"oMobile\":\"9820000774\",\"capacity\":\"owner\"},"
-                    + "\"tenants\":[" + foreignTenant + "]," + PROP + "," + WITNESSES + "," + TERMS + "}", 201);
+                    + "\"tenants\":[" + foreignTenant + "]," + PROP + "," + TERMS + "}", 201);
             upload(owner, id, "ownership-proof");
             upload(owner, id, "tenant-0-passport");
             identities(owner, id, parties(party("owner", 0, OWNER_AADHAAR, null)), 204);
@@ -123,7 +119,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                     + "\"workplaceAddress\":\"Draazy Labs, Baner\",\"workIdProofType\":\"Employee ID\"}}";
             String id = create(owner, "{\"owner\":{\"oName\":\"Asha Patil\",\"oAge\":\"52\","
                     + "\"oAddr\":\"MG Road, Pune\",\"oMobile\":\"9820000715\",\"capacity\":\"owner\"},"
-                    + "\"tenants\":[" + tenantJson + "]," + PROP + "," + WITNESSES + "," + TERMS + "}", 201);
+                    + "\"tenants\":[" + tenantJson + "]," + PROP + "," + TERMS + "}", 201);
 
             identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             upload(owner, id, "ownership-proof");
@@ -295,7 +291,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                     + "\"visaOci\":\"OCI-123\"}";
             String id = create(owner, "{\"owner\":{\"oName\":\"Asha Patil\",\"oAge\":\"52\","
                     + "\"oMobile\":\"9820000766\",\"capacity\":\"owner\"},"
-                    + "\"tenants\":[" + foreignTenant + "]," + PROP + "," + WITNESSES + "," + TERMS + "}", 201);
+                    + "\"tenants\":[" + foreignTenant + "]," + PROP + "," + TERMS + "}", 201);
 
             upload(owner, id, "ownership-proof");
             checkout(owner, id, 409).andExpect(jsonPath("$.message", allOf(
@@ -333,8 +329,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
             checkout(owner, id, 409)
                     .andExpect(jsonPath("$.message", allOf(
                             containsString("Licensor 1"),
-                            containsString("Tenant 1"),
-                            not(containsString("Witness")))));
+                            containsString("Tenant 1"))));
         }
 
         @Test
@@ -342,7 +337,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         void particularsAreCheckedLast() throws Exception {
             User owner = customer("9820000742");
             String id = create(owner, "{\"owner\":{\"oMobile\":\"9820000742\"},"
-                    + "\"tenants\":[{\"mobile\":\"9820000743\"}]," + WITNESSES + "}", 201);
+                    + "\"tenants\":[{\"mobile\":\"9820000743\"}]}", 201);
             identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             upload(owner, id, "ownership-proof");
 
@@ -351,8 +346,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                             containsString("Complete the agreement before checkout"),
                             containsString("Monthly rent"),
                             containsString("Flat number"),
-                            not(containsString("address")),
-                            not(containsString("Witness 1 name")))));
+                            not(containsString("address")))));
         }
     }
 
@@ -371,7 +365,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                     "{\"months\":\"61\"}",
                     "{\"months\":\"11\",\"lockin\":\"12\"}",
                     "{\"months\":\"11\",\"increment\":\"101\"}",
-                    "{\"months\":\"11\",\"startDate\":\"" + LocalDate.now(PlatformTime.IST).minusDays(31) + "\"}",
+                    "{\"months\":\"11\",\"startDate\":\"" + LocalDate.now(PlatformTime.IST).minusDays(121) + "\"}",
                     "{\"months\":\"11\",\"startDate\":\"" + LocalDate.now(PlatformTime.IST).plusDays(181) + "\"}",
                     "{\"months\":\"11\",\"startDate\":\"next week\"}",
                     "{\"months\":\"11\",\"language\":\"Hindi\"}",
@@ -384,9 +378,10 @@ class RentAgreementReadinessTest extends ServiceFixtures {
             }
             create(owner, "{" + mobiles + ",\"terms\":{\"months\":\"11\",\"language\":\"Marathi\",\"visitAt\":\"licensee\","
                     + "\"visitSlot\":\"evening\",\"visitDate\":\"" + LocalDate.now(PlatformTime.IST).plusDays(1) + "\"}}", 201);
+            create(customer("9820000728"), "{\"owner\":{\"oMobile\":\"9820000728\"},\"tenants\":[{\"mobile\":\"9820000729\"}],"
+                    + "\"terms\":{\"months\":\"11\",\"startDate\":\"" + LocalDate.now(PlatformTime.IST).minusDays(120) + "\"}}", 201);
             create(owner, "{\"owner\":{\"oMobile\":\"9820000708\"},\"tenants\":[{\"mobile\":\"98200 00708\"}],"
                     + "\"terms\":{\"months\":\"11\",\"startDate\":\"" + start + "\"}}", 422);
-            create(owner, "{" + mobiles + ",\"wit\":{\"w1Mobile\":\"9820000709\"}}", 422);
             create(owner, "{\"owner\":{\"oMobile\":\"9820000708\",\"capacity\":\"tenant\"}}", 422);
         }
 
@@ -411,7 +406,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         void eachSideWritesItsOwnHalf() throws Exception {
             User owner = customer("9820000712");
             User tenant = customer("9820000713");
-            String id = coFill(owner, tenant, NRI, "," + PROP + "," + WITNESSES + ",\"terms\":{\"rent\":\"30000\","
+            String id = coFill(owner, tenant, NRI, "," + PROP + ",\"terms\":{\"rent\":\"30000\","
                     + "\"deposit\":\"0\",\"months\":\"11\",\"startDate\":\""
                     + LocalDate.now(PlatformTime.IST).plusDays(7) + "\"}");
             partyDetails(tenant, id, "{\"_state\":{\"owner\":{\"oMobile\":\"9820000712\"},"
@@ -420,7 +415,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
             identities(tenant, id, parties(owner(0, OWNER_AADHAAR)), 403);
             identities(tenant, id, parties(tenant(TENANT_AADHAAR)), 204);
             identities(owner, id, parties(tenant(TENANT_AADHAAR)), 409);
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), witnesses()), 204);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR)), 204);
             upload(tenant, id, "licensor-0-passport", 403);
             upload(tenant, id, " Licensor-0-Passport", 403);
             upload(tenant, id, "ownership-proof", 403);
@@ -448,32 +443,32 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         void invitedSideCannotRepeatANumber() throws Exception {
             User owner = customer("9820000786");
             User tenant = customer("9820000787");
-            String id = coFill(owner, tenant, "," + PROP + "," + WITNESSES + "," + TERMS);
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), witnesses()), 204);
+            String id = coFill(owner, tenant, "," + PROP + "," + TERMS);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR)), 204);
 
             identities(tenant, id, parties(party("tenant", 0, TENANT_AADHAAR, "abcde1234f")), 422);
             identities(tenant, id, parties(tenant(OWNER_AADHAAR)), 422);
         }
 
         @Test
-        @DisplayName("the invited side writes only its own half; the licensor, flat, terms and witnesses stay the requester's")
+        @DisplayName("the invited side writes only its own half; the licensor, flat and terms stay the requester's")
         void invitedSideWritesOnlyItsOwnHalf() throws Exception {
             User owner = customer("9820000742");
             User tenant = customer("9820000743");
-            String id = coFill(owner, tenant, "," + PROP + "," + WITNESSES + "," + TERMS);
+            String id = coFill(owner, tenant, "," + PROP + "," + TERMS);
 
             partyDetails(tenant, id, "{\"ownerName\":\"Mallory\",\"_state\":{\"owner\":{\"oName\":\"Mallory\"},"
-                    + "\"prop\":{\"flatNo\":\"Z-9\"},\"wit\":{\"w1Name\":\"Eve\"},\"terms\":{\"lockin\":\"1\"},"
+                    + "\"prop\":{\"flatNo\":\"Z-9\"},\"terms\":{\"lockin\":\"1\"},"
                     + "\"tenants\":[" + tenantRow("Ria Sharma", tenant.getMobile()) + "]}}", 200);
             partyDetails(tenant, id, "{\"_state\":{\"tenants\":[]}}", 422);
 
             Map<String, Object> state = jdbc.queryForMap("select details->'_state'->'owner'->>'oName' as owner,"
-                    + " details->'_state'->'prop'->>'flatNo' as flat, details->'_state'->'wit'->>'w1Name' as witness,"
+                    + " details->'_state'->'prop'->>'flatNo' as flat,"
                     + " details->'_state'->'terms'->>'lockin' as lockin, details->>'ownerName' as summary,"
                     + " details->'_state'->'tenants'->0->>'name' as tenant from service_requests where id = ?",
                     UUID.fromString(id));
             assertThat(state).containsEntry("owner", "Asha Patil").containsEntry("flat", "B-1204")
-                    .containsEntry("witness", "Suresh Patil").containsEntry("tenant", "Ria Sharma");
+                    .containsEntry("tenant", "Ria Sharma");
             assertThat(state.get("lockin")).isNull();
             assertThat(state.get("summary")).isNotEqualTo("Mallory");
         }
@@ -557,8 +552,6 @@ class RentAgreementReadinessTest extends ServiceFixtures {
     private static final String PROP = "\"prop\":{\"gramPanchayat\":false,\"propType\":\"Flat / Apartment\",\"flatNo\":\"B-1204\","
             + "\"society\":\"Skyline Heights\",\"locality\":\"Baner\",\"pincode\":\"411045\",\"area\":\"850\","
             + IGR_PROP_FIELDS + "}";
-    private static final String WITNESSES = "\"wit\":{\"w1Name\":\"Suresh Patil\",\"w1Age\":\"41\","
-            + "\"w1Addr\":\"Karve Road, Pune\",\"w2Name\":\"Meera Joshi\",\"w2Age\":\"36\",\"w2Addr\":\"JM Road, Pune\"}";
     private static final String TERMS = "\"terms\":{\"rent\":\"30000\",\"deposit\":\"0\",\"months\":\"11\","
             + "\"startDate\":\"" + LocalDate.now(PlatformTime.IST).plusDays(7) + "\"}";
 
@@ -576,7 +569,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                 + "\",\"capacity\":\"" + capacity + "\"" + poa + "},"
                 + (coOwners.isEmpty() ? "" : "\"coOwners\":" + coOwners + ",")
                 + "\"tenants\":[{\"name\":\"Ria Sharma\",\"age\":\"29\",\"addr\":\"FC Road, Pune\",\"mobile\":\"" + tenantMobile
-                + "\"}]," + PROP + "," + WITNESSES + ","
+                + "\"}]," + PROP + ","
                 + "\"terms\":{\"months\":\"11\",\"rent\":\"30000\",\"deposit\":\"0\",\"lockin\":\"3\","
                 + "\"increment\":\"5\",\"startDate\":\"" + start + "\"}}";
     }
@@ -589,10 +582,6 @@ class RentAgreementReadinessTest extends ServiceFixtures {
 
     private static String tenant(String aadhaar) {
         return party("tenant", 0, aadhaar, "FGHIJ5678K");
-    }
-
-    private static String witnesses() {
-        return party("witness", 0, WITNESS_1_AADHAAR, null) + "," + party("witness", 1, WITNESS_2_AADHAAR, null);
     }
 
     private static String party(String role, int index, String aadhaar, String pan) {

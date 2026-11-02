@@ -146,7 +146,8 @@ public class ServiceRequestDraftApprovals {
         return otp.resendCooldownSeconds();
     }
 
-    ServiceRequestDto.DraftApproval summary(ServiceRequest request, List<ServiceRequestDraftApproval> rows) {
+    ServiceRequestDto.DraftApproval summary(ServiceRequest request, List<ServiceRequestDraftApproval> rows,
+            AuthPrincipal viewer) {
         List<RequiredApproval> required = required(request);
         if (required.isEmpty()) {
             return null;
@@ -160,7 +161,8 @@ public class ServiceRequestDraftApprovals {
                             p.mobile() == null ? null : MobileMask.mask(p.mobile()),
                             row != null && row.getOpenedAt() != null,
                             row != null && row.getApprovedAt() != null,
-                            row == null ? null : row.getApprovedAt());
+                            row == null ? null : row.getApprovedAt(),
+                            METHOD_IN_APP.equals(p.method()) && viewer.userId().equals(p.userId()));
                 }).toList();
         long approved = parties.stream().filter(ServiceRequestDto.DraftApprovalParty::approved).count();
         return new ServiceRequestDto.DraftApproval(version, (int) approved, parties.size(), parties);

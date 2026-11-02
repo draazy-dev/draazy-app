@@ -39,8 +39,7 @@ public class ServiceRequestPayments {
     @Transactional(readOnly = true)
     public List<Payment> paidBy(UUID userId) {
         List<Payment> out = new ArrayList<>();
-        for (ServiceRequest request : requests.findByRequesterIdAndTypeAndPaymentRefNotNull(userId,
-                ServiceRequestTypes.RENT_AGREEMENT)) {
+        for (ServiceRequest request : requests.findWithOrderInvolving(userId, ServiceRequestTypes.RENT_AGREEMENT)) {
             List<ServiceRequestRefund> history = refunds.findByServiceRequestIdOrderByCreatedAtDesc(request.getId());
             List<ServiceRequestAmendment> topUps = amendments.findByServiceRequestIdAndPaymentRefNotNull(request.getId())
                     .stream().filter(a -> a.delta() > 0
@@ -48,8 +47,13 @@ public class ServiceRequestPayments {
                     .toList();
             long first = (request.getAmount() == null ? 0 : request.getAmount())
                     - topUps.stream().mapToLong(ServiceRequestAmendment::delta).sum();
-            out.add(new Payment(request.getId(), KIND_AGREEMENT, request.getId(), request.getPropertyId(), first,
-                    paidAt(request), request.getPaymentRef(), stateOf(history, request.getPaymentRef())));
+            if (userId.equals(request.payer())) {
+                out.add(new Payment(request.getId(), KIND_AGREEMENT, request.getId(), request.getPropertyId(), first,
+                        paidAt(request), request.getPaymentRef(), stateOf(history, request.getPaymentRef())));
+            }
+            if (!userId.equals(request.getRequesterId())) {
+                continue;
+            }
             for (ServiceRequestAmendment topUp : topUps) {
                 out.add(new Payment(topUp.getId(), KIND_AMENDMENT, request.getId(), request.getPropertyId(),
                         topUp.delta(), topUp.getPaidAt() != null ? topUp.getPaidAt() : topUp.getCreatedAt(),

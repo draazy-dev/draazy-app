@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -22,6 +23,7 @@ import com.draazy.api.common.web.Routes;
 import com.draazy.api.documents.agreement.RentAgreement;
 import com.draazy.api.documents.agreement.RentAgreementRepository;
 import com.draazy.api.identity.user.User;
+import com.draazy.api.security.Roles;
 import com.draazy.api.security.Teams;
 import com.draazy.api.services.request.ServiceRequestStatus;
 import java.time.LocalDate;
@@ -61,7 +63,22 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
     }
 
     private static String withGramPanchayat(String stateJson) {
-        return stateJson.replaceFirst("^\\{", "{\"prop\":{\"gramPanchayat\":false},");
+        return stateJson.contains("\"prop\"")
+                ? stateJson : stateJson.replaceFirst("^\\{", "{\"prop\":{\"gramPanchayat\":false},");
+    }
+
+    private static String onFlat(String rest) {
+        return "{\"prop\":{\"gramPanchayat\":false,\"propType\":\"Flat / Apartment\",\"flatNo\":\"B-704\","
+                + "\"society\":\"Green Meadows\",\"locality\":\"Kothrud\",\"city\":\"Pune\","
+                + "\"pincode\":\"411038\",\"area\":\"950\",\"areaUnit\":\"sqft\"}," + rest + "}";
+    }
+
+    private static final String TENANTS = "\"tenants\":[{\"name\":\"Kiran Tenant\",\"mobile\":\"" + TENANT_ONE
+            + "\"},{\"name\":\"Meera Tenant\",\"mobile\":\"" + TENANT_TWO + "\"}]";
+
+    private static String ownedBy(User owner, String rest) {
+        return onFlat("\"owner\":{\"oName\":\"" + owner.getName() + "\",\"oMobile\":\"" + owner.getMobile()
+                + "\"}," + rest);
     }
 
     private String raise(User caller, Property property, String stateJson) throws Exception {
@@ -419,8 +436,15 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
                 + "{\"name\":\"Typo\",\"mobile\":\"5123456789\"}]}"), owner, desk);
         assertThat(rows(typo)).extracting(RentAgreement::getTenantMobile).containsExactly(TENANT_ONE);
 
-        String invited = complete(raise(owner, listing(owner), "{\"tenantMode\":\"invite\",\"tenants\":["
-                + "{\"name\":\"Before switching\",\"mobile\":\"" + TENANT_TWO + "\"}]}"), owner, desk);
+        String invitedId = raise(owner, listing(owner), "{\"tenantMode\":\"invite\",\"tenants\":["
+                + "{\"name\":\"Before switching\",\"age\":\"30\",\"mobile\":\"" + TENANT_TWO + "\"}]}");
+        mvc.perform(put(Routes.ServiceRequests.IDENTITIES, invitedId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"parties\":[{\"partyRole\":\"tenant\",\"partyIndex\":0,"
+                                + "\"partyName\":\"Before switching\",\"pan\":\"FGHIJ5678K\"}]}"))
+                .andExpect(status().isNoContent());
+        String invited = complete(invitedId, owner, desk);
         assertThat(rows(invited)).isEmpty();
     }
 
@@ -467,19 +491,16 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
     }
 
     @Test
-    @DisplayName("staff typed in as the licensor, a co-owner or a witness cannot work the request either")
-    void typedLicensorAndWitnessStaffAreRefused() throws Exception {
+    @DisplayName("staff typed in as the licensor or a co-owner cannot work the request either")
+    void typedLicensorStaffAreRefused() throws Exception {
         User owner = customer("9820004120");
         User licensor = staff("9820004121", Teams.RENTAL);
         User coOwner = staff("9820004122", Teams.RENTAL);
-        User witness = staff("9820004123", Teams.RENTAL);
         String id = raise(owner, listing(owner), "{\"owner\":{\"oMobile\":\"+91 98200 04121\",\"capacity\":\"co-owner\"},"
-                + "\"coOwners\":[{\"name\":\"Asha\",\"mobile\":\"9820004122\"}],"
-                + "\"wit\":{\"w1Name\":\"Ravi\",\"w1Mobile\":\"9820004123\",\"w2Name\":\"Meera\"}}");
+                + "\"coOwners\":[{\"name\":\"Asha\",\"mobile\":\"9820004122\"}]}");
 
         setStatus(licensor, id, "assigned", 403);
         setStatus(coOwner, id, "assigned", 403);
-        setStatus(witness, id, "assigned", 403);
         setStatus(staff("9820004124", Teams.RENTAL), id, "assigned", 200);
     }
 
@@ -520,5 +541,158 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
         verify(checker, row(id, TENANT_TWO).getId(), "registered", 422);
         verify(checker, row(id, tenant.getMobile()).getId(), "registered", 200);
         assertThat(agreements.hasRegisteredTenancy(p.getId(), tenant.getMobile())).isTrue();
+    }
+
+    private JsonNode homesOf(User owner) throws Exception {
+        return JSON.readTree(mvc.perform(get(Routes.MeManagedProperties.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+    }
+
+    @Test
+    @DisplayName("a registered agreement puts the flat in the owner's hub and the rent on the tenant's dashboard")
+    void registeredAgreementSeedsBothDashboards() throws Exception {
+        User owner = customer("9820004501");
+        User tenant = user(TENANT_ONE, Roles.Wire.BUYER, null, "Kiran Tenant");
+        User desk = staff("9820004502", Teams.RENTAL);
+
+        complete(raise(owner, null, ownedBy(owner, TENANTS)), owner, desk);
+
+        JsonNode homes = homesOf(owner);
+        assertThat(homes).hasSize(1);
+        JsonNode home = homes.get(0);
+        assertThat(home.path("rented").asBoolean()).isTrue();
+        assertThat(home.path("visibility").asText()).isEqualTo("private");
+        assertThat(home.path("deal").asText()).isEqualTo("rent");
+        assertThat(home.path("society").asText()).isEqualTo("Green Meadows");
+        assertThat(home.path("locality").asText()).isEqualTo("Kothrud");
+        assertThat(home.path("tenantName").asText()).isEqualTo("Kiran Tenant");
+        assertThat(home.path("tenantMobile").asText()).isEqualTo(TENANT_ONE);
+        assertThat(home.path("monthlyRent").asLong()).isEqualTo(25000);
+        assertThat(home.path("dueDay").asInt()).isEqualTo(1);
+        assertThat(home.path("leaseEnd").asText()).isEqualTo("2027-03-01");
+        mvc.perform(get(Routes.MeDocuments.FOR_MANAGED, home.path("id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].category", hasItem("Rent Agreement")));
+
+        mvc.perform(get(Routes.MeManagedProperties.TRACKED_RENT)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].monthlyRent").value(25000))
+                .andExpect(jsonPath("$[0].leaseEnd").value("2027-03-01"));
+        mvc.perform(get(Routes.Rentals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].monthlyRent").value(25000))
+                .andExpect(jsonPath("$[0].deposit").value(100000))
+                .andExpect(jsonPath("$[0].leaseStart").value("2026-04-01"))
+                .andExpect(jsonPath("$[0].leaseEnd").value("2027-03-01"));
+        assertThat(jdbc.queryForObject("select count(*) from notifications where user_id = ? and type = ?",
+                Long.class, tenant.getId(), "rent.tracking")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("the deposit and the police intimation reach both cards once the desk confirms it")
+    void depositAndPoliceIntimationReachBothCards() throws Exception {
+        User owner = customer("9820004531");
+        User tenant = user(TENANT_ONE, Roles.Wire.BUYER, null, "Kiran Tenant");
+        User desk = staff("9820004532", Teams.RENTAL);
+        String id = complete(raise(owner, null, ownedBy(owner, TENANTS)), owner, desk);
+
+        JsonNode home = homesOf(owner).get(0);
+        assertThat(home.path("deposit").asLong()).isEqualTo(100000);
+        assertThat(home.path("policeIntimation").asText()).isEqualTo("pending");
+        mvc.perform(get(Routes.MeManagedProperties.TRACKED_RENT).header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(jsonPath("$[0].deposit").value(100000))
+                .andExpect(jsonPath("$[0].policeIntimation").value("pending"));
+
+        String filed = LocalDate.now(PlatformTime.IST).minusDays(1).toString();
+        mvc.perform(post(Routes.ServiceRequests.POLICE_INTIMATION, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reference\":\"PI-77\",\"submittedOn\":\"" + filed + "\"}"))
+                .andExpect(status().isOk());
+
+        home = homesOf(owner).get(0);
+        assertThat(home.path("policeIntimation").asText()).isEqualTo("done");
+        assertThat(home.path("policeIntimatedOn").asText()).isEqualTo(filed);
+        mvc.perform(get(Routes.MeManagedProperties.TRACKED_RENT).header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(jsonPath("$[0].policeIntimation").value("done"))
+                .andExpect(jsonPath("$[0].policeIntimatedOn").value(filed));
+    }
+
+    @Test
+    @DisplayName("a tenant account with no name takes the name typed on the agreement")
+    void unnamedTenantTakesTheFormName() throws Exception {
+        User owner = customer("9820004521");
+        user(TENANT_ONE, Roles.Wire.BUYER, null, null);
+        User desk = staff("9820004522", Teams.RENTAL);
+
+        String id = complete(raise(owner, null, ownedBy(owner, TENANTS)), owner, desk);
+
+        assertThat(requestRepo.findById(UUID.fromString(id)).orElseThrow().getStatus())
+                .isEqualTo(ServiceRequestStatus.COMPLETED);
+        assertThat(homesOf(owner).get(0).path("tenantName").asText()).isEqualTo("Kiran Tenant");
+    }
+
+    @Test
+    @DisplayName("renewing the same flat refreshes the owner's record instead of adding a second one")
+    void renewalRefreshesTheSameHome() throws Exception {
+        User owner = customer("9820004511");
+        User desk = staff("9820004512", Teams.RENTAL);
+
+        complete(raise(owner, null, ownedBy(owner, "\"tenants\":[{\"name\":\"Kiran Tenant\",\"mobile\":\""
+                + TENANT_ONE + "\"}]")), owner, desk);
+        complete(raise(owner, null, ownedBy(owner, "\"tenants\":[{\"name\":\"Meera Tenant\",\"mobile\":\""
+                + TENANT_TWO + "\"}]")), owner, desk);
+
+        JsonNode homes = homesOf(owner);
+        assertThat(homes).hasSize(1);
+        assertThat(homes.get(0).path("tenantName").asText()).isEqualTo("Meera Tenant");
+        assertThat(homes.get(0).path("tenantMobile").asText()).isEqualTo(TENANT_TWO);
+    }
+
+    @Test
+    @DisplayName("an agreement on a listed flat fills the listing's existing record rather than duplicating it")
+    void listedFlatFillsItsExistingRecord() throws Exception {
+        User owner = customer("9820004521");
+        User desk = staff("9820004522", Teams.RENTAL);
+        Property p = listing(owner);
+        mvc.perform(post(Routes.MeManagedProperties.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"2BHK in Kothrud\",\"deal\":\"rent\",\"propertyType\":\"flat\","
+                                + "\"price\":25000,\"locality\":\"Kothrud\",\"publishedListingId\":\""
+                                + p.getId() + "\"}"))
+                .andExpect(status().isCreated());
+
+        complete(raise(owner, p, ownedBy(owner, TENANTS)), owner, desk);
+
+        JsonNode homes = homesOf(owner);
+        assertThat(homes).hasSize(1);
+        assertThat(homes.get(0).path("publishedListingId").asText()).isEqualTo(p.getId().toString());
+        assertThat(homes.get(0).path("rented").asBoolean()).isTrue();
+        assertThat(homes.get(0).path("tenantMobile").asText()).isEqualTo(TENANT_ONE);
+    }
+
+    @Test
+    @DisplayName("a tenant-started agreement gives the tenant the rental and the OTP-approved owner the record")
+    void tenantStartedAgreementSeedsTheOwnerByMobile() throws Exception {
+        User tenant = user(TENANT_ONE, Roles.Wire.BUYER, null, "Kiran Tenant");
+        User owner = user("9820004531", Roles.Wire.BUYER, null, "Ravi Owner");
+        User desk = staff("9820004532", Teams.RENTAL);
+
+        complete(raise(tenant, null, ownedBy(owner, "\"ownerMode\":\"fill\"," + TENANTS)), tenant, desk);
+
+        assertThat(homesOf(tenant)).isEmpty();
+        assertThat(homesOf(owner)).hasSize(1);
+        mvc.perform(get(Routes.Rentals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(jsonPath("$", hasSize(1)));
+        mvc.perform(get(Routes.MeManagedProperties.TRACKED_RENT)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(jsonPath("$", hasSize(1)));
     }
 }

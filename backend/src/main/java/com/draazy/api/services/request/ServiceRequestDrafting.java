@@ -27,11 +27,13 @@ public class ServiceRequestDrafting {
     private final Notifier notifier;
     private final ServiceRequestDocumentReviews documentReviews;
     private final ServiceRequestAmendments amendments;
+    private final RentAgreementReadiness readiness;
+    private final RentAgreementHomes homes;
 
     public ServiceRequestDrafting(ServiceRequestService requests, ServiceRequestMapper mapper,
             RentAgreementRegistration registration, ServiceRequestRegistrationRepository registrations,
             AuditService audit, Notifier notifier, ServiceRequestDocumentReviews documentReviews,
-            ServiceRequestAmendments amendments) {
+            ServiceRequestAmendments amendments, RentAgreementReadiness readiness, RentAgreementHomes homes) {
         this.requests = requests;
         this.mapper = mapper;
         this.registration = registration;
@@ -40,6 +42,8 @@ public class ServiceRequestDrafting {
         this.notifier = notifier;
         this.documentReviews = documentReviews;
         this.amendments = amendments;
+        this.readiness = readiness;
+        this.homes = homes;
     }
 
     @Transactional
@@ -47,6 +51,7 @@ public class ServiceRequestDrafting {
             List<String> checks, MultipartFile file) {
         ServiceRequest request = requests.opsAccessibleForUpdate(caller, id);
         requests.requireHolder(caller, request, "sharing a draft", "the draft is theirs to share");
+        readiness.requireTenantSide(request);
         List<String> attested = DraftingChecklist.require(request, checks);
         documentReviews.requireVerified(caller, request, "sharing the draft");
         amendments.requireNoneOpen(request);
@@ -85,6 +90,7 @@ public class ServiceRequestDrafting {
         requests.transition(request, ServiceRequestStatus.COMPLETED);
         requests.record(request, "status.completed", requests.displayName(caller.userId()));
         registration.prepare(caller, request, UUID.fromString(uploaded.id()));
+        homes.settle(request, UUID.fromString(uploaded.id()));
         if (record == null) {
             audit.record(caller, "service-request.completed", "service_request",
                     request.getId().toString(), "document", uploaded.id());

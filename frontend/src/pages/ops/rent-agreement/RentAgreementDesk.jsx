@@ -9,7 +9,7 @@ import { BTN, CHIP, CHIP_TONE, Cell, Chips, DATE_CHIPS, FactRow, PageNav, QueueT
 import AdminServices from '../../admin/AdminServices.jsx';
 import useDeskTickets from '../../admin/useDeskTickets.js';
 import AgeTone from '../service-queue/AgeTone.jsx';
-import { OverdueToggle, stageTabs, useQueue } from '../service-queue/deskQueue.jsx';
+import { OverdueToggle, stageTabs, useLinkedCase, useQueue } from '../service-queue/deskQueue.jsx';
 import RaCaseModal from './RaCaseModal.jsx';
 import { STAGES, caseSummary, nextStep, stagesDone } from './stages.js';
 
@@ -75,6 +75,9 @@ export default function RentAgreementDesk() {
   }, [loadSummary]);
 
   const [open, setOpen] = useState(null);
+  const [linked, setLinked] = useState(null);
+  const openLinked = useCallback((request) => { setLinked(request); setOpen(request); }, []);
+  useLinkedCase(openLinked);
   const close = useCallback(() => setOpen(null), []);
   const openIndex = rows.findIndex((r) => r.id === open?.id);
   const next = rows.slice(openIndex + 1).find((r) => r.id !== open?.id && (!r.assignedTo || r.assignedToMe)) || null;
@@ -127,6 +130,7 @@ export default function RentAgreementDesk() {
 
       <RaCaseModal
         request={open}
+        loaded={open !== null && open === linked}
         nextId={next?.id || null}
         onNext={() => setOpen(next)}
         onClose={close}
@@ -156,7 +160,7 @@ function CaseRow({ row, onOpen }) {
     <RowCard
       testId="ra-row"
       id={row.id}
-      className={classNames('relative', heldByOther && 'opacity-70')}
+      className={heldByOther ? 'opacity-70' : undefined}
       title={s.flat || 'Flat not given'}
       badges={(
         <>
@@ -169,7 +173,7 @@ function CaseRow({ row, onOpen }) {
           <MapPin className="h-3.5 w-3.5 shrink-0 text-teal-400" aria-hidden="true" />
           <span className="min-w-0 truncate">{[s.locality, 'Pune'].filter(Boolean).join(', ')}</span>
           <span className="max-sm:hidden text-gray-600" aria-hidden="true">·</span>
-          <span className="relative z-10 min-w-0 truncate tabular-nums text-gray-500 max-sm:hidden">{row.id}</span>
+          <span className="min-w-0 truncate tabular-nums text-gray-500 max-sm:hidden">{row.id}</span>
         </>
       )}
       facts={(
@@ -178,7 +182,7 @@ function CaseRow({ row, onOpen }) {
             <Cell className="font-medium text-gray-200 col-span-2 md:col-span-4">{`${s.owner || 'Owner not given'} → ${s.tenants || 'Tenant not given'}`}</Cell>
           </FactRow>
           <FactRow label="Filed by">
-            <span className="relative z-10 col-span-2 max-w-full justify-self-start truncate tabular-nums md:col-span-4" data-testid="requester-mobile">
+            <span className="col-span-2 max-w-full justify-self-start truncate tabular-nums md:col-span-4" data-testid="requester-mobile">
               {[row.requesterName, row.requesterMobile].filter(Boolean).join(' · ') || '—'}
             </span>
           </FactRow>
@@ -201,10 +205,9 @@ function CaseRow({ row, onOpen }) {
         </>
       )}
       primary={(
-        <>
-          <span aria-hidden="true" className={heldByOther ? BTN.ghost : BTN.primary}>Open case <ChevronRight className="h-3.5 w-3.5" /></span>
-          <button type="button" onClick={onOpen} aria-label={`Open case ${s.flat || row.id}`} className="absolute inset-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-400" />
-        </>
+        <button type="button" onClick={onOpen} aria-label={`Open case ${s.flat || row.id}`} className={heldByOther ? BTN.ghost : BTN.primary}>
+          Open case <ChevronRight className="h-3.5 w-3.5" />
+        </button>
       )}
       figure={s.rent ? (
         <>

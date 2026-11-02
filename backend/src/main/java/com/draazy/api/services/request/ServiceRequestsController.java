@@ -55,13 +55,14 @@ public class ServiceRequestsController {
     private final ServiceRequestDrafting drafting;
     private final ServiceRequestDocumentReviews documentReviews;
     private final ServiceRequestDraftApprovals draftApprovals;
+    private final RentAgreementDetailsEdits detailsEdits;
 
     private static final String CANCEL = Routes.ServiceRequests.BY_ID + "/cancel";
 
     private static final String BACK_OFFICE =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.MANAGER + "', '" + Roles.ADMIN + "')";
 
-    private static final String QUEUE_READ =
+    static final String QUEUE_READ =
             BACK_OFFICE + " and " + Capabilities.REQUIRE_VIEW_SERVICE_REQUESTS + " and "
                     + BackOfficePermissions.REQUIRE_SERVICES_READ;
 
@@ -77,7 +78,8 @@ public class ServiceRequestsController {
             ServiceRequestReadReceipts receipts,
             ServiceRequestDrafting drafting,
             ServiceRequestDocumentReviews documentReviews,
-            ServiceRequestDraftApprovals draftApprovals) {
+            ServiceRequestDraftApprovals draftApprovals,
+            RentAgreementDetailsEdits detailsEdits) {
         this.service = service;
         this.staffTransitions = staffTransitions;
         this.identities = identities;
@@ -88,6 +90,7 @@ public class ServiceRequestsController {
         this.drafting = drafting;
         this.documentReviews = documentReviews;
         this.draftApprovals = draftApprovals;
+        this.detailsEdits = detailsEdits;
     }
 
     @GetMapping(Routes.ServiceRequests.BASE)
@@ -171,6 +174,12 @@ public class ServiceRequestsController {
     public ServiceRequestDto submitPartyDetails(@CurrentUser AuthPrincipal principal,
             @PathVariable String id, @Valid @RequestBody PartyDetailsRequest body) {
         return coFill.submitPartyDetails(principal, id, body.details());
+    }
+
+    @PutMapping(Routes.ServiceRequests.DETAILS)
+    public ServiceRequestDto updateDetails(@CurrentUser AuthPrincipal principal,
+            @PathVariable String id, @Valid @RequestBody PartyDetailsRequest body) {
+        return detailsEdits.update(principal, id, body.details());
     }
 
     @PostMapping(Routes.ServiceRequests.CHECKOUT)

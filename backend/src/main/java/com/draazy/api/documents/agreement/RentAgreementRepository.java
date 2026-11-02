@@ -51,6 +51,8 @@ public interface RentAgreementRepository extends JpaRepository<RentAgreement, UU
               and start_date is not null and duration_months is not null
               and renewal_reminded_at is null
               and (start_date + duration_months * interval '1 month')::date - 1 between :from and :to
+              and not exists (select 1 from managed_properties m
+                               where m.agreement_request_id = rent_agreements.service_request_id)
             order by created_at
             """, nativeQuery = true)
     List<RentAgreement> findEndingBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);

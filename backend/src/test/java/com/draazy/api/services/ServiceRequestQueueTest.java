@@ -112,6 +112,8 @@ class ServiceRequestQueueTest extends ServiceFixtures {
         force(raise(buyer, "rent-agreement", listing(buyer)), ServiceRequestStatus.DRAFT_SHARED, desk);
         force(raise(buyer, "rent-agreement", listing(buyer)), ServiceRequestStatus.CHANGES_REQUESTED, colleague);
         force(raise(buyer, "rent-agreement", listing(buyer)), ServiceRequestStatus.CANCELLED, null);
+        force(raise(buyer, "rent-agreement", listing(buyer)), ServiceRequestStatus.CANCELLED, null);
+        force(raise(buyer, "rent-agreement", listing(buyer)), ServiceRequestStatus.COMPLETED, desk);
         raiseUnpaid(buyer, listing(buyer));
         raise(buyer, "legal", null);
 
@@ -124,6 +126,7 @@ class ServiceRequestQueueTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.inProgress").value(2))
                 .andExpect(jsonPath("$.withCustomer").value(1))
                 .andExpect(jsonPath("$.closed").value(1))
+                .andExpect(jsonPath("$.cancelled").value(2))
                 .andExpect(jsonPath("$.overdue").value(1));
     }
 

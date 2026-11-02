@@ -29,7 +29,7 @@ function settle(requestId) {
   );
 }
 
-async function assignedCase() {
+async function assignedCase(beforeAssign) {
   const mobile = uniqueMobile();
   const customer = (await apiLogin(mobile)).accessToken;
   const request = await ok('POST', '/service-requests', customer, {
@@ -47,6 +47,7 @@ async function assignedCase() {
     },
   });
   settle(request.id);
+  await beforeAssign?.(request.id, customer);
   const staff = (await apiLogin(STAFF.rental)).accessToken;
   await ok('PATCH', `/service-requests/${request.id}/status`, staff, { status: 'assigned' });
   return { id: request.id, mobile, customer };
@@ -57,7 +58,7 @@ async function openCase(page, requestId) {
   await expect(page.getByRole('heading', { name: 'Rent Agreement' })).toBeVisible();
   await page.getByPlaceholder('Name, mobile or request id').fill(requestId);
   await expect(page.getByTestId('ra-row')).toHaveCount(1);
-  await page.getByTestId('ra-row').first().click();
+  await page.getByTestId('ra-row').first().getByRole('button', { name: /^Open case/ }).click();
   return page.getByRole('dialog');
 }
 
@@ -147,10 +148,10 @@ test.describe('Ops → Rent agreement → corrections (live)', () => {
   });
 
   test('the holder corrects a mistyped tenant PAN and Aadhaar, which nobody else could fix', async ({ page }) => {
-    const c = await assignedCase();
-    await ok('PUT', `/service-requests/${c.id}/identities`, c.customer, {
+    // The customer's own numbers lock once the team starts, so they are typed before the hand-off.
+    const c = await assignedCase((id, customer) => ok('PUT', `/service-requests/${id}/identities`, customer, {
       parties: [{ partyRole: 'tenant', partyIndex: 0, partyName: 'Rohan Kale', pan: 'ABCDE1234X', aadhaar: '' }],
-    });
+    }));
     await signIn(page, STAFF.rental, { screen: 'staff' });
     const dialog = await openCase(page, c.id);
 

@@ -27,15 +27,10 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
     private static final String PROP = "\"prop\":{\"gramPanchayat\":false,\"propType\":\"Flat / Apartment\","
             + "\"flatNo\":\"B-1204\",\"society\":\"Skyline Heights\",\"locality\":\"Baner\",\"pincode\":\"411045\","
             + "\"area\":\"850\"," + IGR_PROP_FIELDS + "}";
-    private static final String WITNESSES = "\"wit\":{\"w1Name\":\"Suresh Patil\",\"w1Age\":\"41\","
-            + "\"w1Addr\":\"Karve Road, Pune\",\"w2Name\":\"Meera Joshi\",\"w2Age\":\"36\",\"w2Addr\":\"JM Road, Pune\"}";
     private static final String OWNER_ROW = "{\"partyRole\":\"owner\",\"partyIndex\":0,\"partyName\":\"Asha\","
             + "\"aadhaar\":\"211122223335\",\"pan\":\"ABCDE1234F\"}";
     private static final String TENANT_ROW = "{\"partyRole\":\"tenant\",\"partyIndex\":0,\"partyName\":\"Ria\","
             + "\"aadhaar\":\"444455556666\",\"pan\":\"FGHIJ5678K\"}";
-    private static final String WITNESS_ROWS = "{\"partyRole\":\"witness\",\"partyIndex\":0,\"partyName\":\"Suresh\","
-            + "\"aadhaar\":\"666677778888\"},{\"partyRole\":\"witness\",\"partyIndex\":1,\"partyName\":\"Meera\","
-            + "\"aadhaar\":\"234567890124\"}";
 
     @Test
     @DisplayName("a tenant who raised the request cannot file the owner's papers, from upload or from the vault")
@@ -60,7 +55,7 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
 
         refused(identities(tenant, id, rows(OWNER_ROW)));
         refused(identities(tenant, id, rows(TENANT_ROW, OWNER_ROW)));
-        identities(tenant, id, rows(TENANT_ROW, WITNESS_ROWS)).andExpect(status().isNoContent());
+        identities(tenant, id, rows(TENANT_ROW)).andExpect(status().isNoContent());
     }
 
     @Test
@@ -132,7 +127,7 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
         for (String paper : PAPERS) {
             upload(tenant, id, "tenant-0-" + paper, 201);
         }
-        identities(tenant, id, rows(TENANT_ROW, WITNESS_ROWS)).andExpect(status().isNoContent());
+        identities(tenant, id, rows(TENANT_ROW)).andExpect(status().isNoContent());
         pending(checkout(tenant, id), "Index II");
 
         for (String paper : PAPERS) {
@@ -155,7 +150,7 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
             upload(owner, id, "tenant-0-" + paper, 201);
         }
         upload(owner, id, "ownership-proof", 201);
-        identities(owner, id, rows(OWNER_ROW, TENANT_ROW, WITNESS_ROWS)).andExpect(status().isNoContent());
+        identities(owner, id, rows(OWNER_ROW, TENANT_ROW)).andExpect(status().isNoContent());
 
         checkout(owner, id).andExpect(status().isOk());
     }
@@ -221,7 +216,7 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
         return "{\"owner\":{\"oName\":\"Asha Patil\",\"oAge\":\"52\",\"oAddr\":\"MG Road, Pune\",\"oMobile\":\""
                 + ownerMobile + "\",\"capacity\":\"owner\"},"
                 + "\"tenants\":[{\"name\":\"Ria Sharma\",\"age\":\"29\",\"addr\":\"FC Road, Pune\",\"mobile\":\""
-                + tenantMobile + "\"}]," + PROP + "," + WITNESSES + ","
+                + tenantMobile + "\"}]," + PROP + ","
                 + "\"terms\":{\"months\":\"11\",\"rent\":\"30000\",\"deposit\":\"0\",\"lockin\":\"3\","
                 + "\"notice\":\"1\",\"dueDay\":\"5\",\"increment\":\"5\",\"startDate\":\"" + start + "\"}}";
     }

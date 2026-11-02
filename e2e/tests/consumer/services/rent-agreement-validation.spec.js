@@ -1,7 +1,8 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
-import { MOBILE, PNG, active, clickNext, expectNoRemovedPartyInputs, fillBuilding, fillCoOwner, fillIgrProperty, fillOwner, fillProperty, fillTenant, fillTenantPolice, fillTerms, fillWitnesses, pickLocality, uploadAll } from '../../../helpers/rentAgreementWizard.js';
+import { MOBILE, PNG, active, clickNext, expectNoRemovedPartyInputs, fillBuilding, fillCoOwner, fillIgrProperty, fillOwner, fillPartyIgr, fillProperty, fillTenant, fillTenantPolice, fillTerms, pickLocality, uploadAll } from '../../../helpers/rentAgreementWizard.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { gotoSettled, reloadSettled } from '../../../helpers/settle.js';
 /* Mock-only: every rule here is enforced in the browser before anything is sent. The same rules are
    re-checked by the server; `rent-agreement-submit.spec.js` pins that half live. */
 
@@ -40,7 +41,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
   test('the owner and tenant steps refuse a missing Index II, bad PANs, repeats and minors until each is fixed', async ({ page }) => {
     test.slow();
     const DOB_ERR = 'Choose a valid date of birth for an adult party.';
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     await fillOwner(page, { docs: false, next: false });
     const p = active(page);
@@ -92,7 +93,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
   });
 
   test('company or firm parties are blocked into the legal desk quote flow', async ({ page }) => {
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     const p = active(page);
 
@@ -108,7 +109,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
 
   test('a foreign tenant uses passport and visa details, gets SRO-route copy and Form C notice', async ({ page }) => {
     test.slow();
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     await fillOwner(page);
     const t = active(page);
@@ -118,6 +119,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
     await expect(t.getByPlaceholder('12-digit Aadhaar')).toHaveCount(0);
     await t.getByPlaceholder('As per PAN/Aadhaar').first().fill('Ria Sharma');
     await pickDate(page, '[data-err="t0dob"]', '1995-01-01');
+    await fillPartyIgr(page, t, { address: false });
     await t.getByPlaceholder('ABCDE1234F').first().fill('PQRSX6789K');
     await t.getByPlaceholder('e.g. Z1234567').fill('Z1234567');
     await t.getByPlaceholder('Visa, OCI or e-FRRO reference').fill('OCI-123');
@@ -126,7 +128,6 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
     await uploadAll(t, 'foreign-tenant-doc');
     await clickNext(page, 3);
     await fillTerms(page);
-    await fillWitnesses(page);
 
     const review = active(page);
     await expect(review.getByText('SRO appointment — offline route')).toBeVisible();
@@ -138,13 +139,14 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
       step: 3, prop: PROP, tenantMode: 'fill',
       terms: { startDate: '2000-01-01', months: '11', rent: '30000', deposit: '150000', nrDeposit: '', increment: '150', lockin: '20' },
     });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await stillOn(page, 3);
     const p = active(page);
 
     await clickNext(page);
     await stillOn(page, 3);
-    await expect(p.getByText(/Choose a start date between \d{4}-\d{2}-\d{2} and \d{4}-\d{2}-\d{2}/)).toBeVisible();
+    const istDay = (days) => new Date(Date.now() + 5.5 * 3600e3 + days * 864e5).toISOString().slice(0, 10);
+    await expect(p.getByText(`Choose a start date between ${istDay(-120)} and ${istDay(180)}.`), 'back-dating reaches the four-month registration window').toBeVisible();
     await expect(p.getByText('Lock-in must be between 0 and 11 months.')).toBeVisible();
     await expect(p.getByText('Enter an increase between 0 and 100%.')).toBeVisible();
   });
@@ -154,10 +156,10 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
       step: 3, prop: PROP, tenantMode: 'fill',
       terms: { startDate: '', months: '11', rent: '30000', deposit: '', nrDeposit: '', increment: '5', lockin: '6' },
     });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await stillOn(page, 3);
     const p = active(page);
-    const deposit = p.getByPlaceholder('e.g. 100000');
+    const deposit = p.getByPlaceholder('e.g. 1,00,000');
 
     await clickNext(page);
     await stillOn(page, 3);
@@ -169,13 +171,13 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
     await expect(p.getByText('Enter the security deposit — 0 if there is none.')).toHaveCount(0);
 
     await expect(p.getByText(/s\.194-IB/)).toHaveCount(0);
-    await p.getByPlaceholder('e.g. 25000').fill('50001');
+    await p.getByPlaceholder('e.g. 25,000').fill('50001');
     await expect(p.getByText(/s\.194-IB/)).toBeVisible();
   });
 
   test('the terms step no longer asks notice, due day, payment mode, utilities, property tax or occupants, nor second-guesses the furniture list', async ({ page }) => {
     await seedDraft(page, { step: 3, prop: PROP, tenantMode: 'fill', furnItems: [{ name: 'Fan', qty: 3, custom: false }] });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await stillOn(page, 3);
     const p = active(page);
 
@@ -190,7 +192,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
 
   test('the flat\'s area is required; the floor is optional but sane; the removed property rows are gone', async ({ page }) => {
     await seedDraft(page, { step: 0, prop: PROP });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await stillOn(page, 0);
     const p = active(page);
 
@@ -219,7 +221,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
 
   test('the stamp duty payer comes pre-answered, and a non-standard period can be typed', async ({ page }) => {
     await seedDraft(page, { step: 3, prop: PROP, tenantMode: 'fill', terms: { months: '9' } });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await stillOn(page, 3);
     const p = active(page);
     const saved = () => page.evaluate((k) => JSON.parse(localStorage.getItem(k) || '{}').terms || {}, DRAFT);
@@ -258,17 +260,22 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
       step: 3, prop: PROP, tenantMode: 'fill',
       terms: { startDate: '', months: '11', rent: '30,000', deposit: '1,50,000', nrDeposit: '₹ 5,000', increment: '5', lockin: '6' },
     });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await stillOn(page, 3);
     const p = active(page);
-    const deposit = p.getByPlaceholder('e.g. 100000');
+    const deposit = p.getByPlaceholder('e.g. 1,00,000');
 
-    await expect(p.getByPlaceholder('e.g. 25000'), 'a restored draft is cleaned, not re-sent with commas').toHaveValue('30000');
-    await expect(deposit).toHaveValue('150000');
-    await expect(p.getByPlaceholder('0', { exact: true })).toHaveValue('5000');
+    await expect(p.getByPlaceholder('e.g. 25,000'), 'money shows with Indian digit grouping').toHaveValue('30,000');
+    await expect(deposit).toHaveValue('1,50,000');
+    await expect(p.getByPlaceholder('0', { exact: true })).toHaveValue('5,000');
+    const rentBox = p.getByPlaceholder('e.g. 25,000').locator('xpath=..');
+    await expect(rentBox, 'the rent field follows the money-field standard').toContainText('₹');
+    await expect(rentBox).toContainText('/month');
+    await expect(p.getByText('≈ ₹ 1.50 Lakh', { exact: true }), 'the amount is read back in words').toBeVisible();
 
     await deposit.fill('50,000');
-    await expect(deposit).toHaveValue('50000');
+    await expect(deposit).toHaveValue('50,000');
+    await expect.poll(() => page.evaluate((k) => JSON.parse(localStorage.getItem(k) || '{}').terms, DRAFT), 'the draft keeps plain digits, not commas').toMatchObject({ rent: '30000', deposit: '50000', nrDeposit: '5000' });
     await expect(page.locator('div.flex.justify-between', { hasText: 'Deposit (refundable)' }).first()).toContainText('₹50,000');
   });
 
@@ -277,7 +284,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
       step: 3, prop: PROP, tenantMode: 'fill',
       terms: { startDate: '', months: '11', rent: '30000', deposit: '100000', nrDeposit: '', increment: '5', lockin: '6' },
     });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await stillOn(page, 3);
     const pay = active(page).getByTestId('ra-deposit-payments');
     const labels = (row) => row.locator('label.lbl').allInnerTexts();
@@ -288,7 +295,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
 
     await pay.getByRole('button', { name: 'Add payment' }).click();
     const first = pay.getByTestId('ra-deposit-payment-0');
-    await expect(first.getByText('Amount (₹)', { exact: true }).locator('xpath=..').locator('input'), 'the first payment starts at the whole deposit').toHaveValue('100000');
+    await expect(first.getByText('Amount (₹)', { exact: true }).locator('xpath=..').locator('input'), 'the first payment starts at the whole deposit').toHaveValue('1,00,000');
     expect(await labels(first)).toEqual(['Payment mode', 'UPI Ref. No. / UTR No.', 'Amount (₹)', 'Date']);
     for (const [from, to, want] of [
       ['UPI', 'Internet Banking', ['Payment mode', 'Bank Name', 'Branch Name', 'Transfer Ref. No.', 'Amount (₹)', 'Date']],
@@ -309,7 +316,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
 
     await pay.getByRole('button', { name: 'Add payment' }).click();
     const second = pay.getByTestId('ra-deposit-payment-1');
-    await expect(second.getByText('Amount (₹)', { exact: true }).locator('xpath=..').locator('input'), 'a new payment starts at what is left').toHaveValue('60000');
+    await expect(second.getByText('Amount (₹)', { exact: true }).locator('xpath=..').locator('input'), 'a new payment starts at what is left').toHaveValue('60,000');
     await second.getByText('UPI Ref. No. / UTR No.', { exact: true }).locator('xpath=..').locator('input').fill('utr 6123-4567');
     await expect(second.getByText('UPI Ref. No. / UTR No.', { exact: true }).locator('xpath=..').locator('input'), 'a reference keeps letters and digits only').toHaveValue('UTR61234567');
     await expect(pay.getByText('Entered ₹1,00,000 of ₹1,00,000')).toBeVisible();
@@ -328,7 +335,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
       step: 3, prop: PROP, tenantMode: 'fill',
       terms: { startDate: '', months: '11', rent: '20000', deposit: '150000', nrDeposit: '', increment: '5', lockin: '6' },
     });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await stillOn(page, 3);
     const p = active(page);
     const stamp = page.locator('div.flex.justify-between', { hasText: 'Stamp Duty (0.25%)' }).first();
@@ -349,7 +356,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
   });
 
   test('the property step waits for the gram panchayat answer', async ({ page }) => {
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page, { next: false, gramPanchayat: null });
     const p = active(page);
     const answer = p.locator('[data-err="gramPanchayat"]');
@@ -366,31 +373,29 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
     await clickNext(page, 1);
   });
 
-  test('the registration area follows the gram panchayat answer, not the locality', async ({ page }) => {
+  test('the registration fee follows the gram panchayat answer, not the locality', async ({ page }) => {
     await page.route('**/api/fees', (route) => route.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify([{ deal: 'rent', brokerage: 0, platformFee: 1999, stampDuty: null, registration: null, notes: null }]),
     }));
     const terms = { startDate: '', months: '11', rent: '20000', deposit: '100000', nrDeposit: '', increment: '5', lockin: '6' };
     const fee = page.locator('div.flex.justify-between', { hasText: 'Registration Fee' }).first();
-    const area = page.getByTestId('ra-reg-area');
 
     await seedDraft(page, { step: 3, prop: { ...PROP, gramPanchayat: true }, tenantMode: 'fill', terms });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await stillOn(page, 3);
-    await expect(area).toContainText('Gram Panchayat / Rural');
     await expect(fee).toContainText('₹500');
+    await expect(active(page).getByText('Registration Area'), 'the area was answered on the Property step').toHaveCount(0);
     await expect(active(page).getByRole('button', { name: 'Municipal / Urban' }), 'there is no toggle to flip').toHaveCount(0);
 
     await seedDraft(page, { step: 3, prop: { ...PROP, locality: 'Hinjawadi' }, tenantMode: 'fill', terms, regArea: 'rural' });
-    await page.reload({ waitUntil: 'networkidle' });
+    await reloadSettled(page);
     await stillOn(page, 3);
-    await expect(area, 'a stale saved choice is ignored').toContainText('Municipal / Urban');
-    await expect(fee).toContainText('₹1,000');
+    await expect(fee, 'a stale saved choice is ignored').toContainText('₹1,000');
   });
 
   test('a paper that cannot be used says why on the spot, and a phone-camera original is compressed rather than dropped', async ({ page }) => {
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     const p = active(page);
     const slot = p.locator('input[type="file"]').first();
@@ -420,33 +425,34 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
     await expect(p.getByRole('img', { name: 'Preview' })).toBeVisible();
   });
 
-  test('witnesses give name, age and mobile only, and cannot share the invited tenant\'s mobile', async ({ page }) => {
-    await seedDraft(page, {
-      step: 4, prop: PROP, tenantMode: 'invite',
-      invite: { invMobile: MOBILE.tenant, invName: 'Rahul', invMessage: '' },
-    });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
-    await stillOn(page, 4);
-    await fillWitnesses(page, { next: false });
-    const w = active(page);
-    await expect(w.getByText(/must be present at the registration visit/)).toBeVisible();
-    for (const n of [1, 2]) {
-      const card = w.getByTestId(`witness-${n}`);
-      await expect(card.getByPlaceholder('12-digit Aadhaar'), `witness ${n} has no Aadhaar input`).toHaveCount(0);
-      await expect(card.getByPlaceholder('Full permanent address'), `witness ${n} has no address input`).toHaveCount(0);
-    }
-    await w.getByTestId('witness-1').getByPlaceholder('10-digit mobile').fill(MOBILE.tenant);
+  test('the owner gives mother\'s name, gender and residential address, as the IGR party tab requires', async ({ page }) => {
+    test.slow();
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
+    await fillProperty(page);
+    await fillOwner(page, { next: false });
+    const p = active(page);
+    await p.getByPlaceholder('As per Aadhaar or PAN').first().fill('');
+    await p.getByPlaceholder('411004').first().fill('0110');
+    await p.getByPlaceholder('Flat, building, street, locality').first().fill('');
 
     await clickNext(page);
-    await stillOn(page, 4);
-    await expect(w.getByTestId('witness-1').getByText(/This mobile is already used by another party/)).toBeVisible();
+    await stillOn(page, 1);
+    await expect(p.getByText("Enter the mother's name (up to 80 characters).")).toBeVisible();
+    await expect(p.getByText('Enter a 6-digit pincode.')).toBeVisible();
+    await expect(p.getByText('Enter the address.')).toBeVisible();
+
+    await p.getByPlaceholder('As per Aadhaar or PAN').first().fill('Shaila Verma');
+    await p.getByPlaceholder('411004').first().fill('560001');
+    await p.getByPlaceholder('Flat, building, street, locality').first().fill('7 Residency Road, Bengaluru');
+    await clickNext(page, 2);
+    await expect.poll(async () => page.evaluate((k) => localStorage.getItem(k) || '', DRAFT), 'a licensor may live outside Maharashtra').toContain('560001');
   });
 
   test('the page never says 11 months avoids registration, and the wizard is residential-only: commercial premises, or a draft saved for a shop, go to the legal desk', async ({ page }) => {
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
-    await page.getByRole('button', { name: 'Why is the agreement usually for 11 months?' }).click();
-    await expect(page.getByText(/In Maharashtra it does not avoid registration/)).toBeVisible();
-    await page.getByRole('button', { name: 'Is registration of a rent agreement mandatory in Maharashtra?' }).click();
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
+    await page.getByRole('button', { name: 'Why are agreements usually 11 months?' }).click();
+    await expect(page.getByText(/It does not avoid registration in Maharashtra/)).toBeVisible();
+    await page.getByRole('button', { name: 'Is registration mandatory in Maharashtra?' }).click();
     await expect(page.getByText(/Section 55 of the Maharashtra Rent Control Act, 1999/)).toBeVisible();
     await expect(page.getByText(/keeps registration simpler/)).toHaveCount(0);
 
@@ -459,7 +465,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
     await expect(page.getByRole('option', { name: 'Row House' })).toBeVisible();
 
     await seedDraft(page, { step: 0, prop: { ...PROP, propType: 'Shop' } });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await clickNext(page);
     await stillOn(page, 0);
     await expect(active(page).getByText(/Commercial premises need a commercial agreement/)).toBeVisible();
@@ -467,7 +473,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
 
   test('the flat must be in Maharashtra: a pincode outside it, or Goa\'s 403, is stopped on the property step', async ({ page }) => {
     await seedDraft(page, { step: 0, prop: { ...PROP, pincode: '560001' } });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     const p = active(page);
     const state = p.getByText(/We draft Maharashtra agreements only/);
 
@@ -486,7 +492,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
 
   test('co-owners sign too: each needs a PAN, and the primary signs as a co-owner or under a registered POA', async ({ page }) => {
     test.slow();
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     await fillOwner(page, { next: false });
     const p = active(page);
@@ -518,7 +524,8 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
   });
 
   test('an owner mobile that is not yours is refused on a flat you have not listed, until you are among the owners', async ({ page }) => {
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    test.slow();
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     await fillOwner(page, { next: false });
     const p = active(page);
@@ -533,7 +540,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
   });
 
   test('a restored draft names the PAN fields to re-enter without storing the numbers', async ({ page }) => {
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     const owner = active(page);
     await owner.getByPlaceholder('ABCDE1234F').fill('ABCDE1234F');
@@ -544,7 +551,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
     const written = await page.evaluate((k) => localStorage.getItem(k) || '', DRAFT);
     expect(written).not.toContain('ABCDE1234F');
 
-    await page.reload({ waitUntil: 'networkidle' });
+    await reloadSettled(page);
     await stillOn(page, 1);
     await expect(active(page).getByTestId('ra-identity-reminder')).toContainText('Re-enter: Licensor 1 PAN');
     await expect(active(page).getByTestId('ra-identity-reminder')).not.toContainText('Aadhaar');
@@ -565,7 +572,7 @@ test.describe('Rent Agreement — IGR property particulars', () => {
   }
 
   test('the taluka is required and persists to the draft', async ({ page }) => {
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     const p = active(page);
     await p.getByPlaceholder('e.g. B-1204').fill('B-1204');
     await fillBuilding(page);
@@ -585,7 +592,7 @@ test.describe('Rent Agreement — IGR property particulars', () => {
   });
 
   test('the property step blocks Next until every IGR police-record field is filled, then keeps them', async ({ page }) => {
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     const p = active(page);
     await p.getByPlaceholder('e.g. B-1204').fill('B-1204');
     await fillBuilding(page);
@@ -615,7 +622,7 @@ test.describe('Rent Agreement — IGR property particulars', () => {
 
   test('the tenant work ID proof is required for a salaried occupation and not asked of a student', async ({ page }) => {
     test.slow();
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     await fillOwner(page);
     await fillTenant(page, { docs: false, next: false });
@@ -636,7 +643,7 @@ test.describe('Rent Agreement — IGR property particulars', () => {
 
   test('parking area is shown only when parking is part of the licence', async ({ page }) => {
     await seedDraft(page, { step: 3, prop: IGR_PROP, tenantMode: 'fill' });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     const p = active(page);
 
     await expect(p.getByText('Parking area (optional)')).toHaveCount(0);
@@ -655,7 +662,7 @@ test.describe('Rent Agreement — IGR tenant police record', () => {
 
   test('each tenant stores police details, workplace proof and family co-occupants for review', async ({ page }) => {
     test.slow();
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     await fillOwner(page);
     await fillTenant(page, { docs: false, next: false });
@@ -673,7 +680,6 @@ test.describe('Rent Agreement — IGR tenant police record', () => {
     await uploadAll(tenant, 'tenant-doc');
     await clickNext(page, 3);
     await fillTerms(page);
-    await fillWitnesses(page);
 
     const review = active(page);
     await expect(review.getByText('Tenant police record')).toBeVisible();
@@ -685,7 +691,7 @@ test.describe('Rent Agreement — IGR tenant police record', () => {
 
   test('passport address proof must be uploaded before leaving the tenant step', async ({ page }) => {
     test.slow();
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     await fillOwner(page);
     await fillTenant(page, { next: false });

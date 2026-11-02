@@ -16,12 +16,6 @@ public interface ServiceRequestPartyRepository extends JpaRepository<ServiceRequ
 
     List<ServiceRequestParty> findByUserIdAndStatusOrderByCreatedAtDesc(UUID userId, String status);
 
-    boolean existsByRequestIdAndStatus(UUID requestId, String status);
-
-    long countByRequestIdAndStatus(UUID requestId, String status);
-
-    boolean existsByRequestIdAndUserIdAndStatus(UUID requestId, UUID userId, String status);
-
     boolean existsByRequestIdAndUserId(UUID requestId, UUID userId);
 
     List<ServiceRequestParty> findByMobile(String mobile);

@@ -36,6 +36,9 @@ public class ServiceRequestParty extends AuditedEntity {
     @Column(name = "invited_by", nullable = false, updatable = false)
     private UUID invitedBy;
 
+    @Column(name = "details_submitted_at")
+    private Instant detailsSubmittedAt;
+
     protected ServiceRequestParty() {
     }
 
@@ -69,5 +72,9 @@ public class ServiceRequestParty extends AuditedEntity {
 
     void answer(String outcome) {
         this.status = outcome;
+    }
+
+    void markDetailsSubmitted(Instant at) {
+        this.detailsSubmittedAt = at;
     }
 }

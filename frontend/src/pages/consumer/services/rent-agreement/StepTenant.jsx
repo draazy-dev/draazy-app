@@ -68,7 +68,7 @@ export default function StepTenant({ step, canInvite, tenantMode, setTenantMode,
                   )}
                   {(t.residency === 'nri' || t.residency === 'foreign') && <div className="sm:col-span-2 rounded-xl border border-sky-400/20 bg-sky-500/10 p-3 text-xs text-sky-100 leading-relaxed">{tr('services.ra.party.offlineNote')}</div>}
                   <Field label={tr('services.ra.tenant.fullName')} required error={errors['t' + i + 'name'] && tr('services.ra.tenant.fullNameErr')}><input value={t.name} onChange={(e) => { setTenant(i, 'name', e.target.value); clearErr('t' + i + 'name'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'name'] ? ' err' : '')} placeholder={tr('services.ra.tenant.fullNamePlaceholder')} /></Field>
-                  <PartyIdentityFields dob={t.dob} setDob={(v) => setTenant(i, 'dob', v)} setAge={(v) => setTenant(i, 'age', v)} keys={{ dob: 't' + i + 'dob', age: 't' + i + 'age' }} errors={errors} clearErr={clearErr} />
+                  <PartyIdentityFields dob={t.dob} setDob={(v) => setTenant(i, 'dob', v)} setAge={(v) => setTenant(i, 'age', v)} mother={t.mother} setMother={(v) => setTenant(i, 'mother', v)} gender={t.gender} setGender={(v) => setTenant(i, 'gender', v)} keys={{ dob: 't' + i + 'dob', age: 't' + i + 'age', mother: 't' + i + 'mother', gender: 't' + i + 'gender' }} errors={errors} clearErr={clearErr} />
                   <Field label={tr('services.ra.tenant.occupation')}><input value={t.occupation} onChange={(e) => { setTenant(i, 'occupation', e.target.value); if (!workProofRequired(e.target.value)) setTenantDocs((d) => { const next = { ...d }; delete next[tenantDocKey(i, 'workidproof')]; return next; }); }} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={tr('services.ra.tenant.occupationPlaceholder')} /></Field>
                   <Field label={tr('services.ra.tenant.pan')} required error={errors['t' + i + 'pan'] && why('t' + i + 'pan', 'services.ra.tenant.panErr')}><PartyIdInput masked={masked?.[`tenant-${i}`]?.pan} held={held} kind="pan" value={t.pan} onChange={(v) => { setTenant(i, 'pan', v); clearErr('t' + i + 'pan'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'pan'] ? ' err' : '')} placeholder="ABCDE1234F" /></Field>
                   {(t.residency === 'nri' || t.residency === 'foreign') && (
@@ -83,7 +83,7 @@ export default function StepTenant({ step, canInvite, tenantMode, setTenantMode,
                 </div>
                 {offlineDocSlots(t, i).length > 0 && (
                   <>
-                    <p className="text-xs font-semibold text-gray-300 mt-4 mb-2 flex items-center gap-2"><Icon name="paperclip" className="w-3.5 h-3.5 text-teal-400" /> {tr('services.ra.tenant.documents')}</p>
+                    <p className="text-sm font-semibold text-gray-200 mt-4 mb-2 flex items-center gap-2"><Icon name="paperclip" className="w-4 h-4 text-teal-400" /> {tr('services.ra.tenant.documents')}</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {offlineDocSlots(t, i).map(({ key, slug, required }) => <UploadBox key={key} label={tr(`services.ra.tenant.doc.${slug}`)} required={required} error={errors['doc-' + key]} fileName={tenantDocs[key]?.fileName} preview={tenantDocs[key]} onPick={async (f) => { if (await pickDoc(f, tenantDocs[key], setTenantDocs, key)) clearErr('doc-' + key); }} />)}
                     </div>

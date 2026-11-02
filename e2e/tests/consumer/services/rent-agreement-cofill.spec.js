@@ -1,9 +1,10 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, authHeaders, signedInAs, signedInAsNew, uniqueMobile, shownMobile } from '../../../helpers/liveAuth.js';
-import { SOCIETY_PLACEHOLDER, active, clickNext, fillOwner, fillProperty, fillTenantPolice, fillTerms, fillWitnesses, inviteOwner, inviteTenant, uploadAll } from '../../../helpers/rentAgreementWizard.js';
+import { SOCIETY_PLACEHOLDER, active, clickNext, fillOwner, fillPartyIgr, fillProperty, fillTenantPolice, fillTerms, inviteOwner, inviteTenant, payAndSubmit, uploadAll } from '../../../helpers/rentAgreementWizard.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
+import { gotoSettled, reloadSettled } from '../../../helpers/settle.js';
 // Co-fill must be live: it spans two accounts and browser contexts.
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
@@ -100,13 +101,12 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     const before = new Set((await invitesFor(tenantToken)).map((r) => r.id));
 
     await signedInAsNew(page, { api: API });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
 
     await fillProperty(page);
     await fillOwner(page);
     await inviteTenant(page, tenantMobile);
     await fillTerms(page);
-    await fillWitnesses(page);
 
     const review = active(page);
     await review.getByRole('checkbox').check();
@@ -116,7 +116,7 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     const created = page.waitForResponse(
       (r) => r.request().method() === 'POST' && /\/service-requests\/co-fill$/.test(new URL(r.url()).pathname),
     );
-    await review.getByRole('button', { name: /Generate Agreement & Proceed/ }).click();
+    await payAndSubmit(page);
 
     const res = await created;
     expect(res.status(), 'the server accepted the co-fill request').toBe(201);
@@ -152,23 +152,39 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     try {
       const tenantPage = await tenantCtx.newPage();
       await signedInAs(tenantPage, tenantMobile);
-      await tenantPage.goto(inviteUrl({ partyId: party.id, requestId: body.id }), { waitUntil: 'networkidle' });
+      await gotoSettled(tenantPage, inviteUrl({ partyId: party.id, requestId: body.id }));
       /* The owner's sections are readable but not writable, and the tenant's is the one they
          complete. Asserted from a context whose `localStorage` never held the owner's draft. */
 
       await expect(tenantPage.getByText('Set up by the owner — view only')).toBeVisible();
       await expect(active(tenantPage).getByPlaceholder(SOCIETY_PLACEHOLDER)).toBeDisabled();
       await expect(active(tenantPage).locator('.dz-dropdown__trigger').first()).toBeDisabled();
+      const opacity = (loc) => () => loc.evaluate((el) => getComputedStyle(el).opacity);
+      await expect.poll(opacity(active(tenantPage).getByPlaceholder('e.g. Near D-Mart')), { message: 'a locked text box looks locked like the dropdowns' }).toBe('0.55');
+      await expect.poll(opacity(active(tenantPage).locator('.opt-pill').first()), { message: 'a locked choice pill looks locked too' }).toBe('0.55');
 
       await clickNext(tenantPage, 1); // Property -> Owner (still read-only)
+      const ownerDob = active(tenantPage).locator('.dz-datefield').first();
+      await expect(ownerDob, 'the owner\'s birth date is read-only too').toBeDisabled();
+      // A forced click skips Playwright's stability wait, so let the step change's smooth scroll finish first.
+      const scrollSettled = () => tenantPage.evaluate(() => new Promise((done) => {
+        const y = window.scrollY;
+        requestAnimationFrame(() => requestAnimationFrame(() => done(window.scrollY === y)));
+      }));
+      await expect.poll(scrollSettled).toBe(true);
+      await expect(ownerDob).toBeInViewport();
+      await ownerDob.click({ force: true });
+      await expect(tenantPage.locator('.dz-cal'), 'no calendar opens on the owner\'s date').toHaveCount(0);
       await clickNext(tenantPage, 2); // Owner -> Tenant
       await expect(tenantPage.getByText('Your details — please complete this step')).toBeVisible();
       await expect(active(tenantPage).getByPlaceholder('As per PAN/Aadhaar')).toBeEnabled();
+      await expect.poll(opacity(active(tenantPage).getByPlaceholder('As per PAN/Aadhaar')), { message: 'the tenant\'s own fields stay full strength' }).toBe('1');
+      await expect(active(tenantPage).locator('[data-err="t0dob"]'), 'the tenant still sets their own birth date').toBeEnabled();
       await expect(active(tenantPage).getByPlaceholder('10-digit mobile').first(), 'the invitee finds their own mobile already on their step').toHaveValue(shownMobile(tenantMobile));
       /* Accepting removes the row from the *pending* invite list, so a second visit finds nothing
          there and must not read that absence as expiry — the tenant would have no way back in. */
 
-      await tenantPage.reload({ waitUntil: 'networkidle' });
+      await reloadSettled(tenantPage);
       await expect(
         tenantPage.getByText('This invite is no longer available'),
         'reopening an accepted invite is not treated as expiry',
@@ -179,12 +195,12 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     }
   });
 
-  test('a tenant can start the agreement and invite the owner, who fills only the owner half from their own browser', async ({ page, browser }) => {
+  test('a tenant can start the agreement and invite the owner, who takes it over from their own browser and edits every step; once complete the tenant may pay instead', async ({ page, browser }) => {
     test.slow();
     const ownerMobile = uniqueMobile();
     const { accessToken: ownerToken } = await apiLogin(ownerMobile, { api: API });
     const tenantMobile = await signedInAsNew(page, { api: API });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
 
     await fillProperty(page);
     await inviteOwner(page, ownerMobile, 'Rajesh Deshpande');
@@ -192,15 +208,16 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     await expect(t.getByPlaceholder('10-digit mobile').first(), 'the requester is the first tenant').toHaveValue(shownMobile(tenantMobile));
     await t.getByPlaceholder('As per PAN/Aadhaar').first().fill('Rahul Nair');
     await pickDate(page, '[data-err="t0dob"]', '1995-01-01');
+    await fillPartyIgr(page, t, { address: false });
     await t.getByPlaceholder('ABCDE1234F').first().fill('PQRSX6789K');
     await fillTenantPolice(page);
     await uploadAll(t, 'tenant-doc');
     await clickNext(page, 3);
     await fillTerms(page);
-    await fillWitnesses(page);
 
     const review = active(page);
     await expect(review.getByText('Invited: Rajesh Deshpande (pending)')).toBeVisible();
+    await expect(review.getByRole('button', { name: /Pay .+ & Submit/ }), 'the tenant never pays').toHaveCount(0);
     await review.getByRole('checkbox').check();
     const created = page.waitForResponse(
       (r) => r.request().method() === 'POST' && /\/service-requests\/co-fill$/.test(new URL(r.url()).pathname),
@@ -212,70 +229,127 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     const party = (body.parties || []).find((p) => p?.role === 'owner');
     expect(party?.id, 'the invited party is the owner').toBeTruthy();
     await expect(page.getByText('Request sent to the owner!')).toBeVisible();
-    await expect(page.getByText('Send the invite to the owner')).toBeVisible();
+    await expect(page.getByText(/nothing more is needed from you/)).toBeVisible();
     expect((await invitesFor(ownerToken)).map((r) => `${r.requestId}:${r.role}`)).toContain(`${body.id}:owner`);
+
+    const tenantHeaders = await authHeaders(tenantMobile);
+    const tenantCheckout = await fetch(`${API}/service-requests/${body.id}/checkout`, {
+      method: 'POST', headers: tenantHeaders, body: JSON.stringify({ declaration: 'ra-decl-2026-10' }),
+    });
+    expect(tenantCheckout.status, 'no one pays before the owner has accepted').toBe(403);
 
     const ownerCtx = await browser.newContext();
     try {
       const ownerPage = await ownerCtx.newPage();
       await signedInAs(ownerPage, ownerMobile);
-      await ownerPage.goto(inviteUrl({ partyId: party.id, requestId: body.id }), { waitUntil: 'networkidle' });
-      await expect(ownerPage.getByText('Set up by the tenant — view only')).toBeVisible();
-      await expect(active(ownerPage).getByPlaceholder(SOCIETY_PLACEHOLDER)).toBeDisabled();
+      await gotoSettled(ownerPage, inviteUrl({ partyId: party.id, requestId: body.id }));
+      await expect(ownerPage.getByTestId('ra-editing-note')).toContainText('Review the agreement before you pay');
+      await expect(ownerPage, 'the owner now holds the request, not an invite').toHaveURL(/\/services\/rent-agreement$/);
+      await expect(active(ownerPage).getByPlaceholder(SOCIETY_PLACEHOLDER), 'the property step is the owner\'s to edit').toBeEnabled();
       await clickNext(ownerPage, 1);
-      await expect(ownerPage.getByText('Your details — please complete this step')).toBeVisible();
       const o = active(ownerPage);
-      await expect(o.getByPlaceholder('10-digit mobile').first(), 'the invitee\'s own number is already there').toHaveValue(shownMobile(ownerMobile));
+      await expect(o.getByPlaceholder('10-digit mobile').first(), 'the owner\'s own number is already there').toHaveValue(shownMobile(ownerMobile));
       await o.getByPlaceholder('As per PAN/Aadhaar').first().fill('Rajesh Deshpande');
       await pickDate(ownerPage, '[data-err="oDob"]', '1974-01-01');
+      await fillPartyIgr(ownerPage, o);
       await o.getByPlaceholder('ABCDE1234F').first().fill('ABCDE1234F');
       await uploadAll(o, 'owner-doc');
       await clickNext(ownerPage, 2);
-      await expect(active(ownerPage).getByPlaceholder('As per PAN/Aadhaar').first(), 'the tenant half is read-only').toBeDisabled();
-      await expect(active(ownerPage).getByTestId('ra-masked-pan'), 'the tenant\'s PAN shows only its last four').toHaveValue('XXXXXX789K');
-      await expect(active(ownerPage).getByPlaceholder('12-digit Aadhaar'), 'no Aadhaar is collected or shown').toHaveCount(0);
+      const tenantStep = active(ownerPage);
+      await expect(ownerPage.getByTestId('ra-cofilled-note'), 'nothing is view-only for the owner').toHaveCount(0);
+      const heldPan = tenantStep.locator('input[data-held="true"]').first();
+      await expect(heldPan, 'the tenant\'s PAN stays masked but replaceable').toHaveAttribute('placeholder', /XXXXXX789K on file/);
+      await expect(heldPan).toBeEnabled();
+      await expect(heldPan).toHaveValue('');
+      await expect(tenantStep.getByPlaceholder('12-digit Aadhaar'), 'no Aadhaar is collected or shown').toHaveCount(0);
+      await expect(tenantStep.getByPlaceholder('As per PAN/Aadhaar').first(), 'the owner can correct the tenant').toBeEnabled();
+      await tenantStep.getByPlaceholder('As per PAN/Aadhaar').first().fill('Rahul K Nair');
+      await expect(tenantStep.locator('input[data-held="true"]'), 'a renamed tenant\'s old PAN no longer counts').toHaveCount(0);
+      await clickNext(ownerPage);
+      await expect(tenantStep.getByPlaceholder('ABCDE1234F').first(), 'the missing PAN is flagged on this step, not at payment').toHaveClass(/\berr\b/);
+      await tenantStep.getByPlaceholder('ABCDE1234F').first().fill('PQRSX6789K');
       await clickNext(ownerPage, 3);
       await clickNext(ownerPage, 4);
-      await clickNext(ownerPage, 5);
       await active(ownerPage).getByRole('checkbox').check();
-      const filled = ownerPage.waitForResponse(
-        (r) => r.request().method() === 'PUT' && /\/party-details$/.test(new URL(r.url()).pathname),
+      const checkout = ownerPage.waitForResponse(
+        (r) => r.request().method() === 'POST' && /\/service-requests\/[^/]+\/checkout$/.test(new URL(r.url()).pathname),
       );
-      await active(ownerPage).getByRole('button', { name: /Generate Agreement & Proceed/ }).click();
-      expect((await filled).status(), 'the owner half was accepted').toBe(200);
+      ownerPage.once('dialog', (dialog) => dialog.dismiss());
+      await payAndSubmit(ownerPage);
+      const opened = await checkout;
+      expect(opened.status(), 'the owner opened payment, then walked away').toBe(200);
+      expect(new URL(opened.url()).pathname, 'for the same request, not a new one').toContain(body.id);
     } finally {
       await ownerCtx.close();
     }
 
-    const read = await fetch(`${API}/service-requests/${body.id}`, { headers: await authHeaders(tenantMobile) });
-    const merged = (await read.json()).details;
-    expect(merged._state.owner.oName, 'the owner wrote the licensor').toBe('Rajesh Deshpande');
-    expect(merged._state.tenants[0].name, 'and left the requester\'s tenant half alone').toBe('Rahul Nair');
+    const ownerRead = await (await fetch(`${API}/service-requests/${body.id}`, { headers: await authHeaders(ownerMobile) })).json();
+    expect(ownerRead.myPartyId ?? null, 'the owner is now the requester').toBeNull();
+    expect(ownerRead.details._state.owner.oName).toBe('Rajesh Deshpande');
+    expect(ownerRead.details._state.tenants[0].name, 'the owner\'s correction to the tenant half was saved').toBe('Rahul K Nair');
+    const tenantRead = await (await fetch(`${API}/service-requests/${body.id}`, { headers: tenantHeaders })).json();
+    expect(tenantRead.myPartyId, 'the tenant is now a party on the owner\'s request').toBeTruthy();
 
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
-    await expect(page.getByTestId('ra-pay-panel').getByText('The owner has filled in their part')).toBeVisible();
-    const summary = page.getByTestId('ra-pay-summary');
-    await expect(summary, 'the pay panel states the deed being paid for').toContainText('Rahul Nair');
-    const breakdown = page.getByTestId('ra-pay-breakdown');
-    for (const line of ['Stamp Duty', 'Registration Fee', 'Document Handling', 'Draazy Service Fee', 'Total Payable']) {
-      await expect(breakdown, `the pay panel itemises ${line}`).toContainText(line);
-    }
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
+    await expect(page.getByText('You\'re part of a rent agreement')).toBeVisible();
+    expect(tenantRead.payableByMe, 'the owner left checkout unpaid, so the complete form is the tenant\'s to pay too').toBe(true);
+    const panel = page.getByTestId('ra-pay-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel.getByTestId('ra-pay-either')).toBeVisible();
+    await panel.getByRole('checkbox').check();
+    page.once('dialog', (dialog) => dialog.accept());
+    const tenantPaid = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && /\/service-requests\/[^/]+\/checkout$/.test(new URL(r.url()).pathname),
+    );
+    await panel.getByRole('button', { name: /^Pay / }).click();
+    expect((await tenantPaid).status(), 'the tenant\'s checkout replaces the owner\'s abandoned order').toBe(200);
+    await expect.poll(async () => (await (await fetch(`${API}/service-requests/${body.id}`, { headers: tenantHeaders })).json()).status,
+      { message: 'paid once, by the tenant' }).not.toBe('awaiting-payment');
+    const ownerAfter = await (await fetch(`${API}/service-requests/${body.id}`, { headers: await authHeaders(ownerMobile) })).json();
+    expect(ownerAfter.paidBy, 'the owner sees that the tenant paid').toBeTruthy();
+    const ownerInbox = await notificationsFor((await apiLogin(ownerMobile, { api: API })).accessToken);
+    expect(ownerInbox.map((n) => n.type), 'the owner is told the other side paid').toContain('service.party-paid');
+  });
 
-    /* "Add what's missing" must show the owner's half as filed, not reopen the invite form. */
-    await page.getByTestId('ra-continue-filed').click();
-    await clickNext(page, 1);
-    await expect(page.getByTestId('ra-cofilled-note')).toContainText('Filled in by the owner');
-    const ownerHalf = active(page);
-    await expect(ownerHalf.getByPlaceholder('As per PAN/Aadhaar').first()).toHaveValue('Rajesh Deshpande');
-    await expect(ownerHalf.getByPlaceholder('As per PAN/Aadhaar').first()).toBeDisabled();
-    await expect(ownerHalf.getByTestId('ra-masked-pan')).toHaveValue('XXXXXX234F');
-    await expect(ownerHalf.getByText('invite the owner'), 'no invite form over a filled half').toHaveCount(0);
+  test('an owner may take over invites for two different flats, but a second unpaid agreement on the same flat is refused', async ({ page }) => {
+    const ownerMobile = await signedInAsNew(page, { api: API });
+    const ownerHeaders = await authHeaders(ownerMobile);
+    const flat = { gramPanchayat: false, flatNo: 'A-101', society: 'Lake View', pincode: '411045' };
+    const own = await fetch(`${API}/service-requests`, {
+      method: 'POST', headers: ownerHeaders,
+      body: JSON.stringify({ type: 'rent-agreement', details: { ownerName: 'Anita Verma', rent: '30000', _state: { prop: flat } } }),
+    });
+    expect(own.status, 'the owner filed their own agreement').toBe(201);
+    expect((await own.json()).status).toBe('awaiting-payment');
 
-    await clickNext(page, 2);
-    const held = active(page).locator('input[data-held="true"]');
-    await expect(held.first(), 'the tenant\'s own numbers stay on file, not retyped').toHaveAttribute('placeholder', /on file/);
-    await expect(held.first()).toHaveValue('');
-    await clickNext(page, 3);
+    const tenantInvite = async (prop) => {
+      const tenantMobile = uniqueMobile();
+      const { accessToken } = await apiLogin(tenantMobile, { api: API });
+      const created = await fetch(`${API}/service-requests/co-fill`, {
+        method: 'POST', headers: authed(accessToken),
+        body: JSON.stringify({
+          request: { type: 'rent-agreement', details: { rent: '30000', _state: { ownerMode: 'invite', prop, tenants: [{ name: 'Rahul Nair', mobile: tenantMobile }] } } },
+          role: 'owner',
+          mobile: ownerMobile,
+        }),
+      });
+      expect(created.status).toBe(201);
+      const req = await created.json();
+      return { req, party: (req.parties || []).find((p) => p?.role === 'owner') };
+    };
+
+    const other = await tenantInvite({ gramPanchayat: false, flatNo: 'C-303', society: 'Hill Crest', pincode: '411021' });
+    const accepted = await fetch(`${API}/me/service-request-invites/${other.party.id}`, {
+      method: 'POST', headers: ownerHeaders, body: JSON.stringify({ decision: 'accept' }),
+    });
+    expect(accepted.status, 'a second flat is not blocked by the first').toBe(200);
+
+    const same = await tenantInvite(flat);
+    await gotoSettled(page, inviteUrl({ partyId: same.party.id, requestId: same.req.id }));
+    await expect(page.getByText('You already have an agreement for this flat')).toBeVisible();
+    await expect(page.getByText(/already have an unpaid rent agreement for this flat/)).toBeVisible();
+    const still = (await invitesFor((await apiLogin(ownerMobile, { api: API })).accessToken)).find((r) => r.requestId === same.req.id);
+    expect(still?.status, 'the invite stays open for when the owner is ready').toBe('invited');
   });
 
   test('an invite addressed to one account is invisible to another, and a signed-out invitee gets the sign-in sheet and the invite resolves after it — the SERVER withholds it, and the mobile never enters the URL', async ({ page, browser }) => {
@@ -297,7 +371,7 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     expect(peek.status, 'the request does not exist as far as a stranger is concerned').toBe(404);
 
     await signedInAs(page, strangerMobile);
-    await page.goto(inviteUrl({ partyId, requestId }), { waitUntil: 'networkidle' });
+    await gotoSettled(page, inviteUrl({ partyId, requestId }));
     /* Positive wait first. `toHaveCount(0)` is satisfied instantly by a page that has not
        rendered, so without this the two absence assertions below would pass on a blank screen. */
     await expect(page.getByText('This invite is no longer available')).toBeVisible();
@@ -308,7 +382,7 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     const signedOut = await browser.newContext();
     try {
       const anon = await signedOut.newPage();
-      await anon.goto(inviteUrl({ partyId, requestId }), { waitUntil: 'networkidle' });
+      await gotoSettled(anon, inviteUrl({ partyId, requestId }));
 
       await expect(signInSheet(anon)).toBeVisible();
       await expect(anon.getByRole('dialog', { name: 'Sign in to complete your Rent Agreement' })).toBeVisible();
@@ -331,13 +405,12 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     const strangerMobile = uniqueMobile();
 
     await signedInAsNew(page, { api: API });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
 
     await fillProperty(page);
     await fillOwner(page);
     await inviteTenant(page, strangerMobile);
     await fillTerms(page);
-    await fillWitnesses(page);
 
     const review = active(page);
     await review.getByRole('checkbox').check();
@@ -345,7 +418,7 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     const created = page.waitForResponse(
       (r) => r.request().method() === 'POST' && /\/service-requests\/co-fill$/.test(new URL(r.url()).pathname),
     );
-    await review.getByRole('button', { name: /Generate Agreement & Proceed/ }).click();
+    await payAndSubmit(page);
 
     const body = await (await created).json();
     const party = (body.parties || [])[0];
@@ -386,7 +459,7 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
 
     /* A browser that has never run the owner's wizard. Nothing local could tell it this exists. */
     await signedInAs(page, tenantMobile);
-    await page.goto(`${BASE}/dashboard#rental`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/dashboard#rental`);
 
     await expect(
       page.getByText('Action needed: complete your rent agreement'),

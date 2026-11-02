@@ -10,8 +10,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ServiceRequestMessageRepository extends JpaRepository<ServiceRequestMessage, UUID> {
-    List<ServiceRequestMessage> findByRequestIdOrderByCreatedAtAsc(UUID requestId);
-
     List<ServiceRequestMessage> findByRequestIdInOrderByCreatedAtAsc(Collection<UUID> requestIds);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

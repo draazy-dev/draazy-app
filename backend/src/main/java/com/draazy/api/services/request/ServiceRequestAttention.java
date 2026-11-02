@@ -4,6 +4,7 @@ import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -20,14 +21,11 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class ServiceRequestAttention {
     static final int REASON_MAX = 500;
     static final int PAPERS_MAX = 10;
-    private static final String DESK_LINK = "/ops/drafting-desk";
 
     private static final Set<ServiceRequestStatus> ASKABLE = EnumSet.of(ServiceRequestStatus.ASSIGNED,
             ServiceRequestStatus.IN_PROGRESS, ServiceRequestStatus.CHANGES_REQUESTED);
@@ -100,7 +98,7 @@ public class ServiceRequestAttention {
                     ServiceRequestTypes.pageFor(request.getType()));
             if (notifier.allowsWhatsapp(user)) {
                 users.findById(user).map(User::getMobile)
-                        .ifPresent(mobile -> afterCommit(() -> messenger.sendServiceAttention(mobile, "rent agreement")));
+                        .ifPresent(mobile -> AfterCommit.run(() -> messenger.sendServiceAttention(mobile, "rent agreement")));
             }
         });
         return mapper.toDto(request, caller);
@@ -132,7 +130,8 @@ public class ServiceRequestAttention {
                 "note", said.isEmpty() ? null : said);
         if (request.getAssigneeId() != null) {
             notifier.notify(request.getAssigneeId(), "service.attention-resolved", "Customer sent the case back",
-                    said.isEmpty() ? "The correction you asked for is done. Check it and carry on." : said, DESK_LINK);
+                    said.isEmpty() ? "The correction you asked for is done. Check it and carry on." : said,
+                    ServiceRequestTypes.deskFor(request));
         }
         return mapper.toDto(request, caller);
     }
@@ -174,18 +173,5 @@ public class ServiceRequestAttention {
                 .filter(p -> side.equals(p.getRole()))
                 .map(ServiceRequestParty::getUserId).collect(Collectors.toCollection(LinkedHashSet::new));
         return joined.isEmpty() ? Set.of(request.getRequesterId()) : joined;
-    }
-
-    private static void afterCommit(Runnable send) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            send.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                send.run();
-            }
-        });
     }
 }

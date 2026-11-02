@@ -19,8 +19,7 @@ function editScope(key) {
   if (key === 'terms') return { roots: [['terms'], ['maint'], ['furnItems'], ['clauses']] };
   const n = indexOf(key);
   if (key.startsWith('licensor-')) return { roots: [n === 0 ? ['owner'] : ['coOwners', n - 1]] };
-  if (key.startsWith('tenant-')) return { roots: [['tenants', n]] };
-  return { roots: [['wit']], only: (k) => String(k).startsWith(`w${n}`) };
+  return { roots: [['tenants', n]] };
 }
 
 function partyCards(groups, items, kind, prefix, title) {
@@ -62,12 +61,10 @@ export default function CaseParticulars({ request, checklist, status, onChecklis
     />
   ));
   const licensees = partyCards(groups, items, 'licensee', 'tenant-', 'Licensee');
-  const witnesses = groups.filter((g) => g.kind === 'witness');
 
   const sections = [
     { id: 'licensor', title: 'Licensor', prefix: 'licensor-', body: partyCards(groups, items, 'licensor', 'licensor-', 'Licensor').map(detailCard) },
     { id: 'licensee', title: 'Licensee', prefix: 'tenant-', body: licensees.length ? licensees.map(detailCard) : <p className="text-sm text-gray-500">No licensee on the form.</p> },
-    witnesses.length ? { id: 'witnesses', title: 'Witnesses', body: <div className="grid gap-3 md:grid-cols-2">{witnesses.map(detailCard)}</div> } : null,
     children ? { id: 'ids', title: 'ID numbers', body: children } : null,
     { id: 'property', title: 'Property', prefix: 'property', body: <>{detailCard(find('property') || { key: 'property', title: 'Property', name: '', rows: [] })}{append.property}</> },
     { id: 'terms', title: 'Terms', body: <>{editing === 'terms' ? editor('terms', 'Terms') : <TermsCard terms={find('terms')} visit={find('visit')} onEdit={editable && !editing ? () => setEditing('terms') : null} />}{append.terms}</> },

@@ -1,6 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { MOBILE } from '../../../helpers/rentAgreementWizard.js';
+import { gotoSettled, reloadSettled } from '../../../helpers/settle.js';
 /* Mock-only: the server-side spend (once, statutory charges still billed, race-safe) is pinned by
    RentAgreementReferralCreditTest and ReferralCreditRaceTest. This pins what the wizard shows. */
 
@@ -38,13 +39,13 @@ test('a free rent agreement from referrals strikes the Draazy fee but keeps gove
   const fee = page.locator('div.flex.justify-between', { hasText: 'Draazy Service Fee' }).first();
   const waiver = page.getByText(/Free with your referral reward/).first();
 
-  await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `${BASE}/services/rent-agreement`);
   await expect(total).toContainText('₹');
   await expect(waiver, 'no credit, no waiver line').toHaveCount(0);
   const fullTotal = rupees(await total.locator('span').last().textContent());
 
   remaining = 1;
-  await page.reload({ waitUntil: 'networkidle' });
+  await reloadSettled(page);
   await expect(waiver).toContainText('₹499');
   await expect(fee.locator('span').last(), 'the Draazy fee is struck through, not hidden').toHaveClass(/line-through/);
   await expect.poll(async () => rupees(await total.locator('span').last().textContent()),

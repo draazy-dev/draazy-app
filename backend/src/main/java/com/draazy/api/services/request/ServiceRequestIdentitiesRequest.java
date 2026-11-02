@@ -11,7 +11,6 @@ import jakarta.validation.constraints.Size;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public record ServiceRequestIdentitiesRequest(
 
@@ -33,11 +32,6 @@ public record ServiceRequestIdentitiesRequest(
             }
         }
         return true;
-    }
-
-    @AssertTrue(message = "witness index must be 0 or 1")
-    public boolean isWitnessIndexAllowed() {
-        return parties == null || parties.stream().filter(party -> party != null && "witness".equals(party.partyRole())).allMatch(party -> party.partyIndex() <= 1);
     }
 
     @AssertTrue(message = "the same Aadhaar number is recorded for two parties")
@@ -69,13 +63,9 @@ public record ServiceRequestIdentitiesRequest(
         return true;
     }
 
-    Set<String> roles() {
-        return parties.stream().map(Party::partyRole).collect(Collectors.toSet());
-    }
-
     public record Party(
             @NotNull
-            @Pattern(regexp = "^(owner|tenant|witness)$", message = "must be owner, tenant or witness")
+            @Pattern(regexp = "^(owner|tenant)$", message = "must be owner or tenant")
             String partyRole,
 
             @PositiveOrZero(message = "must not be negative")

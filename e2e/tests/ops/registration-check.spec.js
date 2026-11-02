@@ -93,8 +93,18 @@ function enteredStatusAgo(requestId, hours) {
   );
 }
 
-async function approvedAgreement(holder) {
-  const customer = (await apiLogin(uniqueMobile())).accessToken;
+function leaseEndsIn(homeId, days) {
+  if (!/^[\w-]+$/.test(homeId) || !Number.isInteger(days)) throw new Error('bad lease end');
+  execFileSync(
+    PSQL,
+    ['-U', process.env.E2E_DB_USER || 'postgres', '-d', process.env.E2E_DB_NAME || 'draazy_e2e', '-At',
+      '-c', `update managed_properties set lease_end = current_date + ${days} where id = '${homeId}'`],
+    { encoding: 'utf8', env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'postgres' } },
+  );
+}
+
+async function approvedAgreement(holder, { ownerMobile = uniqueMobile(), terms = {} } = {}) {
+  const customer = (await apiLogin(ownerMobile)).accessToken;
   const listing = await ok('POST', '/me/listings', customer, {
     title: '2BHK in Baner', deal: 'rent', propertyType: 'apartment', price: 30000, bhk: 2,
     locality: 'Baner', city: 'Pune', floor: 4,
@@ -107,7 +117,7 @@ async function approvedAgreement(holder) {
       type: 'rent-agreement',
       propertyId: listing.id,
       details: {
-        ownerName: 'Live Check Owner', rent: 30000, deposit: 150000, months: 11,
+        ownerName: 'Live Check Owner', rent: 30000, deposit: 150000, months: 11, ...terms,
         _state: {
           tenantMode: 'fill',
           prop: { gramPanchayat: false },
@@ -138,11 +148,11 @@ async function approvedAgreement(holder) {
   }
   const after = await ok('GET', `/service-requests/${request.id}`, customer);
   if (after.status !== 'approved') throw new Error(`not approved (${after.status}): ${JSON.stringify(after.draftApproval)}`);
-  return { id: request.id, admin, customer, tenantMobile };
+  return { id: request.id, admin, customer, ownerMobile, tenantMobile };
 }
 
-async function completedAgreement(holder) {
-  const agreement = await approvedAgreement(holder);
+async function completedAgreement(holder, options) {
+  const agreement = await approvedAgreement(holder, options);
   await ok('POST', `/service-requests/${agreement.id}/final-doc`, holder || agreement.admin, upload('registered.png', record()));
   return agreement;
 }
@@ -156,7 +166,7 @@ async function openCase(page, requestId, tab = 'progress') {
   await openRentDesk(page, tab);
   await page.getByPlaceholder('Name, mobile or request id').fill(requestId);
   await expect(page.getByTestId('ra-row')).toHaveCount(1);
-  await page.getByTestId('ra-row').first().click();
+  await page.getByTestId('ra-row').first().getByRole('button', { name: /^Open case/ }).click();
   return page.getByRole('dialog');
 }
 
@@ -440,7 +450,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     await ok('POST', `/service-requests/${request.id}/draft`, staff, upload('draft.png', CHECKS));
   });
 
-  test('a refund the holder asks for waits for a colleague, and after the duty only the service fee goes back', async ({ page }) => {
+  test('a refund the holder asks for waits for a manager, and after the duty only the service fee goes back', async ({ page }) => {
     const customer = (await apiLogin(uniqueMobile())).accessToken;
     const request = await ok('POST', '/service-requests', customer, {
       type: 'rent-agreement',
@@ -468,8 +478,9 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     await refunds.getByLabel('Why the money goes back').fill('The owner sold the flat before drafting');
     await refunds.getByRole('button', { name: 'Ask for approval' }).click();
     const open = refunds.getByTestId('refund-open');
-    await expect(open).toContainText('You asked for it, so a colleague has to approve it.');
+    await expect(open).toContainText('Waiting for a manager to approve it.');
     await expect(open.getByRole('button', { name: 'Approve and refund' })).toHaveCount(0);
+    await expect(open.getByRole('button', { name: 'Withdraw' })).toBeVisible();
 
     const [asked] = (await ok('GET', `/service-requests/${request.id}/refunds`, staff)).refunds;
     expect((await call('POST', `/service-requests/${request.id}/refunds/${asked.id}/approve`, staff)).status).toBe(403);
@@ -479,6 +490,106 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     const timeline = (await ok('GET', `/service-requests/${request.id}`, staff)).timeline.map((t) => t.event);
     expect(timeline).toContain('refund.approved');
     expect((await call('GET', `/service-requests/${request.id}/refunds`, customer)).status).toBe(403);
+  });
+
+  test('a desk cancel of a paid agreement raises the refund, and only a manager can pay it out', async ({ page, browser }) => {
+    const customer = (await apiLogin(uniqueMobile())).accessToken;
+    const request = await ok('POST', '/service-requests', customer, {
+      type: 'rent-agreement',
+      details: { ownerName: 'Cancel Refund Owner', rent: 20000, deposit: 60000, months: 11, _state: { tenantMode: 'fill', prop: { gramPanchayat: false } } },
+    });
+    settle(request.id);
+    markPaid(request.id);
+    const staff = (await apiLogin(STAFF.rental)).accessToken;
+    await ok('PATCH', `/service-requests/${request.id}/status`, staff, { status: 'assigned' });
+    const reason = 'The owner withdrew the flat';
+
+    await signIn(page, STAFF.rental, { screen: 'staff' });
+    const dialog = await openCase(page, request.id, 'progress');
+    await dialog.getByRole('button', { name: 'Cancel request' }).click();
+    const cancellation = page.getByRole('dialog').filter({ hasText: 'Reason for cancellation' });
+    await expect(cancellation.getByTestId('cancel-refund-note')).toContainText('a refund for a manager to approve');
+    await cancellation.getByLabel('Reason for cancellation').fill(reason);
+    await cancellation.getByLabel('Reason for cancellation').press('Enter');
+    await expect(page.getByRole('alert').filter({ hasText: 'their refund is waiting for a manager' })).toBeVisible();
+    await dialog.getByRole('tab', { name: 'Payment' }).click();
+    const staffView = dialog.getByRole('region', { name: 'Refunds' }).getByTestId('refund-open');
+    await expect(staffView).toContainText('Waiting for a manager to approve it.');
+    await expect(staffView.getByRole('button', { name: 'Withdraw' })).toHaveCount(0);
+
+    const raised = await ok('GET', `/service-requests/${request.id}/refunds`, staff);
+    expect(raised).toMatchObject({ canDecide: false, refunds: [{ status: 'requested', amount: request.amount, mine: true }] });
+    expect((await call('POST', `/service-requests/${request.id}/refunds/${raised.refunds[0].id}/approve`, staff)).status).toBe(403);
+    expect((await call('POST', `/service-requests/${request.id}/refunds/${raised.refunds[0].id}/reject`, staff, { note: 'Never mind' })).status).toBe(403);
+    const inbox = await ok('GET', '/notifications?size=100', customer);
+    const told = (inbox.content || []).find((n) => n.type === 'service.cancelled');
+    expect(told.body).toContain(reason);
+    expect(told.body).toContain('refund is waiting for approval');
+
+    const adminContext = await browser.newContext();
+    try {
+      const adminPage = await adminContext.newPage();
+      await signIn(adminPage, ACTORS.admin, { screen: 'staff', role: /Administrator/ });
+      await adminPage.goto(`/admin/rent-agreement?request=${request.id}`);
+      const adminCase = adminPage.getByRole('dialog');
+      await adminCase.getByRole('tab', { name: 'Payment' }).click();
+      const open = adminCase.getByRole('region', { name: 'Refunds' }).getByTestId('refund-open');
+      await expect(open).toContainText(`Reason: Cancelled by the desk: ${reason}`);
+      await open.getByRole('button', { name: 'Approve and refund' }).click();
+      await expect(adminPage.getByRole('alert').filter({ hasText: 'Refund sent to the payment gateway.' })).toBeVisible();
+    } finally {
+      await adminContext.close();
+    }
+
+    const settled = await ok('GET', `/service-requests/${request.id}/refunds`, staff);
+    expect(settled).toMatchObject({ refunded: request.amount, refunds: [{ status: 'approved', gatewayRefundId: expect.any(String) }] });
+    expect((await ok('GET', `/service-requests/${request.id}`, customer)).status).toBe('cancelled');
+  });
+
+  test('a cancelled agreement\'s refund is on the Refunds desk under its feature, and the case sits under Cancelled, not Closed', async ({ page }) => {
+    const mobile = uniqueMobile();
+    const customer = (await apiLogin(mobile)).accessToken;
+    const request = await ok('POST', '/service-requests', customer, {
+      type: 'rent-agreement',
+      details: { ownerName: 'Desk Refund Owner', rent: 20000, deposit: 60000, months: 11, _state: { tenantMode: 'fill', prop: { gramPanchayat: false } } },
+    });
+    settle(request.id);
+    markPaid(request.id);
+    const staff = (await apiLogin(STAFF.rental)).accessToken;
+    await ok('PATCH', `/service-requests/${request.id}/status`, staff, { status: 'assigned' });
+    await ok('PATCH', `/service-requests/${request.id}/status`, staff, { status: 'cancelled', note: 'The tenant backed out' });
+    const [raised] = (await ok('GET', `/service-requests/${request.id}/refunds`, staff)).refunds;
+
+    await signIn(page, ACTORS.admin, { screen: 'staff', role: /Administrator/ });
+    await page.goto('/admin/refunds');
+    const row = page.locator(`[data-testid="queue-row"][data-id="${raised.id}"]`);
+    await expect(row).toHaveCount(1, { timeout: 20000 });
+    const feature = page.getByRole('group', { name: 'Feature' });
+    await feature.getByRole('button', { name: 'Passes' }).click();
+    await expect(row).toHaveCount(0);
+    await feature.getByRole('button', { name: 'Rent agreement' }).click();
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText('Rent agreement');
+    await expect(row).toContainText('Pending');
+    await expect(row.getByTestId('customer-mobile')).toHaveText(mobile);
+    await expect(row.getByTestId('refund-reason')).toContainText('The tenant backed out');
+    await expect(row.getByTestId('refund-open-case')).toHaveAttribute('href', `/admin/rent-agreement?request=${request.id}`);
+
+    await row.getByTestId('refund-approve').click();
+    await page.getByTestId('refund-approve-confirm').click();
+    await expect(page.getByRole('alert').filter({ hasText: 'Refund approved' })).toBeVisible();
+    await expect(row).toHaveCount(0);
+    await page.getByRole('tab', { name: /^Approved/ }).click();
+    await expect(row).toHaveCount(1, { timeout: 20000 });
+    await expect(row.getByTestId('refund-approve')).toHaveCount(0);
+    const settled = await ok('GET', `/service-requests/${request.id}/refunds`, staff);
+    expect(settled.refunds[0]).toMatchObject({ status: 'approved', gatewayRefundId: expect.any(String) });
+
+    await openRentDesk(page, 'closed');
+    await page.getByPlaceholder('Name, mobile or request id').fill(request.id);
+    await expect(page.getByText('No cases match these filters.')).toBeVisible();
+    await openCase(page, request.id, 'cancelled');
+    await expect(page.getByRole('tab', { name: /^Cancelled/ })).toHaveAttribute('aria-selected', 'true');
   });
 
   test('the desk sees another agreement on the same flat, and a licensor named differently', async ({ page }) => {
@@ -599,5 +710,100 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
 
     const after = await ok('GET', `/service-requests/${id}/rent-agreements`, admin);
     expect(after.find((r) => r.tenantName === TENANT_NAME).status).not.toBe('registered');
+  });
+
+  test('a registered agreement puts the flat on the owner\'s and the tenant\'s dashboards', async ({ page, browser }) => {
+    const start = today();
+    const { ownerMobile, tenantMobile } = await completedAgreement(undefined, { terms: { startDate: start } });
+    const [y, m] = start.split('-').map(Number);
+    const endMonth = `${y + Math.floor((m + 10) / 12)}-${String(((m + 10) % 12) + 1).padStart(2, '0')}`;
+
+    const owner = (await apiLogin(ownerMobile)).accessToken;
+    const homes = await ok('GET', '/me/managed-properties', owner);
+    const home = (homes.content ?? homes).find((h) => h.tenantMobile === tenantMobile);
+    expect(home).toMatchObject({ rented: true, tenantName: TENANT_NAME, deposit: 150000, policeIntimation: 'pending' });
+    expect(home.leaseEnd.slice(0, 7)).toBe(endMonth);
+    const docs = await ok('GET', `/me/documents/managed/${home.id}`, owner);
+    expect((docs.content ?? docs).map((d) => d.category)).toContain('Rent Agreement');
+
+    const tenant = (await apiLogin(tenantMobile)).accessToken;
+    const tracked = await ok('GET', '/me/tracked-rent', tenant);
+    expect(tracked.find((t) => t.id === home.id)?.leaseEnd.slice(0, 7)).toBe(endMonth);
+    const rentals = await ok('GET', '/me/rentals', tenant);
+    expect((rentals.content ?? rentals).filter((r) => r.monthlyRent === 30000)).toHaveLength(1);
+
+    await signIn(page, ownerMobile);
+    await page.goto(`/owner-hub/property/${home.id}`);
+    await expect(page.getByTestId('rent-lease-end')).toContainText('Registered agreement till');
+    await expect(page.getByTestId('rent-deposit')).toContainText('Security deposit ₹1,50,000');
+    await expect(page.getByTestId('rent-police')).toContainText('Police intimation being filed');
+    await expect(page.getByText('Rent Agreement', { exact: true }).first()).toBeVisible();
+
+    const other = await browser.newContext();
+    try {
+      const tenantPage = await other.newPage();
+      await signIn(tenantPage, tenantMobile);
+      await tenantPage.goto('/dashboard#rental');
+      await expect(tenantPage.getByTestId('tracked-rent-lease-end')).toContainText('Registered agreement till');
+      await expect(tenantPage.getByTestId('tracked-rent-deposit')).toContainText('Security deposit ₹1,50,000');
+      await expect(tenantPage.getByTestId('tracked-rent-police')).toContainText('Police intimation being filed');
+    } finally {
+      await other.close();
+    }
+  });
+
+  test('a lease ending soon offers renewal to both sides on a phone', async ({ browser }) => {
+    test.slow();
+    const { ownerMobile, tenantMobile } = await completedAgreement(undefined, { terms: { startDate: today() } });
+    const owner = (await apiLogin(ownerMobile)).accessToken;
+    const homes = await ok('GET', '/me/managed-properties', owner);
+    const home = (homes.content ?? homes).find((h) => h.tenantMobile === tenantMobile);
+    leaseEndsIn(home.id, 20);
+    const phone = { viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true };
+    const tapSized = async (locator) => expect((await locator.boundingBox()).height).toBeGreaterThanOrEqual(44);
+
+    await test.step('the owner sees renew and list actions first on the property page', async () => {
+      const ctx = await browser.newContext(phone);
+      try {
+        const ownerPage = await ctx.newPage();
+        await signIn(ownerPage, ownerMobile);
+        await ownerPage.goto(`/owner-hub/property/${home.id}`);
+        const block = ownerPage.getByTestId('lease-end-actions');
+        await expect(block).toBeVisible();
+        await tapSized(block.getByTestId('lease-end-renew'));
+        await tapSized(block.getByTestId(/^lease-end-(relist|list)$/));
+        const prefill = ownerPage.waitForResponse((r) => new URL(r.url()).pathname === `/api/me/rent-agreements/homes/${home.id}/renewal`);
+        await block.getByTestId('lease-end-renew').click();
+        const res = await prefill;
+        expect(res.status()).toBe(200);
+        expect((await res.json()).prop).toBeTruthy();
+        await expect(ownerPage).not.toHaveURL(/renewHome=/);
+      } finally {
+        await ctx.close();
+      }
+    });
+
+    await test.step('the tenant sees renew, search, movers and a consented call request', async () => {
+      const ctx = await browser.newContext(phone);
+      try {
+        const tenantPage = await ctx.newPage();
+        await signIn(tenantPage, tenantMobile);
+        await tenantPage.goto('/dashboard#rental');
+        const block = tenantPage.getByTestId('tenant-lease-end');
+        await expect(block).toBeVisible();
+        await expect(block.getByTestId('tenant-lease-renew')).toHaveAttribute('href', `/services/rent-agreement?renewHome=${home.id}`);
+        await expect(block.getByTestId('tenant-lease-search')).toHaveAttribute('href', /deal=rent&rent=0-36000/);
+        await expect(block.getByTestId('tenant-lease-movers')).toHaveAttribute('href', /\/services\/packers-movers\?date=\d{4}-\d{2}-\d{2}/);
+        for (const id of ['tenant-lease-renew', 'tenant-lease-search', 'tenant-lease-movers', 'tenant-lease-call']) await tapSized(block.getByTestId(id));
+        const wrote = tenantPage.waitForResponse((r) => r.url().includes('/api/me/notification-preferences') && r.request().method() === 'PUT');
+        await block.getByTestId('tenant-lease-call').click();
+        expect((await wrote).status()).toBe(200);
+        await expect(block.getByTestId('tenant-lease-called')).toBeVisible();
+        const scroll = await tenantPage.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        expect(scroll, 'no sideways scroll on a phone').toBeLessThanOrEqual(0);
+      } finally {
+        await ctx.close();
+      }
+    });
   });
 });

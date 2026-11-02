@@ -80,9 +80,9 @@ Keep these ready before you start. Scans or clear photos are enough for online r
 - Current address proof if it differs from Aadhaar
 - Aadhaar and its registered mobile, for the OTP at the doorstep visit
 
-**Two witnesses**
+**Witnesses**
 
-- Name, age and mobile number for each. Witnesses also go through Aadhaar verification at the visit.
+- The registration needs two witnesses. With Draazy you don't send their details: our team records them at the doorstep visit.
 
 ## Registering online, step by step
 

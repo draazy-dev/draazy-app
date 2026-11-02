@@ -32,6 +32,7 @@ function span(ms) {
 function slaTone(request, now) {
   const { sla } = request;
   if (sla.waitingOn === 'customer') return { label: "Customer's turn", tone: 'muted' };
+  if (sla.waitingOn === 'tenant') return { label: 'Waiting for tenant details', tone: 'muted' };
   const deadline = registrationDeadline(request);
   const statutory = deadline
     ? ` · register by ${new Date(deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`

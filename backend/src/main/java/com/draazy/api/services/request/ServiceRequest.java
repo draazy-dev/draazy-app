@@ -17,7 +17,7 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "service_requests")
 @Getter
 public class ServiceRequest extends VersionedEntity {
-    @Column(name = "requester_id", updatable = false)
+    @Column(name = "requester_id")
     private UUID requesterId;
 
     @Column(name = "type", nullable = false, updatable = false)
@@ -53,6 +53,9 @@ public class ServiceRequest extends VersionedEntity {
     @Column(name = "payment_ref")
     private String paymentRef;
 
+    @Column(name = "payer_id")
+    private UUID payerId;
+
     @Column(name = "referral_credit", nullable = false)
     private boolean referralCredit;
 
@@ -77,6 +80,10 @@ public class ServiceRequest extends VersionedEntity {
         this.details = details;
     }
 
+    void handOverTo(UUID holder) {
+        this.requesterId = holder;
+    }
+
     void askAttention(Map<String, Object> attention) {
         this.attention = attention;
     }
@@ -95,12 +102,26 @@ public class ServiceRequest extends VersionedEntity {
         this.amount = amountAfterWaiver;
     }
 
-    boolean attachOrder(String orderId) {
+    boolean attachOrder(String orderId, UUID payer) {
         if (status != ServiceRequestStatus.AWAITING_PAYMENT || paymentRef != null) {
             return false;
         }
         this.paymentRef = orderId;
+        this.payerId = payer;
         return true;
+    }
+
+    void releaseOrder() {
+        this.paymentRef = null;
+        this.payerId = null;
+    }
+
+    UUID payer() {
+        return payerId != null ? payerId : requesterId;
+    }
+
+    UUID payerOf(String orderId) {
+        return orderId != null && orderId.equals(paymentRef) ? payer() : requesterId;
     }
 
     void moveTo(ServiceRequestStatus status) {

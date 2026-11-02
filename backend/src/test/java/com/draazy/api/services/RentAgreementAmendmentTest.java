@@ -233,7 +233,7 @@ class RentAgreementAmendmentTest extends ServiceFixtures {
                 .containsEntry("body", "Accept the new terms so our team can revise your draft.");
         assertThat(notice(desk, "service.amendment-applied"))
                 .containsEntry("title", "Revised terms accepted")
-                .containsEntry("link", "/ops/drafting-desk");
+                .containsEntry("link", "/admin/rent-agreement?request=" + id);
     }
 
     @Test
@@ -261,7 +261,7 @@ class RentAgreementAmendmentTest extends ServiceFixtures {
     @DisplayName("a later amendment is priced against what is still paid, not the gross amount")
     void amendmentsPriceAgainstNetPaid() throws Exception {
         User desk = staff("9820008032", Teams.RENTAL);
-        User checker = staff("9820008033", Teams.RENTAL);
+        User checker = manager("9820008033");
         String refunded = raiseWithTerms(customer("9820008031"));
         String untouched = raiseWithTerms(customer("9820008034"));
         setStatus(desk, refunded, "assigned", 200);
@@ -326,7 +326,7 @@ class RentAgreementAmendmentTest extends ServiceFixtures {
     void aPaymentOnWithdrawnTermsIsKeptAsCredit() throws Exception {
         User owner = customer("9820008061");
         User desk = staff("9820008062", Teams.RENTAL);
-        User checker = staff("9820008063", Teams.RENTAL);
+        User checker = manager("9820008063");
         String id = raiseWithTerms(owner);
         setStatus(desk, id, "assigned", 200);
         long paid = requestRepo.findById(UUID.fromString(id)).orElseThrow().getAmount();
@@ -345,7 +345,8 @@ class RentAgreementAmendmentTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.details.rent").value(20000))
                 .andExpect(jsonPath("$.timeline[*].event", hasItem("amendment.payment-unapplied")));
         assertThat(notice(owner, "service.amendment-credit")).containsEntry("title", "Payment received for withdrawn terms");
-        assertThat(notice(desk, "service.amendment-credit")).containsEntry("title", "Refund due on a withdrawn amendment");
+        assertThat(notice(desk, "service.amendment-credit")).containsEntry("title", "Refund due on a withdrawn amendment")
+                .containsEntry("link", "/admin/rent-agreement?request=" + id);
 
         refund(desk, checker, id, paid);
         mvc.perform(post(Routes.ServiceRequests.REFUNDS, id)

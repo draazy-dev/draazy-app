@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../../components/Icon.jsx';
-import IdInput from '../../../../components/IdInput.jsx';
+import MobileField from '../../../../components/MobileField.jsx';
 
 export default function DeclinedInvitePanel({ stalled, onRecover, busy }) {
   const { t } = useTranslation();
@@ -17,14 +17,14 @@ export default function DeclinedInvitePanel({ stalled, onRecover, busy }) {
       </p>
       <p className="text-gray-400 text-xs mt-1 leading-relaxed">{t('services.ra.declined.desc', side)}</p>
       <label className="lbl mt-3" htmlFor="ra-reinvite-mobile">{t('services.ra.declined.mobileLabel', side)}</label>
-      <div className="flex flex-col sm:flex-row gap-2">
-        <IdInput kind="mobile" id="ra-reinvite-mobile" value={mobile} onChange={setMobile}
-          className="field flex-1 px-4 py-3 rounded-xl text-white text-sm" placeholder={t('services.ra.declined.mobilePlaceholder')} />
-        <button type="button" disabled={!valid || busy} onClick={() => onRecover('reinvite', mobile)}
-          className="btn-teal px-4 py-3 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2 min-h-[44px] disabled:opacity-50">
+      <form className="flex flex-col sm:flex-row gap-2" onSubmit={(e) => { e.preventDefault(); if (valid && !busy) onRecover('reinvite', mobile); }}>
+        <MobileField id="ra-reinvite-mobile" value={mobile} onChange={setMobile} enterKeyHint="send"
+          className="sm:flex-1" placeholder={t('services.ra.declined.mobilePlaceholder')} />
+        <button type="submit" disabled={!valid || busy}
+          className="btn-teal h-btn px-4 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50">
           <Icon name="user-plus" className="w-4 h-4" /> {t('services.ra.declined.reinvite')}
         </button>
-      </div>
+      </form>
       <button type="button" disabled={busy} onClick={() => (confirming ? onRecover('cancel') : setConfirming(true))}
         className="mt-3 text-gray-500 hover:text-gray-300 disabled:opacity-50 text-[11px] font-semibold underline underline-offset-2">
         {t(confirming ? 'services.ra.declined.cancelConfirm' : 'services.ra.declined.cancel')}

@@ -13,6 +13,7 @@ import PoaFields from './PoaFields.jsx';
 import UploadBox from './UploadBox.jsx';
 import IdentityReminderNote from './IdentityReminderNote.jsx';
 import PartyIdentityFields from './PartyIdentityFields.jsx';
+import PartyAddressFields from './PartyAddressFields.jsx';
 
 export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, addCoOwner, removeCoOwner, errors, fc, clearErr, ownerDocs, setOwnerDocs, vaultEnabled, onDocSaved, canInvite, ownerMode, chooseOwnerMode, invite, setInvite, identityReminders, masked, held }) {
   const { t } = useTranslation();
@@ -75,7 +76,7 @@ export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, add
           <div className="sm:col-span-2 rounded-xl border border-sky-400/20 bg-sky-500/10 p-3 text-xs text-sky-100 leading-relaxed">{t('services.ra.party.offlineNote')}</div>
         )}
         <Field label={t('services.ra.owner.fullName')} required error={errors.oName && t('services.ra.owner.fullNameErr')}><input value={owner.oName} onChange={(e) => { setO('oName', e.target.value); clearErr('oName'); }} className={fc('oName')} placeholder={t('services.ra.owner.fullNamePlaceholder')} /></Field>
-        <PartyIdentityFields dob={owner.oDob} setDob={(v) => setO('oDob', v)} setAge={(v) => setO('oAge', v)} keys={{ dob: 'oDob', age: 'oAge' }} errors={errors} clearErr={clearErr} />
+        <PartyIdentityFields dob={owner.oDob} setDob={(v) => setO('oDob', v)} setAge={(v) => setO('oAge', v)} mother={owner.mother} setMother={(v) => setO('mother', v)} gender={owner.gender} setGender={(v) => setO('gender', v)} keys={{ dob: 'oDob', age: 'oAge', mother: 'mother', gender: 'gender' }} errors={errors} clearErr={clearErr} />
         <Field label={t('services.ra.owner.pan')} required error={errors.oPan && why('oPan', 'services.ra.owner.panErr')}><PartyIdInput masked={masked?.['owner-0']?.pan} held={held} kind="pan" value={owner.oPan} onChange={(v) => { setO('oPan', v); clearErr('oPan'); }} className={fc('oPan')} placeholder="ABCDE1234F" /></Field>
         {offline && (
           <>
@@ -85,6 +86,7 @@ export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, add
           </>
         )}
         <Field label={t('services.ra.owner.mobile')} required error={errors.oMobile && why('oMobile', errors.oMobile === 'notOwner' ? 'services.ra.owner.mobileNotYou' : 'services.ra.owner.mobileErr')}><MobileField value={owner.oMobile} onChange={(v) => { setO('oMobile', v); clearErr('oMobile'); }} error={!!errors.oMobile} placeholder={t('services.ra.owner.mobilePlaceholder')} inputClassName="px-4 py-3" /></Field>
+        <PartyAddressFields value={owner.addr} onChange={(k, v) => setO('addr', { ...owner.addr, [k]: v })} errPrefix="addr" errors={errors} clearErr={clearErr} />
         <Field className="sm:col-span-2" label={t('services.ra.owner.capacity')} error={errors.capacity && t('services.ra.owner.capacityErr')}>
           <NativeSelect value={capacities.includes(owner.capacity) ? owner.capacity : capacities[0]} onChange={(e) => { setO('capacity', e.target.value); clearErr('capacity'); }} className={fc('capacity')}>
             {capacities.map((c) => <option key={c} value={c}>{t(`services.ra.owner.capacityOpt.${c}`)}</option>)}

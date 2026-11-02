@@ -31,7 +31,10 @@ public class ServiceRequestQueryService {
     private final AccountPermissions accountPermissions;
     private final TicketService tickets;
     private final ServiceRequestQueueRows rows;
+    private final RentAgreementReadiness readiness;
 
+    // An empty NOT IN list can render as "in (null)" and drop every row.
+    private static final List<UUID> NO_IDS = List.of(new UUID(0, 0));
     private static final Set<ServiceRequestStatus> MINE_STATUSES = EnumSet.of(
             ServiceRequestStatus.ASSIGNED,
             ServiceRequestStatus.IN_PROGRESS,
@@ -48,12 +51,13 @@ public class ServiceRequestQueryService {
 
     public ServiceRequestQueryService(ServiceRequestRepository requests,
             ServiceRequestMapper mapper, AccountPermissions accountPermissions, TicketService tickets,
-            ServiceRequestQueueRows rows) {
+            ServiceRequestQueueRows rows, RentAgreementReadiness readiness) {
         this.requests = requests;
         this.mapper = mapper;
         this.accountPermissions = accountPermissions;
         this.tickets = tickets;
         this.rows = rows;
+        this.readiness = readiness;
     }
 
     @Transactional(readOnly = true)
@@ -115,15 +119,16 @@ public class ServiceRequestQueryService {
                 List.copyOf(MINE_STATUSES));
         long overdue = requests.countOverdueForQueue(scope.allTeams(), scope.teams(),
                 now.minus(RentAgreementSla.PICKUP), now.minus(RentAgreementSla.FIRST_DRAFT),
-                now.minus(RentAgreementSla.REVISION), now.minus(RentAgreementSla.REGISTRATION));
+                now.minus(RentAgreementSla.REVISION), now.minus(RentAgreementSla.REGISTRATION))
+                - waitingOnTenant(scope, now).size();
         return new ServiceQueueSummary(
                 count(byStatus, ServiceRequestStatus.NEW),
                 mine,
                 sum(byStatus, IN_PROGRESS_STATUSES),
                 count(byStatus, ServiceRequestStatus.DRAFT_SHARED)
                         + count(byStatus, ServiceRequestStatus.ACTION_REQUIRED),
-                count(byStatus, ServiceRequestStatus.COMPLETED)
-                        + count(byStatus, ServiceRequestStatus.CANCELLED),
+                count(byStatus, ServiceRequestStatus.COMPLETED),
+                count(byStatus, ServiceRequestStatus.CANCELLED),
                 overdue,
                 accountPermissions.granted(caller, BackOfficePermissions.TICKETS_READ)
                         ? tickets.countOpen(caller, team) : null);
@@ -135,10 +140,31 @@ public class ServiceRequestQueryService {
             String prefix, UUID requestId, Instant since, Pageable pageable) {
         QueueScope scope = queueScope(caller, team);
         boolean anyStatus = statusFilters.isEmpty();
+        List<UUID> waitingIds = overdue ? waitingOnTenant(scope, pickupBy, draftBy) : List.of();
         return requests.findForQueue(scope.allTeams(), scope.teams(), typeFilter, anyStatus,
                 anyStatus ? List.copyOf(EnumSet.allOf(ServiceRequestStatus.class)) : statusFilters, ticket,
                 unassigned, mine, caller.userId(), overdue, pickupBy, draftBy, revisionBy,
-                registrationBy, prefix, requestId, since == null ? Instant.EPOCH : since, pageable);
+                registrationBy, waitingIds.isEmpty() ? NO_IDS : waitingIds, prefix, requestId,
+                since == null ? Instant.EPOCH : since, pageable);
+    }
+
+    /** Rent agreements whose SLA clock is stopped because a paid invite still waits on the tenant. */
+    @Transactional(readOnly = true)
+    public Set<UUID> waitingOnTenant() {
+        Instant now = Instant.now();
+        return Set.copyOf(waitingOnTenant(new QueueScope(true, List.of("__none__")), now, now));
+    }
+
+    private List<UUID> waitingOnTenant(QueueScope scope, Instant now) {
+        return waitingOnTenant(scope, now.minus(RentAgreementSla.PICKUP), now.minus(RentAgreementSla.FIRST_DRAFT));
+    }
+
+    // The SLA clock stops while a paid invite waits on the tenant, and that test lives in Java, not SQL.
+    private List<UUID> waitingOnTenant(QueueScope scope, Instant pickupBy, Instant draftBy) {
+        return requests.findTenantInvitesBeforeDraft(scope.allTeams(), scope.teams(), pickupBy, draftBy).stream()
+                .filter(readiness::waitingOnTenant)
+                .map(ServiceRequest::getId)
+                .toList();
     }
 
     private QueueScope queueScope(AuthPrincipal caller, String team) {

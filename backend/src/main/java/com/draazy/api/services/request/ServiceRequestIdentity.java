@@ -17,8 +17,6 @@ public class ServiceRequestIdentity extends BaseEntity {
 
     public static final String TENANT = "tenant";
 
-    public static final String WITNESS = "witness";
-
     @Column(name = "service_request_id", nullable = false, updatable = false)
     private UUID serviceRequestId;
 

@@ -28,12 +28,15 @@ class ServiceRequestQueueRows {
     private final UserRepository users;
     private final ServiceRequestPoliceIntimationRepository policeIntimations;
     private final ServiceRequestEventRepository events;
+    private final RentAgreementReadiness readiness;
 
     ServiceRequestQueueRows(UserRepository users,
-            ServiceRequestPoliceIntimationRepository policeIntimations, ServiceRequestEventRepository events) {
+            ServiceRequestPoliceIntimationRepository policeIntimations, ServiceRequestEventRepository events,
+            RentAgreementReadiness readiness) {
         this.users = users;
         this.policeIntimations = policeIntimations;
         this.events = events;
+        this.readiness = readiness;
     }
 
     List<ServiceRequestQueueRow> of(List<ServiceRequest> requests, AuthPrincipal viewer) {
@@ -64,7 +67,7 @@ class ServiceRequestQueueRows {
                 Objects.equals(r.getAssigneeId(), viewer.userId()),
                 r.getCreatedAt(),
                 r.getAmount(),
-                RentAgreementSla.of(r, now),
+                RentAgreementSla.of(r, now, readiness.waitingOnTenant(r)),
                 confirmed.contains(r.getId()),
                 approvedAt.get(r.getId()))).toList();
     }

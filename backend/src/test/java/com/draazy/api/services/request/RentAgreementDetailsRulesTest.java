@@ -16,11 +16,11 @@ class RentAgreementDetailsRulesTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 4, 1);
 
     @Test
-    @DisplayName("the start date may be 30 days back or 180 ahead, and no further")
+    @DisplayName("the start date may be 120 days back or 180 ahead, and no further")
     void startDateWindow() {
-        assertThatCode(() -> check(Map.of("startDate", "2026-03-02"))).doesNotThrowAnyException();
+        assertThatCode(() -> check(Map.of("startDate", "2025-12-02"))).doesNotThrowAnyException();
         assertThatCode(() -> check(Map.of("startDate", "2026-09-28"))).doesNotThrowAnyException();
-        assertThatThrownBy(() -> check(Map.of("startDate", "2026-03-01")))
+        assertThatThrownBy(() -> check(Map.of("startDate", "2025-12-01")))
                 .isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> check(Map.of("startDate", "2026-09-29")))
                 .isInstanceOf(ValidationException.class);
@@ -77,15 +77,11 @@ class RentAgreementDetailsRulesTest {
     }
 
     @Test
-    @DisplayName("a minor witness is refused, an adult passes, and an email is no longer collected or checked")
+    @DisplayName("an email is no longer collected or checked")
     void partiesAndEmail() {
         assertThatCode(() -> state(Map.of(
-                "wit", Map.of("w1Name", "Meera", "w2Name", "Sunil", "w1Age", "18", "w2Age", 120),
                 "owner", Map.of("oEmail", "owner@example"),
                 "tenants", List.of(Map.of("email", "tenant@example"))))).doesNotThrowAnyException();
-        assertThatThrownBy(() -> state(Map.of("wit", Map.of("w1Age", "17"))))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("_state.wit.w1Age");
     }
 
     @Test
@@ -177,13 +173,10 @@ class RentAgreementDetailsRulesTest {
     }
 
     @Test
-    @DisplayName("witness names are required on create when the witness section is present")
-    void witnessNamesOnCreate() {
-        assertThatThrownBy(() -> state(Map.of("wit", Map.of("w1Name", "Meera"))))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("_state.wit.w2Name");
-        assertThatCode(() -> RentAgreementDetailsRules.check(
-                Map.of("_state", Map.of("wit", Map.of("w1Name", ""))), TODAY, false))
+    @DisplayName("a stored witness block is ignored, whatever it holds")
+    void legacyWitnessBlockIsIgnored() {
+        assertThatCode(() -> state(Map.of("wit", Map.of("w1Age", "17", "w1Gender", "x", "w1Mobile", "9820000001",
+                "w2Mobile", "9820000001"), "owner", Map.of("oMobile", "9820000001"))))
                 .doesNotThrowAnyException();
     }
 

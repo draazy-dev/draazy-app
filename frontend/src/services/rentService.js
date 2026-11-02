@@ -24,7 +24,6 @@ export const deleteRental = async (rentalId) => (await provider()).deleteRental(
 
 export const listTransactions = async (propId, page, size) => (await provider()).listTransactions(propId, page, size);
 export const addTransaction = async (propId, txn) => (await provider()).addTransaction(propId, txn);
-export const updateTransaction = async (propId, txnId, patch) => (await provider()).updateTransaction(propId, txnId, patch);
 export const deleteTransaction = async (propId, txnId) => (await provider()).deleteTransaction(propId, txnId);
 
 export const getBasis = async (propId) => (await provider()).getBasis(propId);
@@ -36,3 +35,4 @@ export const dues = async (propId) => (await provider()).dues(propId);
 
 export const myRentAgreements = async () => (await provider()).myRentAgreements();
 export const rentAgreementRenewal = async (id) => (await provider()).rentAgreementRenewal(id);
+export const rentAgreementHomeRenewal = async (homeId) => (await provider()).rentAgreementHomeRenewal(homeId);

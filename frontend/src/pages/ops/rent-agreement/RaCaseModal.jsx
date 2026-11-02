@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Hand } from 'lucide-react';
 import {
-  addServiceRequestMessage, cancelServiceRequestAsOps, getServiceRequest, readServiceRequestChecklist,
+  addServiceRequestMessage, cancelServiceRequestAsOps, getServiceRequest, getServiceRequestRefunds, readServiceRequestChecklist,
   shareServiceRequestDraft, takeServiceRequest, uploadServiceRequestFinalDoc,
 } from '../../../services/serviceRequestService.js';
 import { classNames, fmtINR } from '../../../lib/format.js';
@@ -36,7 +36,7 @@ const NEXT_TONE = {
 };
 const NEXT_WHO = { desk: 'Your move', customer: "Customer's move", done: 'Closed' };
 
-export default function RaCaseModal({ request, nextId, onNext, onClose, onChanged }) {
+export default function RaCaseModal({ request, loaded, nextId, onNext, onClose, onChanged }) {
   const s = request ? caseSummary(request.details) : null;
   const footer = (
     <>
@@ -52,29 +52,33 @@ export default function RaCaseModal({ request, nextId, onNext, onClose, onChange
       size="xl"
       footer={footer}
     >
-      {request ? <CaseBody key={request.id} id={request.id} onChanged={onChanged} /> : null}
+      {request ? <CaseBody key={request.id} id={request.id} preloaded={loaded ? request : null} onChanged={onChanged} /> : null}
     </Modal>
   );
 }
 
-function CaseBody({ id, onChanged }) {
-  const [initial, setInitial] = useState(null);
+function CaseBody({ id, preloaded, onChanged }) {
+  const [initial, setInitial] = useState(preloaded);
+  const [checklistRead, setChecklistRead] = useState(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let live = true;
+    // Settled up front so a rejection is never unhandled while the detail read is still pending.
+    setChecklistRead(readServiceRequestChecklist(id).then((res) => ({ res }), () => ({ failed: true })));
+    if (preloaded) return undefined;
     getServiceRequest(id)
       .then((res) => { if (live) { if (res) setInitial(res); else setFailed(true); } })
       .catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
-  }, [id]);
+  }, [id, preloaded]);
 
   if (failed) return <p role="alert" className="p-4 text-sm text-gray-300">This case could not be opened. Close it and try again.</p>;
-  if (!initial) return <Loading label="Opening the case…" />;
-  return <CaseView initial={initial} onChanged={onChanged} />;
+  if (!initial || !checklistRead) return <Loading label="Opening the case…" />;
+  return <CaseView initial={initial} checklistRead={checklistRead} onChanged={onChanged} />;
 }
 
-function CaseView({ initial, onChanged }) {
+function CaseView({ initial, checklistRead, onChanged }) {
   const { toast } = useToast();
   const [detail, setDetail] = useState(initial);
   const [checklist, setChecklist] = useState(null);
@@ -85,11 +89,13 @@ function CaseView({ initial, onChanged }) {
 
   useEffect(() => {
     let live = true;
-    readServiceRequestChecklist(detail.id)
-      .then((res) => { if (live) { setChecklist(res); setChecklistStatus('ready'); } })
-      .catch(() => { if (live) setChecklistStatus('error'); });
+    checklistRead.then(({ res, failed }) => {
+      if (!live) return;
+      if (failed) setChecklistStatus('error');
+      else { setChecklist(res); setChecklistStatus('ready'); }
+    });
     return () => { live = false; };
-  }, [detail.id]);
+  }, [checklistRead]);
 
   const s = caseSummary(detail.details);
   const done = stagesDone(detail, checklist);
@@ -137,7 +143,13 @@ function CaseView({ initial, onChanged }) {
 
   const uploadFinal = act(uploadServiceRequestFinalDoc, 'The registered copy was uploaded.', 'Registered copy uploaded');
   const sendMessage = act(addServiceRequestMessage);
-  const cancel = act(cancelServiceRequestAsOps, 'The case was cancelled and the customer was notified.', 'Cancelled');
+  const cancel = async (reason) => {
+    await act(cancelServiceRequestAsOps, null, 'Cancelled')(reason);
+    const after = await getServiceRequestRefunds(detail.id).catch(() => null);
+    toast(after?.refunds?.some((refund) => refund.status === 'requested')
+      ? 'The case was cancelled. The customer was notified, and their refund is waiting for a manager.'
+      : 'The case was cancelled and the customer was notified.', 'success');
+  };
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">

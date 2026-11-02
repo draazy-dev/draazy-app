@@ -111,6 +111,22 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
             cancel(buyer, id, 200);
             cancel(buyer, id, 409);
         }
+
+        @Test
+        @DisplayName("the DTO offers the cancel button only to the requester, and only while unpaid")
+        void cancellableMirrorsTheEndpoint() throws Exception {
+            User buyer = customer("9820000909");
+            User tenant = customer("9820000910");
+            String id = raiseUnpaid(buyer, listing(buyer));
+            jdbc.update("insert into service_request_parties (request_id, user_id, role, status, invited_by)"
+                    + " values (?::uuid, ?, 'tenant', 'accepted', ?)", id, tenant.getId(), buyer.getId());
+
+            expectCancellable(buyer, id, true);
+            expectCancellable(tenant, id, false);
+
+            deliverSigned(paymentRef(id), true);
+            expectCancellable(buyer, id, false);
+        }
     }
 
     @Nested
@@ -298,6 +314,13 @@ class ServiceRequestUnpaidExitTest extends ServiceFixtures {
         mvc.perform(post(CANCEL, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(caller)))
                 .andExpect(status().is(expected));
+    }
+
+    private void expectCancellable(User caller, String id, boolean expected) throws Exception {
+        mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(caller)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cancellable").value(expected));
     }
 
     private void create(User caller, Property property, int expected) throws Exception {

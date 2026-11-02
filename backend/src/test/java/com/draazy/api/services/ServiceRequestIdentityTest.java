@@ -219,12 +219,17 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
                     {"parties":[{"partyRole":"owner","partyIndex":0,"partyName":"Asha Patil","pan":"ZZZZZ9999Z"}]}""";
 
             putIdentities(buyer, id, ownerOnly, 204);
-            setStatus(desk, id, "assigned", 200);
-            assertThat(readIdentities(desk, id, 200)).contains("ZZZZZ9999Z", TENANT_AADHAAR);
+            assertThat(tenantRows(id)).isEqualTo(1);
 
             tenantOnForm(id, "Neha Kulkarni");
             putIdentities(buyer, id, ownerOnly, 204);
+            setStatus(desk, id, "assigned", 200);
             assertThat(readIdentities(desk, id, 200)).contains("ZZZZZ9999Z").doesNotContain(TENANT_AADHAAR);
+        }
+
+        private Integer tenantRows(String id) {
+            return jdbc.queryForObject("select count(*) from service_request_identities where service_request_id = ?"
+                    + " and party_role = 'tenant'", Integer.class, UUID.fromString(id));
         }
 
         private void tenantOnForm(String id, String name) {
@@ -267,14 +272,14 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
                       {"partyRole":"tenant","partyIndex":0,"pan":"ABCDE1234F"}
                     ]}""", 422);
             putIdentities(buyer, id, """
-                    {"parties":[{"partyRole":"witness","partyIndex":2,"aadhaar":"%s"}]}"""
+                    {"parties":[{"partyRole":"witness","partyIndex":0,"aadhaar":"%s"}]}"""
                     .formatted(OWNER_AADHAAR), 422);
             putIdentities(buyer, id, "{\"parties\":[]}", 422);
         }
 
         @Test
-        @DisplayName("co-owners and both attesting witnesses are recorded alongside the owner")
-        void coOwnersAndWitnesses() throws Exception {
+        @DisplayName("co-owners are recorded alongside the owner")
+        void coOwners() throws Exception {
             User buyer = customer("9820000328");
             User desk = staff("9820000329", Teams.RENTAL);
             String id = raise(buyer, "rent-agreement", listing(buyer));
@@ -282,18 +287,16 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
             putIdentities(buyer, id, """
                     {"parties":[
                       {"partyRole":"owner","partyIndex":0,"partyName":"Asha Patil","aadhaar":"%s"},
-                      {"partyRole":"owner","partyIndex":1,"partyName":"Vikram Patil","aadhaar":"555566667771"},
-                      {"partyRole":"witness","partyIndex":0,"partyName":"Meera Kulkarni","aadhaar":"666677778888"},
-                      {"partyRole":"witness","partyIndex":1,"partyName":"Sunil Deshmukh","aadhaar":"234567890124"}
+                      {"partyRole":"owner","partyIndex":1,"partyName":"Vikram Patil","aadhaar":"555566667771"}
                     ]}""".formatted(OWNER_AADHAAR), 204);
 
             setStatus(desk, id, "assigned", 200);
             mvc.perform(get(Routes.ServiceRequests.IDENTITIES, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(4)))
-                    .andExpect(jsonPath("$[?(@.partyRole == 'witness')].partyName",
-                            org.hamcrest.Matchers.containsInAnyOrder("Meera Kulkarni", "Sunil Deshmukh")));
+                    .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(2)))
+                    .andExpect(jsonPath("$[?(@.partyRole == 'owner')].partyName",
+                            org.hamcrest.Matchers.containsInAnyOrder("Asha Patil", "Vikram Patil")));
         }
     }
 

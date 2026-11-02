@@ -74,6 +74,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
     private final RentAgreementOwnerSide ownerSide;
     private final ServiceRequestAmountGuard amountGuard;
     private final ServiceRequestInvoicing invoicing;
+    private final CoFillParties coFill;
 
     private final TransactionTemplate transactions;
 
@@ -96,6 +97,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
             RentAgreementOwnerSide ownerSide,
             ServiceRequestAmountGuard amountGuard,
             ServiceRequestInvoicing invoicing,
+            CoFillParties coFill,
             PlatformTransactionManager transactionManager) {
         this.requests = requests;
         this.events = events;
@@ -116,6 +118,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
         this.ownerSide = ownerSide;
         this.amountGuard = amountGuard;
         this.invoicing = invoicing;
+        this.coFill = coFill;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -146,8 +149,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
         UUID ticketId = ticketMirror.resolve(caller, body.ticketId());
         Long price = pricing.priceFor(type, details);
         if (price != null) {
-            long openUnpaid = requests.countByRequesterIdAndTypeAndStatus(
-                    caller.userId(), type, ServiceRequestStatus.AWAITING_PAYMENT);
+            long openUnpaid = requests.countOpenUnpaidOnFlat(caller.userId(), type, openUnpaidFlat(details));
             if (openUnpaid >= MAX_OPEN_UNPAID_PER_TYPE) {
                 throw openUnpaidConflict(type);
             }
@@ -240,13 +242,18 @@ public class ServiceRequestService implements AbandonedCheckouts {
         }
     }
 
+    static String openUnpaidFlat(Map<String, Object> details) {
+        String flat = RentAgreementOverlaps.flatKey(details == null ? Map.of() : details);
+        return flat == null ? "" : flat;
+    }
+
     private ConflictException openUnpaidConflict(String type) {
-        return new ConflictException("You already have an unpaid " + type + " request. Cancel it "
+        return new ConflictException("You already have an unpaid " + type + " request for this flat. Cancel it "
                 + "from your requests and start again, or finish paying for it — an unpaid request "
                 + "is cancelled automatically once its checkout has expired.");
     }
 
-    private static boolean isOpenUnpaidCollision(DataIntegrityViolationException violation) {
+    static boolean isOpenUnpaidCollision(DataIntegrityViolationException violation) {
         return ConstraintViolations.isOn(violation, OPEN_UNPAID_INDEX);
     }
 
@@ -280,6 +287,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
             transition(request, ServiceRequestStatus.NEW);
             record(request, "payment.received", null);
             invoicing.checkoutPaid(request);
+            coFill.announcePaid(request);
         } else {
             record(request, "payment.failed", null);
         }
@@ -290,8 +298,8 @@ public class ServiceRequestService implements AbandonedCheckouts {
     public ServiceRequestDto simulateMockPayment(AuthPrincipal caller, String id, boolean paid) {
         ServiceRequest request = Ids.parseUuid(id).flatMap(requests::findByIdForUpdate)
                 .orElseThrow(() -> NotFoundException.of("Service request"));
-        if (!caller.userId().equals(request.getRequesterId())) {
-            throw new ForbiddenException("Only the person who raised this request can settle it.");
+        if (!caller.userId().equals(request.payer())) {
+            throw new ForbiddenException("Only the person who opened this checkout can settle it.");
         }
         String paymentRef = request.getPaymentRef();
         if (request.getStatus() != ServiceRequestStatus.AWAITING_PAYMENT || paymentRef == null
@@ -325,11 +333,27 @@ public class ServiceRequestService implements AbandonedCheckouts {
                     "Only a request still waiting for payment can be cancelled here — this one is "
                             + request.getStatus() + ".");
         }
+        closeOthersCheckout(caller, request);
         transition(request, ServiceRequestStatus.CANCELLED);
         record(request, ABANDONED_EVENT, displayName(caller.userId()));
         audit.record(caller, "service-request.cancelled-unpaid", "service_request",
                 request.getId().toString(), "from", ServiceRequestStatus.AWAITING_PAYMENT.wire());
         return mapper.toDto(request, caller);
+    }
+
+    private void closeOthersCheckout(AuthPrincipal caller, ServiceRequest request) {
+        String open = request.getPaymentRef();
+        if (open == null || caller.userId().equals(request.payer())) {
+            return;
+        }
+        if (gateway.paid(open)) {
+            throw new ConflictException("The other side has already paid for this agreement.");
+        }
+        try {
+            gateway.terminate(open);
+        } catch (RuntimeException inFlight) {
+            throw new ConflictException("The other side is paying for this agreement right now. Check again in a few minutes.");
+        }
     }
 
     @Override
@@ -440,7 +464,9 @@ public class ServiceRequestService implements AbandonedCheckouts {
                     && !ownerSide.requesterIsOwner(request)) {
                 throw RentAgreementOwnerSide.refusal();
             }
-            if (identities.hasLiveCoFillSlot(request.getId(), side, partyIndex)) {
+            boolean ownerHoldsTenantSide = "tenant".equals(side) && RentAgreementReadiness.ownerHoldsAll(request)
+                    && ownerSide.requesterIsOwner(request);
+            if (!ownerHoldsTenantSide && identities.hasLiveCoFillSlot(request.getId(), side, partyIndex)) {
                 throw new ForbiddenException("You can file papers only for your own side of this agreement.");
             }
         }

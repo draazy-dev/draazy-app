@@ -17,17 +17,20 @@ public class ServiceRequestStaffTransitions {
     private final ServiceRequestMapper mapper;
     private final AuditService audit;
     private final Notifier notifier;
+    private final ServiceRequestRefunds refunds;
 
     public ServiceRequestStaffTransitions(ServiceRequestService requests,
             ServiceRequestMessageRepository messages,
             ServiceRequestMapper mapper,
             AuditService audit,
-            Notifier notifier) {
+            Notifier notifier,
+            ServiceRequestRefunds refunds) {
         this.requests = requests;
         this.messages = messages;
         this.mapper = mapper;
         this.audit = audit;
         this.notifier = notifier;
+        this.refunds = refunds;
     }
 
     @Transactional
@@ -57,7 +60,7 @@ public class ServiceRequestStaffTransitions {
                 "from", from.wire(), "to", target.wire(), "note", note,
                 "heldBy", heldBy == null ? null : heldBy.toString());
         if (target == ServiceRequestStatus.CANCELLED) {
-            announceCancellation(caller, request, reason);
+            announceCancellation(caller, request, reason, refunds.raiseOnCancel(caller, request, reason));
         }
         return mapper.toDto(request, caller);
     }
@@ -81,12 +84,14 @@ public class ServiceRequestStaffTransitions {
                 "%s is already working this request. Ask them to hand it over, or ask an admin to reassign it.".formatted(holder == null ? "Another operator" : holder));
     }
 
-    private void announceCancellation(AuthPrincipal caller, ServiceRequest request, String reason) {
+    private void announceCancellation(AuthPrincipal caller, ServiceRequest request, String reason, long refund) {
         messages.save(new ServiceRequestMessage(
                 request.getId(), caller.userId(), caller.role(), reason));
+        String refundLine = refund < 1 ? "" : (reason.matches("(?s).*[.!?]") ? " " : ". ") + "Your "
+                + Notifier.rupees(refund) + " refund is waiting for approval. We'll tell you when it's sent.";
         notifier.notify(request.getRequesterId(), "service.cancelled",
                 "Your request was cancelled",
-                "Our team cancelled this request: " + reason,
+                "Our team cancelled this request: " + reason + refundLine,
                 ServiceRequestTypes.pageFor(request.getType()));
     }
 }

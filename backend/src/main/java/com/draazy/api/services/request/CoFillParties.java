@@ -47,6 +47,7 @@ class CoFillParties {
     private final AuditService audit;
     private final Notifier notifier;
     private final AuditLogRepository auditLog;
+    private final RentAgreementOwnerTakeover takeover;
 
     CoFillParties(ServiceRequestPartyRepository parties,
             ServiceRequestRepository requests,
@@ -54,7 +55,8 @@ class CoFillParties {
             UserRepository users,
             AuditService audit,
             Notifier notifier,
-            AuditLogRepository auditLog) {
+            AuditLogRepository auditLog,
+            RentAgreementOwnerTakeover takeover) {
         this.parties = parties;
         this.requests = requests;
         this.documents = documents;
@@ -62,6 +64,7 @@ class CoFillParties {
         this.audit = audit;
         this.notifier = notifier;
         this.auditLog = auditLog;
+        this.takeover = takeover;
     }
 
     @Transactional
@@ -228,13 +231,36 @@ class CoFillParties {
         if (!INVITED.equals(party.getStatus())) {
             throw new ConflictException("You have already " + party.getStatus() + " this invitation.");
         }
+        ServiceRequest request = requests.findById(party.getRequestId()).orElseThrow(() -> NotFoundException.of("Invitation"));
+        boolean takeOver = ACCEPTED.equals(outcome) && RentAgreementOwnerTakeover.applies(request, party);
+        if (takeOver) {
+            takeover.refuseIfBlocked(request, caller.userId());
+        }
         party.answer(outcome);
         parties.saveAndFlush(party);
         audit.record(caller, "service-request.party-" + outcome, "service_request",
                 party.getRequestId().toString(), "role", party.getRole());
-        String type = requests.findById(party.getRequestId()).map(ServiceRequest::getType).orElse(null);
         Map<UUID, String> names = names(List.of(party));
-        return toDto(party, type, names.get(party.getUserId()), names.get(party.getInvitedBy()));
+        ServiceRequestPartyDto answered = toDto(party, request.getType(), names.get(party.getUserId()),
+                names.get(party.getInvitedBy()));
+        if (takeOver) {
+            takeover.takeOver(request, party);
+            audit.record(caller, "service-request.owner-took-over", "service_request",
+                    request.getId().toString());
+        }
+        return answered;
+    }
+
+    void announcePaid(ServiceRequest request) {
+        UUID payer = request.payer();
+        Set<UUID> others = new LinkedHashSet<>();
+        others.add(request.getRequesterId());
+        joined(parties.findByRequestId(request.getId())).forEach(p -> others.add(p.getUserId()));
+        others.remove(payer);
+        String who = users.findById(payer).map(User::getName).filter(name -> !name.isBlank()).orElse("The other side");
+        others.forEach(person -> notifier.notify(person, "service.party-paid", who + " has paid for the agreement",
+                "Nothing more to pay. Our team will now prepare the draft.",
+                ServiceRequestTypes.pageFor(request.getType())));
     }
 
     static ServiceRequestPartyDto toDto(ServiceRequestParty party, String requestType,

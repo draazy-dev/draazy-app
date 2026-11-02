@@ -6,6 +6,7 @@ import Icon from '../../../../components/Icon.jsx';
 import Field from '../../../../components/ui/Field.jsx';
 import DepositPayments from './DepositPayments.jsx';
 import AreaField from './AreaField.jsx';
+import AmountInput from '../../flatmates/AmountInput.jsx';
 import { DEED_LANGUAGES, FURN_PRESETS, PARKING, PERIODS, TDS_RENT_THRESHOLD, VISIT_PLACES, VISIT_SLOTS } from './constants.js';
 import { visitDateBounds } from './validation.js';
 import { digits, num } from './helpers.js';
@@ -13,7 +14,7 @@ import '../../../../styles/components/furniture-tiles.css';
 
 const CLAUSES_SOFT_LIMIT = 1500;
 
-export default function StepTerms({ step, terms, setT, startBounds, errors = {}, fc, clearErr, maint, setMaint, regArea, furnItems, toggleFurn, isChecked, bumpQty, removeFurn, custom, setCustom, addCustom, clauses, setClauses }) {
+export default function StepTerms({ step, terms, setT, startBounds, errors = {}, fc, clearErr, maint, setMaint, furnItems, toggleFurn, isChecked, bumpQty, removeFurn, custom, setCustom, addCustom, clauses, setClauses }) {
   const { t } = useTranslation();
   const [customChosen, setCustomChosen] = useState(false);
   const periodIsCustom = customChosen || !PERIODS.includes(Number(terms.months));
@@ -47,9 +48,9 @@ export default function StepTerms({ step, terms, setT, startBounds, errors = {},
         {periodIsCustom && (
           <Field label={t('services.ra.terms.periodCustomMonths')} required error={errors.months && t('services.ra.terms.monthsErr')}><input inputMode="numeric" value={terms.months} onChange={(e) => setMonths(digits(e.target.value))} className={fc('months')} placeholder="1 – 60" /></Field>
         )}
-        <Field label={t('services.ra.terms.rent')} required error={errors.rent && t('services.ra.terms.rentErr')}><input inputMode="numeric" value={terms.rent} onChange={(e) => { setT('rent', digits(e.target.value)); clearErr('rent'); }} className={fc('rent')} placeholder={t('services.ra.terms.rentPlaceholder')} /></Field>
-        <Field label={t('services.ra.terms.deposit')} required error={errors.deposit && t('services.ra.terms.depositErr')}><input inputMode="numeric" value={terms.deposit} onChange={(e) => { setT('deposit', digits(e.target.value)); clearErr('deposit'); }} className={fc('deposit')} placeholder={t('services.ra.terms.depositPlaceholder')} /></Field>
-        <Field label={t('services.ra.terms.nrDeposit')}><input inputMode="numeric" value={terms.nrDeposit} onChange={(e) => setT('nrDeposit', digits(e.target.value))} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder="0" /></Field>
+        <Field label={t('services.ra.terms.rent')} required error={errors.rent && t('services.ra.terms.rentErr')}><AmountInput value={terms.rent} onChange={(v) => { setT('rent', v); clearErr('rent'); }} className={errors.rent ? 'err' : ''} suffix={t('services.ra.terms.perMonth')} placeholder={t('services.ra.terms.rentPlaceholder')} /></Field>
+        <Field label={t('services.ra.terms.deposit')} required error={errors.deposit && t('services.ra.terms.depositErr')}><AmountInput value={terms.deposit} onChange={(v) => { setT('deposit', v); clearErr('deposit'); }} className={errors.deposit ? 'err' : ''} placeholder={t('services.ra.terms.depositPlaceholder')} /></Field>
+        <Field label={t('services.ra.terms.nrDeposit')}><AmountInput value={terms.nrDeposit} onChange={(v) => setT('nrDeposit', v)} placeholder="0" /></Field>
         {numberField('increment', 'services.ra.terms.incrementErr', Number(terms.months) > 11 ? 'increment' : 'incrementRenewal')}
         {Number(terms.months) > 11 && (
           <Field label={t('services.ra.terms.incrementEvery')}>
@@ -83,9 +84,6 @@ export default function StepTerms({ step, terms, setT, startBounds, errors = {},
           <AreaField t={t} className="col-span-2 sm:col-span-1" label={t('services.ra.terms.parkingArea')} error={errors.parkingArea && t('services.ra.property.optionalAreaErr')} inputClassName={fc('parkingArea')} value={terms.parkingArea} onChange={(v) => { setT('parkingArea', v); clearErr('parkingArea'); }} placeholder={t('services.ra.property.smallAreaPlaceholder')} unit={terms.parkingAreaUnit} onUnit={(v) => setT('parkingAreaUnit', v)} unitTitle={t('services.ra.terms.parkingAreaUnit')} />
         </div>
       )}
-
-      <label className="lbl">{t('services.ra.terms.regArea')}</label>
-      <p className="text-sm mb-5" data-testid="ra-reg-area"><span className="text-white font-medium">{t(regArea === 'rural' ? 'services.ra.terms.regRural' : 'services.ra.terms.regUrban')}</span> <span className="text-gray-500 text-xs">{t('services.ra.terms.regAreaAuto')}</span></p>
 
       <label className="lbl">{t('services.ra.terms.language')}</label>
       <div className="grid grid-cols-2 gap-3 mb-2">
@@ -123,7 +121,7 @@ export default function StepTerms({ step, terms, setT, startBounds, errors = {},
 
       {furnItems.length > 0 && (
         <div className="mb-3">
-          <p className="lbl" style={{ marginBottom: '6px' }}>{t('services.ra.terms.itemsIncluded')} <span className="text-gray-500 font-normal">({furnItems.length})</span></p>
+          <p className="lbl">{t('services.ra.terms.itemsIncluded')} <span className="text-gray-500 font-normal">({furnItems.length})</span></p>
           <div className="space-y-2 max-w-[640px]">
             {furnItems.map((f, i) => (
               <div key={i} className="furn-row">
@@ -142,10 +140,10 @@ export default function StepTerms({ step, terms, setT, startBounds, errors = {},
       <div className="flex items-center gap-2 mb-5 max-w-[640px]">
         <div className="relative flex-1">
           <Icon name="plus-circle" className="w-4 h-4 text-teal-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input value={custom.name} onChange={(e) => setCustom((p) => ({ ...p, name: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }} type="text" placeholder={t('services.ra.terms.customPlaceholder')} className="field w-full pl-9 pr-3 py-2.5 rounded-xl text-sm" />
+          <input value={custom.name} onChange={(e) => setCustom((p) => ({ ...p, name: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }} type="text" placeholder={t('services.ra.terms.customPlaceholder')}           className="field w-full pl-9 pr-3 rounded-xl text-white text-sm" />
         </div>
-        <input type="number" min="1" value={custom.qty} onChange={(e) => setCustom((p) => ({ ...p, qty: e.target.value }))} aria-label={t('services.ra.terms.customQtyAria')} className="field w-16 px-2 py-2.5 rounded-xl text-sm text-center" />
-        <button type="button" onClick={addCustom} className="btn-outline px-4 py-2.5 rounded-xl text-teal-400 text-sm font-semibold whitespace-nowrap">{t('services.ra.terms.add')}</button>
+                  <input type="number" min="1" value={custom.qty} onChange={(e) => setCustom((p) => ({ ...p, qty: e.target.value }))} aria-label={t('services.ra.terms.customQtyAria')} className="field w-16 px-2 rounded-xl text-white text-sm text-center" />
+                  <button type="button" onClick={addCustom} className="btn-outline h-btn px-4 rounded-xl text-teal-400 text-sm font-semibold whitespace-nowrap">{t('services.ra.terms.add')}</button>
       </div>
 
       <label className="lbl" htmlFor="ra-clauses">{t('services.ra.terms.specialClauses')}</label>

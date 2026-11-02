@@ -32,13 +32,18 @@ class RentAgreementCorrectionsTest extends ServiceFixtures {
     EntityManager em;
 
     private String raisedAndAssigned(User owner, User desk) throws Exception {
+        String id = raised(owner);
+        setStatus(desk, id, "assigned", 200);
+        return id;
+    }
+
+    private String raised(User owner) throws Exception {
         String json = mvc.perform(post(Routes.ServiceRequests.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON).content(TERMS))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String id = field(json, "id");
         serviceRequests.applyWebhookOutcome(paymentRef(id), true, null, null);
-        setStatus(desk, id, "assigned", 200);
         return id;
     }
 
@@ -91,6 +96,9 @@ class RentAgreementCorrectionsTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.status").value("in-progress"))
                 .andExpect(jsonPath("$.attention").doesNotExist());
         assertThat(notices(desk, "service.attention-resolved")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select link from notifications where user_id = ? and type = ?",
+                String.class, desk.getId(), "service.attention-resolved"))
+                .isEqualTo("/admin/rent-agreement?request=" + id);
         send(owner, post(Routes.ServiceRequests.ATTENTION_RESOLVE, id), "{}").andExpect(status().isConflict());
     }
 
@@ -151,13 +159,14 @@ class RentAgreementCorrectionsTest extends ServiceFixtures {
     void deskRenameRelabelsTheNumbers() throws Exception {
         User owner = customer("9820009041");
         User desk = staff("9820009042", Teams.RENTAL);
-        String id = raisedAndAssigned(owner, desk);
+        String id = raised(owner);
         em.flush();
         jdbc.update("update service_requests set details = jsonb_set(details, '{_state,tenants}', '[{\"name\":\"Ravi Kale\"}]')"
                 + " where id = ?::uuid", id);
         em.clear();
         send(owner, put(Routes.ServiceRequests.IDENTITIES, id), "{\"parties\":[{\"partyRole\":\"tenant\",\"partyIndex\":0,"
                 + "\"partyName\":\"Ravi Kale\",\"pan\":\"ABCDE1234F\"}]}").andExpect(status().isNoContent());
+        setStatus(desk, id, "assigned", 200);
 
         send(desk, put(Routes.ServiceRequests.DESK_DETAILS, id), "{\"state\":{\"prop\":{\"gramPanchayat\":false},"
                 + "\"tenants\":[{\"name\":\"Ravi S. Kale\"}],\"terms\":{\"rent\":\"20000\",\"deposit\":\"60000\",\"months\":\"11\"}}}")
@@ -173,11 +182,11 @@ class RentAgreementCorrectionsTest extends ServiceFixtures {
         User owner = customer("9820009031");
         User desk = staff("9820009032", Teams.RENTAL);
         User other = staff("9820009033", Teams.RENTAL);
-        String id = raisedAndAssigned(owner, desk);
+        String id = raised(owner);
         send(owner, put(Routes.ServiceRequests.IDENTITIES, id), "{\"parties\":["
-                + "{\"partyRole\":\"tenant\",\"partyIndex\":0,\"partyName\":\"Ravi\",\"pan\":\"ABCDE1234X\"},"
-                + "{\"partyRole\":\"witness\",\"partyIndex\":0,\"partyName\":\"Meera\",\"aadhaar\":\"444455556666\"}]}")
+                + "{\"partyRole\":\"tenant\",\"partyIndex\":0,\"partyName\":\"Ravi\",\"pan\":\"ABCDE1234X\"}]}")
                 .andExpect(status().isNoContent());
+        setStatus(desk, id, "assigned", 200);
         String fix = "{\"parties\":[{\"partyRole\":\"tenant\",\"partyIndex\":0,\"partyName\":\"Ravi\","
                 + "\"pan\":\"ABCDE1234F\",\"aadhaar\":\"211122223335\"}]}";
 
@@ -192,12 +201,11 @@ class RentAgreementCorrectionsTest extends ServiceFixtures {
 
         mvc.perform(get(Routes.ServiceRequests.IDENTITIES, id).header(HttpHeaders.AUTHORIZATION, bearer(desk)))
                 .andExpect(jsonPath("$[?(@.partyRole=='tenant')].pan").value("ABCDE1234F"))
-                .andExpect(jsonPath("$[?(@.partyRole=='tenant')].aadhaar").value("211122223335"))
-                .andExpect(jsonPath("$[?(@.partyRole=='witness')].aadhaar").value("444455556666"));
+                .andExpect(jsonPath("$[?(@.partyRole=='tenant')].aadhaar").value("211122223335"));
         assertThat(notices(owner, "service.details-edited")).isEqualTo(1);
         em.flush();
         assertThat(jdbc.queryForList("select coalesce(metadata::text, '') from audit_log where action = ? and entity_id = ?",
                 String.class, "service-request.identities-corrected", id)).singleElement().asString()
-                .contains("tenant-0").doesNotContain("ABCDE1234F", "211122223335", "witness-0");
+                .contains("tenant-0").doesNotContain("ABCDE1234F", "211122223335");
     }
 }

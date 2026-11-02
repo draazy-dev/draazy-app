@@ -6,7 +6,7 @@ import { classNames } from '../../../lib/format.js';
 import IdInput from '../../../components/IdInput.jsx';
 import { isAadhaar, isPan } from '../../consumer/services/rent-agreement/helpers.js';
 
-const PARTY_LABEL = { owner: 'Owner', tenant: 'Tenant', witness: 'Witness' };
+const PARTY_LABEL = { owner: 'Owner', tenant: 'Tenant' };
 const field = 'mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 font-mono text-sm text-white';
 
 const formParties = (state = {}) => {
@@ -16,8 +16,6 @@ const formParties = (state = {}) => {
     { partyRole: 'owner', partyIndex: 0, partyName: state.owner?.oName },
     ...list(state.coOwners).map((c, i) => ({ partyRole: 'owner', partyIndex: i + 1, partyName: c?.name })),
     ...(tenants.length ? tenants : [{}]).map((t, i) => ({ partyRole: 'tenant', partyIndex: i, partyName: t?.name })),
-    { partyRole: 'witness', partyIndex: 0, partyName: state.wit?.w1Name },
-    { partyRole: 'witness', partyIndex: 1, partyName: state.wit?.w2Name },
   ];
 };
 
@@ -44,7 +42,6 @@ function CorrectNumbers({ requestId, party, onSaved, onCancel }) {
     return () => { mounted.current = false; };
   }, []);
   const uid = useId();
-  const witness = party.partyRole === 'witness';
   const error = (!pan && !aadhaar && 'Enter a PAN or an Aadhaar.')
     || (pan && !isPan(pan) && 'PAN looks like ABCDE1234F.')
     || (aadhaar && !isAadhaar(aadhaar) && 'That Aadhaar number is not valid.')
@@ -59,7 +56,7 @@ function CorrectNumbers({ requestId, party, onSaved, onCancel }) {
         partyRole: party.partyRole,
         partyIndex: party.partyIndex,
         partyName: String(party.partyName || '').slice(0, 120),
-        pan: witness ? '' : pan,
+        pan,
         aadhaar,
       }]);
       toast('Saved. The customer has been told their ID was corrected.', 'success');
@@ -73,12 +70,10 @@ function CorrectNumbers({ requestId, party, onSaved, onCancel }) {
   return (
     <form onSubmit={save} className="mt-2 space-y-2" aria-label={`Correct ${party.partyName || 'party'} ID numbers`}>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {witness ? null : (
-          <div>
-            <label htmlFor={`${uid}-pan`} className="text-xs text-gray-400">PAN</label>
-            <IdInput id={`${uid}-pan`} kind="pan" value={pan} onChange={setPan} className={field} />
-          </div>
-        )}
+        <div>
+          <label htmlFor={`${uid}-pan`} className="text-xs text-gray-400">PAN</label>
+          <IdInput id={`${uid}-pan`} kind="pan" value={pan} onChange={setPan} className={field} />
+        </div>
         <div>
           <label htmlFor={`${uid}-aadhaar`} className="text-xs text-gray-400">Aadhaar</label>
           <IdInput id={`${uid}-aadhaar`} kind="aadhaar" value={aadhaar} onChange={setAadhaar} className={field} />

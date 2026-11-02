@@ -26,7 +26,7 @@ import DocumentChecklist from './service-queue/DocumentChecklist.jsx';
 import ServiceDocuments from './service-queue/ServiceDocuments.jsx';
 import StaffWorkflowActions from './service-queue/StaffWorkflowActions.jsx';
 import PartyIdentities from './service-queue/PartyIdentities.jsx';
-import { OverdueToggle, stageTabs, useQueue } from './service-queue/deskQueue.jsx';
+import { OverdueToggle, stageTabs, useLinkedCase, useQueue } from './service-queue/deskQueue.jsx';
 import { fmtAgo } from './service-queue/helpers.js';
 
 const PAGE_SIZE = 20;
@@ -105,6 +105,9 @@ export default function OpsDraftingDesk({ desk }) {
   const paging = { page, pageCount: Math.ceil(total / PAGE_SIZE), total, size: PAGE_SIZE, onPage: setPage, stale: queue.stale };
 
   const [target, setTarget] = useState(null);
+  const [linked, setLinked] = useState(null);
+  const openLinked = useCallback((request) => { setLinked(request); setTarget(request); }, []);
+  useLinkedCase(openLinked);
   const [detail, setDetail] = useState(null);
   const [detailFailed, setDetailFailed] = useState(false);
   const [checklist, setChecklist] = useState(null);
@@ -114,28 +117,29 @@ export default function OpsDraftingDesk({ desk }) {
   const busy = useRef(false);
 
   const targetId = target?.id || null;
+  const linkedDetail = target !== null && target === linked ? target : null;
   useEffect(() => {
     if (!targetId) return undefined;
+    setDetailFailed(false);
+    if (linkedDetail) { setDetail(linkedDetail); return undefined; }
     let live = true;
     setDetail(null);
-    setDetailFailed(false);
     getServiceRequest(targetId)
       .then((res) => { if (live) { if (res) setDetail(res); else setDetailFailed(true); } })
       .catch(() => { if (live) setDetailFailed(true); });
     return () => { live = false; };
-  }, [targetId]);
+  }, [targetId, linkedDetail]);
 
-  const detailId = detail?.id || null;
   useEffect(() => {
-    if (!detailId) return undefined;
+    if (!targetId) return undefined;
     let live = true;
     setChecklist(null);
     setChecklistStatus('loading');
-    readServiceRequestChecklist(detailId)
+    readServiceRequestChecklist(targetId)
       .then((res) => { if (live) { setChecklist(res); setChecklistStatus('ready'); } })
       .catch(() => { if (live) { setChecklist(null); setChecklistStatus('error'); } });
     return () => { live = false; };
-  }, [detailId]);
+  }, [targetId]);
 
   const closeDetail = () => {
     setTarget(null);

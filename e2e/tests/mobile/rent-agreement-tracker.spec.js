@@ -58,6 +58,38 @@ test.describe('Rent agreement tracker on a phone', () => {
     expect(errors).toEqual([]);
   });
 
+  test('the owner cancels an unpaid request with a second tap, and the wizard unlocks', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedConsent(page);
+    await signedInAsNew(page);
+    await page.goto('/services/rent-agreement');
+    const id = await page.evaluate(async (mobile) => {
+      const svc = await import('/src/services/serviceRequestService.js');
+      const filed = await svc.createCoFillServiceRequest({
+        request: { type: 'rental', customer: { name: 'Tracker Owner' }, details: { property: 'Flat 3, Wakad, Pune' } },
+        role: 'tenant',
+        mobile,
+      });
+      return filed.id;
+    }, uniqueMobile());
+    await page.reload();
+
+    const card = tracker(page).locator('.border-l-4').filter({ hasText: id.slice(0, 10) });
+    await expect(card).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Your request is already submitted')).toBeVisible();
+
+    const cancel = card.getByTestId('tracker-cancel-unpaid');
+    await expect(cancel).toHaveText('Cancel request');
+    await cancel.click();
+    await expect(cancel, 'one stray tap must not cancel').toHaveText('Tap again to cancel');
+    await cancel.click();
+
+    await expect(card, 'the cancelled request folds away').toHaveCount(0);
+    await expect(tracker(page).getByRole('button', { name: 'Show 1 cancelled request' })).toBeVisible();
+    await expect(page.getByText('Your request is already submitted'), 'the wizard is free to file again').toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
   test('the hero starts with the breadcrumb, not a blank band', async ({ page }) => {
     await seedConsent(page);
     await page.goto('/services/rent-agreement');
@@ -82,5 +114,29 @@ test.describe('Rent agreement tracker on a phone', () => {
       const r = el.getBoundingClientRect();
       return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
     }), { message: 'nothing sits on top of Next' }).toBe(true);
+  });
+
+  test('the form sits on the page, not a card in a card, and its fields share one size', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedConsent(page);
+    await page.goto('/services/rent-agreement');
+
+    const form = page.locator('.ra-form-card');
+    await expect(form).toHaveCSS('padding-left', '0px');
+    await expect(form).toHaveCSS('box-shadow', 'none');
+    await expect(form).toHaveCSS('border-top-width', '0px');
+
+    const strip = form.locator('.hscroll-row').first();
+    await expect.poll(() => strip.evaluate((el) => el.scrollWidth - el.clientWidth), { message: 'all six steps fit without a sideways scroll' }).toBeLessThanOrEqual(0);
+    await expect(form.locator('.hscroll-fade--right').first(), 'no fade band over the steps').toHaveCSS('opacity', '0');
+
+    const sizes = await form.evaluate((el) => ({
+      inputs: [...el.querySelectorAll('input.field')].filter((i) => i.offsetParent).map((i) => Math.round(i.getBoundingClientRect().height)),
+      labels: [...new Set([...el.querySelectorAll('.lbl')].filter((l) => l.offsetParent).map((l) => getComputedStyle(l).fontSize))],
+    }));
+    expect(sizes.inputs.length).toBeGreaterThan(0);
+    expect(new Set(sizes.inputs)).toEqual(new Set([44]));
+    expect(sizes.labels).toEqual(['14px']);
+    expect(errors).toEqual([]);
   });
 });

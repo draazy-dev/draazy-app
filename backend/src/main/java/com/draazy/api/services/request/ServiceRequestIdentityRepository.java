@@ -13,8 +13,6 @@ public interface ServiceRequestIdentityRepository extends JpaRepository<ServiceR
     List<ServiceRequestIdentity> findByServiceRequestIdOrderByPartyRoleAscPartyIndexAsc(
             UUID serviceRequestId);
 
-    void deleteByServiceRequestIdAndPartyRoleIn(UUID serviceRequestId, Collection<String> partyRoles);
-
     @Modifying
     void deleteByServiceRequestIdAndPartyRoleAndPartyIndexIn(UUID serviceRequestId,
             String partyRole, Collection<Integer> partyIndexes);

@@ -73,11 +73,11 @@ export default function TenantPoliceRecord({ tenant, index, setTenant, errors = 
   );
 
   return (
-    <section className="sm:col-span-2 rounded-xl border border-white/10 p-3 sm:p-4 mt-1" data-testid={`tenant-police-record-${index}`}>
-      <p className="text-xs font-semibold text-gray-300 mb-3 flex items-center gap-2"><Icon name="shield-check" className="w-3.5 h-3.5 text-teal-400" /> {t('services.ra.tenant.police.title')}</p>
+    <section className="sm:col-span-2 border-t sm:border border-white/10 pt-4 sm:p-4 sm:rounded-xl mt-1" data-testid={`tenant-police-record-${index}`}>
+      <p className="text-sm font-semibold text-gray-200 mb-3 flex items-center gap-2"><Icon name="shield-check" className="w-4 h-4 text-teal-400" /> {t('services.ra.tenant.police.title')}</p>
       <div className="space-y-4">
-        <label className="flex items-start gap-2 text-xs text-gray-300">
-          <input type="checkbox" checked={!!police.permanentSameAsCurrent} onChange={(e) => set('permanentSameAsCurrent', e.target.checked)} className="accent-teal-500 mt-0.5" />
+        <label className="flex items-start gap-2.5 text-sm text-gray-300 cursor-pointer">
+          <input type="checkbox" checked={!!police.permanentSameAsCurrent} onChange={(e) => set('permanentSameAsCurrent', e.target.checked)} className="accent-teal-500 w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>{t('services.ra.tenant.police.permanentSame')}</span>
         </label>
         {!police.permanentSameAsCurrent && renderAddress('permanent', true)}
@@ -89,8 +89,8 @@ export default function TenantPoliceRecord({ tenant, index, setTenant, errors = 
           </Field>
           {addressProofUploadRequired(tenant) ? proofUpload('addressproof') : <p className="mt-2 text-xs text-gray-500">{t('services.ra.tenant.police.uidProofHint')}</p>}
         </div>
-        <label className="flex items-start gap-2 text-xs text-gray-300">
-          <input type="checkbox" checked={!!police.previousSameAsPermanent} onChange={(e) => setPreviousSame(e.target.checked)} className="accent-teal-500 mt-0.5" />
+        <label className="flex items-start gap-2.5 text-sm text-gray-300 cursor-pointer">
+          <input type="checkbox" checked={!!police.previousSameAsPermanent} onChange={(e) => setPreviousSame(e.target.checked)} className="accent-teal-500 w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>{t('services.ra.tenant.police.previousSame')}</span>
         </label>
         {!police.previousSameAsPermanent && (
@@ -118,7 +118,7 @@ export default function TenantPoliceRecord({ tenant, index, setTenant, errors = 
         <div>
           <div className="flex items-center justify-between gap-3 mb-2">
             <p className="lbl">{t('services.ra.tenant.police.occupants')}</p>
-            {police.occupants.length < MAX_POLICE_OCCUPANTS && <button type="button" onClick={() => setOccupants([...police.occupants, BLANK_OCCUPANT])} className="btn-outline px-3 py-2 rounded-xl text-teal-400 text-xs font-semibold flex items-center gap-1"><Icon name="plus-circle" className="w-3.5 h-3.5" /> {t('services.ra.tenant.police.addOccupant')}</button>}
+            {police.occupants.length < MAX_POLICE_OCCUPANTS && <button type="button" onClick={() => setOccupants([...police.occupants, BLANK_OCCUPANT])} className="btn-outline h-btn-sm px-3 rounded-xl text-teal-400 text-sm font-semibold flex items-center gap-1.5 flex-shrink-0"><Icon name="plus-circle" className="w-4 h-4" /> {t('services.ra.tenant.police.addOccupant')}</button>}
           </div>
           <div className="space-y-3">
             {police.occupants.map((row, rowIndex) => (
@@ -129,7 +129,7 @@ export default function TenantPoliceRecord({ tenant, index, setTenant, errors = 
                       {FAMILY_MEMBER_TYPES.map((value) => <option key={value} value={value}>{option('occupantTypeOpt', value)}</option>)}
                     </NativeSelect>
                   </Field>
-                  <button type="button" onClick={() => setOccupants(police.occupants.filter((_, i) => i !== rowIndex))} className="p-3 rounded-xl text-gray-400 hover:text-red-400" title={t('services.ra.tenant.police.removeOccupant')} aria-label={t('services.ra.tenant.police.removeOccupant')}><Icon name="x" className="w-4 h-4" /></button>
+                  <button type="button" onClick={() => setOccupants(police.occupants.filter((_, i) => i !== rowIndex))} className="w-11 h-11 flex items-center justify-center flex-shrink-0 rounded-xl text-gray-400 hover:text-red-400" title={t('services.ra.tenant.police.removeOccupant')} aria-label={t('services.ra.tenant.police.removeOccupant')}><Icon name="x" className="w-4 h-4" /></button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label={t('services.ra.tenant.police.fullName')} required error={errors[`${prefix}Occ${rowIndex}fullName`] && t('services.ra.tenant.police.nameErr')}><input maxLength={80} value={row.fullName || ''} onChange={(e) => setOccupant(rowIndex, 'fullName', e.target.value)} className={fieldClass(`${prefix}Occ${rowIndex}fullName`)} /></Field>
@@ -140,7 +140,7 @@ export default function TenantPoliceRecord({ tenant, index, setTenant, errors = 
                     </NativeSelect>
                   </Field>
                   <Field label={t('services.ra.tenant.police.age')} required error={errors[`${prefix}Occ${rowIndex}age`] && t('services.ra.tenant.police.ageErr')}><input inputMode="numeric" maxLength={3} value={row.age || ''} onChange={(e) => setOccupant(rowIndex, 'age', digits(e.target.value).slice(0, 3))} className={fieldClass(`${prefix}Occ${rowIndex}age`)} placeholder="35" /></Field>
-                  <Field label={t('services.ra.tenant.police.mobile')} required error={errors[`${prefix}Occ${rowIndex}mobile`] && t('services.ra.tenant.mobileErr')}><MobileField value={row.mobile || ''} onChange={(v) => setOccupant(rowIndex, 'mobile', v)} error={!!errors[`${prefix}Occ${rowIndex}mobile`]} placeholder={t('services.ra.tenant.mobilePlaceholder')} inputClassName="px-4 py-3" /></Field>
+                  <Field className="col-span-2 sm:col-span-1" label={t('services.ra.tenant.police.mobile')} required error={errors[`${prefix}Occ${rowIndex}mobile`] && t('services.ra.tenant.mobileErr')}><MobileField value={row.mobile || ''} onChange={(v) => setOccupant(rowIndex, 'mobile', v)} error={!!errors[`${prefix}Occ${rowIndex}mobile`]} placeholder={t('services.ra.tenant.mobilePlaceholder')} inputClassName="px-4 py-3" /></Field>
                 </div>
               </div>
             ))}

@@ -80,7 +80,8 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
                             or (r.status = com.draazy.api.services.request.ServiceRequestStatus.CHANGES_REQUESTED
                                 and r.statusChangedAt < :revisionBy)
                             or (r.status = com.draazy.api.services.request.ServiceRequestStatus.APPROVED
-                                and r.statusChangedAt < :registrationBy))))
+                                and r.statusChangedAt < :registrationBy)))
+                   and r.id not in :waitingIds)
               and (:prefix is null
                    or (:requestId is not null and r.id = :requestId)
                    or exists (select 1 from User u
@@ -104,6 +105,7 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             @Param("draftBy") Instant draftBy,
             @Param("revisionBy") Instant revisionBy,
             @Param("registrationBy") Instant registrationBy,
+            @Param("waitingIds") List<UUID> waitingIds,
             @Param("prefix") String prefix,
             @Param("requestId") UUID requestId,
             @Param("since") Instant since,
@@ -153,20 +155,42 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             @Param("revisionBy") Instant revisionBy,
             @Param("registrationBy") Instant registrationBy);
 
+    @Query(value = """
+            select r.* from service_requests r
+            where (:allTeams = true or r.team in (:teams))
+              and r.type = 'rent-agreement'
+              and ((r.status = 'new' and r.status_changed_at < :pickupBy)
+                   or (r.status in ('assigned', 'in-progress') and r.status_changed_at < :draftBy))
+              and r.details -> '_state' ->> 'tenantMode' = 'invite'
+              and coalesce(r.details -> '_state' ->> 'ownerMode', '') <> 'invite'
+            """, nativeQuery = true)
+    List<ServiceRequest> findTenantInvitesBeforeDraft(@Param("allTeams") boolean allTeams,
+            @Param("teams") List<String> teams,
+            @Param("pickupBy") Instant pickupBy,
+            @Param("draftBy") Instant draftBy);
+
     interface StatusTotal {
         ServiceRequestStatus getStatus();
 
         Long getTotal();
     }
 
-    Optional<ServiceRequest> findByTicketId(UUID ticketId);
-
     Optional<ServiceRequest> findByPaymentRef(String paymentRef);
 
-    long countByRequesterIdAndTypeAndStatus(UUID requesterId, String type,
-            ServiceRequestStatus status);
+    @Query(value = """
+            select count(*) from service_requests r
+            where r.requester_id = :requesterId and r.type = :type and r.status = 'awaiting-payment'
+              and coalesce(rent_agreement_flat_key(r.details), '') = :flat
+            """, nativeQuery = true)
+    long countOpenUnpaidOnFlat(@Param("requesterId") UUID requesterId, @Param("type") String type,
+            @Param("flat") String flat);
 
-    List<ServiceRequest> findByRequesterIdAndTypeAndPaymentRefNotNull(UUID requesterId, String type);
+    @Query("""
+            select r from ServiceRequest r
+            where r.type = :type and r.paymentRef is not null
+              and (r.requesterId = :userId or r.payerId = :userId)
+            """)
+    List<ServiceRequest> findWithOrderInvolving(@Param("userId") UUID userId, @Param("type") String type);
 
     @Query("""
             select r from ServiceRequest r

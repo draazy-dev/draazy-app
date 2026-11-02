@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router';
+import { useSearchParams, useNavigate, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useScrollReveal } from '../../../../lib/useScrollReveal.js';
 import { useLatest, useSignInGate } from '../../../../lib/useSignInGate.js';
@@ -8,9 +8,10 @@ import { usePricing } from '../../../../context/PricingContext.jsx';
 import { useToast } from '../../../../context/ToastContext.jsx';
 import { inviteRouteFor, isActive } from '../../../../lib/serviceRequestStatus.js';
 import { listDocuments, uploadDocument } from '../../../../services/documentService.js';
+import { REVISIT_READ } from '../../../../services/http.js';
 import { useFormDraft } from '../../../../lib/hooks.js';
-import { OWNER_DOCS, OWNER_VAULT_CAT, LAST_PUBLIC_STEP, MAX_LICENSORS, MAX_TENANTS, DECLARATION_VERSION } from './constants.js';
-import { digits, num, rentForTerm, emptyTenant, emptyProp, emptyOwner, emptyCoOwner, emptyInvite, emptyTerms, emptyWit, DETAILS_MAX_CHARS, detailsChars, largestFreeTextField, redactIdentityNumbers, hasIdentityNumbers, identityReminderFields, missingIdentityReminderFields, identityParties, fillBlanks, namesOtherFlat, filingKey, listingAnswers, readSavedKyc } from './helpers.js';
+import { OWNER_DOCS, OWNER_VAULT_CAT, LAST_PUBLIC_STEP, MAX_LICENSORS, MAX_TENANTS, DECLARATION_VERSION, REVIEW_STEP } from './constants.js';
+import { digits, num, rentForTerm, emptyTenant, emptyProp, emptyOwner, emptyCoOwner, emptyInvite, emptyTerms, DETAILS_MAX_CHARS, detailsChars, largestFreeTextField, redactIdentityNumbers, hasIdentityNumbers, identityReminderFields, missingIdentityReminderFields, identityParties, fillBlanks, namesOtherFlat, filingKey, listingAnswers, readSavedKyc } from './helpers.js';
 import { docReady, stepErrors as formStepErrors, startDateBounds } from './validation.js';
 import { collectDocs as collectFormDocs, draftDocRefs, filedDocSlots, removeIndexedDocs } from './documents.js';
 import { useRaFurniture } from './useRaFurniture.js';
@@ -19,7 +20,7 @@ import { useEntitlements } from '../../property/useEntitlements.js';
 import { getDealFees } from '../../../../services/feesService.js';
 import { leaveLicenceStamp } from '../../../../lib/toolCalc.js';
 import { myListing, myListings } from '../../../../services/propertyService.js';
-import { rentAgreementRenewal } from '../../../../services/rentService.js';
+import { rentAgreementRenewal, rentAgreementHomeRenewal } from '../../../../services/rentService.js';
 import {
   addServiceRequestDoc,
   addServiceRequestDocFromVault,
@@ -35,6 +36,7 @@ import {
   recordServiceRequestIdentities,
   readMaskedServiceRequestIdentities,
   submitServiceRequestPartyDetails,
+  updateServiceRequestDetails,
   withdrawServiceRequestParty,
 } from '../../../../services/serviceRequestService.js';
 
@@ -43,6 +45,20 @@ const DRAFT_KEY = 'dzDraft:rentAgreement';
 const withDefaults = (base, saved) => Object.fromEntries(Object.entries(base).map(([k, v]) => [k, saved?.[k] === undefined ? v : saved[k]]));
 
 const invitedRole = (s) => (s?.ownerMode === 'invite' ? 'owner' : s?.tenantMode === 'invite' ? 'tenant' : null);
+
+const heldCoFill = (r) => !invitedRole(r?.details?._state) && (r?.parties || []).some((p) => p?.status === 'accepted');
+
+const partyNames = (s) => ({
+  'owner-0': s?.owner?.oName,
+  ...Object.fromEntries((s?.coOwners || []).map((c, i) => [`owner-${i + 1}`, c?.name])),
+  ...Object.fromEntries((s?.tenants || []).map((t, i) => [`tenant-${i}`, t?.name])),
+});
+const sameName = (a, b) => String(a || '').trim().replace(/\s+/g, ' ').toLowerCase() === String(b || '').trim().replace(/\s+/g, ' ').toLowerCase();
+// The server drops a recorded PAN once its party is renamed, so it only counts as on file under the original name.
+const stillHeld = (masked, state) => {
+  const names = partyNames(state);
+  return Object.fromEntries(Object.entries(masked).filter(([k, v]) => !v.name || sameName(v.name, names[k])));
+};
 
 export function useRentAgreement() {
   const rootRef = useScrollReveal();
@@ -54,6 +70,8 @@ export function useRentAgreement() {
   const { mountedRef, paymentPending, paymentConfirming, payAndConfirm, resetPayment } = useRaPayment({ tr, toast });
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const routeState = useLocation().state;
+  const openedToView = !!routeState?.raView;
   const sendToSignIn = useSignInGate();
 
   const [step, setStep] = useState(0);
@@ -77,7 +95,7 @@ export function useRentAgreement() {
   useEffect(() => {
     if (!isIn) { setMyProperties([]); return undefined; }
     let alive = true;
-    myListings(user)
+    myListings(user, REVISIT_READ)
       .then((rows) => { if (alive) setMyProperties(Array.isArray(rows) ? rows : []); })
       .catch(() => { if (alive) setMyProperties([]); });
     return () => { alive = false; };
@@ -103,8 +121,6 @@ export function useRentAgreement() {
   const { furnItems, setFurnItems, custom, setCustom, isChecked, toggleFurn, bumpQty, removeFurn, addCustom, furnitureText } = useRaFurniture();
   const [clauses, setClauses] = useState('');
 
-  const [wit, setWit] = useState(emptyWit());
-
   const [declare, setDeclare] = useState(false);
 
   const setP = (k, v) => setProp((p) => ({ ...p, [k]: v }));
@@ -116,7 +132,7 @@ export function useRentAgreement() {
 
   const captureFormState = () => ({
     step,
-    prop, terms, maint, regArea, furnItems, clauses, wit, declare,
+    prop, terms, maint, regArea, furnItems, clauses, declare,
     ...(ownerMode === 'invite'
       ? { owner: { ...emptyOwner(false), oMobile: digits(invite.invMobile).slice(-10) }, coOwners: [] }
       : { owner, coOwners }),
@@ -130,7 +146,7 @@ export function useRentAgreement() {
 
   const applyFormState = (s) => {
     if (!s || typeof s !== 'object') return;
-    if (typeof s.step === 'number') setStep(s.step);
+    if (typeof s.step === 'number') setStep(Math.min(s.step, REVIEW_STEP));
     if (s.prop) {
       const restored = withDefaults(emptyProp(), s.prop);
       setProp(restored);
@@ -145,7 +161,6 @@ export function useRentAgreement() {
     if (s.maint) setMaint(s.maint);
     if (s.furnItems) setFurnItems(s.furnItems);
     if (s.clauses != null) setClauses(s.clauses);
-    if (s.wit) setWit(withDefaults(emptyWit(), s.wit));
     if (s.declare != null) setDeclare(s.declare);
     if (s.tenants) setTenants(s.tenants.map((t) => withDefaults(emptyTenant(), t)));
     if (s.tenantMode === 'invite' && s.invite?.invMobile && !(s.tenants || []).some((t) => digits(t.mobile))) {
@@ -169,16 +184,18 @@ export function useRentAgreement() {
   useEffect(() => {
     if (!isIn || !user?.mobile) { setActiveRequests([]); return undefined; }
     let alive = true;
-    listServiceRequests('rental')
+    listServiceRequests('rental', requestsNonce ? undefined : REVISIT_READ)
       .then((rs) => { if (alive) setActiveRequests((rs || []).filter((r) => isActive(r.status))); })
       .catch(() => { if (alive) setActiveRequests([]); });
     return () => { alive = false; };
   }, [isIn, user, done, requestsNonce]);
+  const ownRequests = activeRequests.filter((r) => !r.myPartyId);
   const locked = mode === 'owner' && !done && !startNew && activeRequests.length > 0;
+  const joinedOnly = ownRequests.length === 0;
 
   const stalledInvite = (() => {
     const side = (r, role) => (r.parties || []).filter((p) => p?.role === role);
-    const r = activeRequests.find((x) => {
+    const r = ownRequests.find((x) => {
       const role = invitedRole(x.details?._state);
       if (!role) return false;
       if (role !== 'tenant') return !side(x, role).some((p) => p.status === 'invited' || p.status === 'accepted');
@@ -219,8 +236,11 @@ export function useRentAgreement() {
     }
   };
 
-  const payable = stalledInvite ? null : activeRequests.find((r) => r.status === 'awaiting_payment' && Number(r.amount) > 0
-    && !(r.parties || []).some((p) => p.status === 'invited')) || null;
+  const tenantFillsLater = (r) => invitedRole(r.details?._state) === 'tenant';
+  const payable = ownRequests.find((r) => r.status === 'awaiting_payment' && Number(r.amount) > 0
+    && invitedRole(r.details?._state) !== 'owner'
+    && (tenantFillsLater(r) || (r.id !== stalledInvite?.requestId && !(r.parties || []).some((p) => p.status === 'invited'))))
+    || activeRequests.find((r) => r.myPartyId && r.payableByMe) || null;
   const [paying, setPaying] = useState(false);
   const payingRef = useRef(false);
   const payFiled = async () => {
@@ -229,7 +249,7 @@ export function useRentAgreement() {
     setPaying(true);
     try {
       const checkout = await openServiceRequestCheckout(payable.id, DECLARATION_VERSION);
-      const status = await payAndConfirm(checkout, referralCredit ? null : Number(payable.amount) || null);
+      const status = await payAndConfirm(checkout, referralCredit && !payable.myPartyId ? null : Number(payable.amount) || null);
       if (mountedRef.current && status === 'cancelled') toast(tr('services.ra.checkoutFailed'), 'error');
       else if (mountedRef.current && status && status !== 'awaiting_payment') toast(tr('services.ra.pay.paid'), 'success');
     } catch (err) {
@@ -243,18 +263,21 @@ export function useRentAgreement() {
   };
 
   const liveParty = (r, role) => (r.parties || []).some((p) => p?.role === role && (p.status === 'invited' || p.status === 'accepted'));
-  const continuable = activeRequests.find((r) => r.status === 'awaiting_payment' && !r.paymentSessionId && r.details?._state
-    && (invitedRole(r.details._state) ? liveParty(r, invitedRole(r.details._state)) : !(r.parties || []).length)) || null;
+  const continuable = ownRequests.find((r) => r.status === 'awaiting_payment' && !r.paymentSessionId && r.details?._state
+    && (invitedRole(r.details._state) ? liveParty(r, invitedRole(r.details._state)) : heldCoFill(r) || !(r.parties || []).length)) || null;
   const topUpRef = useRef(null);
   const topUpBaselineRef = useRef(null);
   const [coFilledRole, setCoFilledRole] = useState(null);
   const [maskedIds, setMaskedIds] = useState({});
   const maskedForRef = useRef(null);
-  const loadMaskedIds = (id) => {
+  const loadMaskedIds = (id, state) => {
     maskedForRef.current = id;
     const current = () => mountedRef.current && maskedForRef.current === id;
+    const names = state ? partyNames(state) : {};
     return readMaskedServiceRequestIdentities(id)
-      .then((ids) => { if (current()) setMaskedIds(ids || {}); })
+      .then((ids) => {
+        if (current()) setMaskedIds(Object.fromEntries(Object.entries(ids || {}).map(([k, v]) => [k, names[k] ? { ...v, name: names[k] } : v])));
+      })
       .catch(() => { if (current()) toast(tr('services.ra.maskedIdsFailed'), 'error'); });
   };
   const answersKey = () => filingKey({ ...captureShareableState(), step: 0 });
@@ -269,12 +292,13 @@ export function useRentAgreement() {
   });
   const continueFiled = () => {
     if (!continuable) return;
+    if (heldCoFill(continuable)) { holdFiled(continuable); return; }
     const role = invitedRole(continuable.details._state);
     if (!restored || role) applyFormState(continuable.details._state);
     const coFilled = role && (continuable.parties || []).some((p) => p?.role === role && p.status === 'accepted') ? role : null;
     setCoFilledRole(coFilled);
     setMaskedIds({});
-    loadMaskedIds(continuable.id);
+    loadMaskedIds(continuable.id, continuable.details._state);
     restoreFiledDocs(continuable);
     if (invitedRole(continuable.details._state)) {
       topUpRef.current = continuable;
@@ -285,6 +309,79 @@ export function useRentAgreement() {
     setStep(0);
     setStartNew(true);
   };
+
+  const [viewingFiled, setViewingFiled] = useState(null);
+  const [editingFiled, setEditingFiled] = useState(null);
+  const [inviteEditing, setInviteEditing] = useState(false);
+  const canView = (r) => (r.myPartyId ? r.editableByMe || !!r.details?._state : r.mySideSubmitted && !!r.details?._state);
+  const viewOwnFiled = (r) => {
+    if (!r?.details?._state) return;
+    applyFormState(r.details._state);
+    setCoFilledRole(invitedRole(r.details._state));
+    setMaskedIds({});
+    loadMaskedIds(r.id, r.details._state);
+    setOwnerDocs({});
+    setTenantDocs({});
+    restoreFiledDocs(r);
+    filedRef.current = null;
+    setSelectedPropertyId(r.propertyId || null);
+    setErrors({});
+    setEditingFiled(null);
+    setViewingFiled(r);
+    setStep(0);
+    setStartNew(true);
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const viewSubmitted = (r) => {
+    if (r?.myPartyId) navigate(inviteRouteFor({ id: r.myPartyId, requestId: r.id }), { state: { raView: true } });
+    else viewOwnFiled(r);
+  };
+  const holdFiled = (r) => {
+    viewOwnFiled(r);
+    setViewingFiled(null);
+    setEditingFiled(r);
+  };
+  const heldId = routeState?.raHold;
+  useEffect(() => {
+    const r = heldId && ownRequests.find((x) => x.id === heldId && heldCoFill(x));
+    if (!r) return;
+    const kyc = readSavedKyc(user?.mobile) || {};
+    holdFiled(r);
+    setOwner((o) => ({ ...fillBlanks(o, { oName: user?.name || kyc.name, oDob: kyc.dob, oAge: kyc.age }), oMobile: digits(user?.mobile).slice(-10) }));
+    navigate('/services/rent-agreement', { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume the hand-over once, when the request list arrives
+  }, [heldId, activeRequests]);
+  const editSubmitted = () => {
+    if (mode === 'invite') {
+      setInviteEditing(true);
+      setStep(inviteCtx?.invite?.toRole === 'owner' ? 1 : 2);
+      return;
+    }
+    if (!viewingFiled?.editableByMe) return;
+    setEditingFiled(viewingFiled);
+    setViewingFiled(null);
+  };
+  const closeFiled = () => {
+    if (mode === 'invite') {
+      navigate('/services/rent-agreement');
+      return;
+    }
+    startNewAgreement();
+    setStartNew(false);
+  };
+  const discardEdits = () => {
+    if (mode === 'invite') {
+      if (inviteCtx?.req?.details?._state) applyFormState(inviteCtx.req.details._state);
+      setInviteEditing(false);
+      setErrors({});
+      setStep(0);
+      return;
+    }
+    if (editingFiled) viewOwnFiled(editingFiled);
+    else closeFiled();
+  };
+  const viewOnly = !done && (mode === 'invite' ? !!inviteCtx && !inviteEditing && (!!inviteCtx.req?.mySideSubmitted || openedToView) : !!viewingFiled);
+  const viewedRequest = viewOnly ? (mode === 'invite' ? inviteCtx.req : viewingFiled) : null;
 
   const startNewAgreement = () => {
     clearDraft();
@@ -306,7 +403,6 @@ export function useRentAgreement() {
     setFurnItems([]);
     setCustom({ name: '', qty: 1 });
     setClauses('');
-    setWit(emptyWit());
     setDeclare(false);
     setInviteResult(null);
     setCopied(false);
@@ -320,6 +416,8 @@ export function useRentAgreement() {
     setMaskedIds({});
     maskedForRef.current = null;
     uploadedRef.current = new Map();
+    setEditingFiled(null);
+    setViewingFiled(null);
     setStartNew(true);
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -347,7 +445,7 @@ export function useRentAgreement() {
     setRestoredIdentityFields(Array.isArray(next?.identityReminders) ? next.identityReminders : []);
     applyFormState(next);
   };
-  const { restored, clear: clearDraft, flush: flushDraft, startFresh } = useFormDraft(DRAFT_KEY, form, restoreFormState, { enabled: mode === 'owner' && !done, ignore: ['oName', 'oMobile', 'step'] });
+  const { restored, clear: clearDraft, flush: flushDraft, startFresh } = useFormDraft(DRAFT_KEY, form, restoreFormState, { enabled: mode === 'owner' && !done && !viewingFiled && !editingFiled, ignore: ['oName', 'oMobile', 'step'] });
 
   const gated = mode === 'owner' && !loading && !isIn;
 
@@ -386,7 +484,7 @@ export function useRentAgreement() {
     if (!vaultEnabled) return;
     let cancelled = false;
     (async () => {
-      const personal = await listDocuments(user.mobile, 'personal').catch(() => null);
+      const personal = await listDocuments(user.mobile, 'personal', REVISIT_READ).catch(() => null);
       if (cancelled || !personal) return;
       const held = new Set(personal.map((d) => String(d.id)));
       setOwnerDocs((cur) => {
@@ -410,7 +508,7 @@ export function useRentAgreement() {
     const cat = OWNER_VAULT_CAT[k];
     if (!cat) return;
     try {
-      const existing = await listDocuments(user.mobile, 'personal');
+      const existing = await listDocuments(user.mobile, 'personal', REVISIT_READ);
       const saved = existing.find((x) => x.category === cat && x.name === d.fileName)
         || await uploadDocument(user.mobile, 'personal', { category: cat, file });
       if (!saved?.id || !mountedRef.current) return;
@@ -484,7 +582,7 @@ export function useRentAgreement() {
 
   const inviteRole = inviteCtx?.invite?.toRole || null;
   const inviteAwaitingPayment = inviteCtx?.req?.status === 'awaiting_payment';
-  const formSnapshot = () => ({ mode, inviteRole, prop, owner, coOwners, ownerMode, tenantMode, tenants, invite, terms, wit, ownerDocs, tenantDocs });
+  const formSnapshot = () => ({ mode, inviteRole, prop, owner, coOwners, ownerMode, tenantMode, tenants, invite, terms, ownerDocs, tenantDocs });
   const collectDocs = () => collectFormDocs(formSnapshot());
 
   const addTenant = () => setTenants((arr) => (arr.length < MAX_TENANTS ? [...arr, emptyTenant()] : arr));
@@ -542,7 +640,12 @@ export function useRentAgreement() {
         if (row && row.status !== 'accepted') {
           try {
             await decideServiceRequestInvite(row.id, 'accept');
-          } catch {}
+          } catch (err) {
+            if (err?.status === 409) {
+              if (alive) setInviteError({ kind: 'blocked', detail: err.message || '' });
+              return;
+            }
+          }
         }
         const req = await getServiceRequest(reqId);
         if (!req) {
@@ -551,6 +654,10 @@ export function useRentAgreement() {
         }
         if (!alive) return;
         setInviteError(null);
+        if (!req.myPartyId && req.status === 'awaiting_payment' && heldCoFill(req)) {
+          navigate('/services/rent-agreement', { replace: true, state: { raHold: req.id } });
+          return;
+        }
         const partyRow = row || (req.parties || []).find((p) => p?.id === partyId);
         const role = partyRow?.role || 'tenant';
         const partyIndex = Number(partyRow?.partyIndex) || 0;
@@ -593,7 +700,7 @@ export function useRentAgreement() {
     if (mode === 'invite' || !isIn || !user?.mobile) { setMyInvites([]); return; }
     if (searchParams.get('party')) return;
     let alive = true;
-    listMyServiceRequestInvites()
+    listMyServiceRequestInvites(REVISIT_READ)
       .then((rows) => {
         if (!alive) return;
         setMyInvites((rows || []).filter((row) => row?.status === 'invited').map((row) => ({
@@ -653,14 +760,16 @@ export function useRentAgreement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- consume listing URL once without overwriting edits
   }, [searchParams, mode, myProperties]);
 
-  const renewId = searchParams.get('renew');
+  const renewHomeId = searchParams.get('renewHome');
+  const renewId = searchParams.get('renew') || renewHomeId;
   const renewAppliedRef = useRef(null);
   useEffect(() => {
     if (!renewId || mode === 'invite' || !isIn || renewAppliedRef.current === renewId) return;
     renewAppliedRef.current = renewId;
-    rentAgreementRenewal(renewId).catch(() => null).then((res) => {
+    (renewHomeId ? rentAgreementHomeRenewal(renewHomeId) : rentAgreementRenewal(renewId)).catch(() => null).then((res) => {
       if (!mountedRef.current) return;
       if (res) {
+        if (Object.keys(res.prop).length) setProp((cur) => fillBlanks(cur, res.prop));
         const tenantRows = res.tenants.filter((p) => p.name || digits(p.mobile)).slice(0, MAX_TENANTS);
         if (tenantRows.length) {
           setTenants(tenantRows.map((p) => ({ ...emptyTenant(), name: p.name, mobile: digits(p.mobile).slice(-10) })));
@@ -685,13 +794,14 @@ export function useRentAgreement() {
       setSearchParams((cur) => {
         const rest = new URLSearchParams(cur);
         rest.delete('renew');
+        rest.delete('renewHome');
         return rest;
       }, { replace: true });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- consume the renewal URL once without overwriting edits
   }, [renewId, mode, isIn]);
   const stepErrors = (s) => formStepErrors(s, {
-    ...formSnapshot(), listed: !!selectedPropertyId, selfMobile: mode === 'invite' ? undefined : user?.mobile, held: maskedIds,
+    ...formSnapshot(), listed: !!selectedPropertyId, selfMobile: mode === 'invite' ? undefined : user?.mobile, held: stillHeld(maskedIds, { owner, coOwners, tenants }),
   });
   const [liveStep, setLiveStep] = useState(null);
   const [errorFocus, setErrorFocus] = useState(0);
@@ -700,7 +810,7 @@ export function useRentAgreement() {
     if (liveStep === null || liveStep !== step) return;
     setErrors(stepErrors(step));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- errors recompute from the listed form slices
-  }, [prop, owner, coOwners, ownerMode, tenantMode, tenants, invite, terms, wit, ownerDocs, tenantDocs]);
+  }, [prop, owner, coOwners, ownerMode, tenantMode, tenants, invite, terms, ownerDocs, tenantDocs]);
   useEffect(() => {
     if (!errorFocus) return;
     const el = formRef.current?.querySelector('.step-panel.active .err, .step-panel.active .dz-invalid, .step-panel.active [aria-invalid="true"]');
@@ -716,10 +826,11 @@ export function useRentAgreement() {
     return true;
   };
   const next = () => {
+    if (viewOnly) { setStep((s) => Math.min(REVIEW_STEP, s + 1)); scrollTop(); return; }
     if (!validateStep(step)) return;
     if (gated && step >= LAST_PUBLIC_STEP) { gateToSignIn(() => latestStep.current.next()); return; }
     if (detailsTooLong) toast(tr('services.ra.detailsTooLong', { field: tr(detailsWorstField.label), over: detailsSize - DETAILS_MAX_CHARS }), 'error');
-    setStep((s) => Math.min(5, s + 1));
+    setStep((s) => Math.min(REVIEW_STEP, s + 1));
     scrollTop();
   };
   const prev = () => { setStep((s) => Math.max(0, s - 1)); scrollTop(); };
@@ -745,6 +856,9 @@ export function useRentAgreement() {
       await withdrawServiceRequestParty(inviteResult.requestId, inviteResult.partyId);
       if (!mountedRef.current) return;
       setInviteResult(null);
+      setDone(false);
+      setStartNew(false);
+      setRequestsNonce((n) => n + 1);
       toast(tr('services.ra.invite.withdrawn'), 'success');
     } catch (err) {
       console.error('Rent Agreement invite withdraw failed', err?.status || err?.message);
@@ -798,9 +912,7 @@ export function useRentAgreement() {
     return null;
   };
 
-  const finishOwnerRequest = async (requestId, docs) => {
-    const handOffFailure = await handOff(requestId, identityParties({ owner, coOwners, tenants }), docs);
-    if (handOffFailure) return handOffFailure;
+  const checkoutFiled = async (requestId) => {
     let checkout;
     try {
       checkout = await openServiceRequestCheckout(requestId, DECLARATION_VERSION);
@@ -811,6 +923,11 @@ export function useRentAgreement() {
     await payAndConfirm(checkout, referralCredit ? null : cost.total);
     refreshEntitlements();
     return null;
+  };
+
+  const finishOwnerRequest = async (requestId, docs) => {
+    const handOffFailure = await handOff(requestId, identityParties({ owner, coOwners, tenants }), docs);
+    return handOffFailure || checkoutFiled(requestId);
   };
 
   const shareInvite = (request, role, inviteMobile) => {
@@ -840,6 +957,11 @@ export function useRentAgreement() {
     setPendingRequestId(null);
   };
 
+  const requestCancelled = (id) => {
+    if (filedRef.current?.request?.id === id) settleFiled();
+    setRequestsNonce((n) => n + 1);
+  };
+
   const fileRequest = async (key, create, docs) => {
     const filed = filedRef.current;
     if (filed?.key === key) return filed.request;
@@ -866,6 +988,19 @@ export function useRentAgreement() {
       : [];
     const inviteMobile = invitingRole === 'tenant' ? tenantInvites[0]?.mobile : digits(invite.invMobile);
     const ownParties = invitingRole === 'owner' ? { tenants } : invitingRole === 'tenant' ? { owner, coOwners } : { owner, coOwners, tenants };
+    if (editingFiled) {
+      const unpaid = editingFiled.status === 'awaiting_payment';
+      await updateServiceRequestDetails(editingFiled.id, details);
+      const failure = await handOff(editingFiled.id, identityParties(ownParties), docs)
+        || (unpaid ? await checkoutFiled(editingFiled.id) : null);
+      if (!mountedRef.current) return false;
+      if (failure) { toast(failure, 'error'); return false; }
+      if (unpaid) { setEditingFiled(null); return true; }
+      toast(tr('services.ra.summary.saved'), 'success');
+      closeFiled();
+      setRequestsNonce((n) => n + 1);
+      return false;
+    }
     if (topUpRef.current) {
       const request = topUpRef.current;
       if (answersKey() !== topUpBaselineRef.current) {
@@ -905,6 +1040,10 @@ export function useRentAgreement() {
       }
       settleFiled();
       shareInvite(invitedRequest, invitingRole, inviteMobile);
+      if (invitingRole === 'tenant') {
+        const payFailure = await checkoutFiled(request.id);
+        if (payFailure && mountedRef.current) toast(payFailure, 'error');
+      }
       return true;
     }
     const key = filingKey({ details, propertyId });
@@ -939,7 +1078,7 @@ export function useRentAgreement() {
     if (submitting || done) return;
     if (loading) return;
     if (!isIn) { gateToSignIn(() => latestStep.current.generate()); return; }
-    for (let s = 0; s <= 4; s++) {
+    for (let s = 0; s < REVIEW_STEP; s++) {
       const e = stepErrors(s);
       if (Object.keys(e).length) { setStep(s); flagErrors(s, e); toast(tr('services.ra.validationRequired'), 'error'); return; }
     }
@@ -964,7 +1103,7 @@ export function useRentAgreement() {
       if (finished && mode === 'owner') clearDraft();
     } catch (err) {
       console.error('Rent Agreement submit failed', err?.status || err?.message);
-      if (mountedRef.current) toast(err?.status === 422 && err?.message ? tr('services.ra.detailsRejected', { detail: err.message }) : tr('services.ra.saveError'), 'error');
+      if (mountedRef.current) toast(err?.status === 409 && err?.message ? err.message : err?.status === 422 && err?.message ? tr('services.ra.detailsRejected', { detail: err.message }) : tr('services.ra.saveError'), 'error');
       return;
     } finally {
       if (mountedRef.current) setSubmitting(false);
@@ -997,6 +1136,8 @@ export function useRentAgreement() {
     review: missingIdentityFields.map(labelIdentityReminder),
   };
   const latestStep = useLatest({ next, generate });
+  const editingSubmitted = !!editingFiled || (mode === 'invite' && inviteEditing && !!inviteCtx?.req?.mySideSubmitted);
+  const holdingUnpaid = editingFiled?.status === 'awaiting_payment';
 
   return {
     rootRef, formRef, tr, isIn, user, navigate,
@@ -1009,11 +1150,13 @@ export function useRentAgreement() {
     tenantMode, setTenantMode, tenants, setTenant, addTenant, removeTenant, tenantDocs, setTenantDocs, invite, setInvite,
     terms, setT, startBounds, maint, setMaint, regArea, furnItems, custom, setCustom, clauses, setClauses,
     isChecked, toggleFurn, bumpQty, removeFurn, addCustom, furnitureText,
-    wit, setWit,
     declare, setDeclare, generate, submitting, pendingRequestId, paymentPending, paymentConfirming,
-    clearErr, fc, cost, locked, gated, startNewAgreement, restored, startFresh, myInvites,
+    clearErr, fc, cost, locked, joinedOnly, gated, startNewAgreement, restored, startFresh, myInvites,
     identityReminders,
-    stalledInvite, recoverInvite, recovering, payable, payFiled, paying, continuable, continueFiled, coFilledRole, maskedIds,
+    stalledInvite, recoverInvite, recovering, payable, payFiled, paying, continuable, continueFiled, coFilledRole, maskedIds: stillHeld(maskedIds, { owner, coOwners, tenants }),
+    continuableHeld: heldCoFill(continuable),
+    requestCancelled,
+    viewOnly, viewedRequest, viewSubmitted, canView, editSubmitted, discardEdits, closeFiled, editingSubmitted, holdingUnpaid,
     detailsSize, detailsMax: DETAILS_MAX_CHARS, detailsTooLong, detailsWorstField,
     copyInviteLink, next, prev, signInToInvite: () => sendToSignIn('invite'),
   };

@@ -16,7 +16,7 @@ class ServiceRequestInvoicing {
     }
 
     void checkoutPaid(ServiceRequest request) {
-        invoices.issue(request.getRequesterId(), Invoices.SERVICE_REQUEST, request.getId(), request.getPaymentRef(),
+        invoices.issue(request.payer(), Invoices.SERVICE_REQUEST, request.getId(), request.getPaymentRef(),
                 request.getAmount() == null ? 0 : request.getAmount(), settings.rentAgreementPlatform(),
                 Instant.now());
     }

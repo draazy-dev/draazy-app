@@ -22,7 +22,7 @@ const LABELS = {
 const WIDE = /addr|address|clauses/i;
 const field = 'mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white';
 
-const bare = (key) => String(key).replace(/^o(?=[A-Z])/, '').replace(/^w\d(?=[A-Z])/, '');
+const bare = (key) => String(key).replace(/^o(?=[A-Z])/, '');
 const human = (key) => {
   if (typeof key === 'number') return String(key + 1);
   const b = bare(key);
@@ -49,11 +49,10 @@ const setIn = (obj, [k, ...rest], value) => {
   return copy;
 };
 
-function editableItems(state, roots, only) {
+function editableItems(state, roots) {
   return roots.flatMap((root) => {
     const value = getIn(state, root);
-    if (value === undefined) return [];
-    return items(value, root).filter((l) => l.kind !== 'leaf' || !only || only(l.path.at(-1)));
+    return value === undefined ? [] : items(value, root);
   });
 }
 
@@ -81,7 +80,7 @@ function Input({ id, leaf, numeric, onChange }) {
   );
 }
 
-export default function DeskEditForm({ request, title, roots, only, onSaved, onCancel, onError }) {
+export default function DeskEditForm({ request, title, roots, onSaved, onCancel, onError }) {
   const uid = useId();
   const { toast } = useToast();
   const filed = useMemo(() => request.details?._state || {}, [request.details]);
@@ -94,7 +93,7 @@ export default function DeskEditForm({ request, title, roots, only, onSaved, onC
     () => Object.values(edits).reduce((s, e) => setIn(s, e.path, asTyped(getIn(base, e.path), e.value)), base),
     [edits, base],
   );
-  const rows = editableItems(state, roots, only).map((l) => {
+  const rows = editableItems(state, roots).map((l) => {
     const typed = l.kind === 'leaf' && edits[l.path.join('.')];
     return typed ? { ...l, value: typed.value } : l;
   });

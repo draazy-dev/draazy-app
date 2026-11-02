@@ -1,6 +1,7 @@
 package com.draazy.api.services.request;
 
 import com.draazy.api.catalog.fee.LeaveAndLicenceCharges;
+import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.documents.vault.Document;
 import com.draazy.api.documents.vault.DocumentMapper;
 import com.draazy.api.documents.vault.DocumentRepository;
@@ -39,6 +40,7 @@ public class ServiceRequestMapper {
     private final ServiceRequestPoliceIntimationRepository policeIntimations;
     private final ServiceRequestDraftApprovalRepository draftApprovals;
     private final ServiceRequestDraftApprovals approvalSummary;
+    private final RentAgreementReadiness readiness;
 
     public ServiceRequestMapper(ServiceRequestEventRepository events,
             ServiceRequestMessageRepository messages,
@@ -50,7 +52,8 @@ public class ServiceRequestMapper {
             ServiceRequestAmendmentRepository amendments,
             ServiceRequestPoliceIntimationRepository policeIntimations,
             ServiceRequestDraftApprovalRepository draftApprovals,
-            ServiceRequestDraftApprovals approvalSummary) {
+            ServiceRequestDraftApprovals approvalSummary,
+            RentAgreementReadiness readiness) {
         this.events = events;
         this.messages = messages;
         this.parties = parties;
@@ -62,6 +65,7 @@ public class ServiceRequestMapper {
         this.policeIntimations = policeIntimations;
         this.draftApprovals = draftApprovals;
         this.approvalSummary = approvalSummary;
+        this.readiness = readiness;
     }
 
     public ServiceRequestDto toDto(ServiceRequest request, AuthPrincipal viewer) {
@@ -117,12 +121,69 @@ public class ServiceRequestMapper {
                         null,
                         registration(registered.get(r.getId()), r, names),
                         policeIntimation(police.get(r.getId()), names),
-                        RentAgreementSla.of(r, now),
+                        RentAgreementSla.of(r, now, readiness.waitingOnTenant(r)),
                         amendment(proposed.get(r.getId())),
-                        approvalSummary.summary(r, approvals.getOrDefault(r.getId(), List.of())),
+                        approvalSummary.summary(r, approvals.getOrDefault(r.getId(), List.of()), viewer),
                         charges(r),
-                        attention(r, viewer));
+                        attention(r, viewer),
+                        r.getStatus() == ServiceRequestStatus.AWAITING_PAYMENT
+                                && Objects.equals(r.getRequesterId(), viewer.userId()),
+                        editableBy(r, side, viewer),
+                        sideSubmittedBy(r, side, viewer),
+                        Objects.equals(r.getRequesterId(), viewer.userId()) ? null
+                                : acceptedPartyOf(side, viewer).map(p -> p.getId().toString()).orElse(null),
+                        payableByParty(r, side, viewer),
+                        paidBy(r, viewer, names));
         }).toList();
+    }
+
+    private boolean payableByParty(ServiceRequest request, List<ServiceRequestParty> side, AuthPrincipal viewer) {
+        if (request.getStatus() != ServiceRequestStatus.AWAITING_PAYMENT
+                || !ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())
+                || Objects.equals(request.getRequesterId(), viewer.userId())
+                || acceptedPartyOf(side, viewer).isEmpty()
+                || request.getAmount() == null || request.getAmount() <= 0) {
+            return false;
+        }
+        boolean tenantLater = RentAgreementReadiness.tenantFillsLater(request);
+        if (side.stream().filter(p -> !tenantLater || !"tenant".equals(p.getRole()))
+                .anyMatch(p -> CoFillParties.INVITED.equals(p.getStatus()))) {
+            return false;
+        }
+        try {
+            readiness.require(request);
+            return true;
+        } catch (ConflictException notReady) {
+            return false;
+        }
+    }
+
+    private static String paidBy(ServiceRequest request, AuthPrincipal viewer, Map<UUID, String> names) {
+        UUID payer = request.getPayerId();
+        boolean settled = request.getStatus() != ServiceRequestStatus.AWAITING_PAYMENT
+                && request.getStatus() != ServiceRequestStatus.CANCELLED;
+        return settled && payer != null && !payer.equals(viewer.userId())
+                ? Objects.requireNonNullElse(names.get(payer), "the other side") : null;
+    }
+
+    private boolean editableBy(ServiceRequest request, List<ServiceRequestParty> side, AuthPrincipal viewer) {
+        if (Objects.equals(request.getRequesterId(), viewer.userId())) {
+            return readiness.sideEditable(request, true, null);
+        }
+        return acceptedPartyOf(side, viewer).map(p -> readiness.sideEditable(request, false, p.getRole())).orElse(false);
+    }
+
+    private static boolean sideSubmittedBy(ServiceRequest request, List<ServiceRequestParty> side, AuthPrincipal viewer) {
+        if (Objects.equals(request.getRequesterId(), viewer.userId())) {
+            return request.getStatus() != ServiceRequestStatus.AWAITING_PAYMENT;
+        }
+        return acceptedPartyOf(side, viewer).map(p -> p.getDetailsSubmittedAt() != null).orElse(false);
+    }
+
+    private static Optional<ServiceRequestParty> acceptedPartyOf(List<ServiceRequestParty> side,
+            AuthPrincipal viewer) {
+        return side.stream().filter(p -> Objects.equals(p.getUserId(), viewer.userId())
+                && CoFillParties.ACCEPTED.equals(p.getStatus())).findFirst();
     }
 
     private static ServiceRequestDto.Attention attention(ServiceRequest request, AuthPrincipal viewer) {
@@ -211,6 +272,7 @@ public class ServiceRequestMapper {
             return CoFillParties.ROLES;
         }
         boolean requester = viewer.userId().equals(request.getRequesterId());
+        boolean ownerHoldsAll = RentAgreementReadiness.ownerHoldsAll(request);
         List<ServiceRequestParty> accepted = parties.stream().filter(p -> CoFillParties.ACCEPTED.equals(p.getStatus())).toList();
         Set<String> readable = new HashSet<>();
         if (requester) {
@@ -219,7 +281,7 @@ public class ServiceRequestMapper {
         for (ServiceRequestParty p : accepted) {
             if (viewer.userId().equals(p.getUserId())) {
                 readable.add(p.getRole());
-            } else if (requester) {
+            } else if (requester && !(ownerHoldsAll && "tenant".equals(p.getRole()))) {
                 readable.remove(p.getRole());
             }
         }
@@ -261,6 +323,7 @@ public class ServiceRequestMapper {
             Iterable<ServiceRequestPoliceIntimation> police) {
         Set<UUID> ids = new HashSet<>();
         requests.stream().map(ServiceRequest::getAssigneeId).filter(Objects::nonNull).forEach(ids::add);
+        requests.stream().map(ServiceRequest::getPayerId).filter(Objects::nonNull).forEach(ids::add);
         threads.forEach(thread -> thread.stream().map(ServiceRequestMessage::getAuthorId).filter(Objects::nonNull).forEach(ids::add));
         sides.forEach(side -> side.forEach(p -> {
             ids.add(p.getUserId());
