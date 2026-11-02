@@ -3,20 +3,27 @@ package com.draazy.api.provider.storage;
 import com.draazy.api.provider.FileStorage;
 import java.net.URI;
 import java.time.Duration;
+import java.util.Optional;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
@@ -27,6 +34,9 @@ class R2FileStorage implements FileStorage, DisposableBean {
 
     private static final Duration URL_TTL = Duration.ofMinutes(15);
 
+    private static final Duration ATTEMPT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(20);
+
     private static final String PUBLIC_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
     private final S3Client s3;
@@ -35,7 +45,12 @@ class R2FileStorage implements FileStorage, DisposableBean {
     private final String publicBucket;
     private final String publicBaseUrl;
 
+    @Autowired
     R2FileStorage(R2Properties props) {
+        this(props, ATTEMPT_TIMEOUT, CALL_TIMEOUT);
+    }
+
+    R2FileStorage(R2Properties props, Duration attemptTimeout, Duration callTimeout) {
         if (isBlank(props.endpoint()) || isBlank(props.accessKeyId())
                 || isBlank(props.secretAccessKey()) || isBlank(props.privateBucket())
                 || isBlank(props.publicBucket()) || isBlank(props.publicBaseUrl())) {
@@ -58,6 +73,10 @@ class R2FileStorage implements FileStorage, DisposableBean {
                 .region(Region.of("auto"))
                 .credentialsProvider(creds)
                 .serviceConfiguration(cfg)
+                .overrideConfiguration(ClientOverrideConfiguration.builder()
+                        .apiCallAttemptTimeout(attemptTimeout)
+                        .apiCallTimeout(callTimeout)
+                        .build())
                 .build();
         this.presigner = S3Presigner.builder()
                 .endpointOverride(endpoint)
@@ -110,6 +129,24 @@ class R2FileStorage implements FileStorage, DisposableBean {
     @Override
     public void deletePublic(String key) {
         s3.deleteObject(DeleteObjectRequest.builder().bucket(publicBucket).key(key).build());
+    }
+
+    @Override
+    public Stream<String> listPublic(String prefix) {
+        return s3.listObjectsV2Paginator(ListObjectsV2Request.builder().bucket(publicBucket).prefix(prefix).build())
+                .contents()
+                .stream()
+                .map(S3Object::key);
+    }
+
+    @Override
+    public Optional<byte[]> readPublic(String key) {
+        try {
+            return Optional.of(s3.getObjectAsBytes(GetObjectRequest.builder().bucket(publicBucket).key(key).build())
+                    .asByteArray());
+        } catch (NoSuchKeyException e) {
+            return Optional.empty();
+        }
     }
 
     @Override

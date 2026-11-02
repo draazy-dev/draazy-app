@@ -118,7 +118,7 @@ function pwaPlugin(mode) {
         },
         {
           urlPattern: ({ url }) => url.origin === 'https://images.unsplash.com'
-            || /\/photos\/[0-9a-f-]{36}\/[0-9a-f-]{36}(?:-[0-9a-f]{16})?\.w\d+\.jpg$/.test(url.pathname),
+            || /\/photos\/(?:[0-9a-f]{16}|[0-9a-f-]{36})\/[0-9a-f-]{36}(?:-[0-9a-f]{16})?\.w\d+\.(?:webp|jpg)$/.test(url.pathname),
           handler: 'CacheFirst',
           options: {
             cacheName: 'dz-images',

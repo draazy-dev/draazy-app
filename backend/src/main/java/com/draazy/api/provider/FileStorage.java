@@ -3,6 +3,8 @@ package com.draazy.api.provider;
 import com.draazy.api.provider.storage.DevObjectStore;
 import com.draazy.api.security.LocalOnly;
 import com.draazy.api.security.LocalProfileGuard;
+import java.util.Optional;
+import java.util.stream.Stream;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -19,6 +21,15 @@ public interface FileStorage {
     default void deletePublic(String key) {
         throw new UnsupportedOperationException("This storage cannot delete public objects");
     }
+
+    default Stream<String> listPublic(String prefix) {
+        throw new UnsupportedOperationException("This storage cannot list public objects");
+    }
+
+    default Optional<byte[]> readPublic(String key) {
+        throw new UnsupportedOperationException("This storage cannot read public objects");
+    }
+
     String publicUrlPrefix();
     }
 
@@ -57,6 +68,17 @@ class MockFileStorage implements FileStorage {
     @Override
     public void deletePublic(String key) {
         objects.delete(DevObjectStore.PUBLIC_PREFIX + key);
+    }
+
+    @Override
+    public Stream<String> listPublic(String prefix) {
+        return objects.listPublic(DevObjectStore.PUBLIC_PREFIX + prefix)
+                .map(key -> key.substring(DevObjectStore.PUBLIC_PREFIX.length()));
+    }
+
+    @Override
+    public Optional<byte[]> readPublic(String key) {
+        return objects.readPublic(DevObjectStore.PUBLIC_PREFIX + key);
     }
 
     @Override

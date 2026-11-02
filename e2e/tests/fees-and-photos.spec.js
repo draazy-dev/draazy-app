@@ -6,6 +6,7 @@ import { LIST_PROPERTY_DRAFT_KEY } from '../helpers/listingForm.helper.js';
 import { istInDays } from '../helpers/availability.js';
 import { PHOTO_PNG } from '../helpers/listingPhotos.helper.js';
 import { fillSociety } from '../helpers/places.js';
+import { liveListing } from '../helpers/referral.js';
 
 // The wizard is behind auth and `/me/photos` is scoped by the caller's token, so this must be a real seeded account.
 const OWNER = { mobile: '9470744469', name: 'Meera Deshpande' };
@@ -161,18 +162,39 @@ test.describe('Photos — the listing wizard uploads to the server (live)', () =
      await expect(page.locator(`img[src="${url}"]`).first()).toBeVisible();
   });
 
-  test('a card loads the small JPEG copy the server stored beside the upload, not the original', async ({ page }) => {
+  test('a card loads the small WebP copy the server stored beside the upload, not the original', async ({ page }) => {
     const [url] = await uploadedListingPhotos(await apiLogin(uniqueMobile()));
     await page.goto('/signin');
     const loaded = await page.evaluate(async (original) => {
       const { cardSrcSet } = await import('/src/lib/imgSrcSet.js');
       const img = Object.assign(new Image(), { sizes: '480px', srcset: cardSrcSet(original), src: original });
       await img.decode();
-      return { currentSrc: new URL(img.currentSrc).pathname, width: img.naturalWidth };
+      const res = await fetch(img.currentSrc);
+      return { currentSrc: new URL(img.currentSrc).pathname, width: img.naturalWidth, type: res.headers.get('content-type') };
     }, url);
     expect(loaded.currentSrc.startsWith(`${url}.w`), loaded.currentSrc).toBe(true);
-    expect(loaded.currentSrc).toMatch(/\.w(480|960)\.jpg$/);
+    expect(loaded.currentSrc).toMatch(/\.w(480|960)\.webp$/);
+    expect(loaded.type).toBe('image/webp');
     expect(loaded.width).toBeGreaterThan(0);
+  });
+
+  test('the property gallery loads a WebP copy, and falls back to the original when the copy is missing', async ({ page }) => {
+    const listing = await liveListing(uniqueMobile(), { title: 'Gallery webp fixture' });
+    const slide = page.locator('[data-gallery-track] img').first();
+    const shown = () => slide.evaluate((img) => ({ currentSrc: new URL(img.currentSrc).pathname, width: img.naturalWidth, srcset: img.srcset }));
+
+    await page.goto(`/property/${listing.id}`);
+    await expect(slide).toHaveAttribute('src', /\/photos\/[0-9a-f]{16}\/[0-9a-f-]{36}$/, { timeout: 20_000 });
+    const url = await slide.getAttribute('src');
+    await expect.poll(async () => (await shown()).currentSrc).toMatch(/\.w(480|960)\.webp$/);
+    expect((await shown()).width).toBeGreaterThan(0);
+
+    // A photo uploaded before WebP copies existed has none until the backfill job reaches it.
+    await page.route('**/*.webp', (route) => route.fulfill({ status: 404 }));
+    await page.reload();
+    await expect.poll(async () => (await shown()).currentSrc, { timeout: 20_000 }).toBe(url);
+    expect((await shown()).srcset).toBe('');
+    expect((await shown()).width).toBeGreaterThan(0);
   });
 });
 
@@ -192,7 +214,7 @@ test.describe('Pricing — the product quotes the database, not the bundle (live
 
     // Keys as a set because a missing fee renders as "₹0", not as missing UI.
     expect(Object.keys(prices).sort()).toEqual([
-      'contactPack', 'listingPass', 'referral', 'refunds', 'rentAgreementPlatform',
+      'contactPack', 'contactPackBuy', 'listingPass', 'listingPassBuy', 'referral', 'refunds', 'rentAgreementPlatform',
     ]);
     expect(typeof prices.referral, 'the referral programme rides along as one object').toBe('object');
     expect(typeof prices.refunds, 'the refund numbers ride along as one object').toBe('object');
@@ -204,7 +226,10 @@ test.describe('Pricing — the product quotes the database, not the bundle (live
     // The page, not one node: the figure sits in a translated string in one place and a bare span in another.
     const body = page.locator('body');
     await expect(body).toContainText(rupees(prices.rentAgreementPlatform), { timeout: 20_000 });
-    await expect(body).not.toContainText(STALE_RENT_FEE);
+    // Scoped: ₹1,999 is also the sale listing pass on this page.
+    const agreementLine = page.locator('p').filter({ hasText: 'Delivered to your doorstep' });
+    await expect(agreementLine).toContainText(rupees(prices.rentAgreementPlatform));
+    await expect(agreementLine).not.toContainText(STALE_RENT_FEE);
 
     // The FAQs, in collapsed <details>, so open each first.
     const faq = (question) => page.locator('details').filter({ hasText: question }).first();
@@ -222,7 +247,7 @@ test.describe('Pricing — the product quotes the database, not the bundle (live
     await saveFees({ listingPass: repriced });
     try {
       const { plans } = await (await fetch(`${API}/bootstrap`)).json();
-      expect(plans.find((p) => p.name === 'Listing Pass')?.price, 'the catalogue charges the admin price').toBe(repriced);
+      expect(plans.find((p) => p.kind === 'listing-pass' && p.deal === 'rent')?.price, 'the catalogue charges the admin price').toBe(repriced);
 
       await page.goto('/plans');
       await expect(page.locator('body')).toContainText(rupees(repriced), { timeout: 20_000 });

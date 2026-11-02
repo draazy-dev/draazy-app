@@ -16,10 +16,9 @@ const DOOR = 'M23.2 19.45 L30.7 23.17 V40.83 L23.2 44.55 Z';
 const DOOR_ROUND = 4;
 // Centre on the art's 44x48 box, not the 0..64 grid, or the mark sits off-centre.
 const ART = { x0: 12, y0: 8, x1: 56, y1: 56 };
-// Matches the favicon's data-light variant in index.html. The mark is a shade deeper than the tile's
-// teal so it still reads against the mint bottom at 48px.
-const TILE = ['#f8faf6', '#cfe7e3', '#a9d4cf'];
-const MARK = ['#388f87', '#43a095'];
+// The light palette, matching the default theme and the favicon's data-light variant in index.html.
+const INK = '#f3f7f6';
+const TEAL = '#0d9488';
 
 // `scale` is art height / tile. Maskable is smaller: Android only guarantees the centre 80% circle survives.
 // iOS fills transparent pixels with black and rounds the corners itself, so its icon must be a full square.
@@ -37,21 +36,10 @@ const svg = ({ size, radius, scale }) => {
   const tx = 32 - (k * (ART.x0 + ART.x1)) / 2;
   const ty = 32 - (k * (ART.y0 + ART.y1)) / 2;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 64 64">
-    <defs>
-      <linearGradient id="tile" x2="0" y2="1">
-        <stop offset="0" stop-color="${TILE[0]}"/><stop offset=".5" stop-color="${TILE[1]}"/><stop offset="1" stop-color="${TILE[2]}"/>
-      </linearGradient>
-      <linearGradient id="mark" gradientUnits="userSpaceOnUse" x1="0" y1="${ART.y0}" x2="0" y2="${ART.y1}">
-        <stop offset="0" stop-color="${MARK[0]}"/><stop offset="1" stop-color="${MARK[1]}"/>
-      </linearGradient>
-      <filter id="emboss" x="-20%" y="-20%" width="140%" height="140%">
-        <feDropShadow dx="0" dy="0.7" stdDeviation="0.7" flood-color="#0b5e57" flood-opacity="0.25"/>
-      </filter>
-    </defs>
-    <rect width="64" height="64" rx="${64 * radius}" fill="url(#tile)"/>
-    <g transform="translate(${tx} ${ty}) scale(${k})" filter="url(#emboss)">
-      <path fill="url(#mark)" fill-rule="evenodd" d="${PROFILE}"/>
-      <path fill="url(#mark)" stroke="url(#mark)" stroke-width="${DOOR_ROUND}" stroke-linejoin="round" d="${DOOR}"/>
+    <rect width="64" height="64" rx="${64 * radius}" fill="${INK}"/>
+    <g transform="translate(${tx} ${ty}) scale(${k})">
+      <path fill="${TEAL}" fill-rule="evenodd" d="${PROFILE}"/>
+      <path fill="${TEAL}" stroke="${TEAL}" stroke-width="${DOOR_ROUND}" stroke-linejoin="round" d="${DOOR}"/>
     </g>
   </svg>`;
 };

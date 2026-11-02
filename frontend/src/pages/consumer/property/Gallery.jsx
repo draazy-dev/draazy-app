@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import HScroll from '../../../components/ui/HScroll.jsx';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
-import { srcSetFor } from '../../../lib/imgSrcSet.js';
+import { GALLERY_SIZES, gallerySrcSet } from '../../../lib/imgSrcSet.js';
 import { MAX_PHOTOS_CEILING } from '../../../lib/uploads/policy.js';
 import VideoWalkthrough from './VideoWalkthrough.jsx';
 
@@ -115,11 +115,11 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
           className="no-scrollbar flex w-full aspect-[4/3] sm:aspect-auto sm:h-[320px] lg:h-[360px] overflow-x-auto overflow-y-hidden sm:overflow-hidden overscroll-x-contain snap-x snap-mandatory"
         >
           {gallery.map((g, i) => (
-            <img
+            <PropertyImage
               key={i}
               src={g}
-              srcSet={srcSetFor(g)}
-              sizes="(max-width: 639px) 100vw, 60vw"
+              srcSet={gallerySrcSet(g)}
+              sizes={GALLERY_SIZES}
               fetchPriority={i === 0 ? 'high' : undefined}
               loading={i === 0 ? undefined : 'lazy'}
               alt={t('property.photoAlt', { title, n: i + 1, total: count })}
@@ -204,7 +204,7 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
       <HScroll wrapClassName="hidden sm:block" className="grid grid-flow-col auto-cols-[104px] sm:auto-cols-[120px] gap-3 mt-3 pb-1">
         {gallery.map((g, i) => (
           <button key={i} type="button" onClick={() => showPhoto(i)} aria-label={t('property.photoOf', { n: i + 1, total: count })} aria-current={i === active ? 'true' : undefined} className={'thumbnail h-20 ' + (i === active ? 'active' : '')}>
-            <img src={g} alt="" className="w-full h-full object-cover" />
+            <PropertyImage src={g} sizes="120px" className="w-full h-full object-cover" />
           </button>
         ))}
         {requestPhotos ? (

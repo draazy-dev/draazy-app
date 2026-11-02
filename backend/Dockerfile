@@ -31,4 +31,5 @@ ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=50.0 -XX:MaxMetaspaceSize=192m -XX:R
 EXPOSE 8080
 
 # exec form keeps the JVM as PID 1 so SIGTERM reaches it and in-flight requests drain.
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+# webp-imageio loads libwebp through JNI, which newer JDKs deny unless native access is granted.
+ENTRYPOINT ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "/app/app.jar"]

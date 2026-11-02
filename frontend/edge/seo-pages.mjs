@@ -2,6 +2,7 @@ import { esc, headTags, jsonLd, renderPage } from '../scripts/seo-html.mjs';
 import { crumbs, listingHead, listingJsonLd, listingPrice, listingTitle, propertyPath, societyHead } from '../src/lib/listingSeo.js';
 import { fmtArea } from '../src/lib/format.js';
 import { GUIDE_LOCALITIES, guideSlugFor } from '../src/lib/guideLocalities.js';
+import { GALLERY_SIZES, gallerySrcSet } from '../src/lib/imgSrcSet.js';
 
 export const SITE = 'https://draazy.com';
 
@@ -12,7 +13,7 @@ export const SECURITY_HEADERS = {
   'Permissions-Policy': 'geolocation=(self), camera=(self), microphone=(), payment=(self "https://sdk.cashfree.com" "https://sandbox.cashfree.com" "https://api.cashfree.com"), usb=()',
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'Cross-Origin-Opener-Policy': 'same-origin',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'sha256-ZXdSxc/Anc08bj274JFX2HAdiHdWoQmZxe3rCLP4Fvk=' 'sha256-fmzqcwzg8Fu+3I6J6TQN6xFPxlE8VlpY+1cYig0HEAY=' 'wasm-unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com https://www.googletagmanager.com https://us-assets.i.posthog.com https://sdk.cashfree.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https: https://i.ytimg.com; connect-src 'self' https://images.unsplash.com https://maps.googleapis.com https://maps.gstatic.com https://places.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://us.i.posthog.com https://us-assets.i.posthog.com https://sandbox.cashfree.com https://payments-test.cashfree.com https://api.cashfree.com https://payments.cashfree.com; frame-src 'self' blob: https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com https://www.youtube-nocookie.com https://www.google.com https://challenges.cloudflare.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' https://sandbox.cashfree.com https://api.cashfree.com; frame-ancestors 'none'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'sha256-ZXdSxc/Anc08bj274JFX2HAdiHdWoQmZxe3rCLP4Fvk=' 'sha256-GHLS7DKarByhffwaCvt6usPoW3znodmPQ6zrI7VrE6s=' 'wasm-unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com https://www.googletagmanager.com https://us-assets.i.posthog.com https://sdk.cashfree.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https: https://i.ytimg.com; connect-src 'self' https://images.unsplash.com https://maps.googleapis.com https://maps.gstatic.com https://places.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://us.i.posthog.com https://us-assets.i.posthog.com https://sandbox.cashfree.com https://payments-test.cashfree.com https://api.cashfree.com https://payments.cashfree.com; frame-src 'self' blob: https://sdk.cashfree.com https://sandbox.cashfree.com https://api.cashfree.com https://www.youtube-nocookie.com https://www.google.com https://challenges.cloudflare.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' https://sandbox.cashfree.com https://api.cashfree.com; frame-ancestors 'none'",
 };
 
 export const NOINDEX = '<meta data-shell="" name="robots" content="noindex" />';
@@ -38,6 +39,15 @@ export const notFoundPage = (shell) => ({ status: 404, html: shell.replace('</he
 
 
 
+// Must pick the same URL, srcset and sizes as the Gallery's first slide (useProperty.js), or the browser fetches twice.
+function heroPreload(p) {
+  const hero = p.images?.[0] || p.coverImage;
+  if (!HTTPS.test(hero || '')) return [];
+  const srcset = gallerySrcSet(hero);
+  const responsive = srcset ? ` imagesrcset="${esc(srcset)}" imagesizes="${GALLERY_SIZES}"` : '';
+  return [`<link rel="preload" as="image" href="${esc(hero)}"${responsive} fetchpriority="high" />`];
+}
+
 export function propertyPage(shell, p, { pathname, search = '', site = SITE }) {
   const l = { bhk: p.bhk, type: p.propertyType, deal: p.deal, locality: p.locality, price: p.price, area: p.area, areaUnit: p.areaUnit };
   const path = propertyPath({ id: p.id, slug: p.slug, ...l });
@@ -59,10 +69,11 @@ export function propertyPage(shell, p, { pathname, search = '', site = SITE }) {
     title, description, url, image, type: 'website',
     extra: [
       ...(live ? [] : [NOINDEX]),
-      jsonLd(listingJsonLd(p, { site, path })),
-    ],
-  });
-  const guide = guideSlugFor(p);
+          ...heroPreload(p),
+          jsonLd(listingJsonLd(p, { site, path })),
+        ],
+      });
+      const guide = guideSlugFor(p);
   const floor = p.floor != null && p.floor !== '' ? `${p.floor}${p.totalFloors ? ` of ${p.totalFloors}` : ''}` : '';
   const body = page(trail,
     price && `<p class="mt-3 text-2xl font-bold text-white">${esc(price)}</p>`,

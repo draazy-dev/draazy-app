@@ -55,21 +55,20 @@ public class PhotoService {
             return;
         }
         storage.deletePublic(key);
-        for (int width : PhotoVariants.WIDTHS) {
-            storage.deletePublic(PhotoVariants.key(key, width));
-        }
+        PhotoVariants.allKeys(key).forEach(storage::deletePublic);
     }
 
-    private void storeVariants(String key, byte[] bytes) {
+    boolean storeVariants(String key, byte[] bytes) {
         Map<Integer, byte[]> variants;
         try {
             variants = PhotoVariants.of(bytes);
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException | LinkageError e) {
             log.warn("No card-size copies for {}: {}", key, e.toString());
-            return;
+            return false;
         }
-        variants.forEach((width, jpeg) ->
-                storage.storePublic(PhotoVariants.key(key, width), jpeg, MediaSignatures.JPEG));
+        variants.forEach((width, webp) ->
+                storage.storePublic(PhotoVariants.key(key, width), webp, MediaSignatures.WEBP));
+        return !variants.isEmpty();
     }
 
     private static byte[] readBytes(MultipartFile file) {

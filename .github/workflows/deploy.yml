@@ -22,7 +22,7 @@ on:
 permissions:
   contents: read
 
-# One group for all four jobs, so a second dispatch's frontend cannot overtake the first's backend.
+# One group for every job, so a second dispatch's frontend cannot overtake the first's backend.
 concurrency:
   group: deploy-sandbox
   cancel-in-progress: false
@@ -439,3 +439,37 @@ jobs:
       - name: Remove smoke test output
         if: always()
         run: rm -f "${RUNNER_TEMP}/health.json"
+
+  lighthouse:
+    name: Lighthouse on sandbox (mobile, record-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: frontend-publish
+    if: needs['frontend-publish'].result == 'success'
+    # A measurement must never turn a successful deploy red.
+    continue-on-error: true
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+
+      - name: Measure
+        env:
+          LH_ORIGIN: ${{ env.SITE_URL }}
+        run: node .github/lighthouse/run-lighthouse.mjs
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lighthouse-sandbox-${{ env.DEPLOY_SHA }}
+          path: .lighthouse/
+          retention-days: 90

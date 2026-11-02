@@ -24,12 +24,17 @@ export function srcSetFor(url, widths = DEFAULT_WIDTHS) {
 }
 
 export const CARD_SIZES = '(max-width: 639px) calc(100vw - 2rem), (max-width: 1023px) 45vw, 320px';
+export const GALLERY_SIZES = '(max-width: 639px) 100vw, 60vw';
 
 const UPLOADED_PHOTO = /\/photos\/(?:[0-9a-f]{16}|[0-9a-f-]{36})\/[0-9a-f-]{36}(?:-[0-9a-f]{16})?$/;
 
+const isUploaded = (url) => typeof url === 'string' && UPLOADED_PHOTO.test(url);
+
 export function cardSrcSet(url) {
-  if (typeof url === 'string' && UPLOADED_PHOTO.test(url)) {
-    return `${url}.w480.jpg 480w, ${url}.w960.jpg 960w`;
-  }
-  return srcSetFor(url);
+  return isUploaded(url) ? `${url}.w480.webp 480w, ${url}.w960.webp 960w` : srcSetFor(url);
+}
+
+// imageProcess.js caps the uploaded original's long edge at 2560.
+export function gallerySrcSet(url) {
+  return isUploaded(url) ? `${cardSrcSet(url)}, ${url} 2560w` : srcSetFor(url);
 }

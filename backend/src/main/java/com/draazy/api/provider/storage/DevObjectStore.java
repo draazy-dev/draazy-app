@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.Optional;
+import java.util.stream.Stream;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
@@ -123,6 +124,25 @@ public class DevObjectStore {
 
     Optional<Stored> openPublic(String key) {
         return resolvePublic(key).filter(Files::isRegularFile).flatMap(DevObjectStore::read);
+    }
+
+    public Optional<byte[]> readPublic(String key) {
+        return openPublic(key).map(Stored::content);
+    }
+
+    public Stream<String> listPublic(String prefix) {
+        Optional<Path> dir = resolvePublic(prefix).filter(Files::isDirectory);
+        if (dir.isEmpty()) {
+            return Stream.empty();
+        }
+        try {
+            return Files.walk(dir.get())
+                    .filter(Files::isRegularFile)
+                    .map(path -> root.relativize(path).toString().replace('\\', '/'))
+                    .filter(key -> !key.endsWith(TYPE_SUFFIX));
+        } catch (IOException e) {
+            throw new UncheckedIOException("cannot list objects under " + prefix, e);
+        }
     }
 
     boolean isPublic(String key) {

@@ -1,5 +1,6 @@
 package com.draazy.api.catalog.photo;
 
+import com.draazy.api.common.validation.MediaSignatures;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -7,8 +8,10 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -23,13 +26,23 @@ final class PhotoVariants {
     static final int[] WIDTHS = {960, 480};
 
     private static final float QUALITY = 0.8f;
+    private static final String LOSSY = "Lossy";
     private static final double DECODE_PIXEL_BUDGET = 8_000_000;
 
     private PhotoVariants() {
     }
 
     static String key(String originalKey, int width) {
-        return originalKey + ".w" + width + ".jpg";
+        return originalKey + ".w" + width + ".webp";
+    }
+
+    static List<String> allKeys(String originalKey) {
+        List<String> keys = new ArrayList<>();
+        for (int width : WIDTHS) {
+            keys.add(key(originalKey, width));
+            keys.add(originalKey + ".w" + width + ".jpg");
+        }
+        return keys;
     }
 
     static Map<Integer, byte[]> of(byte[] photo) throws IOException {
@@ -91,9 +104,10 @@ final class PhotoVariants {
     }
 
     private static byte[] encode(BufferedImage image) throws IOException {
-        ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
+        ImageWriter writer = ImageIO.getImageWritersByMIMEType(MediaSignatures.WEBP).next();
         ImageWriteParam param = writer.getDefaultWriteParam();
         param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+        param.setCompressionType(LOSSY);
         param.setCompressionQuality(QUALITY);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (ImageOutputStream stream = ImageIO.createImageOutputStream(out)) {

@@ -1,9 +1,10 @@
-// Record-only on purpose: one run on a shared runner varies more than a real regression (see lighthouse.yml).
+// Record-only on purpose: one run on a shared runner varies more than a real regression (see ci.yml).
 // It prints Lighthouse/Chrome versions and the CPU benchmark so a shift can be blamed on the app or the machine.
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { propertyPath } from '../../frontend/src/lib/listingSeo.js';
 
 // Pinned: Lighthouse re-weights its score between versions, so a bump makes before/after incomparable.
 // Requires Node >= 22.19, which the workflow's NODE_VERSION satisfies.
@@ -12,12 +13,25 @@ const LIGHTHOUSE_VERSION = '13.4.1';
 const ORIGIN = process.env.LH_ORIGIN || 'http://127.0.0.1:4173';
 const OUT_DIR = resolve(process.env.LH_OUT_DIR || '.lighthouse');
 
+async function featuredPropertyPath() {
+  try {
+    const res = await fetch(`${ORIGIN}/api/properties/featured`, { signal: AbortSignal.timeout(15000) });
+    const [p] = res.ok ? await res.json() : [];
+    return p?.id ? propertyPath({ id: p.id, slug: p.slug, bhk: p.bhk, type: p.propertyType, deal: p.deal, locality: p.locality }) : null;
+  } catch {
+    return null;
+  }
+}
+
+// The PR build is served without a backend: there is no listing to open, and home/listings render their empty state.
+const detailPath = await featuredPropertyPath();
+const hasData = detailPath != null;
+
 // Landing, results grid and detail page: the three shapes the product lives on, ~30 s each.
-// P5000 is served from bundled mock data (VITE_API_MODE=mock) and is the same id the mobile e2e suite uses.
 const ROUTES = [
   { slug: 'home', path: '/' },
   { slug: 'listings', path: '/listings' },
-  { slug: 'property-detail', path: '/property/P5000' },
+  ...(hasData ? [{ slug: 'property-detail', path: detailPath }] : []),
 ];
 
 // Read by id defensively: Lighthouse renames/removes audits across majors, and a gap must print "n/a", not crash.
@@ -80,6 +94,7 @@ const record = {
   chrome: chromeVersion(),
   commit: process.env.GITHUB_SHA || null,
   origin: ORIGIN,
+  hasData,
   measuredAt: new Date().toISOString(),
   routes: [],
 };
@@ -122,12 +137,17 @@ for (const route of ROUTES) {
 writeFileSync(resolve(OUT_DIR, 'summary.json'), `${JSON.stringify(record, null, 2)}\n`);
 
 const summary = [
-  '## Lighthouse — mobile, record-only',
+  `## Lighthouse — mobile, record-only — ${ORIGIN}`,
   '',
   '> No budgets. These numbers are recorded, never enforced — this job cannot fail a PR',
-  '> on a metric. See `.github/workflows/lighthouse.yml` for why, and for what would have',
-  '> to be true before it becomes a gate.',
+  '> on a metric. See the `lighthouse` job in `.github/workflows/ci.yml` for why, and for what',
+  '> would have to be true before it becomes a gate.',
   '',
+  ...(hasData ? [] : [
+    `> **No listing data at ${ORIGIN}.** Home and listings rendered their empty/error state and the`,
+    '> detail page was skipped, so read FCP and TBT here; LCP and CLS come from the post-deploy sandbox run.',
+    '',
+  ]),
   `| Route | Perf | ${METRICS.map((m) => m.label).join(' | ')} |`,
   `| --- | --- | ${METRICS.map(() => '---').join(' | ')} |`,
   ...rows,

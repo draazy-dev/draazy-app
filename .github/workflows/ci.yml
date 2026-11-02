@@ -61,11 +61,11 @@ jobs:
         run: npm run check:size
 
   lighthouse:
-    name: Lighthouse (mobile, record-only)
+    name: Lighthouse (mobile, record-only, no backend)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # No thresholds on purpose: runner CPU variance exceeds a real regression, so this
-    # records numbers and never fails. Set a budget only from the recorded spread on main.
+    # No thresholds: runner CPU variance exceeds a real regression; budget only from main's recorded spread.
+    # The preview has no API, so only FCP/TBT mean anything here; deploy.yml measures sandbox with real data.
     steps:
       - uses: actions/checkout@v7
 
