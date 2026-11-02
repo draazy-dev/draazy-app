@@ -12,7 +12,7 @@ tags: [listing, owner, posting, verification, pause]
 
 Posting is free and takes about ten minutes if you have your photos ready.
 
-A free account carries **one live listing at a time**. Posting more is never blocked: an extra rent or sale listing is approved but stays paused until you buy it a Listing Pass (₹999, 60 days) or pause another listing — see [Plans explained](/help/a/plans-explained). Editing a listing you already have never costs a slot. Taking it down or pausing it frees the slot; marking it rented or sold does too.
+A free account carries **one live listing at a time**. Posting more is never blocked: an extra rent or sale listing is approved but stays paused until you buy it a Listing Pass (₹999, 60 days for a rent listing; ₹1,999, 90 days for a sale listing) or pause another listing — see [Plans explained](/help/a/plans-explained). Editing a listing you already have never costs a slot. Taking it down or pausing it frees the slot; marking it rented or sold does too.
 
 ## Before you start
 

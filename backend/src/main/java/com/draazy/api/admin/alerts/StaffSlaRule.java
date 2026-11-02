@@ -3,6 +3,7 @@ package com.draazy.api.admin.alerts;
 import static java.time.Duration.ofDays;
 import static java.time.Duration.ofHours;
 
+import com.draazy.api.identity.verification.IdentityReviewClaimService;
 import com.draazy.api.security.BackOfficeFunctions;
 import com.draazy.api.security.Teams;
 import com.draazy.api.services.request.RentAgreementSla;
@@ -61,10 +62,12 @@ record StaffSlaRule(String name, String one, String many, boolean announces, Dur
             new StaffSlaRule("kyc-review", "ID check", "ID checks", true,
                     ofHours(48), ofHours(72), """
                     select cast(v.id as text), initcap(replace(v.doc_type, '_', ' ')) || ' check', v.submitted_at,
-                           cast(null as text), cast(null as uuid), cast(null as bigint)
+                           cast(null as text),
+                           case when v.claimed_at > now() - interval '%d minutes' then v.claimed_by end,
+                           cast(null as bigint)
                       from identity_verifications v
                      where v.status = 'pending'
-                    """, fixed(BackOfficeFunctions.KYC), fixed("/admin/kyc-review"), fixed("/admin/kyc-review")),
+                    """.formatted(IdentityReviewClaimService.CLAIM_TTL.toMinutes()), fixed(BackOfficeFunctions.KYC), fixed("/admin/kyc-review"), fixed("/admin/kyc-review")),
             new StaffSlaRule("identity-appeal", "identity appeal", "identity appeals", true,
                     ofHours(48), ofHours(72), """
                     select cast(a.id as text), 'Identity appeal', a.created_at, cast(null as text),

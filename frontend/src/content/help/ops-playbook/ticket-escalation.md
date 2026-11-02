@@ -139,7 +139,7 @@ Every hop must include the ticket id, assessed P-level, current stored priority 
 
 The support queue cannot approve or process refunds. It can only collect the customer's request and keep the thread updated.
 
-For rent-agreement refunds, send the case to the Rent Agreement desk: the refund widget requires the current holder to ask and a different colleague to approve before the gateway refund is sent. For other paid products, escalate to Finance with the transaction id and policy reason. Do not quote an internal cap or promise money back before Finance or the service desk confirms the path.
+For rent-agreement refunds, send the case to the Rent Agreement desk: the holder asks for the refund and a manager approves it before the gateway refund is sent. For other paid products, escalate to Finance with the transaction id and policy reason. Do not quote an internal cap or promise money back before Finance or the service desk confirms the path.
 
 ## What never to do
 

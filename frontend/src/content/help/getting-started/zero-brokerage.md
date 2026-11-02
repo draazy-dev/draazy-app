@@ -15,7 +15,7 @@ Zero brokerage means exactly one thing: **Draazy never takes a percentage of you
 ## What is always free
 
 - Browsing and searching every listing
-- Sending owner contact requests and chatting after the owner approves (the free allowance is 15 owner contacts; a Contact Pack adds 15 more for ₹199)
+- Sending owner contact requests and chatting after the owner approves (the free allowance is 15 owner contacts; a Rent Contact Pack adds 15 for rent listings at ₹199, a Buy Contact Pack adds 15 for sale listings at ₹399)
 - Shortlisting, comparing and saving searches
 - Scheduling a site visit
 - Posting one live property listing at a time as an owner
@@ -29,8 +29,10 @@ We charge for optional things that cost us real money to deliver. None renews by
 
 | What | Who buys it | Price |
 | --- | --- | --- |
-| Listing Pass — one extra live listing for 60 days | Owners | ₹999 |
-| Contact Pack — 15 owner contacts for 30 days | Seekers | ₹199 |
+| Rent Listing Pass — one extra live rent listing for 60 days | Owners | ₹999 |
+| Sale Listing Pass — one extra live sale listing for 90 days | Owners | ₹1,999 |
+| Rent Contact Pack — 15 contacts for rent listings, 30 days | Seekers | ₹199 |
+| Buy Contact Pack — 15 contacts for sale listings, 60 days | Seekers | ₹399 |
 | Rent agreement with e-stamp and delivery | Either party | ₹499 plus government charges |
 | Packers & movers, interiors, valuation | Movers | Quote-based |
 

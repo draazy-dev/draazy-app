@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 1
-updated: 2026-10-10
+updated: 2026-11-02
 summary: What to check when you start a shift, how to use the Dashboard, the notification bell and Ctrl+K search, and how to hand over at the end.
 tags: [ops, internal, dashboard, shift, handover]
 modules: [dashboard]
@@ -91,6 +91,32 @@ Click the bell in the top bar.
 - **All caught up.** means nothing is waiting.
 - **This bell is not counting anything here.** or **Part of this bell is dark here.** means a count failed. Open Properties and the service desks, which are the record.
 - Queues show only if you can open Properties or Tickets.
+
+## Desk alerts
+
+**For you** also gets automatic desk alerts. A sweep runs every 15 minutes and sends each alert once.
+
+| Alert | When | Who gets it |
+|---|---|---|
+| **New …** | An unassigned item arrived in the last hour | Everyone holding that desk's function |
+| **Waiting …** | The item passed its reminder time | The person handling it, else everyone holding the function |
+| **Escalated …** | The item passed its escalation time | Managers (admins if there are none) |
+
+| Queue | Reminder | Escalation |
+|---|---|---|
+| Listing review | 24h | 36h |
+| Owner reply, ID check, identity appeal, flatmate check, refund request | 48h | 72h |
+| Unassigned service request | 4h | 8h |
+| Support ticket, abuse report | 24h | 48h |
+| Rent agreement | the stage deadline | 1.5 × the stage deadline |
+| Data-erasure request (admins only) | 7d | 20d |
+
+- Several items on one desk arrive as one alert ("3 listings to review"). It opens the queue; a single item opens the item.
+- An ID check you claimed sends its alerts to you while your claim holds.
+- Refund requests send no **New** alert, only reminders and escalations.
+- A paid rent agreement waiting on the tenant sends no alert. The desk cannot act until the tenant fills their part.
+- Once the item is handled, its unread alert marks itself read. You do not need to clear it.
+- No function holder for a desk means its alerts go straight to managers.
 
 ## Search (Ctrl+K)
 

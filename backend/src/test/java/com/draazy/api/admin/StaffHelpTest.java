@@ -41,14 +41,28 @@ class StaffHelpTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("the index carries every article's metadata but none of the bodies")
+    void indexDropsBodies() throws Exception {
+        mvc.perform(get(Routes.Admin.HELP_STAFF_INDEX)
+                        .header(HttpHeaders.AUTHORIZATION, bearer("9877740006", Roles.Wire.STAFF)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sections[0].access").value("staff"))
+                .andExpect(jsonPath("$.articles[?(@.slug=='identity-review')].title").exists())
+                .andExpect(jsonPath("$.articles[?(@.slug=='identity-review')].modules").exists())
+                .andExpect(jsonPath("$.articles[*].html").isEmpty())
+                .andExpect(jsonPath("$.articles[*].text").isEmpty())
+                .andExpect(jsonPath("$.articles[*].headings").isEmpty());
+    }
+
+    @Test
     @DisplayName("an anonymous caller is 401 and a consumer is 403")
     void othersRefused() throws Exception {
-        mvc.perform(get(Routes.Admin.HELP_STAFF)).andExpect(status().isUnauthorized());
-        mvc.perform(get(Routes.Admin.HELP_STAFF)
-                        .header(HttpHeaders.AUTHORIZATION, bearer("9877740004", Roles.Wire.BUYER)))
-                .andExpect(status().isForbidden());
-        mvc.perform(get(Routes.Admin.HELP_STAFF)
-                        .header(HttpHeaders.AUTHORIZATION, bearer("9877740005", Roles.Wire.OWNER)))
-                .andExpect(status().isForbidden());
+        String buyer = bearer("9877740004", Roles.Wire.BUYER);
+        String owner = bearer("9877740005", Roles.Wire.OWNER);
+        for (String route : new String[] {Routes.Admin.HELP_STAFF, Routes.Admin.HELP_STAFF_INDEX}) {
+            mvc.perform(get(route)).andExpect(status().isUnauthorized());
+            mvc.perform(get(route).header(HttpHeaders.AUTHORIZATION, buyer)).andExpect(status().isForbidden());
+            mvc.perform(get(route).header(HttpHeaders.AUTHORIZATION, owner)).andExpect(status().isForbidden());
+        }
     }
 }

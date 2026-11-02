@@ -125,6 +125,65 @@ class StaffSlaSweepTest extends AbstractApiTest {
         assertThat(types(agent)).containsExactly("queue.support-ticket", "sla.support-ticket");
     }
 
+    @Test
+    @DisplayName("a live KYC claim sends the reminder to the claimer alone; a lapsed claim goes to the desk")
+    void kycReminderFollowsALiveClaim() {
+        User claimer = staff("9820000941", "kyc");
+        User colleague = staff("9820000942", "kyc");
+        pendingCheck(account("9820000943", Roles.Wire.BUYER), claimer, "now()");
+        pendingCheck(account("9820000944", Roles.Wire.BUYER), claimer, "now() - interval '31 minutes'");
+
+        sweep.sweep(BASE.plus(Duration.ofHours(48)));
+
+        assertThat(types(claimer)).containsExactly("sla.kyc-review");
+        assertThat(jdbc.queryForObject("select title from notifications where user_id = ?", String.class,
+                colleague.getId())).isEqualTo("Waiting 2d+: ID check");
+    }
+
+    private void pendingCheck(User applicant, User claimer, String claimedAt) {
+        jdbc.update("""
+                insert into identity_verifications (user_id, status, doc_type, consent_at, submitted_at,
+                                                    claimed_by, claimed_at)
+                values (?, 'pending', 'aadhaar', ?, ?, ?, %s)
+                """.formatted(claimedAt), applicant.getId(), Timestamp.from(BASE), Timestamp.from(BASE),
+                claimer.getId());
+    }
+
+    @Test
+    @DisplayName("a resolved item clears its own alert, and a batched alert clears once its queue is empty")
+    void resolvedItemsClearTheirAlerts() {
+        User moderator = staff("9820000951", "listingModeration");
+        User owner = account("9820000952", Roles.Wire.OWNER);
+        Property first = pendingListing(owner, BASE);
+        sweep.sweep(BASE.plus(Duration.ofMinutes(10)));
+        Property second = pendingListing(owner, BASE.plus(Duration.ofHours(1)));
+        sweep.sweep(BASE.plus(Duration.ofMinutes(70)));
+        Property third = pendingListing(owner, BASE.plus(Duration.ofHours(2)));
+        Property fourth = pendingListing(owner, BASE.plus(Duration.ofHours(2)));
+        sweep.sweep(BASE.plus(Duration.ofMinutes(130)));
+
+        archive(first);
+        archive(third);
+        sweep.sweep(BASE.plus(Duration.ofMinutes(140)));
+        assertThat(unreadLinks(moderator)).containsExactlyInAnyOrder(
+                "/admin/properties?review=" + second.getId(), "/admin/properties");
+
+        archive(second);
+        archive(fourth);
+        sweep.sweep(BASE.plus(Duration.ofMinutes(150)));
+        assertThat(unreadLinks(moderator)).isEmpty();
+        assertThat(types(moderator)).hasSize(3);
+    }
+
+    private void archive(Property listing) {
+        jdbc.update("update properties set archived = true where id = ?", listing.getId());
+    }
+
+    private List<String> unreadLinks(User user) {
+        return jdbc.queryForList("select link from notifications where user_id = ? and read = false",
+                String.class, user.getId());
+    }
+
     private List<String> types(User user) {
         return jdbc.queryForList("select type from notifications where user_id = ? order by type",
                 String.class, user.getId());
@@ -145,6 +204,10 @@ class StaffSlaSweepTest extends AbstractApiTest {
     }
 
     private Property pendingListing(User owner) {
+        return pendingListing(owner, BASE);
+    }
+
+    private Property pendingListing(User owner, Instant createdAt) {
         Property p = new Property(owner, "2BHK in Wakad", "rent", "apartment", 32000L, "Wakad", "Pune");
         p.setBhk(new BigDecimal("2"));
         p.setPriceUnit("per-month");
@@ -152,7 +215,7 @@ class StaffSlaSweepTest extends AbstractApiTest {
         p.setStatus(PropertyStatus.PENDING);
         Property saved = properties.saveAndFlush(p);
         jdbc.update("update properties set created_at = ?, resubmitted_at = null where id = ?",
-                Timestamp.from(BASE), saved.getId());
+                Timestamp.from(createdAt), saved.getId());
         return saved;
     }
 }

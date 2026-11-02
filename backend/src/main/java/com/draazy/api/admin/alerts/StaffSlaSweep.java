@@ -5,11 +5,13 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.Roles;
+import com.draazy.api.services.request.ServiceRequestQueryService;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -47,6 +49,8 @@ public class StaffSlaSweep {
 
     private static final double STAGE_ESCALATION_FACTOR = 1.5;
 
+    private static final String RENT_AGREEMENT = "rent-agreement";
+
     private final JdbcTemplate jdbc;
     private final UserRepository users;
     private final AccountPermissions permissions;
@@ -54,9 +58,11 @@ public class StaffSlaSweep {
     private final Environment env;
     private final Clock clock;
     private final TransactionTemplate transactions;
+    private final ServiceRequestQueryService requests;
 
     public StaffSlaSweep(JdbcTemplate jdbc, UserRepository users, AccountPermissions permissions, Notifier notifier,
-                         Environment env, Clock clock, PlatformTransactionManager transactionManager) {
+                         Environment env, Clock clock, PlatformTransactionManager transactionManager,
+                         ServiceRequestQueryService requests) {
         this.jdbc = jdbc;
         this.users = users;
         this.permissions = permissions;
@@ -64,6 +70,7 @@ public class StaffSlaSweep {
         this.env = env;
         this.clock = clock;
         this.transactions = new TransactionTemplate(transactionManager);
+        this.requests = requests;
     }
 
     public long sweepNow() {
@@ -86,6 +93,7 @@ public class StaffSlaSweep {
     private long sweep(StaffSlaRule rule, Audience audience, Instant now) {
         List<StaffSlaRule.Item> items = items(rule);
         forgetResolved(rule, items, now);
+        clearResolvedAlerts(rule, items, audience);
         Set<LogKey> logged = logged(rule);
         Map<Batch, List<StaffSlaRule.Item>> batches = new LinkedHashMap<>();
         for (StaffSlaRule.Item item : items) {
@@ -100,6 +108,26 @@ public class StaffSlaSweep {
         }
         batches.forEach(this::send);
         return batches.size();
+    }
+
+    // A batched alert links to its queue, so it clears only once no open item shares that queue link.
+    private void clearResolvedAlerts(StaffSlaRule rule, List<StaffSlaRule.Item> items, Audience audience) {
+        Set<String> openLinks = new HashSet<>();
+        for (StaffSlaRule.Item item : items) {
+            openLinks.add(rule.itemLink().apply(item));
+            openLinks.add(rule.queueLink().apply(item));
+        }
+        String[] types = Arrays.stream(Level.values()).map(l -> l.typePrefix + rule.name()).toArray(String[]::new);
+        UUID[] recipients = audience.live().toArray(UUID[]::new);
+        jdbc.query("""
+                select distinct user_id, type, link from notifications
+                 where user_id = any(?) and read = false and type = any(?) and not (link = any(?))
+                """, ps -> {
+            ps.setArray(1, ps.getConnection().createArrayOf("uuid", recipients));
+            ps.setArray(2, ps.getConnection().createArrayOf("text", types));
+            ps.setArray(3, ps.getConnection().createArrayOf("text", openLinks.toArray()));
+        }, (rs, i) -> new Alert(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3)))
+                .forEach(stale -> notifier.markRead(stale.recipient(), stale.type(), stale.link()));
     }
 
     private void forgetResolved(StaffSlaRule rule, List<StaffSlaRule.Item> items, Instant now) {
@@ -117,9 +145,15 @@ public class StaffSlaSweep {
     }
 
     private List<StaffSlaRule.Item> items(StaffSlaRule rule) {
-        return jdbc.query(rule.sql(), (rs, i) -> new StaffSlaRule.Item(rs.getString(1), rs.getString(2),
-                rs.getTimestamp(3).toInstant(), rs.getString(4), rs.getObject(5, UUID.class),
+        List<StaffSlaRule.Item> items = jdbc.query(rule.sql(), (rs, i) -> new StaffSlaRule.Item(rs.getString(1),
+                rs.getString(2), rs.getTimestamp(3).toInstant(), rs.getString(4), rs.getObject(5, UUID.class),
                 rs.getObject(6, Long.class)));
+        if (!RENT_AGREEMENT.equals(rule.name())) {
+            return items;
+        }
+        // The desk cannot act while a paid invite waits on the tenant; the desk queue shows it as waiting, not late.
+        Set<UUID> waiting = requests.waitingOnTenant();
+        return items.stream().filter(item -> !waiting.contains(UUID.fromString(item.id()))).toList();
     }
 
     private Level levelFor(StaffSlaRule rule, StaffSlaRule.Item item, Instant now) {
@@ -227,6 +261,9 @@ public class StaffSlaSweep {
     }
 
     private record Batch(StaffSlaRule rule, Level level, UUID recipient, String link) {
+    }
+
+    private record Alert(UUID recipient, String type, String link) {
     }
 
     private record LogKey(String itemId, String level, Instant anchor) {

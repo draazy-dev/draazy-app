@@ -39,7 +39,7 @@ A staff member sees only the service desks they were granted (**Rent Agreement**
 
 | Control | Use it for |
 | --- | --- |
-| **To pick up / My cases / In progress / With customer / Closed** | Queue tabs with live counts (**My requests** on the other desks) |
+| **To pick up / My cases / In progress / With customer / Closed / Cancelled** | Queue tabs with live counts (**My requests** on the other desks). **Closed** is completed work; **Cancelled** holds cases cancelled by the desk or withdrawn by the customer |
 | **Overdue** | Rent-agreement SLA breaches only |
 | **Name, mobile or request id** | Server-side search |
 | **Customer tickets** | The desk's tickets tab (needs `tickets:read`) |
@@ -88,7 +88,7 @@ The **SLA** cell shows **Due in**, **Overdue by**, or **Customer's turn** from t
 
 ## Corrections
 
-- **Fix it yourself.** While you hold the case and no draft is out with the customer, every card under Licensor, Licensee, Witnesses, Property and Terms has **Edit**, including passport, visa/OCI and FRRO details. List rows (furniture, deposit payments, occupants) can be added and removed there. Saving tells the customer how many details changed, with your note. Rent, deposit, term, escalation and registration area go through **Priced terms**.
+- **Fix it yourself.** While you hold the case and no draft is out with the customer, every card under Licensor, Licensee, Property and Terms has **Edit**, including passport, visa/OCI and FRRO details. List rows (furniture, deposit payments, occupants) can be added and removed there. Saving tells the customer how many details changed, with your note. Rent, deposit, term, escalation and registration area go through **Priced terms**.
 - **Fix a PAN or Aadhaar.** Take the case first (admins too), then on **ID numbers**, **Reveal** and **Correct** on the party. Every party on the form is listed, even one whose numbers were never recorded. The customer is told an ID was corrected; the audit records who changed which party, never the number. Renaming a party on the form keeps their numbers.
 - **Send it back.** Only for what you cannot do yourself: a fresh copy of a paper, or an answer only the customer has. Use **Send back for correction** in the rail, pick the side, tick the papers to upload again and/or ask your question. They get an in-app notification (WhatsApp when the template is set) and an amber banner on their tracker with an upload for each paper. Only the side you asked can mark it **Done**, and only once every ticked paper is uploaded again; that returns the case to `in-progress`, with their reply in the thread. Review the new copies on the checklist as usual.
 
@@ -119,9 +119,9 @@ Confirmed registered tenancies can become trust evidence. Typed tenant numbers t
 
 ## Refunds and cancellation
 
-Use **Refunds** only on paid rent-agreement requests. The holder asks for a refund; a colleague approves it. The requester cannot approve their own refund. Before duty is paid, everything paid can be refunded. After GRAS duty is paid, only the refundable balance beyond statutory charges can go back.
+Use **Refunds** only on paid rent-agreement requests. The holder asks for a refund; a manager approves it, and the manager alerted in their notifications opens the case from there. The refund also waits on the admin **Refunds** page under the **Rent agreement** filter, where a manager can decide it too. Staff cannot approve or reject a refund, only withdraw one they asked for, and never once the request is cancelled. A manager can approve a refund they asked for, including one their own cancel raised. Before duty is paid, everything paid can be refunded. After GRAS duty is paid, only the refundable balance beyond statutory charges can go back.
 
-Use **Cancel request** only before `completed` or `cancelled`. A cancellation reason is required and is sent to the customer.
+Use **Cancel request** only before `completed` or `cancelled`. A cancellation reason is required and is sent to the customer. Cancelling a paid rent agreement raises a refund of what is still refundable for a manager to approve. The customer is told it is waiting for approval, not that it is sent. If a refund was already waiting, the cancel keeps it rather than adding a second one.
 
 ## What never to do
 
@@ -129,6 +129,7 @@ Use **Cancel request** only before `completed` or `cancelled`. A cancellation re
 - Never reveal identity numbers on a matter you do not hold
 - Never share a rent-agreement draft with unverified papers
 - Never approve your own refund or your own registered copy
+- Never refund a cancelled customer by hand: approve the refund the cancel raised
 - Never mark police intimation filed by Draazy
 - Never use `registration` or `docs_review` as a staff status
 
