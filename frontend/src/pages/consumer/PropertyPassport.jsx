@@ -89,9 +89,9 @@ export default function PropertyPassport() {
               {prop.publishedListingId ? (
                 <Link to={`/property/${prop.publishedListingId}`} className="h-btn px-4 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5 flex items-center gap-2"><Icon name="external-link" className="w-4 h-4 text-brand-teal-2" /> {t('ownerHub.viewListing')}</Link>
               ) : (
-                <button onClick={publish} className="btn-teal px-4 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center gap-2"><Icon name="megaphone" className="w-4 h-4" /> {t('ownerHub.publishAsListing')}</button>
+                <button onClick={publish} className="btn-teal min-h-[44px] px-4 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center gap-2"><Icon name="megaphone" className="w-4 h-4" /> {t('ownerHub.publishAsListing')}</button>
               )}
-              <button onClick={() => setConfirmDel(true)} aria-label={t('ownerHub.removeProperty')} className="px-3 py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/30 flex items-center gap-2 transition-all"><Icon name="trash-2" className="w-4 h-4" /></button>
+              <button onClick={() => setConfirmDel(true)} aria-label={t('ownerHub.removeProperty')} className="min-h-[44px] min-w-[44px] justify-center px-3 py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/30 flex items-center gap-2 transition-all"><Icon name="trash-2" className="w-4 h-4" /></button>
             </div>
           </div>
 
@@ -119,8 +119,8 @@ export default function PropertyPassport() {
             <DocVault mobile={mobile} propId={prop.id} onChange={setDocCount} />
           </div>
 
-          <div className="space-y-6">
-            <RentPanel prop={prop} onChange={refresh} />
+          <div className="space-y-6 order-first lg:order-none">
+            <RentPanel prop={prop} onChange={refresh} onPublish={publish} />
 
             {val && (
               <div className="glass-card rounded-2xl p-6">

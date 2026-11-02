@@ -47,8 +47,10 @@ const MAX_GROUPS_CEILING = 10;
 
 const COUNT_FEES = new Set(['freeContactLimit', 'featuredDays']);
 const FEE_FIELDS = [
-  ['listingPass', 'Listing pass (60 days)'],
-  ['contactPack', 'Contact pack (15 contacts, 30 days)'],
+  ['listingPass', 'Rent listing pass (60 days)'],
+  ['listingPassBuy', 'Sale listing pass (90 days)'],
+  ['contactPack', 'Rent contact pack (15 contacts, 30 days)'],
+  ['contactPackBuy', 'Buy contact pack (15 contacts, 60 days)'],
   ['rentAgreementPlatform', 'Rent agreement platform fee'],
   ['freeContactLimit', 'Free owner contacts'],
   ['featuredDays', 'Featured days after verification', 1, 90],

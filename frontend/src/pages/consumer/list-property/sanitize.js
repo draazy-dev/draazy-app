@@ -1,5 +1,3 @@
-export const toDigits = (v) => String(v ?? '').replace(/\D/g, '');
-
 export const toDecimal = (v) => {
   const cleaned = String(v ?? '').replace(/[^\d.]/g, '');
   const dot = cleaned.indexOf('.');

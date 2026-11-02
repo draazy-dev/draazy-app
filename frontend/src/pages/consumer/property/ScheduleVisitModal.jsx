@@ -90,7 +90,7 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
   };
 
   if (!authLoading && !signedIn) return null;
-  if (quotaOpen) return <ContactsExhaustedModal onClose={onClose} />;
+  if (quotaOpen) return <ContactsExhaustedModal deal={p?.deal} onClose={onClose} />;
 
   return (
     <div className="dz-modal-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>

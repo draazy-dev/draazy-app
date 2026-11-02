@@ -7,6 +7,7 @@ import { startPropertyReview, decidePropertyReview } from '../../services/proper
 import { saveNoteIfAny } from '../../components/ui/InternalNote.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { freshnessState } from '../../lib/freshness.js';
+import { preloadable } from '../../lib/preloadable.js';
 import { useAdminFlags } from '../../context/AdminFlagsContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { hasPermission } from '../../lib/adminModules.js';
@@ -21,8 +22,7 @@ import PropertyEditModal from './properties/PropertyEditModal.jsx';
 import { basicsOf, editPatch } from './properties/editForm.js';
 import { statusQuery, PAGE_LIMIT, exportCsv, isMadeBy, MAKER_REASON } from './properties/constants.js';
 
-const loadReviewModal = () => import('./properties/PropertyReviewModal.jsx');
-const PropertyReviewModal = lazy(loadReviewModal);
+const PropertyReviewModal = preloadable(() => import('./properties/PropertyReviewModal.jsx'));
 const DuplicatesTab = lazy(() => import('./properties/DuplicatesTab.jsx'));
 
 const pid = (listing) => listing?.uuid || listing?.id;
@@ -179,7 +179,8 @@ export default function AdminProperties() {
   const pageCount = queue.page?.pageCount ?? 0;
 
   const queueReady = queue.page != null;
-  useEffect(() => { if (queueReady) loadReviewModal(); }, [queueReady]);
+  const reviewSoon = queueReady || params.has('review');
+  useEffect(() => { if (reviewSoon) PropertyReviewModal.preload(); }, [reviewSoon]);
 
   const panelRef = useRef(null);
   const focusPending = useRef(null);

@@ -4,18 +4,18 @@
       "heroBadge": "Everything for your home journey",
       "heroTitle1": "One platform.",
       "heroTitleAccent": "Every home service.",
-      "heroSubtitle": "From discovering your home to loans, legal, moving and interiors — Draazy brings every step of your property journey under one roof, broker-free.",
+      "heroSubtitle": "Homes, loans, legal, moving and interiors. All broker-free, all in one place.",
       "exploreServices": "Explore Services",
       "browseProperties": "Browse Properties",
       "mostBooked": "Most booked",
       "spotlight": {
         "badge": "Most booked service",
         "title": "Rent Agreement, done online",
-        "sub": "Maharashtra-registered rent agreement without a single trip to the office. Fill the form, we handle stamp duty, biometric and delivery.",
+        "sub": "Registered with Maharashtra, zero office trips. We handle stamp duty, biometric and delivery.",
         "chip": {
           "govt": "Govt-registered",
           "doorstep": "Doorstep biometric",
-          "fast": "Track every step online"
+          "fast": "Live tracking"
         },
         "cta": "Start rent agreement"
       },
@@ -113,27 +113,27 @@
       "finalizeSaleTitle": "Sale finalized — let's complete the registration!",
       "finalizeSaleSub": "Get title due-diligence, sale-deed drafting and sub-registrar assistance — end to end.",
       "ourServices": "Our services",
-      "ourServicesSub": "Pick a category or explore everything we offer.",
+      "ourServicesSub": "Pick a category, or browse them all.",
       "signInUnlock": "Sign in to unlock",
       "learnMore": "Learn more",
       "signInRequiredAria": "{{name}} — sign in required",
       "howItWorksTitle": "How Draazy works",
-      "howItWorksSub": "Four simple steps from search to settled in.",
+      "howItWorksSub": "Search to settled in, in four steps.",
       "packBadge": "Bundle & save",
       "packTitle": "Draazy Move-in Pack",
-      "packDesc": "Closing a deal? Bundle everything for move-in and save. Pick what you need:",
+      "packDesc": "Closing a deal? Bundle your move-in and save 12%.",
       "packTotal": "Pack total",
       "packSaveNote": "You save ₹{{amount}} (12% bundle)",
       "bookPack": "Book Move-in Pack",
       "bookingPack": "Booking…",
       "payAfter": "Pay after service. ₹0 brokerage.",
       "packComingSoon": "Coming soon",
-      "packComingSoonDesc": "We're putting together the ultimate move-in bundle — packers, cleaning, agreement, painting and more, at one transparent price. Join the waitlist and we'll notify you the moment it launches.",
+      "packComingSoonDesc": "Movers, cleaning, agreement, painting and more at one clear price. Join the waitlist.",
       "notifyTitle": "Launching soon",
-      "notifySub": "Be the first to know when the Move-in Pack goes live in your area.",
+      "notifySub": "Get a message the day it goes live.",
       "notifyNamePlaceholder": "Your name (optional)",
       "notifyBtn": "Notify me",
-      "notifyFinePrint": "No spam. We'll only message you about the Move-in Pack.",
+      "notifyFinePrint": "No spam. Only Move-in Pack updates.",
       "notifyMobileErr": "Enter a valid 10-digit mobile number.",
       "notifyFailed": "We couldn't add you to the waitlist just now. Please try again in a moment.",
       "notifyToast": "You're on the waitlist! We'll notify you at launch.",
@@ -143,7 +143,7 @@
       "packBookedToast": "Move-in Pack booked! Our team will call to schedule.",
       "packFailed": "We couldn't book your Move-in Pack just now. Your selection is still here — please try again in a moment.",
       "ctaTitle": "Ready to start your home journey?",
-      "ctaSub": "Browse verified homes or let our experts handle loans, legal, moving and interiors.",
+      "ctaSub": "Browse verified homes, or let us handle the rest.",
       "ctaBrowse": "Browse Properties",
       "ctaList": "List Your Property"
     },
@@ -170,6 +170,8 @@
       "doneInviteTitle": "Request sent to the tenant!",
       "doneOwnerTitle": "Request submitted!",
       "doneInviteDesc": "We've asked the tenant to fill in their details & documents. Once they're done, our team prepares the draft for your approval.",
+      "doneInvitePaidTitle": "Paid! Your side is done",
+      "doneInvitePaidDesc": "We've asked the tenant to add their details & documents. Our team prepares the draft as soon as they're done.",
       "doneOwnerDesc": "Our team will share the draft within a few hours and schedule biometric e-registration at your convenience.",
       "doneInviteeUnpaidDesc": "Your details are saved. Our team starts the draft once the person who began this request completes the payment — you'll be notified when it moves.",
       "donePaymentConfirmingTitle": "Confirming your payment",
@@ -210,7 +212,7 @@
         "editableTitle": "Your details — please complete this step",
         "editableDesc": "Add your tenant information and documents. This is the only section you need to fill in.",
         "sendTitle_owner": "Send the invite to the owner",
-        "sendNote_owner": "The owner opens the link, signs in, and fills only their part. You'll be notified once they're done.",
+        "sendNote_owner": "The owner opens the link, signs in and checks the whole agreement. Once it's complete, either of you can pay. You'll be notified as it moves.",
         "readonlyTitle_owner": "Set up by the tenant — view only",
         "readonlyDesc_owner": "You can review every part of this agreement, but only your Owner details can be edited here.",
         "editableDesc_owner": "Add your owner information, ID and ownership papers. This is the only section you need to fill in."
@@ -220,23 +222,26 @@
         "1": "Owner",
         "2": "Tenant",
         "3": "Terms",
-        "4": "Witnesses",
-        "5": "Review"
+        "4": "Review"
       },
       "hero": {
         "badge": "Maharashtra Leave & License",
         "title1": "Online Rent Agreement",
         "titleAccent": "drafted, e-registered, doorstep",
-        "subtitle": "Government-approved format, stamp duty & registration handled, optional biometric at your doorstep — fully compliant with Maharashtra registration norms.",
+        "subtitle": "Govt-approved draft, stamp duty and e-registration, all handled. Optional biometric at your doorstep.",
         "chip1": "100% Legal Format",
         "chip2": "Stamp Duty Included",
         "chip3": "Biometric e-Registration",
         "step1Title": "Share details",
-        "step1Desc": "Property, parties, rent & tenure.",
+        "step1Desc": "Property, parties & rent",
         "step2Title": "Review & pay",
-        "step2Desc": "Draft, stamp duty & registration fee.",
+        "step2Desc": "Draft, duty & fees",
         "step3Title": "Biometric & e-register",
-        "step3Desc": "Doorstep verification & final copy."
+        "step3Desc": "At your doorstep",
+        "jumpLabel": "Jump to",
+        "jumpDocs": "Documents",
+        "jumpAssist": "Inclusions",
+        "jumpFaq": "FAQs"
       },
       "property": {
         "title": "Property & Agreement",
@@ -321,7 +326,16 @@
         "frro": "FRRO registration number (optional)",
         "frroPlaceholder": "If already registered",
         "dob": "Date of birth",
-        "dobErr": "Choose a valid date of birth for an adult party."
+        "dobErr": "Choose a valid date of birth for an adult party.",
+        "mother": "Mother's name",
+        "motherPlaceholder": "As per Aadhaar or PAN",
+        "motherErr": "Enter the mother's name (up to 80 characters).",
+        "gender": "Gender",
+        "genderPick": "Select gender",
+        "genderOpt": { "male": "Male", "female": "Female", "other": "Other" },
+        "genderErr": "Select a gender.",
+        "pincode": "Residential pincode",
+        "address": "Residential address"
       },
       "owner": {
         "title": "Owner / Licensor Details",
@@ -381,14 +395,14 @@
         "fillTitle": "I'm the owner — I'll fill this",
         "fillDesc": "Enter the owner's details & upload their ID and ownership papers.",
         "inviteTitle": "I'm the tenant — invite the owner",
-        "inviteDesc": "Send a request by mobile — the owner fills only their part.",
+        "inviteDesc": "Send a request by mobile — the owner adds their part and checks everything. Then either of you can pay.",
         "inviteMobile": "Owner's Mobile Number",
         "inviteMobileErr": "Enter the owner's 10-digit mobile number.",
         "inviteName": "Owner's Name (optional)",
         "inviteNamePlaceholder": "e.g. Rajesh Deshpande",
         "messagePlaceholder": "Add a short note for the owner…",
-        "inviteInfo": "The owner gets a request to fill only their own details, ID and ownership papers. You fill your tenant details, the terms and the witnesses, and you pay once the owner is done.",
-        "inviteFinishNote": "You don't have to wait for the owner — finish your details, the terms and witnesses now and submit. The owner's step stays pending until they add their own details and papers."
+        "inviteInfo": "The owner gets a request to fill only their own details, ID and ownership papers.         You fill your tenant details and the terms, and you pay once the owner is done.",
+                "inviteFinishNote": "You don't have to wait for the owner — finish your details and the terms now and submit. The owner's step stays pending until they add their own details and papers."
       },
       "tenant": {
         "title": "Tenant / Licensee Details",
@@ -484,7 +498,7 @@
         "message": "Message (optional)",
         "messagePlaceholder": "Add a short note for the tenant…",
         "inviteInfo": "The tenant gets a request to fill only their own details & documents. You stay in control of the property, owner & rent details and the final agreement.",
-        "inviteFinishNote": "You don’t have to wait for the tenant — finish the terms and witnesses now and submit. The tenant’s step stays pending until they add their own details and documents."
+        "inviteFinishNote": "You don’t have to wait for the tenant — finish the terms now and submit. The tenant’s step stays pending until they add their own details and documents."
       },
       "terms": {
         "title": "Agreement Terms & Rent",
@@ -496,10 +510,11 @@
         "periodMonths_one": "{{count}} Month",
         "periodMonths_other": "{{count}} Months",
         "rent": "Monthly Rent (₹)",
-        "rentPlaceholder": "e.g. 25000",
+        "rentPlaceholder": "e.g. 25,000",
+        "perMonth": "/month",
         "rentErr": "Enter the monthly rent.",
         "deposit": "Refundable Security Deposit (₹)",
-        "depositPlaceholder": "e.g. 100000",
+        "depositPlaceholder": "e.g. 1,00,000",
         "depositErr": "Enter the security deposit — 0 if there is none.",
         "nrDeposit": "Non-refundable Deposit / Premium (₹)",
         "increment": "Rent Increase (%)",
@@ -510,7 +525,6 @@
           "Tenant": "Tenant",
           "Owner": "Owner"
         },
-        "regArea": "Registration Area",
         "regUrban": "Municipal / Urban",
         "regRural": "Gram Panchayat / Rural",
         "furniture": "Furniture & Amenities provided",
@@ -601,18 +615,7 @@
           "morning": "Morning (9 am – 12 pm)",
           "afternoon": "Afternoon (12 – 4 pm)",
           "evening": "Evening (4 – 8 pm)"
-        },
-        "regAreaAuto": "— set from your gram panchayat answer; our team confirms it from the property's Index II and settles any difference."
-      },
-      "witnesses": {
-        "title": "Witnesses",
-        "subtitle": "Two adult witnesses are required to execute and register the agreement.",
-        "witness": "Witness {{n}}",
-        "fullName": "Full Name",
-        "biometricNote": "Both witnesses must be present at the registration visit with their Aadhaar for thumb/biometric and live-photo capture. Their names go into the registered deed; the portal fetches the rest from Aadhaar.",
-        "age": "Age",
-        "mobile": "Mobile",
-        "nameErr": "Enter the witness's full name as on their Aadhaar."
+        }
       },
       "review": {
         "title": "Review & Generate",
@@ -644,11 +647,12 @@
         "generating": "Opening secure payment…",
         "residential": "Residential",
         "rowCoOwners": "Co-owners",
-        "rowWitnesses": "Witnesses",
         "rowOwnerIdentity": "Owner identity",
         "rowCoOwnerIdentity": "Co-owner identity",
         "rowTenantIdentity": "Tenant identity",
         "retry": "Retry payment",
+        "saveChanges": "Save changes",
+        "saving": "Saving…",
         "rowLanguage": "Agreement language",
         "rowVisit": "Biometric visit",
         "visitAnyDate": "date to be agreed"
@@ -685,81 +689,89 @@
         "handling": "Document Handling (DHC)"
       },
       "docs": {
-        "title": "Documents Required",
-        "subtitle": "Keep these ready for drafting & e-registration (biometric).",
+        "title": "Documents required",
+        "subtitle": "Keep these handy before you start.",
+        "tab": {
+          "owner": "Owner",
+          "tenant": "Tenant",
+          "other": "At the visit"
+        },
         "ownerTitle": "Owner (Licensor)",
         "tenantTitle": "Tenant (Licensee)",
-        "otherTitle": "Witnesses & Other",
-        "docOwner": [
+        "otherTitle": "At the doorstep visit",
+        "ownerItems": [
           "PAN number",
           "Index II of the flat (mandatory)",
-          "Latest Electricity Bill or Property Tax receipt",
-          "Every co-owner’s PAN number — all co-owners sign",
+          "Latest electricity bill or property tax receipt",
+          "PAN of every co-owner (all co-owners sign)",
           "Registered Power of Attorney, if signing for the owner"
         ],
-        "docTenant": [
+        "tenantItems": [
           "PAN number",
           "Proof of current address (if outstation)"
         ],
-        "docOther": [
-          "Two adult witnesses — name, age and mobile number",
-          "Aadhaar and Aadhaar-registered mobile of every party for the OTP at our doorstep visit",
-          "Biometric (thumb) and live photo of all parties and witnesses at e-registration"
+        "otherItems": [
+          "Aadhaar and its linked mobile of every party, for the OTP at our doorstep visit",
+          "Thumb impression and live photo of every party",
+          "No witness details needed: our team records the witnesses at the visit"
         ]
       },
       "assist": {
-        "title": "We assist end-to-end",
-        "faqTitle": "Frequently Asked Questions",
+        "title": "We handle it end-to-end",
+        "faqTitle": "Frequently asked questions",
+        "ctaTitle": "Ready to start?",
+        "ctaDesc": "Your answers are saved on this device as you go.",
+        "ctaBtn": "Go to the form",
         "item": [
           {
-            "name": "Drafting Leave & License",
-            "desc": "Legally sound, government-approved residential leave & licence drafts."
+            "name": "Leave & License drafting",
+            "desc": "Govt-approved residential format."
           },
           {
-            "name": "Online e-Registration",
-            "desc": "End-to-end e-registration on the Maharashtra IGR portal."
+            "name": "Online e-registration",
+            "desc": "On the Maharashtra IGR portal."
           },
           {
-            "name": "Stamp Duty Calculation & Payment",
-            "desc": "Accurate Art. 36A computation and online payment."
+            "name": "Stamp duty, paid for you",
+            "desc": "Art. 36A computed and paid online."
           },
           {
-            "name": "Biometric Verification",
-            "desc": "Doorstep biometric (thumb) capture for all parties."
+            "name": "Doorstep biometric",
+            "desc": "Thumb capture for all parties."
           },
           {
-            "name": "Agreement Renewal",
-            "desc": "Hassle-free renewal of expiring agreements."
+            "name": "Agreement renewal",
+            "desc": "Renew before it expires."
           },
           {
-            "name": "Police Verification Assistance",
-            "desc": "Tenant police verification support where required."
+            "name": "Police verification help",
+            "desc": "Tenant verification, where required."
           }
         ],
         "faq": [
           {
-            "q": "Is registration of a rent agreement mandatory in Maharashtra?",
-            "a": "Yes. Section 55 of the Maharashtra Rent Control Act, 1999 makes registration compulsory for every leave and licence agreement, whatever its term, and puts the duty on the owner. If it is not registered, the tenant's account of the terms prevails in a dispute, and the owner can be fined up to ₹5,000 or jailed for up to three months."
+            "q": "Is registration mandatory in Maharashtra?",
+            "a": "Yes. Section 55 of the Maharashtra Rent Control Act, 1999 makes registration compulsory for every leave and licence agreement, of any term, and the duty is the owner's. If unregistered, the tenant's account of the terms prevails in a dispute, and the owner can be fined up to ₹5,000 or jailed for up to three months."
           },
           {
             "q": "How is stamp duty calculated?",
-            "a": "For Leave & License (Article 36A), stamp duty is 0.25% of the total of: rent for the full period, including any agreed increases, + any non-refundable deposit + 10% of the refundable deposit for each year of the term. The duty is rounded to the nearest rupee, exactly as the IGR Leave & License calculator does, and is never less than ₹100."
+            "a": "Under Article 36A it is 0.25% of: rent for the full term (including agreed increases) + any non-refundable deposit + 10% of the refundable deposit for each year. Rounded to the nearest rupee, as the IGR calculator does, with a ₹100 minimum."
           },
           {
             "q": "What is the registration fee?",
-            "a": "₹1,000 for properties in municipal / urban areas and ₹500 for properties in rural (Gram Panchayat) areas."
+            "a": "₹1,000 in municipal / urban areas, ₹500 in rural (Gram Panchayat) areas."
           },
           {
-            "q": "Why is the agreement usually for 11 months?",
-            "a": "Mostly habit, and a shorter term means less stamp duty and a chance to renegotiate at renewal. In Maharashtra it does not avoid registration: every leave and licence agreement must be registered, whether it runs 11 months or 60. You can choose any term up to 60 months here."
+            "q": "Why are agreements usually 11 months?",
+            "a": "Mostly habit: a shorter term means less stamp duty and a chance to renegotiate. It does not avoid registration in Maharashtra, where every leave and licence agreement must be registered. You can choose any term up to 60 months here."
           },
           {
-            "q": "Do all parties need to be physically present?",
-            "a": "No. With e-registration and doorstep biometric (thumb impression), the process can be completed from home for owner, tenant and witnesses."
+            "q": "Does everyone need to be present?",
+            "a": "No. With e-registration and doorstep biometric (thumb impression), owner and tenant can finish from home."
           },
           {
             "q": "What documents do I need?",
-            "a": "PAN number of owner and tenant, and the owner’s Index II of the flat. Keep your Aadhaar and its registered mobile handy: we collect them at the doorstep visit for the OTP and biometric, and the portal fetches your name and address from Aadhaar. Two witnesses with name, age and mobile."
+            "a": "PAN of owner and tenant, and the owner's Index II of the flat. Keep Aadhaar and its linked mobile handy for the OTP and biometric at our doorstep visit; the portal fetches names and addresses from Aadhaar."
           }
         ]
       },
@@ -782,6 +794,11 @@
       },
       "inviteErr": {
         "startOwn": "Start my own agreement",
+        "openMine": "Open my agreement",
+        "blocked": {
+          "title": "You already have an agreement for this flat",
+          "desc": "{{detail}}"
+        },
         "signIn": "Sign in to continue",
         "signin": {
           "title": "Sign in to open your invite",
@@ -802,12 +819,17 @@
       },
       "locked": {
         "title": "Your request is already submitted",
+        "title_joined": "You're part of a rent agreement",
         "desc": "You have a rent agreement in progress. The details you submitted are now locked so they can be drafted and registered accurately.",
+        "desc_joined": "Someone added you to their rent agreement. Tap View details on the request above to see it or fill in your part.",
         "changesHint": "Need to change something? Use the request tracker above — open Messages to talk to our team, or choose \"Request changes\" when we share the draft for your approval.",
+        "changesHint_joined": "Questions about this agreement? Open Messages on the request above to talk to our team.",
         "startNew": "Start a new agreement",
         "startNewHint": "For a different property",
         "continue": "Add what's missing to this request",
         "continueHint": "Opens your saved answers. Submitting again completes this request rather than filing a new one.",
+        "continue_held": "Review, edit & pay",
+        "continueHint_held": "Your tenant has sent their part. You can change anything before you pay.",
         "topUpHint": "Your answers are shared with your tenant and stay as filed — this adds only your PAN number and any papers still missing.",
         "toppedUp": "Your side of the agreement is complete.",
         "topUpChanged": "Your answers are shared with your tenant and can't be changed here. Undo the change, or cancel this request from your dashboard and file a new one.",
@@ -816,6 +838,23 @@
         "coFilledTitle": "Filled in by your tenant — view only",
         "coFilledTitle_owner": "Filled in by the owner — view only",
         "coFilledDesc": "PAN shows only the last 4 digits, for both of you."
+      },
+      "summary": {
+        "viewTitle": "Your submitted agreement — view only",
+        "viewTitle_pending": "This agreement — view only",
+        "editableDesc": "You can still change your details until our team starts on the agreement.",
+        "editableDesc_pending": "Check what's filled in so far, then add your details.",
+        "lockedDesc": "Our team has started on this agreement, so your details are locked. To change anything, open Messages on the request tracker above.",
+        "edit": "Edit my details",
+        "edit_pending": "Fill my details",
+        "close": "Close",
+        "editingTitle": "Editing your submitted details",
+        "editingDesc": "Rent, deposit, term and registration area stay as priced. Save on the last step.",
+        "editingDesc_invitee": "Change only what you need, then save on the last step.",
+        "editingTitle_held": "Review the agreement before you pay",
+        "editingDesc_held": "You can change anything, including your tenant's details. Pay on the last step.",
+        "discard": "Discard changes",
+        "saved": "Your changes are saved."
       },
       "checkoutFailed": "We saved your request but couldn't open payment. Please try again.",
       "maskedIdsFailed": "We couldn't load the other party's ID details. Refresh to try again.",
@@ -844,22 +883,21 @@
       "pay": {
         "title": "Ready for payment",
         "coFilledTitle": "Your tenant has filled in their part",
+        "eitherHint": "Either of you can pay. Whoever pays first settles it.",
         "desc": "Pay to send this agreement to our drafting team. If anything is still missing, we'll say exactly what.",
         "cta": "Pay {{amount}}",
         "feeWaived": "Free (referral reward)",
-        "paid": "Payment received — our drafting team will start on your agreement.",
-        "coFilledTitle_owner": "The owner has filled in their part"
+        "paid": "Payment received — our drafting team will start on your agreement."
       },
       "docsRetry": "We saved your request but couldn't upload one or more documents. Please try again.",
       "docsReattach": "You changed the agreement, so it has to be filed again — please re-attach the papers marked below.",
       "err": {
-        "adult": "Enter an age between 18 and 120.",
         "docRequired": "This document is required for registration.",
         "dupMobile": "This mobile is already used by another party. Each person needs their own.",
         "dupPan": "This PAN is already entered for another party. Each person needs their own."
       },
       "doneInviteTitle_owner": "Request sent to the owner!",
-      "doneInviteDesc_owner": "We've asked the owner to fill in their details & ownership papers. Once they're done, you pay and our team prepares the draft for approval."
+      "doneInviteDesc_owner": "Sent to the owner. They add their details, check the whole agreement and pay — nothing more is needed from you."
     },
     "interior": {
       "heroBadge": "Free 3D design · Itemised quote",

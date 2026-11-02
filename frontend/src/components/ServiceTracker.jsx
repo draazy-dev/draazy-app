@@ -6,7 +6,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { STEPS, stepStates, statusMeta, isActive, progressPct } from '../lib/serviceRequestStatus.js';
 import {
   listServiceRequests, decideServiceRequestDraft, approveServiceRequestDraftParty, markServiceRequestRead, markServiceRequestDraftOpened,
-  getServiceRequestDocumentUrl,
+  getServiceRequestDocumentUrl, cancelServiceRequest,
 } from '../services/serviceRequestService.js';
 import { openDocFrom } from '../lib/openDoc.js';
 import { timeAgo } from '../lib/format.js';
@@ -16,6 +16,7 @@ import RevisedTerms from './RevisedTerms.jsx';
 import AttentionNeeded from './AttentionNeeded.jsx';
 import TrackerChat from './TrackerChat.jsx';
 import IdentityRefill, { needsIdentityRefill } from './IdentityRefill.jsx';
+import { REVISIT_READ } from '../services/http.js';
 
 const openRequestFile = (requestId, docId) => openDocFrom(() => getServiceRequestDocumentUrl(requestId, docId));
 
@@ -27,6 +28,12 @@ const hasForeignTenant = (request) => {
 };
 
 const SEGMENT = { done: 'bg-emerald-500', active: 'bg-teal-500', todo: 'bg-white/15' };
+
+// Rent agreements need each party's own open and approval; other drafts use the requester's timeline open.
+const myDraft = (r) => {
+  const mine = r.draftApproval?.parties.find((p) => p.mine);
+  return mine ? { opened: mine.opened, approved: mine.approved } : { opened: !!r.draft?.opened, approved: false };
+};
 
 function Progress({ status }) {
   const pct = progressPct(status);
@@ -90,7 +97,7 @@ function FormCStep({ request, t }) {
   );
 }
 
-export default function ServiceTracker({ typeFilter, title = 'Your requests' }) {
+export default function ServiceTracker({ typeFilter, title = 'Your requests', onCancelled, onView, canView }) {
   const { t } = useTranslation();
   const { user, isIn } = useAuth();
   const { toast } = useToast();
@@ -101,6 +108,8 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
   const [changeNote, setChangeNote] = useState('');
   const [otpDraft, setOtpDraft] = useState({});
   const [showCancelled, setShowCancelled] = useState(false);
+  const [cancelArmed, setCancelArmed] = useState(null);
+  const [cancelling, setCancelling] = useState(null);
   const refresh = () => setTick((t) => t + 1);
 
   useScrollLock(Boolean(changeReq));
@@ -117,7 +126,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
     let alive = true;
     (async () => {
       try {
-        const requests = await listServiceRequests(typeFilter);
+        const requests = await listServiceRequests(typeFilter, tick ? undefined : REVISIT_READ);
         if (alive) setRequests([...requests].sort((a, b) => (rank(a) - rank(b)) || ((b.updatedAt || 0) - (a.updatedAt || 0))));
       } catch (error) {
         if (alive) console.warn('[service-tracker] requests failed', error);
@@ -129,7 +138,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
 
   const openDraft = async (r) => {
     const opened = await openRequestFile(r.id, r.draft?.id);
-    if (!opened || r.draft?.opened) return;
+    if (!opened || myDraft(r).opened) return;
     try {
       await markServiceRequestDraftOpened(r.id);
       refresh();
@@ -138,9 +147,11 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
   const openFinal = (r) => openRequestFile(r.id, r.finalDoc?.id);
   const approve = async (r) => {
     try {
-      await decideServiceRequestDraft(r.id, 'accepted');
+      const after = await decideServiceRequestDraft(r.id, 'accepted');
       refresh();
-      toast('Draft approved — we\'ll proceed with registration.', 'success');
+      toast(after?.status === 'draft_shared'
+        ? 'You approved the draft — waiting for the other party.'
+        : 'Draft approved — we\'ll proceed with registration.', 'success');
     } catch (e) { console.warn('[service-tracker] approve failed', e); toast('Could not approve the draft. Please try again.', 'error'); }
   };
   const sendPartyOtp = async (r, party) => {
@@ -170,6 +181,23 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
       refresh();
       toast('Change request sent to our team.', 'success');
     } catch (e) { console.warn('[service-tracker] request-changes failed', e); toast('Could not send the change request. Please try again.', 'error'); }
+  };
+  const cancelUnpaid = async (r) => {
+    if (cancelling) return;
+    if (cancelArmed !== r.id) { setCancelArmed(r.id); return; }
+    setCancelling(r.id);
+    try {
+      await cancelServiceRequest(r.id);
+      toast('Request cancelled.', 'success');
+      onCancelled?.(r.id);
+    } catch (e) {
+      console.warn('[service-tracker] cancel failed', e);
+      toast('Could not cancel this request. Please try again.', 'error');
+    } finally {
+      setCancelling(null);
+      setCancelArmed(null);
+      refresh();
+    }
   };
   const openThread = async (r) => {
     setOpenId((current) => (current === r.id ? null : r.id));
@@ -217,6 +245,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
                   </div>
                   <p className="text-white font-semibold text-sm line-clamp-2">{r.details?.property || r.details?.from || r.service}</p>
                   <p className="text-gray-500 text-xs mt-0.5 mb-3">{r.service} · Ref {r.id.slice(0, 10)}</p>
+                  {r.paidBy ? <p className="text-emerald-300/90 text-xs -mt-2 mb-3 flex items-center gap-1.5" data-testid="tracker-paid-by"><Icon name="check-circle-2" className="w-3.5 h-3.5" /> Paid by {r.paidBy}</p> : null}
                   <Progress status={r.status} />
 
                   {r.status === 'action_required' && r.attention ? <AttentionNeeded request={r} onChanged={refresh} /> : null}
@@ -234,7 +263,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
                           return (
                             <li key={party.key} className="flex flex-col gap-2 rounded-lg border border-white/5 p-2 text-xs text-gray-300 sm:flex-row sm:items-center sm:justify-between">
                               <span>{party.label}{party.mobile ? ` · ${party.mobile}` : ''} — {party.approved ? 'approved' : party.opened ? 'opened' : 'pending'}</span>
-                              {!party.approved && party.method === 'otp' ? (
+                              {!party.approved && party.method === 'otp' && !r.myPartyId ? (
                                 <span className="flex gap-2">
                                   <button type="button" onClick={() => sendPartyOtp(r, party)} className="btn-outline px-2 py-1 text-[11px]">Send code</button>
                                   <input value={otpDraft[key] || ''} onChange={(e) => setOtpDraft((prev) => ({ ...prev, [key]: e.target.value.replace(/\D/g, '').slice(0, 6) }))} inputMode="numeric" maxLength={6} aria-label={`OTP for ${party.label}`} className="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-white" placeholder="OTP" />
@@ -251,19 +280,36 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
                   <FormCStep request={r} t={t} />
 
                   {(() => {
-                  const soloMsg = r.status !== 'draft_shared' && !(r.status === 'completed' && r.finalDoc);
+                  const view = !!onView && !!canView && r.status !== 'cancelled' && canView(r);
+                  const soloMsg = !view && r.status !== 'draft_shared' && !(r.status === 'completed' && r.finalDoc) && !r.cancellable;
+                  const draft = myDraft(r);
                   return (
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                     {r.status === 'draft_shared' ? (
                       <>
                         <button onClick={() => openDraft(r)} className="btn-outline w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-gray-200 text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="file-text" className="w-3.5 h-3.5" /> View draft{r.draft?.version ? ' v' + r.draft.version : ''}</button>
-                        <button onClick={() => approve(r)} disabled={!r.draft?.opened} title={r.draft?.opened ? undefined : 'Open the draft first'} className="btn-teal w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>
+                        {draft.approved ? (
+                          <button type="button" disabled data-testid="tracker-approved" className="btn-teal w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"><Icon name="check-circle-2" className="w-3.5 h-3.5" /> Approved</button>
+                        ) : (
+                          <button onClick={() => approve(r)} disabled={!draft.opened} title={draft.opened ? undefined : 'Open the draft first'} className="btn-teal w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>
+                        )}
                         <button onClick={() => requestChanges(r)} className="btn-outline w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-gray-200 text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="rotate-ccw" className="w-3.5 h-3.5" /> Request changes</button>
-                        {!r.draft?.opened ? <p className="col-span-2 sm:basis-full text-[11px] text-gray-500">Open the draft to approve it.</p> : null}
+                        {!draft.opened ? <p className="col-span-2 sm:basis-full text-[11px] text-gray-500">Open the draft to approve it.</p> : null}
                       </>
                     ) : null}
                     {r.status === 'completed' && r.finalDoc ? (
                       <button onClick={() => openFinal(r)} className="btn-teal w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="download" className="w-3.5 h-3.5" /> Download registered copy</button>
+                    ) : null}
+                    {r.cancellable ? (
+                      <button type="button" onClick={() => cancelUnpaid(r)} disabled={cancelling === r.id} data-testid="tracker-cancel-unpaid"
+                        className="btn-outline w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-rose-300 text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
+                        <Icon name="x" className="w-3.5 h-3.5" /> {cancelArmed === r.id ? 'Tap again to cancel' : 'Cancel request'}
+                      </button>
+                    ) : null}
+                    {view ? (
+                      <button type="button" onClick={() => onView(r)} data-testid="tracker-view-details" className="btn-outline text-gray-200 w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">
+                        <Icon name="eye" className="w-3.5 h-3.5" /> View details
+                      </button>
                     ) : null}
                     <button onClick={() => openThread(r)} className={'btn-outline w-full sm:w-auto justify-center relative px-3 py-2 rounded-lg text-gray-200 text-xs font-semibold inline-flex items-center gap-1.5 ' + (soloMsg ? 'col-span-2 sm:col-span-1' : '')}>
                       <Icon name="message-square" className="w-3.5 h-3.5" /> Messages

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useScrollReveal } from '../../../lib/useScrollReveal.js';
 import { recordSignal } from '../../../services/demandService.js';
 import { getProperty } from '../../../services/propertyService.js';
+import { REVISIT_MAX_AGE } from '../../../services/http.js';
 import { track } from '../../../lib/pmf.js';
 import { referralShareUrlNow } from '../../../lib/referralShare.js';
 import { usePrefetchReferralCode } from '../../../lib/usePrefetchReferralCode.js';
@@ -59,7 +60,7 @@ export default function useProperty() {
     let alive = true;
     setP(undefined);
     setActive(0);
-    getProperty(id).then((r) => {
+    getProperty(id, { maxAge: REVISIT_MAX_AGE }).then((r) => {
       if (!alive) return;
       setP(r ?? null);
       if (r) {
@@ -309,8 +310,12 @@ export default function useProperty() {
     tr, p, active, setActive, ovOpen, setOvOpen, lightbox, setLightbox,
     reportOpen, setReportOpen, contactOpen, setContactOpen,
     visitOpen, setVisitOpen,
-    closeContact: () => { setContactOpen(false); refreshContactGate().catch(() => {}); },
-    closeVisit: () => { setVisitOpen(false); refreshMyVisits(); refreshContactGate().catch(() => {}); },
+    closeContact: () => { setContactOpen(false); refreshContactGate({ maxAge: REVISIT_MAX_AGE }).catch(() => {}); },
+    closeVisit: () => {
+      setVisitOpen(false);
+      refreshMyVisits({ maxAge: REVISIT_MAX_AGE });
+      refreshContactGate({ maxAge: REVISIT_MAX_AGE }).catch(() => {});
+    },
     contactStatus: contactGate.status, myVisits,
     isIn, user, toast, flagEnabled, rootRef, gallery, activeTab,
     handleContact, handleSchedule, inlineOtpReason,

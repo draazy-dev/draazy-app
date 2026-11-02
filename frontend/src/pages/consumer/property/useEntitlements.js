@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getEntitlements } from '../../../services/entitlementService.js';
+import { REVISIT_MAX_AGE } from '../../../services/http.js';
 import { fmtDate } from '../../../lib/format.js';
+import { dealOf } from '../../../lib/dealPlans.js';
 
 export function useEntitlements(enabled = true) {
   const [entitlements, setEntitlements] = useState(null);
@@ -26,7 +28,7 @@ export function useEntitlements(enabled = true) {
       setEntitlements(null);
       return undefined;
     }
-    getEntitlements()
+    getEntitlements({ maxAge: REVISIT_MAX_AGE })
       .then((next) => { if (alive) setEntitlements(next); })
       .catch(() => { if (alive) setEntitlements(null); });
     return () => { alive = false; };
@@ -35,10 +37,12 @@ export function useEntitlements(enabled = true) {
   return { entitlements, refresh };
 }
 
-export const contactsLeft = (entitlements) => {
+export const contactsLeft = (entitlements, deal) => {
   const c = entitlements?.contacts;
   if (!c || c.unlimited) return null;
-  return Number.isFinite(c.remaining) ? c.remaining : null;
+  const forDeal = deal ? c[dealOf(deal) === 'buy' ? 'remainingBuy' : 'remainingRent'] : undefined;
+  const n = Number.isFinite(forDeal) ? forDeal : c.remaining;
+  return Number.isFinite(n) ? n : null;
 };
 
 export const freeContactsTill = (entitlements) => {

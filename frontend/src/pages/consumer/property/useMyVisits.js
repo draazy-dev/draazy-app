@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listVisits } from '../../../services/visitService.js';
+import { REVISIT_MAX_AGE } from '../../../services/http.js';
 
 const LIVE = new Set(['scheduled', 'confirmed']);
 
@@ -12,16 +13,16 @@ export function useMyVisits(propertyId, identity) {
   const latest = useRef(0);
   const key = identity && propertyId ? `${identity}|${propertyId}` : null;
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback((opts) => {
     const ask = ++latest.current;
     if (!key) return;
-    listVisits({ propertyId })
+    listVisits({ propertyId, ...opts })
       .then((rows) => { if (ask === latest.current) setRead({ key, visits: summarise(rows) }); })
       .catch(() => {});
   }, [key, propertyId]);
 
   useEffect(() => {
-    refresh();
+    refresh({ maxAge: REVISIT_MAX_AGE });
     return () => { latest.current += 1; };
   }, [refresh]);
 

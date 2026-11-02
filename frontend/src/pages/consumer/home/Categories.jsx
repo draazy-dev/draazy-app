@@ -5,7 +5,8 @@ import Icon from '../../../components/Icon.jsx';
 import { CATEGORIES } from '../../../data/homeData.js';
 import { propertyCounts } from '../../../services/propertyService.js';
 import { feed } from '../../../services/flatmateService.js';
-import { TABS as FLATMATE_TABS } from '../flatmates/tabs.js';
+import { PUBLIC_READ_TTL } from '../../../services/http.js';
+import { TAB_MOVE_IN } from '../flatmates/tabs.js';
 
 const formatCount = (value) => new Intl.NumberFormat('en-IN').format(value);
 
@@ -65,9 +66,9 @@ export default function Categories({ navigate }) {
 
   useEffect(() => {
     let live = true;
-    Promise.all(FLATMATE_TABS.map((tab) => feed(tab, {}, 0, 1)))
-      .then((pages) => {
-        if (live) setFlatmateCount(pages.reduce((sum, page) => sum + (page.total || 0), 0));
+    feed(TAB_MOVE_IN, {}, 0, 1, { ttl: PUBLIC_READ_TTL })
+      .then(({ tabTotals }) => {
+        if (live) setFlatmateCount(Object.values(tabTotals).reduce((sum, n) => sum + (n || 0), 0));
       })
       .catch(() => {
         if (live) setFlatmateCount(null);

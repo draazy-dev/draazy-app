@@ -14,7 +14,7 @@ import { roleLabel } from '../../lib/auth.js';
 import { setAppPrefs } from '../../lib/localPrefs.js';
 import { useIsLightTheme } from '../../lib/themeColour.js';
 import { ADMIN_MODULES, NAV_GROUPS, canAccessModule, hasPermission, moduleForPath, portalBase, portalPath, runbooksFor } from '../../lib/adminModules.js';
-import { useHelpTree } from '../../lib/useHelp.js';
+import { useHelpIndex } from '../../lib/useHelp.js';
 import { AdminFlagsProvider, useAdminFlags } from '../../context/AdminFlagsContext.jsx';
 import AdminTopbarTools from './AdminTopbarTools.jsx';
 import BrowserAlertsPrompt from '../BrowserAlertsPrompt.jsx';
@@ -40,7 +40,7 @@ function AdminLayoutInner() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const light = useIsLightTheme();
-  const { articles } = useHelpTree();
+  const { articles } = useHelpIndex();
   const currentModule = moduleForPath(pathname);
   const pageModule = currentModule?.key;
   const pageRunbook = pageModule && runbooksFor(articles, user).find((a) => a.modules?.includes(pageModule));

@@ -247,12 +247,12 @@ export default function Services() {
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=1600&q=80')" }} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(120deg,rgb(var(--dz-c-ink) / .97) 0%,rgb(var(--dz-c-indigo-950) / .88) 45%,rgb(var(--dz-c-teal-600) / .5) 100%)' }} />
           <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full bg-teal-500/20 blur-3xl" />
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-12 sm:py-20 lg:py-28">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-7 pb-12 sm:py-20 lg:py-28">
             <div className="max-w-2xl reveal">
-              <span className="dz-tag bg-white/10 border border-white/20 text-teal-200 font-medium mb-4 sm:mb-5"><Icon name="sparkles" className="w-3.5 h-3.5" /> {tr('services.hub.heroBadge')}</span>
-              <h1 className="text-4xl sm:text-6xl font-extrabold leading-[1.05]">{tr('services.hub.heroTitle1')}<br /><span className="gradient-text">{tr('services.hub.heroTitleAccent')}</span></h1>
+              <span className="dz-tag bg-white/10 border border-white/20 text-teal-200 font-medium mb-3 sm:mb-5"><Icon name="sparkles" className="w-3.5 h-3.5" /> {tr('services.hub.heroBadge')}</span>
+              <h1 className="text-[34px] sm:text-6xl font-extrabold leading-[1.05]">{tr('services.hub.heroTitle1')}<br /><span className="gradient-text">{tr('services.hub.heroTitleAccent')}</span></h1>
               <p className="text-gray-200 text-[15px] sm:text-lg mt-3 sm:mt-5 max-w-xl">{tr('services.hub.heroSubtitle')}</p>
-              <div className="hero-cta-row flex flex-row gap-2 sm:gap-3 mt-5 sm:mt-8">
+              <div className="hidden sm:flex gap-3 mt-8">
                 <a href="#services" className="btn btn-primary btn-lg sm:min-w-[200px]"><Icon name="layout-grid" className="w-4 h-4 shrink-0" /> {tr('services.hub.exploreServices')}</a>
                 <Link to="/listings?deal=buy" className="btn btn-secondary btn-lg sm:min-w-[200px]"><Icon name="search" className="w-4 h-4 shrink-0" /> {tr('services.hub.browseProperties')}</Link>
               </div>
@@ -260,30 +260,35 @@ export default function Services() {
           </div>
         </section>
 
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-10 relative z-10">
-          <Link to="/services/rent-agreement" className="ra-spot glass-card block rounded-2xl p-3.5 sm:p-6 reveal">
-            <div className="ra-spot-row">
-              <span className="w-9 h-9 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-teal-600 to-teal-500 flex items-center justify-center shrink-0 shadow-lg shadow-teal-500/30">
-                <Icon name="file-signature" className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
-              </span>
-              <div className="ra-spot-body min-w-0 flex-1">
-                <span className="dz-tag ra-spot-badge font-bold uppercase tracking-wide text-teal-200" style={{ background: 'rgb(var(--dz-c-teal-500) / .16)' }}>
-                  <Icon name="sparkles" className="w-3 h-3" /> {tr('services.hub.spotlight.badge')}
-                </span>
-                <h2 className="text-[19px] sm:text-2xl font-extrabold text-white mt-2.5 sm:mt-2 leading-tight">{tr('services.hub.spotlight.title')}</h2>
-                <p className="ra-spot-sub text-gray-300 text-[13px] sm:text-sm mt-1 sm:mt-1.5 leading-relaxed">{tr('services.hub.spotlight.sub')}</p>
-                <div className="ra-spot-chips flex flex-wrap gap-1.5 mt-2.5 sm:mt-3">
-                  {SPOT_CHIPS.map((k) => (
-                    <span key={k} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-[11px] text-gray-300">
-                      <Icon name="check" className="w-3 h-3 text-teal-300 shrink-0" /> {tr('services.hub.spotlight.chip.' + k)}
-                    </span>
-                  ))}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 sm:-mt-10 relative z-10">
+          <Link to="/services/rent-agreement" className="ra-spot theme-dark block relative overflow-hidden rounded-3xl p-4 sm:p-7 reveal">
+            <span aria-hidden="true" className="absolute -right-8 -bottom-10 text-white/10 pointer-events-none">
+              <Icon name="file-signature" className="w-44 h-44 sm:w-60 sm:h-60" />
+            </span>
+            <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
+                    <Icon name="file-signature" className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                  </span>
+                  <span className="dz-tag font-bold uppercase tracking-wide text-teal-100 bg-white/10 border border-white/15">
+                    <Icon name="sparkles" className="w-3 h-3" /> {tr('services.hub.spotlight.badge')}
+                  </span>
                 </div>
-                <span className="ra-spot-cta btn btn-primary btn-lg mt-3 sm:mt-4">
-                  <Icon name="file-signature" className="w-4 h-4 shrink-0" /> {tr('services.hub.spotlight.cta')}
-                  <Icon name="arrow-right" className="w-4 h-4 shrink-0" />
-                </span>
+                <h2 className="text-[22px] sm:text-3xl font-extrabold text-white mt-3 leading-tight">{tr('services.hub.spotlight.title')}</h2>
+                <p className="text-gray-200 text-[13px] sm:text-[15px] mt-1.5 leading-relaxed max-w-xl">{tr('services.hub.spotlight.sub')}</p>
+                <ul className="flex flex-wrap gap-x-3.5 gap-y-1 mt-3">
+                  {SPOT_CHIPS.map((k) => (
+                    <li key={k} className="inline-flex items-center gap-1 text-[12px] sm:text-[13px] font-medium text-white">
+                      <Icon name="check-circle-2" className="w-3.5 h-3.5 text-teal-200 shrink-0" /> {tr('services.hub.spotlight.chip.' + k)}
+                    </li>
+                  ))}
+                </ul>
               </div>
+              <span className="ra-spot-cta">
+                {tr('services.hub.spotlight.cta')}
+                <Icon name="arrow-right" className="w-4 h-4 shrink-0" />
+              </span>
             </div>
           </Link>
         </section>
@@ -301,11 +306,11 @@ export default function Services() {
             </div>
           )}
 
-          <div className="text-center mb-8 reveal">
+          <div className="text-center mb-5 sm:mb-8 reveal">
             <h2 className="text-2xl sm:text-3xl font-bold">{tr('services.hub.ourServices')}</h2>
-            <p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.hub.ourServicesSub')}</p>
+            <p className="text-gray-400 text-sm mt-1.5 sm:mt-2 max-w-2xl mx-auto">{tr('services.hub.ourServicesSub')}</p>
           </div>
-          <HScroll wrapClassName="mb-8 sm:mb-10 -mx-4 sm:mx-0 reveal" className="flex sm:flex-wrap justify-start sm:justify-center items-center gap-2 px-4 sm:px-0 sm:overflow-visible" fadeWidth="2rem">
+          <HScroll wrapClassName="mb-5 sm:mb-10 -mx-4 sm:mx-0 reveal" className="flex sm:flex-wrap justify-start sm:justify-center items-center gap-2 px-4 sm:px-0 sm:overflow-visible" fadeWidth="2rem">
             {CATS.map(([key, _label, icon]) => (
               <button key={key} onClick={() => setCat(key)} className={'cat-tab shrink-0 px-4 py-2 min-h-[44px] rounded-full text-sm font-semibold inline-flex items-center gap-2 whitespace-nowrap ' + (cat === key ? 'on' : 'text-gray-300 bg-white/5 hover:bg-white/10')}>
                 <Icon name={icon} className="w-4 h-4" /> {tr('services.hub.cat.' + key)}
@@ -318,14 +323,17 @@ export default function Services() {
               const featured = slug === FEATURED_SLUG;
               const Inner = (
                 <>
-                  <div className="zoom theme-dark relative h-40 sm:h-44">
+                  <div className={'zoom theme-dark relative sm:h-44 ' + (featured ? 'h-36' : 'h-28')}>
                     <img src={IMG(img)} srcSet={srcSetFor(IMG(img))} sizes={CARD_SIZES} alt={cardName} className="w-full h-full object-cover" loading="lazy" />
                     <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,rgb(var(--dz-c-ink) / .1) 40%,rgb(var(--dz-c-ink) / .65) 100%)' }} />
                     <div className="absolute inset-0 sm:hidden" style={{ background: 'linear-gradient(180deg,rgb(var(--dz-c-ink) / 0) 34%,rgb(var(--dz-c-ink) / .55) 62%,rgb(var(--dz-c-ink) / .9) 100%)' }} />
                     <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-teal-600 to-teal-500 flex items-center justify-center shadow-lg shadow-teal-500/30"><Icon name={ic} className="w-4 h-4 sm:w-5 sm:h-5 text-white" /></div>
-                    <span className={'dz-tag absolute top-2.5 right-2.5 sm:top-3 sm:right-3 font-bold uppercase tracking-wider backdrop-blur ' + (featured ? 'svc-ribbon text-white' : 'bg-black/45 text-teal-100')}>{featured ? tr('services.hub.mostBooked') : tr('services.hub.catBadge.' + c)}</span>
+                    <span className={'dz-tag absolute top-2.5 right-2.5 sm:top-3 sm:right-3 font-bold uppercase tracking-wider backdrop-blur ' + (featured ? 'svc-ribbon text-white' : 'hidden sm:inline-flex bg-black/45 text-teal-100')}>{featured ? tr('services.hub.mostBooked') : tr('services.hub.catBadge.' + c)}</span>
                     <div className="absolute inset-x-0 bottom-0 p-3 flex items-end justify-between gap-2 sm:hidden">
-                      <h3 className="text-white font-bold text-sm leading-tight line-clamp-2 drop-shadow-sm">{cardName}</h3>
+                      <div className="min-w-0">
+                        <h3 className={'text-white font-bold leading-tight line-clamp-2 drop-shadow-sm ' + (featured ? 'text-base' : 'text-sm')}>{cardName}</h3>
+                        {featured && <p className="text-gray-200 text-xs mt-0.5 line-clamp-1">{tr('services.hub.card.' + slug + '.desc')}</p>}
+                      </div>
                       <span className="lm w-7 h-7 rounded-full bg-white/15 backdrop-blur flex items-center justify-center shrink-0"><Icon name="arrow-right" className="w-4 h-4" /></span>
                     </div>
                   </div>
@@ -336,7 +344,7 @@ export default function Services() {
                   </div>
                 </>
               );
-              const cls = 'svc-card svc-pop glass-card rounded-2xl overflow-hidden block' + (featured ? ' svc-featured' : '');
+              const cls = 'svc-card svc-pop glass-card rounded-2xl overflow-hidden block' + (featured ? ' svc-featured col-span-2 lg:col-span-1' : '');
               const style = { animationDelay: `${i * 45}ms` };
               return href.startsWith('/listings') || href.startsWith('/locality') || href.startsWith('/home-loans') || href.startsWith('/services')
                 ? <Link key={`${cat}-${t}`} to={href} className={cls} style={style}>{Inner}</Link>
@@ -346,18 +354,19 @@ export default function Services() {
         </section>
 
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
-          <div className="text-center mb-12 reveal"><h2 className="text-2xl sm:text-3xl font-bold">{tr('services.hub.howItWorksTitle')}</h2><p className="text-gray-400 text-sm mt-2">{tr('services.hub.howItWorksSub')}</p></div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+          <div className="text-center mb-5 sm:mb-12 reveal"><h2 className="text-2xl sm:text-3xl font-bold">{tr('services.hub.howItWorksTitle')}</h2><p className="text-gray-400 text-sm mt-1.5 sm:mt-2">{tr('services.hub.howItWorksSub')}</p></div>
+          <ol className="grid grid-cols-4 gap-2 sm:gap-5">
             {STEPS.map(([t, ic, _d, slug], idx) => (
-              <div key={t} className="step glass-card rounded-2xl p-4 sm:p-6 text-center reveal">
-                <div className="step-ic relative w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-teal-400/20 to-teal-600/20 border border-teal-400/20 flex items-center justify-center"><Icon name={ic} className="w-6 h-6 sm:w-7 sm:h-7 text-teal-400" /></div>
+              <li key={t} className="step glass-card rounded-2xl px-1.5 py-3 sm:p-6 text-center reveal">
+                <div className="step-ic relative w-11 h-11 sm:w-16 sm:h-16 mx-auto mb-2 sm:mb-4">
+                  <div className="w-11 h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-br from-teal-400/20 to-teal-600/20 border border-teal-400/20 flex items-center justify-center"><Icon name={ic} className="w-5 h-5 sm:w-7 sm:h-7 text-teal-400" /></div>
+                  <span className="sm:hidden absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-teal-500 text-white text-[10px] font-bold flex items-center justify-center">{idx + 1}</span>
                 </div>
-                <h3 className="text-white font-semibold text-sm sm:text-base flex items-center justify-center gap-1.5"><span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-gradient-to-br from-teal-400/20 to-teal-600/20 border border-teal-400/25 text-teal-300 text-[11px] font-bold shrink-0">{idx + 1}</span><span>{tr('services.hub.step.' + slug + '.t')}</span></h3>
-                <p className="text-gray-500 text-xs mt-1.5">{tr('services.hub.step.' + slug + '.d')}</p>
-              </div>
+                <h3 className="text-white font-semibold text-[12px] leading-tight sm:text-base flex items-center justify-center gap-1.5"><span className="hidden sm:inline-flex items-center justify-center w-5 h-5 rounded-md bg-gradient-to-br from-teal-400/20 to-teal-600/20 border border-teal-400/25 text-teal-300 text-[11px] font-bold shrink-0">{idx + 1}</span><span>{tr('services.hub.step.' + slug + '.t')}</span></h3>
+                <p className="hidden sm:block text-gray-500 text-xs mt-1.5">{tr('services.hub.step.' + slug + '.d')}</p>
+              </li>
             ))}
-          </div>
+          </ol>
         </section>
 
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
@@ -369,38 +378,38 @@ export default function Services() {
         </section>
 
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
-          <div className="rounded-2xl p-6 sm:p-8 glass-card reveal" style={{ background: 'linear-gradient(135deg,rgb(var(--dz-c-teal-600) / .1),rgb(var(--dz-c-indigo-600) / .08))', border: '1px solid rgb(var(--dz-c-teal-500) / .25)' }}>
-            <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <div className="rounded-2xl p-4 sm:p-8 glass-card reveal" style={{ background: 'linear-gradient(135deg,rgb(var(--dz-c-teal-600) / .1),rgb(var(--dz-c-indigo-600) / .08))', border: '1px solid rgb(var(--dz-c-teal-500) / .25)' }}>
+            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-2.5 sm:mb-3">
                   <span className="dz-tag font-semibold text-teal-300" style={{ background: 'rgb(var(--dz-c-teal-500) / .15)' }}><Icon name="package" className="w-3.5 h-3.5" /> {tr('services.hub.packBadge')}</span>
                   {!packLive && (
                     <span className="dz-tag font-semibold text-amber-300" style={{ background: 'rgb(var(--dz-c-amber-500) / .15)' }}><Icon name="clock" className="w-3.5 h-3.5" /> {tr('services.hub.packComingSoon')}</span>
                   )}
                 </div>
-                <h2 className="text-2xl font-bold text-white">{tr('services.hub.packTitle')}</h2>
-                <p className="text-gray-300 mt-2 mb-4">{packLive ? tr('services.hub.packDesc') : tr('services.hub.packComingSoonDesc')}</p>
-                <div className="grid sm:grid-cols-2 gap-2.5">
+                <h2 className="text-xl sm:text-2xl font-bold text-white">{tr('services.hub.packTitle')}</h2>
+                <p className="text-gray-300 text-sm sm:text-base mt-1.5 sm:mt-2 mb-3 sm:mb-4">{packLive ? tr('services.hub.packDesc') : tr('services.hub.packComingSoonDesc')}</p>
+                <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   {PACK.map((p) => {
                     const price = movePack.items[p.id];
                     const sellable = packLive && typeof price === 'number';
                     const on = sellable && !!packSel[p.id];
                     return (
-                      <button key={p.id} type="button" disabled={!sellable} onClick={() => { if (sellable) setPackSel((s) => ({ ...s, [p.id]: !s[p.id] })); }} className={'flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 min-h-[44px] border text-left transition-all ' + (on ? 'border-teal-400/50 bg-teal-400/10' : 'border-white/10 bg-white/5') + (sellable ? '' : ' cursor-default')}>
-                        <span className="flex items-center gap-2.5 min-w-0">
-                          <Icon name={p.icon} className={'w-4 h-4 shrink-0 ' + (on ? 'text-teal-300' : 'text-gray-400')} />
+                      <button key={p.id} type="button" disabled={!sellable} onClick={() => { if (sellable) setPackSel((s) => ({ ...s, [p.id]: !s[p.id] })); }} className={'flex items-center gap-2 sm:gap-2.5 rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 min-h-[44px] border text-left transition-all ' + (on ? 'border-teal-400/50 bg-teal-400/10' : 'border-white/10 bg-white/5') + (sellable ? '' : ' cursor-default')}>
+                        <Icon name={p.icon} className={'w-4 h-4 shrink-0 ' + (on ? 'text-teal-300' : 'text-gray-400')} />
+                        <span className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2">
                           <span className="min-w-0">
-                            <span className="block text-sm text-white truncate">{tr('services.hub.pack.' + p.id)}</span>
-                            <span className="block text-[11px] text-gray-500 truncate">{tr('services.hub.packItemDesc.' + p.id)}</span>
+                            <span className="block text-[13px] sm:text-sm text-white leading-tight sm:truncate">{tr('services.hub.pack.' + p.id)}</span>
+                            <span className="hidden sm:block text-[11px] text-gray-500 truncate">{tr('services.hub.packItemDesc.' + p.id)}</span>
                           </span>
+                          {sellable && <span className={'text-xs font-semibold shrink-0 ' + (on ? 'text-teal-300' : 'text-gray-500')}>₹{price.toLocaleString('en-IN')}</span>}
                         </span>
-                        {sellable && <span className={'text-xs font-semibold shrink-0 ' + (on ? 'text-teal-300' : 'text-gray-500')}>₹{price.toLocaleString('en-IN')}</span>}
                       </button>
                     );
                   })}
                 </div>
               </div>
-              <div className="w-full lg:w-72 flex-shrink-0 rounded-2xl bg-white/5 border border-white/10 p-5">
+              <div className="w-full lg:w-72 flex-shrink-0 rounded-2xl bg-white/5 border border-white/10 p-4 sm:p-5">
                 {packLive ? (
                   <>
                     <p className="text-sm text-gray-400">{tr('services.hub.packTotal')}</p>
@@ -436,12 +445,12 @@ export default function Services() {
         </section>
 
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
-          <div className="theme-dark rounded-2xl p-8 sm:p-12 text-center relative overflow-hidden reveal">
+          <div className="theme-dark rounded-2xl p-6 sm:p-12 text-center relative overflow-hidden reveal">
             <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1400&q=80')" }} />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(120deg,rgb(var(--dz-c-ink) / .95),rgb(var(--dz-c-indigo-900) / .72),rgb(var(--dz-c-teal-600) / .55))' }} />
             <div className="relative">
               <h2 className="text-2xl sm:text-3xl font-bold">{tr('services.hub.ctaTitle')}</h2>
-              <p className="text-gray-200 mt-3 mb-7">{tr('services.hub.ctaSub')}</p>
+              <p className="text-gray-200 mt-2 sm:mt-3 mb-5 sm:mb-7">{tr('services.hub.ctaSub')}</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link to="/listings" className="btn-teal px-6 py-3.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name="search" className="w-4 h-4" /> {tr('services.hub.ctaBrowse')}</Link>
                 <Link to="/list-property" className="h-btn-lg px-6 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold hover:bg-white/15 inline-flex items-center justify-center gap-2 transition-all"><Icon name="plus" className="w-4 h-4" /> {tr('services.hub.ctaList')}</Link>

@@ -9,6 +9,8 @@ export default function PackersMovers() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const [prefillService, setPrefillService] = useState('');
+  const dateParam = searchParams.get('date') || '';
+  const prefillDate = /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : '';
 
   useEffect(() => {
     const serviceParam = searchParams.get('service');
@@ -45,7 +47,7 @@ export default function PackersMovers() {
           { name: 'from', label: t('services.packers.fFrom'), type: 'locality', unrestricted: true, placeholder: t('services.packers.fFromPlaceholder') },
           { name: 'to', label: t('services.packers.fTo'), type: 'locality', unrestricted: true, placeholder: t('services.packers.fToPlaceholder') },
           { name: 'size', label: t('services.packers.fSize'), type: 'select', options: ['1 RK', '1 BHK', '2 BHK', '3 BHK', '4 BHK / Villa', 'Office / Commercial', 'Few items only'] },
-          { name: 'date', label: t('services.packers.fDate'), type: 'date' },
+          { name: 'date', label: t('services.packers.fDate'), type: 'date', value: prefillDate },
         ],
         successMessage: t('services.packers.successMessage'),
       }}

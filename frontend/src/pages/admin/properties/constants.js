@@ -32,11 +32,6 @@ export const statusQuery = (value) => (value === 'archived'
   : PROGRESS.has(value)
     ? { archived: false, progress: value }
     : { archived: false, status: value || undefined });
-export const DEAL_OPTS = [
-  { value: '', label: 'Buy & Rent' },
-  { value: 'buy', label: 'Buy' },
-  { value: 'rent', label: 'Rent' },
-];
 export const EDIT_DEAL_OPTS = [
   { value: 'buy', label: 'Buy' },
   { value: 'rent', label: 'Rent' },

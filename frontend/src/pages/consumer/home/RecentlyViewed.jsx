@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
@@ -8,20 +8,25 @@ import { getRecentProps } from '../../../lib/localPrefs.js';
 import { priceLabel } from '../../../lib/format.js';
 import { cityLabelFor } from '../../../lib/geoConfig.js';
 import { propertyHref } from '../../../lib/listingSeo.js';
+import { useNearViewport } from '../../../lib/useNearViewport.js';
+
+const PREFETCH_MARGIN = '400px';
 
 export default function RecentlyViewed() {
   const { t } = useTranslation();
+  const [ids] = useState(() => getRecentProps().slice(0, 4));
   const [items, setItems] = useState([]);
+  const anchorRef = useRef(null);
+  const near = useNearViewport(anchorRef, PREFETCH_MARGIN);
 
   useEffect(() => {
+    if (!near || !ids.length) return undefined;
     let alive = true;
-    const ids = getRecentProps().slice(0, 4);
-    if (!ids.length) return undefined;
     listPropertiesByIds(ids).then((rows) => { if (alive) setItems(rows); }).catch(() => {});
     return () => { alive = false; };
-  }, []);
+  }, [near, ids]);
 
-  if (!items.length) return null;
+  if (!items.length) return ids.length ? <div ref={anchorRef} aria-hidden="true" /> : null;
 
   return (
     <section className="relative section-pb">

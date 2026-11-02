@@ -203,11 +203,8 @@ export const homeTypeLabelFor = (t) => HOME_TYPE_PILLS.find(([pt]) => pt === t)?
 
 export const leaseKindOf = (t) => (isCommercialType(t) ? 'commercial' : isLandType(t) ? 'land' : 'residential');
 
-export const NONRES = ['commercial', 'openplot', 'farmland', 'plot'];
-
 export const shellOptions = [['bareShell', 'Bare Shell'], ['warmShell', 'Warm Shell'], ['furnished', 'Furnished']];
 export const washroomOptions = ['1', '2', '3', '4+'];
-export const suitableForTags = ['Office', 'Retail', 'Restaurant', 'Clinic', 'Showroom', 'Warehouse', 'Bank / ATM', 'Gym / Studio'];
 export const plotZoneOptions = [
   'Residential (R1)', 'Residential (R2)', 'Commercial (C-1)', 'Industrial (I-1)',
   'Public / Semi-public', 'Mixed-Use', 'Agriculture Zone', 'Green Zone / No-Development Zone',
@@ -328,13 +325,13 @@ export const commercialProfileFromType = (valueOrLabel) => {
   return 'workspace';
 };
 
-export const commercialSaleDocs = [
+const commercialSaleDocs = [
   ...badgeDocsFor('buy'),
   { key: 'Occupancy Certificate', label: 'Occupancy / Completion Certificate', cta: 'Upload OC' },
   { key: 'Sanctioned Building Plan', label: 'Sanctioned Building Plan', cta: 'Upload Approved Plan' },
   { key: 'Fire NOC', label: 'Fire / Trade NOC', cta: 'Upload NOC', hint: 'Required for most commercial usage — reassures serious tenants and buyers.' },
 ];
-export const commercialRentDocs = [
+const commercialRentDocs = [
   ...badgeDocsFor('rent'),
   { key: 'Fire NOC', label: 'Fire / Trade NOC', cta: 'Upload NOC', hint: 'Supporting compliance records for business tenants.' },
 ];

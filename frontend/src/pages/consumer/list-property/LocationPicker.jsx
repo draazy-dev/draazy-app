@@ -85,7 +85,7 @@ export function PinMapBox({ invalid = false, hint = null, ...props }) {
   );
 }
 
-export default function LocationPicker(props) {
+function LocationPicker(props) {
   const { t } = useTranslation();
   return (
     <MapBoundary scope="location-picker" fallback={<MapUnavailable style={{ height: '100%' }} note={t('listProperty.locationPicker.unavailable')} />}>

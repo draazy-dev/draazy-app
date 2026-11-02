@@ -58,16 +58,7 @@ export const COMMERCIAL_SUBTYPES = [
   { key: 'coworking', label: 'Co-working Space', matches: ['co-working', 'coworking'] },
 ];
 
-const COMM_BY_KEY = Object.fromEntries(COMMERCIAL_SUBTYPES.map((t) => [t.key, t]));
-
 export const COMMERCIAL_TYPES = COMMERCIAL_SUBTYPES.map((t) => [t.key, t.label]);
-
-export const matchCommercialKey = (key, typeStr) => {
-  const def = COMM_BY_KEY[key];
-  if (!def) return false;
-  const x = (typeStr || '').toLowerCase();
-  return def.matches.some((m) => x.includes(m));
-};
 
 export const LAND_USE = [
   ['residential', 'Residential'],

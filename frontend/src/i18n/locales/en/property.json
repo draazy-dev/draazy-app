@@ -41,8 +41,6 @@
       "referTitle": "Refer a friend",
       "referBody": "Each friend who qualifies earns you {{count}} more owner contacts. No payment needed.",
       "referCta": "Get my referral link",
-      "planTitle": "Contact Pack",
-      "planBody": "{{price}} · 15 owner contacts · valid 30 days · no auto-renew.",
       "planCta": "Buy for {{price}}"
     },
     "prevPhoto": "Previous photo",

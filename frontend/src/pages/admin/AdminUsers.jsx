@@ -95,11 +95,13 @@ export default function AdminUsers() {
   }, []);
 
   const countsKey = useRef(null);
+  const loadSeq = useRef(0);
   const load = useCallback(async (recount = false) => {
     const key = `${role}|${q.trim()}`;
     const counts = recount === true || countsKey.current !== key;
+    const mine = ++loadSeq.current;
     const res = await listUsers({ role, customers: true, status, q: q.trim(), days, page: page - 1, size: PAGE_SIZE, counts });
-    if (!alive.current) return;
+    if (!alive.current || mine !== loadSeq.current) return;
     setRows(res.items);
     setTotal(res.total);
     if (counts) {
@@ -108,10 +110,12 @@ export default function AdminUsers() {
     }
   }, [role, status, q, days, page]);
 
+  const loadedQ = useRef(q);
   useEffect(() => {
-    const id = setTimeout(() => { load(); }, 250);
+    if (loadedQ.current === q) { load(); return undefined; }
+    const id = setTimeout(() => { loadedQ.current = q; load(); }, 250);
     return () => clearTimeout(id);
-  }, [load]);
+  }, [load, q]);
 
   const openAction = useCallback((targetUser, action) => { setActionModal({ user: targetUser, action, copy: ACTION_COPY[action] }); setNoteText(''); setActionError(''); }, []);
   const closeAction = () => { setActionModal(null); setActionError(''); };

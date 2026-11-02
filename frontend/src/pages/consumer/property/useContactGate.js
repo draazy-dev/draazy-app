@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NO_CONTACT_GATE } from '../../../lib/contact.js';
 import { contactStatus } from '../../../services/contactService.js';
+import { REVISIT_MAX_AGE } from '../../../services/http.js';
 
 export function useContactGate(propertyId, refreshKey = '') {
   const [gate, setGate] = useState(NO_CONTACT_GATE);
   const [loading, setLoading] = useState(Boolean(propertyId));
   const latest = useRef(0);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (opts) => {
     const ask = ++latest.current;
     if (!propertyId) {
       setGate(NO_CONTACT_GATE);
       setLoading(false);
       return NO_CONTACT_GATE;
     }
-    const next = await contactStatus(propertyId);
+    const next = await contactStatus(propertyId, opts);
     if (ask === latest.current) {
       setGate(next);
       setLoading(false);
@@ -33,7 +34,7 @@ export function useContactGate(propertyId, refreshKey = '') {
       return undefined;
     }
 
-    contactStatus(propertyId)
+    contactStatus(propertyId, { maxAge: REVISIT_MAX_AGE })
       .then((next) => {
         if (alive()) setGate(next);
       })

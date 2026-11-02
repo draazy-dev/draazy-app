@@ -88,36 +88,6 @@ export function criteriaChips(rec, locNameBySlug = {}) {
   return chips;
 }
 
-export function countMatches(rec, props = []) {
-  const locs = asArr(rec.localities).map((s) => String(s).toLowerCase());
-  const bhks = asArr(rec.bhk).map(String);
-  const types = asArr(rec.types).map((s) => String(s).toLowerCase());
-  const furnishings = asArr(rec.furnishing).map((s) => String(s).toLowerCase());
-  const amenities = asArr(rec.amenities).map((s) => String(s).toLowerCase());
-  const [lo, hi] = rec.deal === 'rent'
-    ? (Array.isArray(rec.rent) ? rec.rent : [0, RENT_MAX])
-    : (Array.isArray(rec.budget) ? rec.budget : [0, BUY_MAX]);
-  const wantsRent = rec.deal === 'rent';
-  return props.filter((p) => {
-    if (wantsRent ? p.deal !== 'rent' : p.deal === 'rent') return false;
-    if (p.price < lo || p.price > hi) return false;
-    if (locs.length) {
-      const slug = String(p.localitySlug || '').toLowerCase();
-      const name = String(p.locality || '').toLowerCase();
-      if (!locs.includes(slug) && !locs.includes(name)) return false;
-    }
-    if (types.length && !types.includes(String(p.type || '').toLowerCase())) return false;
-    if (bhks.length && !bhks.some((b) => b.endsWith('plus') ? Number(p.bhkNum) >= Number(b.replace('plus', '')) : b === String(p.bhkNum))) return false;
-    if (furnishings.length && !furnishings.includes(String(p.furnishing || '').toLowerCase())) return false;
-    if (amenities.length) {
-      const listingAmenities = asArr(p.amenities).map((s) => String(s).toLowerCase());
-      if (!amenities.every((a) => listingAmenities.includes(a))) return false;
-    }
-    if (rec.pets && p.pets !== true) return false;
-    return true;
-  }).length;
-}
-
 export function searchHref(rec) {
   const params = new URLSearchParams({ deal: rec.deal === 'rent' ? 'rent' : 'buy', ...filtersToParams(deserializeF(rec)) });
   return '/listings?' + params.toString();

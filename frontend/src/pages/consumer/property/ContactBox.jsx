@@ -29,7 +29,7 @@ export function ContactBox({ p, isIn, toast }) {
   const [quotaOpen, setQuotaOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const { entitlements, refresh: refreshEntitlements } = useEntitlements(isIn);
-  const left = contactsLeft(entitlements);
+  const left = contactsLeft(entitlements, p.deal);
   const freeTill = freeContactsTill(entitlements);
   const status = gate.status;
   const ownerHides = status === 'approved' && gate.ownerHidesNumber;
@@ -136,7 +136,7 @@ export function ContactBox({ p, isIn, toast }) {
           onClose={() => setVerifyOpen(false)}
         />
       )}
-      {quotaOpen && <ContactsExhaustedModal onClose={() => setQuotaOpen(false)} />}
+      {quotaOpen && <ContactsExhaustedModal deal={p.deal} onClose={() => setQuotaOpen(false)} />}
     </div>
   );
 }

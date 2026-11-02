@@ -27,7 +27,7 @@ import { useRequestThreads } from './messages/useRequestThreads.js';
 import { targetSlug } from './requests/requestMeta.js';
 import { useRequestActions } from './requests/useRequestActions.js';
 
-const INBOX_POLL_MS = 60000;
+const INBOX_POLL_MS = 300000;
 const THREAD_FALLBACK_POLL_MS = 4000;
 const INBOX_FALLBACK_POLL_MS = 30000;
 const clientId = () => `c${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
@@ -42,7 +42,7 @@ export default function Messages() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { refresh: refreshChatBadge, streamConnected, subscribe } = useConversationUnread();
+  const { refresh: refreshChatBadge, streamConnected, subscribe, freshWhileLive } = useConversationUnread();
   const [convs, setConvs] = useState([]);
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -63,6 +63,9 @@ export default function Messages() {
   const activeAt = useRef(null);
   const activeIdRef = useRef(null);
   const inboxUnread = useRef(0);
+  const reloadedAt = useRef(0);
+  const hydrated = useRef(new Map());
+  const unreadWhileHidden = useRef(null);
   const lastWake = useRef(0);
   const queue = useRef([]);
   const photoUrls = useRef(new Set());
@@ -80,6 +83,7 @@ export default function Messages() {
   }, []);
 
   const reload = useCallback(async ({ quiet = false } = {}) => {
+    reloadedAt.current = Date.now();
     if (!quiet) { setLoading(true); setError(null); }
     try {
       await drainPendingChats().catch(() => null);
@@ -112,11 +116,17 @@ export default function Messages() {
     }
   }, [refreshChatBadge]);
 
+  const markRead = useCallback((id, count) => {
+    inboxUnread.current = Math.max(0, inboxUnread.current - count);
+    markConversationRead(id).then(refreshChatBadge).catch(() => {});
+  }, [refreshChatBadge]);
+
   const hydrate = useCallback((id, onlyIfNew = false) => {
     if (!id || isLocalId(id)) return;
     getConversation(id)
       .then((full) => {
         if (!full) return;
+        hydrated.current.set(id, full.messages);
         activeAt.current = full.at;
         const lastId = full.messages.at(-1)?.id ?? null;
         if (onlyIfNew && lastId === lastMsgId.current) return;
@@ -124,10 +134,11 @@ export default function Messages() {
         patchConv(id, (c) => ({ ...c, ...full, unread: 0, messages: mergeMessages(full.messages, c.messages) }));
         setOffline(false);
         flushQueueRef.current();
-        if (!document.hidden && full.unread > 0) markConversationRead(id).then(refreshChatBadge).catch(() => {});
+        if (full.unread > 0 && document.hidden) unreadWhileHidden.current = { id, count: full.unread };
+        else if (full.unread > 0) markRead(id, full.unread);
       })
       .catch(() => {});
-  }, [patchConv, refreshChatBadge]);
+  }, [markRead, patchConv]);
 
   useEffect(() => { reload().catch(() => {}); }, [reload]);
 
@@ -239,6 +250,12 @@ export default function Messages() {
     } else setShowThread(true);
   };
 
+  const hydrateUnlessHas = useCallback((id, sentId) => {
+    window.setTimeout(() => {
+      if (!hydrated.current.get(id)?.some((m) => m.id === sentId)) hydrate(id);
+    }, 1000);
+  }, [hydrate]);
+
   const sendNow = useCallback(async ({ conversationId, text, id, replyTo }) => {
     const sent = await replyToConversation(conversationId, { body: text, clientId: id, replyToId: replyTo?.id });
     patchConv(conversationId, (c) => ({
@@ -247,8 +264,8 @@ export default function Messages() {
       lastMessage: sent.text,
       messages: c.messages.map((m) => (m.clientId === id ? sent : m)),
     }));
-    window.setTimeout(() => hydrate(conversationId), 1000);
-  }, [hydrate, patchConv]);
+    hydrateUnlessHas(conversationId, sent.id);
+  }, [hydrateUnlessHas, patchConv]);
 
   const sendPhotoNow = useCallback(async ({ conversationId, file, caption, id, previewUrl }) => {
     const sent = await sendConversationPhoto(conversationId, { file, caption, clientId: id });
@@ -262,8 +279,8 @@ export default function Messages() {
       URL.revokeObjectURL(previewUrl);
       photoUrls.current.delete(previewUrl);
     }
-    window.setTimeout(() => hydrate(conversationId), 1000);
-  }, [hydrate, patchConv]);
+    hydrateUnlessHas(conversationId, sent.id);
+  }, [hydrateUnlessHas, patchConv]);
 
   const markFailed = useCallback((conversationId, id, message) => {
     patchConv(conversationId, (c) => ({
@@ -284,6 +301,12 @@ export default function Messages() {
     const onVisible = () => {
       if (document.hidden || Date.now() - lastWake.current < 1000) return;
       lastWake.current = Date.now();
+      const missed = unreadWhileHidden.current;
+      unreadWhileHidden.current = null;
+      if (freshWhileLive(reloadedAt.current)) {
+        if (missed && missed.id === activeId) markRead(missed.id, missed.count);
+        return;
+      }
       reload({ quiet: true }).catch(() => {});
       if (activeId) hydrate(activeId);
     };
@@ -297,7 +320,7 @@ export default function Messages() {
       window.removeEventListener('focus', onVisible);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [activeId, flushQueue, hydrate, reload]);
+  }, [activeId, flushQueue, freshWhileLive, hydrate, markRead, reload]);
 
   const sendText = (text, replyTo = null, retryId = null) => {
     if (!active || active.staged || active.blocked || active.blockedYou || active.listingDeleted) return;

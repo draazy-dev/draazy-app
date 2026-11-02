@@ -2,7 +2,7 @@ import { Navigate, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAdminFlags } from '../context/AdminFlagsContext.jsx';
 import { useAppFlags } from '../context/AppFlagsContext.jsx';
-import { canAccessModule } from '../lib/adminModules.js';
+import { canAccessModule, portalBase } from '../lib/adminModules.js';
 
 function GuardPending() {
   return (
@@ -30,15 +30,16 @@ export function RoleRoute({ roles, redirect = '/staff-login', children }) {
 }
 
 export function FlagRoute({ flag, children }) {
+  const { user } = useAuth();
   const { tabEnabled } = useAdminFlags();
-  if (!tabEnabled(flag)) return <Navigate to="/admin" replace />;
+  if (!tabEnabled(flag)) return <Navigate to={portalBase(user)} replace />;
   return children;
 }
 
 export function ModuleRoute({ moduleKey, children }) {
   const { user, loading: authLoading } = useAuth();
   if (authLoading) return <GuardPending />;
-  if (!canAccessModule(user, moduleKey)) return <Navigate to="/admin" replace />;
+  if (!canAccessModule(user, moduleKey)) return <Navigate to={portalBase(user)} replace />;
   return children;
 }
 

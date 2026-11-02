@@ -74,8 +74,6 @@ export default function InternalNote({ entityType, entityId, value, onChange, sh
   );
 }
 
-export { addNote as submitNote };
-
 export async function saveNoteIfAny(entityType, entityId, text, action) {
   const clean = String(text ?? '').trim();
   if (!clean) return { written: false, error: null };

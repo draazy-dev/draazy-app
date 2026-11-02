@@ -23,7 +23,14 @@
       "paid": "{{month}} rent received by {{owner}}",
       "receipt": "Receipt",
       "receiptFor": "Download rent receipt for {{month}}",
-      "downloadFailed": "Couldn't create the receipt. Try again."
+      "downloadFailed": "Couldn't create the receipt. Try again.",
+      "claimed": "You said {{month}} is paid · waiting for {{owner}} to confirm",
+      "iPaid": "I've paid",
+      "claimedToast": "Sent to {{owner}} to confirm.",
+      "claimFailed": "Couldn't send that. Try again.",
+      "fyReceipts": "{{fy}} receipts",
+      "fyReceiptsFor": "Download all {{fy}} rent receipts",
+      "noPan": "No landlord PAN on these receipts yet. Rent above ₹1 lakh a year needs it for HRA, so ask {{owner}} to add it."
     },
     "societyFinder": {
       "title": "Track a society",
@@ -188,7 +195,7 @@
     "billingHave": "What you have",
     "billingSeePrices": "See prices →",
     "billingFree": "Free",
-    "billingFreeOwner": "1 live listing free · {{price}} pass for each extra",
+    "billingFreeOwner": "1 live listing free · extra listing pass: rent {{rent}}, sale {{buy}}",
     "billingFreeSeeker": "15 free owner contacts within 30 days of your first contact",
     "billingUnlimited": "Unlimited contacts (legacy plan)",
     "billingPass": "Listing pass · till {{date}}",
@@ -238,7 +245,17 @@
     "refundConfirm": "Confirm refund",
     "refundSent": "Request sent — reviewed within 2 business days.",
     "refundFailed": "Couldn’t send the request — please try again",
-    "refundNotEligible": "This purchase can’t be refunded any more."
+    "refundNotEligible": "This purchase can’t be refunded any more.",
+    "leaseEnd": {
+      "title": "Your lease ends on {{date}}",
+      "renew": "Renew with the same owner · {{price}}",
+      "search": "Find next home",
+      "movers": "Book movers",
+      "call": "Ask Draazy to call me",
+      "callConsent": "By tapping, you agree Draazy may call you about homes and moving. Turn this off any time in Settings.",
+      "callDone": "Done. Our team will call you soon.",
+      "callFailed": "Couldn't save that. Please try again."
+    }
   },
   "visits": {
     "stScheduled": "Awaiting confirmation",

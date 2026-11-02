@@ -36,7 +36,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
   const routeId = propertyKey(useParams().id);
   const { gate, loading } = useContactGate(routeId || propId);
   const { entitlements } = useEntitlements(isIn);
-  const left = contactsLeft(entitlements);
+  const left = contactsLeft(entitlements, p.deal);
   const freeTill = freeContactsTill(entitlements);
   const status = gate.status;
   const ownerHides = status === 'approved' && gate.ownerHidesNumber;
@@ -300,7 +300,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
           onClose={() => setVerify(false)}
         />
       )}
-      {quotaOpen && <ContactsExhaustedModal onClose={() => setQuotaOpen(false)} />}
+      {quotaOpen && <ContactsExhaustedModal deal={p.deal} onClose={() => setQuotaOpen(false)} />}
     </div>
   );
 }

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Search, Bell, Building2, User, Wrench, ShieldCheck, LayoutDashboard, BarChart3, MessageSquare, FileText, Flag, LifeBuoy, Users, Settings, IndianRupee, Gift, Compass, BookOpen, Undo2 } from 'lucide-react';
+import { Search, Bell, Building2, User, Wrench, ShieldCheck, LayoutDashboard, BarChart3, MessageSquare, FileText, Flag, LifeBuoy, Users, Settings, IndianRupee, Gift, Compass, BookOpen, Undo2, PhoneCall } from 'lucide-react';
 import { lookupForModeration } from '../../services/propertyService.js';
 import { listUsers } from '../../services/usersService.js';
 import { adminBell } from '../../services/analyticsService.js';
 import { useAdminFlags } from '../../context/AdminFlagsContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { useHelpTree } from '../../lib/useHelp.js';
+import { useHelpIndex } from '../../lib/useHelp.js';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import { listNotifications, markAllRead, markRead } from '../../services/notificationService.js';
 import { safeNotificationLink, TYPE_META } from '../notifications/notificationModel.js';
@@ -44,6 +44,7 @@ const NAV_INDEX_FULL = [
   { label: 'Integrations', keywords: 'integrations email whatsapp otp payments cashfree zoho webhook delivery failures providers', path: '/admin/integrations', icon: Settings, flag: null },
   { label: 'Referrals', keywords: 'referrals ops refer bonus', path: '/admin/referrals', icon: Gift, flag: null },
   { label: 'Refunds', keywords: 'refunds refund money back credit note dispute chargeback pass pack', path: '/admin/refunds', icon: Undo2, flag: null },
+  { label: 'Leads', keywords: 'leads crm follow up call whatsapp prospects sales conversion pipeline unassigned claim', path: '/admin/leads', icon: PhoneCall, flag: null },
   { label: 'Runbooks', keywords: 'help runbook runbooks docs documentation guide guides knowledge base handbook playbook ops internal how to checklist', path: '/admin/runbooks', icon: BookOpen, flag: null },
 ];
 
@@ -172,7 +173,7 @@ export default function AdminTopbarTools() {
     [tabEnabled, user],
   );
 
-  const { articles } = useHelpTree();
+  const { articles } = useHelpIndex();
   const FEATURES = useMemo(() => {
     const runbooks = runbooksFor(articles, user)
       .map((a) => ({ label: a.title, keywords: `${a.summary} runbook internal ops`, path: `/admin/runbooks/${a.slug}`, parent: 'Runbooks', flag: null }));

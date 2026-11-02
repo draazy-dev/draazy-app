@@ -330,6 +330,9 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
         <PrefRow title="New property match alerts" desc="Get notified when new listings match your saved searches.">
           <Switch checked={prefs.matchAlerts} onChange={(v) => changePrefs({ matchAlerts: v })} label="New property match alerts" />
         </PrefRow>
+        <PrefRow title="Calls about homes and moving" desc="Let our team call you before your lease ends.">
+          <Switch checked={!!prefs.marketingCalls} onChange={(v) => changePrefs({ marketingCalls: v })} label="Calls about homes and moving" />
+        </PrefRow>
         <div className="mt-2 border-t border-white/5 pt-3">
           <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2">Delivery channels</p>
           {[

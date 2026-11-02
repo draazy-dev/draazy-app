@@ -10,6 +10,7 @@ import { firstName } from '../../lib/auth.js';
 import { useVerification } from '../../context/VerificationContext.jsx';
 import { listRecentSearches } from '../../services/recentSearchService.js';
 import { dashboardCaps, primeMeDashboard } from '../../services/meDashboardService.js';
+import { REVISIT_MAX_AGE } from '../../services/http.js';
 import VisitsTab from '../../components/dashboard/VisitsTab.jsx';
 import DocumentsTab from '../../components/dashboard/DocumentsTab.jsx';
 import FinancesTab from '../../components/dashboard/FinancesTab.jsx';
@@ -50,7 +51,7 @@ export default function Dashboard() {
     if (candidate && TAB_ALIAS[candidate]) return TAB_ALIAS[candidate];
     return { tab: candidate || 'overview' };
   };
-  const [dashboardDoc] = useState(() => primeMeDashboard({ listingTools: resolveTarget(tabFromLocation()).tab === 'properties' }));
+  const [dashboardDoc] = useState(() => primeMeDashboard({ listingTools: resolveTarget(tabFromLocation()).tab === 'properties', maxAge: REVISIT_MAX_AGE }));
   const [caps, setCaps] = useState({});
   useEffect(() => {
     let live = true;

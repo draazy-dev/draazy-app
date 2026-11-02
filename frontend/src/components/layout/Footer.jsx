@@ -59,7 +59,7 @@ export default function Footer() {
               <Soc k="facebook" label="Draazy on Facebook" href="https://www.facebook.com/profile.php?id=61594205514968" hover="hover:bg-teal-500/10 hover:text-teal-400" />
               <Soc k="instagram" label="Draazy on Instagram" href="https://www.instagram.com/draazyapp.homes" hover="hover:bg-pink-500/10 hover:text-pink-400" />
               <Soc k="x" label="Draazy on X" href="https://x.com/draazyapp" hover="hover:bg-teal-500/10 hover:text-teal-400" />
-              <Soc k="linkedin" label="Draazy on LinkedIn" href="http://www.linkedin.com/in/draazy-app-4a3195435" hover="hover:bg-teal-500/10 hover:text-teal-400" />
+              <Soc k="linkedin" label="Draazy on LinkedIn" href="https://www.linkedin.com/company/draazy" hover="hover:bg-teal-500/10 hover:text-teal-400" />
               <Soc k="youtube" label="Draazy on YouTube" href="https://www.youtube.com/@draazy-x1u" hover="hover:bg-orange-500/10 hover:text-orange-400" />
             </div>
           </div>

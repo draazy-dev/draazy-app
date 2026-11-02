@@ -121,19 +121,6 @@ export default function useListProperty() {
   const stepRef = useRef(1);
   const [quota, setQuota] = useState({ used: 0, allowance: null });
   const [passListingId, setPassListingId] = useState('');
-  useEffect(() => {
-    if (editId || editRoomId || authLoading) return undefined;
-    if (!user) {
-      setQuota({ used: 0, allowance: null });
-      return undefined;
-    }
-    let live = true;
-    loadWizardQuota().then((q) => {
-      if (!live) return;
-      setQuota(q);
-    });
-    return () => { live = false; };
-  }, [editId, editRoomId, authLoading, user]);
 
   const [form, setForm] = useState(() => initialForEntry(searchParams, flatmateMode, editId));
   const entryForm = useRef(form);
@@ -316,6 +303,24 @@ export default function useListProperty() {
   }, [media, requestAuthPrompt, signedIn]);
 
   const isFlatmateMode = !editId && form.deal === 'rent' && rentMode === 'flatmate';
+
+  const quotaUser = useRef(null);
+  useEffect(() => {
+    if (editId || editRoomId) quotaUser.current = null;
+    if (editId || editRoomId || authLoading) return undefined;
+    if (!user) {
+      quotaUser.current = null;
+      setQuota({ used: 0, allowance: null });
+      return undefined;
+    }
+    // Rooms never show or use the quota; a mode toggle reuses the one already read for this user.
+    if (isFlatmateMode || quotaUser.current === user) return undefined;
+    quotaUser.current = user;
+    loadWizardQuota().then((q) => {
+      if (quotaUser.current === user) setQuota(q);
+    });
+    return undefined;
+  }, [editId, editRoomId, authLoading, user, isFlatmateMode]);
 
   const progressState = useMemo(
     () => computeProgress({ form, photos, isFlatmateMode }),

@@ -25,27 +25,22 @@ export default function TimeField({
 
   return (
     <>
-      <div
+      <button
+        type="button"
         ref={anchorRef}
-        className={`dz-datefield ${invalid ? 'dz-invalid' : ''} ${disabled ? 'is-disabled' : ''} ${className}`}
+        className={`dz-datefield ${invalid ? 'dz-invalid' : ''} ${className}`}
         data-err={dataErr}
-        role="button"
-        tabIndex={disabled ? -1 : 0}
+        disabled={disabled}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-disabled={disabled || undefined}
         aria-label={label}
-        onClick={() => !disabled && setOpen((o) => !o)}
-        onKeyDown={(e) => {
-          if (disabled) return;
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((o) => !o); }
-        }}
+        onClick={() => setOpen((o) => !o)}
       >
         <span className={`dz-datefield__text ${!display ? 'is-placeholder' : ''}`}>
           {display || ph}
         </span>
         <Clock className="dz-datefield__icon" aria-hidden="true" />
-      </div>
+      </button>
       <TimePickerDialog
         open={open}
         value={value}

@@ -48,6 +48,7 @@ async function parseWithLocalities(raw, readCtx) {
 }
 const filterSignature = (value) => JSON.stringify(serializeF(value));
 let pendingDrawerBackSnapshot = null;
+let lastSearchIntent = '';
 
 function readStoredListingsSearch() {
   if (typeof window === 'undefined') return null;
@@ -361,14 +362,13 @@ export default function Listings() {
     window.scrollTo({ top: 0 });
   };
 
-  const intentLogged = useRef('');
   useEffect(() => {
     if (!loaded) return;
     const loc = deferredF.localities.size === 1 ? [...deferredF.localities][0] : '';
     const bhk = deferredF.bhk.size === 1 ? [...deferredF.bhk][0] : '';
     const key = `${loc}|${deferredF.deal}|${bhk}`;
-    if (key === intentLogged.current || (!loc && !bhk)) return;
-    intentLogged.current = key;
+    if (key === lastSearchIntent || (!loc && !bhk)) return;
+    lastSearchIntent = key;
     recordSignal({ kind: 'search', localitySlug: loc, deal: deferredF.deal, bhk });
   }, [deferredF, loaded]);
 

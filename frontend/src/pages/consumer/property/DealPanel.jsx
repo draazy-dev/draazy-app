@@ -20,6 +20,7 @@ import {
   myFinalizationRequests, acceptFinalization, declineFinalization,
 } from '../../../services/dealService.js';
 import { tenantsVerified } from '../../../services/rentService.js';
+import { REVISIT_MAX_AGE } from '../../../services/http.js';
 
 const fmtOffer = (n) => '₹' + (Number(n) || 0).toLocaleString('en-IN');
 
@@ -60,15 +61,14 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
 
   const reload = useCallback(async () => {
     if (!propId) return;
+    const scoped = { propertyId: propId, maxAge: REVISIT_MAX_AGE };
     if (isOwner) {
-      const [deal, parties, offers, requests] = await Promise.all([
+      const [deal, parties, ownOffers, pending] = await Promise.all([
         getDeal(propId).catch(() => null),
         listParties(propId).catch(() => []),
-        offersOnMine().catch(() => []),
-        myFinalizationRequests().catch(() => []),
+        offersOnMine(scoped).catch(() => []),
+        myFinalizationRequests(scoped).catch(() => []),
       ]);
-      const ownOffers = (offers || []).filter((o) => String(o.propId) === propId);
-      const pending = (requests || []).filter((r) => String(r.propId) === propId);
 
       const verified = await tenantsVerified([
         ...ownOffers.map((o) => o.buyerMobile),
@@ -88,14 +88,14 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
     }
     const [status, mine, fin] = await Promise.all([
       dealStatusForBuyer(p).catch(() => 'active'),
-      isIn ? myOffers().catch(() => []) : Promise.resolve([]),
+      isIn ? myOffers(scoped).catch(() => []) : Promise.resolve([]),
       isIn && contactApproved ? finalizationStatus(propId).catch(() => null) : Promise.resolve(null),
     ]);
     setState({
       status: status || 'active',
       parties: [],
       offers: [],
-      myOffer: (mine || []).find((o) => String(o.propId) === propId) || null,
+      myOffer: (mine || [])[0] || null,
       myFinalize: fin,
       pending: [],
       verified: new Set(),

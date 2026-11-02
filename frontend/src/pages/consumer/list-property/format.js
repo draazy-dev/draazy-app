@@ -30,5 +30,3 @@ export const perUnit = (amount, area, unitLabel = 'sq.ft') => {
   if (!price || !unitArea) return '';
   return `≈ ₹ ${formatIndian(Math.round(price / unitArea))} / ${unitLabel}`;
 };
-
-export const perSqft = (amount, area) => perUnit(amount, area, 'sq.ft');

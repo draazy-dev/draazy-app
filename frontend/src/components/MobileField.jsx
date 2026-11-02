@@ -4,8 +4,6 @@ import { cleanMobile as sanitize } from '../lib/idFormat.js';
 
 const IN_PATTERN = /^[6-9]\d{9}$/;
 
-export const isValidMobile = (v) => IN_PATTERN.test(sanitize(v));
-
 export default function MobileField({
   value,
   onChange,

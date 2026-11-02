@@ -116,7 +116,7 @@ export const KB = [
     id: 'plans',
     keywords: ['plan', 'plans', 'price', 'pricing', 'paid', 'premium', 'subscription', 'cost', 'upgrade', 'package', 'contact pack', 'pass'],
     q: 'What costs money on Draazy?',
-    a: "Only three things: a Contact Pack (15 owner contacts for 30 days), a Listing Pass for each extra live listing beyond your one free listing (60 days), and a rent agreement. None renews by itself. Everything else, including enquiries, the verified badge and flatmate posts, is free. Compare current prices on the Plans page.",
+    a: "Only three things: a Contact Pack (15 contacts for 30 days on rent listings at ₹199, or for 60 days on sale listings at ₹399), a Listing Pass for each extra live listing beyond your one free listing (₹999 for 60 days on rent, ₹1,999 for 90 days on sale), and a rent agreement. None renews by itself. Everything else, including enquiries, the verified badge and flatmate posts, is free. Compare current prices on the Plans page.",
     actions: [{ label: 'View Plans', to: '/plans', icon: 'badge-check' }],
   },
   {

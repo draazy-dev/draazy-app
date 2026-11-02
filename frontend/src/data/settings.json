@@ -13,13 +13,15 @@
       "facebook": "https://www.facebook.com/profile.php?id=61594205514968",
       "instagram": "https://www.instagram.com/draazyapp.homes",
       "twitter": "https://x.com/draazyapp",
-      "linkedin": "http://www.linkedin.com/in/draazy-app-4a3195435",
+      "linkedin": "https://www.linkedin.com/company/draazy",
       "youtube": "https://www.youtube.com/@draazy-x1u"
     }
   },
   "fees": {
     "listingPass": 999,
+    "listingPassBuy": 1999,
     "contactPack": 199,
+    "contactPackBuy": 399,
     "rentAgreementPlatform": 499
   },
   "movePack": {

@@ -4,6 +4,7 @@ import MyPostsStrip from '../../../components/MyPostsStrip.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import useAsyncList from '../../../hooks/useAsyncList.js';
 import { myListings } from '../../../services/propertyService.js';
+import { REVISIT_MAX_AGE } from '../../../services/http.js';
 import { fmtINR } from '../../../lib/format.js';
 
 const SHOWN_STATUS = new Set(['approved', 'pending']);
@@ -11,7 +12,7 @@ const SHOWN_STATUS = new Set(['approved', 'pending']);
 export default function MyListingsStrip({ deal }) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const load = useCallback(() => myListings(user), [user]);
+  const load = useCallback(() => myListings(user, { maxAge: REVISIT_MAX_AGE }), [user]);
   const [mine] = useAsyncList(load, [load], !!user);
   const isRent = deal === 'rent';
   const items = mine

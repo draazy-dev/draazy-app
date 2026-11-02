@@ -17,6 +17,8 @@ import FlatmateFlow from './list-property/FlatmateFlow.jsx';
 import PostSuccessSplitNudge from './list-property/PostSuccessSplitNudge.jsx';
 import InlineOtpSheet from '../../components/auth/InlineOtpSheet.jsx';
 import ListingStatusCard from '../../components/listing/ListingStatusCard.jsx';
+import PassValueLine from '../../components/billing/PassValueLine.jsx';
+import { passPriceKey, passSlug } from '../../lib/dealPlans.js';
 
 const ListPropertyForm = () => {
   const vm = useListProperty();
@@ -104,10 +106,11 @@ const ListPropertyForm = () => {
           )}
           {passListingId && !isFlatmateMode && !editId && (
             <div className="mb-6 rounded-xl border border-amber-400/30 bg-amber-400/5 p-4 text-left">
-              <p className="text-sm text-amber-100">{t('listProperty.success.passNote', { price: fee('listingPass') })}</p>
-              <Link to={`/checkout?plan=listing-pass&property=${encodeURIComponent(passListingId)}`} className="btn-teal mt-3 inline-flex min-h-[44px] items-center justify-center px-5 py-2.5 rounded-xl text-white font-semibold text-sm">
-                {t('listProperty.success.passCta', { price: fee('listingPass') })}
+              <p className="text-sm text-amber-100">{t('listProperty.success.passNote', { price: fee(passPriceKey(form.deal)) })}</p>
+              <Link to={`/checkout?plan=${passSlug(form.deal)}&property=${encodeURIComponent(passListingId)}`} className="btn-teal mt-3 inline-flex min-h-[44px] items-center justify-center px-5 py-2.5 rounded-xl text-white font-semibold text-sm">
+                {t('listProperty.success.passCta', { price: fee(passPriceKey(form.deal)) })}
               </Link>
+              <PassValueLine deal={form.deal} className="mt-2 text-xs text-amber-100/80" />
             </div>
           )}
           {isFlatmateMode && postedRoom?.id && postedRoom.hostRole === 'tenant' && !postedRoom.agreementDeclared && (
@@ -159,7 +162,7 @@ const ListPropertyForm = () => {
         {listingLimit != null && !editId && !isFlatmateMode && (
           <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-semibold text-gray-300">
             <p>{t('listProperty.quota.entry', { count: listingLimit, used: activeListingCount, allowance: listingLimit })}</p>
-            {quotaFull && <p className="mt-1 font-normal text-amber-200">{t('listProperty.success.passNote', { price: fee('listingPass') })}</p>}
+            {quotaFull && <p className="mt-1 font-normal text-amber-200">{t('listProperty.success.passNote', { price: fee(passPriceKey(form.deal)) })}</p>}
           </div>
         )}
 

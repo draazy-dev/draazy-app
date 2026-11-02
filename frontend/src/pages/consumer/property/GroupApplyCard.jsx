@@ -82,4 +82,3 @@ export function GroupApplyCard({ p, isIn, toast }) {
   );
 }
 
-export default GroupApplyCard;

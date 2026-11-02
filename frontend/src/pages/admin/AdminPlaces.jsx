@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import { useTabParam } from '../../lib/useTabParam.js';
 import { useSocietySearch } from '../../lib/useSocietySearch.js';
 import {
-  listSocietyCandidates, listSocietyCandidateDuplicates,
+  listSocietyCandidates, listDuplicatesForCandidates,
   listSocietyMerges, mergeSocieties, undoSocietyMerge, getSocietiesSummary,
   getSocietyAdminView, editSociety, listSocietyDirectory,
 } from '../../services/societyService.js';
@@ -133,25 +133,18 @@ export default function AdminPlaces() {
   }, [bump]);
 
   useEffect(() => {
-    if (tab !== 'duplicates') return undefined;
+    if (tab !== 'duplicates') return;
     const gen = dupesGen.current;
-    const queue = candidates.items.map((c) => c.slug).filter((s) => s && !dupesAsked.current.has(s));
-    queue.forEach((s) => dupesAsked.current.add(s));
-    const keep = (slug, rows) => { if (gen === dupesGen.current) setDupes((prev) => ({ ...prev, [slug]: rows })); };
-
-    const worker = async () => {
-      for (let slug = queue.shift(); slug; slug = queue.shift()) {
-        try {
-          keep(slug, await listSocietyCandidateDuplicates(slug));
-        } catch (err) {
-          console.warn(`[societies] Could not check ${slug} for duplicates.`, err);
-          keep(slug, DUPES_FAILED);
-        }
-      }
-    };
-
-    Promise.all([worker(), worker(), worker(), worker()]);
-    return () => { queue.splice(0).forEach((s) => dupesAsked.current.delete(s)); };
+    const slugs = candidates.items.map((c) => c.slug).filter((s) => s && !dupesAsked.current.has(s));
+    if (!slugs.length) return;
+    slugs.forEach((s) => dupesAsked.current.add(s));
+    listDuplicatesForCandidates(slugs)
+      .then((bySlug) => slugs.map((s) => [s, bySlug[s] ?? DUPES_FAILED]))
+      .catch((err) => {
+        console.warn('[societies] Could not check the candidates for duplicates.', err);
+        return slugs.map((s) => [s, DUPES_FAILED]);
+      })
+      .then((found) => { if (gen === dupesGen.current) setDupes((prev) => ({ ...prev, ...Object.fromEntries(found) })); });
   }, [tab, candidates]);
 
   const candidateRows = candidates.items.map((c) => ({ ...c, dupes: dupes[c.slug] }));
