@@ -110,10 +110,10 @@
   ("Not rated yet"), `count > 0` (a real average). No hard-coded default.
 
 ### Contact entry point (the gate lives elsewhere)
-- **Number reveal** (`ContactBox.jsx` inside `OwnerCard`): reads `contactStatus(ownerMobile, id)`.
+- **Number reveal** (`ContactBox.jsx` inside `OwnerCard`): reads `contactStatus(propertyId)`.
   `revealed = status === 'owner' || (status === 'approved' && !ownerHidesNumber)`. Masked otherwise;
-  `requestContact` returns `'login' | 'verification_required' | 'pending' | 'approved' | 'declined'`,
-  and `'verification_required'` (only when the owner accepts verified contacts only) opens the opt-in
+  `requestContact` resolves to the new status or rejects with `verification_required`
+  (only when the owner accepts verified contacts only), which opens the opt-in
   Verified-badge hand-off `VerifyIdentityRedirect`.
 - **Contact / chat CTA** (`useProperty.handleContact`): sign-in (L1) required; when `inAppMessaging`
   is on it queues an owner chat request and opens Messages (no badge needed); when off it opens

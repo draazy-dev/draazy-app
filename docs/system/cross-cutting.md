@@ -236,8 +236,8 @@ Grounded in `moderation.verification.PropertyVerificationService` / `ApprovalGat
 |---------|------------------|----------------------------|----------------------|------|
 | Listing verification | owner submits listing | one staff/admin member, never the owner or the poster; their decision is final | listing `status -> approved`, goes live | `moderation.verification.PropertyVerificationService` |
 | Deal finalization | buyer requests finalize | owner accepts/declines | accept closes the deal (`closeDeal`) and auto-declines the other pending requests for that property | `src/lib/store/deals.js` `requestFinalize` / `acceptFinalize` / `declineFinalize` |
-| Contact reveal | buyer requests contact | owner approves/declines | owner phone unmasks for that buyer (subject to owner privacy prefs) | `src/lib/contact.js` `requestContact` / `setContactStatus` |
-| Document access | buyer requests a doc category | owner grants/declines | on grant, matching uploaded docs are shared (`sharedDocIds`) | `src/lib/data/documents.js` `addDocRequest` / `respondDocRequest` |
+| Contact reveal | buyer requests contact | owner approves/declines | owner phone unmasks for that buyer (subject to owner privacy prefs) | `contactService` `requestContact` / `respondToContactRequest` |
+| Document access | buyer requests a doc category | owner grants/declines | on grant, matching uploaded docs are shared (`sharedDocIds`) | `documentService` `requestDocumentAccess` / `respondDocRequest` |
 | Visit request | buyer requests a visit slot | owner confirms/cancels | slot confirmed | see `visitProvider` / `PATCH /visit-requests/:id/status` |
 | Offer / negotiation | buyer submits an offer | owner responds (accept/counter/decline) | accepted offer feeds finalization | `src/lib/store/deals.js` `addOffer` / `respondOffer` |
 | Society claim | resident claims a society role | admin moderates | claim approved | `src/pages/admin/societies/ClaimsTab.jsx` |
@@ -300,17 +300,15 @@ either is a two-file change.
 ## 3. Contact gate
 
 Lead contact information (owner phone numbers) is masked by default. It is gated behind two
-layers, implemented in `src/lib/contact.js` and consumed by
+layers, enforced server-side behind `src/services/contactService.js` and consumed by
 `src/pages/consumer/property/ContactBox.jsx` / `ContactOwnerModal.jsx`.
 
 ### Layer 1 - being signed in (and nothing more)
 
-`requestContact(ownerMobile, propId)` needs an account, not a badge. **Identity verification is not
-consulted here** — contact is L1 mobile, per ADR-019 ("badge, not gate"). Return values:
+`requestContact(propertyId, message)` needs an account, not a badge. **Identity verification is not
+consulted here** — contact is L1 mobile, per ADR-019 ("badge, not gate"). Refusals:
 
-- `'login'` - no signed-in user.
-- `'unavailable'` - no usable owner identity to address a request to (for example the API returned
-  an already-masked number), so we refuse rather than fake a sent request.
+- not signed in - the UI prompts sign-in before calling.
 - `'verification_required'` - **the single exception, and it belongs to the owner, not to us.** An
   owner who switched on *accept verified contacts only* (`verifiedContactOnly`) narrows their own
   inbox; an unverified requester is then pointed at the badge funnel (`/verify-identity`). Every
@@ -324,18 +322,16 @@ number stays **masked** (`maskPhone`, for example `+91 98xxx xxxx02`) until appr
 
 - `'owner'` - the viewer is the owner themselves (`isOwnerViewer`); always sees the full number.
 - `'pending'` - request created, awaiting owner. Number stays masked.
-- `'approved'` - owner approved (`setContactStatus(..., 'approved')`); number can unmask.
+- `'approved'` - owner approved (`respondToContactRequest(reqId, 'approved')`); number can unmask.
 - `'declined'` - owner declined; stays masked.
 - `'none'` - no request yet.
 
 ### Trust rules
 
 - **Owner privacy preference.** Even after approval, an owner who set `hideNumber`
-  (`getOwnerPrefs` / `ownerHidesNumber` in `src/lib/contact.js`) keeps the raw number masked;
+  (`ownerHidesNumber` on the contact status) keeps the raw number masked;
   approved buyers are routed to in-app chat / callback instead. This sits on top of the always-on
   request gate, it does not replace it.
-- **Storage keys are shared with the HTML prototype** (`draazyContactReq:<ownerDigits>`), so the
-  two prototypes stay compatible.
 
 > **Server-enforced.** The backend returns the raw owner number only after it confirms an approved
 > request and `hideNumber=false`; it never ships the raw number to an unapproved client.
@@ -464,8 +460,7 @@ component  ->  services/xService.js  ->  createProvider('x')  ->  providers/http
   `scripts/check-provider-cycle.mjs` fails the build if it comes back.
 - **All service functions return Promises**, so a caller never depends on when the answer arrives.
 
-Domains wired today: `property`, `auth`, `deal`, `contact`, `finance` (barrel:
-`src/services/index.js`).
+Each domain has its own `src/services/{domain}Service.js`; callers import the one they need.
 
 ### Error shape
 
@@ -507,10 +502,6 @@ Notifications are the natural delivery channel for maker-checker outcomes (conta
 finalized, listing verified/rejected). The review thread in property verification
 (`addReviewMessage` in `properties-admin.js`) plays the same role owner<->admin, carrying the
 approval/rejection message with a `read` flag.
-
-Related store events: `src/lib/contact.js` dispatches a `pn:store` `CustomEvent` on owner-pref
-changes so open tabs can react without a reload - a lightweight in-app pub/sub the real backend
-would replace with push/websockets.
 
 Notification generation belongs on the server as a side-effect of approvals and state changes, not
 something the client seeds for itself.
@@ -1054,18 +1045,25 @@ failure, not a display lag. Tests and e2e run with `0s`; `SettingsCacheTest` pro
 Photos never pass through Spring on the way to a browser: the JSON carries URLs and the browser
 fetches them from R2. So the saving is in what is fetched, not in a server cache.
 
-- **Card copies.** `PhotoService.upload` stores `{key}.w960.jpg` and `{key}.w480.jpg`
-  (`PhotoVariants`, JPEG q0.8, never upscaled) *before* the original, so a returned URL always has
-  them. `PropertyImage` uses them by default via `cardSrcSet` (`lib/imgSrcSet.js`), with
-  `sizes="240px"` unless the caller passes a wider one; so cards, thumbnails, map popups and admin
-  queues all get them. Only the property gallery and lightbox load the original. An undecodable
-  image is stored without copies rather than refused.
+- **Card copies.** `PhotoService.upload` stores `{key}.w960.webp` and `{key}.w480.webp`
+  (`PhotoVariants`, lossy WebP q0.8 via the Apache-2.0 `webp-imageio` libwebp binding, never
+  upscaled) *before* the original, so a returned URL always has them. `PropertyImage` uses them by
+  default via `cardSrcSet` (`lib/imgSrcSet.js`), with `sizes="240px"` unless the caller passes a
+  wider one; so cards, thumbnails, map popups and admin queues all get them. The property gallery
+  uses `gallerySrcSet`, which adds the original as the 2560w candidate; only the lightbox always
+  loads the original. An image that will not decode or encode is stored without copies rather than
+  refused.
+- **Backfill.** The FREQUENT `photo-webp-backfill` job (`PhotoVariantBackfill`) lists `photos/` and
+  writes WebP copies for up to 20 originals that lack them per run, in random order so a broken
+  original cannot starve the rest. It covers pre-WebP uploads (whose `.jpg` copies are no longer
+  used) and any upload whose encode failed. The R2 token therefore needs list permission on the
+  public bucket. `PhotoService.delete` removes both the `.webp` and the legacy `.jpg` copies.
 - **Immutable.** Keys are never reused, so `R2FileStorage.storePublic` sets
   `Cache-Control: public, max-age=31536000, immutable`.
 - **Service worker.** `dz-images` caches only the copies. Originals are also fetched with CORS for
   the wizard's canvas hash, and a cached opaque response would break that read.
-- **Older uploads have no copies.** `PropertyImage` drops the srcset on the first error and shows the
-  original, at the cost of one 404 per render.
+- **Older uploads have no copies** until `photo-webp-backfill` reaches them. `PropertyImage` drops
+  the srcset on the first error and shows the original, at the cost of one 404 per render.
 
 ## JWT auth filter
 

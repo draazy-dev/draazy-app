@@ -237,7 +237,7 @@ visibly (D184).
   categories (422) and any upload once the matter is closed (409), so a customer cannot plant a
   "Registered copy" for the checker.
 - **Self-dealing:** a staffer or admin who is the requester, a party, anyone typed on the form (a
-  tenant, the licensor, a co-owner or a witness - matched on the normalised mobile),
+  tenant, the licensor or a co-owner - matched on the normalised mobile),
   or the listing's owner / posting staffer cannot take, share, cancel, upload or check that matter
   (403, `ServiceRequestSelfDealing`) - no admin exemption, as with property verification. They
   still read and decide the draft **as the customer**.

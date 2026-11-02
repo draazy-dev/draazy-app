@@ -32,8 +32,8 @@
   `src/pages/consumer/requests/RequestsPanel.jsx` + `dashboard/LeadSheet.jsx`, fed by `/me/requests`;
   contact, flatmate and group requests also appear as request threads in Messages
   (`messages/useRequestThreads.js`, `RequestThread.jsx`). Route: `/dashboard`, `ProtectedRoute`.
-- **Core logic:** `src/lib/contact.js`, `src/lib/store/listings.js` (opt-in Verified-badge helpers),
-  `src/services/contactService.js`, `src/services/providers/mock/contactProvider.js`.
+- **Core logic:** server-enforced behind `src/services/contactService.js`
+  (`providers/http/contactProvider.js`); `src/lib/contact.js` holds only the phone masking/format helpers.
 
 ## 3. Actors & roles
 - **Maker = buyer/tenant** (signed in at **L1** — mobile OTP; no badge needed) requests the number
@@ -45,32 +45,31 @@
 
 ## 4. Entities touched
 - [`contact_requests`](../../system/data-model.md) - created by the buyer, decided by the owner.
-  Runtime store, key `draazyContactReq:<ownerDigits>` (shared with the HTML prototype).
 - [`identity_verifications`](../../system/data-model.md) - read **only** as the opt-in Verified
   badge, and used solely by the owner "verified contacts only" path; written when a **staff reviewer
-  approves** a submitted document + selfie (key `draazyIdentity:<mobile>`, `{ verified: true, … }`).
+  approves** a submitted document + selfie.
   It is **never** a prerequisite for the contact gate itself.
 - [`enquiries`](../../system/data-model.md) - the owner's "Enquiries" tab is **seed-only** today
   (`src/data/enquiries.json`); the buyer contact flow does **not** create rows here (see edge cases).
-- Owner privacy prefs (`dzOwnerPrefs:<mobile>`, `hideNumber`) and lead annotations
+- Owner privacy prefs (`hideNumber`) and lead annotations
   (`leadNotes`, private note + follow-up date) are read/written on the owner side.
 
 ## 5. Business rules & logic  *(the meat)*
 
-### The contact gate (from `src/lib/contact.js`)
+### The contact gate (`POST /contacts/request`)
 Under **ADR-019 (badge-not-gate)** contact is **L1-only**: the sole floor is being signed in
 (mobile-OTP). There is **no identity gate** on contacting an owner. The real "gate" is the
 **request → owner-approval + conditional reveal** model, plus one narrow opt-in exception.
 
 **Floor - signed in (L1).**
-`requestContact(ownerMobile, propId)`:
-- Returns `'login'` if no signed-in user (the UI prompts sign-in). This is the only hard prerequisite
+`requestContact(propertyId, message)`:
+- Needs a signed-in user (the UI prompts sign-in). This is the only hard prerequisite
   to create a request.
 
 **Narrow exception - owner "verified contacts only" (opt-in badge, L2).**
-- If, and only if, the owner has opted into `verifiedContactOnly` (`ownerVerifiedOnly(ownerMobile)`)
-  **and** the requester lacks the Verified badge (`isViewerVerified` reads `draazyIdentity:<buyerDigits>`),
-  `requestContact` returns `'verification_required'`.
+- If, and only if, the owner has opted into `verifiedContactOnly`
+  **and** the requester lacks the Verified badge,
+  the request is refused with `verification_required`.
 - The UI (`ContactBox.request` / `ContactOwnerModal.request`) then mounts `VerifyIdentityRedirect`,
   which hands the requester to `/verify-identity` — **one document, one selfie, checked by a person
   on our team** — and resumes the request once the badge is issued. This is the **sole** path that
@@ -85,16 +84,7 @@ Under **ADR-019 (badge-not-gate)** contact is **L1-only**: the sole floor is bei
 **Owner approval (maker-checker).**
 Once past the floor (and the exception, if any), `requestContact`:
 - If a request already exists for this buyer+property, returns its current `status` (idempotent).
-- Otherwise unshifts a new record and returns `'pending'`:
-  ```
-  { id: 'c'+Date.now(), propId, buyerName, buyerMobile: <digits>, status: 'pending', requestedAt: Date.now() }
-  ```
-- The owner's number stays **masked** (`maskPhone` -> `+91 98xxx xxxx02`) until approved.
-- If a request already exists for this buyer+property, returns its current `status` (idempotent).
-- Otherwise unshifts a new record and returns `'pending'`:
-  ```
-  { id: 'c'+Date.now(), propId, buyerName, buyerMobile: <digits>, status: 'pending', requestedAt: Date.now() }
-  ```
+- Otherwise creates a `pending` request.
 - The owner's number stays **masked** (`maskPhone` -> `+91 98xxx xxxx02`) until approved.
 
 ### The quota, which is a second gate and is the server's (D31b)
@@ -137,14 +127,13 @@ carries a `notification` event that refreshes the bell's count (cross-cutting.md
 online/last-seen are reciprocal privacy features (`shareReadReceipts`, `shareActivityStatus`); if
 either participant turns one off, that surface is hidden while delivery still records normally.
 
-### Owner decision (`setContactStatus`)
-- `setContactStatus(ownerMobile, reqId, 'approved'|'declined')` flips the stored request's `status`.
+### Owner decision (`respondToContactRequest`)
+- `respondToContactRequest(reqId, 'approved'|'declined')` decides the request.
 - On the dashboard, `decideContact(reqId, decision)` (in `useDashboardData.js`) sends the decision,
   toasts only once the write succeeded ("Accepted — you can chat now and see their number." /
   "Request declined."), then re-reads the inbox. Double taps are ignored while the write is in flight.
   The server audits the decision; a repeat of the same decision is a no-op 200, a different one 409,
   and a request left pending for 30 days reads as `expired` and can no longer be answered.
-- `pendingContactCount(ownerMobile)` powers the owner's "waiting on you" badge.
 
 ### The enquiry variant (`ContactOwnerModal.sendEnquiry`)
 - "Send enquiry" is also "contacting the owner", so like the number request it is **L1-only** (any

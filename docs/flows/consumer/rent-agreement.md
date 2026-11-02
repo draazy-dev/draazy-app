@@ -1,7 +1,7 @@
 # Flow: Rent Agreement Creation
 
 > The owner-driven (or co-filled) Maharashtra Leave & License agreement wizard: capture property,
-> owner, tenant(s), terms, witnesses; compute statutory + platform cost; submit into the ops
+> owner, tenant(s), terms; compute statutory + platform cost; submit into the ops
 > workflow; then track drafting, approval, e-registration and download.
 > The identity details collected here (both parties' PAN + the registered agreement; Aadhaar is taken by staff at the doorstep visit) are a
 > **statutory requirement of the instrument**, not a tier of the trust ladder: a registrable rent
@@ -53,13 +53,13 @@
   surfaces; the property picker for owners with listings; a WhatsApp/in-app invite from the owner.
 - **Source components:** `services/RentAgreement.jsx` (shell + `ServiceTracker`),
   `services/rent-agreement/useRentAgreement.js` (controller), the step components
-  `StepProperty/StepOwner/StepTenant/StepTerms/StepWitnesses/StepReview.jsx`, `CostSidebar.jsx`,
+  `StepProperty/StepOwner/StepTenant/StepTerms/StepReview.jsx`, `CostSidebar.jsx`,
   `DocsRequired.jsx`, `useRaFurniture.js`, `constants.js`, `helpers.js`; workflow engine
   `src/services/serviceRequestService.js`; status and invite URL helpers
   `src/lib/serviceRequestStatus.js`.
 
 ## 3. Actors & roles
-- **Owner (maker / initiator):** fills property/owner/terms/witnesses, optionally invites a tenant,
+- **Owner (maker / initiator):** fills property/owner/terms, optionally invites a tenant,
   and generates the request. After submission the owner's create-wizard is **locked** to the submitted
   request (the legal source of truth) unless they `startNewAgreement`.
 - **Tenant (co-filler):** either filled inline by the owner, or invited to complete only the tenant
@@ -77,7 +77,7 @@
   overlaps too, so the drafter decides. A flat typed two ways ("Flat No. 0402" and "402") is one flat, and an agreement
   filed outside any request on the same listing (`match: record`) is compared too.
   The desk shows the **Deed particulars** the customer typed (property, terms, licensors with their
-  capacity and power of attorney, licensees, witnesses — mobiles masked), and a rent-agreement draft
+  capacity and power of attorney, licensees — mobiles masked), and a rent-agreement draft
   is shared only once the drafter ticks five checks: ID numbers match the scans, the ownership proof
   names every licensor, any POA is checked, the flat address matches, and the terms match. The
   server refuses the draft (422) without all five and audits them.
@@ -120,7 +120,7 @@
   entered as an approved refund on the order's request, with its credit note, and counts toward the
   full-refund cancellation.
   **Draft approvals** (MC-4/MC-8). Every executing party approves the current draft version:
-  in-app for account holders, by OTP for inline parties (witnesses are not asked). Any rejection
+  in-app for account holders, by OTP for inline parties. Any rejection
   sends it back to changes-requested, and a new version resets every approval. A draft the holder shares goes to the customer at once; no second operator checks it first.
   **Police intimation** (LEG-2). After the registered copy, the tracker links the Pune City and
   Pimpri-Chinchwad Police portals; the step stays pending until ops records the owner's
@@ -156,7 +156,7 @@ Link to [`../../system/data-model.md`](../../system/data-model.md).
   live create and before the checkout modal opens. This is the *only* place a PAN leaves the
     tab (the wizard never collects Aadhaar; staff record it at the doorstep via the desk): not in `details` (plaintext `jsonb`, echoed to every staff read), not in the draft, not in the
   co-fill payload, not in `draazyOwnerKYC`. Built by `identityParties(owner, tenants)` from live
-  component state (a PAN row per licensor, co-owner and tenant; none for witnesses), sent, and not retained; the server answers 204 so there is nothing to echo back.
+  component state (a PAN row per licensor, co-owner and tenant), sent, and not retained; the server answers 204 so there is nothing to echo back.
   On the desk's side only the operator the request is **assigned to** can read them back — an admin
   is refused until they take the request — every read and every refusal is written to `audit_log`,
   and the numbers are blanked when the request completes or is cancelled. A failure here is
@@ -169,7 +169,9 @@ Link to [`../../system/data-model.md`](../../system/data-model.md).
 ## 5. Business rules & logic  *(the meat)*
 
 ### 5.1 Wizard shape (6 steps)
-`STEP_LABELS = [Property, Owner, Tenant, Terms, Witnesses, Review]` (`step` 0..5).
+`STEP_LABELS = [Property, Owner, Tenant, Terms, Review]` (`step` 0..4, `REVIEW_STEP` = 4). The app
+collects no witnesses: staff record them on the IGR portal at the doorstep visit. A legacy draft
+saved past the review step is clamped back to it.
 - **Step 0 Property:** propType (`RESIDENTIAL_PROPERTY_TYPES` only), flat no, society,
   locality, city (default Pune), taluka, gram panchayat yes/no, pincode; area (required,
   1..1,00,000, two decimals) with unit (`areaUnit` sqft | sqm), floor (optional, 0..200, 0 =
@@ -218,9 +220,7 @@ Link to [`../../system/data-model.md`](../../system/data-model.md).
   lapses before the invited side submits never blocks them. The desk sees all of it in
   `DeedParticulars`. Furniture list
   (`useRaFurniture`) + extra clauses.
-- **Step 4 Witnesses:** two attesting witnesses, both required (name, age, mobile); staff verify
-  each by Aadhaar OTP and biometrics at the visit.
-- **Step 5 Review:** a declaration checkbox is required before `generate`. It is the authority to
+- **Step 4 Review:** a declaration checkbox is required before `generate`. It is the authority to
   draft and e-register plus consent to the PAN (and the Aadhaar taken at the visit) being used for this deed only (Aadhaar Act
   s.8, DPDP Act 2023 s.6), and checkout sends its version (`DECLARATION_VERSION`); see *Payment opens
   only once the agreement is registrable*.
@@ -306,7 +306,6 @@ total   = stamp + reg + dhc + service
   Advisory, never blocking: *Cash* with any sum ≥ ₹2 lakh shows the s.269ST note; rent over
   ₹50,000/month shows the s.194-IB TDS note. The furniture list is free text with no furnishing
   cross-check, since furnishing is not asked.
-- Step 4: both witnesses' name, age, mobile.
 - Across steps: no two parties share a mobile or a PAN.
 - `generate` re-checks steps 0..4 and the declaration before submitting (jumps to the first bad step).
 - **A refused step shows where:** the first flagged control on the active panel is scrolled into view
@@ -355,10 +354,31 @@ regArea label (overwritten server-side from the locality), and `_state` = the fu
   `captureFormState` sends the licensor blank but for the invited mobile (`_state.ownerMode:
   'invite'`), so the tenant's autofilled self never travels as the owner and the server's
   distinct-mobile rule still covers it. `createCoFillServiceRequest({ …, role:'owner' })` files it;
-  the requester hands off only tenants and witnesses. The invited owner lands on step 2 (the only
-  editable one, prefilled from their account and remembered KYC), and `ownSide('owner')` keeps
-  only `ownerName`, `owner` and `coOwners`. The requester (the tenant) pays from the locked panel;
-  the declined/re-invite panel, top-up and pay copy switch to their `_owner` i18next context.
+  the requester hands off only tenants. The tenant never pays: the review reads "Generate
+  Agreement & Proceed", the done panel says nothing more is needed from them, and their own
+  `POST /{id}/checkout` is a 403 while `_state.ownerMode` is `'invite'`.
+  **Accepting hands the request to the owner** (`RentAgreementOwnerTakeover`, called from
+  `CoFillParties.decide`). The owner becomes the requester (`ServiceRequest.handOverTo`), the
+  tenant becomes an accepted `tenant` party, and `_state.ownerMode` turns `'fill'`. The owner's
+  page then opens the request in the editing view ("Review the agreement before you pay") with
+  every step editable, including the tenant's half and papers, and prefilled from their account.
+  The page is keyed on `party|request`, so the hand-over travels in router state (`raHold`) and
+  resumes once the request list loads. The owner's submit saves the details (repriced while no
+  checkout is open), hands off identities and papers, and opens checkout. An owner who already
+  holds an unpaid rent agreement **for the same flat** (flat no + society + pincode) gets a 409
+  on accept and the "You already have an agreement for this flat" panel; the invite stays open.
+  Unpaid agreements on different flats are fine. Requests filed before this change, still
+  tenant-held with `ownerMode: 'invite'`, cannot be paid.
+- **Who pays (either side, first payment wins):** once the form is complete, the requester or any
+  accepted party may open checkout (`CoFillServiceRequests`); the DTO's `payableByMe` lights the
+  locked panel's pay button for a party, with the "Either of you can pay" hint. Opening checkout
+  while the other side's order is still open replaces it (`takeOverCheckout`); if that order has
+  already been paid, or the gateway cannot cancel it, the caller gets a 409. The payer is recorded
+  (`payer_id`) and gets the invoice, refunds and credit notes; the other side is notified
+  (`service.party-paid`) and its tracker reads "Paid by {name}". Referral credit is applied only
+  when the requester pays. Cancelling an unpaid request is refused while the other side has paid
+  or is mid-payment. A user holds at most one unpaid rent agreement per flat (unique index
+  `uq_service_requests_open_unpaid` on requester + flat key).
 - After submit: `clearDraft()`, `setDone(true)`, scroll to the tracker.
 
 ### 5.6 Invite resolution & security (`useRentAgreement.js` invite init)
@@ -368,6 +388,8 @@ regArea label (overwritten server-side from the locality), and `_state` = the fu
   row is accepted (`POST /me/service-request-invites/{partyId}`), and then `GET /service-requests/{id}`
   decides — it 404s for anyone who is not a party, so a stranger gets the neutral "no longer
   available" panel. An accepted invite leaves the pending list, so absence there is not expiry.
+  An owner accepting a tenant-started invite comes back as the requester (no `myPartyId`) and is
+  taken straight to editing (section 5.5).
 - Invite mode loads the owner's `_state`, seeds the tenant's blanks from the signed-in account, and
   jumps to step 0. The tenant's PAN goes through `PUT /identities`, which accepts an accepted
   party for their own side.
@@ -382,12 +404,12 @@ regArea label (overwritten server-side from the locality), and `_state` = the fu
   The owner's locked panel shows `ReadyToPayPanel` for any `awaiting_payment` request with no
   `invited` party. Its Pay button stays disabled until the declaration is ticked again — the tenant's
   answers arrived after the owner's review-step tick — then it calls `POST /{id}/checkout` and then the same `payAndConfirm` as the inline
-  submit. A refusal (missing paper, PAN or witness) is shown as the server's 409 message.
+  submit. A refusal (missing paper or PAN) is shown as the server's 409 message.
 - **The tenant cannot re-price.** The amount is fixed from the owner's terms at create, so a
   party-details write that would change the priced terms (rent, deposits, months, increment,
   interval, area) is refused 409; blank keys still keep the owner's values.
 - **The tenant writes only the tenant half.** Everything else in the party-details payload — the
-  licensor, the flat, non-priced terms, witnesses, `ownerName` — is dropped before the merge
+  licensor, the flat, non-priced terms, `ownerName` — is dropped before the merge
   (`CoFillServiceRequests.ownSide`); an owner-side party would keep `ownerName`, `owner` and
   `coOwners`. A submit carrying no rows of the caller's side is 422, so the
   `party.details-submitted` event always means the tenant wrote the tenant rows.
@@ -404,6 +426,10 @@ regArea label (overwritten server-side from the locality), and `_state` = the fu
   within 24 hours.
 - **Identity numbers after a refresh** (UX-7). Autosave keeps only markers; after a reload,
   `IdentityReminderNote` names the PAN fields to re-enter.
+- **A PAN on file belongs to a name.** A requester's `PUT /identities` drops a recorded row once the
+  form names a different person in that slot. The wizard mirrors this (`stillHeld`): a masked PAN
+  counts as on file only while the party keeps the name it was loaded with, so renaming a party
+  asks for their PAN on that step rather than failing checkout.
 - **A closed checkout is resumed.** Closing the Cashfree sheet sends no webhook and leaves
   `paymentRef` set. A later `POST /{id}/checkout` asks the gateway for a fresh session on that same
   order (`PaymentGateway.resumeSession`, Cashfree `GET /pg/orders/{id}`, `ACTIVE` only) rather than
@@ -513,7 +539,7 @@ listing.
 `awaiting-payment` with no gateway order. The wizard then records identities, uploads documents and
 calls `POST /service-requests/{id}/checkout`, which `RentAgreementReadiness` refuses (409, naming
 what is missing) until every licensor and licensee has a PAN identity row, the flat has an ownership proof, the tenant police address/work proof uploads required by the IGR portal are filed, and no PAN repeats across
-parties. Witnesses carry no identity rows (name, age and mobile only). Last, it refuses a deed missing its own particulars — a monthly rent (without one there is
+parties. Last, it refuses a deed missing its own particulars — a monthly rent (without one there is
 no stamp duty to charge), the start date, flat number, society, locality, pincode, a residential
 property type, the area, and every licensor's and licensee's name and age — because create
 takes a partial form so a draft can be filed and priced. Only then is the declaration checked: the
@@ -603,7 +629,7 @@ Request (server wire values):
 - **Owner already has an active request:** wizard is locked to the tracker (Messages / draft
   approval); `startNew` is the explicit escape hatch.
 - **Field validation:** the rules in 5.3; declaration required at Review.
-- **Unfinished paperwork:** checkout 409 names the missing party, paper or witness; the request stays
+- **Unfinished paperwork:** checkout 409 names the missing party or paper; the request stays
   `awaiting-payment` with no order. The sweep retires it 30 days after its last change, which frees
   the one-unpaid-request slot and discards its identity rows; the customer can cancel it sooner. A
   row whose checkout opened is retired on the abandoned-checkout TTL, counted from that opening.

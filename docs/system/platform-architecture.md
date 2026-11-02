@@ -915,7 +915,7 @@ support surprise.
 - **Abuse limits.** At most 100 photo uploads per account per rolling 24 hours (`photo_uploads`, counted
   under an advisory lock). The nightly `photo-upload-sweep` deletes an upload that no listing, flatmate
   room or avatar shows 7 days after it was made, which bounds what an abandoned draft can leave behind.
-- **Image processing.** Client-side compress; server writes 480 px and 960 px JPEG card copies.
+- **Image processing.** Client-side compress; server writes 480 px and 960 px WebP card copies.
 - **Recommendation (ratified).** Proxy through the API behind the `FileStorage` seam (mock = local disk in
   dev); split public/private buckets; strip EXIF; defer malware scanning.
 - **Security.** Private docs never public; signed GETs short-lived + scoped; authz checked before

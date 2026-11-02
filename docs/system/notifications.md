@@ -181,11 +181,14 @@ item and the moment its clock started.
 An item first seen already overdue gets only the escalation. Items for the same recipient, rule and level in one run
 share a single notification ("3 new listings to review", body "Oldest: ? and 2 more").
 
+When an item leaves its queue, the next run marks its unread single-item alerts read. A batched alert links to the
+queue, so it clears once no open item shares that link.
+
 | Rule | Queue | Remind | Escalate | Function |
 |---|---|---|---|---|
 | `listing-review` | Listings pending verification | 24h | 36h | `listingModeration` |
 | `verification-reply` | Owner replies nobody has read | 48h | 72h | `propertyVerification` |
-| `kyc-review` | Identity checks awaiting a reviewer | 48h | 72h | `kyc` |
+| `kyc-review` | Identity checks awaiting a reviewer | 48h | 72h | `kyc`; the claimer while the 30-minute claim is live |
 | `identity-appeal` | Identity appeals | 48h | 72h | `kyc` |
 | `desk-pickup` | Unassigned desk tickets and new service requests | 4h | 8h | `desk:{team}` |
 | `rent-agreement` | Rent agreements by stage | stage deadline (`RentAgreementSla`) | 1.5? deadline | `desk:rental` or the assignee |

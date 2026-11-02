@@ -276,7 +276,7 @@ stand-in is same-origin (`DevObjectStore.publicUrl`), so no test will ever go re
 missing. The CORS policy is in §6.2.
 
 The same bucket should sit behind a **proxied custom domain**, not `r2.dev`, which Cloudflare does
-not cache. On that domain the `.w480.jpg`/`.w960.jpg` card copies are edge-cached by default, but
+not cache. On that domain the `.w480.webp`/`.w960.webp` card copies are edge-cached by default, but
 originals have no file extension, so add one free Cache Rule (Caching → Cache Rules): hostname equals
 the photo domain and URI path starts with `/photos/` → *Eligible for cache*, edge TTL *Use cache-control
 header*. Every object already carries `Cache-Control: public, max-age=31536000, immutable`.
@@ -682,10 +682,10 @@ ShedLock is needed.
 
 | Group | Cron property (default) | Jobs |
 |---|---|---|
-| Frequent | `draazy.jobs.frequent.cron` (`0 */15 * * * *`) | `abandoned-checkouts`, `pass-refunds`, `listing-duplicates`, `staff-sla` |
+| Frequent | `draazy.jobs.frequent.cron` (`0 */15 * * * *`) | `abandoned-checkouts`, `pass-refunds`, `listing-duplicates`, `staff-sla`, `photo-webp-backfill` |
 | Hourly | `draazy.jobs.hourly.cron` (`0 5 * * * *`) | `subscription-expiry`, `saved-search-counts`, `page-view-rollup`, `flatmate-post-expiry` (public reads don't check `active_until`, so a lapsed post shows until it runs) |
 | Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `listing-content-purge`, `photo-upload-sweep`, `flatmate-owner-notice-purge`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
-| Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `tracked-rent-reminders`, `waiting-digest` |
+| Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `lease-end-reminders`, `tracked-rent-reminders`, `waiting-digest` |
 
 The app is always on, so the `@Scheduled` cron runs in-process at the times above with no external
 trigger. Switches: `draazy.jobs.enabled=false` turns off all of them (the test suite does), and
