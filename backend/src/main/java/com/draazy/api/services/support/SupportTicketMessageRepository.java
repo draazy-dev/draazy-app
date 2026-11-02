@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface SupportTicketMessageRepository extends JpaRepository<SupportTicketMessage, UUID> {
-    List<SupportTicketMessage> findByTicketIdOrderByCreatedAtAsc(UUID ticketId);
 
     List<SupportTicketMessage> findByTicketIdInOrderByCreatedAtAsc(Collection<UUID> ticketIds);
 

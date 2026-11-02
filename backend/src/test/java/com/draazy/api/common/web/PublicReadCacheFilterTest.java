@@ -38,13 +38,13 @@ class PublicReadCacheFilterTest {
 
     @Test
     void aSignedInReadBypassesTheEntryAndRefreshesItForEveryoneElse() throws Exception {
-        send(get("/localities"));
+        send(get("/fees"));
 
-        var fresh = get("/localities");
+        var fresh = get("/fees");
         fresh.addHeader("Cache-Control", "max-age=0");
         assertThat(send(fresh).getContentAsString()).isEqualTo("{\"n\":2}");
 
-        assertThat(send(get("/localities")).getContentAsString()).isEqualTo("{\"n\":2}");
+        assertThat(send(get("/fees")).getContentAsString()).isEqualTo("{\"n\":2}");
         assertThat(calls).hasValue(2);
     }
 

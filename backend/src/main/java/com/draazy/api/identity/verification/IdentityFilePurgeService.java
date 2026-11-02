@@ -1,5 +1,6 @@
 package com.draazy.api.identity.verification;
 
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.provider.FileStorage;
 import java.time.Instant;
 import java.util.List;
@@ -44,7 +45,7 @@ public class IdentityFilePurgeService {
     public void purgeKeys(List<String> keys) {
         Instant queuedAt = Instant.now();
         keys.forEach(key -> deletes.queue(key, queuedAt));
-        afterCommit(() -> keys.forEach(this::deleteStoredFile));
+        AfterCommit.run(() -> keys.forEach(this::deleteStoredFile));
     }
 
     public int retryQueuedDeletes(Instant now, int batchSize) {
@@ -67,19 +68,6 @@ public class IdentityFilePurgeService {
                 if (status == STATUS_ROLLED_BACK) {
                     deleteStoredFile(key, true);
                 }
-            }
-        });
-    }
-
-    private void afterCommit(Runnable action) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            action.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
             }
         });
     }

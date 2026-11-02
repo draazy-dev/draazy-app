@@ -120,6 +120,8 @@ public final class Routes {
 
         public static final String BASE = "/admin/society-candidates";
 
+        public static final String DUPLICATES_BATCH = BASE + "/duplicates";
+
         public static final String DUPLICATES = BASE + "/{slug}/duplicates";
     }
 
@@ -198,7 +200,11 @@ public final class Routes {
 
         public static final String RENT_TRACKING = BY_ID + "/rent-tracking";
 
+        public static final String RENT_CLAIM = BY_ID + "/rent-claims/{month}";
+
         public static final String TRACKED_RENT = "/me/tracked-rent";
+
+        public static final String TRACKED_RENT_PAID = TRACKED_RENT + "/{id}/paid";
     }
 
     public static final class MePhotos {
@@ -251,6 +257,8 @@ public final class Routes {
         }
 
         public static final String BASE = "/me/requests";
+
+        public static final String PENDING_COUNT = BASE + "/pending-count";
 
         public static final String BY_ID = BASE + "/{kind}/{id}";
 
@@ -637,6 +645,8 @@ public final class Routes {
         public static final String BASE = "/me/rent-agreements";
 
         public static final String RENEWAL = BASE + "/{id}/renewal";
+
+        public static final String HOME_RENEWAL = BASE + "/homes/{homeId}/renewal";
     }
 
     public static final class ServiceRequests {
@@ -654,6 +664,8 @@ public final class Routes {
         public static final String DOC_URL = BY_ID + "/docs/{docId}/url";
 
         public static final String CO_FILL_CREATE = BASE + "/co-fill";
+
+        public static final String DETAILS = BY_ID + "/details";
 
         public static final String STATUS = BY_ID + "/status";
 
@@ -979,6 +991,8 @@ public final class Routes {
 
         public static final String HELP_STAFF = "/admin/help/staff";
 
+        public static final String HELP_STAFF_INDEX = HELP_STAFF + "/index";
+
         public static final String CITY_BY_SLUG = "/admin/cities/{slug}";
 
         public static final String CITY_WAITLIST = "/admin/cities/waitlist";
@@ -1041,6 +1055,41 @@ public final class Routes {
         public static final String APPROVE = DESK + "/{id}/approve";
 
         public static final String REJECT = DESK + "/{id}/reject";
+    }
+
+    public static final class Leads {
+        private Leads() {
+        }
+
+        public static final String BASE = "/admin/leads";
+
+        public static final String BY_ID = BASE + "/{id}";
+
+        public static final String CLAIM = BY_ID + "/claim";
+
+        public static final String RELEASE = BY_ID + "/release";
+
+        public static final String ASSIGN = BY_ID + "/assign";
+
+        public static final String ASSIGNEES = BASE + "/assignees";
+
+        public static final String CONTACTS = BY_ID + "/contacts";
+
+        public static final String STAGE = BY_ID + "/stage";
+
+        public static final String INTERESTS = BY_ID + "/interests";
+
+        public static final String PROFILE = BY_ID + "/profile";
+
+        public static final String NOTES = BY_ID + "/notes";
+
+        public static final String CONVERTIBLE = BY_ID + "/convertible";
+
+        public static final String CONVERSIONS = BY_ID + "/conversions";
+
+        public static final String CONVERSION = BASE + "/conversions/{conversionId}";
+
+        public static final String PERFORMANCE = BASE + "/performance";
     }
 
     public static final class Webhooks {

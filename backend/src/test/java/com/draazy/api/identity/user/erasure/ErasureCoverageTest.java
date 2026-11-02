@@ -121,10 +121,15 @@ class ErasureCoverageTest extends AbstractApiTest {
         map.put("help_article_feedback.comment", Outcome.ROW_REMOVED);
         map.put("help_article_feedback.ip_hash", Outcome.ROW_REMOVED);
 
+        map.put("crm_leads.mobile", Outcome.ROW_REMOVED);
+        map.put("crm_leads.name", Outcome.ROW_REMOVED);
+        map.put("crm_leads.last_contact_at", Outcome.ROW_REMOVED);
+
         map.put("personal_documents.file_name", Outcome.ROW_REMOVED);
 
         map.put("managed_properties.tenant_name", Outcome.CLEARED);
         map.put("managed_properties.tenant_mobile", Outcome.CLEARED);
+        map.put("managed_properties.landlord_pan", Outcome.CLEARED);
 
         map.put("service_request_draft_approvals.party_key", Outcome.ROW_REMOVED);
         map.put("service_request_draft_approvals.party_label", Outcome.ROW_REMOVED);
@@ -736,6 +741,7 @@ class ErasureCoverageTest extends AbstractApiTest {
             Map.entry("service_request_parties", "mobile = ?"),
             Map.entry("tenant_rentals", "tenant_id = ?"),
             Map.entry("help_article_feedback", "user_id = ?"),
+            Map.entry("crm_leads", "user_id = ?"),
             Map.entry("personal_documents", "owner_id = ?"),
             Map.entry("managed_properties", "owner_id = ?"),
             Map.entry("service_request_draft_approvals", "user_id = ?"),
@@ -878,15 +884,19 @@ class ErasureCoverageTest extends AbstractApiTest {
                        ('create-account', 'mr', true, null, ?)
                 """, subjectId, subjectId);
         jdbc.update("""
+                insert into crm_leads (mobile, user_id, name, last_contact_at)
+                values (?, ?, 'Erasable Person', now())
+                """, mobile, subjectId);
+        jdbc.update("""
                 insert into personal_documents (owner_id, category, file_name, storage_key, size_bytes, mime_type)
                 values (?, 'Aadhaar Card', 'aadhaar.pdf', ?, 1024, 'application/pdf')
                 """, subjectId, PERSONAL_DOC_KEY);
         jdbc.update("""
                 insert into managed_properties
                        (owner_id, title, deal, property_type, price, locality, rented, tenant_name, tenant_mobile,
-                        monthly_rent)
+                        monthly_rent, landlord_pan)
                 values (?, '2 BHK Flat in Baner', 'rent', 'Flat', 26000, 'Baner', true, 'Rohit More', '9123456780',
-                        26000)
+                        26000, 'ABCPE1234F')
                 """, subjectId);
         jdbc.update("""
                 insert into service_request_draft_approvals

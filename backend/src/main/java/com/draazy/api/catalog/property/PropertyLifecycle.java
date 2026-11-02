@@ -93,7 +93,7 @@ public class PropertyLifecycle {
         UUID ownerId = property.getOwner().getId();
         if (PropertyStatus.PAUSED.equals(property.getStatus())) {
             notifier.notify(ownerId, "listing.approved_paused", "Your listing is approved",
-                    label(property) + " is approved. " + freeTierHold(),
+                    label(property) + " is approved. " + freeTierHold(property),
                     reviewLink(property));
             return;
         }
@@ -103,7 +103,7 @@ public class PropertyLifecycle {
 
     public String approvalMessage(Property property) {
         return PropertyStatus.PAUSED.equals(property.getStatus())
-                ? "\u2705 Your property has been verified and approved. " + freeTierHold()
+                ? "\u2705 Your property has been verified and approved. " + freeTierHold(property)
                 : "\u2705 Your property has been verified and is now live.";
     }
 
@@ -127,8 +127,8 @@ public class PropertyLifecycle {
         return "\"" + property.getTitle() + "\" in " + property.getLocality();
     }
 
-    private String freeTierHold() {
-        return "You're on the free tier (1 live listing). Buy a ₹" + settings.listingPass()
+    private String freeTierHold(Property property) {
+        return "You're on the free tier (1 live listing). Buy a ₹" + settings.listingPass(property.getDeal())
                 + " listing pass or pause another listing to make it live.";
     }
 

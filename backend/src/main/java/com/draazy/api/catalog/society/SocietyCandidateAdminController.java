@@ -6,6 +6,7 @@ import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.BackOfficePermissions;
 import com.draazy.api.security.Roles;
 import java.util.List;
+import java.util.Map;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,6 +34,13 @@ public class SocietyCandidateAdminController {
     public PageResponse<SocietyCandidateResponse> queue(@RequestParam(required = false) String q,
             @PageableDefault(size = 20) Pageable pageable) {
         return PageResponse.of(minting.candidates(q, Pageables.unsorted(pageable)), s -> s);
+    }
+
+    @GetMapping(Routes.SocietyCandidates.DUPLICATES_BATCH)
+    @PreAuthorize(SOCIETIES_READ)
+    public Map<String, List<SocietyDuplicateSuggestion>> duplicatesBatch(@RequestParam List<String> slugs,
+            @RequestParam(defaultValue = "6") int limit) {
+        return minting.duplicates(slugs, limit);
     }
 
     @GetMapping(Routes.SocietyCandidates.DUPLICATES)

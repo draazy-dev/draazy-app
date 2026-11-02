@@ -4,6 +4,7 @@ import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyLifecycle;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.audit.AuditService;
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.common.trust.ListingCaseNotes;
 import java.util.Comparator;
 import java.util.List;
@@ -15,8 +16,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class VerificationCases implements ListingCaseNotes {
@@ -67,13 +66,8 @@ public class VerificationCases implements ListingCaseNotes {
             reconcilePendingChecklist(review);
 
             String propertyId = event.propertyId().toString();
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    audit.record(event.actorId(), event.actorRole(), "property.verification.checklist.reset",
-                            "property", propertyId, null, "{}");
-                }
-            });
+            AfterCommit.run(() -> audit.record(event.actorId(), event.actorRole(),
+                    "property.verification.checklist.reset", "property", propertyId, null, "{}"));
         });
     }
 

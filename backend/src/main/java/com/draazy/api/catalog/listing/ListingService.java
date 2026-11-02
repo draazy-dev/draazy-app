@@ -129,7 +129,7 @@ public class ListingService {
         }
         if (!quota.mayGoLive(p)) {
             throw new ListingQuotaExhaustedException("You're on the free tier: 1 live listing at a time."
-                    + " Pause another listing or buy a ₹" + settings.listingPass()
+                    + " Pause another listing or buy a ₹" + settings.listingPass(p.getDeal())
                     + " listing pass for this one.");
         }
         p.resumeByOwner();

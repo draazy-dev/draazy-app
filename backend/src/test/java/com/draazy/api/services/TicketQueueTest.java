@@ -22,6 +22,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -324,7 +325,7 @@ class TicketQueueTest extends ServiceFixtures {
             assertThat(json.readTree(created).has("notes")).isFalse();
 
             note(legal, id, SECRET, 201);
-            assertThat(noteRepo.findByTicketIdOrderByAtAsc(UUID.fromString(id))).hasSize(1);
+            assertThat(noteRepo.findByTicketIdInOrderByAtAsc(List.of(UUID.fromString(id)))).hasSize(1);
 
             mvc.perform(get(Routes.Tickets.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(legal)))

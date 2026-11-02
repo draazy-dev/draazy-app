@@ -6,13 +6,17 @@ import static com.draazy.api.jobs.ScheduledJob.Group.HOURLY;
 import static com.draazy.api.jobs.ScheduledJob.Group.NIGHTLY;
 
 import com.draazy.api.admin.alerts.StaffSlaSweep;
+import com.draazy.api.admin.leads.LeadIntake;
+import com.draazy.api.admin.leads.LeadRelease;
 import com.draazy.api.billing.plan.SubscriptionSweeper;
 import com.draazy.api.billing.referral.ReferralHoldSweep;
 import com.draazy.api.billing.referral.ReferralSignalRetention;
 import com.draazy.api.catalog.listing.ListingContentPurge;
 import com.draazy.api.catalog.listing.ListingDuplicateSweep;
+import com.draazy.api.catalog.managed.ManagedLeaseEnds;
 import com.draazy.api.catalog.managed.TrackedRentService;
 import com.draazy.api.catalog.photo.PhotoUploadSweep;
+import com.draazy.api.catalog.photo.PhotoVariantBackfill;
 import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditLogRetention;
 import com.draazy.api.common.log.ErrorEventRetention;
@@ -79,6 +83,16 @@ class JobCatalog {
     @Bean
     ScheduledJob staffSlaJob(StaffSlaSweep sweep) {
         return new ScheduledJob("staff-sla", FREQUENT, sweep::sweepNow);
+    }
+
+    @Bean
+    ScheduledJob crmLeadIntakeJob(LeadIntake intake) {
+        return new ScheduledJob("crm-lead-intake", FREQUENT, intake::sweep);
+    }
+
+    @Bean
+    ScheduledJob crmLeadReleaseJob(LeadRelease release) {
+        return new ScheduledJob("crm-lead-release", FREQUENT, release::releaseIdle);
     }
 
     @Bean
@@ -149,6 +163,11 @@ class JobCatalog {
     @Bean
     ScheduledJob photoUploadSweepJob(PhotoUploadSweep sweep) {
         return new ScheduledJob("photo-upload-sweep", NIGHTLY, drain(() -> sweep.sweep(Instant.now())));
+    }
+
+    @Bean
+    ScheduledJob photoWebpBackfillJob(PhotoVariantBackfill backfill) {
+        return new ScheduledJob("photo-webp-backfill", FREQUENT, backfill::run);
     }
 
     @Bean
@@ -231,6 +250,11 @@ class JobCatalog {
     @Bean
     ScheduledJob renewalRemindersJob(RentAgreementRenewalSweeper renewals) {
         return new ScheduledJob("renewal-reminders", DAYTIME, () -> renewals.remindEnding(Instant.now()));
+    }
+
+    @Bean
+    ScheduledJob leaseEndRemindersJob(ManagedLeaseEnds leaseEnds) {
+        return new ScheduledJob("lease-end-reminders", DAYTIME, () -> leaseEnds.remindEnding(Instant.now()));
     }
 
     @Bean

@@ -14,6 +14,4 @@ public final class PropertyPossession {
 
     public static final String PATTERN_MESSAGE =
             "must be ready-to-move, new-launch or under-construction";
-
-    public static final String UNMATCHABLE = "no.such.possession";
 }

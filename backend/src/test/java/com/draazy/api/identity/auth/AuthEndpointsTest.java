@@ -38,6 +38,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @Import(OtpCaptureConfig.class)
 class AuthEndpointsTest extends AbstractApiTest {
+    private static final long SEND_COOLDOWN_SECONDS = 60;
+    private static final int MAX_SENDS_PER_WINDOW = 5;
+    private static final int MAX_SENDS_PER_DAY = 10;
+
     final ObjectMapper json = new ObjectMapper();
     @Autowired
     UserRepository users;
@@ -240,7 +244,7 @@ class AuthEndpointsTest extends AbstractApiTest {
     @Test
     void sendsBeyondTheHourlyBudgetAre429EvenWhenTheCooldownHasPassed() throws Exception {
         String mobile = "9876500702";
-        for (int i = 0; i < OtpSendBudget.MAX_SENDS_PER_WINDOW; i++) {
+        for (int i = 0; i < MAX_SENDS_PER_WINDOW; i++) {
             sendOtp(mobile);
             ageOutCooldown(mobile);
         }
@@ -255,7 +259,7 @@ class AuthEndpointsTest extends AbstractApiTest {
     @Test
     void sendsBeyondTheDailyBudgetAre429EvenWhenEveryHourIsUnderItsCap() throws Exception {
         String mobile = "9876500711";
-        for (int i = 0; i < OtpSendBudget.MAX_SENDS_PER_DAY; i++) {
+        for (int i = 0; i < MAX_SENDS_PER_DAY; i++) {
             sendOtp(mobile);
             ageOut(mobile, OtpSendBudget.SEND_WINDOW.toSeconds() + 1);
         }
@@ -274,10 +278,10 @@ class AuthEndpointsTest extends AbstractApiTest {
     @Test
     void retryAfterNamesTheLaterReopeningWhenTheHourlyAndDailyCapsBothBind() throws Exception {
         String mobile = "9876500712";
-        for (int i = 0; i < OtpSendBudget.MAX_SENDS_PER_DAY; i++) {
+        for (int i = 0; i < MAX_SENDS_PER_DAY; i++) {
             sendOtp(mobile);
             ageOutCooldown(mobile);
-            if (i == OtpSendBudget.MAX_SENDS_PER_WINDOW - 1) {
+            if (i == MAX_SENDS_PER_WINDOW - 1) {
                 ageOut(mobile, OtpSendBudget.SEND_WINDOW.toSeconds() + 1);
             }
         }
@@ -306,7 +310,7 @@ class AuthEndpointsTest extends AbstractApiTest {
         int retryAfter = Integer.parseInt(res.getResponse().getHeader(HttpHeaders.RETRY_AFTER));
         assertThat(retryAfter)
                 .as("Retry-After must be a usable hint, never 0 or longer than the cooldown")
-                .isBetween(1, (int) OtpSendBudget.SEND_COOLDOWN.toSeconds());
+                .isBetween(1, (int) SEND_COOLDOWN_SECONDS);
 
         mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"mobile\":\"9876500704\"}"))
@@ -315,7 +319,7 @@ class AuthEndpointsTest extends AbstractApiTest {
     }
 
     private void ageOutCooldown(String mobile) {
-        ageOut(mobile, OtpSendBudget.SEND_COOLDOWN.toSeconds() + 1);
+        ageOut(mobile, SEND_COOLDOWN_SECONDS + 1);
     }
 
     private void ageOut(String mobile, long seconds) {

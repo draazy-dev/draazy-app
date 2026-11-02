@@ -61,8 +61,10 @@ class BootstrapEndpointsTest extends AbstractApiTest {
                 .isEqualTo(read(Routes.Engagement.NOTIFICATIONS_UNREAD_COUNT, token));
         assertThat(shell.get("messagesUnread"))
                 .isEqualTo(read(Routes.Conversations.UNREAD_COUNT, token));
+        assertThat(shell.get("requestsPending"))
+                .isEqualTo(read(Routes.MeRequests.PENDING_COUNT, token));
         assertThat(shell.properties()).extracting(java.util.Map.Entry::getKey).containsExactly(
-                "me", "subscription", "saved", "notificationsUnread", "messagesUnread");
+                "me", "subscription", "saved", "notificationsUnread", "messagesUnread", "requestsPending");
     }
 
     private JsonNode read(String uri, String token) throws Exception {

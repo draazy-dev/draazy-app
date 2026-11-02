@@ -31,15 +31,6 @@ public class LocalityService {
     }
 
     @Transactional(readOnly = true)
-    public List<LocalityResponse> list() {
-        Map<String, LocalityStats> stats = statsBySlug(null);
-        return localities.findDirectory(PropertyStatus.APPROVED,
-                Freshness.dormantCutoff(Instant.now())).stream()
-                .map(l -> localityMapper.toResponse(l, stats.getOrDefault(l.getSlug(), LocalityStats.NONE)))
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
     public List<LocalityAdminRow> adminList() {
         Map<String, LocalityStats> stats = statsBySlug(null);
         return localities.findAll(Sort.by("name")).stream()

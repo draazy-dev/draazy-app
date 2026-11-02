@@ -95,8 +95,6 @@ class ReviewEndpointsTest extends AbstractApiTest {
     @ParameterizedTest(name = "{0}")
     @DisplayName("an unknown target is 404, not an empty page or a new target kind")
     @CsvSource(delimiter = '|', value = {
-            "unknown entity slug | /reviews/society/no-such-society-anywhere",
-            "unknown entity type | /reviews/banana/whatever",
             "unknown property | /properties/00000000-0000-0000-0000-000000000000/reviews"
     })
     void unknownTargetIs404(String label, String path) throws Exception {

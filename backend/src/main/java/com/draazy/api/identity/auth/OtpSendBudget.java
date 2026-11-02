@@ -12,21 +12,9 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class OtpSendBudget {
-    static final Duration SEND_COOLDOWN = Duration.ofSeconds(60);
-
     static final Duration SEND_WINDOW = Duration.ofHours(1);
 
-    static final int MAX_SENDS_PER_WINDOW = 5;
-
     static final Duration SEND_DAY = Duration.ofDays(1);
-
-    static final int MAX_SENDS_PER_DAY = 10;
-
-    static final int MAX_PLATFORM_SENDS_PER_WINDOW = 500;
-
-    static final int MAX_PURPOSE_SENDS_PER_WINDOW = 100;
-
-    static final int MAX_CALLER_SENDS_PER_WINDOW = 5;
 
     static final int MAX_PURPOSE_RESERVE_SENDS_PER_WINDOW = 50;
 

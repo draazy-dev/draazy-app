@@ -91,8 +91,10 @@ public interface SocietyRepository
     @Query("""
             select s.slug, s.name, s.localitySlug, s.lat, s.lng
             from Society s
-            where s.mergedInto is null and s.archivedAt is null and s.id <> :excludeId""")
-    List<Object[]> duplicateScan(@Param("excludeId") UUID excludeId);
+            where s.mergedInto is null and s.archivedAt is null""")
+    List<Object[]> duplicateScan();
+
+    List<Society> findBySlugIn(Collection<String> slugs);
 
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """

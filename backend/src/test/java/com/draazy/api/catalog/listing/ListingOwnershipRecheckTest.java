@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 
 import com.draazy.api.catalog.locality.LocalityBinding;
 import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.society.SocietyRepository;
 import com.draazy.api.identity.user.User;
 import java.time.Instant;
@@ -13,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 class ListingOwnershipRecheckTest {
     private final ListingEditRules rules = new ListingEditRules(
-            mock(LocalityBinding.class), mock(SocietyRepository.class));
+            mock(LocalityBinding.class), mock(SocietyRepository.class), mock(PropertyRepository.class));
 
     private Property verifiedRental() {
         Property property = new Property(new User("9812345678", "owner"),

@@ -1,6 +1,5 @@
 package com.draazy.api.catalog.locality;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -45,15 +44,4 @@ public interface LocalityRepository extends JpaRepository<Locality, String> {
             where slug = :slug and place_id is null and active = false""", nativeQuery = true)
     int adopt(@Param("slug") String slug, @Param("placeId") String placeId, @Param("name") String name,
             @Param("lat") double lat, @Param("lng") double lng);
-
-    @Query("""
-            select l from Locality l
-            where l.archivedAt is null
-               or exists (select 1 from Property p
-                          where p.localitySlug = l.slug and p.status = :status and p.archived = false
-                            and p.owner.status <> 'suspended'
-                            and (p.demo = true or coalesce(p.lastConfirmedAt, p.createdAt) > :cutoff))
-            order by l.name
-            """)
-    List<Locality> findDirectory(@Param("status") String status, @Param("cutoff") Instant cutoff);
 }

@@ -102,6 +102,13 @@ class DocumentRequestFlowTest extends AbstractApiTest {
         return requests.findById(UUID.fromString(reqId)).orElseThrow().getShareToken();
     }
 
+    private DocumentRequest lapse(String token) {
+        DocumentRequest row = requests.findByShareToken(token).orElseThrow();
+        requests.updateDecisionIfCurrent(row.getId(), "granted", "granted", token,
+                Instant.now().minusSeconds(60));
+        return row;
+    }
+
     @Test
     void requestAccess_recordsTheAskAgainstTheOwnersListing() throws Exception {
         User owner = user("9820002001", "owner");
@@ -452,9 +459,7 @@ class DocumentRequestFlowTest extends AbstractApiTest {
         Property p = listing(owner, "Lapsed signed-in grant flat");
         upload(owner, p, "Sale Deed", "deed.pdf");
         String token = grantedToken(owner, buyer, p, "[\"Sale Deed\"]");
-        DocumentRequest row = requests.findByShareToken(token).orElseThrow();
-        row.grant(token, Instant.now().minusSeconds(60));
-        requests.saveAndFlush(row);
+        DocumentRequest row = lapse(token);
 
         mvc.perform(get(Routes.MeDocumentRequests.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
@@ -498,9 +503,7 @@ class DocumentRequestFlowTest extends AbstractApiTest {
         Property p = listing(owner, "Lapsed mint flat");
         String deedId = upload(owner, p, "Sale Deed", "deed.pdf");
         String token = grantedToken(owner, buyer, p, "[\"Sale Deed\"]");
-        DocumentRequest row = requests.findByShareToken(token).orElseThrow();
-        row.grant(token, Instant.now().minusSeconds(60));
-        requests.saveAndFlush(row);
+        DocumentRequest row = lapse(token);
 
         mvc.perform(get(Routes.MeDocumentRequests.DOCUMENT_URL, row.getId().toString(), deedId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
@@ -648,10 +651,7 @@ class DocumentRequestFlowTest extends AbstractApiTest {
         Property p = listing(owner, "Lapsed flat");
         upload(owner, p, "Sale Deed", "deed.pdf");
         String token = grantedToken(owner, buyer, p, "[\"Sale Deed\"]");
-
-        var row = requests.findByShareToken(token).orElseThrow();
-        row.grant(token, Instant.now().minusSeconds(60));
-        requests.saveAndFlush(row);
+        lapse(token);
 
         mvc.perform(get(Routes.Documents.SHARED).header(ShareTokens.HEADER, token))
                 .andExpect(status().isUnauthorized());

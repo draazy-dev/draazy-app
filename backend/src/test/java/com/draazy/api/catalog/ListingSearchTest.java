@@ -329,11 +329,12 @@ class ListingSearchTest extends AbstractApiTest {
             persist(ready);
             persist(rent("Possession unstated"));
 
-            assertThat(PropertyPossession.UNMATCHABLE.matches(PropertyPossession.PATTERN)).isFalse();
+            String unmatchable = "no.such.possession";
+            assertThat(unmatchable.matches(PropertyPossession.PATTERN)).isFalse();
 
             String owner = "&owner=" + seller.getId();
             assertThat(count("construction=" + PropertyPossession.READY_TO_MOVE + owner)).isEqualTo(1);
-            assertThat(count("construction=" + PropertyPossession.UNMATCHABLE + owner)).isZero();
+            assertThat(count("construction=" + unmatchable + owner)).isZero();
         }
 
         @Test

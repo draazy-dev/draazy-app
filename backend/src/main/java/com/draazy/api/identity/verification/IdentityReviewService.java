@@ -9,6 +9,7 @@ import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.IdentityAlreadyRegisteredException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.common.persistence.ConstraintViolations;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.trust.OwnerBadgeSink;
@@ -29,8 +30,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class IdentityReviewService {
@@ -306,21 +305,8 @@ public class IdentityReviewService {
 
     private void sendWhatsapp(UUID userId, String mobile, String line) {
         if (notifier.allowsWhatsapp(userId)) {
-            afterCommit(() -> decisionMessenger.sendIdentityDecision(mobile, line));
+            AfterCommit.run(() -> decisionMessenger.sendIdentityDecision(mobile, line));
         }
-    }
-
-    private static void afterCommit(Runnable callback) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            callback.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                callback.run();
-            }
-        });
     }
 
     private record ConfirmedDob(LocalDate value, boolean yearOnly) {

@@ -236,7 +236,7 @@ class AccountPermissionsGuardTest extends AbstractApiTest {
                     .isEqualTo(permission.module() + ":" + permission.action());
             assertThat(permission.action())
                     .isIn(BackOfficePermissions.READ, BackOfficePermissions.WRITE,
-                            "verify", "moderate");
+                            "verify", "moderate", BackOfficePermissions.MANAGE);
             assertThat(BackOfficePermissions.isKnown(permission.name())).isTrue();
         }
         assertThat(BackOfficePermissions.CATALOGUE)

@@ -11,6 +11,7 @@ import java.time.LocalTime;
 import java.time.Month;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -101,14 +102,11 @@ class OwnershipEvidenceTypesTest {
     @Test
     @DisplayName("a rental needs address or title proof; a sale needs title proof")
     void requiredKindsFollowTheDeal() {
-        assertThat(OwnershipEvidenceTypes.requiredKinds("rent"))
-                .containsExactlyInAnyOrder(OwnershipEvidenceTypes.ADDRESS_PROOF, OwnershipEvidenceTypes.TITLE_PROOF);
-        assertThat(OwnershipEvidenceTypes.requiredKinds("buy"))
-                .containsExactly(OwnershipEvidenceTypes.TITLE_PROOF);
-        assertThat(OwnershipEvidenceTypes.requiredKinds("buy"))
-                .as("identity, site photos and the deed are supporting evidence, never a gate")
-                .doesNotContain(OwnershipEvidenceTypes.OWNER_IDENTITY, OwnershipEvidenceTypes.SITE_PRESENCE,
-                        OwnershipEvidenceTypes.TITLE_SUPPORT, OwnershipEvidenceTypes.AUTHORITY_PROOF);
+        assertThat(OwnershipEvidenceTypes.requiredKindAlternatives("rent"))
+                .containsExactly(Set.of(OwnershipEvidenceTypes.ADDRESS_PROOF, OwnershipEvidenceTypes.TITLE_PROOF));
+        assertThat(OwnershipEvidenceTypes.requiredKindAlternatives("buy"))
+                .as("identity, site photos, the deed and authority are supporting evidence, never a gate")
+                .containsExactly(Set.of(OwnershipEvidenceTypes.TITLE_PROOF));
     }
 
     @Test
@@ -117,22 +115,15 @@ class OwnershipEvidenceTypesTest {
         assertThat(OwnershipEvidenceTypes.kindOf(OwnershipEvidenceTypes.POWER_OF_ATTORNEY))
                 .isEqualTo(OwnershipEvidenceTypes.AUTHORITY_PROOF);
         assertThat(OwnershipEvidenceTypes.namesASubject(OwnershipEvidenceTypes.POWER_OF_ATTORNEY)).isTrue();
-        assertThat(OwnershipEvidenceTypes.requiredKinds("rent"))
-                .doesNotContain(OwnershipEvidenceTypes.AUTHORITY_PROOF);
-        assertThat(OwnershipEvidenceTypes.requiredKinds("buy"))
-                .doesNotContain(OwnershipEvidenceTypes.AUTHORITY_PROOF);
     }
 
     @Test
     @DisplayName("only rent takes the shorter gate \u2014 an unrecognised deal takes the sale gate")
     void anUnrecognisedDealTakesTheStricterGate() {
-        assertThat(OwnershipEvidenceTypes.requiredKinds("rent"))
-                .containsExactlyInAnyOrder(OwnershipEvidenceTypes.ADDRESS_PROOF, OwnershipEvidenceTypes.TITLE_PROOF);
-
         for (String deal : new String[] {null, "", "lease", "resale", "pg", "BUY"}) {
-            assertThat(OwnershipEvidenceTypes.requiredKinds(deal))
+            assertThat(OwnershipEvidenceTypes.requiredKindAlternatives(deal))
                     .as("%s is not the rent intent, so it must need the registry's own extract", deal)
-                    .containsExactly(OwnershipEvidenceTypes.TITLE_PROOF);
+                    .containsExactly(Set.of(OwnershipEvidenceTypes.TITLE_PROOF));
         }
     }
 

@@ -37,8 +37,4 @@ public interface OtpCodeRepository extends JpaRepository<OtpCode, UUID> {
             + " and c.createdAt >= :since order by c.createdAt")
     List<Instant> findSendTimesForCallerSince(@Param("requestedBy") UUID requestedBy,
             @Param("family") String family, @Param("since") Instant since, Pageable pageable);
-    @Query("select c.createdAt from OtpCode c where c.purpose like concat(:prefix, ':%')"
-            + " and c.createdAt >= :since order by c.createdAt")
-    List<Instant> findSendTimesForPurposePrefixSince(@Param("prefix") String prefix,
-            @Param("since") Instant since, Pageable pageable);
 }

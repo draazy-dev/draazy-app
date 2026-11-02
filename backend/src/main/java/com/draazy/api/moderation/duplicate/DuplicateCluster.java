@@ -15,8 +15,6 @@ public record DuplicateCluster(
 
     public static final String REASON_IMAGE = "image";
 
-    public static final String REASON_BOTH = REASON_ADDRESS + "+" + REASON_IMAGE;
-
     public record Hint(String code, String severity, String detail) {
     }
 

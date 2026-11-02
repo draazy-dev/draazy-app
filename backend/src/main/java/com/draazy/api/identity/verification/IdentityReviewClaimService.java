@@ -4,6 +4,7 @@ import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ForbiddenException;
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.AuthPrincipal;
@@ -15,13 +16,11 @@ import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class IdentityReviewClaimService {
 
-    static final Duration CLAIM_TTL = Duration.ofMinutes(30);
+    public static final Duration CLAIM_TTL = Duration.ofMinutes(30);
     private static final int MAX_ACTIVE_CLAIMS = 3;
 
     private final IdentityVerificationRepository verifications;
@@ -104,17 +103,7 @@ public class IdentityReviewClaimService {
 
     private void recordAuditAfterCommit(AuthPrincipal reviewer, String action, IdentityVerification v,
             Object... context) {
-        Runnable callback = () -> audit.record(reviewer, action, "identity_verification", v.getId().toString(), context);
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            callback.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                callback.run();
-            }
-        });
+        AfterCommit.run(() -> audit.record(reviewer, action, "identity_verification", v.getId().toString(), context));
     }
 
     private void lockReviewerClaims(AuthPrincipal reviewer) {

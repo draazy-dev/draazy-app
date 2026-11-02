@@ -17,8 +17,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -33,6 +35,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class SocietyMintService {
     private static final int MAX_DUPE_HINTS = 25;
+
+    private static final int MAX_DUPE_BATCH = 50;
 
     private static final int LOOKUPS_PER_DAY = 20;
 
@@ -166,18 +170,43 @@ public class SocietyMintService {
 
     @Transactional(readOnly = true)
     public List<SocietyDuplicateSuggestion> duplicates(String slug, int limit) {
+        requireHintLimit(limit);
+        Society candidate = societies.findBySlug(slug)
+                .orElseThrow(() -> NotFoundException.of("Society"));
+        return rankDuplicates(candidate, societies.duplicateScan(), limit);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, List<SocietyDuplicateSuggestion>> duplicates(List<String> slugs, int limit) {
+        requireHintLimit(limit);
+        if (slugs.isEmpty() || slugs.size() > MAX_DUPE_BATCH) {
+            throw new BadRequestException("slugs must name between 1 and " + MAX_DUPE_BATCH + " societies");
+        }
+        List<Society> candidates = societies.findBySlugIn(slugs);
+        if (candidates.isEmpty()) {
+            return Map.of();
+        }
+        List<Object[]> live = societies.duplicateScan();
+        Map<String, List<SocietyDuplicateSuggestion>> out = new LinkedHashMap<>();
+        for (Society candidate : candidates) {
+            out.put(candidate.getSlug(), rankDuplicates(candidate, live, limit));
+        }
+        return out;
+    }
+
+    private static void requireHintLimit(int limit) {
         if (limit < 1 || limit > MAX_DUPE_HINTS) {
             throw new BadRequestException("limit must be between 1 and " + MAX_DUPE_HINTS);
         }
-        Society candidate = societies.findBySlug(slug)
-                .orElseThrow(() -> NotFoundException.of("Society"));
+    }
 
+    private static List<SocietyDuplicateSuggestion> rankDuplicates(Society candidate, List<Object[]> live, int limit) {
         Set<String> mine = SocietyMatching.tokens(candidate.getName());
         if (mine.isEmpty()) {
             return List.of();
         }
-
-        return societies.duplicateScan(candidate.getId()).stream()
+        return live.stream()
+                .filter(row -> !candidate.getSlug().equals(row[0]))
                 .map(row -> score(row, mine, candidate))
                 .filter(s -> s != null && s.score() >= SocietyMatching.FLOOR)
                 .sorted(Comparator.comparingDouble(SocietyDuplicateSuggestion::score).reversed())

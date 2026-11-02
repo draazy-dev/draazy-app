@@ -38,10 +38,6 @@ public enum Freshness {
         return name().toLowerCase();
     }
 
-    public boolean needsOwnerAttention() {
-        return this != ACTIVE;
-    }
-
     public boolean unconfirmed() {
         return this == STALE || this == DORMANT;
     }

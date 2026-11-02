@@ -1,6 +1,5 @@
 package com.draazy.api.catalog.locality;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,15 +10,12 @@ import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
-import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-@DisplayName("Locality reads: listing-derived stats, indexability and the directory")
+@DisplayName("Locality reads: listing-derived stats and indexability")
 class LocalityReadEndpointsTest extends AbstractApiTest {
 
     @Autowired
@@ -61,31 +57,6 @@ class LocalityReadEndpointsTest extends AbstractApiTest {
 
     private void live(String slug, String deal, long price, String area) {
         listing(slug, deal, "apartment", price, area, PropertyStatus.APPROVED, false);
-    }
-
-    @Test
-    void dormantRealStockDoesNotKeepAnArchivedLocalityInThePublicDirectory() throws Exception {
-        String slug = "zz-freshness-locality";
-        locality(slug, "Zz Freshness Locality", true);
-        Property real = listing(slug, "rent", "apartment", 25000, "900", PropertyStatus.APPROVED, false);
-        Property demo = listing(slug, "rent", "apartment", 26000, "900", PropertyStatus.APPROVED, false);
-        Instant old = Instant.now().minus(32, ChronoUnit.DAYS);
-        jdbc.update("update properties set created_at = ? where id in (?, ?)",
-                java.sql.Timestamp.from(old), real.getId(), demo.getId());
-        jdbc.update("update properties set demo = true where id = ?", demo.getId());
-
-        mvc.perform(get("/localities"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.slug == 'zz-freshness-locality')].liveListings")
-                        .value(org.hamcrest.Matchers.contains(1)));
-        jdbc.update("update properties set demo = false where id = ?", demo.getId());
-        mvc.perform(get("/localities"))
-                .andExpect(jsonPath("$[?(@.slug == 'zz-freshness-locality')]").isEmpty());
-        jdbc.update("update properties set last_confirmed_at = ? where id = ?",
-                java.sql.Timestamp.from(Instant.now()), real.getId());
-        mvc.perform(get("/localities"))
-                .andExpect(jsonPath("$[?(@.slug == 'zz-freshness-locality')].liveListings")
-                        .value(org.hamcrest.Matchers.contains(1)));
     }
 
     @Test
@@ -209,30 +180,6 @@ class LocalityReadEndpointsTest extends AbstractApiTest {
     @DisplayName("an unknown slug is a 404")
     void unknownSlugIsNotFound() throws Exception {
         mvc.perform(get("/localities/zz-no-such-place")).andExpect(status().isNotFound());
-    }
-
-    @Test
-    @DisplayName("the directory lists active rows and retired rows that still have live listings, nothing else")
-    void directoryHidesRetiredRowsWithNothingLive() throws Exception {
-        locality("zz-dir-active", "Zz Dir Active", false);
-        locality("zz-dir-retired-empty", "Zz Dir Retired Empty", true);
-        locality("zz-dir-retired-live", "Zz Dir Retired Live", true);
-        live("zz-dir-retired-live", "rent", 20000, "800");
-        listing("zz-dir-retired-empty", "rent", "apartment", 20000, "800", PropertyStatus.PENDING, false);
-
-        String body = mvc.perform(get("/localities")).andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        assertThat(JsonPath.<java.util.List<String>>read(body, "$[?(@.slug=='zz-dir-active')].slug"))
-                .containsExactly("zz-dir-active");
-        assertThat(JsonPath.<java.util.List<String>>read(body, "$[?(@.slug=='zz-dir-retired-live')].slug"))
-                .containsExactly("zz-dir-retired-live");
-        assertThat(JsonPath.<java.util.List<String>>read(body, "$[?(@.slug=='zz-dir-retired-empty')].slug"))
-                .isEmpty();
-        assertThat(JsonPath.<java.util.List<Boolean>>read(body, "$[?(@.slug=='zz-dir-retired-live')].archived"))
-                .containsExactly(true);
-        assertThat(JsonPath.<java.util.List<Integer>>read(body, "$[?(@.slug=='zz-dir-active')].liveListings"))
-                .containsExactly(0);
     }
 
     @Test

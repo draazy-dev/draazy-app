@@ -6,6 +6,7 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.identity.verification.IdentityAppeal;
@@ -25,8 +26,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class IdentityAppealService {
@@ -168,20 +167,7 @@ public class IdentityAppealService {
                 ? "Your Draazy identity appeal was accepted. Your ID is back in review and we'll update you soon."
                 : "Your Draazy identity appeal was reviewed and the original decision stands. Open the app to try again.";
         users.findById(userId).filter(user -> notifier.allowsWhatsapp(userId))
-                .ifPresent(user -> afterCommit(() -> messenger.sendIdentityDecision(user.getMobile(), line)));
-    }
-
-    private static void afterCommit(Runnable callback) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            callback.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                callback.run();
-            }
-        });
+                .ifPresent(user -> AfterCommit.run(() -> messenger.sendIdentityDecision(user.getMobile(), line)));
     }
 
     private static ConflictException notAllowed(String message) {

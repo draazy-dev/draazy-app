@@ -6,7 +6,5 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TicketNoteRepository extends JpaRepository<TicketNote, UUID> {
-    List<TicketNote> findByTicketIdOrderByAtAsc(UUID ticketId);
-
     List<TicketNote> findByTicketIdInOrderByAtAsc(Collection<UUID> ticketIds);
 }

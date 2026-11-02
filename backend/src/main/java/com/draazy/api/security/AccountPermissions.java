@@ -65,6 +65,7 @@ public class AccountPermissions {
             effective.add(BackOfficePermissions.USERS_READ);
             effective.add(BackOfficePermissions.USERS_WRITE);
             effective.add(BackOfficePermissions.AUDIT_READ);
+            effective.add(BackOfficePermissions.LEADS_MANAGE);
         }
         return effective;
     }

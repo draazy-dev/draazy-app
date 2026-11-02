@@ -2,7 +2,6 @@ package com.draazy.api.provider.cashfree;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -84,14 +83,6 @@ public class CashfreeClient {
         CashfreeException(String message, Throwable cause) {
             super(message, cause);
         }
-    }
-
-    static Map<String, Object> json(Object... keyValuePairs) {
-        Map<String, Object> map = new java.util.LinkedHashMap<>();
-        for (int i = 0; i < keyValuePairs.length; i += 2) {
-            map.put((String) keyValuePairs[i], keyValuePairs[i + 1]);
-        }
-        return map;
     }
 
     private static boolean isBlank(String s) {

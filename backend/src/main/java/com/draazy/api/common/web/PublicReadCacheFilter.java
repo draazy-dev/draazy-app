@@ -34,7 +34,7 @@ import org.springframework.web.util.pattern.PathPatternParser;
 public class PublicReadCacheFilter extends OncePerRequestFilter {
     // Cached routes must answer every caller identically; one varying by caller leaks across users.
     static final Set<String> PATHS = Set.of(
-            Routes.Bootstrap.BASE, Routes.Fees.BASE, Routes.Localities.BASE, Routes.Content.FAQS,
+            Routes.Bootstrap.BASE, Routes.Fees.BASE, Routes.Content.FAQS,
             Routes.Properties.FEATURED, Routes.Properties.SEARCH_INDEX, Routes.Societies.TOP);
 
     static final List<PathPattern> ANONYMOUS = Stream.of(

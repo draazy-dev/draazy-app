@@ -13,7 +13,9 @@ INSERT INTO platform_fees (deal, brokerage, platform_fee, stamp_duty, registrati
 INSERT INTO settings (key, value) VALUES
     ('fees', '{
         "listingPass": 999,
+        "listingPassBuy": 1999,
         "contactPack": 199,
+        "contactPackBuy": 399,
         "rentAgreementPlatform": 499,
         "freeContactLimit": 15,
         "featuredDays": 7,
@@ -255,18 +257,24 @@ ON CONFLICT (id) DO UPDATE SET
     likes = EXCLUDED.likes, views = EXCLUDED.views, tag = EXCLUDED.tag;
 
 -- `price` is a fallback only: paid plans are priced from `settings('fees')` by `PlanMapper`.
-INSERT INTO plans (id, name, audience, price, billing_cycle, term_days, kind, active, listing_limit, contact_limit, unlimited_contacts, features) VALUES
-    ('b1000000-0000-4000-8000-000000000001', 'Owner Free',  'owner',     0, 'yearly',  NULL, 'plan', false,    1, NULL, false,
+INSERT INTO plans (id, name, audience, price, billing_cycle, term_days, kind, deal, active, listing_limit, contact_limit, unlimited_contacts, features) VALUES
+    ('b1000000-0000-4000-8000-000000000001', 'Owner Free',  'owner',     0, 'yearly',  NULL, 'plan', NULL, false,    1, NULL, false,
      '["1 live listing", "Verified owner badge", "Unlimited enquiries"]'::jsonb),
-    ('b1000000-0000-4000-8000-000000000002', 'Owner Plus',  'owner',   999, 'yearly',  NULL, 'plan', false,    2, NULL, true,
+    ('b1000000-0000-4000-8000-000000000002', 'Owner Plus',  'owner',   999, 'yearly',  NULL, 'plan', NULL, false,    2, NULL, true,
      '["2 live listings", "Featured placement on every listing", "Priority support"]'::jsonb),
-    ('b1000000-0000-4000-8000-000000000003', 'Owner Pro',   'owner',  2499, 'yearly',  NULL, 'plan', false,    5, NULL, true,
+    ('b1000000-0000-4000-8000-000000000003', 'Owner Pro',   'owner',  2499, 'yearly',  NULL, 'plan', NULL, false,    5, NULL, true,
      '["5 live listings", "Featured placement on every listing", "Rent agreement included", "Dedicated manager"]'::jsonb),
-    ('b1000000-0000-4000-8000-000000000004', 'Seeker Plus', 'tenant',  199, 'monthly', NULL, 'plan', false, NULL, NULL, true,
+    ('b1000000-0000-4000-8000-000000000004', 'Seeker Plus', 'tenant',  199, 'monthly', NULL, 'plan', NULL, false, NULL, NULL, true,
      '["Unlimited owner contacts", "Instant alerts", "Saved-search priority"]'::jsonb),
-    ('b1000000-0000-4000-8000-000000000005', 'Listing Pass', 'owner',  999, NULL,        60, 'listing-pass', true, NULL, NULL, false,
-     '["1 extra live listing", "Live for 60 days", "No auto-renewal"]'::jsonb),
-    ('b1000000-0000-4000-8000-000000000006', 'Contact Pack', NULL,     199, NULL,        30, 'contact-pack', true, NULL, 15, false,
+    ('b1000000-0000-4000-8000-000000000005', 'Rent Listing Pass', 'owner', 999, NULL,   60, 'listing-pass', 'rent', true, NULL, NULL, false,
+     '["1 extra live rent listing", "Live for 60 days", "No auto-renewal"]'::jsonb),
+    ('b1000000-0000-4000-8000-000000000006', 'Rent Contact Pack', NULL,   199, NULL,   30, 'contact-pack', 'rent', true, NULL, 15, false,
+     '["15 owner contacts on rent listings", "Valid for 30 days", "No auto-renewal"]'::jsonb),
+    ('b1000000-0000-4000-8000-000000000007', 'Buy Contact Pack', NULL,    399, NULL,   60, 'contact-pack', 'buy',  true, NULL, 15, false,
+     '["15 owner contacts on sale listings", "Valid for 60 days", "No auto-renewal"]'::jsonb),
+    ('b1000000-0000-4000-8000-000000000008', 'Sale Listing Pass', 'owner', 1999, NULL,  90, 'listing-pass', 'buy',  true, NULL, NULL, false,
+     '["1 extra live sale listing", "Live for 90 days", "No auto-renewal"]'::jsonb),
+    ('b1000000-0000-4000-8000-000000000009', 'Contact Pack', NULL,        199, NULL,   30, 'contact-pack', NULL,  false, NULL, 15, false,
      '["15 owner contacts", "Valid for 30 days", "No auto-renewal"]'::jsonb)
 ON CONFLICT (id) DO UPDATE SET
     name               = EXCLUDED.name,
@@ -275,6 +283,7 @@ ON CONFLICT (id) DO UPDATE SET
     billing_cycle      = EXCLUDED.billing_cycle,
     term_days          = EXCLUDED.term_days,
     kind               = EXCLUDED.kind,
+    deal               = EXCLUDED.deal,
     active             = EXCLUDED.active,
     listing_limit      = EXCLUDED.listing_limit,
     contact_limit      = EXCLUDED.contact_limit,

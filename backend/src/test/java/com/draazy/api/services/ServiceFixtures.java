@@ -79,6 +79,10 @@ abstract class ServiceFixtures extends AbstractApiTest {
         return user(mobile, Roles.Wire.ADMIN, null, "Admin User");
     }
 
+    User manager(String mobile) {
+        return user(mobile, Roles.Wire.MANAGER, null, "Meera Manager");
+    }
+
     User user(String mobile, String role, String team, String name) {
         User u = new User(mobile, role);
         u.setName(name);

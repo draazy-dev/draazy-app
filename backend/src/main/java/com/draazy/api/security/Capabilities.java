@@ -10,8 +10,6 @@ public final class Capabilities {
 
     public static final String UPDATE_TICKET = "update_ticket";
 
-    public static final String EXPORT_CSV = "export_csv";
-
     public static final String WILDCARD = "*";
 
     public static final String BEAN = "permissions";

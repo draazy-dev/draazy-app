@@ -26,7 +26,10 @@ class MigrationSeedGuardTest {
             "26.10.36",
             "Inserts one timeline row per held draft it releases; a reset database has no held drafts to release.",
             "26.10.52",
-            "Copies retired per-post lifestyle tags into user_living_style; a reset database has no posts to copy from.");
+            "Copies retired per-post lifestyle tags into user_living_style; a reset database has no posts to copy from.",
+            "26.10.67",
+            "Inserts the retired untyped pack only so pre-split pack subscriptions can move onto it; a reset "
+                    + "database has no subscriptions to move, and the R__ seed restores the row.");
 
     private static final Map<String, String> RE_HOMED_INTO_REFERENCE_SEED = Map.of(
             "message_template",

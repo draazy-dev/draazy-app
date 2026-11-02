@@ -229,6 +229,12 @@ public class ErasureService {
                 .setParameter("id", subjectId)
                 .executeUpdate());
 
+        erased.put("crm_leads", entityManager
+                .createNativeQuery("delete from crm_leads where user_id = :id or mobile = :mobile")
+                .setParameter("id", subjectId)
+                .setParameter("mobile", MobileMask.normalise(oldMobile))
+                .executeUpdate());
+
         erased.put("personal_documents", erasePersonalDocuments(subjectId));
 
         erased.put("managed_properties", entityManager
@@ -237,7 +243,8 @@ public class ErasureService {
                            set rented = false,
                                tenant_name = null,
                                tenant_mobile = null,
-                               tenant_since = null
+                               tenant_since = null,
+                               landlord_pan = case when owner_id = :id then null else landlord_pan end
                          where tenant_mobile = :mobile or owner_id = :id
                         """)
                 .setParameter("mobile", MobileMask.normalise(oldMobile))

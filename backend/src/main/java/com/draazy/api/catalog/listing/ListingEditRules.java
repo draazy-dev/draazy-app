@@ -6,8 +6,11 @@ import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyKind;
 import com.draazy.api.catalog.property.PropertyPossession;
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.society.Society;
 import com.draazy.api.catalog.society.SocietyRepository;
+import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
 import jakarta.validation.ConstraintViolation;
@@ -33,10 +36,12 @@ public class ListingEditRules {
 
     private final LocalityBinding localities;
     private final SocietyRepository societies;
+    private final PropertyRepository properties;
 
-    public ListingEditRules(LocalityBinding localities, SocietyRepository societies) {
+    public ListingEditRules(LocalityBinding localities, SocietyRepository societies, PropertyRepository properties) {
         this.localities = localities;
         this.societies = societies;
+        this.properties = properties;
     }
 
     private static void clearStaleAddressParts(Property property, ListingUpdate update) {
@@ -110,6 +115,11 @@ public class ListingEditRules {
             remoderationRequired = true;
         }
         if (in.deal() != null && !in.deal().equals(p.getDeal())) {
+            // Packs and passes are priced per deal and read the listing's current deal, so a flip would reprice them.
+            if (p.getId() != null && properties.hasDealPricedActivity(p.getId())) {
+                throw new ConflictException(ErrorCodes.CONFLICT, "This listing already has seeker contacts or a "
+                        + "Listing Pass, so it can't switch between rent and sale. Archive it and post a new listing.");
+            }
             p.setDeal(in.deal());
 
             p.revokeOwnershipVerification();

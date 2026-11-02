@@ -33,6 +33,16 @@ public interface PropertyRepository
 
     boolean existsByIdAndArchivedFalseAndStatusIn(UUID id, Collection<String> statuses);
 
+    interface DealOf {
+        UUID getId();
+
+        String getDeal();
+    }
+
+    // Native so a deleted listing still reports its deal: a contact spent on it keeps drawing on the same pack.
+    @Query(nativeQuery = true, value = "select id as id, lower(deal) as deal from properties where id in (:ids)")
+    List<DealOf> findDealsByIdIn(@Param("ids") Collection<UUID> ids);
+
     @EntityGraph(attributePaths = "owner")
     Optional<Property> findByIdAndOwner_Id(UUID id, UUID ownerId);
 
@@ -326,6 +336,13 @@ public interface PropertyRepository
             select exists (select 1 from properties p where p.id = :propertyId and\s""" + ACTIVE_PASS_SQL + ")")
     boolean hasActivePass(@Param("propertyId") UUID propertyId, @Param("now") Instant now);
 
+    @Query(nativeQuery = true, value = """
+            select exists (select 1 from contact_requests c where c.property_id = :propertyId)
+                or exists (select 1 from subscriptions s join plans pl on pl.id = s.plan_id
+                           where s.property_id = :propertyId and pl.kind = 'listing-pass'
+                             and s.status in ('pending', 'active', 'past-due'))""")
+    boolean hasDealPricedActivity(@Param("propertyId") UUID propertyId);
+
     @Query("select p.createdAt from Property p where p.owner.id = :ownerId and p.createdAt > :since"
             + " order by p.createdAt asc")
     List<Instant> postedTimesSince(@Param("ownerId") UUID ownerId, @Param("since") Instant since);
@@ -351,27 +368,4 @@ public interface PropertyRepository
     TrustTally tallyTrust(
             @Param("status") String status,
             @Param("now") Instant now, @Param("cutoff") Instant cutoff);
-
-    @Query("""
-            select count(p)
-            from Property p
-            where p.status = :status
-              and p.archived = false
-              and p.owner.status <> 'suspended'
-              and (:unbounded = true
-                   or (p.createdAt is not null and p.createdAt > :baseline))
-              and (:deal is null or lower(p.deal) = :deal)
-              and (:localitiesEmpty = true
-                   or lower(coalesce(p.localitySlug, p.locality)) in :localities)
-              and (:bhkEmpty = true or cast(p.bhk as integer) in :bhkValues)
-            """)
-    long countVisibleWithFilters(
-            @Param("status") String status,
-            @Param("unbounded") boolean unbounded,
-            @Param("baseline") Instant baseline,
-            @Param("deal") String deal,
-            @Param("localitiesEmpty") boolean localitiesEmpty,
-            @Param("localities") List<String> localities,
-            @Param("bhkEmpty") boolean bhkEmpty,
-            @Param("bhkValues") List<Integer> bhkValues);
 }

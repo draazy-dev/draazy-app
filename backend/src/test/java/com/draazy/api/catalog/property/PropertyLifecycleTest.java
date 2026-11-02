@@ -32,7 +32,7 @@ class PropertyLifecycleTest {
         when(owner.getId()).thenReturn(UUID.randomUUID());
         when(permissions.granted(eq(staff), anyString())).thenReturn(true);
         when(liveGate.mayGoLive(any())).thenReturn(true);
-        when(settings.listingPass()).thenReturn(999L);
+        when(settings.listingPass("rent")).thenReturn(999L);
         property = new Property(owner, "Home", "rent", "Flat", 20000L, "Baner", "Pune");
         property.setLocalitySlug("baner");
     }

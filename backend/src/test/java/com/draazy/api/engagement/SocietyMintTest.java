@@ -532,6 +532,64 @@ class SocietyMintTest extends AbstractApiTest {
         dupes(slug, ops, "").andExpect(status().isOk());
     }
 
+    private ResultActions dupesBatch(String query, String auth) throws Exception {
+        var request = get("/admin/society-candidates/duplicates" + query);
+        return mvc.perform(auth == null ? request : request.header(HttpHeaders.AUTHORIZATION, auth));
+    }
+
+    @Test
+    @DisplayName("one batch read answers each candidate exactly as its own read would, skipping unknown slugs")
+    void batchMatchesSingleReads() throws Exception {
+        User first = user("9866000080", "Kavya Mint");
+        User second = user("9866000081", "Rohan Mint");
+        String ops = staff("9866000082");
+
+        String original = slugOf(mint(first, body("Juniper Heights D252 Wakad"))
+                .andExpect(status().isCreated()));
+        String copy = slugOf(mint(second, body("Juniper Heights D252"))
+                .andExpect(status().isCreated()));
+
+        String single = dupes(copy, ops).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String singleOriginal = dupes(original, ops).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String json = dupesBatch("?slugs=" + copy + "&slugs=" + original + "&slugs=" + copy
+                + "&slugs=no-such-society-d252", ops)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['" + copy + "'][0].slug").value(original))
+                .andExpect(jsonPath("$['" + original + "'][0].slug").value(copy))
+                .andExpect(jsonPath("$['no-such-society-d252']").doesNotExist())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(json).contains(single).contains(singleOriginal);
+    }
+
+    @Test
+    @DisplayName("the batch refuses an empty, oversized or out-of-range request")
+    void batchBoundsAreRefused() throws Exception {
+        String ops = staff("9866000083");
+        String fiftyOne = "?slugs=" + String.join("&slugs=",
+                java.util.stream.IntStream.range(0, 51).mapToObj(i -> "s" + i).toList());
+
+        dupesBatch("", ops).andExpect(status().isBadRequest());
+        dupesBatch(fiftyOne, ops).andExpect(status().isBadRequest());
+        dupesBatch("?slugs=a&limit=0", ops).andExpect(status().isBadRequest());
+        dupesBatch("?slugs=a&limit=26", ops).andExpect(status().isBadRequest());
+        dupesBatch("?slugs=no-such-society-d252", ops)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("the batch is staff-only")
+    void batchIsStaffOnly() throws Exception {
+        User buyer = user("9866000084", "Tara Mint");
+        dupesBatch("?slugs=a", bearer(buyer)).andExpect(status().isForbidden());
+        dupesBatch("?slugs=a", null).andExpect(status().isUnauthorized());
+    }
+
     @Test
     @DisplayName("Google's canonical id is what is stored, and a second alias of it finds the same society")
     void canonicalIdIsStored() throws Exception {

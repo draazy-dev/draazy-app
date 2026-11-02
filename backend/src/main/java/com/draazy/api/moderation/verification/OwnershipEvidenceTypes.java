@@ -35,13 +35,6 @@ public final class OwnershipEvidenceTypes {
     private static final List<Set<String>> REQUIRED_FOR_RENT = List.of(Set.of(ADDRESS_PROOF, TITLE_PROOF));
     private static final List<Set<String>> REQUIRED_FOR_SALE = List.of(Set.of(TITLE_PROOF));
 
-    public static List<String> requiredKinds(String deal) {
-        return requiredKindAlternatives(deal).stream()
-                .flatMap(Set::stream)
-                .distinct()
-                .toList();
-    }
-
     public static List<Set<String>> requiredKindAlternatives(String deal) {
         return DealIntent.RENT.equals(deal) ? REQUIRED_FOR_RENT : REQUIRED_FOR_SALE;
     }

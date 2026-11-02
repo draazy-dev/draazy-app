@@ -14,6 +14,8 @@ public final class BackOfficePermissions {
 
     public static final String WRITE = "write";
 
+    public static final String MANAGE = "manage";
+
     public static final String BEAN = "accountPermissions";
 
     public static final String DASHBOARD_READ = "dashboard:read";
@@ -92,6 +94,12 @@ public final class BackOfficePermissions {
 
     public static final String POSTONBEHALF_WRITE = "postOnBehalf:write";
 
+    public static final String LEADS_READ = "leads:read";
+
+    public static final String LEADS_WRITE = "leads:write";
+
+    public static final String LEADS_MANAGE = "leads:manage";
+
     public record Permission(String name, String module, String action, boolean adminOnly) {
     }
 
@@ -139,6 +147,9 @@ public final class BackOfficePermissions {
             ops("reviews", WRITE),
             ops("localities", READ),
             ops("localities", WRITE),
+            ops("leads", READ),
+            ops("leads", WRITE),
+            adminOnly("leads", MANAGE),
             adminOnly("audit", READ),
             adminOnly("settings", READ),
             adminOnly("settings", WRITE));
@@ -173,6 +184,7 @@ public final class BackOfficePermissions {
         Set<String> names = new LinkedHashSet<>(baseline(false));
         names.add(USERS_WRITE);
         names.add(AUDIT_READ);
+        names.add(LEADS_MANAGE);
         return Set.copyOf(names);
     }
 
@@ -270,4 +282,10 @@ public final class BackOfficePermissions {
     public static final String REQUIRE_SOCIETIES_READ = CALL + SOCIETIES_READ + "')";
 
     public static final String REQUIRE_SOCIETIES_WRITE = CALL + SOCIETIES_WRITE + "')";
+
+    public static final String REQUIRE_LEADS_READ = CALL + LEADS_READ + "')";
+
+    public static final String REQUIRE_LEADS_WRITE = CALL + LEADS_WRITE + "')";
+
+    public static final String REQUIRE_LEADS_MANAGE = CALL + LEADS_MANAGE + "')";
 }

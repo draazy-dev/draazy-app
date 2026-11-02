@@ -16,6 +16,4 @@ public interface IdentityConflictRepository extends JpaRepository<IdentityConfli
     @Modifying
     int deleteByCreatedAtBefore(Instant createdAt);
 
-    @Modifying
-    int deleteByUserId(UUID userId);
 }

@@ -310,7 +310,8 @@ public final class DataExportScope {
                 """
                 select id, title, deal, property_type, bhk, price, locality, locality_slug,
                        society, area, area_unit, furnishing, visibility, status, rented,
-                       tenant_name, tenant_mobile, tenant_since, monthly_rent, due_day, valuation,
+                       tenant_name, tenant_mobile, tenant_since, monthly_rent, due_day, lease_end, deposit,
+                       police_intimated_on, landlord_pan, valuation,
                        published_listing_id, source_room_id, address_fingerprint,
                        created_at, updated_at
                   from managed_properties
@@ -323,7 +324,7 @@ public final class DataExportScope {
                 "Owners' rent records that name your number as the tenant.",
                 """
                 select id, locality, rented, tenant_name, tenant_mobile, tenant_since, monthly_rent, due_day,
-                      created_at, updated_at,
+                      lease_end, deposit, police_intimated_on, created_at, updated_at,
                       owner_id as party_ref_src
                  from managed_properties
                 where tenant_mobile = :subjectMobile

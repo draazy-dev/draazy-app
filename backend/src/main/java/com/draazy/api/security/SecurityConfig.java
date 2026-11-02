@@ -100,7 +100,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, Routes.Owners.ANY_SINGLE).permitAll()
 
                         .requestMatchers(HttpMethod.GET,
-                                Routes.Localities.BASE, Routes.Localities.ANY_SINGLE,
+                                Routes.Localities.ANY_SINGLE,
                                 Routes.Societies.BASE, Routes.Societies.ANY_SINGLE, Routes.Societies.ANY_BRIEF,
                                 Routes.Fees.BASE,
 

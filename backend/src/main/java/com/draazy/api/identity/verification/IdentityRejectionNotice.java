@@ -1,13 +1,12 @@
 package com.draazy.api.identity.verification;
 
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.provider.DecisionMessenger;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 // The inbox row joins the caller's transaction; the WhatsApp line leaves only after commit,
 // so a rolled-back decision never reaches the user.
@@ -29,19 +28,6 @@ class IdentityRejectionNotice {
     void send(UUID userId, String text) {
         notifier.notify(userId, "identity.rejected", "Verification needs another try", text, "/verify-identity");
         users.findById(userId).filter(user -> notifier.allowsWhatsapp(userId)).map(User::getMobile)
-                .ifPresent(mobile -> afterCommit(() -> decisionMessenger.sendIdentityDecision(mobile, WHATSAPP_LINE)));
-    }
-
-    private static void afterCommit(Runnable send) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            send.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                send.run();
-            }
-        });
+                .ifPresent(mobile -> AfterCommit.run(() -> decisionMessenger.sendIdentityDecision(mobile, WHATSAPP_LINE)));
     }
 }

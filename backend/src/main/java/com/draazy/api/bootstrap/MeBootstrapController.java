@@ -3,6 +3,7 @@ package com.draazy.api.bootstrap;
 import com.draazy.api.billing.plan.PlansController;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.engagement.notification.NotificationController;
+import com.draazy.api.engagement.requests.RequestInboxController;
 import com.draazy.api.engagement.saved.SavedPropertyController;
 import com.draazy.api.identity.user.MeController;
 import com.draazy.api.leads.conversation.ConversationsController;
@@ -23,15 +24,17 @@ public class MeBootstrapController {
     private final SavedPropertyController saved;
     private final NotificationController notifications;
     private final ConversationsController conversations;
+    private final RequestInboxController requests;
 
     public MeBootstrapController(MeController me, PlansController plans,
             SavedPropertyController saved, NotificationController notifications,
-            ConversationsController conversations) {
+            ConversationsController conversations, RequestInboxController requests) {
         this.me = me;
         this.plans = plans;
         this.saved = saved;
         this.notifications = notifications;
         this.conversations = conversations;
+        this.requests = requests;
     }
 
     @GetMapping(Routes.Bootstrap.ME)
@@ -41,7 +44,8 @@ public class MeBootstrapController {
                 section("subscription", () -> plans.getSubscription(principal)),
                 section("saved", () -> saved.listKeys(principal)),
                 section("notificationsUnread", () -> notifications.unreadCount(principal)),
-                section("messagesUnread", () -> conversations.unreadCount(principal)));
+                section("messagesUnread", () -> conversations.unreadCount(principal)),
+                section("requestsPending", () -> requests.pendingCount(principal)));
     }
 
     private static <T> T section(String name, Supplier<T> read) {

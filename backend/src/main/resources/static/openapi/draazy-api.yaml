@@ -861,23 +861,6 @@ paths:
           description: >
             Unknown, malformed, or belonging to an archived account — one answer for all three, so
             the route cannot be used to test whether an id exists.
-  /localities:
-    get:
-      tags: [Catalog & Search]
-      summary: Localities with a live presence
-      security: []
-      operationId: listLocalities
-      description: >
-        Localities someone has picked from Google Places and still stand, plus retired ones that
-        still have live listings. Counts and averages come from live listings only.
-      responses:
-        '200':
-          description: Localities
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/Locality' }
   /localities/{slug}:
     get:
       tags: [Catalog & Search]
@@ -1863,6 +1846,41 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/TrackedRent' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /me/tracked-rent/{id}/paid:
+    parameters:
+      - { $ref: '#/components/parameters/PropertyId' }
+    post:
+      tags: [Listings]
+      summary: Tell the owner this month's rent is paid (tenant)
+      description: >-
+        Records the tenant's claim for the month `dueOn` refers to and notifies the owner, who confirms
+        by recording a receipt or rejects it. Idempotent; a month already receipted is left alone.
+        404 unless the caller is the record's current tenant.
+      operationId: claimTrackedRentPaid
+      responses:
+        '200':
+          description: The tenant's updated view
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackedRent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /me/managed-properties/{id}/rent-claims/{month}:
+    parameters:
+      - { $ref: '#/components/parameters/PropertyId' }
+      - name: month
+        in: path
+        required: true
+        schema: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$', example: '2026-08' }
+    delete:
+      tags: [Listings]
+      summary: Reject the tenant's "I've paid" (owner)
+      description: The rent has not arrived. Clears the claim and tells the tenant.
+      operationId: rejectManagedRentClaim
+      responses:
+        '204': { description: Claim cleared }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /me/managed-properties/{id}/rent-receipts:
     parameters:
       - { $ref: '#/components/parameters/PropertyId' }
@@ -2024,6 +2042,7 @@ paths:
         unpaged read punishes is the successful one. No `sort` parameter: the order is fixed
         server-side.
       parameters:
+        - { name: propertyId, in: query, schema: { type: string, format: uuid }, description: "Only offers on this one of the caller's listings; another owner's listing yields an empty page." }
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
       responses:
@@ -2049,6 +2068,7 @@ paths:
         in step with it so the response shape does not depend on which side of a negotiation the
         caller is on. No `sort` parameter: the order is fixed server-side.
       parameters:
+        - { name: propertyId, in: query, schema: { type: string, format: uuid }, description: "Only the caller's offers on this listing - what the property page needs." }
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
       responses:
@@ -5364,6 +5384,25 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: invalid_box, message: "box must be 'received' or 'sent'", status: 400 }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /me/requests/pending-count:
+    get:
+      tags: [Leads & Contact]
+      summary: How many connection requests wait on the caller's answer
+      operationId: myPendingRequestCount
+      description: >
+        The header's requests badge. Counts the pending items of the `received` box whose kind opens a
+        conversation once accepted (contact, visit, offer, flatmate, group); photo and document requests are
+        not counted.
+      responses:
+        '200':
+          description: Count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /me/requests/{kind}/{id}:
     parameters:
       - name: kind
@@ -5782,6 +5821,7 @@ paths:
         at the caller, so the collection grows with inbound demand. No `sort` parameter: the order is
         fixed server-side.
       parameters:
+        - { name: propertyId, in: query, schema: { type: string, format: uuid }, description: "Only pending requests on this listing - what the property page needs." }
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
       responses:
@@ -7010,11 +7050,10 @@ paths:
         documents, and opens payment through `openServiceRequestCheckout`, which is where a rent
         agreement is checked for everything the Sub-Registrar will ask for. A rent agreement whose
         `details._state` breaks the leave-and-licence rules (term 1-60 months, lock-in and notice
-        within the term, due day 1-28, increment 0-100%, start date from 30 days back to 180 ahead
+        within the term, due day 1-28, increment 0-100%, start date from 120 days back to 180 ahead
         in IST, deed language English or Marathi, biometric visit at the property / licensor /
         licensee with slot any / morning / afternoon / evening and a preferred date from tomorrow
-        to 90 days ahead, witness ages 18+, witness names when the witness section is filed on create,
-        licensor capacity owner / co-owner / poa, POA registration fields, a distinct mobile per
+        to 90 days ahead, licensor capacity owner / co-owner / poa, POA registration fields, a distinct mobile per
         party, at most 3 co-owners and 6 tenants, and well-formed emails) is a `422`. So is a
         `_state.prop` with a present-but-blank `landmark|policeStation|roadVicinity|roadType`
         (absent keys are tolerated on save; each is at most 80 characters). Older drafts may still send
@@ -7361,7 +7400,7 @@ paths:
         Sending a role owned by an accepted co-fill party is a `409` because the invited party records
         their own identity numbers.
         An accepted co-fill party may write only their own side (a tenant invitee the `tenant` rows),
-        and that write replaces only that role. `witness` rows are indexed 0 and 1. Duplicate
+        and that write replaces only that role. Duplicate
         role/index pairs, Aadhaar numbers or PANs are `422`; duplicate messages never echo the
         number. No role annotation: the guard is participant identity -- staff and admin are refused
         here and correct a mistyped number through `desk-identities`, which is audited. Once retention has blanked the
@@ -7431,7 +7470,7 @@ paths:
                 items:
                   type: object
                   properties:
-                    partyRole: { type: string, enum: [owner, tenant, witness] }
+                    partyRole: { type: string, enum: [owner, tenant] }
                     partyIndex: { type: integer }
                     pan: { type: [string, 'null'], example: XXXXXX234F }
                     aadhaar: { type: [string, 'null'], example: XXXX XXXX 1234 }
@@ -7548,7 +7587,8 @@ paths:
       summary: Cancel an unpaid request (requester only)
       operationId: cancelServiceRequest
       description: >
-        Frees the one-unpaid-request slot for that desk. The rent-agreement wizard calls it when a
+        Frees the one-unpaid-request slot for that desk. The requests tracker offers it as "Cancel
+        request" while `cancellable` is true, and the rent-agreement wizard calls it when a
         customer edits the details after a failed attempt and files again. A request nobody cancels
         is retired by the sweep: once the abandoned-checkout TTL has passed since its checkout
         opened, or 30 days after its last change if checkout never opened.
@@ -7593,14 +7633,18 @@ paths:
         what a form being corrected needs. For a rent agreement only the caller's own side is kept
         -- `tenants` for the tenant; `ownerName`, `_state.owner` and `_state.coOwners` for the
         owner -- and every other key is dropped, so the invitee cannot restate the licensor, the
-        flat, the terms or the witnesses the requester reviewed. A payload with none of its own
+        flat or the terms the requester reviewed. A payload with none of its own
         side's rows is `422`; one that would move the priced terms is still `409`.
 
 
         Only before checkout. Once `payment_ref` exists the priced matter is bound to a gateway
         order and the details it was priced from must stop moving; the requester reopens it by
         cancelling and starting again, which is a visible act rather than a silent edit under a
-        pending payment.
+        pending payment. A paid rent agreement reopens the window: each accepted party may correct
+        their own side while it is `new`, until staff pick it up. A tenant the owner invited with
+        `_state.tenantMode: invite` may also first submit after pickup, while their side is still
+        incomplete and before the draft is shared. `editableByMe` on the request says whether the
+        window is open for the viewer.
       requestBody:
         required: true
         content:
@@ -7624,8 +7668,39 @@ paths:
           description: No such request for this caller
         '409':
           description: >
-            The request is no longer awaiting payment, or checkout is already open. The details it
-            was priced from are settled at that point.
+            The caller's edit window is closed: checkout is open on an unpaid request, or staff have
+            picked the paid agreement up. Changes then go through the request's messages.
+  /service-requests/{id}/details:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    put:
+      tags: [Services & Support]
+      summary: Correct the requester's side of a paid rent agreement before staff pick it up
+      operationId: updateServiceRequestDetails
+      description: >
+        The requester's counterpart to `submitServiceRequestPartyDetails`, for a paid rent agreement
+        still `new`. The body is merged into `details` as that route merges it, but every accepted
+        invitee's side is kept as they wrote it, and the rent, deposit, term and registration area
+        the fee was priced on cannot move. Before payment the requester re-files instead; after
+        pickup the desk makes changes on request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PartyDetailsUpdate' }
+      responses:
+        '200':
+          description: Merged; the whole request is returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceRequest' }
+        '403':
+          description: The caller is not the requester.
+        '404':
+          description: No such request for this caller
+        '409':
+          description: >
+            Not a rent agreement, not yet paid, already picked up by staff, or the edit would move
+            the priced terms.
   /service-requests/{id}/checkout:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -7649,7 +7724,7 @@ paths:
         **A rent agreement must be registrable first.** Every licensor (the owner plus each
         `_state.coOwners` entry) and every licensee (`_state.tenants`, at least one) needs an
         identity row with a PAN, whatever their residency (staff take Aadhaar in person at the
-        doorstep, so no Aadhaar number and no witness identity rows are needed); non-resident
+        doorstep, so no Aadhaar number is needed); non-resident
         parties (`_state.*.residency` `nri` / `foreign`) also need a passport scan
         (`licensor-{i}-passport` / `tenant-{j}-passport`, plus `-visa` for `foreign`), each tenant
         with a police record also needs `tenant-{j}-addressproof` / `-prevaddressproof` as applicable and
@@ -7659,8 +7734,7 @@ paths:
         rent above zero, `terms.startDate`, `prop.flatNo|society|locality|pincode|area`, a residential
         `prop.propType`, the IGR property particulars
         `prop.landmark|policeStation|roadVicinity|roadType`,
-        every licensor's and licensee's name and age, and each witness's name and
-        age. Parties with `_state.*.type: entity` are out of the self-serve flow and are
+        and every licensor's and licensee's name and age. Parties with `_state.*.type: entity` are out of the self-serve flow and are
         refused here with the legal-desk quote message. Last, every `_state.tenants` entry must have confirmed through
         `confirmRentAgreementTenant` or be an accepted co-fill party's own number. Anything short is
         a `409` naming what is missing.
@@ -7709,7 +7783,8 @@ paths:
             particulars are incomplete (`Complete the agreement before checkout: ...`), or a rent agreement's
             `declaration` is absent or not the current version (`Accept the declaration on the review step before checkout.`). All are "the request
             is not in a state where opening checkout means anything", which is what this file uses
-            `409` for throughout.
+            `409` for throughout. A rent agreement raised with `_state.tenantMode: invite` checks
+            only the owner's side; the tenant fills theirs after payment.
   /service-requests/{id}/final-doc:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -7975,7 +8050,7 @@ paths:
         The operator holding a rent agreement replaces the numbers of the parties sent; other parties
         keep theirs. Only the assignee may write, as only the assignee may read them; an admin or
         manager assigns themselves first. Each party must be on the form (owner 0, a co-owner, a
-        tenant, or witness 0/1). The customers are notified; the audit row records the changed slots
+        tenant). The customers are notified; the audit row records the changed slots
         (`tenant-0`), never the numbers.
       operationId: correctServiceRequestIdentities
       x-roles: [staff, admin]
@@ -8012,8 +8087,10 @@ paths:
       tags: [Services & Support]
       summary: Ask for a refund (staff maker)
       description: >
-        The operator holding the request (or an admin) asks; a different operator approves before
-        any money moves (D-b). Everything paid is refundable until the stamp duty is paid on GRAS;
+        The operator holding the request (or a manager or admin) asks; a manager or admin other than
+        the asker approves before any money moves (D-b), and every other manager and admin is notified
+        (`service.refund-requested`). A desk cancel of a paid request asks for the same refund on its
+        own. Everything paid is refundable until the stamp duty is paid on GRAS;
         after that the statutory charges on the current terms (duty, registration fee, DHC) are
         spent and only the rest comes back. `dutyPaid` needs the GRAS challan's `grn`; a registered
         agreement has paid its duty whatever the body says. A refund draws on one gateway order,
@@ -8027,7 +8104,7 @@ paths:
             schema: { $ref: '#/components/schemas/ServiceRequestRefundCreate' }
       responses:
         '201':
-          description: Waiting for a second operator
+          description: Waiting for a manager
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceRequestRefunds' }
@@ -8042,10 +8119,10 @@ paths:
       - { name: refundId, in: path, required: true, schema: { type: string } }
     post:
       tags: [Services & Support]
-      summary: Approve a refund and send it to the gateway (staff checker)
-      description: Anyone on the desk except the operator who asked. The ceiling is re-checked first.
+      summary: Approve a refund and send it to the gateway (manager)
+      description: A manager or admin, including one who asked for it. The ceiling is re-checked first.
       operationId: approveServiceRequestRefund
-      x-roles: [staff, admin]
+      x-roles: [manager, admin]
       requestBody:
         content:
           application/json:
@@ -8057,7 +8134,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceRequestRefunds' }
         '403':
-          description: The caller asked for this refund, or is not on the desk
+          description: The caller is not a manager or admin, or is not on the desk
         '404':
           description: No such open refund
         '409':
@@ -8068,7 +8145,8 @@ paths:
       - { name: refundId, in: path, required: true, schema: { type: string } }
     post:
       tags: [Services & Support]
-      summary: Reject or withdraw a refund (staff)
+      summary: Reject or withdraw a refund (manager, or the staff member who asked)
+      description: A manager or admin rejects; anyone else may only withdraw a refund they asked for, and not once the request is cancelled.
       operationId: rejectServiceRequestRefund
       x-roles: [staff, admin]
       requestBody:
@@ -8291,6 +8369,28 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/RentAgreementRenewal' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /me/rent-agreements/homes/{homeId}/renewal:
+    parameters:
+      - name: homeId
+        in: path
+        required: true
+        description: A managed home id seeded by a registered rent agreement.
+        schema: { type: string }
+    get:
+      tags: [Services & Support]
+      summary: Terms to prefill a renewal from a rented home
+      description: >
+        For the home's owner, or a signed-in caller whose verified mobile is the home's tenant mobile,
+        and only while the home is rented and was seeded by a rent-agreement request; anyone else gets 404.
+        `startDate` is the home's lease end, and `prop` carries the address fields of the original request.
+      operationId: getRentAgreementHomeRenewal
+      responses:
+        '200':
+          description: Renewal prefill
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RentAgreementRenewal' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /me/bootstrap:
     get:
       tags: [Engagement]
@@ -8301,7 +8401,8 @@ paths:
           description: >-
             Only what every signed-in page draws. Each section is byte-for-byte what its own
             endpoint answers (`/auth/me`, `/me/subscription`, `/me/saved/keys`,
-            `/notifications/unread-count`, `/messages/unread-count`), so a client can seed its
+            `/notifications/unread-count`, `/messages/unread-count`,
+            `/me/requests/pending-count`), so a client can seed its
             per-endpoint state from it. A section whose read failed is `null` and the client
             re-reads it from its own endpoint; `me` is never null, because a caller who cannot be
             read gets that error instead.
@@ -8481,11 +8582,15 @@ paths:
       description: >-
         Needs the `refunds` back-office function (admins always). `status` defaults to `pending_review`;
         `auto` lists the system's own refunds (failed, late or mismatched payment, pass for a closed
-        listing) and `disputed` the open gateway disputes. An unknown status is a 400.
+        listing) and `disputed` the open gateway disputes. An unknown status is a 400. Rent-agreement
+        refunds share the pending, approved and rejected tabs; `feature` narrows the rows and the counts
+        to one product. Approving or rejecting a rent-agreement row goes through
+        `/service-requests/{id}/refunds/{refundId}/approve|reject`, which only a manager or admin may call.
       x-roles: [staff, admin]
       parameters:
         - $ref: '#/components/parameters/BoardDays'
         - { name: status, in: query, schema: { type: string, enum: [pending_review, approved, rejected, auto, disputed], default: pending_review } }
+        - { name: feature, in: query, description: Omit for every product., schema: { type: string, enum: [pass, rent_agreement] } }
         - name: counts
           in: query
           schema: { type: boolean, default: false }
@@ -10816,6 +10921,41 @@ paths:
                       content:
                         type: array
                         items: { $ref: '#/components/schemas/SocietyCandidate' }
+  /admin/society-candidates/duplicates:
+    get:
+      tags: [Admin & Analytics]
+      summary: Duplicate hints for a page of candidates in one read
+      operationId: adminListSocietyCandidateDuplicatesBatch
+      x-roles: [staff, admin]
+      description: >
+        The `/admin/society-candidates/{slug}/duplicates` hints for several candidates at once, so the
+        queue page makes one request instead of one per row, and the server scans the live societies
+        once instead of once per candidate. Keyed by candidate slug; a slug that matches no society is
+        left out rather than failing the batch.
+      parameters:
+        - name: slugs
+          in: query
+          required: true
+          style: form
+          explode: true
+          schema: { type: array, minItems: 1, maxItems: 50, items: { type: string } }
+          description: Candidate slugs, repeated (`?slugs=a&slugs=b`). More than 50 is refused with 400.
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 6, minimum: 1, maximum: 25 }
+          description: Hints per candidate. Out of range is refused with 400, as on the single read.
+      responses:
+        '200':
+          description: Possible duplicates per candidate slug, strongest match first
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items: { $ref: '#/components/schemas/SocietyDuplicateSuggestion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
   /admin/society-candidates/{slug}/duplicates:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
@@ -11304,6 +11444,30 @@ paths:
                   articles: { type: array, items: { type: object } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/help/staff/index:
+    get:
+      tags: [Admin & Analytics]
+      summary: Staff runbook index, without article bodies
+      operationId: adminStaffHelpIndex
+      description: >
+        The same tree as `/admin/help/staff` with each article's `html`, `text` and `headings`
+        dropped. The console shell reads it on every page for the runbook link and the topbar search,
+        which need only titles, summaries, slugs and modules; the full bodies (~300 KB) are read only
+        by the runbook and help pages.
+      x-roles: [staff, manager, admin]
+      responses:
+        '200':
+          description: The staff help tree without article bodies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sections: { type: array, items: { type: object } }
+                  categories: { type: array, items: { type: object } }
+                  articles: { type: array, items: { type: object } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /admin/settings/flags:
     get:
       tags: [Admin & Analytics]
@@ -11630,6 +11794,375 @@ paths:
         '204': { description: Resolved. No body. }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /admin/leads:
+    get:
+      tags: [Admin & Analytics]
+      summary: Leads CRM - my leads, the common pool, every lead (managers) or a search
+      operationId: listLeads
+      description: >-
+        Needs the `leads` function. `view=mine` (default) lists the caller's leads, due follow-ups first; `pool` the common pool anyone can claim from; `all` every lead and needs `leads:manage`; `search` finds any lead by name or mobile (`q`, at least 3 characters). `type` narrows any view to owners, seekers or flatmates. Mobiles are masked. `counts` carries `mine`, `due` and `pool`.
+      x-roles: [staff, admin]
+      parameters:
+        - { name: view, in: query, schema: { type: string, enum: [mine, pool, all, search], default: mine } }
+        - { name: type, in: query, schema: { type: string, enum: [owner, seeker, flatmate] } }
+        - { name: q, in: query, description: Name or mobile digits; required for `search`., schema: { type: string } }
+        - { name: stage, in: query, schema: { type: string, enum: [new, contacted, interested, converted, lost, not-reachable, do-not-call] } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+      responses:
+        '200':
+          description: Lead rows
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/LeadSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Admin & Analytics]
+      summary: Add a lead by hand
+      operationId: addLead
+      description: >-
+        Normalises and validates the mobile. One person is one lead: an existing number returns that lead with `200` after filling any blank profile fields, a new one `201`. A profile with a lead type and source is required. Adding does not claim it.
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '200':
+          description: Already a lead
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/leads/assignees:
+    get:
+      tags: [Admin & Analytics]
+      summary: Staff a manager can assign leads to
+      operationId: listLeadAssignees
+      description: >-
+        Needs `leads:manage`. Active back-office accounts with their open-lead count.
+      x-roles: [staff, admin]
+      responses:
+        '200':
+          description: Assignees
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/LeadAssignee' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/leads/performance:
+    get:
+      tags: [Admin & Analytics]
+      summary: Staff performance on leads
+      operationId: leadPerformance
+      description: >-
+        Needs `leads:manage`. Per staff member over the last `days` (7, 30 or 90; other values are a 400): open leads, claims, contacts, attempts, hours from claim to first contact, conversions, revenue and conversion rate (conversions / claimed).
+      x-roles: [staff, admin]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, enum: [7, 30, 90], default: 30 } }
+      responses:
+        '200':
+          description: Report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadPerformance' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/leads/conversions/{conversionId}:
+    parameters:
+      - { name: conversionId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Admin & Analytics]
+      summary: Move the credit for a conversion to another staff member
+      operationId: recreditLeadConversion
+      description: >-
+        Needs `leads:manage`. Audited.
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadCredit' }
+      responses:
+        '200':
+          description: The conversion
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadConversion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/leads/{id}:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    get:
+      tags: [Admin & Analytics]
+      summary: A lead with its signals, timeline and conversions
+      operationId: getLead
+      description: >-
+        Carries the full `mobile` for anyone with leads access (lists stay masked). Each view is audited as `lead.reveal`, and the timeline logs a `reveal` at most once a day per viewer. `nextContactAfter` is set while the 24-hour contact cooldown applies.
+      x-roles: [staff, admin]
+      responses:
+        '200':
+          description: The lead
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/leads/{id}/claim:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Admin & Analytics]
+      summary: Claim an unowned lead
+      operationId: claimLead
+      description: >-
+        First claim wins. `409 lead-owned` names the owner; `409 lead-cap` at 50 open leads; `409 lead-closed` for do-not-call.
+      x-roles: [staff, admin]
+      responses:
+        '200':
+          description: The lead after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/leads/{id}/release:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Admin & Analytics]
+      summary: Return a lead to the common pool
+      operationId: releaseLead
+      description: >-
+        The owner or a manager.
+      x-roles: [staff, admin]
+      responses:
+        '200':
+          description: The lead after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/leads/{id}/assign:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Admin & Analytics]
+      summary: Assign a lead to a staff member
+      operationId: assignLead
+      description: >-
+        Needs `leads:manage`.
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadAssign' }
+      responses:
+        '200':
+          description: The lead after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/leads/{id}/contacts:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Admin & Analytics]
+      summary: Log a call, WhatsApp or SMS attempt
+      operationId: logLeadContact
+      description: >-
+        Owner only. `409 lead-cooldown` within 24 hours of the last contact unless the follow-up is due; `409 lead-closed` once the lead is closed. Three failed attempts in a row mark it not-reachable; a wrong number marks it lost.
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadContact' }
+      responses:
+        '200':
+          description: The lead after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/leads/{id}/stage:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Admin & Analytics]
+      summary: Move a lead to another stage
+      operationId: changeLeadStage
+      description: >-
+        Owner only. A note is required; contacted and interested need a future follow-up. Converted goes through `/conversions`. Do-not-call is final.
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadStageChange' }
+      responses:
+        '200':
+          description: The lead after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/leads/{id}/interests:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    put:
+      tags: [Admin & Analytics]
+      summary: Replace the services a lead is interested in
+      operationId: setLeadInterests
+      description: >-
+        Anyone with the `leads` function, owned or not. Unknown services are a 400.
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadInterests' }
+      responses:
+        '200':
+          description: The lead after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/leads/{id}/profile:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    put:
+      tags: [Admin & Analytics]
+      summary: Replace who a lead is, what they offer or want, and where they came from
+      operationId: setLeadProfile
+      description: >-
+        Anyone with the `leads` function, owned or not. Needs a lead type and source; the intent must fit the type. A blank name keeps the current one. Logged as a `profile` activity.
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadProfileInput' }
+      responses:
+        '200':
+          description: The lead after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/leads/{id}/notes:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Admin & Analytics]
+      summary: Add a note to the lead timeline
+      operationId: addLeadNote
+      description: >-
+        Anyone with the `leads` function, owned or not.
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadNoteCreate' }
+      responses:
+        '200':
+          description: The lead after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/leads/{id}/convertible:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    get:
+      tags: [Admin & Analytics]
+      summary: Paid service requests that can be credited to this lead
+      operationId: listLeadConvertible
+      description: >-
+        The owner or a manager. Paid requests by the lead's account that no lead has been credited for yet; empty when the lead has no account.
+      x-roles: [staff, admin]
+      responses:
+        '200':
+          description: Requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/LeadConvertible' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/leads/{id}/conversions:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Admin & Analytics]
+      summary: Credit a paid service request to this lead
+      operationId: convertLead
+      description: >-
+        Owner only. The request must be in `/convertible`; `409 lead-conversion-invalid` otherwise. The lead becomes converted and the caller is credited.
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadConvert' }
+      responses:
+        '200':
+          description: The lead after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeadDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /admin/staff-activity:
     get:
       tags: [Admin & Analytics]
@@ -15814,6 +16347,16 @@ components:
         tenantMobile: { type: [string, 'null'], example: '9876543201', description: The tenant's 10-digit mobile; links the tenant to this record. }
         monthlyRent: { type: [integer, 'null'], format: int64 }
         dueDay: { type: [integer, 'null'], description: Rent due day of month. }
+        leaseEnd: { type: [string, 'null'], format: date, readOnly: true, description: The registered agreement's end date; null for a tenant named by hand. }
+        deposit: { type: [integer, 'null'], format: int64, readOnly: true, description: Security deposit from the registered agreement, whole INR. }
+        landlordPan: { type: [string, 'null'], example: ABCDE1234F, description: Printed on the tenant's rent receipts for HRA. }
+        policeIntimation: { type: [string, 'null'], enum: [pending, done, null], readOnly: true, description: Null unless the tenancy came from a Draazy rent agreement. }
+        policeIntimatedOn: { type: [string, 'null'], format: date, readOnly: true }
+        rentClaims:
+          type: array
+          readOnly: true
+          description: Months (YYYY-MM) the current tenant says are paid that have no receipt yet, newest first.
+          items: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
         valuation: { type: [object, 'null'], additionalProperties: true, description: Opaque Rent-o-meter snapshot. }
         publishedListingId: { type: [string, 'null'], description: Id of the spawned listing once published. }
         sourceRoomId: { type: [string, 'null'], readOnly: true, description: The flatmate room whose owner confirmation created this private home; null for a record the owner made themselves, or once that room is deleted. }
@@ -15873,6 +16416,7 @@ components:
         monthlyRent: { type: [integer, 'null'], format: int64, minimum: 0, maximum: 10000000 }
         dueDay: { type: [integer, 'null'], minimum: 1, maximum: 28 }
         valuation: { type: [object, 'null'], additionalProperties: true }
+        landlordPan: { type: [string, 'null'], pattern: '^$|^[A-Z]{5}[0-9]{4}[A-Z]$', description: Omitted or null keeps it; an empty string removes it. }
     ManagedRentReceipt:
       type: object
       description: >-
@@ -15906,14 +16450,20 @@ components:
         dueDay: { type: integer, minimum: 1, maximum: 28 }
         status:
           type: string
-          enum: [paid, due, overdue]
+          enum: [paid, due, overdue, claimed]
           description: >-
             This month, in IST. A month whose due date fell before the caller was named is never theirs,
-            so it reads as due next month rather than overdue.
+            so it reads as due next month rather than overdue. `claimed` means the tenant said it is
+            paid and the owner has not yet recorded a receipt.
         dueOn: { type: string, format: date, description: The due date the status refers to. }
+        leaseEnd: { type: [string, 'null'], format: date }
+        deposit: { type: [integer, 'null'], format: int64 }
+        landlordPan: { type: [string, 'null'], description: For HRA; printed on receipts when set. }
+        policeIntimation: { type: [string, 'null'], enum: [pending, done, null] }
+        policeIntimatedOn: { type: [string, 'null'], format: date }
         receipts:
           type: array
-          description: Newest month first, at most 12.
+          description: Newest month first, at most 24.
           items: { $ref: '#/components/schemas/ManagedRentReceipt' }
     ManagedRentReceiptCreate:
       type: object
@@ -16176,6 +16726,12 @@ components:
         details: { type: ['object', 'null'], additionalProperties: true }
         assignee: { type: [string, 'null'] }
         assignedToMe: { type: boolean }
+        cancellable: { type: boolean, description: Whether the viewer may call cancelServiceRequest -- the requester of a request still awaiting payment. }
+        editableByMe: { type: boolean, description: Whether the viewer may still change their own side of the details and identity numbers. False for anyone not a party. }
+        mySideSubmitted: { type: boolean, description: Whether the viewer has already submitted their side -- the requester once paid, an invitee once they have sent their details. }
+        myPartyId: { type: string, format: uuid, description: "The viewer's accepted co-fill party on this request; absent for the requester and for staff." }
+        payableByMe: { type: boolean, description: Whether the viewer, an accepted invitee who is not the requester, may pay for a rent agreement whose parties are all ready. }
+        paidBy: { type: string, description: "Who paid, when it was someone other than the viewer; absent until paid." }
         timeline:
           type: array
           items:
@@ -16271,7 +16827,8 @@ components:
         mine: { type: integer, format: int64 }
         inProgress: { type: integer, format: int64 }
         withCustomer: { type: integer, format: int64 }
-        closed: { type: integer, format: int64 }
+        closed: { type: integer, format: int64, description: Completed requests. }
+        cancelled: { type: integer, format: int64, description: Requests the desk or the customer cancelled. }
         overdue: { type: integer, format: int64 }
         openTickets:
           type: integer
@@ -16297,6 +16854,7 @@ components:
               opened: { type: boolean }
               approved: { type: boolean }
               approvedAt: { type: [string, 'null'], format: date-time }
+              mine: { type: boolean, description: True on the in-app party row that belongs to the caller }
     DraftOtpRequest:
       type: object
       required: [partyKey]
@@ -16362,6 +16920,7 @@ components:
         refundableBeforeDuty: { type: integer, format: int64, description: 'The most one refund may return now if the duty is unpaid (the after-duty figure once registered)' }
         refundableAfterDuty: { type: integer, format: int64 }
         dutyPaidOnRecord: { type: boolean, description: 'A registration is on record, so the duty is paid' }
+        canDecide: { type: boolean, description: 'The caller is a manager or admin, so may approve or reject a refund someone else asked for' }
         refunds:
           type: array
           items:
@@ -16379,7 +16938,7 @@ components:
               gatewayRefundId: { type: [string, 'null'] }
               requestedAt: { type: string, format: date-time }
               decidedAt: { type: [string, 'null'], format: date-time }
-              mine: { type: boolean, description: 'The caller asked for it, so cannot approve it' }
+              mine: { type: boolean, description: 'The caller asked for it; staff may withdraw their own before a cancel' }
     ServiceRequestRefundCreate:
       type: object
       required: [amount, reason]
@@ -16397,9 +16956,10 @@ components:
       description: >
         The rental desk's turnaround on an open, paid rent agreement, measured from when it entered
         its status: pickup 4 h, first draft 48 h, revision 24 h, registration 7 days. A shared draft
-        is the customer's move and carries no due time. Null for every other type.
+        is the customer's move and carries no due time, as does a paid owner request still waiting
+        for the invited tenant's details (`tenant`). Null for every other type.
       properties:
-        waitingOn: { type: string, enum: [desk, customer] }
+        waitingOn: { type: string, enum: [desk, customer, tenant] }
         dueAt: { type: [string, 'null'], format: date-time }
         overdue: { type: boolean }
     ServiceRequestRegistration:
@@ -16504,7 +17064,7 @@ components:
         carrying neither is rejected with 422. Dropping such a party silently would leave the desk
         short of a number it had no way to know it should have asked for.
       properties:
-        partyRole: { type: string, enum: [owner, tenant, witness] }
+        partyRole: { type: string, enum: [owner, tenant] }
         partyIndex: { type: integer, minimum: 0, default: 0 }
         partyName: { type: string, maxLength: 120 }
         pan: { type: string, pattern: '^$|^[A-Za-z]{5}[0-9]{4}[A-Za-z]$', example: ABCDE1234F }
@@ -16519,7 +17079,7 @@ components:
         What makes that safe is the route, not the shape: assignee-only, audited, and purged when
         the matter closes.
       properties:
-        partyRole: { type: string, enum: [owner, tenant, witness] }
+        partyRole: { type: string, enum: [owner, tenant] }
         partyIndex: { type: integer }
         partyName: { type: [string, 'null'] }
         pan: { type: [string, 'null'] }
@@ -16563,7 +17123,7 @@ components:
     RentAgreementRenewal:
       type: object
       properties:
-        propertyId: { type: string }
+        propertyId: { type: [string, 'null'], description: Null for a home renewal whose record was never published. }
         serviceRequestId: { type: [string, 'null'] }
         rent: { type: [integer, 'null'] }
         deposit: { type: [integer, 'null'] }
@@ -16574,6 +17134,10 @@ components:
           type: array
           description: Tenants on the same registered document, from the agreement rows that are registered or active.
           items: { $ref: '#/components/schemas/RentAgreementRenewalParty' }
+        prop:
+          type: [object, 'null']
+          description: Address fields from the original wizard; identity numbers are never included.
+          additionalProperties: { type: string }
     RentAgreementRenewalParty:
       type: object
       properties:
@@ -16589,6 +17153,7 @@ components:
         billingCycle: { type: [string, 'null'], enum: [monthly, quarterly, yearly, null] }
         termDays: { type: [integer, 'null'], description: Fixed term from payment; overrides billingCycle when set. }
         kind: { type: string, enum: [plan, listing-pass, contact-pack] }
+        deal: { type: [string, 'null'], enum: [rent, buy, null], description: 'Which listings a pass or pack is for; null works on both.' }
         listingLimit: { type: [integer, 'null'] }
         contactLimit: { type: [integer, 'null'] }
         features: { type: array, items: { type: string } }
@@ -16626,6 +17191,8 @@ components:
         used: { type: integer, description: Contact requests opened, for all time }
         allowance: { type: [integer, 'null'] }
         remaining: { type: [integer, 'null'] }
+        remainingRent: { type: [integer, 'null'], description: Contacts left for rent listings; null when unlimited. }
+        remainingBuy: { type: [integer, 'null'], description: Contacts left for sale listings; null when unlimited. }
         referralBonus: { type: integer, description: Part of allowance earned by the caller's seeker-track referrals }
         friendBonus: { type: integer, description: Extra free contacts the caller got for joining through a code; 0 once rejected or clawed back. }
         freeWindowEndsAt:
@@ -18089,12 +18656,18 @@ components:
         matchAlerts: { type: boolean, default: true }
         quietHours: { $ref: '#/components/schemas/QuietHours' }
         language: { type: string, enum: [en, hi, mr], default: en }
+        marketingCalls:
+          type: boolean
+          default: false
+          description: >
+            Opt-in for the rental desk to call about renewing, relisting or moving when a lease nears its end.
+            The server stamps when it was first turned on and clears it when turned off.
     NotificationPreferencesUpdate:
       type: object
       description: >
         The whole document. Every field is required -- see the operation description for why an
         omission is a 400 rather than a keep or a reset.
-      required: [email, sms, whatsapp, matchAlerts, quietHours, language]
+      required: [email, sms, whatsapp, matchAlerts, quietHours, language, marketingCalls]
       properties:
         email: { type: boolean }
         sms: { type: boolean }
@@ -18108,6 +18681,7 @@ components:
             start: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', example: '22:00' }
             end: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', example: '07:00' }
         language: { type: string, enum: [en, hi, mr] }
+        marketingCalls: { type: boolean }
     PushSubscriptionCreate:
       type: object
       required: [endpoint, keys]
@@ -18267,19 +18841,31 @@ components:
         Prices are **whole rupees** — there are no paise anywhere on this platform.
       required:
         - listingPass
+        - listingPassBuy
         - contactPack
+        - contactPackBuy
         - rentAgreementPlatform
       properties:
         listingPass:
           type: integer
           minimum: 0
-          description: Price of one listing pass — an extra live listing for 60 days.
+          description: Price of one rent listing pass — an extra live rent listing for 60 days.
           example: 999
+        listingPassBuy:
+          type: integer
+          minimum: 0
+          description: Price of one sale listing pass — an extra live sale listing for 90 days.
+          example: 1999
         contactPack:
           type: integer
           minimum: 0
-          description: Price of one contact pack — 15 owner contacts for 30 days.
+          description: Price of one rent contact pack — 15 rent-listing owner contacts for 30 days.
           example: 199
+        contactPackBuy:
+          type: integer
+          minimum: 0
+          description: Price of one buy contact pack — 15 sale-listing owner contacts for 60 days.
+          example: 399
         rentAgreementPlatform:
           type: integer
           minimum: 0
@@ -18345,8 +18931,8 @@ components:
       type: object
       properties:
         id: { type: string, description: 'The request id; the order id for `auto`, the dispute id for `disputed`.' }
-        status: { type: string, enum: [pending_review, approved, rejected, auto, disputed] }
-        kind: { type: string, enum: [listing_pass, contact_pack] }
+        status: { type: string, enum: [pending_review, approved, rejected, auto, disputed, failed], description: '`failed` is an approved rent-agreement refund the gateway could not pay; it sits on the approved tab.' }
+        kind: { type: string, enum: [listing_pass, contact_pack, rent_agreement] }
         label: { type: string }
         customerId: { type: string }
         customerName: { type: string }
@@ -18385,6 +18971,7 @@ components:
             gatewayRefund: { type: [string, 'null'], description: The gateway's refund id. }
             refundAttempts: { type: integer, description: Refunds the gateway reported failed. }
             refundTriedAt: { type: [string, 'null'], format: date-time, description: The last send the gateway refused. }
+        serviceRequestId: { type: [string, 'null'], description: The rent-agreement request a `rent_agreement` row refunds; null for passes. }
     LegalNotices:
       type: object
       description: The notices the footer and refund copy publish; the `legal` admin setting.
@@ -18495,6 +19082,10 @@ components:
           properties:
             count: { type: integer }
         messagesUnread:
+          type: [object, 'null']
+          properties:
+            count: { type: integer }
+        requestsPending:
           type: [object, 'null']
           properties:
             count: { type: integer }
@@ -19264,6 +19855,171 @@ components:
           description: >
             The browser's random id, so signed-out readers behind one shared IP count separately.
             Ignored when signed in.
+    LeadSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, nullable: true }
+        maskedMobile: { type: string, example: 98XXXXXX21 }
+        stage: { type: string, enum: [new, contacted, interested, converted, lost, not-reachable, do-not-call] }
+        interests: { type: array, items: { type: string } }
+        sources: { type: array, items: { type: string, enum: [rent-agreement, unpaid-checkout, quote-request, lease-ending, flatmate, manual] } }
+        ownerId: { type: string, format: uuid, nullable: true }
+        ownerName: { type: string, nullable: true }
+        mine: { type: boolean }
+        nextFollowUpAt: { type: string, format: date-time, nullable: true }
+        lastContactAt: { type: string, format: date-time, nullable: true }
+        lastSignalAt: { type: string, format: date-time }
+        failedAttempts: { type: integer }
+        consent: { type: string, enum: [opted-in, service-only] }
+        due: { type: boolean }
+        profile: { $ref: '#/components/schemas/LeadProfile' }
+    LeadProfile:
+      type: object
+      properties:
+        leadType: { type: string, nullable: true, enum: [owner, seeker, flatmate] }
+        intent: { type: string, nullable: true, enum: [sell, rent-out, buy, rent, has-room, needs-room], description: 'owner: sell, rent-out; seeker: buy, rent; flatmate: has-room, needs-room' }
+        propertyTypes: { type: array, items: { type: string, enum: [flat, independent, villa, commercial, openplot, farmland] }, description: Always empty for flatmates }
+        bhk: { type: array, items: { type: string, enum: [1rk, '1', '2', '3', '4', 5+] } }
+        localities: { type: string, nullable: true, maxLength: 200 }
+        budget: { type: integer, format: int64, nullable: true, description: Rupees; expected price for owners, budget for seekers, monthly rent for flatmates }
+        leadSource: { type: string, nullable: true, enum: [walk-in, inbound-call, whatsapp, facebook, instagram, referral, flyer, draazy, portal, other] }
+        sourceDetail: { type: string, nullable: true, maxLength: 120 }
+    LeadProfileInput:
+      type: object
+      required: [leadType, leadSource]
+      properties:
+        name: { type: string, maxLength: 80 }
+        leadType: { type: string, enum: [owner, seeker, flatmate] }
+        intent: { type: string, enum: [sell, rent-out, buy, rent, has-room, needs-room] }
+        propertyTypes: { type: array, items: { type: string, enum: [flat, independent, villa, commercial, openplot, farmland] } }
+        bhk: { type: array, items: { type: string, enum: [1rk, '1', '2', '3', '4', 5+] } }
+        localities: { type: string, maxLength: 200 }
+        budget: { type: integer, format: int64, minimum: 1 }
+        leadSource: { type: string, enum: [walk-in, inbound-call, whatsapp, facebook, instagram, referral, flyer, draazy, portal, other] }
+        sourceDetail: { type: string, maxLength: 120 }
+    LeadDetail:
+      allOf:
+        - $ref: '#/components/schemas/LeadSummary'
+        - type: object
+          properties:
+            mobile: { type: string, nullable: true, example: '9876543210', description: 'Full number so staff can call from their own phone; null once the lead is do-not-call.' }
+            userId: { type: string, format: uuid, nullable: true }
+            nextContactAfter: { type: string, format: date-time, nullable: true }
+            signals:
+              type: array
+              items:
+                type: object
+                properties:
+                  source: { type: string }
+                  service: { type: string, nullable: true }
+                  summary: { type: string, nullable: true }
+                  createdAt: { type: string, format: date-time }
+            activities:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  kind: { type: string, enum: [call, whatsapp, sms, note, stage, assign, claim, release, reveal, convert, profile] }
+                  outcome: { type: string, nullable: true }
+                  body: { type: string, nullable: true }
+                  actorName: { type: string, nullable: true }
+                  createdAt: { type: string, format: date-time }
+            conversions:
+              type: array
+              items: { $ref: '#/components/schemas/LeadConversion' }
+    LeadConversion:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        serviceRequestId: { type: string, format: uuid }
+        service: { type: string }
+        amount: { type: number }
+        creditedToId: { type: string, format: uuid }
+        creditedToName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    LeadConvertible:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string }
+        amount: { type: number, nullable: true }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+    LeadAssignee:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        openLeads: { type: integer }
+    LeadPerformanceRow:
+      type: object
+      properties:
+        staffId: { type: string, format: uuid, nullable: true }
+        staffName: { type: string, nullable: true }
+        openLeads: { type: integer }
+        claimed: { type: integer }
+        contacted: { type: integer }
+        attempts: { type: integer }
+        avgFirstContactHours: { type: number }
+        conversions: { type: integer }
+        revenue: { type: integer, format: int64 }
+        conversionRate: { type: number }
+    LeadPerformance:
+      type: object
+      properties:
+        days: { type: integer }
+        rows: { type: array, items: { $ref: '#/components/schemas/LeadPerformanceRow' } }
+        totals: { $ref: '#/components/schemas/LeadPerformanceRow' }
+    LeadCreate:
+      type: object
+      required: [mobile, profile]
+      properties:
+        mobile: { type: string, example: '9876543210' }
+        profile: { $ref: '#/components/schemas/LeadProfileInput' }
+        interests: { type: array, items: { type: string } }
+        note: { type: string }
+    LeadContact:
+      type: object
+      required: [channel, outcome]
+      properties:
+        channel: { type: string, enum: [call, whatsapp, sms] }
+        outcome: { type: string, enum: [connected, no-answer, busy, switched-off, wrong-number, message-sent] }
+        note: { type: string }
+        nextFollowUpAt: { type: string, format: date-time, nullable: true }
+    LeadStageChange:
+      type: object
+      required: [stage, note]
+      properties:
+        stage: { type: string, enum: [new, contacted, interested, lost, not-reachable, do-not-call] }
+        note: { type: string }
+        nextFollowUpAt: { type: string, format: date-time, nullable: true }
+    LeadInterests:
+      type: object
+      required: [interests]
+      properties:
+        interests: { type: array, items: { type: string, enum: [rent-agreement, legal, interior, packers, valuation, loans, listing, home-search] } }
+    LeadNoteCreate:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string }
+    LeadAssign:
+      type: object
+      required: [staffId]
+      properties:
+        staffId: { type: string, format: uuid }
+    LeadConvert:
+      type: object
+      required: [serviceRequestId]
+      properties:
+        serviceRequestId: { type: string, format: uuid }
+    LeadCredit:
+      type: object
+      required: [creditedTo]
+      properties:
+        creditedTo: { type: string, format: uuid }
     PageViewBatchCreate:
       type: object
       description: >
@@ -19615,7 +20371,9 @@ components:
           description: Platform fee configuration (INR); read by the billing layer.
           properties:
             listingPass: { type: integer }
+            listingPassBuy: { type: integer }
             contactPack: { type: integer }
+            contactPackBuy: { type: integer }
             rentAgreementPlatform: { type: integer }
             contactReplyDays: { type: integer, minimum: 1, maximum: 30, example: 7 }
             contactPendingMax: { type: integer, minimum: 1, maximum: 100, example: 10 }
