@@ -163,7 +163,7 @@ public class SubscriptionService {
                 .filter(Plan::isActive)
                 .orElseThrow(() -> NotFoundException.of("Plan"));
         UUID propertyId = Plan.KIND_LISTING_PASS.equals(plan.getKind())
-                ? passes.requireBuyable(caller.userId(), body.propertyId())
+                ? passes.requireBuyable(caller.userId(), body.propertyId(), plan.getDeal())
                 : null;
 
         Instant now = Instant.now();
@@ -218,7 +218,8 @@ public class SubscriptionService {
                 "subscription:" + caller.userId() + ":" + plan.getId()
                         + (propertyId == null ? "" : ":" + propertyId),
                 new PaymentGateway.Customer(caller.userId().toString(), phone),
-                "/checkout?plan=" + plan.getKind() + (propertyId == null ? "" : "&property=" + propertyId)
+                "/checkout?plan=" + plan.getKind() + ("buy".equals(plan.getDeal()) ? "-buy" : "")
+                        + (propertyId == null ? "" : "&property=" + propertyId)
                         + "&order_id={order_id}");
     }
 

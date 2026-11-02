@@ -8,6 +8,7 @@ import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.trust.AgreementCreditUsageLookup;
 import com.draazy.api.common.trust.ContactAllowanceLookup;
 import com.draazy.api.common.trust.ContactUsageLookup;
+import com.draazy.api.common.trust.ContactUse;
 import com.draazy.api.common.trust.ListingAllowanceLookup;
 import com.draazy.api.common.trust.ListingSlotLookup;
 import java.time.Instant;
@@ -47,17 +48,18 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         Optional<Plan> plan = subscriptions.entitlingPlan(userId);
         int contactBonus = referralContacts(userId);
         int friendBonus = friendBonus(userId);
-        List<Instant> contacted = usage.contactTimes(userId);
+        List<ContactUse> contacted = usage.contactUses(userId);
         long used = contacted.size();
 
         ContactEntitlementDto contacts;
         if (plan.map(Plan::isUnlimitedContacts).orElse(false)) {
-            contacts = new ContactEntitlementDto(true, used, null, null, contactBonus, friendBonus, null, null);
+            contacts = new ContactEntitlementDto(true, used, null, null, null, null, contactBonus, friendBonus, null,
+                    null);
         } else {
             ContactAllocator.Standing standing = standingOf(userId, contacted, contactBonus, friendBonus);
             contacts = new ContactEntitlementDto(false, used, Math.toIntExact(used) + standing.remaining(),
-                    standing.remaining(), contactBonus, friendBonus, iso(standing.freeWindowEndsAt()),
-                    iso(standing.packExpiresAt()));
+                    standing.remaining(), standing.remainingRent(), standing.remainingBuy(), contactBonus,
+                    friendBonus, iso(standing.freeWindowEndsAt()), iso(standing.packExpiresAt()));
         }
 
         List<ListingEntitlementDto.Pass> passes = subscriptions.listingPasses(userId).stream()
@@ -75,13 +77,13 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         if (terms.stream().noneMatch(t -> pack.subscriptionId().equals(t.subscriptionId()))) {
             terms.add(pack);
         }
-        List<Instant> before = usage.contactTimes(userId).stream().filter(at -> at.isBefore(asOf)).toList();
+        List<ContactUse> before = usage.contactUses(userId).stream().filter(u -> u.at().isBefore(asOf)).toList();
         return ContactAllocator.spentFromPacks(before,
                 Math.toIntExact(settings.freeContactLimit()) + friendBonus(userId), terms,
                 referralContacts(userId)).getOrDefault(pack.subscriptionId(), 0);
     }
 
-    private ContactAllocator.Standing standingOf(UUID userId, List<Instant> contacted, int contactBonus,
+    private ContactAllocator.Standing standingOf(UUID userId, List<ContactUse> contacted, int contactBonus,
             int friendBonus) {
         return ContactAllocator.allocate(contacted, Math.toIntExact(settings.freeContactLimit()) + friendBonus,
                 subscriptions.contactPacks(userId), contactBonus, Instant.now());
@@ -125,10 +127,16 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
     @Override
     @Transactional(readOnly = true)
     public OptionalInt contactsRemaining(UUID userId) {
+        return contactsRemaining(userId, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OptionalInt contactsRemaining(UUID userId, String deal) {
         if (subscriptions.entitlingPlan(userId).map(Plan::isUnlimitedContacts).orElse(false)) {
             return OptionalInt.empty();
         }
-        return OptionalInt.of(standingOf(userId, usage.contactTimes(userId), referralContacts(userId),
-                friendBonus(userId)).remaining());
+        return OptionalInt.of(standingOf(userId, usage.contactUses(userId), referralContacts(userId),
+                friendBonus(userId)).remainingFor(deal));
     }
 }

@@ -5,6 +5,8 @@ public record ContactEntitlementDto(
         long used,
         Integer allowance,
         Integer remaining,
+        Integer remainingRent,
+        Integer remainingBuy,
         int referralBonus,
         int friendBonus,
         String freeWindowEndsAt,

@@ -2,7 +2,9 @@ package com.draazy.api.common.settings;
 
 public record PricingResponse(
         long listingPass,
+        long listingPassBuy,
         long contactPack,
+        long contactPackBuy,
         long rentAgreementPlatform,
         Referral referral,
         Refunds refunds) {

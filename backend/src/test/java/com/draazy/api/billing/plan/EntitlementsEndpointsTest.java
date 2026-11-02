@@ -2,6 +2,7 @@ package com.draazy.api.billing.plan;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -51,7 +52,11 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     }
 
     private Property listing(User owner, String title) {
-        Property p = new Property(owner, title, "rent", "apartment", 25000L, "Kothrud", "Pune");
+        return listing(owner, title, "rent");
+    }
+
+    private Property listing(User owner, String title, String deal) {
+        Property p = new Property(owner, title, deal, "apartment", 25000L, "Kothrud", "Pune");
         p.setBhk(new BigDecimal("2"));
         p.setStatus("approved");
         p.setPriceUnit("per-month");
@@ -159,6 +164,70 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
         grants.grantPack(buyer.getId(), Instant.now(), Instant.now().plus(30, ChronoUnit.DAYS));
 
         assertThat(ask(buyer, listing(user("9844400071", "owner"), "Now allowed"))).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("a buy pack opens sale listings only, and the refusal names the pack that would")
+    void aBuyPackNeverPaysForARentContact() throws Exception {
+        User buyer = user("9844400140", "buyer");
+        spend(buyer, FREE_LIMIT, 9844400141L);
+        // One test transaction stamps every contact alike; the replay needs the rent ones first.
+        jdbc.update("update contact_requests set first_requested_at = first_requested_at - interval '1 minute'"
+                + " where requester_id = ?", buyer.getId());
+        grants.grantBuyPack(buyer.getId(), Instant.now().minus(1, ChronoUnit.HOURS),
+                Instant.now().plus(60, ChronoUnit.DAYS));
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.contacts.remaining").value(15))
+                .andExpect(jsonPath("$.contacts.remainingRent").value(0))
+                .andExpect(jsonPath("$.contacts.remainingBuy").value(15));
+
+        mvc.perform(post(Routes.Contacts.REQUEST)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + listing(user("9844400170", "owner"), "Rent flat").getId()
+                                + "\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("Rent Contact Pack")));
+
+        assertThat(ask(buyer, listing(user("9844400171", "owner"), "Sale flat", "buy"))).isEqualTo(200);
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.contacts.remainingBuy").value(14));
+    }
+
+    @Test
+    @DisplayName("free contacts count toward either deal until spent")
+    void freeContactsServeBothDeals() throws Exception {
+        User buyer = user("9844400180", "buyer");
+        assertThat(ask(buyer, listing(user("9844400181", "owner"), "Sale home", "buy"))).isEqualTo(200);
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT - 1))
+                .andExpect(jsonPath("$.contacts.remainingRent").value(FREE_LIMIT - 1))
+                .andExpect(jsonPath("$.contacts.remainingBuy").value(FREE_LIMIT - 1));
+    }
+
+    @Test
+    @DisplayName("a listing with a seeker contact or a pass cannot flip between rent and sale")
+    void aPricedListingKeepsItsDeal() throws Exception {
+        User owner = user("9844400190", "owner");
+        Property contacted = listing(owner, "Contacted flat");
+        assertThat(ask(user("9844400191", "buyer"), contacted)).isEqualTo(200);
+        assertThat(flipToSale(owner, contacted)).isEqualTo(409);
+
+        Property passed = listing(owner, "Passed flat");
+        grants.grantPass(owner.getId(), passed.getId(), Instant.now().plus(60, ChronoUnit.DAYS));
+        assertThat(flipToSale(owner, passed)).isEqualTo(409);
+
+        assertThat(flipToSale(owner, listing(owner, "Quiet flat"))).isEqualTo(200);
+    }
+
+    private int flipToSale(User owner, Property p) throws Exception {
+        return mvc.perform(patch("/me/listings/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deal\":\"buy\",\"price\":5000000}"))
+                .andReturn().getResponse().getStatus();
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.draazy.api.common.settings;
 
+import com.draazy.api.common.persistence.AfterCommit;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -7,8 +8,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 // Kill switches and the permission allow-list must never be cached here;
 // they have to bite on the next request.
@@ -45,16 +44,7 @@ public class SettingsCache {
     }
 
     public void evictAfterCommit() {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            evict();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                evict();
-            }
-        });
+        AfterCommit.run(this::evict);
     }
 
     private void evict() {

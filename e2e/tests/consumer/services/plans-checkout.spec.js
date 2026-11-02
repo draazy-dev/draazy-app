@@ -15,24 +15,26 @@ const CONTACT_PACK = '₹199';
 const SENTINEL = 111777;
 const SENTINEL_TEXT = '₹1,11,777';
 
-/** Serves the catalogue with `name`'s price replaced; keyed on `name` because the slug is derived by `planMapper`
- * and is not on the wire. The caller must run the returned assertion. */
-async function catalogueQuoting(page, name, price) {
+/** Serves the catalogue with the `kind`/`deal` row's price replaced; the slug is derived by `planMapper` and is
+ * not on the wire. The caller must run the returned assertion. */
+async function catalogueQuoting(page, { kind, deal }, price) {
+  const label = `${kind}/${deal}`;
+  const isTarget = (r) => r.kind === kind && r.deal === deal;
   let substituted = false;
   await page.route('**/api/bootstrap', async (route) => {
     const res = await route.fetch();
     const doc = await res.json();
-    if (!doc.plans.some((r) => r.name === name)) {
-      throw new Error(`the catalogue carries no plan named "${name}", so nothing was substituted`);
+    if (!doc.plans.some(isTarget)) {
+      throw new Error(`the catalogue carries no ${label} plan, so nothing was substituted`);
     }
     substituted = true;
     await route.fulfill({
       response: res,
-      json: { ...doc, plans: doc.plans.map((r) => (r.name === name ? { ...r, price } : r)) },
+      json: { ...doc, plans: doc.plans.map((r) => (isTarget(r) ? { ...r, price } : r)) },
     });
   });
   /* Every caller must assert this: a glob that stops matching silently serves the real catalogue. */
-  return () => expect(substituted, `the ${name} price was never substituted — check the route glob`).toBe(true);
+  return () => expect(substituted, `the ${label} price was never substituted — check the route glob`).toBe(true);
 }
 
 /* The global cookie banner is also role="dialog" and can overlay the plan-card CTAs. Seeding consent
@@ -55,30 +57,37 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
        database the rest of this file talks to. */
     const { plans, pricing } = await (await fetch(`${API}/bootstrap`)).json();
 
-    const planNamed = (name) => {
-      const plan = plans.find((p) => p.name === name);
-      expect(plan, `the seeded catalogue must carry a plan named ${name}`).toBeTruthy();
+    const planOf = (kind, deal) => {
+      const plan = plans.find((p) => p.kind === kind && p.deal === deal);
+      expect(plan, `the seeded catalogue must carry a ${deal} ${kind} plan`).toBeTruthy();
       return plan;
     };
 
-    expect(planNamed('Listing Pass').price, 'the pass is charged the catalogue price, so the schedule the page\n'
+    expect(planOf('listing-pass', 'rent').price, 'the pass is charged the catalogue price, so the schedule the page\n'
       + 'falls back to must name the same number').toBe(pricing.listingPass);
-    expect(planNamed('Contact Pack').price).toBe(pricing.contactPack);
+    expect(planOf('listing-pass', 'buy').price).toBe(pricing.listingPassBuy);
+    expect(planOf('contact-pack', 'rent').price).toBe(pricing.contactPack);
+    expect(planOf('contact-pack', 'buy').price).toBe(pricing.contactPackBuy);
     // And they are the numbers this file asserts on screen, so a repricing fails here rather than
     // in several UI assertions whose messages would blame the rendering.
-    expect(planNamed('Listing Pass').price).toBe(999);
-    expect(planNamed('Contact Pack').price).toBe(199);
+    expect(planOf('listing-pass', 'rent').price).toBe(999);
+    expect(planOf('listing-pass', 'buy').price).toBe(1999);
+    expect(planOf('contact-pack', 'rent').price).toBe(199);
+    expect(planOf('contact-pack', 'buy').price).toBe(399);
 
-    expect(planNamed('Listing Pass')).toMatchObject({ kind: 'listing-pass', termDays: 60 });
-    expect(planNamed('Contact Pack')).toMatchObject({ kind: 'contact-pack', termDays: 30, contactLimit: 15 });
-    expect(plans.map((p) => p.name).sort(), 'Owner Plus, Owner Pro and Seeker Plus no longer sell').toEqual(['Contact Pack', 'Listing Pass']);
+    expect(planOf('listing-pass', 'rent')).toMatchObject({ termDays: 60 });
+    expect(planOf('listing-pass', 'buy')).toMatchObject({ termDays: 90 });
+    expect(planOf('contact-pack', 'rent')).toMatchObject({ termDays: 30, contactLimit: 15 });
+    expect(planOf('contact-pack', 'buy')).toMatchObject({ termDays: 60, contactLimit: 15 });
+    expect(plans.map((p) => `${p.kind}:${p.deal}`).sort(), 'Owner Plus, Owner Pro, Seeker Plus and the untyped packs no longer sell')
+      .toEqual(['contact-pack:buy', 'contact-pack:rent', 'listing-pass:buy', 'listing-pass:rent']);
   });
 
   test('/plans is public and quotes the catalogue price on the cards and in the FAQ, and /checkout sends a signed-out visitor to sign-in', async ({ page }) => {
     await page.context().clearCookies();
     await seedConsent(page);
     /* The catalogue differs from the fee schedule, so the card's price identifies which table was read. */
-    const substituted = await catalogueQuoting(page, 'Contact Pack', SENTINEL);
+    const substituted = await catalogueQuoting(page, { kind: 'contact-pack', deal: 'rent' }, SENTINEL);
     await page.goto('/plans');
 
     await expect(page.getByRole('heading', { name: 'Plans & Pricing' })).toBeVisible({ timeout: 20000 });
@@ -111,7 +120,7 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
     await expect.poll(
       async () => (await faq.textContent())?.replace(/\s+/g, ' ').trim() ?? '',
       { timeout: 20000, message: 'the FAQ never picked up the catalogue price' },
-    ).toContain(`Contact Pack (${SENTINEL_TEXT})`);
+    ).toContain(`Rent Contact Pack (${SENTINEL_TEXT}`);
     substituted();
 
     const body = page.locator('body');
@@ -138,7 +147,7 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
     expect(ent.contacts).toMatchObject({ unlimited: false, allowance: 15, used: 0, remaining: 15, packExpiresAt: null });
 
     await seedConsent(page);
-    const substituted = await catalogueQuoting(page, 'Contact Pack', SENTINEL);
+    const substituted = await catalogueQuoting(page, { kind: 'contact-pack', deal: 'rent' }, SENTINEL);
     await page.goto('/plans');
     await expect(desktopLink(page, 'Get a Contact Pack')).toBeVisible({ timeout: 20000 });
     // Nobody is "on" a pass or a pack; there is no Current-plan lock to render.
@@ -148,7 +157,7 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
 
     await expect(page).toHaveURL(/\/checkout\?plan=contact-pack/);
     await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible({ timeout: 20000 });
-    await expect(page.getByRole('heading', { name: 'Contact Pack', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Rent Contact Pack', exact: true })).toBeVisible();
     await expect(page.getByText('Order summary')).toBeVisible();
 
     // Both pages resolve the catalogue independently; the substituted price makes agreement a catalogue claim.
@@ -334,22 +343,20 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
     await page.context().clearCookies();
     await seedConsent(page);
     const { plans } = await (await fetch(`${API}/bootstrap`)).json();
-    const pack = plans.find((p) => p.name === 'Contact Pack');
-    const pass = plans.find((p) => p.name === 'Listing Pass');
+    const pack = plans.find((p) => p.kind === 'contact-pack' && p.deal === 'rent');
+    const pass = plans.find((p) => p.kind === 'listing-pass' && p.deal === 'rent');
     await page.goto('/plans');
 
-    const card = (name) => page.locator('h3', { hasText: new RegExp(`^${name}$`) }).last().locator('xpath=ancestor::div[contains(@class,"glass")][1]');
-    // Three "Free" cards render: the mobile carousel, then the desktop seeker and owner grids.
-    const free = page.locator('h3', { hasText: /^Free$/ });
-    const cardOf = (heading) => heading.locator('xpath=ancestor::div[contains(@class,"glass")][1]');
-    await expect(cardOf(free.nth(1))).toContainText('15 owner contacts within 30 days of your first contact', { timeout: 20000 });
-    await expect(cardOf(free.last())).toContainText('Featured for 7 days after verification');
-    await expect(cardOf(free.last())).toContainText('1 live listing at a time');
-    await expect(card('Contact Pack')).toContainText(`${pack.contactLimit} more owner contacts`);
-    await expect(card('Contact Pack')).toContainText(`Valid for ${pack.termDays} days`);
-    await expect(card('Contact Pack')).toContainText('No auto-renewal');
-    await expect(card('Listing Pass')).toContainText(`Keeps one more listing live for ${pass.termDays} days`);
-    await expect(card('Listing Pass')).toContainText('No auto-renewal');
+    const card = (name) => page.locator('h3', { hasText: new RegExp(`^${name}$`) }).locator('xpath=ancestor::div[contains(@class,"glass")][1]');
+    const free = page.locator('h2', { hasText: /^Free$/ }).locator('xpath=ancestor::div[contains(@class,"glass")][1]');
+    await expect(free).toContainText('15 owner contacts within 30 days of your first contact', { timeout: 20000 });
+    await expect(free).toContainText('Featured for 7 days after verification');
+    await expect(free).toContainText('1 live listing at a time');
+    await expect(card('Rent Contact Pack')).toContainText(`${pack.contactLimit} more contacts for rent listings`);
+    await expect(card('Rent Contact Pack')).toContainText(`Valid for ${pack.termDays} days`);
+    await expect(card('Rent Contact Pack')).toContainText('No auto-renewal');
+    await expect(card('Rent Listing Pass')).toContainText(`Keeps one more listing live for ${pass.termDays} days`);
+    await expect(card('Rent Listing Pass')).toContainText('No auto-renewal');
   });
 
   test('what a buyer holds is named in billing, as a dated purchase and not a subscription', async ({ page }) => {

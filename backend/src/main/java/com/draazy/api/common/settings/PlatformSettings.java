@@ -53,14 +53,18 @@ public class PlatformSettings {
 
     private static final long DEFAULT_LISTING_PASS = 999L;
 
+    private static final long DEFAULT_LISTING_PASS_BUY = 1_999L;
+
     private static final long DEFAULT_CONTACT_PACK = 199L;
+
+    private static final long DEFAULT_CONTACT_PACK_BUY = 399L;
 
     private static final long DEFAULT_RENT_AGREEMENT_PLATFORM = 499L;
 
     public static final int MAX_PRICE = 100_000;
 
-    public static final List<String> PRICE_FIELDS = List.of("listingPass", "contactPack",
-            "rentAgreementPlatform");
+    public static final List<String> PRICE_FIELDS = List.of("listingPass", "listingPassBuy", "contactPack",
+            "contactPackBuy", "rentAgreementPlatform");
 
     public static final String LISTINGS_KEY = "listings";
 
@@ -93,8 +97,20 @@ public class PlatformSettings {
         return wholeNumber(FEES_KEY, "listingPass", DEFAULT_LISTING_PASS, MAX_PRICE);
     }
 
+    public long listingPassBuy() {
+        return wholeNumber(FEES_KEY, "listingPassBuy", DEFAULT_LISTING_PASS_BUY, MAX_PRICE);
+    }
+
+    public long listingPass(String deal) {
+        return "buy".equals(deal) ? listingPassBuy() : listingPass();
+    }
+
     public long contactPack() {
         return wholeNumber(FEES_KEY, "contactPack", DEFAULT_CONTACT_PACK, MAX_PRICE);
+    }
+
+    public long contactPackBuy() {
+        return wholeNumber(FEES_KEY, "contactPackBuy", DEFAULT_CONTACT_PACK_BUY, MAX_PRICE);
     }
 
     public long rentAgreementPlatform() {

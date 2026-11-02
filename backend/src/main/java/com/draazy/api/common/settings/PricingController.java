@@ -13,7 +13,9 @@ public class PricingController {
     public PricingResponse pricing() {
         return new PricingResponse(
                 settings.listingPass(),
+                settings.listingPassBuy(),
                 settings.contactPack(),
+                settings.contactPackBuy(),
                 settings.rentAgreementPlatform(),
                 new PricingResponse.Referral(
                         settings.referralContactBonus(),

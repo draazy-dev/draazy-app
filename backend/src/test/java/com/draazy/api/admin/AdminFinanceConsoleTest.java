@@ -134,7 +134,7 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
         void thePlanLinesSumToMrrAndCarryTheStickerPrice() throws Exception {
             String token = admin();
             subscribe("9877730014", "Book Member", "Owner Pro", "active");
-            subscribe("9877730015", "Pass Member", "Listing Pass", "active");
+            subscribe("9877730015", "Pass Member", "Rent Listing Pass", "active");
 
             String json = body(Routes.Admin.FINANCE, token);
             List<Map<String, Object>> plans = JsonPath.read(json, "$.plans");
@@ -146,7 +146,7 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
                 assertThat(p).containsEntry("termDays", null);
             });
             assertThat(plans).anySatisfy(p -> {
-                assertThat(p.get("name")).isEqualTo("Listing Pass");
+                assertThat(p.get("name")).isEqualTo("Rent Listing Pass");
                 assertThat(((Number) p.get("termDays")).intValue()).isEqualTo(60);
             });
         }

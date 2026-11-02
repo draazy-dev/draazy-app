@@ -3,6 +3,7 @@ package com.draazy.api.billing.plan;
 import com.draazy.api.billing.credit.CreditNotes;
 import com.draazy.api.billing.refund.RefundStaffAlerts;
 import com.draazy.api.catalog.listing.ListingDuplicateProbe;
+import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
@@ -79,13 +80,18 @@ class ListingPasses {
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
-    UUID requireBuyable(UUID ownerId, String propertyId) {
+    UUID requireBuyable(UUID ownerId, String propertyId, String passDeal) {
         UUID id = Ids.parseUuid(propertyId)
                 .orElseThrow(() -> new ValidationException("propertyId is required for a listing pass"));
         Property property = properties.findByIdAndOwner_Id(id, ownerId)
                 .orElseThrow(() -> NotFoundException.of("Listing"));
         if (property.isArchived() || !BUYABLE_STATUSES.contains(property.getStatus())) {
             throw new ConflictException("A listing pass can only be bought for a pending, live or paused listing.");
+        }
+        if (passDeal != null && !passDeal.equalsIgnoreCase(property.getDeal())) {
+            throw new ConflictException(DealIntent.BUY.equalsIgnoreCase(property.getDeal())
+                    ? "This is a sale listing. Choose the Sale Listing Pass."
+                    : "This is a rent listing. Choose the Rent Listing Pass.");
         }
         if (properties.hasActivePass(id, Instant.now())) {
             throw new ConflictException("This listing already has an active listing pass.");

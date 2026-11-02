@@ -11,6 +11,8 @@ import { usePricing } from '../../context/PricingContext.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { fmtDate } from '../../lib/format.js';
 import RefundGuarantee from '../../components/billing/RefundGuarantee.jsx';
+import WhyFee from '../../components/billing/WhyFee.jsx';
+import { passSlug } from '../../lib/dealPlans.js';
 
 const DAY_MS = 86_400_000;
 const POLL_MS = 3_000;
@@ -27,8 +29,11 @@ async function purchaseExpiry({ needsProperty, propertyId, before }) {
 
 const checkoutPlans = (t) => ({
   'contact-pack': { nameLabel: t('misc.coContactPackName'), priceKey: 'contactPack', sub: t('misc.coContactPackSub'), termDays: 30, icon: 'user-plus', tagline: t('misc.coContactPackTagline'), feats: [t('misc.coContactPackFeat1'), t('misc.coContactPackFeat2'), t('misc.coContactPackFeat3')], done: { cta: t('misc.coContactPackDoneCta'), href: '/listings' } },
+  'contact-pack-buy': { nameLabel: t('misc.coContactPackBuyName'), priceKey: 'contactPackBuy', sub: t('misc.coContactPackBuySub'), termDays: 60, icon: 'user-plus', tagline: t('misc.coContactPackBuyTagline'), feats: [t('misc.coContactPackBuyFeat1'), t('misc.coContactPackBuyFeat2'), t('misc.coContactPackFeat3')], done: { cta: t('misc.coContactPackDoneCta'), href: '/listings' } },
   'listing-pass': { nameLabel: t('misc.coListingPassName'), priceKey: 'listingPass', sub: t('misc.coListingPassSub'), termDays: 60, icon: 'building-2', tagline: t('misc.coListingPassTagline'), feats: [t('misc.coListingPassFeat1'), t('misc.coListingPassFeat2'), t('misc.coListingPassFeat3')], done: { cta: t('misc.coListingPassDoneCta'), href: '/dashboard#properties' } },
+  'listing-pass-buy': { nameLabel: t('misc.coListingPassBuyName'), priceKey: 'listingPassBuy', sub: t('misc.coListingPassBuySub'), termDays: 90, icon: 'building-2', tagline: t('misc.coListingPassBuyTagline'), feats: [t('misc.coListingPassBuyFeat1'), t('misc.coListingPassFeat2'), t('misc.coListingPassFeat3')], done: { cta: t('misc.coListingPassDoneCta'), href: '/dashboard#properties' } },
 });
+const PASS_SLUGS = ['listing-pass', 'listing-pass-buy'];
 const inr = (n) => '₹' + Number(n).toLocaleString('en-IN');
 
 export default function Checkout() {
@@ -36,12 +41,14 @@ export default function Checkout() {
   const { isIn } = useAuth();
   const { flagEnabled } = useAppFlags();
   const [params] = useSearchParams();
-  const planId = params.get('plan');
+  const requestedPlan = params.get('plan');
   const propertyId = params.get('property');
   const { prices } = usePricing();
   const CO = checkoutPlans(t);
+  const needsProperty = PASS_SLUGS.includes(requestedPlan);
+  const [listing, setListing] = useState(null);
+  const planId = needsProperty && listing ? passSlug(listing.deal) : requestedPlan;
   const base = CO[planId];
-  const needsProperty = planId === 'listing-pass';
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
   const returnedOrder = useRef(params.get('order_id'));
@@ -49,11 +56,11 @@ export default function Checkout() {
   const [orderRef, setOrderRef] = useState(returnedOrder.current ?? '');
   const gatewayOrder = useRef(returnedOrder.current);
   const [session, setSession] = useState(null);
-  const [serverPlan, setServerPlan] = useState(null);
-  const [listing, setListing] = useState(null);
+  const [serverRow, setServerRow] = useState(null);
+  const serverPlan = serverRow?.slug === planId ? serverRow : null;
   const [expiresAt, setExpiresAt] = useState(null);
   const packExpiryBefore = useRef(null);
-  const attemptKey = `dz_co_${planId}_${propertyId || ''}`;
+  const attemptKey = `dz_co_${requestedPlan}_${propertyId || ''}`;
   const [attemptId, setAttemptId] = useState(() => {
     try {
       const saved = sessionStorage.getItem(attemptKey);
@@ -71,7 +78,7 @@ export default function Checkout() {
     listPlans()
       .then((rows) => {
         const row = rows.find((r) => r.slug === planId);
-        if (alive && row) setServerPlan(row);
+        if (alive && row) setServerRow(row);
       })
       .catch(() => {});
     return () => { alive = false; };
@@ -254,7 +261,7 @@ export default function Checkout() {
               <div className="flex justify-between text-gray-400"><span>{P.nameLabel} <span className="text-gray-600">({P.sub})</span></span><span className="text-gray-200">{inr(P.price)}</span></div>
               <div className="flex justify-between font-bold text-base pt-2 border-t border-white/8 mt-2"><span>{t('misc.coTotal')}</span><span>{inr(P.price)}</span></div>
               {needsProperty && <RefundGuarantee kind="pass" />}
-              {planId === 'contact-pack' && <RefundGuarantee kind="pack" />}
+              {!needsProperty && <RefundGuarantee kind="pack" />}
             </div>
           </div>
 
@@ -279,6 +286,8 @@ export default function Checkout() {
             )}
           </div>
         </div>
+
+        <div className="mt-6"><WhyFee compact deal={planId.endsWith('-buy') ? 'buy' : 'rent'} kind={needsProperty ? 'pass' : 'pack'} price={inr(P.price)} /></div>
 
         <div className="md:hidden sticky bottom-0 z-30 -mx-4 sm:-mx-6 mt-6 border-t border-white/10 bg-ink/95 backdrop-blur-xl px-4 sm:px-6 py-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}>
           <div className="flex items-center gap-4">

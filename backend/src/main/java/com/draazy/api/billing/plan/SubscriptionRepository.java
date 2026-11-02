@@ -25,7 +25,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
 
     @Query("""
             select new com.draazy.api.billing.plan.ContactPackTerm(s.id, s.startedAt, s.renewsAt, p.contactLimit,
-                                                                   s.frozenAt)
+                                                                   s.frozenAt, p.deal)
             from Subscription s join Plan p on p.id = s.planId
             where s.userId = :userId and p.kind = 'contact-pack' and p.contactLimit is not null
               and s.status in ('active', 'past-due', 'expired', 'refund-review', 'disputed')

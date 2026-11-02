@@ -26,17 +26,29 @@ tags: [plans, pricing, owner, contacts, referral]
 
 | Item | Price | What you get |
 | --- | --- | --- |
-| Listing Pass | ₹999 | One extra live listing for 60 days, tied to that listing |
-| Contact Pack | ₹199 | 15 owner contacts, valid 30 days; packs stack |
+| Rent Listing Pass | ₹999 | One extra live rent listing for 60 days, tied to that listing |
+| Sale Listing Pass | ₹1,999 | One extra live sale listing for 90 days, tied to that listing |
+| Rent Contact Pack | ₹199 | 15 contacts for rent listings, valid 30 days; packs stack |
+| Buy Contact Pack | ₹399 | 15 contacts for sale listings, valid 60 days; packs stack |
 | Rent agreement | ₹499 + government charges | A first agreement or a renewal |
+
+## Why a small fee?
+
+- **Brokers kept out:** broker listings are flagged and removed, so you deal with owners only.
+- **Every listing checked:** our team reviews each listing before it goes live.
+- **Verified seekers only:** owners get requests only from ID-verified seekers.
+- **Your number stays private:** owners share their number only when they approve your request.
+- **No auto-renewal:** pay once, nothing renews on its own.
+
+It is still far cheaper than a broker, who typically charges about a month's rent on a rental and 1–2% on a purchase.
 
 ## If you list more than one property
 
-Posting is never blocked. A second live rent or sale listing is approved but stays paused until you either buy a Listing Pass for it or pause your other listing. Going live again on the free slot is free whenever it fits.
+Posting is never blocked. A second live rent or sale listing is approved but stays paused until you either buy a Listing Pass for it (the rent or sale pass, matching the listing) or pause your other listing. Going live again on the free slot is free whenever it fits.
 
 ## If you are searching, not listing
 
-The free account includes 15 owner contacts, usable within 30 days of your first. If a serious search in a competitive locality spends them, buy a **Contact Pack**. See [Contacting owners](/help/a/contacting-owners) for how the quota is counted.
+The free account includes 15 owner contacts, usable within 30 days of your first, on rent and sale listings alike. If a serious search in a competitive locality spends them, buy a **Rent Contact Pack** (for rent listings) or a **Buy Contact Pack** (for sale listings). The 15 free contacts, referral bonuses and packs bought before the rent/buy split work on both. See [Contacting owners](/help/a/contacting-owners) for how the quota is counted.
 
 ## Earning allowance instead of buying it
 

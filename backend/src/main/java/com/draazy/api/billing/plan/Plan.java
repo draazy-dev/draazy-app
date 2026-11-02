@@ -36,6 +36,9 @@ public class Plan extends AuditedEntity {
     @Column(name = "kind", nullable = false)
     private String kind;
 
+    @Column(name = "deal")
+    private String deal;
+
     @Column(name = "active", nullable = false)
     private boolean active;
 

@@ -2,6 +2,7 @@ import { expect, test } from '../fixtures/live.js';
 import { ACTORS } from '../fixtures/live.js';
 import { signedInAs, authHeaders, API, uniqueMobile } from '../helpers/liveAuth.js';
 import { newListing } from '../helpers/monetisation.js';
+import { gotoSettled } from '../helpers/settle.js';
 
 test.describe('Listing quota — live', () => {
   test('the server, not the browser, decides the ceiling and the count', async ({ request }) => {
@@ -39,7 +40,7 @@ test.describe('Listing quota — live', () => {
     await signedInAs(page, ACTORS.owner);
 
     await test.step('the form opens: the tier is applied when a listing is approved, not when it is drafted', async () => {
-      await page.goto('/list-property', { waitUntil: 'networkidle' });
+      await gotoSettled(page, '/list-property');
       await expect(page.getByTestId('listing-wizard')).toBeVisible({ timeout: 15000 });
       await expect(page.locator('[data-err="propertyType"]')).toBeVisible({ timeout: 15000 });
       await expect(page.getByText(/used your free listing/i)).toHaveCount(0);
@@ -49,7 +50,7 @@ test.describe('Listing quota — live', () => {
 
     // Flatmate rooms do not occupy listing slots, so this path was never tiered.
     await test.step('the room flow opens straight on the room, without re-asking what is being posted', async () => {
-      await page.goto('/list-property?flatmate=1', { waitUntil: 'networkidle' });
+      await gotoSettled(page, '/list-property?flatmate=1');
       await expect(page.getByTestId('listing-wizard')).toBeVisible({ timeout: 15000 });
       await expect(page.getByRole('group', { name: 'Room type', exact: true })).toBeVisible();
       await expect(page.getByText('Rent out the whole place')).toHaveCount(0);
@@ -68,7 +69,7 @@ test.describe('Listing quota — live', () => {
 
     await signedInAs(page, mobile);
     const slots = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/me/listings/quota');
-    await page.goto('/list-property', { waitUntil: 'networkidle' });
+    await gotoSettled(page, '/list-property');
 
     await expect(page.getByTestId('listing-wizard')).toBeVisible({ timeout: 15000 });
     expect(await (await slots).json()).toEqual({ used: 0, allowance: 1 });

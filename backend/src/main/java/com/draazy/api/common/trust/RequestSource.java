@@ -38,7 +38,7 @@ public interface RequestSource {
 
     List<RequestView> sent(UUID requesterId, Instant since);
 
-    List<RequestView> received(UUID recipientId, Instant since);
+    List<RequestView> received(UUID recipientId, List<UUID> ownedPropertyIds, Instant since);
 
     Optional<RequestView> findSent(UUID requesterId, UUID id);
 

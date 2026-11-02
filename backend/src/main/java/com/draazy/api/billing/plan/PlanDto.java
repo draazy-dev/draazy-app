@@ -10,6 +10,7 @@ public record PlanDto(
         String billingCycle,
         Integer termDays,
         String kind,
+        String deal,
         Integer listingLimit,
         Integer contactLimit,
         List<String> features) {

@@ -1,6 +1,7 @@
 package com.draazy.api.billing.plan;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -25,6 +26,8 @@ import org.springframework.test.web.servlet.ResultActions;
 class AdminFeesPriceEverySurfaceTest extends AbstractApiTest {
     private static final String LISTING_PASS = "b1000000-0000-4000-8000-000000000005";
     private static final String CONTACT_PACK = "b1000000-0000-4000-8000-000000000006";
+    private static final String BUY_CONTACT_PACK = "b1000000-0000-4000-8000-000000000007";
+    private static final String SALE_LISTING_PASS = "b1000000-0000-4000-8000-000000000008";
     private static final String OWNER_PLUS = "b1000000-0000-4000-8000-000000000002";
 
     @Autowired UserRepository users;
@@ -65,12 +68,42 @@ class AdminFeesPriceEverySurfaceTest extends AbstractApiTest {
     }
 
     @Test
+    void repricedBuyPassAndPackAreWhatTheCatalogueQuotes() throws Exception {
+        saveFees("{\"listingPassBuy\":2499,\"contactPackBuy\":449}").andExpect(status().isOk());
+
+        mvc.perform(get(Routes.Bootstrap.BASE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(planPrice(SALE_LISTING_PASS)).value(hasItem(2499)))
+                .andExpect(jsonPath(planPrice(BUY_CONTACT_PACK)).value(hasItem(449)))
+                .andExpect(jsonPath(planPrice(LISTING_PASS)).value(hasItem(999)))
+                .andExpect(jsonPath("$.pricing.listingPassBuy").value(2499))
+                .andExpect(jsonPath("$.pricing.contactPackBuy").value(449));
+    }
+
+    @Test
     void retiredPlansAreNotInTheCatalogue() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.plans.length()").value(2))
-                .andExpect(jsonPath("$.plans[0].id").value(CONTACT_PACK))
-                .andExpect(jsonPath("$.plans[1].id").value(LISTING_PASS));
+                .andExpect(jsonPath("$.plans.length()").value(4))
+                .andExpect(jsonPath("$.plans[*].id").value(containsInAnyOrder(
+                        CONTACT_PACK, LISTING_PASS, BUY_CONTACT_PACK, SALE_LISTING_PASS)))
+                .andExpect(jsonPath("$.plans[?(@.id=='" + BUY_CONTACT_PACK + "')].deal").value(hasItem("buy")))
+                .andExpect(jsonPath("$.plans[?(@.id=='" + LISTING_PASS + "')].deal").value(hasItem("rent")));
+    }
+
+    @Test
+    void aSalePassCannotBeBoughtForARentListing() throws Exception {
+        User owner = user("9869120004", Roles.Wire.OWNER);
+        Property listing = properties.saveAndFlush(new Property(owner, "Rent home", "rent", "Flat",
+                20000L, "Baner", "Pune"));
+
+        mvc.perform(post(Routes.Plans.SUBSCRIPTION)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"planId\":\"" + SALE_LISTING_PASS + "\",\"propertyId\":\"" + listing.getId()
+                                + "\",\"paymentMethod\":\"upi\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("Rent Listing Pass")));
     }
 
     @Test

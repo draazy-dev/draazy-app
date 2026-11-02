@@ -14,6 +14,8 @@ public class TestPlanGrants {
 
     public static final UUID CONTACT_PACK = UUID.fromString("b1000000-0000-4000-8000-000000000006");
 
+    public static final UUID BUY_CONTACT_PACK = UUID.fromString("b1000000-0000-4000-8000-000000000007");
+
     @Autowired SubscriptionRepository subscriptions;
 
     @Autowired PlanRepository plans;
@@ -28,6 +30,10 @@ public class TestPlanGrants {
 
     public Subscription grantPack(UUID userId, Instant from, Instant renewsAt) {
         return save(userId, CONTACT_PACK, null, from, renewsAt);
+    }
+
+    public Subscription grantBuyPack(UUID userId, Instant from, Instant renewsAt) {
+        return save(userId, BUY_CONTACT_PACK, null, from, renewsAt);
     }
 
     private Subscription save(UUID userId, UUID planId, UUID propertyId, Instant from, Instant renewsAt) {

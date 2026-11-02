@@ -13,7 +13,9 @@ import org.springframework.stereotype.Component;
 public class PlanMapper {
     private static final Map<UUID, ToLongFunction<PlatformSettings>> ADMIN_PRICED = Map.of(
             UUID.fromString("b1000000-0000-4000-8000-000000000005"), PlatformSettings::listingPass,
-            UUID.fromString("b1000000-0000-4000-8000-000000000006"), PlatformSettings::contactPack);
+            UUID.fromString("b1000000-0000-4000-8000-000000000006"), PlatformSettings::contactPack,
+            UUID.fromString("b1000000-0000-4000-8000-000000000007"), PlatformSettings::contactPackBuy,
+            UUID.fromString("b1000000-0000-4000-8000-000000000008"), PlatformSettings::listingPassBuy);
 
     private final PlatformSettings settings;
 
@@ -35,6 +37,7 @@ public class PlanMapper {
                 plan.getBillingCycle(),
                 plan.getTermDays(),
                 plan.getKind(),
+                plan.getDeal(),
                 plan.getListingLimit(),
                 plan.getContactLimit(),
                 List.copyOf(plan.getFeatures()));

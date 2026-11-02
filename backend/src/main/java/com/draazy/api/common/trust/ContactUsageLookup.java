@@ -5,5 +5,9 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ContactUsageLookup {
-    List<Instant> contactTimes(UUID userId);
+    List<ContactUse> contactUses(UUID userId);
+
+    default List<Instant> contactTimes(UUID userId) {
+        return contactUses(userId).stream().map(ContactUse::at).toList();
+    }
 }

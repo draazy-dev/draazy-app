@@ -3,6 +3,7 @@ package com.draazy.api.billing.entitlement;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.draazy.api.billing.plan.ContactPackTerm;
+import com.draazy.api.common.trust.ContactUse;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -19,8 +20,16 @@ class ContactAllocatorTest {
         return T0.plus(n, ChronoUnit.DAYS);
     }
 
-    private static List<Instant> contactsOn(int count, int dayNumber) {
-        return IntStream.range(0, count).mapToObj(i -> day(dayNumber).plusSeconds(i)).toList();
+    private static List<ContactUse> contactsOn(int count, int dayNumber) {
+        return contactsOn(count, dayNumber, "rent");
+    }
+
+    private static List<ContactUse> contactsOn(int count, int dayNumber, String deal) {
+        return IntStream.range(0, count).mapToObj(i -> new ContactUse(day(dayNumber).plusSeconds(i), deal)).toList();
+    }
+
+    private static ContactPackTerm pack(int fromDay, int untilDay, String deal) {
+        return new ContactPackTerm(null, day(fromDay), day(untilDay), 15, null, deal);
     }
 
     @Test
@@ -58,7 +67,7 @@ class ContactAllocatorTest {
     @Test
     @DisplayName("a frozen pack keeps the contacts it already served but supplies no more")
     void aFrozenPackKeepsItsHistoryAndLendsNothing() {
-        var frozen = new ContactPackTerm(null, day(0), day(30), 15, day(5));
+        var frozen = new ContactPackTerm(null, day(0), day(30), 15, day(5), null);
         var live = new ContactPackTerm(day(0), day(60), 15);
 
         var beforeFreeze = ContactAllocator.allocate(contactsOn(3, 1), 0, List.of(frozen, live), 0, day(6));
@@ -104,5 +113,49 @@ class ContactAllocatorTest {
         var standing = ContactAllocator.allocate(contactsOn(20, 0), 15, List.of(pack), 0, day(60));
 
         assertThat(standing.remaining()).isEqualTo(15);
+    }
+
+    @Test
+    @DisplayName("a rent pack serves rent listings only, a buy pack sale listings only")
+    void typedPacksServeTheirOwnDealOnly() {
+        var standing = ContactAllocator.allocate(contactsOn(3, 1, "buy"), 0,
+                List.of(pack(0, 30, "rent"), pack(0, 60, "buy")), 0, day(5));
+
+        assertThat(standing.remainingRent()).isEqualTo(15);
+        assertThat(standing.remainingBuy()).isEqualTo(12);
+        assertThat(standing.remaining()).isEqualTo(27);
+    }
+
+    @Test
+    @DisplayName("a sale contact with only a rent pack left has nothing to draw on")
+    void aRentPackNeverPaysForASaleContact() {
+        var standing = ContactAllocator.allocate(contactsOn(2, 1, "buy"), 0, List.of(pack(0, 30, "rent")), 0,
+                day(5));
+
+        assertThat(standing.remainingFor("buy")).isZero();
+        assertThat(standing.remainingFor("rent")).isEqualTo(15);
+    }
+
+    @Test
+    @DisplayName("free, referral and pre-split packs serve both deals, and a typed pack is spent first on a tie")
+    void sharedBucketsServeBothDealsAndTypedWinsTies() {
+        var standing = ContactAllocator.allocate(contactsOn(4, 1, "rent"), 0,
+                List.of(pack(0, 30, null), pack(0, 30, "rent")), 5, day(5));
+
+        assertThat(standing.remainingRent()).isEqualTo(15 + 11 + 5);
+        assertThat(standing.remainingBuy()).isEqualTo(15 + 5);
+    }
+
+    @Test
+    @DisplayName("refund maths counts only the contacts a typed pack actually paid for")
+    void spentFromPacksFollowsTheDeal() {
+        var rent = new ContactPackTerm(java.util.UUID.randomUUID(), day(0), day(30), 15, null, "rent");
+        var buy = new ContactPackTerm(java.util.UUID.randomUUID(), day(0), day(60), 15, null, "buy");
+        var contacts = java.util.stream.Stream.concat(contactsOn(2, 1, "rent").stream(),
+                contactsOn(3, 2, "buy").stream()).toList();
+
+        var spent = ContactAllocator.spentFromPacks(contacts, 0, List.of(rent, buy), 0);
+
+        assertThat(spent).containsEntry(rent.subscriptionId(), 2).containsEntry(buy.subscriptionId(), 3);
     }
 }
