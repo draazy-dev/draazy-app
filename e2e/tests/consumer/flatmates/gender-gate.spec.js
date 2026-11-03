@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -9,6 +11,7 @@ const track = flatmateCleanup(test);
 
 async function approve(id) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, id, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),
@@ -24,10 +27,10 @@ async function womenOnlyGroup() {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
-    body: JSON.stringify({
+    body: JSON.stringify(huntingGroup({
       title: `Gender gate ${Date.now().toString(36)} in Baner`, locality: 'Baner',
-      rent: 30000, deposit: 50000, seats: 3, seatsOpen: 2, policy: 'women', role: 'tenant',
-    }),
+      rent: 30000, deposit: 50000, seats: 3, seatsOpen: 2, policy: 'women',
+    })),
   });
   const body = await res.text();
   expect(res.status, body).toBe(201);

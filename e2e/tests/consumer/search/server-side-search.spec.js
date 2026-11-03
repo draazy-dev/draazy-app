@@ -192,6 +192,11 @@ test('a misspelt place name still finds its listings, and the grid shows the ser
   expect((await get('q=wagholy&size=1')).totalElements).toBeGreaterThanOrEqual(exact);
 
   await page.goto('/listings?q=wagholy');
-  await expect.poll(async () => settledCount(page), { timeout: 15000 })
-    .toBe((await get('q=wagholy&size=1')).totalElements);
+  // Other shards add and retire Wagholi stock mid-run, so a mismatch reloads rather than failing on a moved target.
+  await expect.poll(async () => {
+    const shown = await settledCount(page);
+    const served = (await get('q=wagholy&size=1')).totalElements;
+    if (shown !== served) await page.reload();
+    return shown === served;
+  }, { timeout: 30000 }).toBe(true);
 });

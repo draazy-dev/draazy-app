@@ -2,6 +2,16 @@ import { test, expect } from '../../../fixtures/live.js';
 import { signedInAsNew } from '../../../helpers/liveAuth.js';
 import { PHOTO_PNG } from '../../../helpers/listingPhotos.helper.js';
 import { fillRoomDetails, fillRoomLocation, fillRoomPrice, nextStep } from '../../../helpers/roomWizard.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
+
+// A bootstrap reply can land after the page has closed; that late route must not fail the next test.
+const capPhotos = (page, maxPhotos) => page.route('**/api/bootstrap', async (route) => {
+  const res = await route.fetch().catch(() => null);
+  const body = res && await res.json().catch(() => null);
+  if (body) await route.fulfill({ response: res, json: { ...body, listingPolicy: { maxPhotos } } }).catch(() => {});
+});
 
 const SMALL_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4AWJiYGD4D8IgBpBmYAAAAAD//7vS9wEAAAAGSURBVAMAGDACA6ybwrYAAAAASUVORK5CYII=', 'base64');
 
@@ -13,7 +23,7 @@ async function openRoomPhotoStep(page) {
   await nextStep(page);
   await fillRoomLocation(page, { society: 'Photo Limit Heights' });
   await nextStep(page);
-  await fillRoomPrice(page, { rent: '13500', deposit: '27000', availableFrom: '2026-12-01' });
+  await fillRoomPrice(page, { rent: '13500', deposit: '27000', availableFrom: MOVE_IN });
   await nextStep(page);
   await expect(page.locator('[data-err="photos"]')).toBeVisible();
 }
@@ -21,10 +31,7 @@ async function openRoomPhotoStep(page) {
 test.describe('flatmate room photo limit', () => {
   test('the room wizard follows the limit the server publishes and skips extra picks', async ({ page }) => {
     let photoId = 0;
-    await page.route('**/api/bootstrap', async (route) => {
-      const res = await route.fetch();
-      await route.fulfill({ response: res, json: { ...(await res.json()), listingPolicy: { maxPhotos: 4 } } });
-    });
+    await capPhotos(page, 4);
     await page.route('**/api/me/photos', (route) => {
       photoId += 1;
       return route.fulfill({
@@ -49,10 +56,7 @@ test.describe('flatmate room photo limit', () => {
 
   test('picking more than the limit says how many were skipped', async ({ page }) => {
     let photoId = 0;
-    await page.route('**/api/bootstrap', async (route) => {
-      const res = await route.fetch();
-      await route.fulfill({ response: res, json: { ...(await res.json()), listingPolicy: { maxPhotos: 4 } } });
-    });
+    await capPhotos(page, 4);
     await page.route('**/api/me/photos', (route) => {
       photoId += 1;
       return route.fulfill({

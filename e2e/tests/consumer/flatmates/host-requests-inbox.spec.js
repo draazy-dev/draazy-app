@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 /* `/me/flatmate-requests` is the host's inbox (what seekers sent), not to be confused with
    `/me/flatmate-posts`, which is the seeker's own authored posts. */
@@ -17,6 +19,7 @@ async function newHost() {
 
 async function approve(id) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, id, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),
@@ -46,10 +49,10 @@ test.describe('Host flatmate requests inbox (live API)', () => {
     const created = await fetch(`${API}/flatmates/groups`, {
       method: 'POST',
       headers: auth(host1.accessToken),
-      body: JSON.stringify({
+      body: JSON.stringify(huntingGroup({
         title: `Inbox owner ${Date.now().toString(36)}`, locality: 'Baner', rent: 30000, deposit: 50000,
-        seats: 2, seatsOpen: 1, policy: 'women', role: 'tenant',
-      }),
+        seats: 2, seatsOpen: 1, policy: 'women',
+      })),
     });
     expect(created.status, await created.clone().text()).toBe(201);
     const group = await created.json();

@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -10,6 +12,7 @@ const track = flatmateCleanup(test);
  *  which is what the board reads — cannot see it, and the host cannot see their own card either. */
 async function approve(groupId) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, groupId, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${groupId}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),
@@ -32,10 +35,10 @@ async function hostsGroup(token, title, { seats = 3, seatsOpen = 1 } = {}) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(token),
-    body: JSON.stringify({
+    body: JSON.stringify(huntingGroup({
       title, locality: 'Baner', rent: 45000, deposit: 50000, seats, seatsOpen,
-      policy: 'any', role: 'tenant',
-    }),
+      policy: 'any',
+    })),
   });
   expect(res.status).toBe(201);
   const group = await res.json();
@@ -71,7 +74,7 @@ test.describe('Flatmate seat stepper (live)', () => {
     await openDetail(page, group.id);
 
     await expect(page.getByText(/1 seat left/i).first()).toBeVisible();
-    await expect(page.getByText('Your share · 3 sharing')).toBeVisible();
+    await expect(page.getByText('Budget each · 3 sharing')).toBeVisible();
   });
 
   test('adding an open seat grows the group, and the share and sharing count follow', async ({ page }) => {
@@ -80,10 +83,10 @@ test.describe('Flatmate seat stepper (live)', () => {
     const group = await hostsGroup(accessToken, title, { seats: 3, seatsOpen: 1 });
 
     const panel = await openDetail(page, group.id);
-    await expect(page.getByText('Your share · 3 sharing')).toBeVisible();
+    await expect(page.getByText('Budget each · 3 sharing')).toBeVisible();
     await panel.locator('.seat-reopen-btn').click();
 
-    await expect(page.getByText('Your share · 4 sharing')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Budget each · 4 sharing')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/2 seats left/i)).toBeVisible();
     await expect(page.getByText('2 of 4 seats taken')).toBeVisible();
     await expect(page.getByText('₹11,250').first()).toBeVisible();
@@ -91,7 +94,7 @@ test.describe('Flatmate seat stepper (live)', () => {
     expect([row.seatsOpen, row.seatsTotal, Math.round(row.rent / row.seatsTotal)]).toEqual([2, 4, 11250]);
 
     await page.reload();
-    await expect(page.getByText('Your share · 4 sharing')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Budget each · 4 sharing')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/2 seats left/i).first()).toBeVisible();
   });
 
@@ -105,7 +108,7 @@ test.describe('Flatmate seat stepper (live)', () => {
 
     // "Full" is not a field the API carries; it is `seatsOpen === 0` as the card reads it.
     await expect(page.getByText(/^Full$/)).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Your share · 1 sharing')).toBeVisible();
+    await expect(page.getByText('Budget each · 1 sharing')).toBeVisible();
     const row = await serverGroup(accessToken, group.id);
     expect([row.seatsOpen, row.seatsTotal]).toEqual([0, 1]);
     await expect(panel.locator('.seat-close-btn')).toBeDisabled();
@@ -119,7 +122,7 @@ test.describe('Flatmate seat stepper (live)', () => {
     await expect(panel.locator('.seat-reopen-btn')).toBeEnabled();
     await panel.locator('.seat-reopen-btn').click();
 
-    await expect(page.getByText('Your share · 12 sharing')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Budget each · 12 sharing')).toBeVisible({ timeout: 10_000 });
     await expect(panel.locator('.seat-reopen-btn')).toBeDisabled();
     await expect(page.getByTestId('group-member')).toHaveCount(1);
     await expect(page.getByTestId('group-seat-open')).toHaveCount(11);

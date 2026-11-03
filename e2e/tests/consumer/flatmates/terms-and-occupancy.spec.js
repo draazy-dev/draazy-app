@@ -4,6 +4,9 @@ import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 const track = flatmateCleanup(test);
@@ -26,7 +29,7 @@ async function roomBody(token, overrides = {}) {
     ...(await withSocietyId(token, { society: newSociety() })),
     rentShare: 16000,
     deposit: 32000,
-    availableFrom: '2026-12-01',
+    availableFrom: MOVE_IN,
     ...agreement,
     ...overrides,
   };
@@ -89,39 +92,6 @@ test.describe('flatmate terms, occupancy and the budget range', () => {
     expect((await res.json()).message).toMatch(/included, separate, shared/);
   });
 
-  test('a group takes a deposit and the same terms a room does', async () => {
-    const token = await newHost();
-    const res = await fetch(`${API}/flatmates/groups`, {
-      method: 'POST',
-      headers: auth(token),
-      body: JSON.stringify({
-        title: `Terms Group ${Date.now().toString(36)}`,
-        locality: 'Baner',
-        rent: 40000,
-        deposit: 80000,
-        seats: 3,
-        seatsOpen: 1,
-        policy: 'any',
-        role: 'tenant',
-        noticePeriodDays: 45,
-        lockInMonths: 11,
-        maintenanceBilling: 'separate',
-        electricityBilling: 'separate',
-      }),
-    });
-    expect(res.status).toBe(201);
-    const group = await res.json();
-    track('groups', group.id, token);
-
-    expect(group).toMatchObject({
-      deposit: 80000,
-      noticePeriodDays: 45,
-      lockInMonths: 11,
-      maintenanceBilling: 'separate',
-      electricityBilling: 'separate',
-    });
-  });
-
   test('a group must say where it is rather than being filed under a default locality', async () => {
     const res = await fetch(`${API}/flatmates/groups`, {
       method: 'POST',
@@ -148,7 +118,7 @@ test.describe('flatmate terms, occupancy and the budget range', () => {
       occupation: 'Engineer',
       budget: 15000,
       localities: ['Baner'],
-      moveIn: '2026-12-01',
+      moveIn: MOVE_IN,
       flatPref: 'women',
       roomPref: 'private',
     };

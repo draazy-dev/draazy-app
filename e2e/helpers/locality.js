@@ -28,7 +28,12 @@ export async function chooseLocality(page, opener, name = 'Baner', { query = nam
   const multi = (await localityMenu(page).getAttribute('aria-multiselectable')) === 'true';
   if (domClick) await option.evaluate((el) => el.click());
   else if (tap) await option.tap();
-  else await option.click();
+  else {
+    // The fixed menu follows its trigger, so a late page scroll can carry it off-screen
+    // where Playwright cannot reach it.
+    await opener.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+    await option.click();
+  }
   if (multi && await localityMenu(page).isVisible()) await page.keyboard.press('Escape');
   await expect(localityMenu(page)).toBeHidden();
 }

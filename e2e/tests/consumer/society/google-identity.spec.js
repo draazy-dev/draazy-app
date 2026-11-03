@@ -7,6 +7,9 @@ import { mintSociety, seedSocietyReviews } from '../../../helpers/liveSociety.js
 import { fillSociety, pickGoogleSociety, pickSocietyNotOnMaps, stubPlaceId, wizardSocietyInput } from '../../../helpers/places.js';
 import { pickLocality } from '../../../helpers/locality.js';
 import { fillRoomDetails, fillRoomPrice, nextStep } from '../../../helpers/roomWizard.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 // Society identity is the Google Place ID: a pick resolves to the society that place already has,
 // offers nearby look-alikes before minting, and "Not on Google Maps" is the only way past without one.
@@ -218,7 +221,7 @@ test('the flatmate room wizard takes its society from the same Google picker', a
   expect((await resolveByPlace(request, stubPlaceId(name), name)).society?.name).toBe(name);
   await page.locator('[data-err="flatNumber"] input').fill('A-101');
   await nextStep(page);
-  await fillRoomPrice(page, { rent: '15000', deposit: '30000', availableFrom: '2026-12-01' });
+  await fillRoomPrice(page, { rent: '15000', deposit: '30000', availableFrom: MOVE_IN });
   await nextStep(page);
   await expect(page.locator('[data-err="photos"]')).toBeVisible();
 });

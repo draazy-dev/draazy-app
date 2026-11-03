@@ -6,6 +6,10 @@ import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { liveListing, verifyOwnership } from '../../../helpers/referral.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -15,6 +19,7 @@ const uniqueTitle = (kind) => `Live ${kind} tier ${Date.now().toString(36)} in B
 
 async function publish(id) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, id, auth(accessToken));
   const response = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),
@@ -39,7 +44,7 @@ async function createRoom(token, society, propertyId) {
       ...(await withSocietyId(token, { society })),
       rentShare: 15000,
       deposit: 30000,
-      availableFrom: '2026-12-01',
+      availableFrom: MOVE_IN,
       lookingFor: 'any',
       foodPref: 'any',
       ...host,

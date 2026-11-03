@@ -5,6 +5,9 @@ import { signedInAsNew } from '../../../helpers/liveAuth.js';
 import { pickFloors, readListPropertyDraft } from '../../../helpers/listingForm.helper.js';
 import { fillSociety } from '../../../helpers/places.js';
 import { pickLocality } from '../../../helpers/locality.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const AVAILABLE_FROM = istInDays(59);
 
 async function gotoFlow(page) {
   const mobile = await signedInAsNew(page);
@@ -107,7 +110,7 @@ test('a fresh Details step: unselected deal and BHK, strength meter, StepNav and
   });
 
   await test.step('full strength needs optional enrichment and five photos, not documents', async () => {
-    const scores = await page.evaluate(async () => {
+    const scores = await page.evaluate(async (availableFrom) => {
       const { computeProgress } = await import('/src/pages/consumer/list-property/progress.js');
       const form = {
         deal: 'buy', propertyType: 'flat', bhk: '2', bathrooms: '2', balconies: '1',
@@ -116,14 +119,14 @@ test('a fresh Details step: unselected deal and BHK, strength meter, StepNav and
         locality: 'Baner', flatNumber: 'A-401', tower: 'A', societyId: 'soc-1',
         street: 'High Street', landmark: 'Near park', pincode: '411045', price: '9500000',
         monthlyMaintenance: '2500', ownership: 'freehold', construction: 'new',
-        availableFrom: '2027-01-01', reraId: 'P52100000001', description: 'A bright home with a quiet outlook and practical room layout for a family.',
+        availableFrom, reraId: 'P52100000001', description: 'A bright home with a quiet outlook and practical room layout for a family.',
         amenities: ['lift'],
       };
       return {
         fourPhotos: computeProgress({ form, photos: Array(4).fill('photo') }),
         full: computeProgress({ form, photos: Array(5).fill('photo') }),
       };
-    });
+    }, AVAILABLE_FROM);
     expect(scores.fourPhotos.pct).toBeLessThan(100);
     expect(scores.full.pct).toBe(100);
     expect(scores.full.nudge).toBeNull();

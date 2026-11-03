@@ -2,6 +2,10 @@ import { test, expect, ACTORS, STAFF } from '../../../fixtures/live.js';
 import { API, apiLogin, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const track = flatmateCleanup(test);
 const cardIds = (page) =>
@@ -84,8 +88,10 @@ async function splitFlat() {
   const room = split.json.rooms[0];
   created.roomId = room.id;
 
+  const staffHeaders = await authHeaders(STAFF.rental);
+  await tickDeskChecklist(API, room.id, staffHeaders);
   const published = await api('PATCH', `/admin/flatmates/${room.id}/moderation`,
-    await authHeaders(STAFF.rental), { modStatus: 'approved' });
+    staffHeaders, { modStatus: 'approved' });
   expect(published.status, published.text).toBe(200);
 
   return { mobile, listingId: listing.json.id, room };
@@ -222,7 +228,7 @@ test.describe('Flatmates discovery (live)', () => {
     const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Empty Tab' });
     const seeker = await api('POST', '/flatmates/posts', auth(accessToken), {
       gender: 'female', age: 26, occupation: 'Engineer', budget: 16000,
-      localities: [loc], moveIn: '2026-12-01', flatPref: 'any', roomPref: 'private', note: 'Zztest empty tab',
+      localities: [loc], moveIn: MOVE_IN, flatPref: 'any', roomPref: 'private', note: 'Zztest empty tab',
     });
     expect(seeker.status, seeker.text).toBe(201);
     track('posts', seeker.json.id, accessToken);

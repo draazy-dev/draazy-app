@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { signInSheet } from '../../../helpers/signInSheet.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const track = flatmateCleanup(test);
 
@@ -37,7 +40,7 @@ async function seedSmokeFreeMaleAuthor(viewerToken) {
   const res = await fetch(`${API}/flatmates/posts`, {
     method: 'POST',
     headers: auth(author.accessToken),
-    body: JSON.stringify({ gender: 'male', age: 27, occupation: 'Analyst', budget: 15000, localities: ['Baner'], moveIn: '2026-12-01', flatPref: 'men', roomPref: 'private', note: 'Alert card coverage' }),
+    body: JSON.stringify({ gender: 'male', age: 27, occupation: 'Analyst', budget: 15000, localities: ['Baner'], moveIn: MOVE_IN, flatPref: 'men', roomPref: 'private', note: 'Alert card coverage' }),
   });
   expect(res.status, 'seeding a seeker post').toBe(201);
   track('posts', (await res.json()).id, author.accessToken);

@@ -4,6 +4,7 @@ import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
 /* Accept is verified by reading `GET /me/flatmate-requests` from an independent API client, not by
    the optimistic UI flip — a handler that dropped the write would still hide the button. */
 
@@ -13,6 +14,7 @@ const track = flatmateCleanup(test);
 
 async function approve(id) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, id, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),

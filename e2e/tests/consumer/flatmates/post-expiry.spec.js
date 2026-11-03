@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const track = flatmateCleanup(test);
 
@@ -16,7 +19,7 @@ async function hostsPost(token, locality) {
       occupation: 'Engineer',
       budget: 18000,
       localities: [locality],
-      moveIn: '2026-12-01',
+      moveIn: MOVE_IN,
       flatPref: 'women',
       roomPref: 'private',
       note: 'Expiry coverage',

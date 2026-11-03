@@ -102,8 +102,8 @@ test('a rent flat shows the locality average rent only when the server has one, 
   await test.step('the locality average rent tile follows the server stats', async () => {
     const { avgRent } = await (await pageStats).json();
     if (avgRent != null) {
-      await expect(page.getByTestId('rent-locality-avg')).toBeVisible();
-      expect(txt).toContain('avg rent in wakad');
+      await page.getByRole('tab', { name: 'Rent Details' }).click();
+      await expect(page.getByTestId('rent-locality-avg')).toContainText(/avg rent in wakad/i);
     } else {
       expect(txt).not.toContain('avg rent in wakad');
     }

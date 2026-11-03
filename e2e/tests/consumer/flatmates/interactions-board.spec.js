@@ -5,6 +5,10 @@ import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { postAsSolo } from '../../../helpers/app.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const POST_BUTTON = /^Post(?: Property| property — Free)?$/;
@@ -15,6 +19,7 @@ const track = flatmateCleanup(test);
 let adminToken;
 async function approve(id) {
   adminToken ??= (await apiLogin(ACTORS.admin)).accessToken;
+  await tickDeskChecklist(API, id, auth(adminToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(adminToken),
@@ -64,7 +69,7 @@ async function seedPost(token, over = {}) {
       occupation: 'Software Engineer',
       budget: 16000,
       localities: ['Baner'],
-      moveIn: '2026-12-01',
+      moveIn: MOVE_IN,
       flatPref: 'women',
       roomPref: 'private',
       note: 'Looking for a place to stay',

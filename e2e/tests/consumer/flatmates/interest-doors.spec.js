@@ -6,6 +6,8 @@ import { trackErrors } from '../../../helpers/console.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -14,6 +16,7 @@ const track = flatmateCleanup(test);
  *  both are born `pending` — the public board the seeker reads cannot see them until this runs. */
 async function approve(id) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, id, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),
@@ -60,10 +63,10 @@ async function hostsGroup(token, title, { seats = 2, seatsOpen = 1 } = {}) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(token),
-    body: JSON.stringify({
+    body: JSON.stringify(huntingGroup({
       title, locality: 'Baner', rent: 30000, deposit: 50000, seats, seatsOpen,
-      policy: 'any', role: 'tenant',
-    }),
+      policy: 'any',
+    })),
   });
   const body = await res.text();
   expect(res.status, body).toBe(201);

@@ -3,6 +3,9 @@ import { API, apiLogin, signedInAs, signedInAsNew, shownMobile } from '../../../
 import { ACTORS } from '../../../fixtures/live.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { fillRoomDetails, fillRoomLocation, nextStep, uploadRoomPhotos } from '../../../helpers/roomWizard.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 // Derive assertions from real owner and tenant inventory so prefill cannot pass against fixture literals.
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
@@ -22,7 +25,7 @@ async function openPriceStep(page) {
   await expect(page.getByRole('heading', { name: 'Rent & terms', exact: true })).toBeVisible();
   await page.locator('input[data-err="rentShare"]').fill('13500');
   await page.locator('input[data-err="deposit"]').fill('27000');
-  await pickDate(page, '[data-err="availableFrom"]', '2026-12-01');
+  await pickDate(page, '[data-err="availableFrom"]', MOVE_IN);
   await page.getByRole('spinbutton', { name: 'Notice period (days)' }).fill('30');
   await page.getByRole('spinbutton', { name: 'Minimum stay (months)' }).fill('0');
 }

@@ -4,6 +4,8 @@ import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
@@ -16,6 +18,7 @@ async function newSeeker() {
 let adminToken;
 async function approve(id) {
   adminToken ??= (await apiLogin(ACTORS.admin)).accessToken;
+  await tickDeskChecklist(API, id, auth(adminToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(adminToken),
@@ -54,7 +57,7 @@ async function seedGroup(hostToken, over = {}) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(hostToken),
-    body: JSON.stringify({
+    body: JSON.stringify(huntingGroup({
       title: `Group ${Number(uniqueMobile()).toString(36)}`,
       locality: 'Baner',
       rent: 30000,
@@ -62,9 +65,8 @@ async function seedGroup(hostToken, over = {}) {
       seats: 3,
       seatsOpen: 2,
       policy: 'any',
-      role: 'tenant',
       ...over,
-    }),
+    })),
   });
   expect(res.status).toBe(201);
   const group = await res.json();
