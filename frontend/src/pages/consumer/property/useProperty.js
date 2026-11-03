@@ -286,6 +286,11 @@ export default function useProperty() {
     }
   };
 
+  const openReport = (e) => {
+    if (!isIn) { sendToSignIn('report', undefined, replay(e)); return; }
+    setReportOpen(true);
+  };
+
   const returnTo = location.state?.from || getLastSearch()?.search || `/listings?deal=${p.deal}&loc=${encodeURIComponent(p.locality)}`;
 
   const hasAmenities = !!(p.amenities && p.amenities.length);
@@ -308,7 +313,7 @@ export default function useProperty() {
 
   return {
     tr, p, active, setActive, ovOpen, setOvOpen, lightbox, setLightbox,
-    reportOpen, setReportOpen, contactOpen, setContactOpen,
+    reportOpen, setReportOpen, openReport, contactOpen, setContactOpen,
     visitOpen, setVisitOpen,
     closeContact: () => { setContactOpen(false); refreshContactGate({ maxAge: REVISIT_MAX_AGE }).catch(() => {}); },
     closeVisit: () => {

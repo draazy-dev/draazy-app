@@ -3,6 +3,7 @@ import Icon from './Icon.jsx';
 import { createReport } from '../services/reportService.js';
 import { LISTING_REPORT_REASONS } from '../lib/reportReasons.js';
 import useScrollLock from '../hooks/useScrollLock.js';
+import { useSignInGate } from '../lib/useSignInGate.js';
 
 export default function ReportModal({
   target,
@@ -17,6 +18,7 @@ export default function ReportModal({
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
   const [sending, setSending] = useState(false);
+  const sendToSignIn = useSignInGate();
 
   useScrollLock();
   useEffect(() => {
@@ -40,8 +42,9 @@ export default function ReportModal({
         details: details.trim(),
         url: window.location.href,
       });
-    } catch {
+    } catch (err) {
       setSending(false);
+      if (err?.status === 401) { onClose(); sendToSignIn('report'); return; }
       toast('Your report could not be sent. Please try again.', 'error');
       return;
     }

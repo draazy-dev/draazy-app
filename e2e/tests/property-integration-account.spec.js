@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { pickDate } from '../helpers/datePicker.helper.js';
 import { IGNORE as SHARED_IGNORE } from '../helpers/console.js';
-import { signedInAs, signedInAsNew, authHeaders, API } from '../helpers/liveAuth.js';
+import { signedInAs, signedInAsNew, authHeaders, API, uniqueMobile } from '../helpers/liveAuth.js';
+import { signInSheet, verifyInSheet } from '../helpers/signInSheet.js';
 
 // OWNER has four listings, including one non-public row, to distinguish /me/listings from public search.
 const OWNER = { mobile: '9470744469', name: 'Meera Deshpande', total: 4, publiclyVisible: 3 };
@@ -208,6 +209,26 @@ test.describe('LIVE: abuse reports against the real API', () => {
       errors.filter((e) => !IGNORE.test(e) && !expected.test(e)),
       `failed API calls: ${apiFails.filter((f) => !expected.test(f)).join(', ') || 'none'}`,
     ).toEqual([]);
+  });
+
+  test('a signed-out visitor is asked to sign in before reporting, and the report form opens once they do', async ({ page }) => {
+    await page.context().clearCookies();
+    const posts = [];
+    page.on('request', (r) => { if (/\/api\/reports$/.test(r.url()) && r.method() === 'POST') posts.push(r.url()); });
+    await page.goto('/listings');
+    const card = page.locator('a[href^="/property/"]').first();
+    await expect(card).toBeVisible({ timeout: 20000 });
+    await page.goto(await card.getAttribute('href'));
+
+    await page.getByRole('button', { name: /report/i }).first().click();
+    const sheet = signInSheet(page);
+    await expect(sheet).toBeVisible({ timeout: 10000 });
+    await expect(sheet.getByRole('heading', { name: 'Sign in to report' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /report this listing/i })).toHaveCount(0);
+
+    await verifyInSheet(page, uniqueMobile());
+    await expect(page.getByRole('dialog', { name: /report this listing/i })).toBeVisible({ timeout: 10000 });
+    expect(posts, 'nothing is filed until the reporter submits').toEqual([]);
   });
 
   test('a report reaches the ops queue, and a duplicate is refused', async ({ page }) => {

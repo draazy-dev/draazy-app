@@ -7,6 +7,7 @@ import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
 import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
 import { istInDays } from '../../../helpers/availability.js';
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 
 const MOVE_IN = istInDays(28);
 
@@ -153,6 +154,21 @@ test.describe('Flatmates board', () => {
       expect(after).toBe(before);
     });
   });
+  test('a signed-out visitor who reports a room is asked to sign in first, then lands in the report form', async ({ page }) => {
+    const host = await newSeeker();
+    const room = await seedRoom(host.accessToken);
+    await page.goto(`${BASE}/flatmates/room/${room.id}`);
+
+    const flag = page.getByRole('button', { name: 'Report this room' });
+    await flag.waitFor({ state: 'visible', timeout: 15000 });
+    await flag.click();
+    await expect(signInSheet(page).getByRole('heading', { name: 'Sign in to report' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('dialog', { name: /Report this post/i })).toHaveCount(0);
+
+    await verifyInSheet(page, uniqueMobile());
+    await expect(page.getByRole('dialog', { name: /Report this post/i })).toBeVisible({ timeout: 10000 });
+  });
+
   test('reporting a room from its detail page reaches the server, and the seeker is told so', async ({ page }) => {
     const host = await newSeeker();
     const room = await seedRoom(host.accessToken);

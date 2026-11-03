@@ -173,7 +173,11 @@ export default function FlatmateDetail() {
 
   const latest = useLatest({ onAsk });
 
-  const viewProps = { owned, onReport: setReportTarget, ownerPanel: owned && <OwnerPanel kind={kind} item={item} patch={patchItem} /> };
+  const openReport = (target) => {
+    if (!user) { sendToSignIn('report', undefined, () => setReportTarget(target)); return; }
+    setReportTarget(target);
+  };
+  const viewProps = { owned, onReport: openReport, ownerPanel: owned && <OwnerPanel kind={kind} item={item} patch={patchItem} /> };
 
   return (
     <div ref={rootRef} className="sf-page">

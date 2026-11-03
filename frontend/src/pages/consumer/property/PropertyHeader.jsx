@@ -17,7 +17,7 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
   const {
     tags, priceStr, isRent, isLand, tr, title, p,
     areaLabel, perUnitVal, showPerUnit, kind, furnishLabel, possessionLabel,
-    setReportOpen, isIn, toast, contactApproved, ownerMob, handleContact, handleSchedule, canChat,
+    openReport, isIn, toast, contactApproved, ownerMob, handleContact, handleSchedule, canChat,
     flagEnabled, contactStatus, myVisits,
   } = ctx;
   const deposit = Number(p.deposit) > 0 ? fmtINR(p.deposit) : '';
@@ -101,7 +101,7 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                     <span className="inline-flex items-center gap-2 text-xs text-slate-200 rounded-lg border border-white/10 bg-white/5 px-3 py-2"><Icon name="user-check" className="w-4 h-4 text-emerald-400" /> {tr('property.assuredVerified')}</span>
                     <span className="inline-flex items-center gap-2 text-xs text-slate-200 rounded-lg border border-white/10 bg-white/5 px-3 py-2"><Icon name="phone-off" className="w-4 h-4 text-gray-400" /> {tr('property.numberProtected')}</span>
 
-                    <button type="button" onClick={() => setReportOpen(true)} className="inline-flex items-center gap-2 min-h-[44px] text-xs text-slate-200 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-white/10 hover:border-amber-400/30 transition-smooth"><Icon name="flag" className="w-4 h-4 text-amber-400" /> {tr('property.reportReverify')}</button>
+                    <button type="button" onClick={openReport} className="inline-flex items-center gap-2 min-h-[44px] text-xs text-slate-200 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-white/10 hover:border-amber-400/30 transition-smooth"><Icon name="flag" className="w-4 h-4 text-amber-400" /> {tr('property.reportReverify')}</button>
                     <Link to="/how-verification-works" className="inline-flex items-center gap-2 min-h-[44px] text-xs text-slate-200 rounded-lg border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10 hover:border-emerald-400/30 transition-smooth"><Icon name="info" className="w-4 h-4 text-emerald-400" /> {tr('property.assuredHow')}</Link>
                   </div>
                 </MobileCollapse>

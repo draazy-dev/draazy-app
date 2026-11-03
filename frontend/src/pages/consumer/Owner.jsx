@@ -175,6 +175,11 @@ export default function Owner() {
       .finally(() => setPosting(false));
   };
 
+  const openReport = (e) => {
+    if (!isIn) { sendToSignIn('report', undefined, replay(e)); return; }
+    setReported(true);
+  };
+
   const messageOwner = (e) => {
     if (!isIn) { sendToSignIn('contact', undefined, replay(e)); return; }
     if (latestListing) {
@@ -201,7 +206,7 @@ export default function Owner() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="glass-card rounded-2xl p-6 -mt-16 relative">
-            <button onClick={() => setReported(true)} type="button" aria-label={t('owner.reportAria')} className="sm:hidden absolute top-4 right-4 w-9 h-9 rounded-xl border border-white/10 text-gray-400 flex items-center justify-center hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/30 transition-all"><Icon name="flag" className="w-4 h-4" /></button>
+            <button onClick={openReport} type="button" aria-label={t('owner.reportAria')} className="sm:hidden absolute top-4 right-4 w-9 h-9 rounded-xl border border-white/10 text-gray-400 flex items-center justify-center hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/30 transition-all"><Icon name="flag" className="w-4 h-4" /></button>
             <div className="flex flex-col sm:flex-row sm:items-end gap-5">
               <div className="w-28 h-28 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white text-4xl font-bold shadow-xl shadow-teal-500/25 -mt-16 sm:-mt-20 flex-shrink-0">{initials}</div>
               <div className="flex-1 min-w-0">
@@ -223,7 +228,7 @@ export default function Owner() {
                   <a href="#owner-listings" className="h-btn px-4 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5 flex items-center gap-2"><Icon name="lock-keyhole" className="w-4 h-4 text-teal-400" /> {t('owner.contactViaListing')}</a>
                 )}
                 <button onClick={messageOwner} type="button" className="btn-teal px-4 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center gap-2"><Icon name="send" className="w-4 h-4" /> {t('owner.message')}</button>
-                <button onClick={() => setReported(true)} type="button" className="h-btn px-4 rounded-xl border border-white/10 text-gray-400 text-sm font-medium hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/30 flex items-center gap-2 transition-all"><Icon name="flag" className="w-4 h-4" /> {t('owner.report')}</button>
+                <button onClick={openReport} type="button" className="h-btn px-4 rounded-xl border border-white/10 text-gray-400 text-sm font-medium hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/30 flex items-center gap-2 transition-all"><Icon name="flag" className="w-4 h-4" /> {t('owner.report')}</button>
               </div>
             </div>
             <div id="owner-header-stats" className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/10">

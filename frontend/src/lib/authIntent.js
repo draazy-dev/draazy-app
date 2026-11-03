@@ -1,7 +1,7 @@
 export const AUTH_REASONS = [
   'save', 'contact', 'alerts', 'schedule', 'checkout', 'services', 'invite',
   'saved', 'notifications', 'messages', 'community', 'society', 'listproperty', 'dashboard',
-  'review', 'offer', 'docs', 'photos', 'verify', 'default',
+  'review', 'offer', 'docs', 'photos', 'verify', 'report', 'default',
 ];
 
 // Map a `next` path to a reason key. Order matters (most specific first).

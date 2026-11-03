@@ -1,7 +1,8 @@
 /* The public owner profile against the live API. Most of this spec is about absence: the fields
  * that must not reach the wire, and the rows that must not reach the rail. */
 import { test, expect, ACTORS } from '../../fixtures/live.js';
-import { API, authHeaders } from '../../helpers/liveAuth.js';
+import { API, authHeaders, uniqueMobile } from '../../helpers/liveAuth.js';
+import { signInSheet, verifyInSheet } from '../../helpers/signInSheet.js';
 
 const OWNER_ID = '3ad0171b-3206-53e2-b6dc-732bf4e1b44c';
 
@@ -263,6 +264,16 @@ test('Verified properties is this owner\'s own share, not a constant', async ({ 
 
   await page.goto(`/owner/${UNVERIFIED_OWNER_ID}`);
   await expect(tileValue(page, 'Verified properties')).toHaveText(all);
+});
+
+test('a signed-out visitor who reports an owner is asked to sign in first, then lands in the report form', async ({ page }) => {
+  await page.goto(`/owner/${OWNER_ID}`);
+  await page.getByRole('button', { name: 'Report', exact: true }).click();
+  await expect(signInSheet(page).getByRole('heading', { name: 'Sign in to report' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Report this owner' })).toHaveCount(0);
+
+  await verifyInSheet(page, uniqueMobile());
+  await expect(page.getByRole('dialog', { name: 'Report this owner' })).toBeVisible();
 });
 
 test('reporting an owner files the report against that owner\'s user id', async ({ page, login }) => {
