@@ -83,20 +83,3 @@
   opacity: 1;
   transform: scale(1);
 }
-.furn-tile.furn-tile--text {
-  min-height: 52px;
-  padding: 8px 6px;
-  justify-content: center;
-  gap: 0;
-  font-size: 0.8125rem;
-  line-height: 1.2;
-  font-weight: 500;
-  color: rgb(var(--dz-c-gray-400));
-}
-
-.furn-tile--text.checked { color: rgb(var(--dz-c-teal-300)); }
-
-.furn-tile--text .furn-check {
-  top: -6px;
-  right: -6px;
-}

@@ -3,10 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { VIBE_FILTER_KEYS } from '../../../lib/flatmates/filterState.js';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import LivingStyleSheet from './livingStyle/LivingStyleSheet.jsx';
+import { VibeLabel } from './livingStyle/LivingStyleQuestions.jsx';
 import useLivingStyle from './livingStyle/useLivingStyle.js';
-import { MIN_COMMON } from './livingStyle/questions.js';
-
-const chipCx = (on) => 'seg w-full !h-auto min-h-11 px-1.5 py-1.5 rounded-xl text-xs font-semibold leading-tight text-center text-gray-300 box-border disabled:opacity-40' + (on ? ' active' : '');
+import { MIN_COMMON, VIBE_TRACK, vibeCellCx } from './livingStyle/questions.js';
 
 export default function VibeFilter({ vibe, onChange }) {
   const { t } = useTranslation();
@@ -40,13 +39,13 @@ export default function VibeFilter({ vibe, onChange }) {
         {VIBE_FILTER_KEYS.map((key) => (
           <div key={key} data-q={key} role="group" aria-label={t(`flatmates.ls.q_${key}`)}>
             <p className="mb-1.5 text-xs font-medium text-gray-400">{t(`flatmates.ls.q_${key}`)}</p>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className={VIBE_TRACK}>
               {[0, 1, 2].map((v) => {
                 const token = `${key}:${v}`;
                 const on = vibe.includes(token);
                 return (
-                  <button key={v} type="button" data-v={v} aria-pressed={on} disabled={!on && !answered(key)} onClick={() => toggle(token)} className={chipCx(on)}>
-                    {t(`flatmates.ls.a_${key}_${v}`)}
+                  <button key={v} type="button" data-v={v} aria-pressed={on} disabled={!on && !answered(key)} onClick={() => toggle(token)} className={vibeCellCx(on)}>
+                    <VibeLabel label={t(`flatmates.ls.a_${key}_${v}`)} />
                   </button>
                 );
               })}

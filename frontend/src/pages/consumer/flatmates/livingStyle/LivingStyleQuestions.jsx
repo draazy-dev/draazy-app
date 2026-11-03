@@ -1,9 +1,16 @@
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../../components/Icon.jsx';
-import '../../../../styles/components/furniture-tiles.css';
-import { STYLE_ICONS, STYLE_KEYS } from './questions.js';
+import { STYLE_ICONS, STYLE_KEYS, VIBE_TRACK, splitEmoji, vibeCellCx } from './questions.js';
 
-const glueEmoji = (label) => label.replace(/ (?=\p{Extended_Pictographic})/u, '\u00A0');
+export function VibeLabel({ label }) {
+  const { emoji, text } = splitEmoji(label);
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1">
+      {emoji && <span aria-hidden="true" className="shrink-0">{emoji}</span>}
+      <span>{text}</span>
+    </span>
+  );
+}
 
 export function LoadError({ onRetry }) {
   const { t } = useTranslation();
@@ -31,11 +38,10 @@ export default function LivingStyleQuestions({ answers, onChange, disabled = fal
             <Icon name={STYLE_ICONS[key]} className="w-4 h-4 text-teal-400 shrink-0" />
             {t(`flatmates.ls.q_${key}`)}
           </p>
-          <div className="mt-2 grid grid-cols-3 gap-2" role="group" aria-label={t(`flatmates.ls.q_${key}`)}>
+          <div className={'mt-2 ' + VIBE_TRACK} role="group" aria-label={t(`flatmates.ls.q_${key}`)}>
             {[0, 1, 2].map((v) => (
-              <button key={v} type="button" disabled={disabled} aria-pressed={answers[key] === v} data-v={v} onClick={() => pick(key, v)} className={'furn-tile furn-tile--text disabled:opacity-50' + (answers[key] === v ? ' checked' : '')}>
-                <span className="furn-check" aria-hidden="true"><Icon name="check" className="w-3 h-3" /></span>
-                {glueEmoji(t(`flatmates.ls.a_${key}_${v}`))}
+              <button key={v} type="button" disabled={disabled} aria-pressed={answers[key] === v} data-v={v} onClick={() => pick(key, v)} className={vibeCellCx(answers[key] === v)}>
+                <VibeLabel label={t(`flatmates.ls.a_${key}_${v}`)} />
               </button>
             ))}
           </div>

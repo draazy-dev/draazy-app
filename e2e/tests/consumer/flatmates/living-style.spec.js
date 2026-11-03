@@ -178,4 +178,41 @@ test.describe('LIVE: flatmates living style', () => {
     await page.getByTestId('ls-section-add').click();
     await expectFullSheet();
   });
+
+  test('on a narrow phone each vibe question is a three-cell bar, labels at most two lines and inside their cell', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.setViewportSize({ width: 360, height: 780 });
+    await signedInAs(page, uniqueMobile());
+    await openFlatmates(page);
+    await page.getByTestId('ls-open').click();
+    const questions = page.getByTestId('ls-sheet').getByTestId('ls-questions');
+    await expect(questions.locator('button[data-v]')).toHaveCount(36);
+
+    const rows = await questions.evaluate((ol) => {
+      const bounds = ol.getBoundingClientRect();
+      return [...ol.querySelectorAll('[role="group"]')].map((g) => [...g.querySelectorAll('button[data-v]')].map((b) => {
+        const r = b.getBoundingClientRect();
+        const label = b.firstElementChild.getBoundingClientRect();
+        return {
+          name: b.textContent, top: r.top, label: label.height,
+          lineHeight: parseFloat(getComputedStyle(b).lineHeight),
+          overflows: b.scrollHeight > b.clientHeight || b.scrollWidth > b.clientWidth || r.right > bounds.right + 0.5,
+        };
+      }));
+    });
+    for (const cells of rows) {
+      expect(new Set(cells.map((c) => Math.round(c.top))).size, `${cells[0].name}: one row of three`).toBe(1);
+      for (const c of cells) {
+        expect(c.label, `"${c.name}" wraps to at most two lines`).toBeLessThanOrEqual(c.lineHeight * 2 + 1);
+        expect(c.overflows, `"${c.name}" fits its cell and the sheet`).toBe(false);
+      }
+    }
+
+    const veg = questions.locator('[data-q="food"] button[data-v="0"]');
+    await expect(veg).toHaveText('🥦Veg only');
+    await expect(veg).toHaveAccessibleName('Veg only');
+    await veg.click();
+    await expect(veg).toHaveAttribute('aria-pressed', 'true');
+    expect(errors, `console errors: ${errors.join('\n')}`).toHaveLength(0);
+  });
 });
