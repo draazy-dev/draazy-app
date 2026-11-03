@@ -255,8 +255,7 @@ class DemandSignalTest extends AbstractApiTest {
         User visitor = new User("9820950005", "buyer");
         visitor.setMobileVerified(true);
         visitor = users.saveAndFlush(visitor);
-        Property listing = properties.saveAndFlush(
-                new Property(owner, "Viewed flat", "rent", "apartment", 25000L, "Kothrud", "Pune"));
+        Property listing = liveListing(owner, "Viewed flat");
         String view = "{\"kind\":\"view\",\"propertyId\":\"" + listing.getId() + "\"}";
 
         send(view);
@@ -269,6 +268,60 @@ class DemandSignalTest extends AbstractApiTest {
 
         assertThat(jdbc.queryForObject("select views from properties where id = ?", Integer.class, listing.getId()))
                 .isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("a viewer counts once a day, however often they reload; anonymous viewers are told apart by IP")
+    void aViewerCountsOncePerDay() throws Exception {
+        User owner = new User("9820950006", "owner");
+        owner.setMobileVerified(true);
+        owner = users.saveAndFlush(owner);
+        User visitor = new User("9820950007", "buyer");
+        visitor.setMobileVerified(true);
+        visitor = users.saveAndFlush(visitor);
+        Property listing = liveListing(owner, "Reloaded flat");
+        String view = "{\"kind\":\"view\",\"propertyId\":\"" + listing.getId() + "\"}";
+
+        for (int i = 0; i < 3; i++) {
+            mvc.perform(post("/demand-signals").header("Authorization", bearer(visitor))
+                            .contentType(MediaType.APPLICATION_JSON).content(view))
+                    .andExpect(status().isAccepted());
+            for (String ip : List.of("10.0.0.1", "10.0.0.2")) {
+                mvc.perform(post("/demand-signals").with(r -> { r.setRemoteAddr(ip); return r; })
+                                .contentType(MediaType.APPLICATION_JSON).content(view))
+                        .andExpect(status().isAccepted());
+            }
+        }
+        em.flush();
+
+        assertThat(jdbc.queryForObject("select views from properties where id = ?", Integer.class, listing.getId()))
+                .isEqualTo(3);
+        assertThat(jdbc.queryForObject("select count(*) from demand_signals where property_id = ?",
+                Integer.class, listing.getId()))
+                .as("demand stays raw; only the owner's counter is de-duplicated")
+                .isEqualTo(9);
+    }
+
+    @Test
+    @DisplayName("a listing that is not live gains no views")
+    void anOffMarketListingGainsNoViews() throws Exception {
+        User owner = new User("9820950008", "owner");
+        owner.setMobileVerified(true);
+        owner = users.saveAndFlush(owner);
+        Property listing = liveListing(owner, "Paused flat");
+        listing.pauseByOwner();
+        properties.saveAndFlush(listing);
+
+        send("{\"kind\":\"view\",\"propertyId\":\"" + listing.getId() + "\"}");
+
+        assertThat(jdbc.queryForObject("select views from properties where id = ?", Integer.class, listing.getId()))
+                .isZero();
+    }
+
+    private Property liveListing(User owner, String title) {
+        Property listing = new Property(owner, title, "rent", "apartment", 25000L, "Kothrud", "Pune");
+        listing.setStatus("approved");
+        return properties.saveAndFlush(listing);
     }
 
     private User admin() {

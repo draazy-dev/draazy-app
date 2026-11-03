@@ -1,6 +1,6 @@
 /** Assertions are deltas on one locality: other live specs append to `demand_signals`, so absolute counts race. */
 import { test, expect } from '@playwright/test';
-import { API, authHeaders } from '../helpers/liveAuth.js';
+import { API, authHeaders, uniqueMobile } from '../helpers/liveAuth.js';
 import { ACTORS } from '../fixtures/live.js';
 
 /** A slug no locality row will ever match, so this spec cannot collide with seeded demand. */
@@ -33,4 +33,28 @@ test('an anonymous search signal reaches the admin supply-gap report', async ({ 
   // No locality matches the slug, so the API leaves the name out rather than inventing one.
   expect(after.localityName ?? null).toBeNull();
   expect(after.supply).toBe(0);
+});
+
+async function liveListingViews(request, headers, id) {
+  const res = await request.get(`${API}/me/listings?size=20`, { headers });
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  const rows = Array.isArray(body) ? body : (body.content ?? []);
+  return id ? rows.find((r) => r.id === id) : rows.find((r) => r.status === 'approved' && !r.archived);
+}
+
+test('a viewer reloading a live listing counts once, and the owner never counts', async ({ request }) => {
+  const owner = await authHeaders(ACTORS.owner);
+  const listing = await liveListingViews(request, owner);
+  expect(listing, 'the anchor owner keeps a live listing').toBeTruthy();
+  const viewer = await authHeaders(uniqueMobile());
+  const view = { kind: 'view', propertyId: listing.id };
+
+  for (const headers of [viewer, viewer, viewer, owner]) {
+    const res = await request.post(`${API}/demand-signals`, { headers, data: view });
+    expect(res.status()).toBe(202);
+  }
+
+  const after = await liveListingViews(request, owner, listing.id);
+  expect(after.views).toBe(listing.views + 1);
 });

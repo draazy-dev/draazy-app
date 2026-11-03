@@ -34,8 +34,9 @@ class R2FileStorage implements FileStorage, DisposableBean {
 
     private static final Duration URL_TTL = Duration.ofMinutes(15);
 
-    private static final Duration ATTEMPT_TIMEOUT = Duration.ofSeconds(10);
-    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(20);
+    // Sized for a 12 MB upload over a slow server link; a stalled call still frees its thread.
+    private static final Duration ATTEMPT_TIMEOUT = Duration.ofSeconds(20);
+    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(45);
 
     private static final String PUBLIC_CACHE_CONTROL = "public, max-age=31536000, immutable";
 

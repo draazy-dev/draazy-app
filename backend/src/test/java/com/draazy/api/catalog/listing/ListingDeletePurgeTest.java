@@ -3,8 +3,11 @@ package com.draazy.api.catalog.listing;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.draazy.api.catalog.photo.ListingPhotoFiles;
+import com.draazy.api.catalog.photo.PhotoDeleteQueue;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
@@ -49,6 +53,7 @@ class ListingDeletePurgeTest extends AbstractApiTest {
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
     @Autowired ListingContentPurge purge;
+    @Autowired PhotoDeleteQueue deleteQueue;
     @MockitoSpyBean FileStorage storage;
 
     private final List<String> listingIds = new ArrayList<>();
@@ -62,6 +67,7 @@ class ListingDeletePurgeTest extends AbstractApiTest {
     void removeAuditRowsThatEscapedRollback() {
         jdbc.update("delete from audit_log where entity = 'property' and entity_id = any (?)",
                 (Object) listingIds.toArray(String[]::new));
+        jdbc.update("delete from photo_storage_deletes where url like ?", PREFIX + "%");
     }
 
     private User user(String mobile, String role) {
@@ -243,6 +249,56 @@ class ListingDeletePurgeTest extends AbstractApiTest {
         }
         mvc.perform(get("/messages/" + chat).header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                 .andExpect(jsonPath("$.listingDeleted").value(true));
+    }
+
+    @Test
+    @DisplayName("a photo whose storage delete fails is queued and the nightly retry deletes it")
+    void failedDeleteIsQueuedAndRetried() throws Exception {
+        User owner = user("9862000081", "owner");
+        String photo = listingPhoto(owner);
+        Property p = listing(owner, photo);
+        deleteAs(owner, p).andExpect(status().isOk());
+        jdbc.update("update properties set purge_after = now() - interval '1 minute' where id = ?", p.getId());
+        doThrow(new IllegalStateException("R2 timed out")).when(storage).deletePublic(key(photo));
+
+        purge.purgeDue(Instant.now());
+        commitSideEffects();
+
+        assertThat(jdbc.queryForObject("select last_error from photo_storage_deletes where url = ?",
+                String.class, photo)).isEqualTo("R2 timed out");
+
+        doCallRealMethod().when(storage).deletePublic(key(photo));
+        assertThat(deleteQueue.retryQueued()).isPositive();
+
+        assertThat(jdbc.queryForObject("select count(*) from photo_storage_deletes where url = ?",
+                Integer.class, photo)).isZero();
+        verify(storage, times(2)).deletePublic(key(photo));
+    }
+
+    @Test
+    @DisplayName("a purged listing still renders in chats, saved and offers, with no address or photos")
+    void purgedListingRendersEverywhere() throws Exception {
+        User owner = user("9862000091", "owner");
+        User seeker = user("9862000092", "buyer");
+        Property p = listing(owner, listingPhoto(owner));
+        String chat = jdbc.queryForObject("insert into conversations (user_a_id, user_b_id, property_id)"
+                + " values (least(?::uuid, ?::uuid), greatest(?::uuid, ?::uuid), ?) returning id::text", String.class,
+                owner.getId(), seeker.getId(), owner.getId(), seeker.getId(), p.getId());
+        jdbc.update("insert into saved_properties (user_id, property_id) values (?, ?)", seeker.getId(), p.getId());
+        jdbc.update("insert into offers (property_id, from_user_id, amount, status) values (?, ?, 27000, 'declined')",
+                p.getId(), seeker.getId());
+        deleteAs(owner, p).andExpect(status().isOk());
+        jdbc.update("update properties set purge_after = now() - interval '1 minute' where id = ?", p.getId());
+        purge.purgeDue(Instant.now());
+
+        for (String path : List.of("/messages", "/messages/" + chat, "/me/saved", "/offers/mine")) {
+            String body = mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(body).as(path).doesNotContain("Green Acres").doesNotContain("Sunny two-bedroom");
+        }
+        mvc.perform(get("/me/offers").header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk());
     }
 
     @Test

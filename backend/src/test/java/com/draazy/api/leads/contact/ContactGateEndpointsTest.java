@@ -252,6 +252,9 @@ class ContactGateEndpointsTest extends AbstractApiTest {
 
         assertThat(contactRequests.findByPropertyIdInOrderByCreatedAtDesc(List.of(p.getId()),
                 Pageable.unpaged())).hasSize(1);
+        assertThat(jdbc.queryForObject("select enquiries from properties where id = ?", Integer.class, p.getId()))
+                .as("the owner's enquiry counter moves with the row, not with each tap")
+                .isEqualTo(1);
     }
 
     @Test

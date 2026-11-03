@@ -52,6 +52,9 @@ class PhotoVariantBackfillTest {
         assertThat(backfill.run()).isEqualTo(1);
 
         assertThat(bucket.objects).containsKey(fine + ".w480.webp").doesNotContainKey(broken + ".w480.webp");
+        bucket.reads.clear();
+        assertThat(backfill.run()).isZero();
+        assertThat(bucket.reads).as("a broken original is not re-read every run").isEmpty();
     }
 
     @Test

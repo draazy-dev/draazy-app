@@ -3,6 +3,7 @@ package com.draazy.api.engagement.demand;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.CurrentUser;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +22,7 @@ public class DemandSignalController {
     @PostMapping(Routes.DemandSignals.BASE)
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void record(@Valid @RequestBody DemandSignalCreate body,
-                       @CurrentUser AuthPrincipal principal) {
-        service.record(body, principal);
+                       @CurrentUser AuthPrincipal principal, HttpServletRequest request) {
+        service.record(body, principal, request.getRemoteAddr());
     }
 }

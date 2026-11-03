@@ -15,6 +15,7 @@ import com.draazy.api.catalog.listing.ListingContentPurge;
 import com.draazy.api.catalog.listing.ListingDuplicateSweep;
 import com.draazy.api.catalog.managed.ManagedLeaseEnds;
 import com.draazy.api.catalog.managed.TrackedRentService;
+import com.draazy.api.catalog.photo.PhotoDeleteQueue;
 import com.draazy.api.catalog.photo.PhotoUploadSweep;
 import com.draazy.api.catalog.photo.PhotoVariantBackfill;
 import com.draazy.api.common.PlatformTime;
@@ -166,8 +167,13 @@ class JobCatalog {
     }
 
     @Bean
+    ScheduledJob photoDeleteRetryJob(PhotoDeleteQueue deletes) {
+        return new ScheduledJob("photo-delete-retry", NIGHTLY, deletes::retryQueued);
+    }
+
+    @Bean
     ScheduledJob photoWebpBackfillJob(PhotoVariantBackfill backfill) {
-        return new ScheduledJob("photo-webp-backfill", FREQUENT, backfill::run);
+        return new ScheduledJob("photo-webp-backfill", HOURLY, backfill::run);
     }
 
     @Bean

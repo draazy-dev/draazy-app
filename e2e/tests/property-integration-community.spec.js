@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { IGNORE as SHARED_IGNORE } from '../helpers/console.js';
 import { signedInAs, signedInAsNew, apiLogin, uniqueMobile, authHeaders, API } from '../helpers/liveAuth.js';
 import { roomBasics } from '../helpers/roomWizard.js';
+import { tickDeskChecklist } from '../helpers/flatmateDesk.js';
 import { paidPack } from '../helpers/refunds.js';
 
 // OWNER has four listings, including one non-public row, to distinguish /me/listings from public search.
@@ -38,11 +39,15 @@ const PROPERTY_REVIEW = {
 async function tokenFor(page, mobile) {
   await signedInAs(page, mobile);
   // "Remember me" determines the storage area, so both stores supply the token fixture.
-  const token = await page.evaluate(() => {
-    const raw = localStorage.getItem('draazyTokens') || sessionStorage.getItem('draazyTokens');
-    return JSON.parse(raw || 'null')?.accessToken;
-  });
-  expect(token, `no access token cached for ${mobile}`).toBeTruthy();
+  // Polled: switching users on one page can trigger a second boot navigation that destroys the evaluate context.
+  let token;
+  await expect.poll(async () => {
+    token = await page.evaluate(() => {
+      const raw = localStorage.getItem('draazyTokens') || sessionStorage.getItem('draazyTokens');
+      return JSON.parse(raw || 'null')?.accessToken;
+    }).catch(() => null);
+    return token;
+  }, { message: `no access token cached for ${mobile}` }).toBeTruthy();
   return token;
 }
 
@@ -365,8 +370,10 @@ test.describe('LIVE: the flatmates board against the real API', () => {
       `a brand-new room is public before anyone reviewed it — D72 says it must not be (id ${created.id})`,
     ).toBeNull();
 
+    const staff = await authHeaders(ADMIN.mobile);
+    await tickDeskChecklist(API, created.id, staff);
     const decided = await request.patch(`/api/admin/flatmates/${created.id}/moderation`, {
-      headers: await authHeaders(ADMIN.mobile),
+      headers: staff,
       data: { modStatus: 'approved', note: 'e2e fixture' },
     });
     expect(decided.status(), `PATCH moderation: ${await decided.text()}`).toBe(200);

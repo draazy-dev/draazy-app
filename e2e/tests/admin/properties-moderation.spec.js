@@ -66,6 +66,26 @@ test('approving puts it on the public site; rejecting takes it off again', async
   expect(await ownerView(id, headers)).toBe(200);
 });
 
+test('the owner is told of an approval and a rejection by listing name, with the note apart from the resubmit line', async ({ request }) => {
+  const { id, headers } = await freshListing('Owner is told');
+  const notice = async (type) => {
+    const res = await fetch(`${API}/notifications?size=50`, { headers });
+    expect(res.status).toBe(200);
+    return (await res.json()).content.find((n) => n.type === type);
+  };
+
+  expect((await approveListing(request, id, await admin())).status()).toBe(200);
+  const approved = await notice('listing.approved');
+  expect(approved?.body).toContain('"Owner is told" in Baner');
+  expect(approved.link).toBe(`/property/${id}`);
+
+  expect((await rejectListing(request, id, await admin(), { reasonCode: 'wrong_details', reason: 'Rent is wrong' })).status()).toBe(200);
+  const rejected = await notice('listing.rejected');
+  expect(rejected?.body).toContain('"Owner is told" in Baner');
+  expect(rejected.body).toContain('Rent is wrong\nEdit the listing and resubmit it for review.');
+  expect(rejected.link).toBe(`/dashboard?review=${id}`);
+});
+
 test('the status route refuses the two decisions that belong to other routes', async ({ request }) => {
   const { id } = await freshListing('Refused transitions');
 

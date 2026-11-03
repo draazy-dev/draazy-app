@@ -184,8 +184,22 @@ public interface PropertyRepository
     int setFeaturedDays(@Param("id") UUID id, @Param("days") Integer days);
 
     @Modifying
-    @Query("update Property p set p.views = p.views + 1 where p.id = :id and (:viewerId is null or p.owner.id <> :viewerId)")
-    int countView(@Param("id") UUID id, @Param("viewerId") UUID viewerId);
+    @Query(value = """
+            with seen as (
+                insert into property_view_days (property_id, day, viewer_key)
+                select p.id, cast(now() at time zone 'Asia/Kolkata' as date), :viewerKey
+                  from properties p join users o on o.id = p.owner_id
+                 where p.id = :id and p.status = 'approved' and not p.archived and o.status <> 'suspended'
+                   and (cast(:viewerId as uuid) is null or p.owner_id <> cast(:viewerId as uuid))
+                on conflict do nothing
+                returning property_id)
+            update properties set views = views + 1 where id in (select property_id from seen)""",
+            nativeQuery = true)
+    int countView(@Param("id") UUID id, @Param("viewerId") UUID viewerId, @Param("viewerKey") String viewerKey);
+
+    @Modifying
+    @Query(value = "update properties set enquiries = enquiries + 1 where id = :id", nativeQuery = true)
+    int countEnquiry(@Param("id") UUID id);
 
     @Query("""
             select p from Property p

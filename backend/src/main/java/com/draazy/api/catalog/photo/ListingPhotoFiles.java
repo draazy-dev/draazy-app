@@ -4,21 +4,17 @@ import com.draazy.api.catalog.property.PropertyRepository;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Component
 public class ListingPhotoFiles {
-    private static final Logger log = LoggerFactory.getLogger(ListingPhotoFiles.class);
-
-    private final PhotoService photos;
+    private final PhotoDeleteQueue deletes;
     private final PropertyRepository properties;
 
-    ListingPhotoFiles(PhotoService photos, PropertyRepository properties) {
-        this.photos = photos;
+    ListingPhotoFiles(PhotoDeleteQueue deletes, PropertyRepository properties) {
+        this.deletes = deletes;
         this.properties = properties;
     }
 
@@ -35,13 +31,7 @@ public class ListingPhotoFiles {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                for (String url : unused) {
-                    try {
-                        photos.delete(url);
-                    } catch (RuntimeException e) {
-                        log.warn("Photo {} is no longer shown but its file was not deleted: {}", url, e.toString());
-                    }
-                }
+                unused.forEach(deletes::deleteOrQueue);
             }
         });
     }

@@ -102,6 +102,7 @@ public class ContactService {
         if (existing.isEmpty()) {
             requireRoomForAnotherRequest(viewerId, property.getId(), now);
             contactRequests.saveAndFlush(new ContactRequest(property.getId(), viewerId, body.message()));
+            properties.countEnquiry(property.getId());
             announceToOwner(owner, viewerId, property);
         } else if (isWithdrawn(existing.get()) || window.lapsed(existing.get().getStatus(), existing.get().getCreatedAt(), now)) {
             if (isWithdrawn(existing.get()) && WithdrawnCooldown.active(existing.get().getUpdatedAt(), now)) {
