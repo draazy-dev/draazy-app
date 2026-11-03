@@ -9,7 +9,11 @@
 
 - [ ] Flaky under full-run load, green on rerun (2026-11-03): `flatmates/owner-notice.spec.js:44` (locality menu left outside the viewport after the page scrolled to the footer), `services/rent-agreement-view-filed.spec.js:207` (one checkout 409 right after the docs upload), `services/rent-agreement.spec.js:201`, `rent-agreement-validation.spec.js:376/542`, the locality picker stuck on "Searching…" (`list-property/photo-ux.spec.js:98`, `managed-properties.spec.js:84`), `flatmates/group-join-vetting.spec.js:44` (host missed the seeker's SSE reply for 15s), `flatmates/interest-doors.spec.js:227` (`goto` ERR_ABORTED), `upload-policy.spec.js:72` (Vite reload mid-`evaluate`).
 
+- [ ] LOG-RETENTION (committed 2026-11-03): PENDING AGENT REVIEW (reviewed by hand, no reviewer agents on this Mac); `e2e\run-fast.ps1 -Full` not run (no pwsh). Backend suites green; no e2e spec reaches a nightly job.
+
 ## Open: follow-ups on shipped work
+
+- [ ] Owner (DigitalOcean): sandbox dev DB was opened to all IPs on 2026-11-03 for pgAdmin; re-tick Apps ▸ draazy-api-sandbox ▸ Settings ▸ db ▸ Trusted Sources ▸ "Add app as a trusted source" when done.
 
 - [ ] Owner (GitHub settings, needs admin): enable Dependabot alerts, secret scanning and push protection.
 - [ ] Owner (Google Cloud): restrict the Maps browser key by HTTP referrer and to the APIs in use; an old copy sits in git history (`frontend/dist-perf`).

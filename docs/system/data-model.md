@@ -517,13 +517,15 @@ Only critical or high-value activity is written, and rows are kept 365 days.
 
 ## Log table retention
 
-Log-shaped tables are purged nightly by the job runner; the `error_event` and `audit_log` sweeps delete in 5,000-row batches.
+Log-shaped tables are purged nightly by the job runner; the `error_event`, `audit_log`, `otp_codes` and `outbound_message` sweeps delete in 5,000-row batches.
 
 | Table | Kept | Sweep |
 |---|---|---|
 | `provider_call` | 30 days | `ProviderCalls.purgeExpired` |
 | `page_views` | 30 days (daily rollups are kept forever; the rollup only recomputes the last two days) | `PageViewRetention` |
 | `error_event` | 30 days since `first_seen` | `ErrorEventRetention` |
+| `otp_codes` | 7 days (outlives the 1-day OTP send budget that counts these rows) | `OtpRetention` |
+| `outbound_message` | 180 days since `prepared_at`; older outreach drops out of the moderation "contacted N times" count | `OutboundMessageRetention` |
 | `audit_log` | 365 days (CERT-In 180 days, DPDP Rule 6 one year); rows code reads as state are kept: `property.status`, `property.verification.decision`, `service-request.party-declined`, `serviceRequest.amountMismatch` | `AuditLogRetention` |
 
 ## Identity root notes (`users`)

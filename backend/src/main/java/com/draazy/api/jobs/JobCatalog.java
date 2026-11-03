@@ -26,11 +26,13 @@ import com.draazy.api.documents.agreement.RentAgreementRenewalSweeper;
 import com.draazy.api.engagement.flatmate.FlatmateExpiryService;
 import com.draazy.api.engagement.flatmate.FlatmateOwnerNoticeService;
 import com.draazy.api.engagement.flatmate.FlatmateTrustReconciler;
+import com.draazy.api.engagement.messaging.OutboundMessageRetention;
 import com.draazy.api.engagement.notification.NotificationRetention;
 import com.draazy.api.engagement.notification.WaitingDigestService;
 import com.draazy.api.engagement.pageview.PageViewRetention;
 import com.draazy.api.engagement.pageview.PageViewRollup;
 import com.draazy.api.engagement.search.SavedSearchService;
+import com.draazy.api.identity.auth.OtpRetention;
 import com.draazy.api.identity.auth.RefreshTokenService;
 import com.draazy.api.identity.verification.IdentityConflictService;
 import com.draazy.api.identity.verification.IdentityFilePurgeService;
@@ -154,6 +156,16 @@ class JobCatalog {
     @Bean
     ScheduledJob providerCallRetentionJob(ProviderCalls calls) {
         return new ScheduledJob("provider-call-retention", NIGHTLY, calls::purgeExpired);
+    }
+
+    @Bean
+    ScheduledJob otpRetentionJob(OtpRetention retention) {
+        return new ScheduledJob("otp-retention", NIGHTLY, retention::purgeNow);
+    }
+
+    @Bean
+    ScheduledJob outboundMessageRetentionJob(OutboundMessageRetention retention) {
+        return new ScheduledJob("outbound-message-retention", NIGHTLY, retention::purgeNow);
     }
 
     @Bean
