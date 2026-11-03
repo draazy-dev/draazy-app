@@ -111,6 +111,9 @@ services:
       - key: ZEPTOMAIL_API_KEY
         type: SECRET
         value: "${ZEPTOMAIL_API_KEY}"
+      - key: ZEPTOMAIL_WEBHOOK_KEY
+        type: SECRET
+        value: "${ZEPTOMAIL_WEBHOOK_KEY}"
       - key: WHATSAPP_ENABLED
         value: "true"
       - key: WHATSAPP_PHONE_NUMBER_ID

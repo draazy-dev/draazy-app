@@ -18,7 +18,7 @@ public class MaintenanceModeFilter extends OncePerRequestFilter {
     private static final Set<String> MUTATING = WriteRateLimitFilter.MUTATING;
 
     private static final Set<String> PROVIDER_CALLBACKS =
-            Set.of(Routes.Webhooks.CASHFREE_PAYMENT, Routes.Webhooks.WHATSAPP);
+            Set.of(Routes.Webhooks.CASHFREE_PAYMENT, Routes.Webhooks.WHATSAPP, Routes.Webhooks.ZEPTOMAIL);
 
     private static final String AUTH_PREFIX = "/auth/";
 

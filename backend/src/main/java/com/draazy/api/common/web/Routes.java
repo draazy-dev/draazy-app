@@ -569,6 +569,14 @@ public final class Routes {
         public static final String MY_GROUP_APPLICATIONS = "/me/group-applications";
 
         public static final String MY_GROUP_APPLICATION_BY_ID = MY_GROUP_APPLICATIONS + "/{id}";
+
+        public static final String MY_REVIEWS = "/me/flatmate-reviews";
+
+        public static final String CASE = "/flatmates/{kind}/{id}/verification";
+
+        public static final String CASE_MESSAGES = CASE + "/messages";
+
+        public static final String CASE_READ = CASE + "/read";
     }
 
     public static final class Reviews {
@@ -887,6 +895,8 @@ public final class Routes {
 
         public static final String FLATMATE_MODERATION = "/admin/flatmates/{id}/moderation";
 
+        public static final String FLATMATE_MODERATION_CHECKLIST = FLATMATE_MODERATION + "/checklist";
+
         public static final String FLATMATE_MODERATION_QUEUE = "/admin/flatmates/moderation";
 
         public static final String FLATMATE_MODERATION_SUMMARY = FLATMATE_MODERATION_QUEUE + "/summary";
@@ -1100,5 +1110,7 @@ public final class Routes {
         public static final String CASHFREE_PAYMENT = "/webhooks/cashfree/payment";
 
         public static final String WHATSAPP = "/webhooks/whatsapp";
+
+        public static final String ZEPTOMAIL = "/webhooks/zeptomail";
     }
 }

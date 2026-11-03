@@ -73,7 +73,8 @@ class AuthorizationCoverageTest extends AbstractApiTest {
             "POST /client-errors",
             "POST /help/feedback",
             "POST /webhooks/cashfree/payment",
-            "GET /webhooks/whatsapp", "POST /webhooks/whatsapp");
+            "GET /webhooks/whatsapp", "POST /webhooks/whatsapp",
+            "POST /webhooks/zeptomail");
 
     @Autowired
     @Qualifier("requestMappingHandlerMapping")

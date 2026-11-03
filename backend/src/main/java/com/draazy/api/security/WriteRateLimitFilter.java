@@ -33,7 +33,7 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
             "/me/data-export");
 
     private static final Set<String> PROVIDER_CALLBACKS =
-            Set.of(Routes.Webhooks.CASHFREE_PAYMENT, Routes.Webhooks.WHATSAPP);
+            Set.of(Routes.Webhooks.CASHFREE_PAYMENT, Routes.Webhooks.WHATSAPP, Routes.Webhooks.ZEPTOMAIL);
 
     private static final int CALLBACK_BUDGET_MULTIPLIER = 50;
 
