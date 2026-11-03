@@ -4,6 +4,7 @@ import com.draazy.api.catalog.managed.ManagedAgreementHomes;
 import com.draazy.api.catalog.managed.ManagedProperty;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.persistence.Savepoints;
 import com.draazy.api.documents.vault.DocumentRepository;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -79,7 +80,12 @@ class RentAgreementHomes {
             return;
         }
         if (homeId != null) {
-            homes.announce(homeId);
+            try {
+                UUID announced = homeId;
+                Savepoints.isolated(dataSource, () -> homes.announce(announced));
+            } catch (RuntimeException e) {
+                log.warn("Could not announce the managed home for rent agreement {}", request.getId(), e);
+            }
         }
     }
 

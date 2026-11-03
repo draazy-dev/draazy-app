@@ -1,6 +1,7 @@
 package com.draazy.api.catalog.managed;
 
 import com.draazy.api.common.PlatformTime;
+import com.draazy.api.common.persistence.Savepoints;
 import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.identity.user.User;
@@ -12,12 +13,16 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ManagedLeaseEnds {
+    private static final Logger log = LoggerFactory.getLogger(ManagedLeaseEnds.class);
     static final int REMIND_DAYS_AHEAD = 60;
     static final String TYPE = "lease.ending";
 
@@ -34,24 +39,36 @@ public class ManagedLeaseEnds {
     private final Notifier notifier;
     private final PlatformSettings settings;
     private final JdbcTemplate jdbc;
+    private final DataSource dataSource;
 
     public ManagedLeaseEnds(ManagedPropertyRepository records, UserRepository users, Notifier notifier,
-            PlatformSettings settings, JdbcTemplate jdbc) {
+            PlatformSettings settings, JdbcTemplate jdbc, DataSource dataSource) {
         this.records = records;
         this.users = users;
         this.notifier = notifier;
         this.settings = settings;
         this.jdbc = jdbc;
+        this.dataSource = dataSource;
     }
 
     @Transactional
     public int remindEnding(Instant now) {
         LocalDate today = now.atZone(PlatformTime.IST).toLocalDate();
         List<UUID> due = jdbc.queryForList(DUE, UUID.class, today, today.plusDays(REMIND_DAYS_AHEAD));
-        records.findAllById(due).forEach(this::remind);
-        due.forEach(id -> jdbc.update("update managed_properties set renewal_reminded_at = ? where id = ?",
-                Timestamp.from(now), id));
-        return due.size();
+        int reminded = 0;
+        for (ManagedProperty m : records.findAllById(due)) {
+            try {
+                Savepoints.isolated(dataSource, () -> {
+                    remind(m);
+                    jdbc.update("update managed_properties set renewal_reminded_at = ? where id = ?",
+                            Timestamp.from(now), m.getId());
+                });
+                reminded++;
+            } catch (RuntimeException e) {
+                log.warn("Could not send the lease-end reminder for managed home {}", m.getId(), e);
+            }
+        }
+        return reminded;
     }
 
     private void remind(ManagedProperty m) {

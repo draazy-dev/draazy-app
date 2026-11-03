@@ -237,19 +237,22 @@ export function useRentAgreement() {
   };
 
   const tenantFillsLater = (r) => invitedRole(r.details?._state) === 'tenant';
-  const payable = ownRequests.find((r) => r.status === 'awaiting_payment' && Number(r.amount) > 0
-    && invitedRole(r.details?._state) !== 'owner'
-    && (tenantFillsLater(r) || (r.id !== stalledInvite?.requestId && !(r.parties || []).some((p) => p.status === 'invited'))))
-    || activeRequests.find((r) => r.myPartyId && r.payableByMe) || null;
+  const payables = [
+    ...ownRequests.filter((r) => r.status === 'awaiting_payment' && Number(r.amount) > 0
+      && invitedRole(r.details?._state) !== 'owner'
+      && (tenantFillsLater(r) || (r.id !== stalledInvite?.requestId && !(r.parties || []).some((p) => p.status === 'invited')))),
+    ...activeRequests.filter((r) => r.myPartyId && r.payableByMe),
+  ];
+  const payable = payables[0] || null;
   const [paying, setPaying] = useState(false);
   const payingRef = useRef(false);
-  const payFiled = async () => {
-    if (payingRef.current || !payable) return;
+  const payFiled = async (request = payable) => {
+    if (payingRef.current || !request) return;
     payingRef.current = true;
     setPaying(true);
     try {
-      const checkout = await openServiceRequestCheckout(payable.id, DECLARATION_VERSION);
-      const status = await payAndConfirm(checkout, referralCredit && !payable.myPartyId ? null : Number(payable.amount) || null);
+      const checkout = await openServiceRequestCheckout(request.id, DECLARATION_VERSION);
+      const status = await payAndConfirm(checkout, referralCredit && !request.myPartyId ? null : Number(request.amount) || null);
       if (mountedRef.current && status === 'cancelled') toast(tr('services.ra.checkoutFailed'), 'error');
       else if (mountedRef.current && status && status !== 'awaiting_payment') toast(tr('services.ra.pay.paid'), 'success');
     } catch (err) {
@@ -1153,7 +1156,7 @@ export function useRentAgreement() {
     declare, setDeclare, generate, submitting, pendingRequestId, paymentPending, paymentConfirming,
     clearErr, fc, cost, locked, joinedOnly, gated, startNewAgreement, restored, startFresh, myInvites,
     identityReminders,
-    stalledInvite, recoverInvite, recovering, payable, payFiled, paying, continuable, continueFiled, coFilledRole, maskedIds: stillHeld(maskedIds, { owner, coOwners, tenants }),
+    stalledInvite, recoverInvite, recovering, payable, payables, payFiled, paying, continuable, continueFiled, coFilledRole, maskedIds: stillHeld(maskedIds, { owner, coOwners, tenants }),
     continuableHeld: heldCoFill(continuable),
     requestCancelled,
     viewOnly, viewedRequest, viewSubmitted, canView, editSubmitted, discardEdits, closeFiled, editingSubmitted, holdingUnpaid,

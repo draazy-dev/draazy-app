@@ -24,12 +24,12 @@ export default function DocsRequired() {
     <section id="ra-docs" className="scroll-mt-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
       <h2 className="text-xl sm:text-2xl font-bold text-white">{t('services.ra.docs.title')}</h2>
       <p className="text-gray-400 text-sm mt-1 mb-4 sm:mb-6">{t('services.ra.docs.subtitle')}</p>
-      <div role="tablist" aria-label={t('services.ra.docs.title')} onKeyDown={onKeyDown} className="md:hidden grid grid-cols-3 gap-1 p-1 mb-3 rounded-xl bg-white/[0.03] border border-white/10">
+      <div role="tablist" aria-label={t('services.ra.docs.title')} className="md:hidden grid grid-cols-3 gap-1 p-1 mb-3 rounded-xl bg-white/[0.03] border border-white/10">
         {GROUPS.map((g, i) => (
           <button
             key={g.key} ref={(el) => { tabs.current[i] = el; }} type="button" role="tab"
             id={`ra-docs-tab-${g.key}`} aria-controls={`ra-docs-panel-${g.key}`} aria-selected={i === active} tabIndex={i === active ? 0 : -1}
-            onClick={() => setActive(i)}
+            onClick={() => setActive(i)} onKeyDown={onKeyDown}
             className={'min-h-[44px] rounded-lg text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 select-none transition-colors ' + (i === active ? 'bg-teal-400/15 text-teal-400 ring-1 ring-inset ring-teal-400/40' : 'text-gray-400')}
           >
             {t(`services.ra.docs.tab.${g.key}`)}

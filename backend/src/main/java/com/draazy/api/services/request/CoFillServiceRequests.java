@@ -189,6 +189,9 @@ public class CoFillServiceRequests {
         } catch (RuntimeException inFlight) {
             throw new ConflictException("The other side is paying for this agreement right now. Check again in a few minutes.");
         }
+        if (gateway.paid(orderId)) {
+            throw new ConflictException("This agreement has already been paid for. It will show as paid in a few minutes.");
+        }
         transactions.executeWithoutResult(tx -> {
             ServiceRequest request = checkoutable(caller, id);
             if (orderId.equals(request.getPaymentRef())) {

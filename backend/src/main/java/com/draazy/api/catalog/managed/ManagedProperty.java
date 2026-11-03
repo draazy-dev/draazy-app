@@ -12,11 +12,14 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+// ManagedAgreementHomes writes the lease columns over JDBC; a full-row update would clobber them.
 @Entity
 @Table(name = "managed_properties")
+@DynamicUpdate
 @Getter
 public class ManagedProperty extends AuditedEntity {
     public static final String VISIBILITY_PRIVATE = "private";

@@ -1,7 +1,9 @@
 package com.draazy.api.catalog.managed;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -13,6 +15,10 @@ public class ManagedPropertyMapper {
     }
 
     public ManagedPropertyDto toDto(ManagedProperty m) {
+        return toDto(m, claims.pending(m));
+    }
+
+    private ManagedPropertyDto toDto(ManagedProperty m, List<String> pendingClaims) {
         return new ManagedPropertyDto(
                 m.getId().toString(),
                 m.getTitle(),
@@ -38,7 +44,7 @@ public class ManagedPropertyMapper {
                 m.getLandlordPan(),
                 policeIntimation(m),
                 m.getPoliceIntimatedOn(),
-                claims.pending(m),
+                pendingClaims,
                 m.getValuation(),
                 Objects.toString(m.getPublishedListingId(), null),
                 Objects.toString(m.getSourceRoomId(), null),
@@ -54,7 +60,8 @@ public class ManagedPropertyMapper {
     }
 
     public List<ManagedPropertyDto> toDtos(List<ManagedProperty> records) {
-        return records.stream().map(this::toDto).toList();
+        Map<UUID, List<String>> pending = claims.pending(records);
+        return records.stream().map(m -> toDto(m, pending.getOrDefault(m.getId(), List.of()))).toList();
     }
 
     public ManagedRentReceiptDto toDto(ManagedRentReceipt r) {

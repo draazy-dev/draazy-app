@@ -104,6 +104,24 @@ public class ManagedPropertyService {
         return mapper.toDto(saved);
     }
 
+    // A rental closed on a listing published from this record starts tracking that tenant's rent.
+    // Not @Transactional: the deal close isolates it in a savepoint, and a throwing proxy would doom that transaction.
+    public void fillFromClosedRental(UUID ownerId, UUID listingId, User tenant, long monthlyRent) {
+        String name = trimmed(tenant.getName());
+        if (name == null || name.isEmpty() || monthlyRent <= 0 || monthlyRent > ManagedProperty.MAX_MONTHLY_RENT) {
+            return;
+        }
+        records.findByPublishedListingId(listingId)
+                .filter(m -> m.getOwnerId().equals(ownerId))
+                .ifPresent(m -> {
+                    m.setRented(true);
+                    m.setTenantName(name);
+                    boolean named = m.setTenantMobile(MobileMask.normalise(tenant.getMobile()));
+                    m.setMonthlyRent(monthlyRent);
+                    announced(records.saveAndFlush(m), named);
+                });
+    }
+
     private UUID adopt(UUID ownerId, String listingId) {
         Property listing = Ids.parseUuid(listingId)
                 .flatMap(properties::findById)

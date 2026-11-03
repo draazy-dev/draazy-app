@@ -148,11 +148,10 @@ public class TrackedRentService {
             String rent = Notifier.rupees(m.getMonthlyRent());
             String tenantName = m.getTenantName() == null ? "Your tenant" : m.getTenantName();
             String ownerLink = "/owner-hub/property/" + m.getId();
-            Optional<UUID> tenant = tenantOf(m);
             LocalDate headsUp = today.plusDays(HEADS_UP_DAYS);
             LocalDate overdue = today.minusDays(OVERDUE_DAYS);
             if (unpaidDueOn(m, headsUp)) {
-                tenant.ifPresent(id -> notifier.notify(id, DUE, "Rent due on " + DAY.format(headsUp),
+                tenantOf(m).ifPresent(id -> notifier.notify(id, DUE, "Rent due on " + DAY.format(headsUp),
                         rent + " for " + m.getTitle() + ".", TENANT_LINK));
             } else if (unpaidDueOn(m, today)) {
                 notifier.notify(m.getOwnerId(), DUE, "Rent due today from " + tenantName,
@@ -161,7 +160,7 @@ public class TrackedRentService {
                 String title = "Rent overdue since " + DAY.format(overdue);
                 notifier.notify(m.getOwnerId(), OVERDUE, title,
                         tenantName + " hasn't paid " + rent + " for " + m.getTitle() + " yet.", ownerLink);
-                tenant.ifPresent(id -> notifier.notify(id, OVERDUE, title,
+                tenantOf(m).ifPresent(id -> notifier.notify(id, OVERDUE, title,
                         rent + " for " + m.getTitle() + " is still unpaid.", TENANT_LINK));
             } else {
                 continue;

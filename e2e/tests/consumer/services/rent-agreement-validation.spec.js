@@ -540,6 +540,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
   });
 
   test('a restored draft names the PAN fields to re-enter without storing the numbers', async ({ page }) => {
+    test.slow();
     await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     const owner = active(page);

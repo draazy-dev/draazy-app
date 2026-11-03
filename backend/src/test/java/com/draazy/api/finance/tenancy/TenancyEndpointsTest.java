@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.managed.ManagedProperty;
+import com.draazy.api.catalog.managed.ManagedPropertyRepository;
 import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -42,6 +44,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
     @Autowired TenancyRepository tenancies;
     @Autowired PropertyExperienceService experience;
     @Autowired NotificationRepository notifications;
+    @Autowired ManagedPropertyRepository managedHomes;
     @Autowired @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping handlerMapping;
 
     private User user(String mobile, String role) {
@@ -104,6 +107,27 @@ class TenancyEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(user("9822200011", "buyer"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void closingARentDeal_onAManagedHome_fillsItsTenantAndRent() throws Exception {
+        User owner = user("9822200091", "owner");
+        User tenant = user("9822200092", "buyer");
+        Property p = rentListing(owner);
+        ManagedProperty home = new ManagedProperty(owner.getId(), "Managed let", "rent", "apartment",
+                new BigDecimal("2"), 25000L, "Baner", "baner", null, new BigDecimal("950"), "sqft", null);
+        home.markPublished(p.getId());
+        managedHomes.saveAndFlush(home);
+
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+
+        em.clear();
+        ManagedProperty filled = managedHomes.findById(home.getId()).orElseThrow();
+        assertThat(filled.isRented()).isTrue();
+        assertThat(filled.getTenantName()).isEqualTo(tenant.getName());
+        assertThat(filled.getTenantMobile()).isEqualTo(tenant.getMobile());
+        assertThat(filled.getMonthlyRent()).isEqualTo(28000L);
+        assertThat(filled.getTenantSince()).isNotNull();
     }
 
     @Test

@@ -19,14 +19,17 @@ async function invitesFor(token) {
   return Array.isArray(rows) ? rows : [];
 }
 
-async function coFillOverHttp(ownerToken, inviteeMobile) {
+async function coFillOverHttp(ownerToken, inviteeMobile, flat = { flatNo: 'B-1204', society: 'Skyline Heights' }) {
   const res = await fetch(`${API}/service-requests/co-fill`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
       request: {
         type: 'rent-agreement',
-        details: { ownerName: 'Anita Verma', property: 'B-1204, Skyline Heights', rent: '30000', _state: { tenantMode: 'invite', prop: { gramPanchayat: false } } },
+        details: {
+          ownerName: 'Anita Verma', property: `${flat.flatNo}, ${flat.society}`, rent: '30000',
+          _state: { tenantMode: 'invite', prop: { gramPanchayat: false, ...flat, pincode: '411045' } },
+        },
       },
       role: 'tenant',
       mobile: inviteeMobile,
@@ -126,6 +129,28 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     expect(refused.status(), 'the click reached the server checkout').toBe(409);
     await expect(page.getByText(/not ready for payment yet/)).toBeVisible();
     await expect(panel.getByRole('button', { name: /^Pay/ })).toBeEnabled();
+  });
+
+  test('an owner holding two payable agreements sees a pay panel for each flat', async ({ page }) => {
+    const ownerMobile = uniqueMobile();
+    const { accessToken: ownerToken } = await apiLogin(ownerMobile, { api: API });
+    /* One unpaid agreement is allowed per flat, so the two filings name different flats. */
+    const flats = [{ flatNo: 'B-1204', society: 'Skyline Heights' }, { flatNo: 'C-302', society: 'Riverview Towers' }];
+    for (const flat of flats) {
+      const tenantMobile = uniqueMobile();
+      const { accessToken: tenantToken } = await apiLogin(tenantMobile, { api: API });
+      const { partyId } = await coFillOverHttp(ownerToken, tenantMobile, flat);
+      const accepted = await fetch(`${API}/me/service-request-invites/${partyId}`, {
+        method: 'POST', headers: authed(tenantToken), body: JSON.stringify({ decision: 'accept' }),
+      });
+      expect(accepted.ok, `the tenant of ${flat.flatNo} accepts`).toBe(true);
+    }
+
+    await signedInAs(page, ownerMobile);
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
+    const panels = page.getByTestId('ra-pay-panel');
+    await expect(panels).toHaveCount(2);
+    for (const flat of flats) await expect(panels.filter({ hasText: flat.society })).toHaveCount(1);
   });
 
   test('a filing that fell short is completed in place after a reload, not refused as a second unpaid request', async ({ page }) => {

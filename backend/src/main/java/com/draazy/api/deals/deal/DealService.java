@@ -1,5 +1,6 @@
 package com.draazy.api.deals.deal;
 
+import com.draazy.api.catalog.managed.ManagedPropertyService;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
@@ -9,6 +10,7 @@ import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.persistence.Savepoints;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.finance.tenancy.TenancyService;
 import com.draazy.api.identity.user.User;
@@ -18,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -35,16 +38,21 @@ public class DealService {
     private final PropertyLifecycle lifecycle;
 
     private final TenancyService tenancyService;
+    private final ManagedPropertyService managedHomes;
+    private final DataSource dataSource;
 
     public DealService(DealRepository deals, DealPartyRepository parties,
                        PropertyRepository properties, UserRepository users,
-                       PropertyLifecycle lifecycle, TenancyService tenancyService) {
+                       PropertyLifecycle lifecycle, TenancyService tenancyService,
+                       ManagedPropertyService managedHomes, DataSource dataSource) {
         this.deals = deals;
         this.parties = parties;
         this.properties = properties;
         this.users = users;
         this.lifecycle = lifecycle;
         this.tenancyService = tenancyService;
+        this.managedHomes = managedHomes;
+        this.dataSource = dataSource;
     }
 
     @Transactional(readOnly = true)
@@ -183,10 +191,22 @@ public class DealService {
         }
         tenancyService.openFromClosedDeal(property.getId(), ownerId, tenantId, tenantMobile, monthlyRent)
                 .ifPresentOrElse(
-                        tenancy -> LOG.info("Tenancy {} proposed on rent close of property {}",
-                                tenancy.getId(), property.getId()),
+                        tenancy -> {
+                            LOG.info("Tenancy {} proposed on rent close of property {}",
+                                    tenancy.getId(), property.getId());
+                            users.findById(tenantId).ifPresent(tenant -> fillManagedHome(ownerId, property, tenant, monthlyRent));
+                        },
                         () -> LOG.info("Rent deal closed off-platform on property {}; "
                                 + "no tenancy opened", property.getId()));
+    }
+
+    private void fillManagedHome(UUID ownerId, Property property, User tenant, long monthlyRent) {
+        try {
+            Savepoints.isolated(dataSource,
+                    () -> managedHomes.fillFromClosedRental(ownerId, property.getId(), tenant, monthlyRent));
+        } catch (RuntimeException e) {
+            LOG.warn("Could not fill the managed home for closed rental on property {}", property.getId(), e);
+        }
     }
 
     private void closeOut(Property property) {

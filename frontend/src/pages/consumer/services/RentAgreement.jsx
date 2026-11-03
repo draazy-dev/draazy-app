@@ -42,7 +42,7 @@ function RentAgreement() {
     declare, setDeclare, generate, submitting, pendingRequestId, paymentPending, paymentConfirming,
     clearErr, fc, cost, locked, joinedOnly, gated, startNewAgreement, restored, startFresh, myInvites,
     identityReminders,
-    stalledInvite, recoverInvite, recovering, payable, payFiled, paying, continuable, continueFiled, coFilledRole, maskedIds, continuableHeld,
+    stalledInvite, recoverInvite, recovering, payable, payables, payFiled, paying, continuable, continueFiled, coFilledRole, maskedIds, continuableHeld,
     requestCancelled,
     viewOnly, viewedRequest, viewSubmitted, canView, editSubmitted, discardEdits, closeFiled, editingSubmitted, holdingUnpaid,
     copyInviteLink, next, prev,
@@ -115,7 +115,7 @@ function RentAgreement() {
                       <p className="text-white font-semibold">{tr('services.ra.donePaymentPendingTitle')}</p>
                       <p className="text-gray-400 text-sm mt-1">{tr('services.ra.donePaymentPendingDesc')}</p>
                       {payable ? (
-                        <button type="button" disabled={paying} onClick={payFiled} className="btn-teal inline-flex items-center justify-center gap-2 px-5 py-3 mt-4 rounded-xl text-white text-sm font-semibold min-h-[44px] disabled:opacity-50"><Icon name="credit-card" className="w-4 h-4" /> {tr('services.ra.donePaymentPendingCta')}</button>
+                        <button type="button" disabled={paying} onClick={() => payFiled()} className="btn-teal inline-flex items-center justify-center gap-2 px-5 py-3 mt-4 rounded-xl text-white text-sm font-semibold min-h-[44px] disabled:opacity-50"><Icon name="credit-card" className="w-4 h-4" /> {tr('services.ra.donePaymentPendingCta')}</button>
                       ) : (
                         <Link to="/dashboard#rental" className="btn-teal inline-flex items-center justify-center gap-2 px-5 py-3 mt-4 rounded-xl text-white text-sm font-semibold min-h-[44px]"><Icon name="credit-card" className="w-4 h-4" /> {tr('services.ra.donePaymentPendingCta')}</Link>
                       )}
@@ -127,7 +127,7 @@ function RentAgreement() {
                     <p className="text-gray-400 text-sm mt-1">{tenantInvitePaid ? tr('services.ra.doneInvitePaidDesc') : inviting ? tr('services.ra.doneInviteDesc', invitedSide) : tr(inviteAwaitingPayment ? 'services.ra.doneInviteeUnpaidDesc' : 'services.ra.doneOwnerDesc')}</p>
                   </div>
                   )}
-                  {payable && !paymentPending && <ReadyToPayPanel request={payable} onPay={payFiled} busy={paying} unconfirmed={false} />}
+                  {payable && !paymentPending && <ReadyToPayPanel request={payable} onPay={() => payFiled()} busy={paying} unconfirmed={false} />}
                   {inviting && inviteResult ? (
                     <div className="p-5 rounded-xl bg-white/[0.03]">
                       <p className="text-white font-semibold text-sm flex items-center gap-2"><Icon name="message-circle" className="w-4 h-4 text-emerald-400" /> {tr('services.ra.invite.sendTitle', invitedSide)}</p>
@@ -168,7 +168,7 @@ function RentAgreement() {
                     <p className="text-gray-300 text-xs leading-relaxed">{tr('services.ra.locked.changesHint', lockedCtx)}</p>
                   </div>
                   {stalledInvite && <DeclinedInvitePanel stalled={stalledInvite} onRecover={recoverInvite} busy={recovering} />}
-                  {payable && <ReadyToPayPanel request={payable} onPay={payFiled} busy={paying} unconfirmed={paymentPending} />}
+                  {payables.map((r) => <ReadyToPayPanel key={r.id} request={r} onPay={() => payFiled(r)} busy={paying} unconfirmed={paymentPending} />)}
                   {continuable && (
                     <div className="mt-4 max-w-md mx-auto">
                       <button type="button" onClick={continueFiled} data-testid="ra-continue-filed" className="btn-outline w-full px-4 py-3 rounded-xl text-gray-200 text-sm font-semibold inline-flex items-center justify-center gap-2 min-h-[44px]">

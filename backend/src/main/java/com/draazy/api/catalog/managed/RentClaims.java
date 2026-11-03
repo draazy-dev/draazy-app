@@ -3,7 +3,10 @@ package com.draazy.api.catalog.managed;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -27,6 +30,15 @@ class RentClaims {
     private static final String PENDING = """
             select c.rent_month from managed_property_rent_claims c
              where c.managed_property_id = ? and c.created_at >= ?
+               and not exists (select 1 from managed_property_rent_receipts r
+                                where r.managed_property_id = c.managed_property_id and r.rent_month = c.rent_month)
+             order by c.rent_month desc
+            """;
+
+    private static final String PENDING_FOR = """
+            select c.managed_property_id, c.rent_month from managed_property_rent_claims c
+              join managed_properties m on m.id = c.managed_property_id
+             where c.managed_property_id = any(?) and c.created_at >= m.tenant_since
                and not exists (select 1 from managed_property_rent_receipts r
                                 where r.managed_property_id = c.managed_property_id and r.rent_month = c.rent_month)
              order by c.rent_month desc
@@ -57,6 +69,21 @@ class RentClaims {
             return List.of();
         }
         return jdbc.queryForList(PENDING, String.class, m.getId(), since(m));
+    }
+
+    Map<UUID, List<String>> pending(List<ManagedProperty> homes) {
+        List<UUID> ids = homes.stream().filter(m -> m.isRented() && m.getTenantSince() != null)
+                .map(ManagedProperty::getId).toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, List<String>> byHome = new HashMap<>();
+        jdbc.query(PENDING_FOR,
+                ps -> ps.setArray(1, ps.getConnection().createArrayOf("uuid", ids.toArray())),
+                rs -> {
+                    byHome.computeIfAbsent(rs.getObject(1, UUID.class), id -> new ArrayList<>()).add(rs.getString(2));
+                });
+        return byHome;
     }
 
     private static Timestamp since(ManagedProperty m) {
