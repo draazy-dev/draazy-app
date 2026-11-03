@@ -20,6 +20,7 @@ const SECTIONS = [
   ['visits', '/visits', SIZE],
   ['visitRequests', '/me/visit-requests', SIZE],
   ['propertyReviews', '/me/property-reviews', PAGE],
+  ['offers', '/me/offers', SIZE],
   ['recentSearches', '/me/recent-searches'],
   ['managedProperties', '/me/managed-properties'],
   ['entitlements', '/me/entitlements'],

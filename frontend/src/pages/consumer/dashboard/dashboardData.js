@@ -1,7 +1,7 @@
 import { parseWhen } from '../../../lib/visitWhen.js';
 import { getOwnerListingState } from '../../../components/listing/ListingStatusCard.jsx';
 
-const LEAD_KINDS = new Set(['contact', 'photo', 'doc', 'flatmate', 'app']);
+const LEAD_KINDS = new Set(['contact', 'photo', 'doc', 'flatmate', 'app', 'offer']);
 const OWNER_ROLES = new Set(['owner', 'host', 'listing_owner', 'property_owner']);
 const VISITOR_ROLES = new Set(['visitor', 'buyer', 'seeker', 'guest']);
 
@@ -117,6 +117,7 @@ export function buildActionItems({
   scheduledVisits = [],
   flatmateReqs = [],
   serviceReqs = [],
+  offers = [],
   userId,
   go,
   openReview,
@@ -141,6 +142,10 @@ export function buildActionItems({
         id: `app:${a.id}`, kind: 'app', who: a.groupTitle || 'A flatmate group',
         title: `Group wants to rent ${a.listingTitle || 'your flat'}`, at: a.at,
       });
+    });
+    offers.filter((o) => ['pending', 'countered'].includes(o.status) && o.from === 'buyer').forEach((o) => {
+      const who = o.buyerName || 'A buyer';
+      actionItems.push({ id: `offer:${o.id}`, kind: 'offer', who, title: `Offer from ${who} to answer`, at: o.createdAt });
     });
     photoReqs.filter((r) => (r.status || 'pending') === 'pending').forEach((r) => {
       const who = r.buyerName || 'A buyer';

@@ -8,6 +8,7 @@ import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
+import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.security.AuthPrincipal;
 import java.util.List;
@@ -56,18 +57,21 @@ public class LeadWorkflow {
     private final LeadQueries queries;
     private final LeadIngest ingest;
     private final AuditService audit;
+    private final RateLimitLock locks;
 
     LeadWorkflow(JdbcTemplate jdbc, LeadRecords records, LeadQueries queries, LeadIngest ingest,
-            AuditService audit) {
+            AuditService audit, RateLimitLock locks) {
         this.jdbc = jdbc;
         this.records = records;
         this.queries = queries;
         this.ingest = ingest;
         this.audit = audit;
+        this.locks = locks;
     }
 
     @Transactional
     public void claim(AuthPrincipal caller, UUID id) {
+        locks.holdUntilCommit(RateLimitLock.Limit.LEAD_CLAIM, caller.userId().toString());
         if (jdbc.update(CLAIM, caller.userId(), id, caller.userId()) == 1) {
             records.activity(id, caller.userId(), "claim", null, null);
             return;

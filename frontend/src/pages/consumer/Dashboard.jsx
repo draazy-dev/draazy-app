@@ -7,6 +7,7 @@ import { useSaved } from '../../context/SavedContext.jsx';
 import { useFollows } from '../../context/FollowContext.jsx';
 import { useSavedSearches } from '../../context/SavedSearchContext.jsx';
 import { firstName } from '../../lib/auth.js';
+import { flatmateCaseKey } from '../../lib/data/myListings.js';
 import { useVerification } from '../../context/VerificationContext.jsx';
 import { listRecentSearches } from '../../services/recentSearchService.js';
 import { dashboardCaps, primeMeDashboard } from '../../services/meDashboardService.js';
@@ -78,7 +79,7 @@ export default function Dashboard() {
     listings, listingsLoaded, visits, recent, recommended, alertMatches,
     contactReqs, photoReqs, flatmateReqs, docReqs, serviceReqs,
     reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
-    apps, mutateVisit, openReview, sendReview,
+    apps, offers, mutateVisit, openReview, sendReview,
     dataStatus, dataError, retryData,
     refreshData, refreshRequests, setListings,
   } = useDashboardData({ user, toast, ownsProperty: caps.ownsProperty });
@@ -144,7 +145,7 @@ export default function Dashboard() {
   const scheduledVisits = useMemo(() => visits.filter((v) => v.status === 'scheduled'), [visits]);
   const actionItems = buildActionItems({
     isOwner, contactReqs, apps, photoReqs, pendingDocGroups, listings, reviewsByProp,
-    scheduledVisits, flatmateReqs, serviceReqs, userId: user?.id, openReview, go,
+    scheduledVisits, flatmateReqs, serviceReqs, offers, userId: user?.id, openReview, go,
   });
   const attentionCounts = attentionFromItems(actionItems);
 
@@ -152,7 +153,7 @@ export default function Dashboard() {
   const ownerStats = buildOwnerStats({ listings, items: actionItems, go });
   const seekerStats = buildSeekerStats({ savedCount, alertCount, followCount, upcomingVisits, go });
   const hasAnyCoreData = [
-    listings, visits, recent, recommended, alertMatches, contactReqs, photoReqs, flatmateReqs, docReqs, apps,
+    listings, visits, recent, recommended, alertMatches, contactReqs, photoReqs, flatmateReqs, docReqs, apps, offers,
   ].some((rows) => (rows || []).length > 0);
   const personaPending = dataStatus === 'loading' && !hasAnyCoreData;
 
@@ -222,7 +223,7 @@ export default function Dashboard() {
         reviewProp={reviewProp}
         setReviewProp={setReviewProp}
         thread={reviewThread}
-        listing={(listings || []).find((l) => l.id === reviewProp || l.uuid === reviewProp)}
+        listing={(listings || []).find((l) => l.id === reviewProp || l.uuid === reviewProp || flatmateCaseKey(l) === reviewProp)}
         reviewInput={reviewInput}
         setReviewInput={setReviewInput}
         sendReview={sendReview}

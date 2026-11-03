@@ -4,6 +4,7 @@ import com.draazy.api.billing.entitlement.EntitlementsDto;
 import com.draazy.api.catalog.managed.ManagedPropertyDto;
 import com.draazy.api.catalog.listing.OwnerListingCard;
 import com.draazy.api.common.web.PageResponse;
+import com.draazy.api.deals.offer.OfferDto;
 import com.draazy.api.deals.visit.VisitDto;
 import com.draazy.api.documents.request.DocumentRequestDto;
 import com.draazy.api.engagement.flatmate.FlatmateGroupCard;
@@ -31,6 +32,7 @@ public record MeDashboardResponse(
         PageResponse<VisitDto> visits,
         PageResponse<VisitDto> visitRequests,
         PageResponse<ReviewBadge> propertyReviews,
+        PageResponse<OfferDto> offers,
         List<RecentSearchDto> recentSearches,
         List<ManagedPropertyDto> managedProperties,
         Boolean hasTenancy,

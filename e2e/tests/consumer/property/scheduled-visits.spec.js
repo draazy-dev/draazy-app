@@ -100,9 +100,11 @@ test.describe('Scheduled visits (live)', () => {
         .toBe(`${asha.mobile.slice(0, 2)}XXXXX${asha.mobile.slice(-3)}`);
     });
 
-    await test.step('confirming one visit moves only that row, and the handoff appears without a reload', async () => {
+    await test.step('confirming one visit opens its chat, as Confirm in Requests does, and moves only that row', async () => {
       await page.getByRole('button', { name: /^Confirm$/ }).first().click();
-      // Re-read from the server after the write (useDashboardData#mutateVisit), so this is the server's answer.
+      await expect(page).toHaveURL(/\/messages\?c=/);
+      await page.goto('/dashboard#visits');
+      await expect(upcoming).toBeVisible();
       await expect(badges(page, 'Confirmed')).toHaveCount(1);
       await expect(badges(page, 'Awaiting confirmation')).toHaveCount(1);
 

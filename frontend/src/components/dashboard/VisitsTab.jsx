@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import Modal from '../ui/Modal.jsx';
@@ -9,6 +9,7 @@ import { parseWhen, formatWhen, slotFromParts, todayIso } from '../../lib/visitW
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { useOpenChat } from '../../lib/useOpenChat.js';
+import { openLeadRequestConversation } from '../../services/conversationService.js';
 import { isVisitHost } from '../../pages/consumer/dashboard/dashboardData.js';
 
 const isPastSlot = (date, time) => new Date(slotFromParts(date, time)) <= new Date();
@@ -83,6 +84,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
   const { flagEnabled } = useAppFlags();
   const chatEnabled = flagEnabled('inAppMessaging');
   const openChat = useOpenChat(toast);
+  const navigate = useNavigate();
   const locale = i18n.language;
   const CAL_MONTHS = useMemo(() => calMonths(locale), [locale]);
   const CAL_DAYS = useMemo(() => calDays(locale), [locale]);
@@ -93,6 +95,13 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
     if (!ok) return;
     const msg = status === 'confirmed' ? t('visits.confirmedToast') : status === 'cancelled' ? t('visits.cancelledToast') : status === 'completed' ? t('visits.visitedToast') : status === 'no-show' ? t('visits.noShowToast') : t('visits.updatedToast');
     toast(msg, 'success');
+    if (status !== 'confirmed' || !chatEnabled) return;
+    try {
+      const conv = await openLeadRequestConversation('visit', id);
+      navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
+    } catch {
+      toast(t('visits.chatOpenFailed'), 'error');
+    }
   };
 
   const [reschedule, setReschedule] = useState(null);

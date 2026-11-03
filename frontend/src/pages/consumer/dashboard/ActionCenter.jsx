@@ -29,6 +29,7 @@ const GROUPS = [
   { key: 'flatmate', kinds: ['flatmate', 'app'], label: 'Flatmate requests', icon: 'users-round', tone: 'teal', to: 'leads-flatmate' },
   { key: 'photos', kinds: ['photo'], label: 'Photo requests', icon: 'image', tone: 'amber', to: 'leads-photos' },
   { key: 'documents', kinds: ['doc'], label: 'Document requests', icon: 'folder-check', tone: 'teal', to: 'leads-documents' },
+  { key: 'offers', kinds: ['offer'], label: 'Offers to answer', icon: 'hand-coins', tone: 'indigo', to: 'leads-offers' },
   { key: 'visits', kinds: ['visit'], label: 'Visits to confirm', icon: 'calendar-check', tone: 'indigo', to: 'visits' },
   { key: 'listings', kinds: ['clarify', 'message'], label: 'Listings need you', icon: 'alert-circle', tone: 'rose', to: 'properties' },
   { key: 'agreements', kinds: ['agreement'], label: 'Rent agreement', icon: 'file-pen-line', tone: 'amber', to: 'rent-agreement' },

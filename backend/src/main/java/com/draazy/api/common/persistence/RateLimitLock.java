@@ -34,7 +34,9 @@ public class RateLimitLock {
 
         PHOTO_UPLOAD(13),
 
-        OWNER_NOTICE(14);
+        OWNER_NOTICE(14),
+
+        LEAD_CLAIM(15);
 
         private final int namespace;
 

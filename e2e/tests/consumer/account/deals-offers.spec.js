@@ -255,6 +255,33 @@ test('after the owner accepts: no Revise button, the finalize price is the offer
   expect(tenancies.body.map((t) => t.status)).toEqual(['pending']);
 });
 
+test('an offer waiting on the owner is one Home row that opens the Offers inbox, read from the dashboard document', async ({ page }) => {
+  const owner = await newActor(`Zztest Offer Home Owner ${letterTag()}`);
+  const buyer = await newActor(`Zztest Offer Home Buyer ${letterTag()}`);
+  const listing = await createApprovedListing(owner);
+  await approveContact(owner, buyer, listing.id);
+  const offered = await api('POST', '/offers', buyer.headers, { propertyId: listing.id, amount: 25000 });
+  expect(offered.status).toBe(201);
+
+  const offerReads = [];
+  page.on('request', (r) => { if (new URL(r.url()).pathname === '/api/me/offers') offerReads.push(r.url()); });
+  await signedInAs(page, owner.mobile);
+  await page.goto('/dashboard');
+  const row = page.locator('[data-group="offers"]');
+  await expect(row).toContainText('Offers to answer');
+  expect(offerReads, 'seeded from /me/dashboard, not read on its own').toEqual([]);
+
+  await row.click();
+  await expect(page).toHaveURL(/#leads/);
+  await expect(page.getByText(buyer.name).first()).toBeVisible();
+
+  const declined = await api('POST', `/offers/${offered.body.id}/respond`, owner.headers, { action: 'decline' });
+  expect(declined.status).toBe(200);
+  await page.goto('/dashboard');
+  await expect(page.getByTestId('action-center').or(page.getByTestId('action-center-clear'))).toBeVisible();
+  await expect(page.locator('[data-group="offers"]')).toHaveCount(0);
+});
+
 test('Finalize rental validates each field, defaults to the local date and fires once on a double-click', async ({ page }) => {
   const owner = await newActor(`Zztest Modal Owner ${letterTag()}`);
   const tenant = await newActor(`Zztest Modal Tenant ${letterTag()}`);

@@ -19,6 +19,7 @@ class LeadIntakeTest extends LeadsTestBase {
     private static final String TENANT = "9877100002";
 
     @Autowired LeadIntake intake;
+    @Autowired LeadIngest ingest;
     @Autowired LeadRelease release;
     @Autowired ManagedAgreementHomes homes;
 
@@ -78,6 +79,20 @@ class LeadIntakeTest extends LeadsTestBase {
         assertThat(jdbc.queryForObject("select user_id from crm_leads where mobile = ?", UUID.class, "9877100001"))
                 .isEqualTo(owner.getId());
         assertThat(interestsOf(TENANT)).containsExactly("interior", "packers");
+    }
+
+    @Test
+    @DisplayName("a feed row with an unusable mobile is marked rejected so the feed stops re-selecting it")
+    void unusableRowIsRejectedOnce() {
+        LeadIngest.Incoming bad = new LeadIngest.Incoming("quote-request", "reject-ref-1", "12345", "Bad Mobile",
+                List.of("packers"), "Quote", null);
+
+        assertThat(ingest.ingest(bad)).isEmpty();
+        assertThat(ingest.ingest(bad)).isEmpty();
+
+        assertThat(count("select count(*) from crm_lead_signals where source = 'quote-request'"
+                + " and source_ref = ? and lead_id is null", "reject-ref-1")).isEqualTo(1);
+        assertThat(count("select count(*) from crm_leads where mobile = ?", "12345")).isZero();
     }
 
     @Test

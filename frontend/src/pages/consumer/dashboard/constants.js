@@ -18,6 +18,7 @@ export const TAB_ALIAS = {
   'leads-photos': { tab: 'leads', sub: 'photos' },
   'leads-documents': { tab: 'leads', sub: 'documents' },
   'leads-flatmate': { tab: 'leads', sub: 'flatmate' },
+  'leads-offers': { tab: 'leads', sub: 'offers' },
   saved: { link: '/saved' },
   messages: { link: '/messages' },
   'rent-agreement': { link: '/services/rent-agreement' },

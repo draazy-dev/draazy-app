@@ -79,13 +79,16 @@ class LeadIngest {
 
     Optional<Landed> ingest(Incoming in) {
         String mobile = MobileMask.normalise(in.mobile());
-        if (!validMobile(mobile) || seen(in)) {
+        if (seen(in)) {
             return Optional.empty();
+        }
+        if (!validMobile(mobile)) {
+            return rejected(in);
         }
         Optional<Account> account = jdbc.query(ACCOUNT, (rs, i) -> new Account(rs.getObject("id", UUID.class),
                 rs.getString("role"), rs.getBoolean("archived"), rs.getString("name")), mobile).stream().findFirst();
         if (account.filter(a -> a.archived() || isBackOffice(a.role())).isPresent()) {
-            return Optional.empty();
+            return rejected(in);
         }
         String name = blankToNull(in.name());
         UUID userId = account.map(Account::id).orElse(null);
@@ -105,6 +108,11 @@ class LeadIngest {
 
     private boolean seen(Incoming in) {
         return Boolean.TRUE.equals(jdbc.queryForObject(SIGNAL_SEEN, Boolean.class, in.source(), in.ref()));
+    }
+
+    private Optional<Landed> rejected(Incoming in) {
+        jdbc.update(SIGNAL, null, in.source(), in.ref(), null, "rejected");
+        return Optional.empty();
     }
 
     private Landed closedLead(String mobile) {

@@ -1,6 +1,8 @@
 package com.draazy.api.admin.leads;
 
-import com.draazy.api.admin.leads.LeadIngest.Incoming;
+import com.draazy.api.common.persistence.Savepoints;
+import java.util.concurrent.atomic.AtomicLong;
+import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -12,18 +14,25 @@ public class LeadIntake {
 
     private final LeadSources sources;
     private final LeadIngest ingest;
+    private final DataSource dataSource;
 
-    LeadIntake(LeadSources sources, LeadIngest ingest) {
+    LeadIntake(LeadSources sources, LeadIngest ingest, DataSource dataSource) {
         this.sources = sources;
         this.ingest = ingest;
+        this.dataSource = dataSource;
     }
 
     @Transactional
     public long sweep() {
         long landed = 0;
         for (LeadSources.Feed feed : LeadSources.FEEDS) {
-            for (Incoming incoming : sources.pull(feed)) {
-                landed += ingest.ingest(incoming).isPresent() ? 1 : 0;
+            AtomicLong fromFeed = new AtomicLong();
+            try {
+                Savepoints.isolated(dataSource, () -> fromFeed.set(sources.pull(feed).stream()
+                        .filter(incoming -> ingest.ingest(incoming).isPresent()).count()));
+                landed += fromFeed.get();
+            } catch (RuntimeException e) {
+                LOG.warn("crm-lead-intake feed {} failed", feed.source(), e);
             }
         }
         if (landed > 0) {

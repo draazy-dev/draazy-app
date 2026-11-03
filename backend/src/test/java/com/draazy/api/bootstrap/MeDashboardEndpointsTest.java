@@ -39,6 +39,7 @@ class MeDashboardEndpointsTest extends AbstractApiTest {
         SECTION_READS.put("visits", "/visits?size=100");
         SECTION_READS.put("visitRequests", "/me/visit-requests?size=100");
         SECTION_READS.put("propertyReviews", "/me/property-reviews?page=0&size=100");
+        SECTION_READS.put("offers", "/me/offers?page=0&size=100");
         SECTION_READS.put("recentSearches", "/me/recent-searches");
         SECTION_READS.put("managedProperties", "/me/managed-properties");
     }

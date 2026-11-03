@@ -7,6 +7,7 @@ import com.draazy.api.catalog.listing.OwnerListingCard;
 import com.draazy.api.common.error.ApiException;
 import com.draazy.api.common.web.PageResponse;
 import com.draazy.api.common.web.Routes;
+import com.draazy.api.deals.offer.MeOffersController;
 import com.draazy.api.deals.visit.VisitController;
 import com.draazy.api.deals.visit.VisitRequestController;
 import com.draazy.api.documents.request.MeDocumentRequestsController;
@@ -56,6 +57,7 @@ public class MeDashboardController {
     private final ServiceRequestInvitesController serviceRequestInvites;
     private final MeManagedPropertiesController managedProperties;
     private final MeEntitlementsController entitlements;
+    private final MeOffersController offers;
 
     public MeDashboardController(MeListingsController listings,
             FlatmateSeekerController flatmateSeeker, FlatmateHostRoomController flatmateRooms,
@@ -66,7 +68,8 @@ public class MeDashboardController {
             PropertyVerificationController propertyReviews,
             MeRecentSearchesController recentSearches,
             ServiceRequestInvitesController serviceRequestInvites,
-            MeManagedPropertiesController managedProperties, MeEntitlementsController entitlements) {
+            MeManagedPropertiesController managedProperties, MeEntitlementsController entitlements,
+            MeOffersController offers) {
         this.listings = listings;
         this.flatmateSeeker = flatmateSeeker;
         this.flatmateRooms = flatmateRooms;
@@ -82,6 +85,7 @@ public class MeDashboardController {
         this.serviceRequestInvites = serviceRequestInvites;
         this.managedProperties = managedProperties;
         this.entitlements = entitlements;
+        this.offers = offers;
     }
 
     @GetMapping(Routes.Bootstrap.ME_DASHBOARD)
@@ -113,6 +117,7 @@ public class MeDashboardController {
                         () -> visitRequests.myVisitRequests(principal, INBOX_PAGE)) : empty(),
                 owner ? section("propertyReviews",
                         () -> propertyReviews.listMyCases(principal, INBOX_PAGE)) : empty(),
+                owner ? section("offers", () -> offers.offersOnMine(principal, null, INBOX_PAGE)) : empty(),
                 section("recentSearches", () -> recentSearches.mine(principal)),
                 section("managedProperties", () -> managedProperties.mine(principal)),
                 rented == null ? null : !rented.isEmpty(),

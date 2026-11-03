@@ -22,7 +22,7 @@ const inApp = (page, url) => page.evaluate((to) => {
 const SECTION_READS = [
   '/api/me/listings', '/api/me/flatmate-posts', '/api/me/flatmate-rooms', '/api/me/flatmate-groups',
   '/api/visits', '/api/me/visit-requests', '/api/me/flatmate-requests',
-  '/api/me/contact-requests', '/api/me/photo-requests', '/api/me/documents/requests', '/api/me/group-applications',
+  '/api/me/contact-requests', '/api/me/photo-requests', '/api/me/documents/requests', '/api/me/group-applications', '/api/me/offers',
 ];
 
 test.describe('Dashboard request budget on a phone', () => {
