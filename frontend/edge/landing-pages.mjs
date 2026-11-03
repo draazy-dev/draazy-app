@@ -2,6 +2,7 @@ import { esc, headTags, jsonLd, renderPage } from '../scripts/seo-html.mjs';
 import { NOINDEX, SITE, crumbs, edgePage, fetchShell, headersFor, htmlResponse, notFoundPage, page } from './seo-pages.mjs';
 import { listingPrice, listingTitle, propertyPath } from '../src/lib/listingSeo.js';
 import { fmtArea } from '../src/lib/format.js';
+import { OG_SIZE, flatmatesOg, landingOg } from '../src/lib/ogImages.js';
 import {
   LANDING_BHKS, LANDING_PLACES, MIN_INDEXABLE, PUNE, bhkMatches, flatmateCopy, flatmatePath, isIndexable, isWomenOnly, landingCopy, landingPath,
   landingQuery, listingsUrl, parseFlatmateLanding, parseLanding,
@@ -46,7 +47,8 @@ export function landingPage(shell, target, data, { site = SITE } = {}) {
     itemListElement: items.map((x, i) => ({ '@type': 'ListItem', position: i + 1, url: `${site}${x.href}`, name: x.name })),
   };
   const head = headTags({
-    title: copy.title, description: copy.description, url, image: `${site}/og-image.jpg`, type: 'website',
+    title: copy.title, description: copy.description, url, type: 'website',
+    image: `${site}${landingOg(deal, place.slug)}`, imageAlt: copy.h1, imageSize: OG_SIZE,
     extra: [
       ...(isIndexable(target, total) ? [] : [NOINDEX]),
       jsonLd({ '@context': 'https://schema.org', '@graph': [itemList, crumbs(site, trail)].filter(Boolean) }),
@@ -118,7 +120,8 @@ export function flatmatePage(shell, target, data, { site = SITE } = {}) {
     itemListElement: items.map((x, i) => ({ '@type': 'ListItem', position: i + 1, url: `${site}${x.href}`, name: x.name })),
   };
   const head = headTags({
-    title: copy.title, description: copy.description, url, image: `${site}/og-image.jpg`, type: 'website',
+    title: copy.title, description: copy.description, url, type: 'website',
+    image: `${site}${flatmatesOg(path.split('/').pop())}`, imageAlt: copy.h1, imageSize: OG_SIZE,
     extra: [
       ...(total >= MIN_INDEXABLE.flatmates ? [] : [NOINDEX]),
       jsonLd({ '@context': 'https://schema.org', '@graph': [itemList, crumbs(site, trail)].filter(Boolean) }),

@@ -6,6 +6,7 @@ import { TRUST_PAGES } from '../src/data/trustPages.js';
 import { COMPARE_NOBROKER } from '../src/data/compareNobroker.js';
 import { compareBody } from './compare-body.mjs';
 import { toolBodies, toolsItemList } from './tools-body.mjs';
+import { OG_SIZE, SITE_OG_ALT, routeOg } from '../src/lib/ogImages.js';
 
 const SITE = 'https://draazy.com';
 const ORG = { '@id': `${SITE}/#organization` };
@@ -153,7 +154,8 @@ export function routePage(shell, path, head, { body = '', faq } = {}) {
   const crumbs = head.schema === 'Service' && breadcrumbList([['Home', `${SITE}/`], ['Services', `${SITE}/services`], [head.title.split(' | ')[0], url]]);
   const graph = [schemaFor(head, url), faq && faqPage(faq), crumbs].filter(Boolean);
   const extra = graph.length ? [jsonLd({ '@context': 'https://schema.org', '@graph': graph })] : [];
-  const tags = headTags({ ...head, url, image: `${SITE}/og-image.jpg`, type: 'website', extra });
+  const image = { image: `${SITE}${routeOg(path)}`, imageAlt: path === '/' ? SITE_OG_ALT : head.title.split(' | ')[0], imageSize: OG_SIZE };
+  const tags = headTags({ ...head, url, ...image, type: 'website', extra });
   return renderPage(shell, tags, body);
 }
 

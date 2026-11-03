@@ -15,6 +15,7 @@
 - [ ] Owner (Google Cloud): restrict the Maps browser key by HTTP referrer and to the APIs in use; an old copy sits in git history (`frontend/dist-perf`).
 - [ ] Owner (deploy): confirm prod/sandbox set `JWT_SECRET`, `REFERRAL_SIGNAL_SALT`, `IDENTITY_HASH_SECRET`, `IDENTITY_ENCRYPTION_KEY`, `IDENTITY_ENCRYPTION_KEY_ID`, `STAFF_TOTP_KEY`; they no longer have a fallback, so a missing one fails boot.
 - [ ] 19 moderate/low npm advisories remain in dev tooling only (prod deps: 0); revisit when Dependabot opens majors.
+- [ ] Light share cards: after deploy, re-scrape a property, `/rent/baner`, `/flatmates/room/<id>` and `/signup?ref=` in Meta's Sharing Debugger, since WhatsApp caches old previews.
 
 
 ## Waiting by design

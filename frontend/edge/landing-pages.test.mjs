@@ -60,10 +60,12 @@ assert.equal(list['@type'], 'ItemList');
 assert.equal(list.itemListElement.length, 6);
 assert.ok(list.itemListElement[0].url.startsWith('https://draazy.com/property/2-bhk-apartment-for-rent-baner-'));
 assert.deepEqual(crumbs.itemListElement.map((c) => c.name), ['Home', 'Rent', 'Baner']);
+assert.ok(lived.html.includes('<meta property="og:image" content="https://draazy.com/og/rent/baner.jpg" />'));
 const thin = landingPage(SHELL, baner('rent'), { content: rows(4), totalElements: 4 });
 assert.ok(thin.html.includes('name="robots" content="noindex"'), 'four homes are below the area threshold');
 const bhkPage = landingPage(SHELL, baner('rent', 2), { content: rows(3), totalElements: 3 });
 assert.ok(!bhkPage.html.includes('noindex'), 'three 2 BHK homes clear the BHK threshold');
+assert.ok(bhkPage.html.includes('content="https://draazy.com/og/rent/baner.jpg"'), 'BHK pages reuse the area card');
 assert.deepEqual(ldOf(bhkPage.html)['@graph'][1].itemListElement.map((c) => c.name), ['Home', 'Rent', 'Baner', '2 BHK']);
 const empty = landingPage(SHELL, baner('buy'), { content: [], totalElements: 0 });
 assert.ok(empty.html.includes('noindex') && empty.html.includes('No homes listed right now'));
@@ -85,12 +87,14 @@ assert.equal(flatmateApiPath(women, 1), '/flatmates/feed?tab=move-in&gender=fema
 assert.ok(isWomenOnly(room(1, { gender: 'female' })) && isWomenOnly(group(1, { policy: 'women' })) && !isWomenOnly(room(1)));
 const fm = flatmatePage(SHELL, baFm, { content: [room(1, { seatsTotal: 1, seatsOpen: 1 }), room(2), group(3)], totalElements: 3 });
 assert.ok(!fm.html.includes('noindex'));
+assert.ok(fm.html.includes('<meta property="og:image" content="https://draazy.com/og/flatmates/baner.jpg" />'));
 assert.ok(fm.html.includes('href="/flatmates/room/r1"') && fm.html.includes('href="/flatmates/group/g3"'), 'a room with seats is still a room');
 assert.ok(fm.html.includes('₹9,000/month'), 'a room keeps its budget');
 assert.ok(!fm.html.includes('Secret Name') && !fm.html.includes('9999999999'), 'no personal data in the edge body');
 assert.ok(flatmatePage(SHELL, baFm, { content: [room(1), room(2)], totalElements: 2 }).html.includes('noindex'));
 const womenFm = flatmatePage(SHELL, women, { content: [room(1, { gender: 'female' }), room(2), room(3, { gender: 'female' }), group(4, { policy: 'women' }), group(5)], totalElements: 5 });
 assert.ok(!womenFm.html.includes('noindex'), 'three strictly women-only posts');
+assert.ok(womenFm.html.includes('content="https://draazy.com/og/flatmates/women-only-pune.jpg"'));
 assert.equal(ldOf(womenFm.html)['@graph'][0].itemListElement.length, 3);
 assert.ok(flatmatePage(SHELL, women, { content: [room(1, { gender: 'female' }), room(2), room(3)], totalElements: 3 }).html.includes('noindex'), 'hosts open to anyone do not count');
 

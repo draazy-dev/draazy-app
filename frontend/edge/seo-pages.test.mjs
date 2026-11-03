@@ -37,6 +37,9 @@ const UP = 'https://media.draazy.com/photos/0123456789abcdef/3f2a9c1e-7b4d-4e8a-
 const uploaded = propertyPage(SHELL, { ...P, coverImage: 'https://images.unsplash.com/cover.jpg', images: [UP] }, { pathname: PATH }).html;
 assert.ok(uploaded.includes(`<link rel="preload" as="image" href="${UP}" imagesrcset="${UP}.w480.webp 480w, ${UP}.w960.webp 960w, ${UP} 2560w" imagesizes="(max-width: 639px) 100vw, 60vw" fetchpriority="high" />`), 'preloads the gallery first slide, not the cover');
 assert.ok(!propertyPage(SHELL, { ...P, coverImage: null, images: ['photos/x/y'] }, { pathname: PATH }).html.includes('rel="preload"'), 'no preload for a non-https first slide');
+const photoless = propertyPage(SHELL, { ...P, coverImage: null, images: [] }, { pathname: PATH }).html;
+assert.ok(photoless.includes('<meta property="og:image" content="https://draazy.com/og/listing/rent-flat.jpg" />'), 'no photo: the share card names the type and deal');
+assert.ok(photoless.includes('<meta property="og:image:alt" content="2 BHK Apartment for Rent in Baner" />'));
 assert.ok(!live.html.includes('noindex'));
 assert.ok(!live.html.includes('<script>alert(1)'), 'listing text is escaped in body and JSON-LD');
 assert.ok(live.html.includes('<h1 class="mt-4 text-3xl font-extrabold leading-tight text-white sm:text-4xl">2 BHK Apartment for Rent in Baner</h1>'));
@@ -64,6 +67,7 @@ const soc = societyPage(SHELL, S, { slug: S.slug });
 assert.ok(soc.html.includes('<title data-shell="Draazy">Green Acres, Baner, Pune: Homes, Amenities &amp; Reviews | Draazy</title>'));
 assert.ok(soc.html.includes('Green Acres in Baner, Pune by Kolte Patil, built in 2015. 2 homes for rent and 1 home for sale from owners, with no brokerage.'));
 assert.ok(!soc.html.includes('noindex'));
+assert.ok(soc.html.includes('<meta property="og:image" content="https://draazy.com/og/page/society.jpg" />'));
 assert.equal(ldOf(soc.html)['@graph'][0]['@type'], 'ApartmentComplex');
 const thin = societyPage(SHELL, { slug: 'x', name: 'X', localitySlug: 'baner', listingCount: 0, homes: [] }, { slug: 'x' });
 assert.ok(thin.html.includes('<meta data-shell="" name="robots" content="noindex" />'));

@@ -3,6 +3,7 @@ import { crumbs, listingHead, listingJsonLd, listingPrice, listingTitle, propert
 import { fmtArea } from '../src/lib/format.js';
 import { GUIDE_LOCALITIES, guideSlugFor } from '../src/lib/guideLocalities.js';
 import { GALLERY_SIZES, gallerySrcSet } from '../src/lib/imgSrcSet.js';
+import { OG_SIZE, listingOg, pageOg } from '../src/lib/ogImages.js';
 
 export const SITE = 'https://draazy.com';
 
@@ -60,13 +61,13 @@ export function propertyPage(shell, p, { pathname, search = '', site = SITE }) {
   const live = p.status === 'approved' && p.dealStatus !== 'closed';
   const rent = p.deal === 'rent';
   const images = [...new Set([p.coverImage, ...(p.images || [])].filter((s) => HTTPS.test(s || '')))];
-  const image = images[0] || `${site}/og-image.jpg`;
+  const image = images[0] ? { image: images[0] } : { image: `${site}${listingOg(p.propertyType, p.deal)}`, imageAlt: name, imageSize: OG_SIZE };
   const society = p.societySlug && p.societyName && [p.societyName, `/society/${p.societySlug}`];
   const trail = [['Home', '/'], [rent ? 'Rent' : 'Buy', `/listings?deal=${rent ? 'rent' : 'buy'}`], [p.locality || 'Pune', p.localitySlug ? `/locality/${p.localitySlug}` : '/listings'],
     ...(society ? [society] : []), [name, path]];
 
   const head = headTags({
-    title, description, url, image, type: 'website',
+    title, description, url, ...image, type: 'website',
     extra: [
       ...(live ? [] : [NOINDEX]),
           ...heroPreload(p),
@@ -114,7 +115,7 @@ export function societyPage(shell, s, { slug, search = '', site = SITE }) {
     ...(s.localitySlug && { containedInPlace: { '@type': 'Place', name: where, url: `${site}/locality/${s.localitySlug}` } }),
   };
   const head = headTags({
-    title, description, url, image: `${site}/og-image.jpg`, type: 'website',
+    title, description, url, type: 'website', image: `${site}${pageOg('society')}`, imageAlt: s.name, imageSize: OG_SIZE,
     extra: [...(thin ? [NOINDEX] : []), jsonLd({ '@context': 'https://schema.org', '@graph': [complex, crumbs(site, trail)] })],
   });
   const body = page(trail,
