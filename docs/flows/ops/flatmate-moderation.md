@@ -172,6 +172,24 @@ Publish does not. The author is told only when the item goes public, or is remov
 internal note is never sent to them. Re-stamping the current state is a no-op unless it clears a
 re-check (audited as `flatmate.recheck.clear`). The expiry clock restarts only when an item goes public.
 
+### 5.8 Publication parity with properties (FM-TRUST-3)
+Rooms and groups that hold a flat are checked like a property. The popup shows a three-tick
+checklist (photos are real, not a duplicate, details look right) stored as a case file on
+`property_reviews`; **Publish stays disabled until all three are ticked**, and
+`PATCH /admin/flatmates/{id}/moderation` answers 409 `checklist_incomplete` if called without them.
+Only a move into public is gated: Hide and Remove need no ticks, and an already public post is not
+re-gated. Seeker posts and hunting groups stay live-first and are reviewed after (no checklist).
+Posting never needs an ID or property badge (ADR-019); the badges are separate decisions.
+
+### 5.9 Needs info and the Support thread (FM-TRUST-4)
+On a **pending** post the desk can pick a reason code (`photos_not_real`, `duplicate`, `broker`,
+`wrong_details`, `locality_unclear`, `document_unreadable`, `name_mismatch`, `other`) and press
+**Needs info**. The post stays pending and off the board; the reason and note are posted into the
+host's "Messages from Draazy Support" thread (the same `review_messages` model as properties) and
+the host is notified. The case shows "Needs info" on the card; once the host replies or edits, the
+case reopens (`in_review`), the ticks reset, and the card shows "Host replied (N)" until the desk
+reads it. Needs info on a post that is not pending is 409 `needs_info_not_pending`.
+
 ---
 
 ## 6. Maker-checker / approval
@@ -267,6 +285,12 @@ This is an **intentional extension**, not drift.
 - `e2e/tests/ops/flatmate-moderation.spec.js` - 10 tests: the four-tab layout, a tenant claim living
   on Badge requests (with its banner) and not on Pending, every decision taken through the popup,
   plus the retired `/admin/flatmates` route, live.
+- `e2e/tests/ops/flatmate-trust-desk.spec.js` - 4 tests: the three-tick Publish gate for a room and a
+  flat-holding group, a live-first seeker post, and Needs info with the host's reply.
+- `e2e/tests/consumer/flatmates/support-thread.spec.js` - 4 tests: the dashboard status card, the
+  Support thread reply, the ID verified card and the badge copy.
+- `backend/src/test/java/com/draazy/api/engagement/flatmate/FlatmateCaseFileTest.java` - the tick
+  gate, live-first kinds, Needs info, unread counts, `verifiedOnly` and the agreement migration.
 - `e2e/tests/ops/flatmate-review.spec.js` - 1 test: the offline panel, which is the only claim that
   has to be checked with the API unreachable. The three consumer-facing verification cues moved to
   `e2e/tests/consumer/flatmates/review-status.spec.js`, where each label is earned through a

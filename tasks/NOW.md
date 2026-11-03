@@ -3,19 +3,19 @@
 > **Read this file first and nothing else.** It is the whole orientation a new session needs. Hard
 > cap: 60 lines. It holds *state*, never narrative — every line is either a standing rule, a pointer,
 > or a number with the date it was taken. Rewrite it at the end of a session; do not append to it.
-> Last written: **2026-11-03** on `feature/e2e-testing` after the PERF-1..10 sweep and the all-sessions commit batch.
+> Last written: **2026-11-03** on `feature/e2e-testing` after the PERF-1..10 sweep and two all-sessions commit batches (30 commits).
 
 ## Lane
 
 | | |
 |---|---|
 | Branch | `feature/e2e-testing`, QA fixes lane; not pushed |
-| Commit policy | Commit only when the user asks; never push. 15 commits made 2026-11-03 cover every dirty path |
+| Commit policy | Commit only when the user asks; never push. 30 commits made 2026-11-03 cover every dirty path |
 | Working tree | Clean apart from `graphify-out/` (never committed) on 2026-11-03; one session only |
 
 ## The queue
 
-Open feature and verification work is indexed in [todo.md](todo.md); every item has a ruling (through 358). Built rulings are deleted, not kept.
+Open feature and verification work is indexed in [todo.md](todo.md); every item has a ruling (through 364). Built rulings are deleted, not kept.
 Committed but PENDING AGENT REVIEW: the `Committed slices` line, PERF-1/2, RA-LANDING-MOBILE, SERVICES-HUB-MOBILE in todo.md.
 Performance work: PERF-1..10 done; PERF-3 (Lighthouse) and PERF-LATER stay open in todo.md.
 UGC reels (Google Flow, separate lane): read `ugc-flow\00-HANDOFF-state.txt` then `ugc-flow\reels\00-CONTINUITY-RULES.txt`; next = reel 5; ask the user before every Generate.
@@ -27,8 +27,8 @@ Owner-only: todo.md `WA-WEBHOOK`.
 | What | Where | Size |
 |---|---|---|
 | Manual / smoke test plan | [docs/Draazy-Tester-Checklist.xlsx](../docs/Draazy-Tester-Checklist.xlsx) | 307 rows on 2026-10-15; stale, re-derive |
-| Open dev work and verification | [tasks/todo.md](todo.md) | 68 lines on 2026-10-29; grep slice IDs |
-| Standing rulings | [tasks/DECISIONS-NEEDED.md](DECISIONS-NEEDED.md) | 72 lines on 2026-10-29 |
+| Open dev work and verification | [tasks/todo.md](todo.md) | 25 lines on 2026-11-03; grep slice IDs |
+| Standing rulings | [tasks/DECISIONS-NEEDED.md](DECISIONS-NEEDED.md) | 78 lines on 2026-11-03 |
 | Durable rules and house style | [tasks/lessons.md](lessons.md) | 256 lines on 2026-10-29; grep |
 | Owner-only actions | [tasks/OWNER-CHECKLIST.md](OWNER-CHECKLIST.md) | 37 lines on 2026-10-15; stale, re-derive |
 | Backend tech debt | [docs/system/tech-debt.md](../docs/system/tech-debt.md) | highest **D264** on 2026-10-29 |
@@ -49,7 +49,7 @@ Owner-only: todo.md `WA-WEBHOOK`.
 
 | Fact | Value | Taken |
 |---|---|---|
-| Next free Flyway slot | `26.11.08__?` (no `V`) | 2026-11-03 |
-| e2e spec files | 467 under `e2e/tests` | 2026-11-03 |
-| Full e2e (`-Full`, 4 shards + nobackend) | 2,177 tests: 7 red then green on `-Failed`, 1 flaky; ~114 min | 2026-11-03 |
-| Backend suite (full) | 4,519 tests, 0 failed, 4 skipped (483 classes) | 2026-11-02 |
+| Next free Flyway slot | `26.11.33__?` (no `V`) | 2026-11-03 |
+| e2e spec files | 470 under `e2e/tests` | 2026-11-03 |
+| Full e2e (`-Full`, 4 shards + nobackend) | 27 red, all fixed or flaky (green on rerun, flakes listed in todo.md); flatmate set 293/293 after the team retirement | 2026-11-03 |
+| Backend suite (full) | 4,577 tests; 139 reds were Postgres connection exhaustion plus one migration guard, all green on rerun | 2026-11-03 |

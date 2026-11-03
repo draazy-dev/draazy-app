@@ -70,3 +70,9 @@ Nothing.
 | 356 | City selector, SMS, 1.5/2.5 BHK | Deferred, no date |
 | 357 | SSE multi-node, vault/camera race, in-app-only photo takedown notice | Waiting by design; Zoho/Meta delivery webhooks get built |
 | 358 | Tenant flatmate groups that already have a flat (API-legal, UI cannot create) | Migrate them into rooms with a one-off migration, then refuse new ones in the API |
+| 359 | RA step validation (errors only at final submit) | Closed after the held-PAN fix; reopen only with a repro (toast text and step) |
+| 360 | Leads ingested with service-only consent (RA party, quote, unpaid checkout) | No marketing calls unless `marketing_consent_at` is set; the "Service follow-up only" chip tells staff |
+| 361 | Rent-agreement licence start back-dating | 120 days stays (Registration Act s.23 four-month window) |
+| 362 | Lead notes, interests and profile edits by any Leads staffer | By design (LEADS-PROFILE shared pool); notes are attributed and append-only |
+| 363 | Jobs that assume one app instance (lease-end reminders, lead intake) | Fine while single-instance; add `skip locked` claiming before scaling out |
+| 364 | Frontend read-cache residuals (30s staleness for the non-paying RA party, expired entries kept until the key is re-read, prefetch before token restore wasted) | Accepted: bounded by 30s and by key count |

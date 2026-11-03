@@ -18,6 +18,15 @@ Things code can't close: secrets, deploy steps, real-device checks, human fact-c
 - [ ] DigitalOcean: add the alert policies and the one free Uptime check from `docs/DEPLOY.md` §8; leave log forwarding off
 - [ ] Optional: `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY` for graphify community labels
 - [ ] GitHub repo **variables** (not secrets): `VITE_POSTHOG_KEY=phc_BYWgUQHA2LvRkSCRQ4bSDFUdkKWjwRDRsyshdrAW4LzQ`, `VITE_POSTHOG_APP_URL=https://us.posthog.com/project/666838/dashboard/2218193`, then redeploy the frontend
+- [ ] Sandbox: buy a Contact Pack after redeploy (checkout TTL 20, floor 16; Cashfree floor is 15)
+- [ ] Sandbox: after redeploy, DO memory settles at or below ~80% (50% heap, metaspace 192 MB, code cache 128 MB, Tomcat 50 threads)
+- [ ] Cashfree dashboard: rename merchant from "testMerchantName"; webhook subscribes to failed/user-dropped events; try an RA payment and UPI collect (untested here)
+- [ ] WhatsApp webhook (needs repo admin; set both secrets or neither, or boot fails): generate a 32-char token, add `SANDBOX_WHATSAPP_WEBHOOK_VERIFY_TOKEN` + `SANDBOX_WHATSAPP_APP_SECRET` to the `sandbox` environment, deploy, then in Meta set callback `https://sandbox.draazy.com/api/webhooks/whatsapp` with that token and subscribe `messages`; smoke: room post notice arrives, STOP stops it
+- [ ] ZeptoMail webhook (needs repo admin): in CPaaS → Agents → agent → Webhooks set an Authentication Key, add it as `SANDBOX_ZEPTOMAIL_WEBHOOK_KEY` to the `sandbox` environment, deploy, then add `https://sandbox.draazy.com/api/webhooks/zeptomail` with Hard bounce, Soft bounce and Feedback loop events; smoke: "Send Test" hard bounce shows as a failed `delivery` row in Admin › Integrations
+- [ ] PostHog: `$web_vitals` events arrive after deploy
+- [ ] WebP photos: deploy backend first; the R2 token needs list on the public bucket; check `.webp` card copies appear
+- [ ] Lighthouse on sandbox: detail page LCP image load delay ~0 (`lcp-breakdown-insight`) and Cloudflare does not challenge the GitHub runner; drop the `draazy.com` 302 dashboard rule at launch
+- [ ] Confirm the DO app and Postgres share a region; add OpenTelemetry only once there is more than one instance
 
 ## Real phones
 - [ ] Real Safari (Mac + iPhone), Firefox, Android: the SB-11 checklist rows (25, 194, 195, 216, 260, 261), incl. a contrast audit with a real tool
@@ -28,6 +37,9 @@ Things code can't close: secrets, deploy steps, real-device checks, human fact-c
 - [ ] `/flatmates`: locality popup, drawer insets on a notch; group chat; detail tap/safe-area feel
 - [ ] Scroll lock (older iOS): Compare picker, `DashboardReviewModal`, society stack, `AdminSocieties` dialogs; home-indicator clearance
 - [ ] Select/MultiSelect with the iOS Safari and Android keyboards
+- [ ] `/rent-agreement` landing and wizard on a real iPhone/Android: tap feel, smooth scroll, hero fold, step strip
+- [ ] `/services` on a real phone: the spotlight fold and the priced Move-in Pack state
+- [ ] Flatmates on real phones: map pan, sheets, photo/HEIC upload, OTP autofill, real SMS/OTP delivery, Maps quota exhaustion
 
 ## Content and ops
 - [ ] Fact-check the 12 blog posts and 12 locality guides; re-check Metro Line 3 and the Hinjawadi PCMC merger before deploy

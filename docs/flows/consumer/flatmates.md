@@ -127,6 +127,14 @@ unknown key or a value outside `0..2` with 400, and an empty map deletes the row
   public; guests get `{}`). `matches` is keyed `room:<id>` / `group:<id>` / `post:<id>` for the
   returned page rows only, omitting the viewer's own rows and any author with fewer than three shared
   answers. Authors' answers are fetched in one batch query.
+- **Feed `sharedVibes`.** Same pass, same keys, same omissions: up to two answers the viewer and the
+  author gave *identically*, as `[{ key, answer }]` in a fixed priority (sleep, food, smoking, pets, drinks,
+  tidy, wfh, guests, visitors, bills, family, quiet). Only the viewer's own answers are echoed back, so
+  nothing new about the author is exposed; guests and viewers under three answers get `{}`. Cards render
+  one line ("Both night owls · Both veg") from `flatmates.ls.both_<key>_<answer>`.
+- **Home tiles.** `GET /bootstrap` → `flatmatePulse.tabs` carries `{ move-in, people, teams }` live counts
+  (the same totals the board tabs show; `team-up` is `people + teams`). The Home Flatmates section draws
+  one tile per case from it and opens `/flatmates?view=<tab>`; there is no extra request.
 - **`sort=match`.** A viewer with at least three answers gets a living-style term worth up to +4
   (100% match; 0 when unknown or the row is theirs) added to the SQL score. The viewer's values are bound
   parameters, never concatenated.
@@ -274,6 +282,14 @@ Dashboard -> My Listings ("Let room by room"), and confirmed in `SplitFlatModal`
   listing (sent as `propertyId`, tier `owner`); a tenant may link a Draazy tenancy (fills locality and
   the owner's mobile, and lets the reconciler match the agreement). The host view echoes the link back
   as `host.attachedPropertyId` so an edit keeps it.
+- **Room must-haves** (Details tab, all optional): `parking` (`bike` / `car` / none, the same codes a
+  seeker and a hunting team use) and `amenities`, any of `wifi`, `ac`, `washing_machine`, `lift`,
+  `power_backup` (stored as a JSONB array, order kept as sent). An unknown, blank or repeated code, more
+  than five codes, or an unknown parking value is a 422; omitting either on an edit clears it, and
+  editing them does not send a live room back to review. Both come back on the detail read and the
+  feed card. The room page shows a Parking tile and a "Room amenities" chip grid; the card shows a
+  short parking chip. How long the host wants the occupant to stay is the existing `lockInMonths`
+  ("Minimum stay"), shown in the terms tiles, so there is no second stay field.
 
 ### Creating a group (`submitGroup`)
 - Gated by `requireSignedIn` (L1). A new group is always **hunting** — it teams up first and finds
@@ -292,6 +308,11 @@ Dashboard -> My Listings ("Let room by room"), and confirmed in `SplitFlatModal`
   page adds "The flat we're looking for" and, for the owner and accepted members, **"Find flats for
   us"** — a `/listings?deal=rent&loc=…&bhks=…&rent=lo-hi&deposit=lo-hi&furn=…&tenants=bachelors`
   search (`groupListingsUrl`; gated maps to `amen=security`, listings having no gated facet).
+- **"See matching rooms"** sits beside it (and on the owner's seeker-post page, `matchingRoomsUrl`):
+  it opens `/flatmates?view=move-in` pre-filtered with the existing room-feed params, mapped from the
+  stated must-haves: `loc` (only when exactly one locality is shortlisted), `budget=0-<ceiling>` (seeker
+  posts only), `furn` (`furnished` / `semi`), `gated=1`, `bath=1` (seeker posts only). No new feed
+  params; the result shows as the usual active filter chips.
 - Search reads `localities` for **every** group (a housed group holds its one locality there), so the
   locality filter, free text and radius match any shortlisted locality.
 - The rest of this section applies to a **legacy group with a flat**. Validation: `title`, `rent`, member `name`.
@@ -369,6 +390,18 @@ The single decision point every supply path calls - group create, single-room po
     (owner tier, or a post with no flat).
 - Group applications (`flatmate_group_applications`) are private to the group's host and start
   `live`; they are not held.
+- **Publish needs the three ticks (FM-TRUST-3).** Rooms and groups that hold a flat can only be
+  published once the desk ticks the three property checks (409 `checklist_incomplete` otherwise);
+  seeker posts and hunting groups stay live-first. **Needs info** (reason code required) keeps the
+  post pending and posts to the host's "Messages from Draazy Support" thread
+  (`GET /flatmates/{kind}/{id}/verification`, `POST .../verification/messages`, `POST
+  .../verification/read`, `GET /me/flatmate-reviews`), built on the property `review_messages`
+  model. A host reply or edit reopens the case and resets the ticks. See
+  [`../ops/flatmate-moderation.md`](../ops/flatmate-moderation.md) §5.8-5.9.
+- **Two badges, plain names.** *ID verified* (the person) and *Verified property* (the home);
+  `verifiedOnly` filters rooms to Verified property and people to ID verified. The dashboard shows
+  every flatmate kind on the property status card with a Support messages link, and the Documents
+  tab has one Get-verified card per kind (people posts get the ID verified card).
 - Distinct from the Ops review desk below, which is a trust check on tenant-tier and flagged posts
   that decides the badge, not visibility.
 
