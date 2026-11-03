@@ -44,6 +44,26 @@ class FlatmatePulseTest extends AbstractApiTest {
         assertThat(after.initials()).hasSizeLessThanOrEqualTo(FlatmatePulse.FACES).first().isEqualTo("RS");
     }
 
+    @Test
+    @DisplayName("the tiles count each board case: people and hunting teams add up to seeking, hidden rows excluded")
+    void tabsCountEachCase() {
+        FlatmatePulse before = pulse.pulse();
+
+        seekerPost(user("9877731011"), "Counted Person", "live");
+        seekerPost(user("9877731012"), "Hidden Person", "pending");
+        User host = user("9877731013");
+        group(host, "Counted team", "Aundh", 36000, 3, "[]", true, null, "live", 1);
+        group(host, "Pending team", "Baner", 50000, 2, "[]", true, null, "pending", 2);
+        group(host, "Settled group", "Wakad", 45000, 4, "[]", false, null, "live", 3);
+
+        FlatmatePulse after = pulse.pulse();
+        assertThat(after.tabs()).containsOnlyKeys("move-in", "people", "teams");
+        assertThat(after.tabs().get("people")).isEqualTo(before.tabs().get("people") + 1);
+        assertThat(after.tabs().get("teams")).isEqualTo(before.tabs().get("teams") + 1);
+        assertThat(after.tabs().get("move-in")).isEqualTo(before.tabs().get("move-in"));
+        assertThat(after.tabs().get("people") + after.tabs().get("teams")).isEqualTo(after.seeking());
+    }
+
     private void group(User host, String title, String locality, long rent, int seats, String bhk, boolean hunting,
             UUID propertyId, String modStatus, int minutesAhead) {
         jdbc.update("insert into flatmate_groups (host_id, title, locality, rent, seats_total, seats_open, pref_bhk,"

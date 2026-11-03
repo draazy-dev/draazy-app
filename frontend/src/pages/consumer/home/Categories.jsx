@@ -4,9 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import { CATEGORIES } from '../../../data/homeData.js';
 import { propertyCounts } from '../../../services/propertyService.js';
-import { feed } from '../../../services/flatmateService.js';
-import { PUBLIC_READ_TTL } from '../../../services/http.js';
-import { TAB_MOVE_IN } from '../flatmates/tabs.js';
+import { flatmatePulse } from '../../../services/flatmateService.js';
 
 const formatCount = (value) => new Intl.NumberFormat('en-IN').format(value);
 
@@ -66,9 +64,9 @@ export default function Categories({ navigate }) {
 
   useEffect(() => {
     let live = true;
-    feed(TAB_MOVE_IN, {}, 0, 1, { ttl: PUBLIC_READ_TTL })
-      .then(({ tabTotals }) => {
-        if (live) setFlatmateCount(Object.values(tabTotals).reduce((sum, n) => sum + (n || 0), 0));
+    flatmatePulse()
+      .then((pulse) => {
+        if (live) setFlatmateCount(pulse?.tabs ? Object.values(pulse.tabs).reduce((sum, n) => sum + (n || 0), 0) : null);
       })
       .catch(() => {
         if (live) setFlatmateCount(null);

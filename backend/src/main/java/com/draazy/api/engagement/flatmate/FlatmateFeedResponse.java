@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.web.PageResponse;
+import com.draazy.api.engagement.livingstyle.LivingStyleCatalogue;
 import java.util.List;
 import java.util.Map;
 
@@ -14,7 +15,8 @@ public record FlatmateFeedResponse<T>(
         long verifiedElements,
         long otherTabElements,
         Map<String, Long> tabElements,
-        Map<String, Integer> matches) {
+        Map<String, Integer> matches,
+        Map<String, List<LivingStyleCatalogue.Shared>> sharedVibes) {
     public static <T> FlatmateFeedResponse<T> of(PageResponse<T> page, FlatmateFeedService.FeedResult result) {
         return new FlatmateFeedResponse<>(
                 page.content(),
@@ -26,6 +28,7 @@ public record FlatmateFeedResponse<T>(
                 result.verifiedTotal(),
                 result.otherTabTotal(),
                 result.tabTotals(),
-                result.matches());
+                result.matches(),
+                result.sharedVibes());
     }
 }

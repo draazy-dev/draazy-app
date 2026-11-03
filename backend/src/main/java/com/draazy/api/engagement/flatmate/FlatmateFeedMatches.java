@@ -18,15 +18,20 @@ class FlatmateFeedMatches {
         this.styles = styles;
     }
 
-    Map<String, Integer> forWindow(LivingStyleViewer viewer, List<Object> window) {
+    record Styles(Map<String, Integer> matches, Map<String, List<LivingStyleCatalogue.Shared>> shared) {
+        static final Styles NONE = new Styles(Map.of(), Map.of());
+    }
+
+    Styles forWindow(LivingStyleViewer viewer, List<Object> window) {
         if (!viewer.scorable() || window.isEmpty()) {
-            return Map.of();
+            return Styles.NONE;
         }
         Map<UUID, Map<String, Integer>> authors = styles.answersOf(window.stream()
                 .map(FlatmateFeedMatches::authorOf)
                 .filter(id -> id != null && !id.equals(viewer.userId()))
                 .collect(Collectors.toSet()));
         Map<String, Integer> out = new HashMap<>();
+        Map<String, List<LivingStyleCatalogue.Shared>> shared = new HashMap<>();
         for (Object row : window) {
             UUID author = authorOf(row);
             Map<String, Integer> theirs = author == null ? null : authors.get(author);
@@ -37,8 +42,12 @@ class FlatmateFeedMatches {
             if (match != null) {
                 out.put(keyOf(row), match);
             }
+            List<LivingStyleCatalogue.Shared> same = LivingStyleCatalogue.shared(viewer.answers(), theirs);
+            if (!same.isEmpty()) {
+                shared.put(keyOf(row), same);
+            }
         }
-        return out;
+        return new Styles(out, shared);
     }
 
     static UUID authorOf(Object row) {

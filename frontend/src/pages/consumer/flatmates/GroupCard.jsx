@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 import { seatsLeft, inr, perHead, shareFloor, moneyRange, groupLocalities, allVerified, matchFor, hostTierMeta, showHostBadge, detailPath, moveInLabel, bhkText, policyAvatar, mustHaves } from './helpers.js';
-import { SaveBtn, TrustTag, Facts, MustHaveChips, policyFact, MatchPill, Fresh, CardBadge, ReviewChip, CardLink } from './atoms.jsx';
+import { SaveBtn, TrustTag, Facts, MustHaveChips, policyFact, MatchPill, Fresh, CardBadge, ReviewChip, CardLink, SharedVibes } from './atoms.jsx';
 
 export function GroupJoinButton({ g, onJoin }) {
   const { t: tr } = useTranslation();
@@ -86,6 +86,7 @@ function GroupCard({ g, i, saved, onSave, anchorId, myPost }) {
         ['calendar-check', p?.moveInBy && moveInLabel(p.moveInBy)],
       ]} />
       {p && <MustHaveChips items={mustHaves(p, tr)} className="mt-3" />}
+      <SharedVibes item={g} />
       <div className="flex flex-wrap items-center gap-1.5 mt-3 empty:hidden">
         <CardBadge item={g} match={match} />
       </div>

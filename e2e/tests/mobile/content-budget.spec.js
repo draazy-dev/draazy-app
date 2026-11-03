@@ -121,26 +121,26 @@ test.describe('Mobile reach and legibility', () => {
     expect(escaping, `controls escaping a ${vw}px viewport`).toEqual([]);
   });
 
-  test('the flatmates KYC-done tag is legible and stays in its card', async ({ page }) => {
+  test('the flatmates ID verified tag is legible and stays in its card', async ({ page }) => {
     await consent(page);
     // Use `people` because the seeker tag only renders on SeekerCard.
     await page.goto('/flatmates?view=people');
 
-    const badge = page.locator('.sf-card .dz-tag', { hasText: /kyc done/i }).first();
+    const badge = page.locator('.sf-card .dz-tag', { hasText: /id verified/i }).first();
     await expect(badge).toBeVisible();
     const box = await badge.boundingBox();
-    expect(box.height, 'KYC-done tag size').toBeGreaterThanOrEqual(16);
+    expect(box.height, 'ID verified tag size').toBeGreaterThanOrEqual(16);
 
     const escaping = await page.evaluate(() => {
       const bad = [];
       for (const b of document.querySelectorAll('.sf-card .dz-tag')) {
-        if (!/kyc done/i.test(b.textContent)) continue;
+        if (!/id verified/i.test(b.textContent)) continue;
         const r = b.getBoundingClientRect();
         const c = b.closest('.sf-card').getBoundingClientRect();
         if (r.width && (r.left < c.left - 1 || r.right > c.right + 1)) bad.push(b.textContent.trim());
       }
       return bad;
     });
-    expect(escaping, 'KYC-done tags must stay inside their card').toEqual([]);
+    expect(escaping, 'ID verified tags must stay inside their card').toEqual([]);
   });
 });

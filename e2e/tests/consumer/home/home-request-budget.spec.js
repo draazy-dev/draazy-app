@@ -25,7 +25,7 @@ async function scrollToBottom(page) {
 test.describe('Home request budget on a phone', () => {
   test.use({ viewport: { width: 412, height: 915 } });
 
-  test('the Flatmates tile counts every tab from one feed read', async ({ page, consoleErrors }) => {
+  test('the Flatmates tile counts every tab from the bootstrap pulse, with no feed read', async ({ page, consoleErrors }) => {
     const totals = await Promise.all(['move-in', 'people', 'teams'].map(async (tab) => {
       const res = await fetch(`${API}/flatmates/feed?tab=${tab}&page=0&size=1`);
       return (await res.json()).totalElements;
@@ -37,7 +37,7 @@ test.describe('Home request budget on a phone', () => {
     await expect(flatmatesTile(page)).toContainText(`${expected} listings`, { timeout: 15000 });
     await page.waitForTimeout(1000);
 
-    expect(api.times('/api/flatmates/feed'), 'flatmate feed reads on Home').toBe(1);
+    expect(api.times('/api/flatmates/feed'), 'flatmate feed reads on Home').toBe(0);
     expect(api.repeated()).toEqual([]);
     expect(consoleErrors).toEqual([]);
   });
@@ -71,7 +71,7 @@ test.describe('Home request budget on a phone', () => {
     await expect(flatmatesTile(page)).toContainText('listings', { timeout: 15000 });
     await scrollToBottom(page);
 
-    expect.soft(api.times('/api/flatmates/feed'), 'flatmate feed re-read on return').toBe(1);
+    expect.soft(api.times('/api/flatmates/feed'), 'flatmate feed read on Home or on return').toBe(0);
     expect.soft(api.times('/api/societies/top'), 'society list re-read on return').toBe(1);
     expect(api.repeated()).toEqual([]);
     expect(consoleErrors).toEqual([]);

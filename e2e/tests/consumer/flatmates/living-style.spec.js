@@ -3,6 +3,9 @@ import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAu
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { flatmateTab, openFlatmates, postAsSolo } from '../../../helpers/app.js';
 import { trackErrors } from '../../../helpers/console.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const track = flatmateCleanup(test);
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -15,7 +18,7 @@ async function seekerPost(token) {
   const res = await fetch(`${API}/flatmates/posts`, {
     method: 'POST',
     headers: auth(token),
-    body: JSON.stringify({ gender: 'female', age: 25, occupation: 'Analyst', budget: 17000, localities: ['Baner'], moveIn: '2026-12-01', flatPref: 'women', roomPref: 'private', note: 'Living style coverage' }),
+    body: JSON.stringify({ gender: 'female', age: 25, occupation: 'Analyst', budget: 17000, localities: ['Baner'], moveIn: MOVE_IN, flatPref: 'women', roomPref: 'private', note: 'Living style coverage' }),
   });
   expect(res.status, 'seeding a seeker post').toBe(201);
   const post = await res.json();

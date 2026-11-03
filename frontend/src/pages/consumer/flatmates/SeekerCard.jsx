@@ -5,7 +5,7 @@ import { useToast } from '../../../context/ToastContext.jsx';
 import { useTapPop } from '../../../lib/useTapPop.js';
 import { avatarGrad, initials, genderLabel, seekerBudget, matchFor, moveInLabel, detailPath, seekerTitle, mustHaves } from './helpers.js';
 import { FLAT_PREF_LBL, ROOM_PREF_LBL } from './constants.js';
-import { SaveBtn, TrustTag, Facts, MustHaveChips, CardBadge, CardLink } from './atoms.jsx';
+import { SaveBtn, TrustTag, Facts, MustHaveChips, CardBadge, CardLink, SharedVibes } from './atoms.jsx';
 
 export function SeekerAskButton({ r, owned, ask, onInterest }) {
   const { t: tr } = useTranslation();
@@ -62,6 +62,7 @@ function SeekerCard({ r, i, saved, onSave, anchorId, myPost }) {
         ['calendar-check', r.moveIn && moveInLabel(r.moveIn)],
       ]} />
       <MustHaveChips items={mustHaves(r, tr)} className="mt-3" />
+      <SharedVibes item={r} />
       <div className="flex flex-wrap items-center gap-1.5 mt-3 empty:hidden">
         <CardBadge item={r} match={match} />
       </div>

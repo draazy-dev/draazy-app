@@ -1,5 +1,6 @@
 package com.draazy.api.engagement.flatmate;
 
+import com.draazy.api.engagement.livingstyle.LivingStyleCatalogue;
 import com.draazy.api.engagement.livingstyle.LivingStyleService;
 import com.draazy.api.engagement.livingstyle.LivingStyleViewer;
 import com.draazy.api.identity.user.User;
@@ -45,7 +46,8 @@ public class FlatmateFeedService {
     }
 
     public record FeedResult(Page<Object> page, long verifiedTotal, long otherTabTotal,
-            Map<String, Long> tabTotals, Map<String, Integer> matches) {
+            Map<String, Long> tabTotals, Map<String, Integer> matches,
+            Map<String, List<LivingStyleCatalogue.Shared>> sharedVibes) {
     }
 
     @Transactional(readOnly = true)
@@ -58,9 +60,10 @@ public class FlatmateFeedService {
         long otherTab = facets.movingIn()
                 ? tabTotals.get(FlatmateVocabulary.TAB_PEOPLE) + tabTotals.get(FlatmateVocabulary.TAB_TEAMS)
                 : tabTotals.get(FlatmateVocabulary.TAB_MOVE_IN);
+        FlatmateFeedMatches.Styles styles = feedMatches.forWindow(viewer, window);
         return new FeedResult(
                 new PageImpl<>(render(window), pageable, result.total()), result.verifiedTotal(),
-                otherTab, tabTotals, feedMatches.forWindow(viewer, window));
+                otherTab, tabTotals, styles.matches(), styles.shared());
     }
 
     private Map<String, Long> tabTotals(FlatmateSearchQuery facets, long current) {

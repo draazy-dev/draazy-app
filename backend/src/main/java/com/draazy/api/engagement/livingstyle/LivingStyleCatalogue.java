@@ -21,6 +21,22 @@ public final class LivingStyleCatalogue {
     public record Score(Integer match, int common) {
     }
 
+    public record Shared(String key, int answer) {
+    }
+
+    private static final List<String> SHARED_PRIORITY = List.of("sleep", "food", "smoking", "pets", "drinks",
+            "tidy", "wfh", "guests", "visitors", "bills", "family", "quiet");
+
+    public static final int SHARED_TOP = 2;
+
+    public static List<Shared> shared(Map<String, Integer> mine, Map<String, Integer> theirs) {
+        return SHARED_PRIORITY.stream()
+                .filter(key -> mine.get(key) != null && mine.get(key).equals(theirs.get(key)))
+                .limit(SHARED_TOP)
+                .map(key -> new Shared(key, mine.get(key)))
+                .toList();
+    }
+
     public static Score score(Map<String, Integer> mine, Map<String, Integer> theirs) {
         int common = 0;
         int points = 0;

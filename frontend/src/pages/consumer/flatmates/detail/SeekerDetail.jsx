@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router';
 import Icon from '../../../../components/Icon.jsx';
-import { avatarGrad, initials, seekerBudget, moveInLabel, seekerTitle, mustHaves } from '../helpers.js';
+import { avatarGrad, initials, seekerBudget, moveInLabel, seekerTitle, mustHaves, matchingRoomsUrl } from '../helpers.js';
 import { FLAT_PREF_LBL, ROOM_PREF_LBL } from '../constants.js';
 import { Fresh, MustHaveChips } from '../atoms.jsx';
 import { SeekerAskButton } from '../SeekerCard.jsx';
@@ -61,6 +62,11 @@ export default function SeekerDetail({ r, owned, ask, onAsk, onReport, ownerPane
             ['bed', t('flatmates.detailRoomPref'), ROOM_PREF_LBL[r.roomPref || 'any']],
             ['users', t('flatmates.detailFlatPref'), FLAT_PREF_LBL[r.flatPref || 'any']],
           ]} />
+          {owned && (
+            <Link to={matchingRoomsUrl(r)} className="mt-4 btn-teal inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold text-white" data-testid="see-matching-rooms">
+              <Icon name="door-open" className="w-4 h-4" /> {t('flatmates.seeMatchingRooms')}
+            </Link>
+          )}
         </Section>
         {(hasAbout || r.note) && (
           <Section icon="message-square" title={t('flatmates.detailAbout')}>

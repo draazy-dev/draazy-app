@@ -3,9 +3,15 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import { flatmatePulse } from '../../../services/flatmateService.js';
 import { bhkLabel } from '../../../lib/listingSeo.js';
+import { TAB_ICON, TAB_MOVE_IN, TAB_PEOPLE, TAB_TEAMS } from '../flatmates/tabs.js';
 
 const AVATAR_TONES = ['from-pink-500 to-rose-400', 'from-blue-500 to-indigo-400', 'from-teal-500 to-teal-700'];
 const inr = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
+const TILES = [
+  { tab: TAB_MOVE_IN, icon: TAB_ICON[TAB_MOVE_IN] },
+  { tab: TAB_PEOPLE, icon: TAB_ICON[TAB_PEOPLE] },
+  { tab: TAB_TEAMS, icon: TAB_ICON[TAB_TEAMS] },
+];
 
 export default function FlatmatesSection({ navigate }) {
   const { t } = useTranslation();
@@ -20,6 +26,7 @@ export default function FlatmatesSection({ navigate }) {
   }, []);
 
   const split = pulse?.split;
+  const tabs = pulse?.tabs;
   const seeking = pulse?.seeking > 0 ? pulse.seeking : 0;
   const faces = seeking ? (pulse.initials || []).slice(0, AVATAR_TONES.length) : [];
   const flat = split && bhkLabel(split.bhk);
@@ -40,6 +47,17 @@ export default function FlatmatesSection({ navigate }) {
                 <span className="flex shrink-0 items-center gap-1 sm:gap-1.5 whitespace-nowrap"><Icon name="venus" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-300" /> {t('home.flatmates.featWomen')}</span>
                 <span className="flex shrink-0 items-center gap-1 sm:gap-1.5 whitespace-nowrap"><Icon name="phone-off" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-300" /> {t('home.flatmates.featNoNumber')}</span>
               </div>
+              {tabs && (
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-7" data-testid="flatmates-tiles">
+                  {TILES.map(({ tab, icon }) => (
+                    <button key={tab} type="button" data-tile={tab} onClick={() => navigate(`/flatmates?view=${tab}`)} className="min-w-0 text-left rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 px-2.5 sm:px-4 py-2.5 sm:py-3 transition-colors">
+                      <Icon name={icon} className="w-4 h-4 sm:w-5 sm:h-5 text-teal-300" />
+                      <b data-testid="tile-count" className="block mt-1 text-lg sm:text-2xl font-extrabold text-white tabular-nums leading-none">{Number(tabs[tab] ?? 0).toLocaleString('en-IN')}</b>
+                      <span className="block mt-1 text-[11px] sm:text-xs leading-tight text-gray-300 truncate">{t(`home.flatmates.tile_${tab}`)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3">
                 <button onClick={() => navigate('/flatmates?view=team-up')} className="inline-flex w-full sm:w-auto justify-center items-center gap-2 px-6 h-btn sm:h-btn-lg rounded-full bg-cta-btn text-cta-btn-text font-bold text-sm hover:opacity-90 transition-all duration-300 sm:hover:scale-105 shadow-2xl shadow-black/20">
                   <Icon name="hand-heart" className="w-5 h-5" /> {t('home.flatmates.ctaFind')}

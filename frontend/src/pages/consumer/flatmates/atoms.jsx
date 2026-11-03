@@ -82,4 +82,15 @@ const CardBadge = ({ item, match }) => (Number.isFinite(item.styleMatch)
   : match ? <MatchPill match={match} /> : <Fresh item={item} />);
 
 const CardLink = ({ to }) => <Link to={to} tabIndex={-1} aria-hidden="true" className="absolute inset-0 rounded-2xl" />;
-export { Chip, SaveBtn, TileChip, TrustTag, Facts, MustHaveChips, policyFact, MatchPill, Fresh, StyleMatch, CardBadge, ReviewChip, CardLink };
+
+const SharedVibes = ({ item }) => {
+  const { t } = useTranslation();
+  if (!item.sharedVibes?.length) return null;
+  return (
+    <p data-testid="shared-vibes" className="flex items-center gap-1.5 mt-3 text-xs text-teal-300 min-w-0">
+      <Icon name="heart-handshake" className="w-3.5 h-3.5 shrink-0" />
+      <span className="truncate">{item.sharedVibes.map((v) => t(`flatmates.ls.both_${v.key}_${v.answer}`)).join(' · ')}</span>
+    </p>
+  );
+};
+export { Chip, SaveBtn, TileChip, TrustTag, Facts, MustHaveChips, policyFact, MatchPill, Fresh, StyleMatch, CardBadge, ReviewChip, CardLink, SharedVibes };

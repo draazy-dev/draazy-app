@@ -29,7 +29,15 @@ public class FlatmatePulseService {
     @Transactional(readOnly = true)
     public FlatmatePulse pulse() {
         FlatmateSearchQueries.Result seekers = search.search(NEWEST_SEEKERS, PageRequest.of(0, FlatmatePulse.FACES));
-        return new FlatmatePulse(seekers.total(), faces(seekers.refs()), search.newestSplit());
+        return new FlatmatePulse(seekers.total(), faces(seekers.refs()), tabs(seekers.total()), search.newestSplit());
+    }
+
+    private Map<String, Long> tabs(long teamUp) {
+        long people = search.total(NEWEST_SEEKERS.withTab(FlatmateVocabulary.TAB_PEOPLE));
+        return Map.of(
+                FlatmateVocabulary.TAB_MOVE_IN, search.total(NEWEST_SEEKERS.withTab(FlatmateVocabulary.TAB_MOVE_IN)),
+                FlatmateVocabulary.TAB_PEOPLE, people,
+                FlatmateVocabulary.TAB_TEAMS, teamUp - people);
     }
 
     private List<String> faces(List<FlatmateSearchQueries.Ref> refs) {
