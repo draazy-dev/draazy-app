@@ -3472,6 +3472,31 @@ paths:
       responses:
         '200': { description: Acknowledged }
         '404': { $ref: '#/components/responses/NotFound' }
+  /webhooks/zeptomail:
+    post:
+      tags: [Engagement]
+      summary: ZeptoMail delivery webhook (Zoho → backend)
+      operationId: zeptomailWebhook
+      security: []
+      description: >
+        Server-to-server callback from Zoho ZeptoMail, trusted only when producer-signature
+        (ts=<ms>;s=<base64>;s-algorithm=HmacSHA256) is the HMAC-SHA256 of the posted event under
+        ZEPTOMAIL_WEBHOOK_KEY and ts is within five minutes. Hard and soft bounces and spam
+        complaints are recorded in the provider ledger against each bounced address; opens, clicks
+        and deliveries are ignored. A forged or stale signature is only logged and answered 200.
+        Answers 404 while the webhook key is unset.
+      parameters:
+        - { name: producer-signature, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { type: object, additionalProperties: { type: string } }
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Acknowledged }
+        '404': { $ref: '#/components/responses/NotFound' }
   /properties/{id}/verification:
     parameters: [ { $ref: '#/components/parameters/PropertyId' } ]
     get:
@@ -5068,9 +5093,19 @@ paths:
 
 
         A note is required to flag or remove, and to restore a removed or rejected item
-        (400). An `expired` item accepts only `removed`; anything else is a 409 because only the
-        host's renewal revives it. A staffer may not moderate an item they authored or whose group
-        they belong to (403).
+        (400); a `reasonCode` stands in for the note on a remove. An `expired` item accepts only
+        `removed`; anything else is a 409 because only the host's renewal revives it. A staffer may
+        not moderate an item they authored or whose group they belong to (403).
+
+
+        Publishing a **room** or a **flat-holding group** (`item.checklistRequired`) needs the three
+        checks ticked first (`PATCH /admin/flatmates/{id}/moderation/checklist`), else 409
+        `checklist_incomplete`. Seeker posts and hunting groups are live first and reviewed after,
+        so they never need the checks. `needs_info` asks the host for more on a post that is still
+        `pending`: `reasonCode` is required (`other` also needs a note), the post stays pending, and
+        the ask lands in the host's Support thread; on any other state it is 409
+        `needs_info_not_pending`. Publishing posts a note in the thread; a remove with a
+        `reasonCode` posts the reason there.
       operationId: moderateFlatmatePost
       externalDocs: { description: Behaviour, url: docs/flows/ops/flatmate-moderation.md }
       requestBody:
@@ -5081,14 +5116,49 @@ paths:
               type: object
               required: [modStatus]
               properties:
-                modStatus: { $ref: '#/components/schemas/FlatmateModStatus' }
+                modStatus:
+                  type: string
+                  enum: [pending, live, approved, flagged, removed, rejected, needs_info]
+                  description: '`needs_info` keeps the post pending and asks the host in the Support thread.'
                 note: { type: string, description: Internal note, never exposed to consumers. Required to hide or restore. }
+                reasonCode:
+                  type: string
+                  enum: [photos_not_real, duplicate, broker, wrong_details, locality_unclear, document_unreadable, name_mismatch, other]
+                  description: Required for `needs_info`; optional on a remove, where it is also posted to the host.
       responses:
         '200': { description: Moderated }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: The item has expired and the verdict is not `removed` }
+        '409': { description: The item has expired and the verdict is not `removed`; or the three checks are not ticked (`checklist_incomplete`); or `needs_info` on a post that is not pending (`needs_info_not_pending`) }
+  /admin/flatmates/{id}/moderation/checklist:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    patch:
+      tags: [Moderation]
+      summary: Tick or untick one publish check on a flatmate post
+      operationId: tickFlatmateChecklist
+      description: >
+        `flatmates:write`. Opens the case file on first use. Returns the detail with the updated
+        `caseFile`. Refused (403) on an item the caller authored or whose group they belong to.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [item, pass]
+              properties:
+                item: { type: string, maxLength: 120, description: 'One of `caseFile.checklist[].item`.' }
+                pass: { type: boolean }
+      responses:
+        '200':
+          description: The post with its updated case file
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlatmateModerationDetail' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /admin/group-applications:
     get:
       tags: [Moderation]
@@ -9320,6 +9390,24 @@ paths:
                           at least three answers with the caller appear; the caller's own rows and
                           every row for a guest or a caller without answers are omitted.
                         additionalProperties: { type: integer, minimum: 0, maximum: 100 }
+                      sharedVibes:
+                        type: object
+                        description: >
+                          Up to two living-style answers the caller has in common with each row's
+                          author, keyed like `matches`, strongest first. Needs the caller to have
+                          answered at least three questions, the same reciprocity rule as the
+                          detail endpoint; a guest, a caller without answers, the caller's own rows
+                          and rows with nothing in common are omitted. Only answers equal to the
+                          caller's own are returned, never any other answer of the author.
+                        additionalProperties:
+                          type: array
+                          maxItems: 2
+                          items:
+                            type: object
+                            required: [key, answer]
+                            properties:
+                              key: { type: string, enum: [tidy, food, sleep, wfh, guests, visitors, smoking, drinks, pets, bills, family, quiet] }
+                              answer: { type: integer, minimum: 0, maximum: 2 }
                       content:
                         type: array
                         items:
@@ -9763,8 +9851,10 @@ paths:
       summary: Create a flatmate group
       description: >
         L1 signed-in. The verification tier is derived server-side from role + proof; the client can
-        never self-assign a host badge. `role: owner` is 409 `owner_lists_rooms`: an owner letting a
-        flat lists its rooms (`createFlatmateRoom`), a group is people renting together.
+        never self-assign a host badge. A group is people hunting for a flat, so the body carries
+        `preferences`. Without it the body describes a flat the group already has, which is 409
+        `flat_lists_as_room` (`owner_lists_rooms` when the role is `owner`): list the room instead
+        (`createFlatmateRoom`).
       operationId: createFlatmateGroup
       requestBody:
         required: true
@@ -9778,7 +9868,9 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/FlatmateGroup' }
         '409':
-          description: Blocked by the host-eligibility guardrails, or `owner_lists_rooms` (Error shape)
+          description: >
+            Blocked by the host-eligibility guardrails, or `flat_lists_as_room` / `owner_lists_rooms`
+            for a body without `preferences` (Error shape)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/HostEligibility' }
@@ -9839,7 +9931,8 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: >
-            `owner_lists_rooms` when a group not already owner-hosted switches to `role: owner`, or
+            `flat_lists_as_room` when the body has no `preferences` (`owner_lists_rooms` when the
+            role is `owner`), or
             `host_capped` when reopening a full group would exceed the live-post cap
           content:
             application/json:
@@ -10387,6 +10480,85 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /flatmates/{kind}/{id}/verification:
+    parameters:
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [room, group, post] } }
+      - { $ref: '#/components/parameters/GenericId' }
+    get:
+      tags: [Engagement]
+      summary: The Draazy Support thread for my flatmate post
+      operationId: getFlatmateCase
+      description: >
+        The review status, the three publish checks and the "Messages from Draazy Support" thread of
+        a flatmate post I host, on the same case file a property review uses. Messages are
+        `from: owner` (mine) or `from: ops`. Internal staff notes are never returned. A post nobody
+        has reviewed yet answers `in_review` with every check unticked. Someone else's post is 404.
+      responses:
+        '200':
+          description: The case
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlatmateCase' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /flatmates/{kind}/{id}/verification/messages:
+    parameters:
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [room, group, post] } }
+      - { $ref: '#/components/parameters/GenericId' }
+    post:
+      tags: [Engagement]
+      summary: Reply to Draazy Support about my flatmate post
+      operationId: replyToFlatmateCase
+      description: >
+        Replying to a `needs_info` case puts the post back in the desk queue (`in_review`). Editing
+        the post does the same. Someone else's post is 404.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '201':
+          description: The case with the new message
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlatmateCase' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /flatmates/{kind}/{id}/verification/read:
+    parameters:
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [room, group, post] } }
+      - { $ref: '#/components/parameters/GenericId' }
+    post:
+      tags: [Engagement]
+      summary: Mark the Draazy Support messages on my flatmate post as read
+      operationId: markFlatmateCaseRead
+      responses:
+        '204': { description: Marked read }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /me/flatmate-reviews:
+    get:
+      tags: [Engagement]
+      summary: Review status and unread Support messages of all my flatmate posts
+      operationId: listMyFlatmateCases
+      description: >
+        One row per room, group or seeker post of mine that has a case file; posts nobody has
+        reviewed yet are absent. `unread` counts Draazy Support messages I have not opened.
+      responses:
+        '200':
+          description: My cases
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FlatmateCaseSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /notifications:
     get:
       tags: [Engagement]
@@ -13943,8 +14115,8 @@ components:
                 `/me/listings` views and on the staff moderation surfaces; absent entirely from the
                 public listing response, because a meter number names a live utility account and is
                 one of the few values here a stranger could act on rather than merely read.
-            views: { type: integer, description: Denormalized view counter }
-            enquiries: { type: integer, description: Denormalized enquiry counter }
+            views: { type: integer, description: 'Distinct viewers per IST day while the listing is live (signed-in user, else hashed IP); the owner''s own views never count' }
+            enquiries: { type: integer, description: One per person who has ever requested contact on this listing }
             featured: { type: boolean }
             flagReason: { type: [string, 'null'], description: Admin moderation flag; empty when unflagged }
             recheckPending:
@@ -17413,12 +17585,6 @@ components:
         status:
           type: string
           enum: [pending, published, rejected]
-        rating: { type: integer, minimum: 1, maximum: 5 }
-        body: { type: string }
-        createdAt: { type: string, format: date-time }
-        status:
-          type: string
-          enum: [pending, published, rejected]
           description: >
             `pending` is in the enum because the column can hold it, not because this platform
             writes it: reviews are post-moderated, so `ReviewService` publishes on write.
@@ -17683,6 +17849,9 @@ components:
             When the re-check was first raised. Not reset by later edits: its age is the SLA, so a
             host who re-crops a photo daily cannot walk their own row back down the queue.
         createdAt: { type: string, format: date-time }
+        checklistRequired:
+          type: boolean
+          description: True for a room and a flat-holding group, which need the three checks before they are published.
     FlatmateModerationRow:
       type: object
       description: >
@@ -17703,6 +17872,59 @@ components:
         recheckReason: { type: [string, 'null'] }
         recheckRequestedAt: { type: [string, 'null'], format: date-time }
         createdAt: { type: string, format: date-time }
+        checklistRequired: { type: boolean, description: As on `FlatmateModerationQueueItem`. }
+        caseStatus:
+          oneOf:
+            - $ref: '#/components/schemas/FlatmateCaseStatus'
+            - type: 'null'
+          description: The case file's status; null when nobody has opened one.
+        caseReasonCode: { type: [string, 'null'], description: The reason code of a `needs_info` or `rejected` case. }
+        unreadFromHost: { type: integer, description: Host replies in the Support thread the desk has not opened. }
+    FlatmateCaseStatus:
+      type: string
+      enum: [in_review, needs_info, approved, rejected]
+      description: A flatmate case file's status; `in_review` is a pending case.
+    FlatmateCase:
+      type: object
+      description: A flatmate post's review case, shared by the host's thread and the desk's popup.
+      required: [status, checklist, messages]
+      properties:
+        status: { $ref: '#/components/schemas/FlatmateCaseStatus' }
+        reasonCode: { type: [string, 'null'] }
+        reasonNote: { type: [string, 'null'] }
+        checklist:
+          type: array
+          items:
+            type: object
+            required: [item, pass]
+            properties:
+              item: { type: string }
+              pass: { type: boolean }
+        messages:
+          type: array
+          items:
+            type: object
+            required: [id, from, body, at, read, clarificationRequested]
+            properties:
+              id: { type: string }
+              from: { type: string, enum: [owner, ops] }
+              body: { type: string }
+              at: { type: string, format: date-time }
+              read: { type: boolean }
+              clarificationRequested: { type: boolean }
+        decidedAt: { type: [string, 'null'], format: date-time }
+    FlatmateCaseSummary:
+      type: object
+      required: [kind, id, status, unread, updatedAt]
+      properties:
+        kind: { type: string, enum: [room, group, post] }
+        id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/FlatmateCaseStatus' }
+        reasonCode: { type: [string, 'null'] }
+        reasonNote: { type: [string, 'null'] }
+        unread: { type: integer, description: Support messages the host has not opened. }
+        updatedAt: { type: string, format: date-time }
+        lastMessage: { type: [string, 'null'] }
     FlatmateModerationSummary:
       type: object
       properties:
@@ -17738,6 +17960,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/LivingStyleAnswers'
           description: The author's full living-style answers, in question order; empty when none. Staff see every answer.
+        caseFile: { $ref: '#/components/schemas/FlatmateCase' }
     FlatmateSeekerPost:
       type: object
       description: >
@@ -17838,6 +18061,10 @@ components:
       description: >
         How much notice a flatmate must give before leaving. Zero is a real and common term between
         flatmates; null means the host did not state one.
+    FlatmateRoomAmenity:
+      type: string
+      enum: [wifi, ac, washing_machine, lift, power_backup]
+      description: A convenience the room or flat offers. Any other code is refused with `422`.
     FlatmateLockInMonths:
       type: [integer, 'null']
       minimum: 0
@@ -17925,6 +18152,8 @@ components:
         gender: { type: string, enum: [any, male, female] }
         food: { type: string, enum: [any, veg, nonveg] }
         note: { type: string, maxLength: 600 }
+        parking: { type: [string, 'null'], enum: [bike, car, null], description: Parking the room comes with; null means none or not stated. }
+        amenities: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/FlatmateRoomAmenity' }, description: Amenities the host ticked; empty when none. }
         cover: { type: [string, 'null'], format: uri, readOnly: true, description: 'Derived — the first of the room''s photos, the card thumbnail. The gallery itself stays on the detail read. Null when the host has not added one yet.' }
         owner: { type: string }
         createdAt: { type: string, format: date-time }
@@ -17998,6 +18227,8 @@ components:
         gender: { type: string, enum: [any, male, female] }
         food: { type: string, enum: [any, veg, nonveg] }
         note: { type: string, maxLength: 600 }
+        parking: { type: [string, 'null'], enum: [bike, car, null], description: Parking the room comes with; null means none or not stated. }
+        amenities: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/FlatmateRoomAmenity' }, description: Amenities the host ticked; empty when none. }
         cover: { type: [string, 'null'], format: uri, readOnly: true, description: 'Derived — the first of `photos`, the card thumbnail. Null when the host has not added one yet.' }
         photos: { type: array, items: { type: string, format: uri } }
         owner: { type: string }
@@ -18179,6 +18410,8 @@ components:
         lng: { type: number, format: double }
         gatedCommunity: { type: boolean }
         details: { $ref: '#/components/schemas/FlatmateRoomDetails' }
+        parking: { type: [string, 'null'], enum: [bike, car, null], description: 'Parking the room comes with. Omitted or null clears it; any other value is refused with `422`.' }
+        amenities: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/FlatmateRoomAmenity' }, description: 'Amenities on offer. Omitted or null clears them; an unknown or repeated code is refused with `422`.' }
         title: { type: [string, 'null'], maxLength: 120, description: The host's own headline for the card. Blank clears it. }
     FlatmateDetail:
       type: object
@@ -18736,12 +18969,22 @@ components:
       type: object
       description: >
         The home flatmate panel, counted from the same public rows the flatmate board lists.
-      required: [seeking, initials]
+      required: [seeking, initials, tabs]
       properties:
         seeking:
           type: integer
           minimum: 0
           description: Live seeker posts plus groups still hunting — the board's "team-up" tab total.
+        tabs:
+          type: object
+          description: >
+            Open listings per board case, unfiltered and counted for an anonymous caller: rooms to
+            move into, people looking for a flatmate, and teams still hunting.
+          required: [move-in, people, teams]
+          properties:
+            move-in: { type: integer, format: int64, minimum: 0 }
+            people: { type: integer, format: int64, minimum: 0 }
+            teams: { type: integer, format: int64, minimum: 0 }
         initials:
           type: array
           maxItems: 3
@@ -19211,6 +19454,17 @@ components:
                     content:
                       type: array
                       items: { $ref: '#/components/schemas/ReviewBadge' }
+            - type: 'null'
+        offers:
+          description: Offers on the caller's listings, as /me/offers; an empty page for a non-owner.
+          oneOf:
+            - allOf:
+                - $ref: '#/components/schemas/PageEnvelope'
+                - type: object
+                  properties:
+                    content:
+                      type: array
+                      items: { $ref: '#/components/schemas/Offer' }
             - type: 'null'
         recentSearches:
           type: [array, 'null']
