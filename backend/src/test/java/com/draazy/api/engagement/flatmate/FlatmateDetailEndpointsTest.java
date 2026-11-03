@@ -71,10 +71,8 @@ class FlatmateDetailEndpointsTest extends AbstractApiTest {
     }
 
     private String group(User host) throws Exception {
-        return create(Routes.Flatmates.GROUPS, host, """
-                {"title":"Detail trio","locality":"DetailTown","policy":"any","rent":40000,"deposit":10000,
-                 "seats":3,"seatsOpen":1,"name":"Host"}
-                """);
+        return create(Routes.Flatmates.GROUPS, host,
+                FlatmateGroupFixture.hunting("Detail trio", "DetailTown", "any", 40000, 3, 1));
     }
 
     private String room(User host) throws Exception {
@@ -102,8 +100,8 @@ class FlatmateDetailEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("the host reaches their own pending group, with host-only fields")
-    void hostSeesOwnPendingGroup() throws Exception {
+    @DisplayName("the host reaches their own group, with host-only fields")
+    void hostSeesOwnGroup() throws Exception {
         User host = seeker("9812000001", "Host");
         String id = group(host);
 
@@ -117,60 +115,12 @@ class FlatmateDetailEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("the host reads what the tenant badge waits on; a visitor gets no checklist")
-    void verificationChecklistIsTheHostsAlone() throws Exception {
-        User host = seeker("9812000007", "Host");
-        String docId = personalDocuments.saveAndFlush(new PersonalDocument(host.getId(),
-                "Registered Leave and Licence", "a.png",
-                "personal/" + host.getId() + "/" + UUID.randomUUID(), 70L, "image/png"))
-                .getId().toString();
-        String id = create(Routes.Flatmates.GROUPS, host, """
-                {"title":"Checklist trio","locality":"DetailTown","policy":"any","rent":40000,"deposit":10000,
-                 "seats":3,"seatsOpen":1,"name":"Host","role":"tenant","agreement":true,
-                 "agreementDoc":{"id":"%s","name":"a.png","mime":"image/png","size":70,
-                   "dataUrl":"data:image/png;base64,iVBORw0KGgo="}}
-                """.formatted(docId));
-
-        mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(host)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.verification.status").value("pending"))
-                .andExpect(jsonPath("$.verification.ownerConsent").value(false));
-
-        approve("flatmate_groups", id);
-        mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.verification").doesNotExist());
-    }
-
-    @Test
-    @DisplayName("the host gets their own consent number back unmasked; a visitor never sees it")
-    void consentNumberIsUnmaskedOnlyForTheHost() throws Exception {
-        User host = seeker("9812000006", "Host");
-        String id = create(Routes.Flatmates.GROUPS, host, """
-                {"title":"Consent trio","locality":"DetailTown","policy":"any","rent":40000,"deposit":10000,
-                 "seats":3,"seatsOpen":1,"name":"Host","role":"tenant",
-                 "consentMobile":"9876543210"}
-                """);
-
-        mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(host)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.item.ownerConsentMobile").value("9876543210"));
-
-        approve("flatmate_groups", id);
-        mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id))
-                .andExpect(status().isOk())
-                .andExpect(content().string(Matchers.not(Matchers.containsString("9876543210"))));
-    }
-
-    @Test
-    @DisplayName("a pending ad is 404 to anyone but its author")
+    @DisplayName("a pending room is 404 to anyone but its author")
     void pendingIsHiddenFromOthers() throws Exception {
         User host = seeker("9812000002", "Host");
         User other = seeker("9812000003", "Other");
-        String groupId = group(host);
         String roomId = room(host);
 
-        mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, groupId)).andExpect(status().isNotFound());
         mvc.perform(get(Routes.Flatmates.ROOM_BY_ID, roomId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(other)))
                 .andExpect(status().isNotFound());

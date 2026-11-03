@@ -1,6 +1,5 @@
 package com.draazy.api.engagement.flatmate;
 
-import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Ids;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,10 +14,12 @@ class FlatmateEditRules {
             FlatmateRoomCreateRequest.class,
             Set.of("attachedBath", "lookingFor", "foodPref", "hostRole", "propertyId",
                     "agreementDeclared", "agreementDoc", "ownerConsentMobile", "ownerConsent",
-                    "occupants", "maxOccupants", "gatedCommunity", "details", "society", "localitySlug"),
+                    "occupants", "maxOccupants", "gatedCommunity", "parking", "amenities", "details", "society",
+                    "localitySlug"),
             FlatmateGroupCreateRequest.class,
-            Set.of("policy", "seatsOpen", "role", "propertyId", "agreement",
-                    "agreementDoc", "localitySlug"),
+            Set.of("locality", "localitySlug", "policy", "rent", "deposit", "noticePeriodDays",
+                    "lockInMonths", "maintenanceBilling", "electricityBilling", "seatsOpen", "role",
+                    "propertyId", "agreement", "agreementDoc", "consentMobile"),
             FlatmateSeekerPostCreateRequest.class,
             Set.of("gender", "age", "flatPref", "roomPref", "verifiedContactOnly", "furnishing", "gatedOnly",
                     "attachedBath", "parking"));
@@ -84,33 +85,21 @@ class FlatmateEditRules {
         return impact(remoderationRequired, rechecked);
     }
 
-    FlatmateEditImpact classify(FlatmateGroup group, FlatmateGroupCreateRequest in, String locality,
-            int seats) {
-        boolean remoderationRequired = false;
+    FlatmateEditImpact classify(FlatmateGroup group, FlatmateGroupCreateRequest in, int seats) {
         List<String> rechecked = new ArrayList<>();
-        FlatmateGroupPreferences wanted = in.hunting() ? in.preferences().normalised() : null;
+        FlatmateGroupPreferences wanted = in.preferences().normalised();
 
-        if (group.isHunting() != in.hunting()
-                || (!in.hunting() && !same(group.getLocality(), locality))) {
-            remoderationRequired = true;
-        }
+        // Only a legacy flat-holding group is not hunting; saving it as a team is a new kind of post.
+        boolean remoderationRequired = !group.isHunting();
 
         if (!same(group.getTitle(), in.title())) {
             rechecked.add("title");
         }
-        if (!Objects.equals(group.getRent(), wanted == null ? in.rent() : wanted.rentMax())) {
+        if (!Objects.equals(group.getRent(), wanted.rentMax())) {
             rechecked.add("rent");
         }
-        if (wanted != null && !wanted.equals(group.getPreferences())) {
+        if (!wanted.equals(group.getPreferences())) {
             rechecked.add("preferences");
-        }
-
-        if (wanted == null && (!Objects.equals(group.getDeposit(), in.deposit())
-                || !Objects.equals(group.getNoticePeriodDays(), in.noticePeriodDays())
-                || !Objects.equals(group.getLockInMonths(), in.lockInMonths())
-                || !same(group.getMaintenanceBilling(), in.maintenanceBilling())
-                || !same(group.getElectricityBilling(), in.electricityBilling()))) {
-            rechecked.add("deposit");
         }
         if (!same(group.getNote(), in.note())) {
             rechecked.add("note");
@@ -118,11 +107,6 @@ class FlatmateEditRules {
 
         if (group.getSeatsTotal() != seats) {
             rechecked.add("seats");
-        }
-
-        if (wanted == null
-                && !same(group.getOwnerConsentMobile(), MobileMask.normalise(in.consentMobile()))) {
-            rechecked.add("owner consent");
         }
 
         return impact(remoderationRequired, rechecked);

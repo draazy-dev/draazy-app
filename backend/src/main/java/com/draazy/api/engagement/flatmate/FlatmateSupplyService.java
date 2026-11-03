@@ -240,20 +240,12 @@ public class FlatmateSupplyService {
         User host = users.findById(caller.userId())
                 .orElseThrow(() -> NotFoundException.of("User"));
         String hostName = FlatmateVocabulary.profileName(host);
-        FlatmateGroupClaim claim = FlatmateGroupClaim.of(body,
-                () -> declaresAgreement(caller.userId(), body.agreement(), body.agreementDoc()),
-                localities::canonicalNames, localities::canonicalName);
-        refuseOwnerGroup(claim.hostRole());
-        String hostRole = claim.hostRole();
-        boolean declared = claim.declared();
-        UUID propertyId = claim.propertyId();
-
-        String tier = deriveTier(caller, hostRole, propertyId, declared);
+        refuseGroupWithFlat(body);
+        FlatmateGroupClaim claim = FlatmateGroupClaim.of(body, localities::canonicalNames);
+        String tier = FlatmateVocabulary.TIER_IDENTITY;
         String locality = claim.locality();
 
-        var address = new FlatmateGuardrails.Address(
-                FlatmateVocabulary.TIER_OWNER.equals(tier) ? propertyId : null,
-                null, locality, body.title());
+        var address = new FlatmateGuardrails.Address(null, null, locality, body.title());
         var eligibility = guardrails.evaluate(caller.userId(), tier, address);
         if (eligibility.blocked()) {
             throw new HostBlockedException(eligibility);
@@ -265,19 +257,15 @@ public class FlatmateSupplyService {
         claim.shape(group);
         rejectMoreOpenSeatsThanSeats(group);
 
-        group.setHostRole(hostRole);
+        group.setHostRole(FlatmateVocabulary.ROLE_TENANT);
         group.setVerificationTier(tier);
-        group.setAgreementDeclared(declared);
+        group.setAgreementDeclared(false);
         group.setAddressFingerprint(eligibility.fingerprint());
 
-        group.setOwnerConsent(consentService.has(
-                group.getOwnerConsentMobile(), caller.userId(), group.getAddressFingerprint()));
         group.setFlagForReview(eligibility.flagForReview());
-        String state = publication.stateFor(tier, eligibility.flagForReview(), group.isHunting());
+        String state = publication.stateFor(tier, eligibility.flagForReview(), true);
         group.setModStatus(state);
-        FlatmatePublication.queueUnreviewed(group.getRecheck(), state, group.isHunting());
-
-        group.setPropertyId(FlatmateVocabulary.TIER_OWNER.equals(tier) ? propertyId : null);
+        FlatmatePublication.queueUnreviewed(group.getRecheck(), state, true);
 
         group.addMember(new FlatmateGroupMember(hostName, caller.userId(), caller.verified()));
         clampOpenSeats(group);
@@ -286,7 +274,7 @@ public class FlatmateSupplyService {
         publication.enqueueReviewIfNeeded(caller, "group", null, saved.getId(), tier,
                 eligibility.flagForReview(),
                 addressLabel(null, saved.getLocality()),
-                claimOf(caller, body, saved.isOwnerConsent()));
+                noAgreementClaim());
         return mapper.toDto(saved, ownParty(caller));
     }
 
@@ -377,23 +365,15 @@ public class FlatmateSupplyService {
     public FlatmateGroupDto updateGroup(AuthPrincipal caller, UUID groupId,
             FlatmateGroupCreateRequest body) {
         FlatmateGroup group = ownedGroup(caller, groupId);
+        refuseGroupWithFlat(body);
 
         FlatmateGroupClaim claim = FlatmateGroupClaim.of(body,
-                () -> declaresAgreement(caller.userId(), body.agreement(), body.agreementDoc()),
-                names -> localities.canonicalNames(names, group.getLocalities()),
-                (slug, name) -> localities.canonicalName(slug, name, group.getLocalities()));
-        if (!FlatmateVocabulary.ROLE_OWNER.equals(group.getHostRole())) {
-            refuseOwnerGroup(claim.hostRole());
-        }
-        String hostRole = claim.hostRole();
-        boolean declared = claim.declared();
-        UUID propertyId = claim.propertyId();
-        String tier = deriveTier(caller, hostRole, propertyId, declared);
+                names -> localities.canonicalNames(names, group.getLocalities()));
+        String tier = FlatmateVocabulary.TIER_IDENTITY;
         String locality = claim.locality();
         boolean reopenBlocked = group.openSeats() == 0 && guardrails.capBlocksReopen(caller.userId(), tier);
 
-        FlatmateEditImpact impact = editRules.classify(group, body, locality,
-                mapper.seatsOrTwo(body.seats()));
+        FlatmateEditImpact impact = editRules.classify(group, body, mapper.seatsOrTwo(body.seats()));
         mapper.applyTo(body, group);
         group.setTitle(body.title().strip());
         claim.shape(group);
@@ -410,22 +390,17 @@ public class FlatmateSupplyService {
         }
 
         publication.reapplyAfterEdit(caller, tier, impact, group,
-                new FlatmateGuardrails.Address(
-                        FlatmateVocabulary.TIER_OWNER.equals(tier) ? propertyId : null,
-                        null, locality, body.title()));
-        group.setHostRole(hostRole);
-        group.setAgreementDeclared(declared);
+                new FlatmateGuardrails.Address(null, null, locality, body.title()));
+        group.setHostRole(FlatmateVocabulary.ROLE_TENANT);
+        group.setAgreementDeclared(false);
         group.setVerificationTier(tier);
-        group.setPropertyId(FlatmateVocabulary.TIER_OWNER.equals(tier) ? propertyId : null);
-
-        group.setOwnerConsent(consentService.has(
-                group.getOwnerConsentMobile(), caller.userId(), group.getAddressFingerprint()));
+        group.setOwnerConsent(false);
 
         FlatmateGroup saved = groups.saveAndFlush(group);
         publication.enqueueReviewIfNeeded(caller, "group", null, saved.getId(), tier,
                 saved.isFlagForReview(),
                 addressLabel(null, saved.getLocality()),
-                claimOf(caller, body, saved.isOwnerConsent()));
+                noAgreementClaim());
         return mapper.toDto(saved, ownParty(caller));
     }
 
@@ -498,11 +473,16 @@ public class FlatmateSupplyService {
                 requester == null ? null : requester.getMobile());
     }
 
-    private static void refuseOwnerGroup(String hostRole) {
-        if (FlatmateVocabulary.ROLE_OWNER.equals(hostRole)) {
+    private static void refuseGroupWithFlat(FlatmateGroupCreateRequest body) {
+        if (body.hunting()) {
+            return;
+        }
+        if (FlatmateVocabulary.ROLE_OWNER.equals(FlatmateVocabulary.blankToNull(body.role()))) {
             throw new ConflictException("owner_lists_rooms",
                     "Owners list each room on its own. Use List a room instead of starting a team.");
         }
+        throw new ConflictException("flat_lists_as_room",
+                "A team that already has a flat lists its spare seats as a room. Use List a room instead.");
     }
 
     private String deriveTier(AuthPrincipal caller, String hostRole, UUID propertyId,
@@ -592,16 +572,9 @@ public class FlatmateSupplyService {
                 evidenceTypeOf(caller.userId(), body.agreementDoc()));
     }
 
-    private FlatmatePublication.AgreementClaim claimOf(AuthPrincipal caller,
-            FlatmateGroupCreateRequest body, boolean ownerConsent) {
-        if (body.hunting()) {
-            return new FlatmatePublication.AgreementClaim(null,
-                    new AgreementRegistration(), false, null, null);
-        }
-        return new FlatmatePublication.AgreementClaim(storedDoc(body.agreementDoc()),
-                new AgreementRegistration(), ownerConsent,
-                Ids.parseUuid(body.propertyId()).orElse(null),
-                evidenceTypeOf(caller.userId(), body.agreementDoc()));
+    private static FlatmatePublication.AgreementClaim noAgreementClaim() {
+        return new FlatmatePublication.AgreementClaim(null,
+                new AgreementRegistration(), false, null, null);
     }
 
     // Rebuilt from fixed keys: a client-sent dataUrl would let Ops open the host's bytes instead of the vault file.

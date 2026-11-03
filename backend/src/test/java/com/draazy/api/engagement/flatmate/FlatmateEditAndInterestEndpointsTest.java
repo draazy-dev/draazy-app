@@ -86,13 +86,8 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                                 + agreementEvidence(host));
     }
 
-    private String groupBody(User host, String title, String locality, String policy,
-            int seats, int seatsOpen) {
-        return """
-                {"title":"%s","locality":"%s","policy":"%s","rent":40000,"deposit":10000,"agreement":true,
-                 "seats":%d,"seatsOpen":%d,"name":"Host",%s}
-                """.formatted(title, locality, policy, seats, seatsOpen,
-                agreementEvidence(host));
+    private String groupBody(String title, String locality, String policy, int seats, int seatsOpen) {
+        return FlatmateGroupFixture.hunting(title, locality, policy, 40000, seats, seatsOpen);
     }
 
     private static String idOf(String json) {
@@ -135,7 +130,7 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
         return approved("flatmate_groups", idOf(mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(groupBody(host, title, locality, policy, seats, seatsOpen)))
+                        .content(groupBody(title, locality, policy, seats, seatsOpen)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString()));
     }
@@ -249,14 +244,14 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
             mvc.perform(patch(Routes.Flatmates.GROUP_BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(groupBody(host, "Baner 3BHK", "Baner", "any", 4, 2)))
+                            .content(groupBody("Baner 3BHK", "Baner", "any", 4, 2)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.seatsTotal").value(4));
 
             mvc.perform(patch(Routes.Flatmates.GROUP_BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(groupBody(host, "Baner 3BHK", "Baner", "any", 1, 0)))
+                            .content(groupBody("Baner 3BHK", "Baner", "any", 1, 0)))
                     .andExpect(status().isBadRequest());
         }
 

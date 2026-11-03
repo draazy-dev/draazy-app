@@ -72,10 +72,7 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"%s","locality":"Kothrud","policy":"any","rent":45000,"deposit":10000,
-                                 "seats":3,"seatsOpen":1,"name":"%s"}
-                                """.formatted(title, host.getName())))
+                        .content(FlatmateGroupFixture.hunting(title, "Kothrud", "any", 45000, 3, 1)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
@@ -424,14 +421,15 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
         @DisplayName("includes a group still waiting on moderation — the host is not a stranger")
         void includesPending() throws Exception {
             User host = user("9811100025", "Host Eleven");
-            mvc.perform(post(Routes.Flatmates.GROUPS)
+            String id = mvc.perform(post(Routes.Flatmates.GROUPS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"title":"Still pending","locality":"Kothrud","policy":"any",
-                                     "rent":45000,"deposit":10000,"seats":3,"seatsOpen":1,"name":"Host Eleven"}
-                                    """))
-                    .andExpect(status().isCreated());
+                            .content(FlatmateGroupFixture.hunting("Still pending", "Kothrud", "any", 45000, 3, 1)))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString()
+                    .replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+            jdbc.update("update flatmate_groups set mod_status = 'pending' where id = ?::uuid", id);
+            em.clear();
 
             mvc.perform(get(Routes.Flatmates.MY_GROUPS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host)))

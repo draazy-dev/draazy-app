@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.draazy.api.common.web.Routes;
+import com.draazy.api.engagement.flatmate.FlatmateGroupFixture;
 import com.draazy.api.engagement.flatmate.FlatmateRoomFixture;
 import com.draazy.api.identity.user.User;
 import org.junit.jupiter.api.DisplayName;
@@ -33,10 +34,7 @@ class CrossUserFlatmateOwnershipTest extends AbstractSecurityTest {
     }
 
     private static String group(String title) {
-        return """
-                {"title":"%s","locality":"Baner","policy":"women","rent":40000,"deposit":10000,
-                 "seats":3,"seatsOpen":1,"name":"Host"}
-                """.formatted(title);
+        return FlatmateGroupFixture.hunting(title, "Baner", "women", 40000, 3, 1);
     }
 
     private String create(User host, String route, String body) throws Exception {

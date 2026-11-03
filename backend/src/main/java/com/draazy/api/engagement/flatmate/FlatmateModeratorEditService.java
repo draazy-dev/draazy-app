@@ -152,14 +152,13 @@ public class FlatmateModeratorEditService {
             group.setRent(body.rent());
         }
         if (body.deposit() != null) {
-            refuse(group.isHunting(), "A group still hunting for a flat has a deposit range, not a deposit.");
-            group.setDeposit(body.deposit());
+            throw new ValidationException("A group still hunting for a flat has a deposit range, not a deposit.");
         }
         if (body.localities() != null) {
             List<String> localities = localityBinding.canonicalNames(
                     FlatmateSeekerService.clean(body.localities()), group.getLocalities());
             refuse(localities.isEmpty(), "A group needs a locality.");
-            refuse(localities.size() > (group.isHunting() ? FlatmateVocabulary.MAX_LOCALITIES : 1),
+            refuse(localities.size() > FlatmateVocabulary.MAX_LOCALITIES,
                     "Too many localities for this group.");
             group.relocate(localities);
         }
@@ -168,7 +167,6 @@ public class FlatmateModeratorEditService {
                     new FlatmateGuardrails.Address(null, null, group.getLocality(), group.getTitle())));
         }
         if (body.moveIn() != null) {
-            refuse(!group.isHunting(), "Only a group hunting for a flat has a move-in date.");
             group.moveInBy(body.moveIn());
         }
         groups.saveAndFlush(group);

@@ -3,6 +3,7 @@ import { API, apiLogin, authHeaders, uploadedListingPhotos, signedInAs, uniqueMo
 import { ACTORS, STAFF } from '../../../fixtures/live.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { verifyOwnership } from '../../../helpers/referral.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -50,8 +51,10 @@ async function ownerWithFlat({ deal = 'rent', bhk = 3, price = 36000, approve = 
 }
 
 async function publishRoom(id) {
+  const staffHeaders = await authHeaders(STAFF.rental);
+  await tickDeskChecklist(API, id, staffHeaders);
   const published = await api('PATCH', `/admin/flatmates/${id}/moderation`,
-    await authHeaders(STAFF.rental), { modStatus: 'approved' });
+    staffHeaders, { modStatus: 'approved' });
   expect(published.status, published.text).toBe(200);
 }
 // Empty occupied rooms first; unsplit refuses while anyone lives there.

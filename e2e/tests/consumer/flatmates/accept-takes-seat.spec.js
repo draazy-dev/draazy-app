@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -9,6 +11,7 @@ const track = flatmateCleanup(test);
 
 async function approve(id) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, id, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),
@@ -35,10 +38,10 @@ test('accepting a group request adds the member and fills the seat; the next acc
   const created = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(hostToken),
-    body: JSON.stringify({
+    body: JSON.stringify(huntingGroup({
       title, locality: 'Baner', rent: 30000, deposit: 50000,
-      seats: 2, seatsOpen: 1, policy: 'women', role: 'tenant',
-    }),
+      seats: 2, seatsOpen: 1, policy: 'women',
+    })),
   });
   expect(created.status, await created.clone().text()).toBe(201);
   const group = await created.json();

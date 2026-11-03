@@ -267,6 +267,7 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
             String firstRoom = com.jayway.jsonpath.JsonPath.read(split, "$.rooms[0].id");
             String sibling = com.jayway.jsonpath.JsonPath.read(split, "$.rooms[1].id");
 
+            FlatmateDeskTicks.tickAll(mvc, bearer(admin), firstRoom);
             mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION.replace("{id}", firstRoom))
                             .header(HttpHeaders.AUTHORIZATION, bearer(admin))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -429,49 +430,6 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
     }
 
     @Nested
-    @DisplayName("owner consent")
-    class OwnerConsent {
-        @Test
-        @DisplayName("a wrong code records nothing")
-        void wrongCodeIsRefused() throws Exception {
-            User tenant = user("9830000022", "Tenant2", Roles.Wire.BUYER);
-            String groupId = createGroup(tenant);
-
-            mvc.perform(post(Routes.Flatmates.OWNER_CONSENT)
-                            .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"ownerMobile\":\"9830000023\",\"title\":\"Replacement flatmate\","
-                                    + "\"locality\":\"Baner\"}"))
-                    .andExpect(status().isOk());
-
-            mvc.perform(post(Routes.Flatmates.OWNER_CONSENT)
-                            .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"ownerMobile\":\"9830000023\",\"otp\":\"000000\","
-                                    + "\"title\":\"Replacement flatmate\",\"locality\":\"Baner\"}"))
-                    .andExpect(status().isUnauthorized());
-
-            Boolean consented = jdbc.queryForObject(
-                    "select owner_consent from flatmate_groups where id = ?::uuid",
-                    Boolean.class, groupId);
-            assertThat(consented).isFalse();
-        }
-
-        private String createGroup(User host) throws Exception {
-            String json = mvc.perform(post(Routes.Flatmates.GROUPS)
-                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"title":"Replacement flatmate","locality":"Baner",
-                                     "rent":40000,"deposit":10000,"name":"Host","role":"tenant"}
-                                    """))
-                    .andExpect(status().isCreated())
-                    .andReturn().getResponse().getContentAsString();
-            return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
-        }
-    }
-
-    @Nested
     @DisplayName("group applications")
     class GroupApplications {
         @Test
@@ -495,10 +453,7 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
             String groupJson = mvc.perform(post(Routes.Flatmates.GROUPS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(applicant))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"title":"Four of us","locality":"Baner","rent":45000,"deposit":10000,
-                                     "seats":4,"name":"Applicant"}
-                                    """))
+                            .content(FlatmateGroupFixture.hunting("Four of us", "Baner", "any", 45000, 4, 1)))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
             String groupId = groupJson.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");

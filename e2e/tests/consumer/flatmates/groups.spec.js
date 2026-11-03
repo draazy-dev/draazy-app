@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 /* API-level because almost every group rule is a server rule. The write and read vocabularies
    differ: `FlatmateGroupCreate` takes `seats`/`role`, the response answers `seatsTotal`/`hostRole`. */
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -18,7 +20,7 @@ async function newSeeker() {
   return { mobile, accessToken };
 }
 
-const groupBody = (over = {}) => ({
+const groupBody = (over = {}) => huntingGroup({
   title: 'Baner 3BHK Group',
   locality: 'Baner',
   rent: 35000,
@@ -26,7 +28,6 @@ const groupBody = (over = {}) => ({
   seats: 3,
   seatsOpen: 1,
   policy: 'any',
-  role: 'tenant',
   ...over,
 });
 
@@ -53,6 +54,7 @@ async function createGroup(token, over = {}) {
 
 async function approve(groupId) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, groupId, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${groupId}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),
@@ -129,28 +131,27 @@ test.describe('Flatmate groups', () => {
       expect(problem.fields.map((f) => f.field)).toContain('title');
     });
   });
-  test('a brand-new group with a flat is pending, and therefore not yet joinable', async ({ page }) => {
+  test('a team is live at once and joinable, and a group that already has a flat is refused', async () => {
     const host = await newHost();
     const seeker = await newSeeker();
     const { body: group } = await createGroup(host.accessToken, { seats: 3, seatsOpen: 2 });
-    // Nothing in the create path publishes a group, which is why every seeker-side test here must
-    // approve first — and an identity-tier group is not even enqueued, so today it stays pending.
-    expect(group.modStatus).toBe('pending');
+    expect(['live', 'approved']).toContain(group.modStatus);
 
     const joinRes = await fetch(`${API}/flatmates/groups/${group.id}/join`, {
       method: 'POST',
       headers: auth(seeker.accessToken),
       body: JSON.stringify({ share: 'solo' }),
     });
-    expect(joinRes.status).toBe(404);
+    expect(joinRes.status).toBe(201);
 
-    await approve(group.id);
-    const afterRes = await fetch(`${API}/flatmates/groups/${group.id}/join`, {
+    const housed = { title: 'Already housed', locality: 'Baner', rent: 35000, deposit: 50000, seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant' };
+    const refused = await fetch(`${API}/flatmates/groups`, {
       method: 'POST',
-      headers: auth(seeker.accessToken),
-      body: JSON.stringify({ share: 'solo' }),
+      headers: auth(host.accessToken),
+      body: JSON.stringify(housed),
     });
-    expect(afterRes.status).toBe(201);
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error).toBe('flat_lists_as_room');
   });
 
   test('the public teams feed is open, carries no host mobile, and filters and pages', async () => {
@@ -341,10 +342,7 @@ test.describe('Flatmate groups', () => {
     expect(await onFeed()).toBe(true);
   });
 
-  test('a team still hunting lists under Teams; one that has its flat lists nowhere but stays readable by id', async () => {
-    const settledHost = await newHost();
-    const { body: settled } = await createGroup(settledHost.accessToken, { locality: 'Wakad', seats: 3, seatsOpen: 1 });
-    await approve(settled.id);
+  test('a team still hunting lists under Teams, never under Move-in, and stays readable by id', async () => {
     const huntingHost = await newHost();
     const { status, body: hunting } = await createGroup(huntingHost.accessToken, hunt('Wakad'));
     expect(status, JSON.stringify(hunting)).toBe(201);
@@ -354,9 +352,7 @@ test.describe('Flatmate groups', () => {
 
     const [moveIn, teams] = [await ids('move-in'), await ids('teams')];
     expect(teams).toContain(hunting.id);
-    expect(teams).not.toContain(settled.id);
-    expect(moveIn).not.toContain(settled.id);
     expect(moveIn).not.toContain(hunting.id);
-    expect((await fetch(`${API}/flatmates/groups/${settled.id}`)).status).toBe(200);
+    expect((await fetch(`${API}/flatmates/groups/${hunting.id}`)).status).toBe(200);
   });
 });

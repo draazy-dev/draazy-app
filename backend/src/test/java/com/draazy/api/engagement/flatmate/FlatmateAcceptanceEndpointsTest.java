@@ -70,10 +70,7 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Two of us in Aundh","locality":"Aundh","policy":"women",
-                                 "rent":40000,"deposit":10000,"seats":2,"seatsOpen":1,"name":"Host"}
-                                """))
+                        .content(FlatmateGroupFixture.hunting("Two of us in Aundh", "Aundh", "women", 40000, 2, 1)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return publish("flatmate_groups", idOf(json));

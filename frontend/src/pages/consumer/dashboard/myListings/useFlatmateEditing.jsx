@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import '../../../../styles/routes/flatmates.css';
 import { getMyFlatmatePost } from '../../../../services/flatmateService.js';
 import { useFlatmateSupply } from '../../flatmates/useFlatmateSupply.jsx';
-import { useGroupPickers } from '../../flatmates/useGroupPickers.js';
 import SupplyModals from '../../flatmates/SupplyModals.jsx';
 
 const noop = () => {};
@@ -20,7 +19,6 @@ export function useFlatmateEditing({ user, toast, refresh }) {
     setInterests: noop, ownsGroup: ownsNothing, myPost, myPostsStatus: 'ready',
     onGroupEdited: noop,
   });
-  const pickers = useGroupPickers(user, supply.groupOpen);
 
   useEffect(() => {
     if (!pendingPostId || myPost?.id !== pendingPostId) return;
@@ -40,7 +38,7 @@ export function useFlatmateEditing({ user, toast, refresh }) {
 
   const modals = (
     <div className="sf-page">
-      <SupplyModals s={{ ...supply, ...pickers, toast, t }} />
+      <SupplyModals s={supply} />
     </div>
   );
   return { editGroup: supply.editGroup, editPost, modals };

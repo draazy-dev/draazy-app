@@ -80,10 +80,7 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
     }
 
     private String createGroup(User host, String title) throws Exception {
-        String body = """
-                {"title":"%s","locality":"Baner","policy":"women","rent":40000,"deposit":10000,
-                 "seats":3,"seatsOpen":1,"name":"Host"}
-                """.formatted(title);
+        String body = FlatmateGroupFixture.hunting(title, "Baner", "women", 40000, 3, 1);
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)

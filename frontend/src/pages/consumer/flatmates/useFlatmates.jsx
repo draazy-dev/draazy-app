@@ -15,7 +15,6 @@ import { normalizeTab } from './model.js';
 import { SHARE_OPENER, SEEKER_OPENER } from './openers.js';
 import { useFlatmateDiscovery, emptyFilters } from './useFlatmateDiscovery.jsx';
 import { useFlatmateSupply } from './useFlatmateSupply.jsx';
-import { useGroupPickers } from './useGroupPickers.js';
 import { useGenderGate } from './useGenderGate.jsx';
 import { MAX_PAGE_SIZE } from '../../../services/apiLimits.js';
 import { REVISIT_MAX_AGE } from '../../../services/http.js';
@@ -130,8 +129,7 @@ export function useFlatmates() {
   };
   const { askGender, genderSheet } = useGenderGate();
   const supply = useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: navigate, setInterests, ownsGroup, myPost, myPostsStatus, askGender });
-  const { groupOpen, isVerified, setVerifyOpen, openPostModal } = supply;
-  const pickers = useGroupPickers(user, groupOpen);
+  const { isVerified, setVerifyOpen, openPostModal } = supply;
 
   const discovery = useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, openPostModal, onPost: openPostChooser, viewer: user?.mobile || '' });
   const { setF } = discovery;
@@ -239,7 +237,6 @@ export function useFlatmates() {
     viewMode,
     setViewMode,
     myPost,
-    ...pickers,
     ownsGroup,
     ownsRoom,
     myRooms,

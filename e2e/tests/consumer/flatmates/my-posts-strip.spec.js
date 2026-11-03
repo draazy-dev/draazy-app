@@ -2,6 +2,9 @@ import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, apiLogin, authHeaders, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -44,7 +47,7 @@ test('teams and flatmates: own posts sit in the strip, capped at two with a View
   const { accessToken } = await apiLogin(mobile, { name: 'Strip Host' });
   const post = await create('posts', accessToken, {
     gender: 'female', age: 26, occupation: 'Engineer', budget: 16000,
-    localities: ['Baner'], moveIn: '2026-12-01', flatPref: 'any', roomPref: 'private', note: 'Strip test',
+    localities: ['Baner'], moveIn: MOVE_IN, flatPref: 'any', roomPref: 'private', note: 'Strip test',
   });
   const hunt = { locality: undefined, rent: undefined, deposit: undefined,
     preferences: { localities: ['Baner'], rentMax: 45000, depositMax: 90000, gatedOnly: false, bachelors: false } };
@@ -74,10 +77,9 @@ test('teams and flatmates: own posts sit in the strip, capped at two with a View
   await expect(page).toHaveURL(new RegExp(`/flatmates/post/${post.id}$`));
 });
 
-test('a settled team sits in neither strip: Rooms shows only rooms, Teams only hunting teams', async ({ page }) => {
+test('the Teams strip holds hunting teams, and Move-in lists rooms only', async ({ page }) => {
   const mobile = uniqueMobile();
   const { accessToken } = await apiLogin(mobile, { name: 'Strip Host' });
-  const settled = await group(accessToken, `Strip flat group ${stamp()}`);
   const hunting = await group(accessToken, `Strip hunting group ${stamp()}`, { locality: undefined, rent: undefined, deposit: undefined,
     preferences: { localities: ['Baner'], rentMax: 45000, depositMax: 90000, gatedOnly: false, bachelors: false } });
   const tileFor = (g) => strip(page).locator(`a[href="/flatmates/group/${g.id}"]`);
@@ -85,7 +87,6 @@ test('a settled team sits in neither strip: Rooms shows only rooms, Teams only h
   await signedInAs(page, mobile);
   await page.goto(`${BASE}/flatmates?view=teams`);
   await expect(tileFor(hunting)).toBeVisible({ timeout: 20_000 });
-  await expect(tileFor(settled)).toHaveCount(0);
 
   await page.locator('button[data-tab="move-in"]').click();
   await expect(page.locator('[data-sf-id^="r:"]').first()).toBeVisible({ timeout: 20_000 });

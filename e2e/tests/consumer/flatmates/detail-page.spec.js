@@ -7,6 +7,11 @@ import { trackErrors } from '../../../helpers/console.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const track = flatmateCleanup(test);
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -16,7 +21,7 @@ async function hostsGroup(token, title) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(token),
-    body: JSON.stringify({ title, locality: 'Baner', rent: 30000, deposit: 50000, seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant', noticePeriodDays: 30, lockInMonths: 0 }),
+    body: JSON.stringify(huntingGroup({ title, locality: 'Baner', rent: 30000, deposit: 50000, seats: 3, seatsOpen: 1, policy: 'any' })),
   });
   expect(res.status, 'seeding a group').toBe(201);
   const group = await res.json();
@@ -28,7 +33,7 @@ async function hostsPost(token) {
   const res = await fetch(`${API}/flatmates/posts`, {
     method: 'POST',
     headers: auth(token),
-    body: JSON.stringify({ gender: 'female', age: 26, occupation: 'Engineer', budget: 18000, localities: ['Baner'], moveIn: '2026-12-01', flatPref: 'women', roomPref: 'private', note: 'Detail page coverage' }),
+    body: JSON.stringify({ gender: 'female', age: 26, occupation: 'Engineer', budget: 18000, localities: ['Baner'], moveIn: MOVE_IN, flatPref: 'women', roomPref: 'private', note: 'Detail page coverage' }),
   });
   expect(res.status, 'seeding a seeker post').toBe(201);
   const post = await res.json();
@@ -42,6 +47,12 @@ test.describe('LIVE: flatmate detail page', () => {
     const { accessToken } = await apiLogin(mobile, { name: 'Detail Host' });
     const title = unique('Group');
     const group = await hostsGroup(accessToken, title);
+    // A hunting team publishes straight to live; Ops sending it back to pending puts it under review.
+    const admin = await apiLogin(ACTORS.admin);
+    const held = await fetch(`${API}/admin/flatmates/${group.id}/moderation`, {
+      method: 'PATCH', headers: auth(admin.accessToken), body: JSON.stringify({ modStatus: 'pending', note: 'Add a line about the flat you are hunting for.' }),
+    });
+    expect(held.status, 'Ops holds the group back').toBeLessThan(300);
     await signedInAs(page, mobile);
     const errors = trackErrors(page);
 
@@ -57,9 +68,8 @@ test.describe('LIVE: flatmate detail page', () => {
     await expect(page.locator('.sf-card.reveal').first(), 'reduced motion hides a missing reveal hook, so assert the class it adds').toHaveClass(/\bvisible\b/);
     const tile = (label) => page.locator('.detail-card').filter({ has: page.getByText(label, { exact: true }) });
     await expect(tile('Open to')).toContainText('Anyone');
-    await expect(tile('Listed by')).toContainText('Current tenant');
-    await expect(tile('Notice period')).toContainText('30 days');
-    await expect(tile('Minimum stay')).toContainText('None');
+    await expect(tile('Listed by'), 'a team still hunting has no flat to list').toHaveCount(0);
+    await expect(tile('Notice period'), 'nor flat terms').toHaveCount(0);
 
     await panel.getByRole('link', { name: 'Edit' }).click();
     const dialog = page.getByRole('dialog', { name: 'Edit group' });
@@ -211,6 +221,7 @@ test.describe('LIVE: flatmate detail page', () => {
     const author = await apiLogin(uniqueMobile(), { name: 'Detail Seeker' });
     const post = await hostsPost(author.accessToken);
     const admin = await apiLogin(ACTORS.admin);
+    await tickDeskChecklist(API, post.id, auth(admin.accessToken));
     const live = await fetch(`${API}/admin/flatmates/${post.id}/moderation`, {
       method: 'PATCH',
       headers: auth(admin.accessToken),

@@ -4,6 +4,7 @@ import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 import { detailCta } from '../../../helpers/app.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -11,6 +12,7 @@ const track = flatmateCleanup(test);
 
 async function approve(id) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, id, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),

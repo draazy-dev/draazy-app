@@ -6,6 +6,9 @@ import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { fillRoomDetails, fillRoomLocation, nextStep, roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 import { sql } from '../../../helpers/monetisation.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 const track = flatmateCleanup(test);
@@ -24,7 +27,7 @@ async function tenantRoomWithNotice() {
       ...(await roomBasics(accessToken)),
       bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi',
       locality: 'Baner', ...(await withSocietyId(accessToken, { society })),
-      rentShare: 16000, deposit: 0, availableFrom: '2026-12-01', lookingFor: 'any', foodPref: 'any',
+      rentShare: 16000, deposit: 0, availableFrom: MOVE_IN, lookingFor: 'any', foodPref: 'any',
       hostRole: 'tenant', ownerConsent: true, ownerConsentMobile: ownerMobile,
     }),
   });
@@ -51,7 +54,7 @@ test('a room asks for the deposit, takes 0, and requires the tenant to give the 
   await nextStep(page);
 
   await page.locator('input[data-err="rentShare"]').fill('13500');
-  await pickDate(page, '[data-err="availableFrom"]', '2026-12-01');
+  await pickDate(page, '[data-err="availableFrom"]', MOVE_IN);
   await page.getByRole('spinbutton', { name: 'Notice period (days)' }).fill('30');
   await page.getByRole('spinbutton', { name: 'Minimum stay (months)' }).fill('0');
   await nextStep(page);

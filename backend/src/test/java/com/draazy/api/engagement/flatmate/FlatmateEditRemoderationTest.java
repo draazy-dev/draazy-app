@@ -396,45 +396,8 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     }
 
     @Nested
-    @DisplayName("a group keeps its default locality without being taken down for it")
+    @DisplayName("a group's locality")
     class Groups {
-        private String createGroup(User owner, String title, String locality, int rent)
-                throws Exception {
-            return approved("flatmate_groups", idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
-                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(ownedEvidence(owner, """
-                                    {"title":"%s","locality":"%s","policy":"any","rent":%d,"deposit":10000,
-                                     "seats":3,"seatsOpen":1,"name":"Host",
-                                     "agreement":true,"note":"Chill flat.",%s}
-                                    """.formatted(title, locality, rent,
-                                    FlatmateAgreementFixture.EVIDENCE))))
-                    .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.modStatus").value("pending"))
-                    .andReturn().getResponse().getContentAsString()));
-        }
-
-        @Test
-        @DisplayName("an edit that keeps the locality re-checks the title, and stays up")
-        void unchangedLocalityIsNotARelocation() throws Exception {
-            User owner = host("9812000030", "Grouper");
-            String id = createGroup(owner, "Three of us", "EditTownP", 40000);
-
-            mvc.perform(patch(Routes.Flatmates.GROUP_BY_ID, id)
-                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(ownedEvidence(owner, """
-                                    {"title":"Four of us now","locality":"EditTownP","policy":"any",
-                                     "rent":40000,"deposit":10000,"seats":3,"seatsOpen":1,"name":"Host",
-                                     "agreement":true,"note":"Chill flat.",%s}
-                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
-                    .andExpect(status().isOk());
-
-            recheckBoard(admin("9812000031"), "group")
-                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckReason",
-                            Matchers.contains("title")));
-        }
-
         @Test
         @DisplayName("a blank locality is refused rather than defaulted to a locality nobody named")
         void blankLocalityIsRefused() throws Exception {
@@ -581,28 +544,22 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
         }
 
         @Test
-        @DisplayName("a settled group's rent changes; a move-in date it does not have is refused")
+        @DisplayName("a hunting group's rent changes; a deposit it does not have is refused")
         void groupCorrection() throws Exception {
             User owner = host("9812000064", "Grouper");
-            String id = approved("flatmate_groups", idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
+            String id = idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ownedEvidence(owner, """
-                                    {"title":"Three of us","locality":"EditTownQ","policy":"any",
-                                     "rent":40000,"deposit":10000,"seats":3,"seatsOpen":1,"name":"Host",
-                                     "agreement":true,"note":"Chill flat.",%s}
-                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
+                            .content(FlatmateGroupFixture.hunting("Three of us", "EditTownQ", "any", 40000, 3, 1)))
                     .andExpect(status().isCreated())
-                    .andReturn().getResponse().getContentAsString()));
+                    .andReturn().getResponse().getContentAsString());
             User mod = admin("9812000065");
 
             edit(mod, id, "{\"title\":\"Three of us in Baner\",\"rent\":42000}")
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.group.title").value("Three of us in Baner"))
-                    .andExpect(jsonPath("$.group.rent").value(42000))
-                    .andExpect(jsonPath("$.group.modStatus").value("approved"));
-            assertThat(fingerprint("flatmate_groups", id)).isEqualTo("addr:three of us in baner|edittownq");
-            edit(mod, id, "{\"moveIn\":\"2026-11-01\"}").andExpect(status().isUnprocessableEntity());
+                    .andExpect(jsonPath("$.group.rent").value(42000));
+            edit(mod, id, "{\"deposit\":5000}").andExpect(status().isUnprocessableEntity());
             edit(mod, id, "{\"localities\":[]}").andExpect(status().isUnprocessableEntity());
         }
 

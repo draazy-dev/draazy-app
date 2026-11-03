@@ -4,6 +4,7 @@ import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { postAsGroup } from '../../../helpers/app.js';
 import { pickLocalitiesIn } from '../../../helpers/locality.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
 /** Live UI coverage verifies group persistence, owner controls, and deletion. */
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
@@ -13,6 +14,7 @@ const track = flatmateCleanup(test);
 /** Let a group out of moderation, over the route the Ops console uses. */
 async function approve(groupId) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, groupId, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${groupId}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),

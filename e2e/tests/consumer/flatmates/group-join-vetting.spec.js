@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -14,12 +16,13 @@ async function askedGroup() {
   const created = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(hostToken),
-    body: JSON.stringify({ title: `Vibe check ${tag()}`, locality: 'Baner', rent: 30000, deposit: 50000, seats: 3, seatsOpen: 2, policy: 'any', role: 'tenant' }),
+    body: JSON.stringify(huntingGroup({ title: `Vibe check ${tag()}`, locality: 'Baner', rent: 30000, deposit: 50000, seats: 3, seatsOpen: 2, policy: 'any' })),
   });
   expect(created.status, await created.clone().text()).toBe(201);
   const group = await created.json();
   track('groups', group.id, hostToken);
   const { accessToken: admin } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, group.id, auth(admin));
   const mod = await fetch(`${API}/admin/flatmates/${group.id}/moderation`, {
     method: 'PATCH', headers: auth(admin), body: JSON.stringify({ modStatus: 'live', note: 'e2e' }),
   });

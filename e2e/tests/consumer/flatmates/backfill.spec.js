@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
@@ -17,7 +19,7 @@ async function createGroup(accessToken, overrides = {}) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
-    body: JSON.stringify({
+    body: JSON.stringify(huntingGroup({
       title: `Test Group ${Number(uniqueMobile()).toString(36)}`,
       locality: 'Baner',
       rent: 40000,
@@ -25,9 +27,8 @@ async function createGroup(accessToken, overrides = {}) {
       seats: 3,
       seatsOpen: 1,
       policy: 'any',
-      role: 'tenant',
       ...overrides,
-    }),
+    })),
   });
   expect(res.status).toBe(201);
   const group = await res.json();
@@ -44,6 +45,7 @@ const setSeats = (token, groupId, seatsOpen) =>
 
 async function approve(groupId) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, groupId, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${groupId}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),

@@ -311,13 +311,9 @@ public class FlatmateSearchQueries {
 
     private static String groupVerified() {
         return """
-                (g.verification_tier = 'owner'
-                 or (g.verification_tier = 'tenant'
-                     and exists (select 1 from flatmate_reviews fr
-                                 where fr.group_id = g.id and fr.status = 'approved'))
-                 or (exists (select 1 from flatmate_group_members gm where gm.group_id = g.id)
-                     and not exists (select 1 from flatmate_group_members gm
-                                     where gm.group_id = g.id and gm.verified = false)))""";
+                (exists (select 1 from flatmate_group_members gm where gm.group_id = g.id)
+                 and not exists (select 1 from flatmate_group_members gm
+                                 where gm.group_id = g.id and gm.verified = false))""";
     }
 
     private static String groupSelect(FlatmateSearchQuery f, Map<String, Object> params) {

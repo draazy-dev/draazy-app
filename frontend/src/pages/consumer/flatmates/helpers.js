@@ -40,6 +40,17 @@ const groupListingsUrl = (p) => {
   if (amen.length) q.set('amen', amen.join(','));
   return `/listings?${q}`;
 };
+const matchingRoomsUrl = (p) => {
+  const q = new URLSearchParams({ view: 'move-in' });
+  const names = p.localities?.length ? p.localities : [p.locality].filter(Boolean);
+  if (names.length === 1) q.set('loc', names[0]);
+  const budgetMax = +p.budgetMax || +p.budget;
+  if (budgetMax) q.set('budget', `0-${budgetMax}`);
+  if (p.furnishing === 'furnished' || p.furnishing === 'semi') q.set('furn', p.furnishing);
+  if (p.gatedOnly) q.set('gated', '1');
+  if (p.attachedBath) q.set('bath', '1');
+  return `/flatmates?${q}`;
+};
 const mustHaves = (p, t) => [
   ['sofa', FURN_KEY[p.furnishing] && t('flatmates.' + FURN_KEY[p.furnishing])],
   ['building-2', p.gatedOnly && t('flatmates.gatedOnly')],
@@ -57,11 +68,6 @@ const seatsLeft = (g) => {
 const seatCeiling = (kind, item) => (kind === 'group' ? seatsLeft(item) + MAX_GROUP_SEATS - item.seatsTotal : maxOpenSeats(item));
 const allVerified = (g) => g.members.length > 0 && g.members.every((m) => m.verified);
 const policyAvatar = (p) => (p === 'women' ? 'from-pink-500 to-rose-400' : p === 'men' ? 'from-blue-500 to-indigo-400' : 'from-teal-500 to-indigo-500');
-
-const replacementTitle = ({ bhk, locality } = {}) => {
-  const where = locality ? ' in ' + locality : '';
-  return bhk ? `1 more flatmate for a ${bhk}${where}` : `1 more flatmate${where}`;
-};
 
 const HOST_TIERS = {
   owner: { label: 'Verified property', icon: 'badge-check', cls: 'text-emerald-300' },
@@ -243,4 +249,4 @@ const terms = (f) => ({
   ...(f.electricityBilling ? { electricityBilling: f.electricityBilling } : {}),
 });
 
-export { inr, avatarGrad, initials, genderLabel, genderPref, foodLabel, perHead, shareFloor, moneyRange, seekerBudget, bhkText, mustHaves, groupLocalities, groupListingsUrl, maxOpenSeats, MAX_GROUP_SEATS, seatCeiling, seatsLeft, allVerified, policyAvatar, replacementTitle, hostTierMeta, showHostBadge, hostVerifiedFor, matchFor, isFresh, moveInLabel, isDateVal, todayIso, moveInByForm, moveInByWire, readAgreementDoc, hasAgreementEvidence, toSavedCard, numeric, terms, FLATMATE_IMG, FLATMATE_GROUP_IMG, withCoords };
+export { inr, avatarGrad, initials, genderLabel, genderPref, foodLabel, perHead, shareFloor, moneyRange, seekerBudget, bhkText, mustHaves, groupLocalities, groupListingsUrl, matchingRoomsUrl, maxOpenSeats, MAX_GROUP_SEATS, seatCeiling, seatsLeft, allVerified, policyAvatar, hostTierMeta, showHostBadge, hostVerifiedFor, matchFor, isFresh, moveInLabel, isDateVal, todayIso, moveInByForm, moveInByWire, readAgreementDoc, hasAgreementEvidence, toSavedCard, numeric, terms, FLATMATE_IMG, FLATMATE_GROUP_IMG, withCoords };

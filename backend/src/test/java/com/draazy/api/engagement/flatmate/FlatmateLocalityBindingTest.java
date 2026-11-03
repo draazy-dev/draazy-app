@@ -69,32 +69,4 @@ class FlatmateLocalityBindingTest extends AbstractApiTest {
 
         assertThat(jdbc.queryForObject("select count(*) from flatmate_seeker_posts", Integer.class)).isZero();
     }
-
-    private ResultActions createGroup(User u, String localityBody) throws Exception {
-        return mvc.perform(post(Routes.Flatmates.GROUPS)
-                .header(HttpHeaders.AUTHORIZATION, bearer(u))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"title\":\"Four of us\",\"policy\":\"any\",\"rent\":45000,\"deposit\":10000,\"seats\":3,"
-                        + "\"seatsOpen\":1,\"name\":\"Locality Seeker\"," + localityBody + "}"));
-    }
-
-    @Test
-    void aGroupBoundBySlugStoresTheCanonicalName() throws Exception {
-        liveLocality("Zzflat Nagar");
-        String slug = jdbc.queryForObject("select slug from localities where name='Zzflat Nagar'", String.class);
-
-        createGroup(seeker(), "\"locality\":\"whatever the user typed\",\"localitySlug\":\"" + slug + "\"")
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.locality").value("Zzflat Nagar"));
-    }
-
-    @Test
-    void aGroupSlugOfARetiredRowIsRefused() throws Exception {
-        jdbc.update("insert into localities (slug, name, city, active, archived_at) "
-                + "values ('zzretired-wadi', 'Zzretired Wadi', 'Pune', false, now())");
-
-        createGroup(seeker(), "\"locality\":\"Zzretired Wadi\",\"localitySlug\":\"zzretired-wadi\"")
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.message").value("Pick the locality from the suggestions."));
-    }
 }

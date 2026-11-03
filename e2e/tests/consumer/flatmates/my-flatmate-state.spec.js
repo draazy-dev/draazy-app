@@ -2,6 +2,10 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, signIn, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 const track = flatmateCleanup(test);
@@ -16,7 +20,7 @@ async function createPost(token, locality = 'Baner') {
       occupation: 'Engineer',
       budget: 18000,
       localities: [locality],
-      moveIn: '2026-12-01',
+      moveIn: MOVE_IN,
       flatPref: 'women',
       roomPref: 'private',
       note: 'Dashboard coverage',
@@ -30,6 +34,7 @@ async function createPost(token, locality = 'Baner') {
 
 async function publish(postId) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, postId, auth(accessToken));
   const response = await fetch(`${API}/admin/flatmates/${postId}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),

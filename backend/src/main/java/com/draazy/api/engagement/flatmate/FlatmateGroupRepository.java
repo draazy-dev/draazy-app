@@ -128,8 +128,4 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update FlatmateGroupMember m set m.verified = :verified where m.userId = :userId and m.verified <> :verified")
     int copyMemberBadge(@Param("userId") UUID userId, @Param("verified") boolean verified);
-
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("update FlatmateGroup g set g.ownerConsent = true where g.id = :id")
-    int markOwnerConsent(@Param("id") UUID id);
 }

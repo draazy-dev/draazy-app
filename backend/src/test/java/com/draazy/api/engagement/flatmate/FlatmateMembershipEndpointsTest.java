@@ -63,10 +63,7 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Team up in Baner","locality":"Baner","policy":"%s",
-                                 "rent":30000,"deposit":10000,"seats":3,"seatsOpen":2,"name":"Host"}
-                                """.formatted(policy)))
+                        .content(FlatmateGroupFixture.hunting("Team up in Baner", "Baner", policy)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");

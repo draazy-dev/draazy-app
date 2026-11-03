@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import Icon from '../../../../components/Icon.jsx';
-import { inr, perHead, shareFloor, moneyRange, bhkText, groupListingsUrl, seatsLeft, policyAvatar, moveInLabel, groupLocalities, mustHaves } from '../helpers.js';
+import { inr, perHead, shareFloor, moneyRange, bhkText, groupListingsUrl, matchingRoomsUrl, seatsLeft, policyAvatar, moveInLabel, groupLocalities, mustHaves } from '../helpers.js';
 import { FLAT_PREF_LBL } from '../constants.js';
 import { TAB_TEAMS } from '../model.js';
 import { MustHaveChips } from '../atoms.jsx';
@@ -41,9 +41,14 @@ function WantedFlat({ p, canSearch }) {
         ['calendar', t('flatmates.groupMoveInBy'), moveInLabel(p.moveInBy)],
       ]} />
       {canSearch && (
-        <Link to={groupListingsUrl(p)} className="mt-4 btn-teal inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold text-white" data-testid="group-find-flats">
-          <Icon name="search" className="w-4 h-4" /> {t('flatmates.findFlatsForUs')}
-        </Link>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link to={groupListingsUrl(p)} className="btn-teal inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold text-white" data-testid="group-find-flats">
+            <Icon name="search" className="w-4 h-4" /> {t('flatmates.findFlatsForUs')}
+          </Link>
+          <Link to={matchingRoomsUrl(p)} className="btn-ghost inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold text-gray-200" data-testid="see-matching-rooms">
+            <Icon name="door-open" className="w-4 h-4" /> {t('flatmates.seeMatchingRooms')}
+          </Link>
+        </div>
       )}
     </Section>
   );

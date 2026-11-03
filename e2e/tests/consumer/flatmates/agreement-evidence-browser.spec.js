@@ -6,6 +6,9 @@ import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { PHOTO_PNG } from '../../../helpers/listingPhotos.helper.js';
 import { fillRoomDetails, fillRoomLocation, fillRoomPrice, nextStep, uploadRoomPhotos } from '../../../helpers/roomWizard.js';
 import { createRequire } from 'node:module';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const { PDFDocument } = createRequire(new URL('../../../../frontend/package.json', import.meta.url))('pdf-lib');
 // Browser uploads must reach the real review queue; browser-only review labels remain out of scope.
@@ -29,7 +32,7 @@ async function fillRoomUpToConsent(page, society) {
   await fillRoomLocation(page, { society });
   await nextStep(page);
   await expect(page.getByText('I have a registered rent agreement', { exact: true }), 'the agreement waits until after posting').toHaveCount(0);
-  await fillRoomPrice(page, { rent: '13500', deposit: '27000', availableFrom: '2026-12-01' });
+  await fillRoomPrice(page, { rent: '13500', deposit: '27000', availableFrom: MOVE_IN });
 }
 
 async function uploadAgreement(page, file) {
@@ -244,38 +247,4 @@ test('a light bill in the owner name backs the badge request and reaches Ops as 
   const detail = await fetch(`${API}/admin/flatmates/${room.id}`, { headers: auth(staff) }).then((r) => r.json());
   expect(detail.review.evidenceType).toBe('electricity_bill');
   expect(detail.review.hostVerified).toBe(true);
-});
-
-test('a tenant group that holds a flat gets the same Get verified button and requests its badge from Documents', async ({ page }) => {
-  const mobile = await signedInAsNew(page);
-  const { accessToken } = await apiLogin(mobile);
-  await grantIdentityBadge(mobile);
-  const created = await fetch(`${API}/flatmates/groups`, {
-    method: 'POST', headers: auth(accessToken),
-    body: JSON.stringify({
-      title: `Badge Group ${Date.now().toString(36)}`, locality: 'Kothrud', policy: 'any', rent: 45000, deposit: 50000,
-      seats: 3, seatsOpen: 1, role: 'tenant',
-    }),
-  });
-  const group = await created.json();
-  expect(created.status, JSON.stringify(group)).toBe(201);
-  track('groups', group.id, accessToken);
-
-  await page.goto('/dashboard#properties');
-  const verifyLink = page.getByTestId(`room-verification-${group.id}`);
-  await expect(verifyLink).toHaveText('Get Verified property badge');
-  await expect(verifyLink).toHaveAttribute('href', `/dashboard?tab=documents&group=${group.id}`);
-  await verifyLink.click();
-  await expect(page.getByTestId('room-badge-request-card')).toHaveAttribute('data-state', 'none');
-  await expect(page.getByText(/· Flatmate post$/).first(), 'the group is picked in the Property docs dropdown').toBeVisible();
-  await expect(page.getByRole('button', { name: 'My room' })).toHaveCount(0);
-  await uploadAgreement(page, AGREEMENT_FILE);
-  await fillAgreementPeriod(page);
-
-  const saved = page.waitForResponse((r) => new URL(r.url()).pathname === `/api/flatmates/groups/${group.id}/badge-request` && r.request().method() === 'POST');
-  await page.getByTestId('request-room-badge').click();
-  expect((await saved).status()).toBe(200);
-  await expect(page.getByTestId('room-badge-request-card')).toHaveAttribute('data-state', 'pending');
-  await page.goto('/dashboard#properties');
-  await expect(page.getByTestId(`room-verification-${group.id}`)).toHaveText('Badge under review');
 });

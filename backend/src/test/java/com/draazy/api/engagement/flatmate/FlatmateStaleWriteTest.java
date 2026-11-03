@@ -110,9 +110,8 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
         flat.setArea(new BigDecimal("1100"));
         properties.saveAndFlush(flat);
         String groupId = created(post(Routes.Flatmates.GROUPS).header(HttpHeaders.AUTHORIZATION, bearer(host))
-                .contentType(MediaType.APPLICATION_JSON).content("""
-                        {"title":"Three of us","locality":"Stalewrite Kothrud","policy":"any","rent":45000,"deposit":10000,
-                         "seats":3,"seatsOpen":1,"name":"Host"}"""));
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(FlatmateGroupFixture.hunting("Three of us", "Stalewrite Kothrud", "any", 45000, 3, 1)));
         jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", groupId);
         String applicationId = created(post(Routes.Flatmates.GROUP_APPLY.replace("{id}", groupId))
                 .header(HttpHeaders.AUTHORIZATION, bearer(host)).contentType(MediaType.APPLICATION_JSON)

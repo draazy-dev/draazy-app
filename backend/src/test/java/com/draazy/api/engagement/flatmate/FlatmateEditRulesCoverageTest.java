@@ -78,42 +78,31 @@ class FlatmateEditRulesCoverageTest {
         private FlatmateEditImpact classifyGroup(FlatmateGroup stored,
                 FlatmateGroupCreateRequest in) {
             int seats = in.seats() == null ? 2 : in.seats();
-            String locality = in.hunting() ? in.preferences().localities().get(0) : in.locality();
-            return rules.classify(stored, in, locality, seats);
-        }
-
-        private FlatmateGroup hunting(FlatmateGroupCreateRequest in) {
-            FlatmateGroup group = new FlatmateGroup();
-            group.setTitle(in.title());
-            group.setSeatsTotal(in.seats());
-            group.setNote(in.note());
-            group.hunt(in.preferences().normalised());
-            return group;
+            return rules.classify(stored, in, seats);
         }
 
         @Test
-        @DisplayName("a hunting group re-saved as stored changes nothing")
-        void huntingUnchangedIsSilent() {
-            FlatmateGroupCreateRequest in =
-                    huntingRequest(preferences(List.of("Baner", "Aundh"), List.of("3", "2")));
-            assertThat(classifyGroup(hunting(in), in)).isEqualTo(FlatmateEditImpact.SILENT);
-        }
-
-        @Test
-        @DisplayName("a hunting group's budget, sizes and shortlist are re-checked, never re-moderated")
-        void huntingPreferencesAreClassified() {
-            FlatmateGroup stored = hunting(huntingRequest(
+        @DisplayName("a group's budget, sizes and shortlist are re-checked, never re-moderated")
+        void preferencesAreClassified() {
+            FlatmateGroup stored = groupMatching(groupRequest(
                     preferences(List.of("Baner", "Aundh"), List.of("2", "3"))));
 
             FlatmateEditImpact sizes = classifyGroup(stored,
-                    huntingRequest(preferences(List.of("Baner", "Aundh"), List.of("2"))));
+                    groupRequest(preferences(List.of("Baner", "Aundh"), List.of("2"))));
             assertThat(sizes.remoderationRequired()).isFalse();
             assertThat(sizes.rechecked()).containsExactly("preferences");
 
             FlatmateEditImpact places = classifyGroup(stored,
-                    huntingRequest(preferences(List.of("Baner", "Wakad"), List.of("2", "3"))));
+                    groupRequest(preferences(List.of("Baner", "Wakad"), List.of("2", "3"))));
             assertThat(places.remoderationRequired()).isFalse();
             assertThat(places.rechecked()).containsExactly("preferences");
+        }
+
+        @Test
+        @DisplayName("a stored group that is not hunting is re-moderated when saved as a team")
+        void legacyFlatGroupIsRemoderated() {
+            assertThat(classifyGroup(new FlatmateGroup(), groupRequest()).remoderationRequired())
+                    .isTrue();
         }
     }
 
@@ -246,7 +235,7 @@ class FlatmateEditRulesCoverageTest {
                 Map.<String, Object>of("url", "https://cdn.example/a.pdf"),
                 "9800000001", true,
                 List.of("https://cdn.example/1.jpg", "https://cdn.example/2.jpg"),
-                "Sunny room.", 18.5600, 73.7800, false,
+                "Sunny room.", 18.5600, 73.7800, false, "car", List.of("wifi", "ac"),
                 new FlatmateRoomDetails("4", 12, null, 2, 1, List.of("Sofa"), "B", "Baner Road",
                         "Near the temple", "411045"), "Sunny room in Baner");
     }
@@ -281,12 +270,7 @@ class FlatmateEditRulesCoverageTest {
     }
 
     private static FlatmateGroupCreateRequest groupRequest() {
-        return new FlatmateGroupCreateRequest("Four of us in Baner", "Baner", null, "mixed",
-                48000L, 96000L, 30, 6, "shared", "separate", 4, 1,
-                "tenant", UUID.randomUUID().toString(), true,
-                Map.of("url", "https://cdn.example/b.pdf"),
-                "9800000001",
-                "Quiet flat.", null);
+        return groupRequest(preferences(List.of("Baner", "Aundh"), List.of("3", "2")));
     }
 
     private static FlatmateGroupPreferences preferences(List<String> localities, List<String> bhk) {
@@ -294,25 +278,19 @@ class FlatmateEditRulesCoverageTest {
                 true, true, "semi", "bike", LocalDate.of(2026, 9, 1));
     }
 
-    private static FlatmateGroupCreateRequest huntingRequest(FlatmateGroupPreferences prefs) {
-        FlatmateGroupCreateRequest b = groupRequest();
-        return new FlatmateGroupCreateRequest(b.title(), null, null, b.policy(), null, null, null, null,
-                null, null, b.seats(), b.seatsOpen(), null, null, null, null, null,
-                b.note(), prefs);
+    private static FlatmateGroupCreateRequest groupRequest(FlatmateGroupPreferences prefs) {
+        return new FlatmateGroupCreateRequest("Four of us in Baner", null, null, "mixed",
+                null, null, null, null, null, null, 4, 1,
+                null, null, null, null, null,
+                "Quiet flat.", prefs);
     }
 
     private static FlatmateGroup groupMatching(FlatmateGroupCreateRequest in) {
         FlatmateGroup group = new FlatmateGroup();
         group.setTitle(in.title());
-        group.settle(in.locality(), in.rent());
-        group.setDeposit(in.deposit());
-        group.setNoticePeriodDays(in.noticePeriodDays());
-        group.setLockInMonths(in.lockInMonths());
-        group.setMaintenanceBilling(in.maintenanceBilling());
-        group.setElectricityBilling(in.electricityBilling());
         group.setSeatsTotal(in.seats());
         group.setNote(in.note());
-        group.setOwnerConsentMobile(in.consentMobile());
+        group.hunt(in.preferences().normalised());
         return group;
     }
 

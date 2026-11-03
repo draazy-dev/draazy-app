@@ -16,7 +16,6 @@ import com.draazy.api.provider.OtpSender;
 import com.draazy.api.security.AuthPrincipal;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class FlatmateOwnerConsentService {
     private final FlatmateOwnerConsentRepository consents;
     private final FlatmateRoomRepository rooms;
-    private final FlatmateGroupRepository groups;
     private final FlatmateGuardrails guardrails;
 
     private final FlatmateReviewRepository reviews;
@@ -33,12 +31,11 @@ public class FlatmateOwnerConsentService {
     private final AuditService audit;
 
     public FlatmateOwnerConsentService(FlatmateOwnerConsentRepository consents,
-            FlatmateRoomRepository rooms, FlatmateGroupRepository groups,
+            FlatmateRoomRepository rooms,
             FlatmateGuardrails guardrails, FlatmateReviewRepository reviews,
             UserRepository users, OtpService otpService, AuditService audit) {
         this.consents = consents;
         this.rooms = rooms;
-        this.groups = groups;
         this.guardrails = guardrails;
         this.reviews = reviews;
         this.users = users;
@@ -80,13 +77,8 @@ public class FlatmateOwnerConsentService {
                 .filter(room -> hostId.equals(room.getHostId()))
                 .filter(room -> mobile.equals(room.getOwnerConsentMobile()))
                 .map(FlatmateRoom::getId).toList();
-        List<UUID> groupIds = groups.findByAddressFingerprintAndArchivedFalseOrderByIdAsc(fingerprint).stream()
-                .filter(group -> hostId.equals(group.getHostId()))
-                .filter(group -> mobile.equals(group.getOwnerConsentMobile()))
-                .map(FlatmateGroup::getId).toList();
         roomIds.forEach(rooms::markOwnerConsent);
-        groupIds.forEach(groups::markOwnerConsent);
-        Stream.concat(roomIds.stream(), groupIds.stream()).forEach(reviews::markOwnerConsent);
+        roomIds.forEach(reviews::markOwnerConsent);
     }
 
     void grantFromNotice(UUID hostId, String ownerMobile, String addressFingerprint) {

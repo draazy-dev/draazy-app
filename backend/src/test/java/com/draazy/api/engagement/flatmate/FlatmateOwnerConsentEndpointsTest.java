@@ -1,7 +1,6 @@
 package com.draazy.api.engagement.flatmate;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -131,21 +130,15 @@ class FlatmateOwnerConsentEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("consent granted before the group is created lands on the group")
+    @DisplayName("consent granted before the room is created lands on the room")
     void consentIsReadBackAtCreateTime() throws Exception {
         User tenant = user("9830000403", "Tenant");
-        sendAndForceCode(tenant, "9830000404");
-        record(tenant, "9830000404", "Replacement flatmate", "Baner");
+        sendAndForceCode(tenant, "9830000404", "Consent Towers", "Baner");
+        record(tenant, "9830000404", "Consent Towers", "Baner");
 
-        mvc.perform(post(Routes.Flatmates.GROUPS)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Replacement flatmate","locality":"Baner","rent":40000,"deposit":10000,
-                                 "name":"Tenant","role":"tenant","consentMobile":"9830000404"}
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.ownerConsent").value(true));
+        String roomId = createTenantRoom(tenant, "Consent Towers", "9830000404");
+
+        assertThat(roomConsent(roomId)).isTrue();
     }
 
     @Test
@@ -153,16 +146,31 @@ class FlatmateOwnerConsentEndpointsTest extends AbstractApiTest {
     void theFlagIsNotClientSettable() throws Exception {
         User tenant = user("9830000405", "Optimist");
 
-        mvc.perform(post(Routes.Flatmates.GROUPS)
+        String roomId = createTenantRoom(tenant, "Optimist Towers", "9830000406");
+
+        assertThat(roomConsent(roomId)).isFalse();
+    }
+
+    private String createTenantRoom(User tenant, String society, String ownerMobile) throws Exception {
+        String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Replacement flatmate","locality":"Baner","rent":40000,"deposit":10000,
-                                 "name":"Optimist","role":"tenant","consentMobile":"9830000406",
-                                 "ownerConsent":true}
-                                """))
+                        .content(withSocietyIds("""
+                                {"bhk":"2","roomType":"Private room","attachedBath":"attached",
+                                 "locality":"Baner","society":"%s","rentShare":15000,"deposit":30000,
+                                 "availableFrom":"2026-09-01","lookingFor":"any","foodPref":"any",
+                                 "hostRole":"tenant","ownerConsent":true,"ownerConsentMobile":"%s",
+                                 %s,"note":"Quiet room.",%s,%s}
+                                """.formatted(society, ownerMobile, FlatmateRoomFixture.photos(tenant.getId()),
+                                FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.ownerConsent").value(false));
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(json, "$.id");
+    }
+
+    private boolean roomConsent(String roomId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "select owner_consent from flatmate_rooms where id = ?::uuid", Boolean.class, roomId));
     }
 
     @Test
@@ -221,58 +229,16 @@ class FlatmateOwnerConsentEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("consent granted after the group exists still reaches it")
+    @DisplayName("consent granted after the room exists still reaches it")
     void consentTakenLaterReachesThePostItNames() throws Exception {
         User tenant = user("9830000413", "Latecomer");
+        String roomId = createTenantRoom(tenant, "Late Towers", "9830000414");
+        assertThat(roomConsent(roomId)).isFalse();
 
-        mvc.perform(post(Routes.Flatmates.GROUPS)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Late consent","locality":"Baner","rent":40000,"deposit":10000,
-                                 "name":"Latecomer","role":"tenant","consentMobile":"9830000414"}
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.ownerConsent").value(false));
+        sendAndForceCode(tenant, "9830000414", "Late Towers", "Baner");
+        record(tenant, "9830000414", "Late Towers", "Baner");
 
-        sendAndForceCode(tenant, "9830000414", "Late consent", "Baner");
-        record(tenant, "9830000414", "Late consent", "Baner");
-
-        Integer consented = jdbc.queryForObject("""
-                select count(*) from flatmate_groups
-                 where host_id = ?::uuid and owner_consent = true""",
-                Integer.class, tenant.getId().toString());
-        assertThat(consented).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("consent granted after the group exists is visible in my groups")
-    void consentAfterTheGroupExistsShowsInMyGroups() throws Exception {
-        User tenant = user("9830000417", "Scoped");
-        String ownerMobile = "9830000418";
-        usedMobiles.add(ownerMobile);
-
-        String groupJson = mvc.perform(post(Routes.Flatmates.GROUPS)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Scoped consent","locality":"Baner","rent":40000,"deposit":10000,
-                                 "name":"Scoped","role":"tenant","consentMobile":"9830000418"}
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.ownerConsent").value(false))
-                .andReturn().getResponse().getContentAsString();
-        String groupId = JsonPath.read(groupJson, "$.id");
-
-        sendAndForceCode(tenant, ownerMobile, "Scoped consent", "Baner");
-        record(tenant, ownerMobile, "Scoped consent", "Baner");
-
-        String myGroup = mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, groupId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        Boolean consentFlag = JsonPath.read(myGroup, "$.item.ownerConsent");
-        assertThat(consentFlag).isTrue();
+        assertThat(roomConsent(roomId)).isTrue();
     }
 
     @Test

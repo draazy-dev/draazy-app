@@ -229,22 +229,6 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
         propertyId = null;
     }
 
-    void settle(String locality, Long rent) {
-        hunting = false;
-        this.locality = locality;
-        this.rent = rent;
-        localities = new ArrayList<>(List.of(locality));
-        prefBhk = new ArrayList<>();
-        rentMin = null;
-        depositMin = null;
-        depositMax = null;
-        gatedOnly = false;
-        bachelors = false;
-        furnishing = null;
-        parking = null;
-        moveInBy = null;
-    }
-
     void relocate(List<String> next) {
         localities = new ArrayList<>(next);
         locality = next.get(0);

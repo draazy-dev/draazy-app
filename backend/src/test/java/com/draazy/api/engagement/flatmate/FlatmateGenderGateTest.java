@@ -80,10 +80,7 @@ class FlatmateGenderGateTest extends AbstractApiTest {
         String id = idOf(mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Team up in Baner","locality":"Baner","policy":"%s",
-                                 "rent":30000,"deposit":10000,"seats":3,"seatsOpen":2,"name":"Host"}
-                                """.formatted(policy)))
+                        .content(FlatmateGroupFixture.hunting("Team up in Baner", "Baner", policy)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
         jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", id);

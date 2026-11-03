@@ -234,24 +234,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("group agreement documents must belong to the caller too")
-    void groupAgreementDocumentMustBeOwned() throws Exception {
-        User host = user("9815550106", "Group Foreign Doc");
-
-        mvc.perform(post(Routes.Flatmates.GROUPS)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Borrowed paper","locality":"Baner","rent":40000,"deposit":10000,"seats":3,
-                                 "seatsOpen":1,"name":"Host","role":"tenant","agreement":true,
-                                 "agreementDoc":{"id":"11111111-1111-1111-1111-111111111111"}}
-                                """))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.message").value(
-                        "agreementDoc.id must reference an uploaded agreement document you own."));
-    }
-
-    @Test
     @DisplayName("tenant room agreement document from the caller's vault is accepted")
     void tenantRoomAgreementDocumentCanComeFromCallerVault() throws Exception {
         User host = user("9815550105", "Tenant Own Doc");
@@ -297,10 +279,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     }
 
     private static String groupBody(String title, String locality) {
-        return """
-                {"title":"%s","locality":"%s","policy":"women","rent":40000,"deposit":10000,
-                 "seats":3,"seatsOpen":1,"name":"Host"}
-                """.formatted(title, locality);
+        return huntingGroupBody(title, locality, "women", 40000, 3, 1, "Host");
     }
 
     private String createGroup(User host, String title, String locality) throws Exception {
@@ -1580,24 +1559,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the Ops verdict, server-side")
     class ReviewStatusOnTheWire {
-        private String tenantClaimGroup(User host, String title, String locality) throws Exception {
-            String ownerConsentMobile = recordOwnerConsent(host, title, null, locality);
-            String json = mvc.perform(post(Routes.Flatmates.GROUPS)
-                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"title":"%s","locality":"%s","rent":40000,"deposit":10000,"seats":3,
-                                     "seatsOpen":1,"name":"Host","role":"tenant",
-                                     "agreement":true,%s,
-                                     "consentMobile":"%s"}
-                                    """.formatted(title, locality, agreementEvidence(host),
-                                    ownerConsentMobile)))
-                    .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.verificationTier").value("tenant"))
-                    .andReturn().getResponse().getContentAsString();
-            return publish("flatmate_groups", idOf(json));
-        }
-
         private String tenantClaimRoom(User host, String society, String locality) throws Exception {
             String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
@@ -1703,16 +1664,16 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         void hostSeesTheirOwnVerdict() throws Exception {
             User host = user("9820000075", "Owner of it");
             User ops = user("9820000076", "Ops5", Roles.Wire.STAFF);
-            String id = tenantClaimGroup(host, "Mine", "VerdictTownD");
+            String id = tenantClaimRoom(host, "Mine", "VerdictTownD");
 
-            mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id)
+            mvc.perform(get(Routes.Flatmates.ROOM_BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.item.reviewStatus").value("pending"));
 
             decide(ops, id, "approved");
 
-            mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id)
+            mvc.perform(get(Routes.Flatmates.ROOM_BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.item.reviewStatus").value("approved"));

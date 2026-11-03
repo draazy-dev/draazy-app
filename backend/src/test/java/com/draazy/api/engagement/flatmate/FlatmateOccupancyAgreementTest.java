@@ -102,6 +102,7 @@ class FlatmateOccupancyAgreementTest extends AbstractApiTest {
     }
 
     private void clear(User admin, String roomId) throws Exception {
+        FlatmateDeskTicks.tickAll(mvc, bearer(admin), roomId);
         mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION.replace("{id}", roomId))
                         .header(HttpHeaders.AUTHORIZATION, bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)

@@ -1,5 +1,7 @@
 import { expect, test } from '../../../fixtures/live.js';
 import { API, apiLogin } from '../../../helpers/liveAuth.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const STAFF = '9733798115';
 
@@ -30,7 +32,7 @@ async function visibleGroup(host, title) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
-    body: JSON.stringify({
+    body: JSON.stringify(huntingGroup({
       title,
       locality: 'Kothrud',
       policy: 'any',
@@ -38,13 +40,13 @@ async function visibleGroup(host, title) {
       deposit: 50000,
       seats: 3,
       seatsOpen: 1,
-      role: 'tenant',
-    }),
+    })),
   });
   if (!res.ok) throw new Error(`create group → ${res.status} ${await res.text()}`);
   const group = await res.json();
 
   const { accessToken: staffToken } = await apiLogin(STAFF);
+  await tickDeskChecklist(API, group.id, auth(staffToken));
   const publish = await fetch(`${API}/admin/flatmates/${group.id}/moderation`, {
     method: 'PATCH',
     headers: auth(staffToken),
