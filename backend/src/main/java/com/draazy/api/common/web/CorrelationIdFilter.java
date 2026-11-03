@@ -21,6 +21,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class CorrelationIdFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(CorrelationIdFilter.class);
 
+    // One stable logger name so log alerts can watch refusals (401/403/429) across every route.
+    static final String SECURITY_LOGGER = "draazy.security";
+
+    private static final Logger securityLog = LoggerFactory.getLogger(SECURITY_LOGGER);
+
     private static final long SLOW_REQUEST_MS = 2_000;
 
     private static final Pattern SAFE_TRACE_ID = Pattern.compile("^[A-Za-z0-9_-]{1,128}$");
@@ -55,10 +60,22 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
     }
 
     private static void logOutcome(HttpServletRequest request, int status, long millis) {
+        logSecurityEvent(request, status);
         if (status >= 500 || millis > SLOW_REQUEST_MS) {
             log.warn("{} {} -> {} in {} ms", request.getMethod(), request.getRequestURI(), status, millis);
         } else if (log.isDebugEnabled()) {
             log.debug("{} {} -> {} in {} ms", request.getMethod(), request.getRequestURI(), status, millis);
+        }
+    }
+
+    // 401 is routine (every expired access token earns one), so it stays below the WARN alert line.
+    private static void logSecurityEvent(HttpServletRequest request, int status) {
+        switch (status) {
+            case HttpServletResponse.SC_UNAUTHORIZED -> securityLog.info(
+                    "security_event status={} {} {}", status, request.getMethod(), request.getRequestURI());
+            case HttpServletResponse.SC_FORBIDDEN, 429 -> securityLog.warn(
+                    "security_event status={} {} {}", status, request.getMethod(), request.getRequestURI());
+            default -> { }
         }
     }
 }

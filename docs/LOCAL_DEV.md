@@ -228,8 +228,11 @@ with their production counterparts — which exist only to throw. The app starts
 you then cannot complete an OTP login or upload a document, and the failure reads as a 500 from the
 endpoint rather than as a missing profile.
 
-Serves `http://localhost:8080`. Defaults (all env-overridable via `DB_URL` / `DB_USER` /
-`DB_PASSWORD` / `JWT_SECRET`) live in `src/main/resources/application.properties`. The `prod` profile
+Serves `http://localhost:8080`. Database defaults (env-overridable via `DB_URL` / `DB_USER` /
+`DB_PASSWORD`) live in `src/main/resources/application.properties`; the dev signing and encryption
+keys (`JWT_SECRET`, `IDENTITY_*`, `STAFF_TOTP_KEY`, `REFERRAL_SIGNAL_SALT`) default only in
+`application-local.properties`, so a boot without `local` fails rather than use keys published in
+this repo. The `prod` profile
 re-declares them as bare `${ENV}` lookups, so a missing secret fails the boot instead of silently
 falling back to a well-known local value. It adds one more, `INTERNAL_PROXIES`, which must be a Java
 regex matching the load balancer's addresses — the write rate limiter keys anonymous callers on the

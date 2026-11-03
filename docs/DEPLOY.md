@@ -430,6 +430,7 @@ admin's copy-link dialog is unchanged and stays the fallback.
 |---|---|
 | `ZEPTOMAIL_ENABLED` | `true` to send; off logs `[MOCK EMAIL]` with recipient domain + subject |
 | `ZEPTOMAIL_API_KEY` | The agent's **Send Mail token** (CPaaS → Agents → agent → SMTP/API). Secret (`SANDBOX_ZEPTOMAIL_API_KEY`); with or without the `Zoho-enczapikey ` prefix |
+| `ZEPTOMAIL_WEBHOOK_KEY` | The agent's webhook **Authentication Key** (CPaaS → Agents → agent → Webhooks → Authentication Key). Secret (`SANDBOX_ZEPTOMAIL_WEBHOOK_KEY`); blank turns `POST /api/webhooks/zeptomail` off. Add that URL as the agent's webhook with Hard/Soft bounce and Feedback loop events; each lands in the provider call log |
 | `ZEPTOMAIL_FROM_ADDRESS` | Default `noreply@draazy.com`; must be on a domain whose DKIM **and** CNAME show Verified |
 | `ZEPTOMAIL_FROM_NAME` | Default `Draazy`; the spec sets `Draazy Sandbox` |
 | `ZEPTOMAIL_BASE_URL` | Default `https://cpaas.zoho.in` (India DC; the account lives on `cpaas.zoho.in`) |
@@ -642,7 +643,7 @@ tell those apart.
 
 | Scope | Secrets | Variables |
 |---|---|---|
-| `sandbox` environment | `DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_WHATSAPP_ACCESS_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
+| `sandbox` environment | `DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_ZEPTOMAIL_WEBHOOK_KEY`, `SANDBOX_WHATSAPP_ACCESS_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
 | `sandbox-web` environment | `CLOUDFLARE_API_TOKEN` (Account → Cloudflare Pages → Edit, nothing else) | `CLOUDFLARE_ACCOUNT_ID` |
 | repository (frontend build) | `VITE_GOOGLE_MAPS_API_KEY`, `VITE_GA_ID` | `VITE_GOOGLE_MAPS_MAP_ID`, `VITE_CASHFREE_MODE`, `VITE_PMF_MODE`, `VITE_VAPID_PUBLIC_KEY`, `VITE_TURNSTILE_SITE_KEY`, `VITE_POSTHOG_KEY` (US-cloud project key; blank = off), `VITE_POSTHOG_APP_URL` |
 
@@ -682,9 +683,9 @@ ShedLock is needed.
 
 | Group | Cron property (default) | Jobs |
 |---|---|---|
-| Frequent | `draazy.jobs.frequent.cron` (`0 */15 * * * *`) | `abandoned-checkouts`, `pass-refunds`, `listing-duplicates`, `staff-sla`, `photo-webp-backfill` |
-| Hourly | `draazy.jobs.hourly.cron` (`0 5 * * * *`) | `subscription-expiry`, `saved-search-counts`, `page-view-rollup`, `flatmate-post-expiry` (public reads don't check `active_until`, so a lapsed post shows until it runs) |
-| Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `listing-content-purge`, `photo-upload-sweep`, `flatmate-owner-notice-purge`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
+| Frequent | `draazy.jobs.frequent.cron` (`0 */15 * * * *`) | `abandoned-checkouts`, `pass-refunds`, `listing-duplicates`, `staff-sla` |
+| Hourly | `draazy.jobs.hourly.cron` (`0 5 * * * *`) | `subscription-expiry`, `saved-search-counts`, `page-view-rollup`, `flatmate-post-expiry` (public reads don't check `active_until`, so a lapsed post shows until it runs), `photo-webp-backfill` (20 legacy photos an hour; an original that won't decode is skipped until restart) |
+| Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `listing-content-purge`, `photo-upload-sweep`, `photo-delete-retry` (listing photos whose R2 delete failed, from `photo_storage_deletes`, 500 a night, least-tried first), `flatmate-owner-notice-purge`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
 | Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `lease-end-reminders`, `tracked-rent-reminders`, `waiting-digest` |
 
 The app is always on, so the `@Scheduled` cron runs in-process at the times above with no external

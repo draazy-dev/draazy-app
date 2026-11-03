@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
@@ -245,6 +246,21 @@ class ProdProfileContractTest {
         assertThat(mainResource("application.properties").getProperty("server.port"))
                 .as("the platform health-checks the port it injects; a fixed port never gets traffic")
                 .isEqualTo("${PORT:8080}");
+    }
+
+    @Test
+    @DisplayName("the public repo's well-known dev keys apply only under `local`")
+    void signingAndEncryptionKeysHaveNoDefaultOutsideLocal() throws IOException {
+        Properties base = mainResource("application.properties");
+        Properties local = mainResource("application-local.properties");
+        for (String key : List.of("draazy.security.jwt.secret", "draazy.security.referral-signal-salt",
+                "draazy.security.identity-hash-secret", "draazy.security.identity-key",
+                "draazy.security.identity-key-id", "draazy.security.staff-totp-key")) {
+            assertThat(base.getProperty(key))
+                    .as("%s: a profile-less boot must fail, not sign tokens with a key anyone can read", key)
+                    .matches("\\$\\{[A-Z_]+}");
+            assertThat(local.getProperty(key)).as("%s keeps a dev default so local boots", key).contains(":");
+        }
     }
 
     private static MockEnvironment environmentSupplying(Set<String> variables) {

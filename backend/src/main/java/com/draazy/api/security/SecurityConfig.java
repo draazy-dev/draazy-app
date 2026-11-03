@@ -26,6 +26,8 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 @EnableMethodSecurity
 @EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
+    static final String[] API_DOCS = {"/docs", "/docs/**", "/swagger-ui/**", "/webjars/**", "/openapi/**"};
+
     private final JwtService jwtService;
     private final RestAuthEntryPoint authEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
@@ -39,6 +41,7 @@ public class SecurityConfig {
     private final Duration rateLimitWindow;
     private final boolean proxyAware;
     private final Optional<OriginGateFilter> originGate;
+    private final boolean publicApiDocs;
 
     public SecurityConfig(JwtService jwtService, RestAuthEntryPoint authEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler, BotDefence botDefence,
@@ -50,7 +53,9 @@ public class SecurityConfig {
             @Value("${draazy.security.rate-limit.living-style-reads-per-window:60}") int livingStyleBudget,
             @Value("${draazy.security.rate-limit.window-seconds:60}") long windowSeconds,
             @Value("${draazy.security.trusted-proxies:none}") String trustedProxies,
-            @Value("${draazy.security.origin-secret}") String originSecret) {
+            @Value("${draazy.security.origin-secret}") String originSecret,
+            @Value("${draazy.security.public-api-docs:false}") boolean publicApiDocs) {
+        this.publicApiDocs = publicApiDocs;
         this.jwtService = jwtService;
         this.authEntryPoint = authEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
@@ -73,6 +78,14 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, RoleSource roles,
             PlatformSettings platformSettings) throws Exception {
+        http.authorizeHttpRequests(auth -> {
+            var docs = auth.requestMatchers(API_DOCS);
+            if (publicApiDocs) {
+                docs.permitAll();
+            } else {
+                docs.denyAll();
+            }
+        });
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -136,14 +149,13 @@ public class SecurityConfig {
                                 Routes.Documents.SHARED_URL).permitAll()
 
                         .requestMatchers(HttpMethod.POST,
-                                Routes.Webhooks.CASHFREE_PAYMENT, Routes.Webhooks.WHATSAPP).permitAll()
+                                Routes.Webhooks.CASHFREE_PAYMENT, Routes.Webhooks.WHATSAPP, Routes.Webhooks.ZEPTOMAIL).permitAll()
                         .requestMatchers(HttpMethod.GET, Routes.Webhooks.WHATSAPP).permitAll()
 
                         .requestMatchers("/", "/favicon.ico",
- "/docs", "/docs/**", "/swagger-ui/**", "/webjars/**",
- "/openapi/**", "/actuator/health/**", "/actuator/info").permitAll()
+                                "/actuator/health/**", "/actuator/info").permitAll()
 
-.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authEntryPoint)
