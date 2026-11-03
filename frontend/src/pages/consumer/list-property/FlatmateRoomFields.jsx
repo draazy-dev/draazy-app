@@ -1,7 +1,8 @@
 import { ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import RequiredMark from '../../../components/ui/RequiredMark.jsx';
-import { PillRow, FieldError } from './controls.jsx';
+import { PillRow, Pill, FieldError } from './controls.jsx';
+import { ROOM_AMENITIES } from '../flatmates/roomAmenities.js';
 import { lbl } from './styles.js';
 import FlatmateFlatFields from './FlatmateFlatFields.jsx';
 import FurnitureIncluded from './FurnitureIncluded.jsx';
@@ -35,6 +36,18 @@ export default function FlatmateRoomFields({ form, set, errors, isHouse, toggleI
 
       {optional('lookingFor', L('openTo'), [['any', t('listProperty.opt.anyone')], ['female', t('listProperty.opt.women')], ['male', t('listProperty.opt.men')]], 'grid-cols-3')}
       {optional('foodPref', L('food'), [['any', t('listProperty.opt.any')], ['veg', t('listProperty.opt.vegOnly')], ['nonveg', t('listProperty.opt.nonvegOk')]], 'grid-cols-3')}
+      {optional('roomParking', L('parking'), [['', t('listProperty.opt.parkingNone')], ['bike', t('listProperty.opt.parkingBike')], ['car', t('listProperty.opt.parkingCar')]], 'grid-cols-3')}
+
+      <div className="mb-5" data-testid="room-amenities">
+        <p className={lbl}>{L('amenities')}</p>
+        <div role="group" aria-label={L('amenities')} className="flex flex-wrap gap-2">
+          {ROOM_AMENITIES.map(([code]) => (
+            <Pill key={code} selected={form.roomAmenities.includes(code)} onClick={() => toggleInArray('roomAmenities', code)} className="min-h-[var(--btn-h)] px-4 py-1.5 inline-flex items-center justify-center">
+              {t(`listProperty.flatmate.amenity.${code}`)}
+            </Pill>
+          ))}
+        </div>
+      </div>
 
       <div className="flex justify-end lp-step-actions">
         <button onClick={nextStep} className="btn-teal px-8 py-3.5 min-h-[44px] rounded-xl text-white font-semibold text-sm flex items-center gap-2 shadow-lg shadow-teal-500/20">

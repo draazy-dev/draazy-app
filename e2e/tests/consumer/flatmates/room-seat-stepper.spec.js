@@ -5,6 +5,10 @@ import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 /* The fixture omits `propertyId` and declares no agreement, so the server derives the identity
    floor; owner tier is covered by `trust-badges.spec.js`. */
 
@@ -14,6 +18,7 @@ const track = flatmateCleanup(test);
 
 async function publish(roomId) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, roomId, auth(accessToken));
   const response = await fetch(`${API}/admin/flatmates/${roomId}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),
@@ -47,7 +52,7 @@ test('the host closes and reopens a real standalone room seat from its detail pa
       ...(await withSocietyId(accessToken, { society })),
       rentShare: 15000,
       deposit: 30000,
-      availableFrom: '2026-12-01',
+      availableFrom: MOVE_IN,
       lookingFor: 'any',
       foodPref: 'any',
       hostRole: 'tenant',

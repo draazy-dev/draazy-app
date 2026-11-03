@@ -49,6 +49,8 @@ public record FlatmateRoomCreateRequest(
         Double lat,
         Double lng,
         Boolean gatedCommunity,
+        String parking,
+        @Size(max = 5) List<String> amenities,
         @Valid FlatmateRoomDetails details,
         @Size(max = 120) @NoContactDetails(message = NO_CONTACT) String title) {
 }

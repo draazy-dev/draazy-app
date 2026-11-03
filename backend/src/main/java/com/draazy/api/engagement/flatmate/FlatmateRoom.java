@@ -169,6 +169,15 @@ public class FlatmateRoom extends AuditedEntity implements FlatmateSupplyPost {
     @Setter
     private boolean gatedCommunity = false;
 
+    @Column(name = "parking")
+    @Setter
+    private String parking;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "amenities", nullable = false)
+    @Setter
+    private List<String> amenities = new ArrayList<>();
+
     @Column(name = "furnishing")
     @Setter
     private String furnishing;

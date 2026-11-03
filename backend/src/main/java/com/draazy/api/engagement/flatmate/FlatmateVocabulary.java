@@ -3,6 +3,8 @@ package com.draazy.api.engagement.flatmate;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.identity.user.User;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 public final class FlatmateVocabulary {
@@ -31,6 +33,9 @@ public final class FlatmateVocabulary {
 
     public static final Set<String> FURNISHING = Set.of("unfurnished", "semi", "furnished");
     public static final Set<String> PARKING = Set.of("bike", "car");
+
+    public static final List<String> ROOM_AMENITIES =
+            List.of("wifi", "ac", "washing_machine", "lift", "power_backup");
 
     public static final Set<String> BILLING = Set.of("included", "shared", "separate");
 
@@ -117,6 +122,29 @@ public final class FlatmateVocabulary {
     public static String optional(String value, Set<String> allowed, String field) {
         String trimmed = blankToNull(value);
         return trimmed == null ? null : require(trimmed, allowed, field);
+    }
+
+    public static String roomParking(String value) {
+        String trimmed = blankToNull(value);
+        if (trimmed != null && !PARKING.contains(trimmed)) {
+            throw new ValidationException("Unknown parking: '" + trimmed + "'. Expected bike or car.");
+        }
+        return trimmed;
+    }
+
+    public static List<String> roomAmenities(List<String> codes) {
+        if (codes == null) {
+            return List.of();
+        }
+        Set<String> seen = new LinkedHashSet<>();
+        for (String code : codes) {
+            String trimmed = blankToNull(code);
+            if (trimmed == null || !ROOM_AMENITIES.contains(trimmed) || !seen.add(trimmed)) {
+                throw new ValidationException("Unknown or repeated amenity: '" + code + "'. Expected each of "
+                        + String.join(", ", ROOM_AMENITIES) + " at most once.");
+            }
+        }
+        return List.copyOf(seen);
     }
 
     public static String require(String value, Set<String> allowed, String field) {

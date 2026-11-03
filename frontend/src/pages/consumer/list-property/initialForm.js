@@ -100,6 +100,8 @@ export const initialForm = {
   roomType: '',
   rentShare: '',
   lookingFor: 'any',
+  roomParking: '',
+  roomAmenities: [],
   note: '',
   hostRole: 'owner',
   agreementDeclared: false,

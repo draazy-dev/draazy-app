@@ -41,6 +41,8 @@ public record FlatmateRoomFeedDto(
         String flatType,
         String homeTypeLabel,
         boolean gatedCommunity,
+        String parking,
+        List<String> amenities,
         String furnishing,
         String facing,
         String overlooking,

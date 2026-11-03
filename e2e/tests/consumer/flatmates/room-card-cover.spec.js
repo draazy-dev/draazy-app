@@ -5,6 +5,10 @@ import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { trackErrors } from '../../../helpers/console.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const track = flatmateCleanup(test);
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -22,7 +26,7 @@ test.describe('LIVE: room card cover', () => {
         ...(await roomBasics(accessToken, { photos: 0 })),
         ...(await withSocietyId(accessToken, { society })), roomType: 'Private room', locality: 'Baner', rentShare: 17333, deposit: 34666, bhk: '2',
         attachedBath: 'attached', furnishing: 'semi', lookingFor: 'any', foodPref: 'any',
-        availableFrom: '2026-12-01', hostRole: 'tenant', photos: [COVER, SECOND, THIRD],
+        availableFrom: MOVE_IN, hostRole: 'tenant', photos: [COVER, SECOND, THIRD],
         ...(await tenantRoomAgreement(accessToken)),
       }),
     });
@@ -30,6 +34,7 @@ test.describe('LIVE: room card cover', () => {
     const room = await created.json();
     track('rooms', room.id, accessToken);
 
+    await tickDeskChecklist(API, room.id, await authHeaders(STAFF.rental));
     const published = await fetch(`${API}/admin/flatmates/${room.id}/moderation`, {
       method: 'PATCH',
       headers: await authHeaders(STAFF.rental),
@@ -42,7 +47,7 @@ test.describe('LIVE: room card cover', () => {
     expect(row, 'the published room should be on the public feed').toBeTruthy();
     expect(row.cover, 'the feed projects the first photo as the cover').toBe(COVER);
     expect(row.photos, 'the gallery itself stays on the detail read').toBeUndefined();
-    expect(row.availableFrom, "the card's Move-in column reads the room's date").toBe('2026-12-01');
+    expect(row.availableFrom, "the card's Move-in column reads the room's date").toBe(MOVE_IN);
 
     const errors = trackErrors(page);
     await page.goto('/flatmates');

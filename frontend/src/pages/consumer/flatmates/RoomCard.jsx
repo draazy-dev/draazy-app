@@ -6,7 +6,7 @@ import { CARD_SIZES } from '../../../lib/imgSrcSet.js';
 import { inr, matchFor, moveInLabel, FLATMATE_IMG, detailPath, roomTitle, hostTierMeta, showHostBadge, genderPref, foodLabel } from './helpers.js';
 import { roomKindOf, occupancyOf, filledSeatsOf, priceBasisOf, bestPerPersonRent, hasSharerAlready, roomTypeLabel, PRICE_ROOM, OCCUPANCY_EMPTY, OCCUPANCY_OCCUPIED } from './model.js';
 import { FURN_KEY } from './constants.js';
-import { SaveBtn, CardBadge, CardLink, TileChip, Facts } from './atoms.jsx';
+import { SaveBtn, CardBadge, CardLink, TileChip, Facts, SharedVibes } from './atoms.jsx';
 
 export function roomPriceLabel(r, tr) {
   const perRoom = priceBasisOf(r) === PRICE_ROOM;
@@ -71,9 +71,11 @@ function RoomCard({ r, i, saved, onSave, anchorId, myPost }) {
           {moveIn && <TileChip icon="calendar-check">{moveInLabel(moveIn, 'From ')}</TileChip>}
           {r.gender && r.gender !== 'any' && <TileChip icon={r.gender === 'female' ? 'venus' : 'mars'}>{genderPref(r.gender)}</TileChip>}
           {r.food === 'veg' && <TileChip icon="utensils">{foodLabel(r.food)}</TileChip>}
+          {r.parking && <TileChip icon="car-front">{tr('flatmates.parking_' + r.parking)}</TileChip>}
           {note && <TileChip icon="users">{note}</TileChip>}
           <CardBadge item={r} match={match} />
         </div>
+        <SharedVibes item={r} />
       </div>
       <CardLink to={href} />
     </div>

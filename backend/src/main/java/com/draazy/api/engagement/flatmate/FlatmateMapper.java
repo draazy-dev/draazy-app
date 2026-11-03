@@ -143,6 +143,8 @@ public interface FlatmateMapper {
     @Mapping(target = "lat", source = "lat")
     @Mapping(target = "lng", source = "lng")
     @Mapping(target = "gatedCommunity", expression = "java(Boolean.TRUE.equals(body.gatedCommunity()))")
+    @Mapping(target = "parking", source = "parking", qualifiedByName = "roomParkingOrNull")
+    @Mapping(target = "amenities", source = "amenities", qualifiedByName = "roomAmenitiesOrEmpty")
     @Mapping(target = "details", source = "details")
 
     @Mapping(target = "ownerConsentMobile", source = "ownerConsentMobile",
@@ -207,6 +209,16 @@ public interface FlatmateMapper {
     @Named("homeTypeOrNull")
     default String homeTypeOrNull(String value) {
         return FlatmateVocabulary.optional(value, FlatmateVocabulary.HOME_TYPE, "home type");
+    }
+
+    @Named("roomParkingOrNull")
+    default String roomParkingOrNull(String value) {
+        return FlatmateVocabulary.roomParking(value);
+    }
+
+    @Named("roomAmenitiesOrEmpty")
+    default List<String> roomAmenitiesOrEmpty(List<String> values) {
+        return FlatmateVocabulary.roomAmenities(values);
     }
 
     @Named("trimmedOrNull")

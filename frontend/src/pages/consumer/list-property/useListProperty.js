@@ -810,6 +810,8 @@ export default function useListProperty() {
         lat: form.propLat,
         lng: form.propLng,
         gatedCommunity: house && !!form.gatedCommunity,
+        parking: form.roomParking || null,
+        amenities: form.roomAmenities,
         details: {
           ...(house ? numeric('floorsInHouse', form.floorsInHouse) : { floor: form.floor, ...numeric('totalFloors', form.totalFloors) }),
           ...numeric('bathrooms', form.bathrooms),

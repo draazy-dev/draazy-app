@@ -231,6 +231,9 @@
       "any": "Any",
       "vegOnly": "Veg only",
       "nonvegOk": "Non-veg ok",
+      "parkingNone": "None",
+      "parkingBike": "Bike",
+      "parkingCar": "Car",
       "attachedPrivate": "Attached (private)",
       "sharedCommon": "Shared / common",
       "newProperty": "New Property",
@@ -515,7 +518,16 @@
         "floorsInHouse": "Floors in the house",
         "floor": "Floor",
         "totalFloors": "Total floors",
-        "food": "Food"
+        "food": "Food",
+        "parking": "Parking",
+        "amenities": "Amenities"
+      },
+      "amenity": {
+        "wifi": "Wi-Fi",
+        "ac": "AC",
+        "washing_machine": "Washing machine",
+        "lift": "Lift",
+        "power_backup": "Power backup"
       },
       "attach": {
         "none": "Don't link",

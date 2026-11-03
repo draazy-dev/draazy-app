@@ -24,7 +24,7 @@ class FlatmateRoomShapeTest {
             "verified", "reviewStatus", "society", "locality", "localities", "lat",
             "lng", "bhk", "flatType", "homeTypeLabel", "gatedCommunity", "furnishing", "moveIn",
             "availableFrom", "gender", "food", "note", "cover", "owner", "createdAt", "facing",
-            "overlooking");
+            "overlooking", "parking", "amenities");
 
     private static final List<String> DETAIL_ONLY_FIELDS = List.of(
             "agreementDeclared", "addressFingerprint", "flagForReview", "flatNumber", "societyId",

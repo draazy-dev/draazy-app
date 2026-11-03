@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { fillRoomDetails, fillRoomLocation, fillRoomPrice, nextStep, uploadRoomPhotos } from '../../../helpers/roomWizard.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const track = flatmateCleanup(test);
 const unique = (tag) => `Room Tabs ${tag} ${Date.now().toString(36)}`;
@@ -97,7 +100,7 @@ test.describe('room wizard — four tabs like a property post', () => {
     const res = await fetch(`${API}/flatmates/rooms`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ bhk: '2', roomType: 'Private room', locality: 'Baner', rentShare: 12000, deposit: 0, availableFrom: '2026-12-01' }),
+      body: JSON.stringify({ bhk: '2', roomType: 'Private room', locality: 'Baner', rentShare: 12000, deposit: 0, availableFrom: MOVE_IN }),
     });
     expect(res.status).toBe(422);
     expect((await res.json()).message).toMatch(/^A new room needs: home type, washroom, furnishing, flat \/ house number/);

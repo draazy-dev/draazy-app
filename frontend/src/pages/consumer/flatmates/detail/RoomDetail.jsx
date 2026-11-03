@@ -4,6 +4,7 @@ import Icon from '../../../../components/Icon.jsx';
 import { inr, genderPref, foodLabel, seatsLeft, hostTierMeta, showHostBadge, moveInLabel, FLATMATE_IMG, roomTitle } from '../helpers.js';
 import { roomKindOf, perPersonRent, bestPerPersonRent, hasSharerAlready, roomTypeLabel } from '../model.js';
 import { FURN_KEY } from '../constants.js';
+import { ROOM_AMENITIES } from '../roomAmenities.js';
 import { Fresh, ReviewChip } from '../atoms.jsx';
 import { roomPriceLabel, occupancyNote, canChooseShare } from '../RoomCard.jsx';
 import LivingStyleSection from '../livingStyle/LivingStyleSection.jsx';
@@ -99,8 +100,21 @@ export default function RoomDetail({ r, owned, ask, onAsk, onReport, ownerPanel 
             ['sofa', t('property.furnishingLabel'), furnishing],
             ['users', t('flatmates.detailOpenTo'), genderPref(r.gender)],
             ['utensils', t('flatmates.detailFood'), foodLabel(r.food)],
+            ['car-front', t('flatmates.parkingLabel'), r.parking && t(r.parking === 'car' ? 'flatmates.parkingCar' : 'flatmates.parkingBike')],
           ]} />
         </Section>
+        {r.amenities?.length > 0 && (
+          <Section icon="sparkles" title={t('flatmates.detailRoomAmenities')}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5" data-testid="room-amenity-chips">
+              {ROOM_AMENITIES.filter(([code]) => r.amenities.includes(code)).map(([code, icon]) => (
+                <div key={code} className="amenity-card" data-testid={'room-amenity-' + code}>
+                  <span className="w-8 h-8 rounded-lg bg-brand-teal/10 flex items-center justify-center flex-shrink-0"><Icon name={icon} className="w-4 h-4 text-brand-teal-3" /></span>
+                  <span className="text-sm font-medium text-white break-words">{t('flatmates.roomAmenity_' + code)}</span>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
         <Section icon="home" title={t('flatmates.detailTheFlat')}>
           <SpecGrid items={[
             ['bed-double', t('flatmates.detailFlat'), r.flatType],

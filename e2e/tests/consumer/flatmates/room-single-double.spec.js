@@ -5,6 +5,10 @@ import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { fillRoomDetails, fillRoomLocation, nextStep, roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -19,7 +23,7 @@ async function doubleRoom() {
       ...(await roomBasics(accessToken)),
       bhk: '2', roomType: 'Shared room', attachedBath: 'attached', furnishing: 'semi',
       locality: 'Baner', ...(await withSocietyId(accessToken, { society: `Double room ${Date.now().toString(36)}` })),
-      rentShare: 15000, deposit: 30000, availableFrom: '2026-12-01',
+      rentShare: 15000, deposit: 30000, availableFrom: MOVE_IN,
       lookingFor: 'any', foodPref: 'any', hostRole: 'tenant', occupants: 2,
       ...(await tenantRoomAgreement(accessToken)),
     }),
@@ -30,6 +34,7 @@ async function doubleRoom() {
   expect(room).toMatchObject({ seatsTotal: 2, seatsOpen: 2, priceBasis: 'room' });
 
   const admin = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, room.id, auth(admin.accessToken));
   const published = await fetch(`${API}/admin/flatmates/${room.id}/moderation`, {
     method: 'PATCH', headers: auth(admin.accessToken),
     body: JSON.stringify({ modStatus: 'live', note: 'e2e double room fixture' }),

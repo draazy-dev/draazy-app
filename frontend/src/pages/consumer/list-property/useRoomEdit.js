@@ -49,6 +49,8 @@ export const roomToForm = (room) => {
     availableFrom: room.availableFrom || '',
     lookingFor: room.gender || 'any',
     foodPref: room.food || 'any',
+    roomParking: room.parking || '',
+    roomAmenities: room.amenities || [],
     note: room.note || '',
     hostRole: room.hostRole || 'owner',
     agreementDeclared: !!room.agreementDeclared,
