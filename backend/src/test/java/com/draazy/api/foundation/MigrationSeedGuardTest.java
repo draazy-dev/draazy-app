@@ -27,6 +27,12 @@ class MigrationSeedGuardTest {
             "Inserts one timeline row per held draft it releases; a reset database has no held drafts to release.",
             "26.10.52",
             "Copies retired per-post lifestyle tags into user_living_style; a reset database has no posts to copy from.",
+            "26.11.10",
+            "Rebuilds per-day viewer rows from past view signals; a reset database has no signals to rebuild from.",
+            "26.11.30",
+            "Moves tenant groups that already have a flat into rooms; a reset database has no groups to move.",
+            "26.11.32",
+            "Moves owner groups that already have a flat into rooms; a reset database has no groups to move.",
             "26.10.67",
             "Inserts the retired untyped pack only so pre-split pack subscriptions can move onto it; a reset "
                     + "database has no subscriptions to move, and the R__ seed restores the row.");

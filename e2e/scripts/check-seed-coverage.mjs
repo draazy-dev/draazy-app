@@ -24,6 +24,8 @@ const WAIVED = new Map([
   ['erasure_requests', 'the DSR spec submits one'],
   ['city_waitlist', 'the waitlist form submits one'],
   ['demand_signals', 'append-only; `demand-signals` writes rows and asserts the delta'],
+  ['photo_storage_deletes', 'retry queue; only a failed storage delete on listing purge fills it'],
+  ['property_view_days', 'one row per viewer-day; `demand-signals` views a live listing and asserts the count'],
   ['offer_history', 'append-only trail written when an offer changes state'],
   ['review_messages', 'written by the review-thread spec'],
   ['ticket_notes', 'written by staff inside the ticket spec'],

@@ -26,7 +26,7 @@ class ServiceSizeGuardTest {
 
     static {
         BASELINE.put("com/draazy/api/services/request/ServiceRequestService.java", 992);
-        BASELINE.put("com/draazy/api/engagement/flatmate/FlatmateSupplyService.java", 876);
+        BASELINE.put("com/draazy/api/engagement/flatmate/FlatmateSupplyService.java", 722);
     }
 
     private static final Pattern FILLER_SUFFIX =
