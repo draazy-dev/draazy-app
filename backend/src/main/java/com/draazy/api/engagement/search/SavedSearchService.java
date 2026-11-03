@@ -3,6 +3,7 @@ package com.draazy.api.engagement.search;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.persistence.Savepoints;
 import com.draazy.api.common.trust.Notifier;
 import java.time.Duration;
 import java.time.Instant;
@@ -13,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
@@ -27,16 +29,18 @@ public class SavedSearchService {
 
     private final SavedSearchRepository repo;
     private final SavedSearchMapper mapper;
-    private final SavedSearchMatchCounter counter;
+    private final SavedSearchMatcher matcher;
+    private final DataSource dataSource;
     private final ObjectMapper objectMapper;
 
     private final Notifier notifier;
 
     public SavedSearchService(SavedSearchRepository repo, SavedSearchMapper mapper,
-            SavedSearchMatchCounter counter, ObjectMapper objectMapper, Notifier notifier) {
+            SavedSearchMatcher matcher, DataSource dataSource, ObjectMapper objectMapper, Notifier notifier) {
         this.repo = repo;
         this.mapper = mapper;
-        this.counter = counter;
+        this.matcher = matcher;
+        this.dataSource = dataSource;
         this.objectMapper = objectMapper;
         this.notifier = notifier;
     }
@@ -205,13 +209,17 @@ public class SavedSearchService {
             }
             for (SavedSearch search : chunk) {
                 Instant alerted = search.getLastAlertedAt();
-                int count;
+                Instant baseline = alerted == null ? search.getCreatedAt() : alerted;
+                int[] counted = new int[1];
+                // Flushed first so a failed count's savepoint rollback cannot undo earlier searches' updates.
+                repo.flush();
                 try {
-                    count = countMatchingSince(search, alerted == null ? search.getCreatedAt() : alerted);
+                    Savepoints.isolated(dataSource, () -> counted[0] = countMatchingSince(search, baseline));
                 } catch (RuntimeException failedSearch) {
                     LOG.warn("Skipping saved-search count for {}", search.getId(), failedSearch);
                     continue;
                 }
+                int count = counted[0];
                 Instant alertedAt = count > 0 && isAlertDue(search, now) ? alert(search, count, now) : alerted;
                 if (count != search.getNewCount() || alertedAt != alerted) {
                     search.setNewCount(count);
@@ -269,6 +277,6 @@ public class SavedSearchService {
     }
 
     private int countMatching(SavedSearch search, Instant baseline) {
-        return counter.count(search, baseline);
+        return matcher.count(search, baseline);
     }
 }
