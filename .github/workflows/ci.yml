@@ -19,6 +19,39 @@ env:
   NODE_VERSION: '26'
 
 jobs:
+  secrets:
+    name: Secret scan (new commits)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The binary, not gitleaks-action: the action needs a paid licence on organisation repos.
+      - name: Install gitleaks
+        env:
+          VERSION: 8.30.1
+          SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -sSfL -o /tmp/gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          echo "${SHA256}  /tmp/gitleaks.tgz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
+
+      # Only the commits this run introduces: older history holds already-triaged noise (see .gitleaks.toml).
+      - name: Scan
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            range="-1 $HEAD"
+          else
+            range="$BASE..$HEAD"
+          fi
+          /tmp/gitleaks git --no-banner --redact --exit-code 1 --log-opts="$range" .
+
   checks:
     name: Lint, content checks, build, size budget
     runs-on: ubuntu-latest
@@ -209,6 +242,6 @@ jobs:
       # Configuration lives in sonar-project.properties at the repo root; this action reads it.
       # SONAR_TOKEN is a repository secret - rotate it in the SonarQube Cloud UI if ever leaked.
       - name: SonarQube scan
-        uses: SonarSource/sonarqube-scan-action@v8
+        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

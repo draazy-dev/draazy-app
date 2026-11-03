@@ -114,16 +114,16 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: echo "lower=${OWNER,,}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build and push image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: backend
           file: backend/Dockerfile
@@ -148,6 +148,7 @@ jobs:
           CASHFREE_APP_ID: ${{ secrets.SANDBOX_CASHFREE_APP_ID }}
           CASHFREE_SECRET_KEY: ${{ secrets.SANDBOX_CASHFREE_SECRET_KEY }}
           ZEPTOMAIL_API_KEY: ${{ secrets.SANDBOX_ZEPTOMAIL_API_KEY }}
+          ZEPTOMAIL_WEBHOOK_KEY: ${{ secrets.SANDBOX_ZEPTOMAIL_WEBHOOK_KEY }}
           WHATSAPP_ACCESS_TOKEN: ${{ secrets.SANDBOX_WHATSAPP_ACCESS_TOKEN }}
           WHATSAPP_APP_SECRET: ${{ secrets.SANDBOX_WHATSAPP_APP_SECRET }}
           WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${{ secrets.SANDBOX_WHATSAPP_WEBHOOK_VERIFY_TOKEN }}
@@ -172,10 +173,10 @@ jobs:
             [ -n "${!name}" ] || { echo "::error::$name is empty." >&2; exit 1; }
           done
           vars=$(printf '${%s} ' $required BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_MOBILE BOOTSTRAP_ADMIN_RECOVER \
-            WHATSAPP_APP_SECRET WHATSAPP_WEBHOOK_VERIFY_TOKEN)
+            WHATSAPP_APP_SECRET WHATSAPP_WEBHOOK_VERIFY_TOKEN ZEPTOMAIL_WEBHOOK_KEY)
           envsubst "$vars" < backend/deploy/do-app-sandbox.yaml > "$RUNNER_TEMP/app.yaml"
 
-      - uses: digitalocean/action-doctl@v2
+      - uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2.5.2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
