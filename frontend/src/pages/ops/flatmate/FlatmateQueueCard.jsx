@@ -9,7 +9,7 @@ const KIND_LABEL = { post: 'Seeker post', room: 'Room', group: 'Group', applicat
 const PRICE_NOTE = { post: 'budget', application: 'flat rent' };
 const GROUP = 'mt-2.5 border-t border-white/[0.06] pt-2.5';
 
-const WARN_REASONS = new Set(['Contested address', 'Owner consent missing', 'Edited since review', 'Live · not yet reviewed']);
+const WARN_REASONS = new Set(['Contested address', 'Owner consent missing', 'Edited since review', 'Live · not yet reviewed', 'Needs info']);
 
 export const entryKind = (e) => (e.application ? 'application' : e.post?.kind || e.review?.kind || 'post');
 

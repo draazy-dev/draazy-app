@@ -5,6 +5,10 @@ import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { badgeChecks, tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 /* `reviewStatus` is joined onto the feed rows server-side (`FlatmateReviewStatuses`), so every row
    here is created over HTTP and published through real moderation — the two gates are independent. */
 
@@ -36,29 +40,13 @@ async function consentTo(token, address) {
 }
 /** Let a row past the moderation gate, which is a different gate from the one under test. */
 async function publish(id) {
+  await tickDeskChecklist(API, id, auth(await adminToken()));
   const response = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(await adminToken()),
     body: JSON.stringify({ modStatus: 'live', note: 'e2e review-status fixture' }),
   });
   expect(response.status).toBeLessThan(300);
-}
-
-async function createGroup(token, body) {
-  const response = await fetch(`${API}/flatmates/groups`, {
-    method: 'POST',
-    headers: auth(token),
-    body: JSON.stringify({
-      locality: 'Baner', rent: 40000, deposit: 50000, seats: 3, seatsOpen: 1, policy: 'any',
-      ...body,
-      ...(body.agreementDoc ? { agreementDoc: (await tenantRoomAgreement(token)).agreementDoc } : {}),
-    }),
-  });
-  const group = await response.json();
-  expect(response.status, JSON.stringify(group)).toBe(201);
-  track('groups', group.id, token);
-  await publish(group.id);
-  return group;
 }
 
 async function createRoom(token, body) {
@@ -71,7 +59,7 @@ async function createRoom(token, body) {
     body: JSON.stringify({
       ...(await roomBasics(token)),
       bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi',
-      locality: 'Baner', rentShare: 15000, deposit: 30000, availableFrom: '2026-12-01',
+      locality: 'Baner', rentShare: 15000, deposit: 30000, availableFrom: MOVE_IN,
       lookingFor: 'any', foodPref: 'any',
       ...(await withSocietyId(token, payload)),
     }),
@@ -126,47 +114,17 @@ async function openFilters(page) {
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
-test('a tenant group waits on Ops without the badge it asked for, then an approval turns it into a Verified property', async ({ page }) => {
-  test.slow();
+test('a rejected room says it is not a verified property yet, and gives the host the reason', async ({ page }) => {
   const mobile = uniqueMobile();
   const { accessToken } = await apiLogin(mobile, { name: 'Review Host' });
-  await grantIdentityBadge(mobile);
-  const title = `Live approved verdict ${stamp()} in Baner`;
-  const consentMobile = await consentTo(accessToken, { title, locality: 'Baner' });
-  const group = await createGroup(accessToken, {
-    title, role: 'tenant', agreement: true, consentMobile, ...REGISTERED,
-  });
-  expect(group.verificationTier).toBe('tenant');
-  await signedInAs(page, mobile);
-  const card = page.locator('main');
-
-  await test.step('a tenant group waiting on Ops says so, and is not given the badge it asked for', async () => {
-    await openDetail(page, 'group', group.id);
-
-    await expect(card.getByText('Agreement under review', { exact: true })).toBeVisible();
-    await expect(card.getByText('Verified property', { exact: true })).toHaveCount(0);
+  const room = await createRoom(accessToken, {
+    society: `Live rejected verdict ${stamp()}`, hostRole: 'tenant', agreementDeclared: true, ...REGISTERED,
   });
 
-  await test.step('an Ops approval turns the same group into a Verified property', async () => {
-    await decide(group.id, 'approved');
-
-    await openDetail(page, 'group', group.id);
-    await expect(card.getByText('Verified property', { exact: true })).toBeVisible();
-    await expect(card.getByText('Agreement under review', { exact: true })).toHaveCount(0);
-  });
-});
-
-test('a rejected group says it is not a verified property yet, and gives the host the reason', async ({ page }) => {
-  const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile, { name: 'Review Host' });
-  const group = await createGroup(accessToken, {
-    title: `Live rejected verdict ${stamp()} in Baner`, role: 'tenant', agreement: true, ...REGISTERED,
-  });
-
-  await decide(group.id, 'rejected', 'Registration number does not match the document');
+  await decide(room.id, 'rejected', 'Registration number does not match the document');
 
   await signedInAs(page, mobile);
-  await openDetail(page, 'group', group.id);
+  await openDetail(page, 'room', room.id);
   const card = page.locator('main');
   await expect(card.getByText('Not a verified property yet', { exact: true })).toBeVisible();
   await expect(card.getByText('Verified property', { exact: true })).toHaveCount(0);
@@ -246,14 +204,14 @@ test('the same verdict drives a room card, and the room filter with it', async (
 test('a post nobody had to review carries neither a badge nor a review chip', async ({ page }) => {
   const mobile = uniqueMobile();
   const { accessToken } = await apiLogin(mobile, { name: 'Review Host' });
-  const title = `Live no claim ${stamp()} in Baner`;
-  const group = await createGroup(accessToken, { title, role: 'tenant' });
-  expect(group.verificationTier).toBe('identity');
+  const society = `Live no claim ${stamp()}`;
+  const room = await createRoom(accessToken, { society, hostRole: 'owner' });
+  expect(room.verificationTier).toBe('identity');
 
   await signedInAs(page, mobile);
-  await openDetail(page, 'group', group.id);
+  await openDetail(page, 'room', room.id);
   const card = page.locator('main');
-  await expect(card.getByText(title).first()).toBeVisible({ timeout: 15_000 });
+  await expect(card.getByText(society).first()).toBeVisible({ timeout: 15_000 });
   await expect(card.getByText('Agreement under review', { exact: true })).toHaveCount(0);
   await expect(card.getByText('Verified property')).toHaveCount(0);
 });

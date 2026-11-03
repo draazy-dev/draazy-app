@@ -94,6 +94,9 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
     }
 
     private void moderate(User mod, String id, String state) throws Exception {
+        if ("approved".equals(state)) {
+            FlatmateDeskTicks.tickAll(mvc, bearer(mod), id);
+        }
         mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION.replace("{id}", id))
                         .header(HttpHeaders.AUTHORIZATION, bearer(mod))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -220,10 +223,7 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
         String groupId = idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(applicant))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Four of us","locality":"Baner","rent":45000,"deposit":10000,
-                                 "seats":4,"name":"Applicant"}
-                                """))
+                        .content(FlatmateGroupFixture.hunting("Four of us", "Baner", "any", 45000, 4, 1)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
         String appId = jdbc.queryForObject(

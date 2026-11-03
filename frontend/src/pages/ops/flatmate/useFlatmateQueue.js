@@ -51,7 +51,14 @@ const fromPost = (row) => ({
   coverPhoto: row.coverPhoto,
   rent: row.rent,
   snippet: row.freeText,
+  caseStatus: row.caseStatus,
+  unreadFromHost: row.unreadFromHost,
 });
+
+const caseReasons = (row) => [
+  ...(row.caseStatus === 'needs_info' ? ['Needs info'] : []),
+  ...(row.unreadFromHost > 0 ? [`Host replied (${row.unreadFromHost})`] : []),
+];
 
 const recheckLabel = (reason) => ((reason || '').split(', ').includes('new post')
   ? 'Live · not yet reviewed' : 'Edited since review');
@@ -66,8 +73,8 @@ function entryPatch(type, row) {
   switch (type) {
     case 'moderation':
       return row.recheckRequestedAt
-        ? { post: fromPost(row), reasons: [recheckLabel(row.recheckReason)], since: row.recheckRequestedAt }
-        : { post: fromPost(row), reasons: ['Awaiting publish'], since: row.createdAt };
+        ? { post: fromPost(row), reasons: [recheckLabel(row.recheckReason), ...caseReasons(row)], since: row.recheckRequestedAt }
+        : { post: fromPost(row), reasons: [row.caseStatus === 'needs_info' ? null : 'Awaiting publish', ...caseReasons(row)].filter(Boolean), since: row.createdAt };
     case 'badge':
       return { review: row, reasons: badgeReasons(row), since: row.createdAt };
     case 'application':

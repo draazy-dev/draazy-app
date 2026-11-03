@@ -1,5 +1,6 @@
 package com.draazy.api.engagement.flatmate;
 
+import com.draazy.api.common.trust.FlatmateCaseFiles;
 import com.draazy.api.security.AuthPrincipal;
 import java.util.List;
 import java.util.Map;
@@ -12,10 +13,13 @@ class FlatmatePublication {
 
     private final FlatmateGuardrails guardrails;
     private final FlatmateReviewRepository reviews;
+    private final FlatmateCaseFiles caseFiles;
 
-    FlatmatePublication(FlatmateGuardrails guardrails, FlatmateReviewRepository reviews) {
+    FlatmatePublication(FlatmateGuardrails guardrails, FlatmateReviewRepository reviews,
+            FlatmateCaseFiles caseFiles) {
         this.guardrails = guardrails;
         this.reviews = reviews;
+        this.caseFiles = caseFiles;
     }
 
     void enqueueReviewIfNeeded(AuthPrincipal caller, String kind, UUID roomId, UUID groupId,
@@ -74,5 +78,9 @@ class FlatmatePublication {
         String state = lowered ? FlatmateVocabulary.MOD_PENDING : standing;
         post.setModStatus(state);
         post.getRecheck().settle(state, impact.rechecked());
+        if (lowered) {
+            caseFiles.reopen(post instanceof FlatmateRoom ? FlatmateCaseFiles.KIND_ROOM
+                    : FlatmateCaseFiles.KIND_GROUP, post.getId());
+        }
     }
 }

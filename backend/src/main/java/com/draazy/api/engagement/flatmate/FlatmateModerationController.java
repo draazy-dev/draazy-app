@@ -43,14 +43,16 @@ public class FlatmateModerationController {
     private final FlatmateBadgeReviewService badgeReviews;
     private final FlatmateModerationDetails details;
     private final FlatmateModeratorEditService editor;
+    private final FlatmateCaseService cases;
 
     public FlatmateModerationController(FlatmateModerationService service,
             FlatmateBadgeReviewService badgeReviews, FlatmateModerationDetails details,
-            FlatmateModeratorEditService editor) {
+            FlatmateModeratorEditService editor, FlatmateCaseService cases) {
         this.service = service;
         this.badgeReviews = badgeReviews;
         this.details = details;
         this.editor = editor;
+        this.cases = cases;
     }
 
     @GetMapping(Routes.Moderation.FLATMATE_REVIEWS)
@@ -119,7 +121,15 @@ public class FlatmateModerationController {
     @ResponseStatus(HttpStatus.OK)
     public void moderate(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @Valid @RequestBody ModerationRequest body) {
-        service.moderate(principal, id, body.modStatus(), body.note());
+        service.moderate(principal, id, body.modStatus(), body.note(), body.reasonCode());
+    }
+
+    @PatchMapping(Routes.Moderation.FLATMATE_MODERATION_CHECKLIST)
+    @PreAuthorize(FLATMATES_WRITE)
+    public FlatmateModerationDetailDto tick(@CurrentUser AuthPrincipal principal,
+            @PathVariable UUID id, @Valid @RequestBody ChecklistRequest body) {
+        cases.tick(principal, id, body.item(), body.pass());
+        return details.find(id);
     }
 
     public record DecisionRequest(@NotBlank String decision, @Size(max = 600) String note,
@@ -135,7 +145,11 @@ public class FlatmateModerationController {
     public record RevokeRequest(@NotBlank @Size(max = 300) String reason) {
     }
 
-    public record ModerationRequest(@NotBlank String modStatus, @Size(max = 600) String note) {
+    public record ModerationRequest(@NotBlank String modStatus, @Size(max = 600) String note,
+            @Size(max = 40) String reasonCode) {
+    }
+
+    public record ChecklistRequest(@NotBlank @Size(max = 120) String item, boolean pass) {
     }
 
     @GetMapping(Routes.Moderation.GROUP_APPLICATIONS)

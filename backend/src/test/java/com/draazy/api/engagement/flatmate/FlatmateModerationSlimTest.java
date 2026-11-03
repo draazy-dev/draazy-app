@@ -95,6 +95,9 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
     }
 
     private void moderate(User mod, String id, String state) throws Exception {
+        if ("approved".equals(state)) {
+            FlatmateDeskTicks.tickAll(mvc, bearer(mod), id);
+        }
         mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(mod))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -174,7 +177,8 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
         assertThat(room).hasSize(1);
         assertThat(room.get(0).keySet()).containsExactlyInAnyOrder("id", "kind", "modStatus", "authorName",
                 "authorMobile", "headline", "locality", "freeText", "photoCount", "coverPhoto", "rent",
-                "recheckReason", "recheckRequestedAt", "createdAt");
+                "recheckReason", "recheckRequestedAt", "createdAt", "checklistRequired", "caseStatus",
+                "caseReasonCode", "unreadFromHost");
         assertThat(room.get(0)).containsEntry("photoCount", 3).containsEntry("authorName", "Photo Host")
                 .containsEntry("rent", 15000);
         assertThat((String) room.get(0).get("coverPhoto")).isNotBlank();

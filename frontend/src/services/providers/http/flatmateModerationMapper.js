@@ -76,8 +76,43 @@ export function toModerationRowViewModel(row) {
     recheckReason: text(row?.recheckReason),
     recheckRequestedAt: epoch(row?.recheckRequestedAt),
     createdAt: epoch(row?.createdAt),
+    checklistRequired: !!row?.checklistRequired,
+    caseStatus: row?.caseStatus || null,
+    caseReasonCode: text(row?.caseReasonCode),
+    unreadFromHost: Number(row?.unreadFromHost) || 0,
   };
 }
+
+const list = (xs) => (Array.isArray(xs) ? xs : []);
+
+export function toCaseViewModel(res) {
+  if (!res) return null;
+  return {
+    status: res.status || 'in_review',
+    reasonCode: text(res.reasonCode),
+    reasonNote: text(res.reasonNote),
+    checklist: list(res.checklist).map((c) => ({ item: c?.item ?? '', pass: !!c?.pass })),
+    messages: list(res.messages).map((m) => ({
+      id: String(m?.id ?? ''),
+      from: m?.from === 'owner' ? 'owner' : 'ops',
+      body: m?.body ?? '',
+      at: m?.at ?? null,
+      read: !!m?.read,
+    })),
+    decidedAt: res.decidedAt || null,
+  };
+}
+
+export const toCaseSummaryViewModel = (row) => ({
+  kind: row?.kind || 'room',
+  id: row?.id || '',
+  status: row?.status || 'in_review',
+  reasonCode: text(row?.reasonCode),
+  reasonNote: text(row?.reasonNote),
+  unread: Number(row?.unread) || 0,
+  updatedAt: row?.updatedAt || null,
+  lastMessage: text(row?.lastMessage) || '',
+});
 
 export const toModerationItemViewModel = (item) => ({
   ...toModerationRowViewModel(item),

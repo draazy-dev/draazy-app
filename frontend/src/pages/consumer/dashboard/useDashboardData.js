@@ -7,14 +7,15 @@ import { listPropertiesByIds, searchListings } from '../../../services/propertyS
 import { listVisits, myVisitRequests, rescheduleVisit, updateVisitStatus } from '../../../services/visitService.js';
 import { myContactRequests } from '../../../services/contactService.js';
 import { listDocRequests } from '../../../services/documentService.js';
-import { listMyGroupApplications, myRequests } from '../../../services/flatmateService.js';
+import { listMyGroupApplications, myRequests, getFlatmateCase, listMyFlatmateCases, markFlatmateCaseRead, replyToFlatmateCase } from '../../../services/flatmateService.js';
 import { myPhotoRequests } from '../../../services/photoRequestService.js';
+import { offersOnMine } from '../../../services/dealService.js';
 import { listServiceRequests } from '../../../services/serviceRequestService.js';
 import {
   listMyPropertyReviews, getPropertyReview, markPropertyReviewRead, addPropertyReviewMessage,
 } from '../../../services/propertyReviewService.js';
 import { getRecentProps } from '../../../lib/localPrefs.js';
-import { loadMyListings } from '../../../lib/data/myListings.js';
+import { loadMyListings, parseFlatmateCaseKey } from '../../../lib/data/myListings.js';
 import { searchHref } from '../listings/alertCriteria.js';
 import { useSavedSearches } from '../../../context/SavedSearchContext.jsx';
 
@@ -65,6 +66,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
   const [reviewProp, setReviewProp] = useState(null);
   const [reviewInput, setReviewInput] = useState('');
   const [reviewRows, setReviewRows] = useState([]);
+  const [caseRows, setCaseRows] = useState([]);
   const [reviewThread, setReviewThread] = useState(null);
   const [busyIds, setBusyIds] = useState(() => new Set());
   const busyRef = useRef(new Set());
@@ -117,6 +119,12 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     ownerReads,
   );
 
+  const [offers, , , , , refreshOffers] = useAsyncList(
+    () => offersOnMine(),
+    [user],
+    ownerReads,
+  );
+
   const mutateVisit = (id, patch) => {
     if (busyRef.current.has(`visit:${id}`)) return false;
     setBusy(`visit:${id}`, true);
@@ -146,10 +154,16 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     setReviewProp(pid);
     setReviewInput('');
     setReviewThread(null);
+    const fm = parseFlatmateCaseKey(pid);
     try {
-      await markPropertyReviewRead(pid);
-      setReviewThread(await getPropertyReview(pid));
-      refreshReviews();
+      if (fm) {
+        await markFlatmateCaseRead(fm.kind, fm.id);
+        setReviewThread(await getFlatmateCase(fm.kind, fm.id));
+      } else {
+        await markPropertyReviewRead(pid);
+        setReviewThread(await getPropertyReview(pid));
+      }
+      refreshReviews(fm ? 'flatmate' : 'property');
     } catch (err) {
       toast(`Could not open that verification thread: ${err.message}`, 'error');
       setReviewProp(null);
@@ -159,9 +173,12 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     const body = reviewInput.trim();
     if (!body || !reviewProp) return;
     setReviewInput('');
+    const fm = parseFlatmateCaseKey(reviewProp);
     try {
-      setReviewThread(await addPropertyReviewMessage(reviewProp, body));
-      refreshReviews();
+      setReviewThread(fm
+        ? await replyToFlatmateCase(fm.kind, fm.id, body)
+        : await addPropertyReviewMessage(reviewProp, body));
+      refreshReviews(fm ? 'flatmate' : 'property');
     } catch (err) {
       setReviewInput(body);
       toast(`Could not send that reply: ${err.message}`, 'error');
@@ -218,7 +235,8 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     refreshPhotoReqs();
     refreshDocReqs();
     refreshApps();
-  }, [ownerReads, refreshApps, refreshContactReqs, refreshData, refreshDocReqs, refreshFlatmateReqs, refreshPhotoReqs, refreshServiceReqs]);
+    refreshOffers();
+  }, [ownerReads, refreshApps, refreshOffers, refreshContactReqs, refreshData, refreshDocReqs, refreshFlatmateReqs, refreshPhotoReqs, refreshServiceReqs]);
 
   const lastVisibleRefresh = useRef(0);
   useEffect(() => {
@@ -233,18 +251,19 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [refreshRequests]);
 
-  const refreshReviews = useCallback(async () => {
-    try {
-      setReviewRows((await listMyPropertyReviews({ size: MAX_PAGE_SIZE })).items);
-    } catch {
-      setReviewRows([]);
-    }
-  }, []);
+  const hasFlatmateListings = listings.some((l) => l.flatmate);
+  const refreshReviews = useCallback((scope) => Promise.all([
+    ownerReads && scope !== 'flatmate'
+      && listMyPropertyReviews({ size: MAX_PAGE_SIZE }).then((r) => setReviewRows(r.items), () => setReviewRows([])),
+    hasFlatmateListings && scope !== 'property'
+      && listMyFlatmateCases().then(setCaseRows, () => setCaseRows([])),
+  ]), [ownerReads, hasFlatmateListings]);
 
   useEffect(() => {
-    if (ownerReads) refreshReviews();
-    else setReviewRows([]);
-  }, [ownerReads, refreshReviews]);
+    if (!ownerReads) setReviewRows([]);
+    if (!hasFlatmateListings) setCaseRows([]);
+    refreshReviews();
+  }, [ownerReads, hasFlatmateListings, refreshReviews]);
 
   const reviewsByProp = useMemo(() => {
     const slugOf = new Map(listings.map((l) => [l.uuid || l.id, l.id]));
@@ -254,14 +273,15 @@ export function useDashboardData({ user, toast, ownsProperty }) {
       const slug = slugOf.get(row.propertyId);
       if (slug) next.set(slug, row);
     });
+    caseRows.forEach((row) => next.set(`fm:${row.kind}:${row.id}`, row));
     return next;
-  }, [reviewRows, listings]);
+  }, [reviewRows, caseRows, listings]);
 
   return {
     listings, listingsLoaded, visits, recent, recommended, alertMatches,
     contactReqs, photoReqs, flatmateReqs, docReqs, serviceReqs,
     reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
-    apps, mutateVisit, openReview, sendReview,
+    apps, offers, mutateVisit, openReview, sendReview,
     busyIds, refreshData, refreshRequests, setListings,
     dataStatus, dataError, retryData,
   };

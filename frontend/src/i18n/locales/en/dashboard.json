@@ -53,6 +53,14 @@
       "requestedToast": "Badge request sent. We'll notify you once it's checked.",
       "requestFailed": "Could not send the badge request"
     },
+    "idBadge": {
+      "title": "ID verified",
+      "verified": "ID verified",
+      "notVerified": "Not verified",
+      "lineNone": "Verify your identity once. Every post of yours shows it.",
+      "lineVerified": "Flatmates see the ID verified badge on your posts.",
+      "cta": "Get verified"
+    },
     "roomBadge": {
       "title": "Verified property badge",
       "flatmateTag": "Flatmate post",
@@ -264,6 +272,7 @@
     "stCancelled": "Cancelled",
     "stNoShow": "No-show",
     "confirmedToast": "Visit confirmed",
+    "chatOpenFailed": "Visit confirmed, but the chat did not open. Find it in Messages.",
     "cancelledToast": "Visit cancelled",
     "visitedToast": "Marked as visited",
     "noShowToast": "Marked as a no-show",

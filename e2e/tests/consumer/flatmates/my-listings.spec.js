@@ -6,6 +6,11 @@ import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { fillRoomDetails, fillRoomLocation, fillRoomPrice, nextStep, roomBasics, uploadRoomPhotos } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 import { chooseLocality } from '../../../helpers/locality.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const track = flatmateCleanup(test);
 
@@ -28,7 +33,7 @@ async function hostsPost(token, { locality = 'Baner' } = {}) {
       occupation: 'Engineer',
       budget: 18000,
       localities: [locality],
-      moveIn: '2026-12-01',
+      moveIn: MOVE_IN,
       flatPref: 'women',
       roomPref: 'private',
       note: 'My Listings coverage',
@@ -44,7 +49,7 @@ async function hostsGroup(token, title) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(token),
-    body: JSON.stringify({
+    body: JSON.stringify(huntingGroup({
       title,
       locality: 'Baner',
       rent: 30000,
@@ -52,8 +57,7 @@ async function hostsGroup(token, title) {
       seats: 3,
       seatsOpen: 1,
       policy: 'any',
-      role: 'tenant',
-    }),
+    })),
   });
   expect(res.status, 'seeding a group').toBe(201);
   const group = await res.json();
@@ -198,7 +202,7 @@ test.describe('LIVE: my flatmate listings', () => {
     await nextStep(page);
 
     await expectAgreementDeferred(page);
-    await fillRoomPrice(page, { rent: '13500', deposit: '27000', availableFrom: '2026-12-01', notice: '30' });
+    await fillRoomPrice(page, { rent: '13500', deposit: '27000', availableFrom: MOVE_IN, notice: '30' });
     await nextStep(page);
 
     await uploadRoomPhotos(page);
@@ -244,6 +248,7 @@ test.describe('LIVE: my flatmate listings', () => {
     });
     expect(outlook.status, 'setting the outlook on a pending room').toBe(200);
     const admin = await apiLogin(ACTORS.admin);
+    await tickDeskChecklist(API, room.id, auth(admin.accessToken));
     const approved = await fetch(`${API}/admin/flatmates/${room.id}/moderation`, {
       method: 'PATCH', headers: auth(admin.accessToken),
       body: JSON.stringify({ modStatus: 'live', note: 'Outlook regression fixture' }),
@@ -269,7 +274,7 @@ test.describe('LIVE: my flatmate listings', () => {
     await fillRoomLocation(page, { society });
     await nextStep(page);
 
-    await fillRoomPrice(page, { rent: '14500', deposit: '0', availableFrom: '2026-12-01' });
+    await fillRoomPrice(page, { rent: '14500', deposit: '0', availableFrom: MOVE_IN });
     await nextStep(page);
 
     await uploadRoomPhotos(page);
@@ -306,7 +311,7 @@ test.describe('LIVE: my flatmate listings', () => {
         society: unique('Bad Home Type'),
         rentShare: 14000,
         deposit: 28000,
-        availableFrom: '2026-12-01',
+        availableFrom: MOVE_IN,
         ...(await tenantRoomAgreement(accessToken)),
       }),
     });

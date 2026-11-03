@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test';
 import { API, authHeaders } from './liveAuth.js';
 import { STAFF } from '../fixtures/live.js';
+import { tickDeskChecklist } from './flatmateDesk.js';
 
 export const REVIEW_CHECKLIST = [
   'Photos are real and match the listing',
@@ -88,9 +89,11 @@ export async function rejectListingWithFetch(
 }
 
 export async function publishFlatmate(id, { api = API } = {}) {
+  const headers = await authHeaders(STAFF.rental);
+  await tickDeskChecklist(api, id, headers);
   const res = await jsonResult(await fetch(`${api}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
-    headers: await authHeaders(STAFF.rental),
+    headers,
     body: JSON.stringify({ modStatus: 'approved' }),
   }));
   expect(res.status, `publishing flatmate post ${id}: ${res.text}`).toBe(200);

@@ -435,18 +435,11 @@ class FlatmateBadgeRequestEndpointsTest extends AbstractApiTest {
         assertThat(reviewField(roomId, "evidence_type")).isEqualTo("rent_agreement");
     }
 
-    private String groupBody(String role) {
-        return """
-                {"title":"Badge group","locality":"Baner","rent":40000,"deposit":10000,"seats":3,
-                 "seatsOpen":1,"name":"Host","role":"%s"}
-                """.formatted(role);
-    }
-
-    private String postGroup(User host, String role) throws Exception {
+    private String postHuntingGroup(User host) throws Exception {
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(groupBody(role)))
+                        .content(FlatmateGroupFixture.hunting("Badge group", "Baner", "any", 40000, 3, 1)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = com.jayway.jsonpath.JsonPath.read(json, "$.id");
@@ -463,55 +456,19 @@ class FlatmateBadgeRequestEndpointsTest extends AbstractApiTest {
                 .content(badgeBody(docId)));
     }
 
-    private String groupReview(String groupId, String column) {
-        return jdbc.queryForObject("select " + column + "::text from flatmate_reviews where group_id = ?::uuid",
-                String.class, groupId);
-    }
-
     @Test
-    @DisplayName("a tenant host of a flat-holding group files a pending review and gets the group back")
-    void groupBadgeRequest() throws Exception {
-        User host = user("9820000115", Roles.Wire.BUYER);
-        String groupId = postGroup(host, "tenant");
-        requestGroup(host, groupId, doc(host, "Electricity Bill"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(groupId))
-                .andExpect(jsonPath("$.verificationTier").value("tenant"));
-        assertThat(groupReview(groupId, "status")).isEqualTo("pending");
-        assertThat(groupReview(groupId, "evidence_type")).isEqualTo("electricity_bill");
-        assertThat(jdbc.queryForObject("select verification_tier from flatmate_groups where id = ?::uuid",
-                String.class, groupId)).isEqualTo("tenant");
-    }
-
-    @Test
-    @DisplayName("a group request is refused for a hunting group, an owner-hosted one and an unverified host")
+    @DisplayName("a group request is refused for a hunting group and 404s for a stranger")
     void groupBadgeRequestRefusals() throws Exception {
         User host = user("9820000116", Roles.Wire.BUYER);
-        User ownerHost = user("9820000140", Roles.Wire.BUYER);
-        String hunting = postGroup(host, "tenant");
-        jdbc.update("update flatmate_groups set hunting = true where id = ?::uuid", hunting);
-        entityManager.clear();
+        String hunting = postHuntingGroup(host);
         requestGroup(host, hunting, doc(host, "Rent agreement"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("hunting_group"));
 
-        String owned = postGroup(ownerHost, "tenant");
-        jdbc.update("update flatmate_groups set host_role = 'owner' where id = ?::uuid", owned);
-        entityManager.clear();
-        requestGroup(ownerHost, owned, doc(ownerHost, "Rent agreement"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("not_tenant_hosted"));
-
-        User unverified = user("9820000117", Roles.Wire.BUYER, false);
-        String third = postGroup(unverified, "tenant");
-        requestGroup(unverified, third, doc(unverified, "Rent agreement"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("identity_required"));
-
         User stranger = user("9820000118", Roles.Wire.BUYER);
-        requestGroup(stranger, third, doc(stranger, "Rent agreement")).andExpect(status().isNotFound());
-        assertThat(jdbc.queryForObject("select count(*) from flatmate_reviews where agreement_doc is not null and group_id in "
-                + "(?::uuid, ?::uuid, ?::uuid)", Integer.class, hunting, owned, third)).isZero();
+        requestGroup(stranger, hunting, doc(stranger, "Rent agreement")).andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("select count(*) from flatmate_reviews where group_id = ?::uuid",
+                Integer.class, hunting)).isZero();
     }
 
     @Test

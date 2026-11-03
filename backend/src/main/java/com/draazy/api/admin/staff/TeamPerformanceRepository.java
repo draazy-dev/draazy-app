@@ -58,11 +58,11 @@ class TeamPerformanceRepository {
                       (order by extract(epoch from (decided_at - created_at)) / 60.0)
                     from property_reviews
                     where decided_at >= cast(:from as timestamptz)
-                      and decided_at is not null)
+                      and decided_at is not null and property_id is not null)
             from (
               select created_at as waiting_since
               from property_reviews
-              where status = 'pending'
+              where status = 'pending' and property_id is not null
               union all
               select ownership_requested_at
               from properties
@@ -112,7 +112,7 @@ class TeamPerformanceRepository {
             from (
               select created_at as waiting_since
               from property_reviews
-              where status = 'pending'
+              where status = 'pending' and property_id is not null
               union all
               select ownership_requested_at
               from properties

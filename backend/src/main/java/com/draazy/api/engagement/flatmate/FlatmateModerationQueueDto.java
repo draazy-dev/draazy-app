@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.identity.user.User;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -18,7 +19,9 @@ public record FlatmateModerationQueueDto(
         Long rent,
         String recheckReason,
         Instant recheckRequestedAt,
-        Instant createdAt) {
+        Instant createdAt,
+        boolean checklistRequired,
+        @JsonIgnore UUID authorId) {
     public static final String KIND_POST = "post";
     public static final String KIND_ROOM = "room";
     public static final String KIND_GROUP = "group";
@@ -28,7 +31,8 @@ public record FlatmateModerationQueueDto(
         return new FlatmateModerationQueueDto(post.getId(), KIND_POST, post.getModStatus(),
                 nameOf(author), mobileOf(author), post.getName(), where, post.getNote(),
                 List.of(), post.getBudgetMax() == null ? post.getBudget() : post.getBudgetMax(),
-                post.getRecheck().getReason(), post.getRecheck().getRequestedAt(), post.getCreatedAt());
+                post.getRecheck().getReason(), post.getRecheck().getRequestedAt(), post.getCreatedAt(),
+                false, post.getUserId());
     }
 
     static FlatmateModerationQueueDto of(FlatmateRoom room, User author) {
@@ -38,14 +42,15 @@ public record FlatmateModerationQueueDto(
                 nameOf(author), mobileOf(author), headline, room.getLocality(), room.getNote(),
                 room.getPhotos() == null ? List.of() : List.copyOf(room.getPhotos()), room.getBudget(),
                 room.getRecheck().getReason(), room.getRecheck().getRequestedAt(),
-                room.getCreatedAt());
+                room.getCreatedAt(), true, room.getHostId());
     }
 
     static FlatmateModerationQueueDto of(FlatmateGroup group, User author) {
         return new FlatmateModerationQueueDto(group.getId(), KIND_GROUP, group.getModStatus(),
                 nameOf(author), mobileOf(author), group.getTitle(), group.getLocality(),
                 group.getNote(), List.of(), group.getRent(), group.getRecheck().getReason(),
-                group.getRecheck().getRequestedAt(), group.getCreatedAt());
+                group.getRecheck().getRequestedAt(), group.getCreatedAt(), !group.isHunting(),
+                group.getHostId());
     }
 
     private static String nameOf(User u) {

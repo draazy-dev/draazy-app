@@ -1,5 +1,6 @@
 package com.draazy.api.engagement.flatmate;
 
+import com.draazy.api.common.trust.FlatmateCaseFiles;
 import java.util.Map;
 
 public record FlatmateModerationDetailDto(
@@ -8,5 +9,6 @@ public record FlatmateModerationDetailDto(
         FlatmateGroupDto group,
         FlatmateSeekerPostDto post,
         FlatmateReviewDto review,
-        Map<String, Integer> livingStyle) {
+        Map<String, Integer> livingStyle,
+        FlatmateCaseFiles.CaseView caseFile) {
 }

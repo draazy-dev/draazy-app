@@ -4,8 +4,22 @@ import { myFlatmateGroups, myFlatmatePosts, myFlatmateRooms } from '../../servic
 const SHARE_REQ_IMG = 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&q=80';
 const FLATMATE_GROUP_IMG = 'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&q=80';
 
-const CARD_STATUS = { live: 'approved', approved: 'approved', pending: 'pending', flagged: 'pending', removed: 'rejected', rejected: 'rejected', expired: 'expired' };
+const CARD_STATUS = { live: 'approved', approved: 'approved', pending: 'pending', needs_info: 'pending', flagged: 'pending', removed: 'rejected', rejected: 'rejected', expired: 'expired' };
 const cardStatus = (modStatus) => CARD_STATUS[modStatus] || 'pending';
+
+export const flatmateKindOf = (l) => (l?.flatmateGroup ? 'group' : l?.flatmatePost ? 'post' : l?.flatmate ? 'room' : null);
+
+export function flatmateCaseKey(l) {
+  const kind = flatmateKindOf(l);
+  return kind ? `fm:${kind}:${l.id}` : null;
+}
+
+export function parseFlatmateCaseKey(key) {
+  const m = /^fm:(room|group|post):(.+)$/.exec(String(key || ''));
+  return m ? { kind: m[1], id: m[2] } : null;
+}
+
+const propertyVerified = (tier, reviewStatus) => tier === 'owner' || (tier === 'tenant' && reviewStatus === 'approved');
 
 export function flatmatePostToListing(r) {
   const locality = (r.localities && r.localities[0]) || 'Pune';
@@ -52,6 +66,7 @@ export function flatmateGroupToListing(g) {
     hunting: g.hunting,
     verificationTier: g.verificationTier,
     reviewStatus: g.reviewStatus,
+    ownershipVerified: !g.hunting && propertyVerified(g.verificationTier, g.reviewStatus),
     type: 'Flatmate group',
     createdAt: g.createdAt,
   };
@@ -81,6 +96,7 @@ export function roomToListing(room) {
     hostRole: room.hostRole,
     verificationTier: room.verificationTier,
     reviewStatus: room.reviewStatus,
+    ownershipVerified: propertyVerified(room.verificationTier, room.reviewStatus),
     occupants: room.occupants || 0,
     type: 'Flatmate',
     createdAt: room.createdAt,

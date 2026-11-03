@@ -616,10 +616,7 @@ class FlatmateMakerCheckerTest extends AbstractApiTest {
         String id = idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Two of us in Aundh","locality":"Aundh","policy":"women",
-                                 "rent":40000,"deposit":10000,"seats":3,"seatsOpen":2,"name":"Host"}
-                                """))
+                        .content(FlatmateGroupFixture.hunting("Two of us in Aundh", "Aundh", "women")))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
         sql("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", id);
         return id;
@@ -652,10 +649,7 @@ class FlatmateMakerCheckerTest extends AbstractApiTest {
         String groupId = idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Three of us","locality":"Kothrud","policy":"any","rent":45000,"deposit":10000,
-                                 "seats":3,"seatsOpen":1,"name":"Host"}
-                                """))
+                        .content(FlatmateGroupFixture.hunting("Three of us", "Kothrud", "any", 45000, 3, 1)))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
         sql("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", groupId);
         return idIn(mvc.perform(post(Routes.Flatmates.GROUP_APPLY.replace("{id}", groupId))

@@ -5,6 +5,9 @@ import { tenantRoomAgreement } from '../../helpers/flatmateAgreement.js';
 import { roomBasics } from '../../helpers/roomWizard.js';
 import { withSocietyId } from '../../helpers/liveSociety.js';
 import { sql } from '../../helpers/monetisation.js';
+import { istInDays } from '../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const STAFF = '9733798115';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -19,7 +22,7 @@ async function call(method, path, token, body) {
 const moderate = async (id, modStatus, note) => call('PATCH', `/admin/flatmates/${id}/moderation`,
   (await apiLogin(STAFF)).accessToken, { modStatus, ...(note ? { note } : {}) });
 
-const postBody = (note) => ({ age: 27, budget: 16000, localities: ['Kothrud'], moveIn: '2026-12-01', note });
+const postBody = (note) => ({ age: 27, budget: 16000, localities: ['Kothrud'], moveIn: MOVE_IN, note });
 
 async function seekerPost(note) {
   const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Asha' });
@@ -35,7 +38,7 @@ async function tenantRoom() {
   const res = await call('POST', '/flatmates/rooms', accessToken, {
     ...(await roomBasics(accessToken)),
     bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi', locality: 'Baner',
-    rentShare: 15000, deposit: 30000, availableFrom: '2026-12-01', lookingFor: 'any', foodPref: 'any',
+    rentShare: 15000, deposit: 30000, availableFrom: MOVE_IN, lookingFor: 'any', foodPref: 'any',
     ...(await tenantRoomAgreement(accessToken)),
     ...(await withSocietyId(accessToken, { society: `Checker Court ${stamp()}` })),
   });

@@ -21,7 +21,6 @@ public class FlatmateBadgeRequestService {
     private final FlatmateRoomRepository rooms;
     private final FlatmateGroupRepository groups;
     private final FlatmateReviewRepository reviews;
-    private final FlatmateReviewStatuses reviewStatuses;
     private final FlatmateOwnerConsentService consentService;
     private final FlatmatePublication publication;
     private final FlatmateMapper mapper;
@@ -31,7 +30,7 @@ public class FlatmateBadgeRequestService {
     private final IdentityVerificationService identity;
 
     FlatmateBadgeRequestService(FlatmateRoomRepository rooms, FlatmateGroupRepository groups,
-            FlatmateReviewRepository reviews, FlatmateReviewStatuses reviewStatuses,
+            FlatmateReviewRepository reviews,
             FlatmateOwnerConsentService consentService, FlatmatePublication publication,
             FlatmateMapper mapper, FlatmateRoomCards cards, OwnedDocumentLookup ownedDocuments,
             UserRepository users, IdentityVerificationService identity) {
@@ -39,7 +38,6 @@ public class FlatmateBadgeRequestService {
         this.rooms = rooms;
         this.groups = groups;
         this.reviews = reviews;
-        this.reviewStatuses = reviewStatuses;
         this.consentService = consentService;
         this.publication = publication;
         this.mapper = mapper;
@@ -65,8 +63,7 @@ public class FlatmateBadgeRequestService {
             room.setAgreementDeclared(true);
             room.setVerificationTier(FlatmateVocabulary.TIER_TENANT);
             room = rooms.saveAndFlush(room);
-            file(caller, "room", room.getId(), null, address(room.getSociety(), room.getLocality()),
-                    room.isFlagForReview(), room.isOwnerConsent(), evidence);
+            file(caller, room, evidence);
         }
         return mapper.toDto(room, cards.ownerViews(List.of(room), me.getName(), me.getMobile())
                 .get(room.getId()));
@@ -82,29 +79,16 @@ public class FlatmateBadgeRequestService {
             throw new ConflictException("hunting_group",
                     "A group still looking for a flat has no flat to verify.");
         }
-        requireTenantHosted(group.getHostRole(), group.getVerificationTier());
-        User me = requireIdentitySubmitted(caller);
-        Evidence evidence = evidenceOf(caller, body);
-        if (!unchanged(reviews.findByGroupId(group.getId()).orElse(null), evidence)) {
-            group.setOwnerConsent(consentService.has(
-                    group.getOwnerConsentMobile(), caller.userId(), group.getAddressFingerprint()));
-            group.setAgreementDeclared(true);
-            group.setVerificationTier(FlatmateVocabulary.TIER_TENANT);
-            group = groups.saveAndFlush(group);
-            file(caller, "group", null, group.getId(), address(null, group.getLocality()),
-                    group.isFlagForReview(), group.isOwnerConsent(), evidence);
-        }
-        return mapper.toDto(group, new FlatmateMapper.PartyView(me.getName(), me.getMobile(),
-                reviewStatuses.forGroups(List.of(group)).get(group.getId())));
+        throw notTenantHosted();
     }
 
-    private void file(AuthPrincipal caller, String kind, UUID roomId, UUID groupId, String address,
-            boolean flagged, boolean ownerConsent, Evidence evidence) {
-        var standing = roomId != null ? reviews.findByRoomId(roomId) : reviews.findByGroupId(groupId);
-        publication.enqueueReviewIfNeeded(caller, kind, roomId, groupId, FlatmateVocabulary.TIER_TENANT,
-                flagged, address, new FlatmatePublication.AgreementClaim(evidence.doc(),
-                        new AgreementRegistration(), ownerConsent,
-                        standing.map(FlatmateReview::getTenancyPropertyId).orElse(null), evidence.type()));
+    private void file(AuthPrincipal caller, FlatmateRoom room, Evidence evidence) {
+        publication.enqueueReviewIfNeeded(caller, "room", room.getId(), null, FlatmateVocabulary.TIER_TENANT,
+                room.isFlagForReview(), address(room.getSociety(), room.getLocality()),
+                new FlatmatePublication.AgreementClaim(evidence.doc(), new AgreementRegistration(),
+                        room.isOwnerConsent(),
+                        reviews.findByRoomId(room.getId()).map(FlatmateReview::getTenancyPropertyId).orElse(null),
+                        evidence.type()));
     }
 
     private User requireIdentitySubmitted(AuthPrincipal caller) {
@@ -136,9 +120,13 @@ public class FlatmateBadgeRequestService {
     private static void requireTenantHosted(String hostRole, String tier) {
         if (!FlatmateVocabulary.ROLE_TENANT.equals(hostRole)
                 || FlatmateVocabulary.TIER_OWNER.equals(tier)) {
-            throw new ConflictException("not_tenant_hosted",
-                    "Only a tenant-hosted post can request the Verified property badge.");
+            throw notTenantHosted();
         }
+    }
+
+    private static ConflictException notTenantHosted() {
+        return new ConflictException("not_tenant_hosted",
+                "Only a tenant-hosted post can request the Verified property badge.");
     }
 
     private static String address(String society, String locality) {

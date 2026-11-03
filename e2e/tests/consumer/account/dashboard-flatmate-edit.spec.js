@@ -1,11 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, uniqueMobile, shownMobile } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { trackErrors } from '../../../helpers/console.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 import { chooseLocality } from '../../../helpers/locality.js';
 import { nextStep, roomBasics } from '../../../helpers/roomWizard.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const STAFF = '9733798115';
 
@@ -34,8 +38,8 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     const mobile = uniqueMobile();
     const { accessToken } = await apiLogin(mobile, { name: 'Dash Host' });
     const title = `Dash edit ${Date.now().toString(36)}`;
-    const group = await seed(accessToken, 'groups', { title, locality: 'Baner', rent: 30000, deposit: 50000, seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant' });
-    const post = await seed(accessToken, 'posts', { gender: 'female', age: 26, occupation: 'Engineer', budget: 18000, localities: ['Wakad'], moveIn: '2026-12-01', flatPref: 'women', roomPref: 'private', note: 'Dashboard edit coverage' });
+    const group = await seed(accessToken, 'groups', huntingGroup({ title, locality: 'Baner', rent: 30000, deposit: 50000, seats: 3, seatsOpen: 1, policy: 'any' }));
+    const post = await seed(accessToken, 'posts', { gender: 'female', age: 26, occupation: 'Engineer', budget: 18000, localities: ['Wakad'], moveIn: MOVE_IN, flatPref: 'women', roomPref: 'private', note: 'Dashboard edit coverage' });
     await signedInAs(page, mobile);
     const errors = trackErrors(page);
 
@@ -107,7 +111,7 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     const room = await seed(accessToken, 'rooms', {
       ...(await roomBasics(accessToken)),
       society, locality: 'Baner', roomType: 'Private room', bhk: '2', furnishing: 'semi', rentShare: 18000,
-      deposit: 36000, availableFrom: '2026-12-01', hostRole: 'owner', occupants: 1, maxOccupants: 3, lat: 18.559, lng: 73.776,
+      deposit: 36000, availableFrom: MOVE_IN, hostRole: 'owner', occupants: 1, maxOccupants: 3, lat: 18.559, lng: 73.776,
     });
     expect(room.modStatus, 'a room under review is not live').not.toBe('live');
     await signedInAs(page, mobile);
@@ -152,7 +156,7 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     const room = await seed(accessToken, 'rooms', {
       ...(await roomBasics(accessToken)),
       society, locality: 'Baner', flatNumber: 'C-1203', homeTypeLabel: 'Flat', roomType: 'Private room', bhk: '3', attachedBath: 'attached',
-      furnishing: 'furnished', rentShare: 21000, deposit: 42000, availableFrom: '2026-12-01', occupants: 2, maxOccupants: 4,
+      furnishing: 'furnished', rentShare: 21000, deposit: 42000, availableFrom: MOVE_IN, occupants: 2, maxOccupants: 4,
       lat: 18.559, lng: 73.776, hostRole: 'tenant', ...(await tenantRoomAgreement(accessToken)),
       ownerConsentMobile: consentMobile, details,
     });
@@ -206,8 +210,8 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     const mobile = uniqueMobile();
     const { accessToken } = await apiLogin(mobile, { name: 'Del Host' });
     const title = `Dash delete ${Date.now().toString(36)}`;
-    const group = await seed(accessToken, 'groups', { title, locality: 'Hinjawadi', rent: 35000, deposit: 50000, seats: 4, policy: 'women', role: 'tenant' });
-    const post = await seed(accessToken, 'posts', { gender: 'female', age: 25, occupation: 'Analyst', budget: 15000, localities: ['Kharadi'], moveIn: '2026-12-01', flatPref: 'women', roomPref: 'private', note: 'Dashboard delete coverage' });
+    const group = await seed(accessToken, 'groups', huntingGroup({ title, locality: 'Hinjawadi', rent: 35000, deposit: 50000, seats: 4, policy: 'women' }));
+    const post = await seed(accessToken, 'posts', { gender: 'female', age: 25, occupation: 'Analyst', budget: 15000, localities: ['Kharadi'], moveIn: MOVE_IN, flatPref: 'women', roomPref: 'private', note: 'Dashboard delete coverage' });
     await signedInAs(page, mobile);
 
     await page.goto('/dashboard#properties');

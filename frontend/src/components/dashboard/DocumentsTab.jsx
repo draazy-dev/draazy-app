@@ -5,6 +5,8 @@ import Icon from '../Icon.jsx';
 import IdInput from '../IdInput.jsx';
 import BadgeRequestCard from './BadgeRequestCard.jsx';
 import RoomBadgeRequestCard from './RoomBadgeRequestCard.jsx';
+import PersonIdBadgeCard from './PersonIdBadgeCard.jsx';
+import { flatmateKindOf } from '../../lib/data/myListings.js';
 import AgreementPerks from './AgreementPerks.jsx';
 import PropertyImage from '../ui/PropertyImage.jsx';
 import Select from '../ui/Select.jsx';
@@ -250,11 +252,17 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
   }, [rental.loaded, isOwner, isTenant]);
   const searchParams = useSearchParams()[0];
   const linkedProp = searchParams.get('prop');
-  const linkedRoom = searchParams.get('room') || searchParams.get('group');
-  const linkedFlatmate = linkedRoom ? `${searchParams.get('room') ? 'room' : 'group'}:${linkedRoom}` : null;
-  const flatmateOptions = (listings || [])
-    .filter((l) => l.flatmate && !l.flatmatePost && l.hostRole === 'tenant' && !(l.flatmateGroup && l.hunting))
-    .map((l) => ({ value: `${l.flatmateGroup ? 'group' : 'room'}:${l.id}`, label: `${l.title} · ${t('dash.roomBadge.flatmateTag')}` }));
+  const linkedRoom = searchParams.get('room') || searchParams.get('group') || searchParams.get('post');
+  const linkedKind = searchParams.get('room') ? 'room' : searchParams.get('group') ? 'group' : 'post';
+  const linkedFlatmate = linkedRoom ? `${linkedKind}:${linkedRoom}` : null;
+  const flatmateOption = (l) => ({ value: `${flatmateKindOf(l)}:${l.id}`, label: `${l.title} · ${t('dash.roomBadge.flatmateTag')}` });
+  const needsPropertyProof = (l) => l.hostRole === 'tenant' && !l.flatmatePost && !(l.flatmateGroup && l.hunting);
+  const flatmateListings = (listings || []).filter((l) => l.flatmate && !l.propertyId);
+  const proofOptions = flatmateListings.filter(needsPropertyProof).map(flatmateOption);
+  const flatmateOptions = [
+    ...proofOptions,
+    ...flatmateListings.filter((l) => l.flatmatePost || (l.flatmateGroup && l.hunting)).map(flatmateOption),
+  ];
   if (linkedFlatmate && !flatmateOptions.some((o) => o.value === linkedFlatmate)) {
     flatmateOptions.unshift({ value: linkedFlatmate, label: t('dash.roomBadge.roomFallback') });
   }
@@ -281,7 +289,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
       return;
     }
     if (!propList.some((l) => l.id === docProp) && !flatmateOptions.some((o) => o.value === docProp)) {
-      setDocProp(propList[0]?.id || flatmateOptions[0]?.value || 'portfolio');
+      setDocProp(propList[0]?.id || proofOptions[0]?.value || 'portfolio');
     }
   }, [listings, linkedProp]); // eslint-disable-line react-hooks/exhaustive-deps -- linkedProp derives from listings
   useEffect(() => {
@@ -293,6 +301,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
 
   const selectedListing = propList.find((l) => l.id === docProp);
   const [flatmateKind, flatmateId] = flatmateOptions.some((o) => o.value === docProp) ? docProp.split(':') : [];
+  const personKind = flatmateId && (flatmateKind === 'post' || (flatmateKind === 'group' && flatmateListings.some((l) => l.id === flatmateId && l.hunting)));
   const docPropertyId = selectedListing?.uuid || docProp;
   const activeProp = context === 'owner' ? docPropertyId : 'personal';
   const mobile = user?.mobile;
@@ -449,8 +458,10 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
         <>
           {flatmateId ? (
             <>
-              <RoomBadgeRequestCard key={`${mobile}:${docProp}`} kind={flatmateKind} roomId={flatmateId} personalDocs={personalDocs}
-                onRequested={() => { reloadPersonal(); onRoomBadgeChanged?.(flatmateId); }} toast={toast} />
+              {personKind ? <PersonIdBadgeCard key={docProp} /> : (
+                <RoomBadgeRequestCard key={`${mobile}:${docProp}`} kind={flatmateKind} roomId={flatmateId} personalDocs={personalDocs}
+                  onRequested={() => { reloadPersonal(); onRoomBadgeChanged?.(flatmateId); }} toast={toast} />
+              )}
               {personalStatus === 'error' && <LoadError message={t('dash.vaultLoadError')} error={personalError} onRetry={reloadPersonal} t={t} />}
             </>
           ) : (

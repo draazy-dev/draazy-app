@@ -120,7 +120,8 @@ public class VerificationCases implements ListingCaseNotes {
     }
 
     private void reconcilePendingChecklist(PropertyReview review) {
-        if (review.getDecidedAt() != null && !PropertyReviewStatuses.NEEDS_INFO.equals(review.getStatus())) {
+        if (review.getPropertyId() == null
+                || review.getDecidedAt() != null && !PropertyReviewStatuses.NEEDS_INFO.equals(review.getStatus())) {
             return;
         }
         Optional<Property> property = properties.findById(review.getPropertyId());

@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { API, E2E_OTP, apiLogin, grantIdentityBadge, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, grantIdentityBadge, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { PHOTO_PNG } from '../../../helpers/listingPhotos.helper.js';
 import { fillRoomDetails, fillRoomLocation, fillRoomPrice, nextStep, uploadRoomPhotos } from '../../../helpers/roomWizard.js';
-import { badgeChecks, uploadAgreementDocument } from '../../../helpers/flatmateAgreement.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const isoDaysFromNow = (days) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
@@ -13,53 +15,8 @@ const auth = (token) => ({ 'content-type': 'application/json', authorization: `B
 const track = flatmateCleanup(test);
 const stamp = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
-const AGREEMENT_DOC = {
-  mime: 'image/png',
-  name: 'agreement.png',
-  size: 70,
-  dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ'
-    + 'AAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-};
-
-async function agreementDoc(token, doc = {}) {
-  const uploaded = await uploadAgreementDocument(token);
-  return {
-    ...AGREEMENT_DOC,
-    id: uploaded.id,
-    name: uploaded.fileName || AGREEMENT_DOC.name,
-    size: uploaded.sizeBytes || AGREEMENT_DOC.size,
-    mime: uploaded.mimeType || AGREEMENT_DOC.mime,
-    ...doc,
-  };
-}
-
 async function adminToken() {
   return (await apiLogin(ACTORS.admin)).accessToken;
-}
-
-async function createTenantGroup(token, body = {}) {
-  const proof = await agreementDoc(token, body.agreementDoc);
-  const response = await fetch(`${API}/flatmates/groups`, {
-    method: 'POST',
-    headers: auth(token),
-    body: JSON.stringify({
-      title: `Consent badge ${stamp()} in Baner`,
-      locality: 'Baner',
-      rent: 35000,
-      deposit: 50000,
-      seats: 3,
-      seatsOpen: 1,
-      policy: 'any',
-      role: 'tenant',
-      agreement: true,
-      agreementDoc: proof,
-      ...body,
-    }),
-  });
-  const group = await response.json();
-  expect(response.status, JSON.stringify(group)).toBe(201);
-  track('groups', group.id, token);
-  return group;
 }
 /** The queue row behind a post, read as the desk reads it rather than round the route. */
 async function queuedReview(target) {
@@ -70,94 +27,6 @@ async function queuedReview(target) {
   expect(row, `an agreement-backed post must be queued for Ops (${target})`).toBeTruthy();
   return row;
 }
-/** Decide a queued review and hand back the raw response, so a refusal can be asserted on. */
-async function decide(reviewId, decision, note = 'e2e verdict') {
-  const response = await fetch(`${API}/admin/flatmate-reviews/${reviewId}`, {
-    method: 'PATCH',
-    headers: auth(await adminToken()),
-    body: JSON.stringify({ decision, note, ...(decision === 'approved' ? { checks: badgeChecks() } : {}) }),
-  });
-  return { status: response.status, body: await response.text() };
-}
-/** Walk the owner through both legs of the consent OTP, which is the only way the flag is set. */
-async function recordConsent(group, token, ownerMobile) {
-  const address = { title: group.title, locality: group.locality };
-  for (const payload of [{ ownerMobile, ...address }, { ownerMobile, otp: E2E_OTP, ...address }]) {
-    const response = await fetch(`${API}/flatmates/owner-consent`, {
-      method: 'POST',
-      headers: auth(token),
-      body: JSON.stringify(payload),
-    });
-    expect(response.status, `owner-consent ${JSON.stringify(payload)}`).toBe(200);
-  }
-}
-
-test('Ops cannot badge a sub-let the owner never consented to, and can once they have', async () => {
-  const hostMobile = uniqueMobile();
-  const ownerMobile = uniqueMobile(); // a different number — the server refuses self-consent
-  const { accessToken } = await apiLogin(hostMobile, { name: 'Consent Tenant' });
-  await grantIdentityBadge(hostMobile);
-
-  const group = await createTenantGroup(accessToken, { consentMobile: ownerMobile });
-  expect(group.ownerConsent, 'a fresh group starts unconsented').toBe(false);
-  // The whole point of the field: a desk that cannot see it is deciding on a photograph.
-  const review = await queuedReview(group.id);
-  expect(review.ownerConsent).toBe(false);
-  // The refusal. 422 rather than 403 because the moderator holds every permission this needs —
-  // "you are not allowed" would send them hunting for a role that cannot exist.
-  const refused = await decide(review.id, 'approved');
-  expect(refused.status, refused.body).toBe(422);
-  expect(refused.body, 'the message must name the OTP as the way out').toMatch(/consent OTP/i);
-
-  const rejected = await decide(review.id, 'rejected', 'e2e — refusing without consent');
-  expect(rejected.status, rejected.body).toBe(200);
-  // Now the owner actually consents, and the same claim goes through.
-  const consented = await createTenantGroup(accessToken, { consentMobile: ownerMobile });
-  await recordConsent(consented, accessToken, ownerMobile);
-
-  const secondReview = await queuedReview(consented.id);
-  expect(secondReview.ownerConsent, 'the OTP must have written the flag the gate reads').toBe(true);
-
-  const approved = await decide(secondReview.id, 'approved');
-  expect(approved.status, approved.body).toBe(200);
-  expect(JSON.parse(approved.body).status).toBe('approved');
-});
-test('a consent taken before the group exists vouches for that flat and no other', async () => {
-  const hostMobile = uniqueMobile();
-  const ownerMobile = uniqueMobile();
-  const { accessToken } = await apiLogin(hostMobile, { name: 'Consent Tenant' });
-  await grantIdentityBadge(hostMobile);
-  const title = `Consented flat ${stamp()} in Baner`;
-
-  const address = { title, locality: 'Baner' };
-  for (const payload of [{ ownerMobile, ...address }, { ownerMobile, otp: E2E_OTP, ...address }]) {
-    const response = await fetch(`${API}/flatmates/owner-consent`, {
-      method: 'POST',
-      headers: auth(accessToken),
-      body: JSON.stringify(payload),
-    });
-    expect(response.status, `owner-consent ${JSON.stringify(payload)}`).toBe(200);
-  }
-  // A send that names no flat is refused before it costs the owner an SMS.
-  const unscoped = await fetch(`${API}/flatmates/owner-consent`, {
-    method: 'POST',
-    headers: auth(accessToken),
-    body: JSON.stringify({ ownerMobile }),
-  });
-  expect(unscoped.status, await unscoped.clone().text()).toBe(400);
-  // The flat the owner was asked about picks the consent up at submit time.
-  const consented = await createTenantGroup(accessToken, { title, consentMobile: ownerMobile });
-  expect(consented.ownerConsent, 'the flat named in the OTP must carry the flag').toBe(true);
-
-  const elsewhere = await createTenantGroup(accessToken, {
-    title: `Another flat ${stamp()} in Baner`,
-    consentMobile: ownerMobile,
-  });
-  expect(elsewhere.ownerConsent, 'an unrelated flat must not inherit the consent').toBe(false);
-
-  const refused = await decide((await queuedReview(elsewhere.id)).id, 'approved');
-  expect(refused.status, refused.body).toBe(422);
-});
 
 test('the agreement, added after posting, asks only for the document, names the obligations and offers a way out', async ({ page }) => {
   const hostMobile = uniqueMobile();
@@ -171,7 +40,7 @@ test('the agreement, added after posting, asks only for the document, names the 
   await nextStep(page);
   await fillRoomLocation(page, { society: `Consent Heights ${stamp()}` });
   await nextStep(page);
-  await fillRoomPrice(page, { rent: '13500', deposit: '27000', availableFrom: '2026-12-01', host: 'tenant', ownerMobile: '9876501234' });
+  await fillRoomPrice(page, { rent: '13500', deposit: '27000', availableFrom: MOVE_IN, host: 'tenant', ownerMobile: '9876501234' });
   await expect(page.getByTestId('room-agreement-later')).toBeVisible();
   await nextStep(page);
   await uploadRoomPhotos(page);

@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { istInDays } from '../../../helpers/availability.js';
 
-const BASE = process.env.BASE_URL || 'http://localhost:5173';
+const MOVE_IN = istInDays(28);
+
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 const track = flatmateCleanup(test);
 
@@ -17,7 +19,7 @@ async function createPost(token, { locality = 'Baner', note = 'Moderation covera
       occupation: 'Engineer',
       budget: 18000,
       localities: [locality],
-      moveIn: '2026-12-01',
+      moveIn: MOVE_IN,
       flatPref: 'women',
       roomPref: 'private',
       note,
@@ -57,35 +59,13 @@ test('a phone number in a seeker post is refused, not published', async () => {
   expect(res.status).toBe(422);
 });
 
-test('a group with a flat is still held until a moderator publishes it', async ({ page }) => {
+test('a group that already has a flat is refused and told to list a room', async () => {
   const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Host' });
-  const title = `Held flat ${Date.now().toString(36)}`;
-  const group = await created(await fetch(`${API}/flatmates/groups`, {
+  const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
-    body: JSON.stringify({ title, locality: 'Kothrud', policy: 'any', rent: 40000, deposit: 50000, seats: 3, seatsOpen: 1 }),
-  }), accessToken, 'groups');
-  expect(group.modStatus).toBe('pending');
-
-  const feed = await (await fetch(`${API}/flatmates/feed?tab=team-up&locality=Kothrud&size=100`)).json();
-  expect(feed.content.some((g) => g.id === group.id), 'a pending group must not appear on the public feed').toBe(false);
-
-  await approve(group.id);
-  // Confirmed as a stranger: the author would see the row in the always-present "Your request"
-  // banner instead of as a card, so a stranger's card is the stronger claim.
-  const strangerMobile = uniqueMobile();
-  await apiLogin(strangerMobile);
-  await signedInAs(page, strangerMobile);
-  await page.goto(`${BASE}/flatmates/group/${group.id}`);
-  await expect(page.getByText(title).first()).toBeVisible({ timeout: 20_000 });
-});
-
-async function approve(id) {
-  const { accessToken } = await apiLogin(ACTORS.admin);
-  const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
-    method: 'PATCH',
-    headers: auth(accessToken),
-    body: JSON.stringify({ modStatus: 'live', note: 'e2e moderation spec' }),
+    body: JSON.stringify({ title: `Held flat ${Date.now().toString(36)}`, locality: 'Kothrud', policy: 'any', rent: 40000, deposit: 50000, seats: 3, seatsOpen: 1 }),
   });
-  expect(res.status, `approve ${id}: ${await res.clone().text()}`).toBeLessThan(300);
-}
+  expect(res.status).toBe(409);
+  expect((await res.json()).error).toBe('flat_lists_as_room');
+});

@@ -31,6 +31,7 @@ const STATUS_META = {
   archived: { icon: 'folder-lock', labelKey: statusKey('status.archived'), label: 'Archived', cls: 'text-slate-300 bg-slate-500/15 border-slate-500/20' },
   under_offer: { icon: 'handshake', labelKey: statusKey('status.underOffer'), label: 'Under offer', cls: 'text-purple-300 bg-purple-500/15 border-purple-500/20' },
   private: { icon: 'lock', labelKey: statusKey('status.private'), label: 'Private', cls: 'text-gray-300 bg-white/10 border-white/10' },
+  expired: { icon: 'clock', labelKey: statusKey('status.expired'), label: 'Expired', cls: 'text-rose-300 bg-rose-500/15 border-rose-500/20' },
 };
 
 const REASON_DEFAULTS = {
@@ -44,7 +45,7 @@ const REASON_DEFAULTS = {
   other: 'Our reviewer needs one more detail.',
 };
 
-const CLOSED_STATUSES = new Set(['paused', 'sold', 'rented', 'archived', 'under_offer', 'private']);
+const CLOSED_STATUSES = new Set(['paused', 'sold', 'rented', 'archived', 'under_offer', 'private', 'expired']);
 const REVIEW_ACTION_REASONS = new Set(['document_unreadable', 'name_mismatch']);
 const AWAITING_CONFIRM = new Set(['created', 'link_sent']);
 const TRACKED_STATES = new Set(['pending', 'needs_info', 'confirm', 'flagged', 'rejected']);
@@ -105,12 +106,27 @@ const statusLine = (state, t, review) => {
     archived: [statusKey('line.archived'), 'This listing is archived.'],
     under_offer: [statusKey('line.underOffer'), 'This listing is under offer.'],
     private: [statusKey('line.private'), 'This listing is private.'],
+    expired: [statusKey('line.expired'), 'Renew it to put it back on the board.'],
   };
   const [key, fallback] = lines[state] || lines.pending;
   return tr(t, key, fallback);
 };
 
-const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, claimHref, t }) => {
+const flatmateActionFor = ({ state, viewHref, supportHref, onOpenReview, onShare, t }) => {
+  if (state === 'needs_info' && onOpenReview) {
+    return { kind: 'button', onClick: onOpenReview, icon: 'message-square', label: tr(t, statusKey('actions.fixNow'), 'Fix now') };
+  }
+  if (state === 'rejected') {
+    return { kind: 'link', href: supportHref, icon: 'life-buoy', label: tr(t, statusKey('actions.contactSupport'), 'Contact support') };
+  }
+  if (onShare && (state === 'pending' || state === 'live')) {
+    return { kind: 'button', onClick: onShare, icon: 'share-network', label: tr(t, statusKey('actions.share'), 'Share listing') };
+  }
+  return { kind: 'link', href: viewHref, icon: 'eye', label: tr(t, statusKey('actions.view'), 'View listing') };
+};
+
+const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, claimHref, flatmate, t }) => {
+  if (flatmate) return flatmateActionFor({ state, viewHref, supportHref, onOpenReview, onShare, t });
   const badgeRequested = hasBadgeRequest(listing);
   const verified = Boolean(listing?.ownershipVerified);
   if (state === 'confirm' && claimHref) {
@@ -169,28 +185,37 @@ export default function ListingStatusCard({
   onShare,
   claimHref,
   omitView = false,
+  flatmate = null,
+  testId = 'listing-status-card',
   t,
   className = '',
 }) {
   const meta = getOwnerListingStatusMeta(listing, review, t);
   const unread = Number(review?.unread) || 0;
   const compact = variant === 'slim';
-  const resolved = actionFor({ state: meta.state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, claimHref, t });
+  const resolved = actionFor({ state: meta.state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, claimHref, flatmate, t });
   const action = omitView && resolved.icon === 'eye' ? null : resolved;
-  const getBadge = meta.state === 'live' && onShare && !listing?.ownershipVerified && !hasBadgeRequest(listing)
-    ? { kind: 'link', href: badgeHref(listing), icon: 'shield-check', label: tr(t, statusKey('actions.getBadge'), 'Get Verified property badge') }
+  const flatmateBadge = flatmate?.badge && (meta.state === 'pending' || meta.state === 'live')
+    ? { kind: 'link', href: flatmate.badge.href, testId: flatmate.badge.testId, icon: 'shield-check', label: flatmate.badge.label }
     : null;
+  const getBadge = flatmate ? flatmateBadge
+    : meta.state === 'live' && onShare && !listing?.ownershipVerified && !hasBadgeRequest(listing)
+      ? { kind: 'link', href: badgeHref(listing), icon: 'shield-check', label: tr(t, statusKey('actions.getBadge'), 'Get Verified property badge') }
+      : null;
   const reportWrong = meta.state === 'confirm' && claimHref
     ? { kind: onOpenReview ? 'button' : 'link', onClick: onOpenReview, href: supportHref, icon: 'alert-circle', label: tr(t, statusKey('actions.reportWrong'), "Something's wrong"), testId: 'report-listing-wrong' }
     : null;
-  const line = statusLine(meta.state, t, review);
+  const flatmateLine = flatmate && meta.state === 'live' ? tr(t, 'dash.flatmateCard.live', 'Flatmates can now find and contact you.')
+    : flatmate && meta.state === 'pending' ? tr(t, 'dash.flatmateCard.pending', 'Your post is being reviewed.')
+    : null;
+  const line = flatmateLine || statusLine(meta.state, t, review);
   const badgeLabel = tr(t, statusKey('badge'), 'Verified property');
   const wrapper = compact
     ? 'rounded-xl border border-white/8 bg-white/[0.025] px-4 py-3'
     : 'rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-left';
 
   return (
-    <div data-testid="listing-status-card" className={`${wrapper} ${className}`}>
+    <div data-testid={testId} className={`${wrapper} ${className}`}>
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -198,7 +223,12 @@ export default function ListingStatusCard({
               <Icon name={meta.icon} className="h-3 w-3" /> {meta.label}
               {unread ? <span aria-hidden="true" className="dz-count ml-0.5 bg-rose-500 text-white">{unread}</span> : null}
             </span>
-            {listing?.ownershipVerified ? (
+            {flatmate?.idVerified ? (
+              <span data-testid="id-verified-chip" className="dz-tag border border-brand-teal/25 bg-brand-teal/10 font-semibold text-brand-teal-3">
+                <Icon name="shield-check" className="h-3 w-3" /> {tr(t, 'dash.idBadge.verified', 'ID verified')}
+              </span>
+            ) : null}
+            {listing?.ownershipVerified && !flatmate?.badge ? (
               <span className="dz-tag border border-brand-teal/25 bg-brand-teal/10 font-semibold text-brand-teal-3">
                 <Icon name="shield-check" className="h-3 w-3" /> {badgeLabel}
               </span>
@@ -223,7 +253,7 @@ export default function ListingStatusCard({
             </button>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-1 sm:shrink-0">
+        <div className={`flex ${flatmate ? '' : 'flex-wrap '}items-center gap-1 sm:shrink-0`}>
           {action ? <ListingStatusAction action={action} /> : null}
           {getBadge ? <ListingStatusAction action={getBadge} secondary /> : null}
           {reportWrong ? <ListingStatusAction action={reportWrong} secondary /> : null}

@@ -13,7 +13,7 @@ import { closeDeal, reopenDeal, reserveDeal } from '../../../services/dealServic
 import { composeOwnerProperties } from '../../../lib/data/ownerProperties.js';
 import { referralShareUrlNow } from '../../../lib/referralShare.js';
 import { usePrefetchReferralCode } from '../../../lib/usePrefetchReferralCode.js';
-import { getMyRooms, withRooms } from '../../../lib/data/myListings.js';
+import { flatmateCaseKey, getMyRooms, withRooms } from '../../../lib/data/myListings.js';
 import { publishManaged, deleteManaged, ensureManagedForListing } from '../../../services/managedService.js';
 import { listingFreshness } from '../../../lib/freshness.js';
 import { loadListingQuota } from '../../../lib/data/listingQuota.js';
@@ -460,7 +460,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
                   <ListingCard
                     l={l}
                     split={splitOf(l)}
-                    review={reviewsByProp?.get(l.id) || null}
+                    review={reviewsByProp?.get(l.flatmate ? flatmateCaseKey(l) : l.id) || null}
                     navigate={navigate}
                     openReview={openReview}
                     onConfirmFresh={handleConfirmFresh}

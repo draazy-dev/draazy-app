@@ -81,7 +81,8 @@
         "rented": "Rented",
         "archived": "Archived",
         "underOffer": "Under offer",
-        "private": "Private"
+        "private": "Private",
+        "expired": "Expired"
       },
       "line": {
         "pending": "Our team usually reviews listings within 24 hours.",
@@ -93,7 +94,8 @@
         "rented": "This listing is marked rented.",
         "archived": "This listing is archived.",
         "underOffer": "This listing is under offer.",
-        "private": "This listing is private."
+        "private": "This listing is private.",
+        "expired": "Renew it to put it back on the board."
       },
       "actions": {
         "getBadge": "Get Verified property badge",

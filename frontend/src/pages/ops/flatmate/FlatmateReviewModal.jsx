@@ -14,6 +14,7 @@ import {
   moderateFlatmatePost,
   moderateGroupApplication,
   revokeFlatmateReview,
+  tickFlatmateChecklist,
 } from '../../../services/flatmateService.js';
 import { Block, fmtDate } from './board.jsx';
 import { entryKind, entrySummary, MOD_LABEL } from './FlatmateQueueCard.jsx';
@@ -22,6 +23,8 @@ import EditDetails from './review-modal/EditDetails.jsx';
 import BadgeSection from './review-modal/BadgeSection.jsx';
 import BadgeRequestBanner from './review-modal/BadgeRequestBanner.jsx';
 import DecisionSection from './review-modal/DecisionSection.jsx';
+import ChecklistSection from './review-modal/ChecklistSection.jsx';
+import CaseThread from './review-modal/CaseThread.jsx';
 
 const KIND_LABEL = { post: 'Seeker post', room: 'Room', group: 'Group' };
 const PUBLIC = ['approved', 'live'];
@@ -162,13 +165,24 @@ export default function FlatmateReviewModal({ entry, onClose, onChanged }) {
     }
   }, [toast, onChanged, onClose]);
 
-  const moderate = (current) => (next, note) => {
+  const moderate = (current) => (next, note, reasonCode) => {
     const settled = next === current;
-    const message = settled ? 'Re-check cleared' : next === 'approved' ? (isApp ? 'Cleared' : 'Published — it is on the board now') : `Marked ${next}`;
+    const message = settled ? 'Re-check cleared' : next === 'approved' ? (isApp ? 'Cleared' : 'Published — it is on the board now') : next === 'needs_info' ? 'Asked the host for more info' : `Marked ${next}`;
     const work = isApp
       ? () => moderateGroupApplication(entry.application.id, next, note)
-      : () => moderateFlatmatePost(entry.key, next, note);
-    return run(work, message, settled || next === 'approved' ? 'success' : 'error', true);
+      : () => moderateFlatmatePost(entry.key, next, note, reasonCode);
+    return run(work, message, settled || next === 'approved' || next === 'needs_info' ? 'success' : 'error', next !== 'needs_info');
+  };
+
+  const tick = async (item, pass) => {
+    setBusy(true);
+    try {
+      setDetail({ status: 'ready', data: await tickFlatmateChecklist(entry.key, item, pass), error: '' });
+    } catch (e) {
+      toast(e.message || 'Could not save that check.', 'error');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const [decided, setDecided] = useState(null);
@@ -241,6 +255,7 @@ export default function FlatmateReviewModal({ entry, onClose, onChanged }) {
                 chips={(
                   <>
                     {item ? <Badge status={item.modStatus}>{MOD_LABEL[item.modStatus] || null}</Badge> : null}
+                    {d?.caseFile?.status === 'needs_info' ? <span data-testid="case-needs-info" className="dz-tag border border-amber-400/30 bg-amber-500/10 text-amber-300">Needs info</span> : null}
                     <span className="dz-tag border border-white/10 text-gray-300">{KIND_LABEL[item?.kind || kind]}</span>
                     {entry.reasons.map((r) => (
                       <span key={r} className="dz-tag border border-amber-400/30 bg-amber-500/10 text-amber-300">{r}</span>
@@ -274,11 +289,17 @@ export default function FlatmateReviewModal({ entry, onClose, onChanged }) {
           rail={(
             <>
               {review ? <BadgeSection key={`${review.id}:${review.status}`} review={review} busy={busy || editing} onDecide={decideBadge} onRevoke={revokeBadge} /> : null}
+              {d?.caseFile ? <CaseThread messages={d.caseFile.messages} /> : null}
+              {item && item.checklistRequired && d?.caseFile && !live ? (
+                <ChecklistSection items={d.caseFile.checklist} busy={busy || editing} onTick={tick} />
+              ) : null}
               {item ? (
                 <DecisionSection
                   modStatus={item.modStatus}
                   recheck={item.recheckRequestedAt ? { at: item.recheckRequestedAt, reason: item.recheckReason } : null}
                   busy={busy || editing}
+                  askInfo
+                  ticksPending={!!item.checklistRequired && !live && !(d?.caseFile?.checklist || []).every((c) => c.pass)}
                   onDecide={moderate(item.modStatus)}
                 />
               ) : null}

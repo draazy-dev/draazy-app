@@ -6,6 +6,11 @@ import { roomBasics } from '../../helpers/roomWizard.js';
 import { withSocietyId } from '../../helpers/liveSociety.js';
 import { pickLocalitiesIn } from '../../helpers/locality.js';
 import { sql } from '../../helpers/monetisation.js';
+import { tickDeskChecklist } from '../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../helpers/flatmateGroup.js';
+import { istInDays } from '../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const STAFF = '9733798115';
 
@@ -68,7 +73,7 @@ async function seedTenantRoom(host, society, agreementDoc = undefined, extra = {
     ...(await withSocietyId(accessToken, { society })),
     rentShare: 15000,
     deposit: 30000,
-    availableFrom: '2026-12-01',
+    availableFrom: MOVE_IN,
     lookingFor: 'any',
     foodPref: 'any',
     photos,
@@ -89,7 +94,7 @@ async function seedSeekerPost(host, freeText) {
     occupation: 'Engineer',
     budget: 16000,
     localities: ['Kothrud'],
-    moveIn: '2026-12-01',
+    moveIn: MOVE_IN,
     // The moderation board's "What they typed" column. Everything below matches on this, because
     // it is the field a moderator is actually reading.
     note: freeText,
@@ -100,7 +105,7 @@ async function seedSeekerPost(host, freeText) {
 // A visible group, plus an application to a seeded rental listing.
 async function seedApplication(host, title) {
   const { accessToken } = await apiLogin(host.mobile, { name: host.name });
-  const group = await post('/flatmates/groups', accessToken, {
+  const group = await post('/flatmates/groups', accessToken, huntingGroup({
     title,
     locality: 'Kothrud',
     policy: 'any',
@@ -108,11 +113,11 @@ async function seedApplication(host, title) {
     deposit: 50000,
     seats: 3,
     seatsOpen: 1,
-    role: 'tenant',
-  });
+  }));
 
   // Use the desk decision route because groups must pass moderation before applying.
   const { accessToken: staffToken } = await apiLogin(STAFF);
+  await tickDeskChecklist(API, group.id, auth(staffToken));
   const publish = await fetch(`${API}/admin/flatmates/${group.id}/moderation`, {
     method: 'PATCH',
     headers: auth(staffToken),
@@ -272,6 +277,11 @@ test.describe('Ops → flatmate desk (live)', () => {
     expect(await onPublicBoard()).toBe(false);
 
     dialog = await review(page, society);
+    await expect(dialog.getByRole('button', { name: 'Publish' }), 'a room needs its three desk ticks before Publish').toBeDisabled();
+    for (const tick of await dialog.getByTestId('flatmate-checklist-item').all()) {
+      await tick.click();
+      await expect(tick).toBeChecked();
+    }
     await dialog.getByRole('button', { name: 'Publish' }).click();
     await expect(dialog).toHaveCount(0);
 
@@ -504,6 +514,7 @@ test.describe('Ops → flatmate desk (live)', () => {
     // Publish first so the edit is to something already visible.
     const { accessToken: staffToken } = await apiLogin(STAFF);
     for (const id of [swapRoom.id, quietRoom.id]) {
+      await tickDeskChecklist(API, id, auth(staffToken));
       const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
         method: 'PATCH',
         headers: auth(staffToken),
@@ -522,7 +533,7 @@ test.describe('Ops → flatmate desk (live)', () => {
       society,
       rentShare: 15000,
       deposit: 30000,
-      availableFrom: '2026-12-01',
+      availableFrom: MOVE_IN,
       lookingFor: 'any',
       foodPref: 'any',
       photos: quietPhotos,

@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 const track = flatmateCleanup(test);
@@ -19,15 +21,16 @@ async function createGroup(host, policy) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(host.accessToken),
-    body: JSON.stringify({
+    body: JSON.stringify(huntingGroup({
       title: `Owner payload ${Date.now().toString(36)}`, locality: 'Baner', rent: 30000, deposit: 50000,
-      seats: 2, seatsOpen: 1, policy, role: 'tenant',
-    }),
+      seats: 2, seatsOpen: 1, policy,
+    })),
   });
   expect(res.status, await res.clone().text()).toBe(201);
   const group = await res.json();
   track('groups', group.id, host.accessToken);
   const admin = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, group.id, auth(admin.accessToken));
   const live = await fetch(`${API}/admin/flatmates/${group.id}/moderation`, {
     method: 'PATCH', headers: auth(admin.accessToken), body: JSON.stringify({ modStatus: 'live', note: 'e2e' }),
   });

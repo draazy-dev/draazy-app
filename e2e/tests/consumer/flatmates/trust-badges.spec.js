@@ -1,11 +1,15 @@
 import { test, expect, ACTORS, STAFF } from '../../../fixtures/live.js';
 import { API, E2E_OTP, apiLogin, authHeaders, grantIdentityBadge, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
 import { badgeChecks, tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { verifyOwnership } from '../../../helpers/referral.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const track = flatmateCleanup(test);
@@ -53,7 +57,7 @@ const roomBody = ({ society: name, hostRole = 'tenant', agreementDeclared = fals
   society: name,
   rentShare: RENT,
   deposit: 90000,
-  availableFrom: '2026-12-01',
+  availableFrom: MOVE_IN,
   lookingFor: 'any',
   foodPref: 'any',
   hostRole,
@@ -78,8 +82,10 @@ async function postRoom(token, spec) {
 }
 
 async function publish(roomId) {
+  const staffHeaders = await authHeaders(STAFF.rental);
+  await tickDeskChecklist(API, roomId, staffHeaders);
   const published = await api('PATCH', `/admin/flatmates/${roomId}/moderation`,
-    await authHeaders(STAFF.rental), { modStatus: 'live', note: 'Zztest trust-badge fixture' });
+    staffHeaders, { modStatus: 'live', note: 'Zztest trust-badge fixture' });
   expect(published.status, published.text).toBe(200);
 }
 

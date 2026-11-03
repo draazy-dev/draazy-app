@@ -3,10 +3,14 @@ import { API, E2E_OTP, apiLogin, uniqueMobile } from '../../helpers/liveAuth.js'
 import { tenantRoomAgreement } from '../../helpers/flatmateAgreement.js';
 import { roomBasics } from '../../helpers/roomWizard.js';
 import { withSocietyId } from '../../helpers/liveSociety.js';
+import { istInDays } from '../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const REVIEW_KEYS = ['id', 'kind', 'roomId', 'groupId', 'host', 'hostMobile', 'hostVerified', 'evidenceType', 'address', 'tier', 'flagForReview', 'ownerConsent', 'createdAt'];
 const QUEUE_KEYS = ['id', 'kind', 'modStatus', 'authorName', 'authorMobile', 'headline', 'locality', 'freeText', 'photoCount',
-  'coverPhoto', 'rent', 'recheckReason', 'recheckRequestedAt', 'createdAt'];
+  'coverPhoto', 'rent', 'recheckReason', 'recheckRequestedAt', 'createdAt',
+  'checklistRequired', 'caseStatus', 'caseReasonCode', 'unreadFromHost'];
 const DESK = /\/api\/admin\/(flatmate-reviews|flatmates\/moderation(\/summary)?|flatmates\/[^/]+)$/;
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -34,7 +38,7 @@ async function seedTenantRoom(host, society) {
     ...(await withSocietyId(accessToken, { society })),
     rentShare: 15000,
     deposit: 30000,
-    availableFrom: '2026-12-01',
+    availableFrom: MOVE_IN,
     lookingFor: 'any',
     foodPref: 'any',
     note: 'Quiet building, sunny room.',

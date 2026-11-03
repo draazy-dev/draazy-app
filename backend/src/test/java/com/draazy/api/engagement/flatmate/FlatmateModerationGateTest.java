@@ -103,18 +103,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString());
     }
 
-    private String createGroup(User host, String title, String locality) throws Exception {
-        return idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"%s","locality":"%s","policy":"any","rent":40000,"deposit":10000,
-                                 "seats":3,"seatsOpen":1,"name":"Host"}
-                                """.formatted(title, locality)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString());
-    }
-
     @Nested
     @DisplayName("a post with a flat is not public")
     class NotPublic {
@@ -124,16 +112,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
             createRoom(seeker("9811000002", "RoomHost"), "GateTownB", "Gate Heights");
 
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "GateTownB"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
-        }
-
-        @Test
-        @DisplayName("a group with a flat is absent from the anonymous feed until it is decided")
-        void groupStartsInvisible() throws Exception {
-            createGroup(seeker("9811000003", "GroupHost"), "Three of us", "GateTownC");
-
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "GateTownC"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
         }
@@ -258,8 +236,10 @@ class FlatmateModerationGateTest extends AbstractApiTest {
             User host = seeker("9811000022", "Patient");
             String id = createRoom(host, "GateTownH", "Patient House");
 
+            User desk = admin("9811000023");
+            FlatmateDeskTicks.tickAll(mvc, bearer(desk), id);
             mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION.replace("{id}", id))
-                            .header(HttpHeaders.AUTHORIZATION, bearer(admin("9811000023")))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"modStatus\":\"approved\"}"))
                     .andExpect(status().isOk());

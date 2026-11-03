@@ -1,6 +1,8 @@
 import Icon from '../../../../components/Icon.jsx';
 import PropertyImage from '../../../../components/ui/PropertyImage.jsx';
-import ListingStatusCard, { getOwnerListingStatusMeta, ListingStatusAction, mayResubmit } from '../../../../components/listing/ListingStatusCard.jsx';
+import ListingStatusCard, { getOwnerListingStatusMeta, mayResubmit } from '../../../../components/listing/ListingStatusCard.jsx';
+import { flatmateCaseKey } from '../../../../lib/data/myListings.js';
+import { useVerification } from '../../../../context/VerificationContext.jsx';
 import { fmtINR, fmtNum, fmtDate } from '../../../../lib/format.js';
 import { onlySeeksOwnershipBadge } from '../../../../lib/recheckFields.js';
 import { qualityTips, qualityColor } from '../../../../lib/qualityScore.js';
@@ -62,6 +64,8 @@ export default function ListingCard({
   const splitRoom = flatmateKind === 'room' && !!l.propertyId;
   const tenantRoom = flatmateKind === 'room' && l.hostRole === 'tenant' && !splitRoom;
   const tenantGroup = flatmateKind === 'group' && l.hostRole === 'tenant' && !l.hunting;
+  const personKind = flatmateKind === 'post' || (flatmateKind === 'group' && !!l.hunting);
+  const { verified: idVerified } = useVerification();
   const roomBadgeStatus = l.verificationTier === 'tenant' ? l.reviewStatus : null;
   const editHref = `/list-property?edit=${l.id}`;
   const viewHref = flatmateKind ? detailPath(flatmateKind, l.id) : `/property/${l.id}`;
@@ -182,35 +186,29 @@ export default function ListingCard({
 
       {l.flatmate && (
         <div className="px-3 pb-3 sm:px-4">
-          <div data-testid={`flatmate-status-${l.id}`} className="rounded-xl border border-white/8 bg-white/[0.025] px-4 py-3">
-            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
-                {statusTag}
-                {['approved', 'pending'].includes(l.status) && (
-                  <p className="text-xs leading-relaxed text-gray-300">
-                    {t(l.status === 'approved' ? 'dash.flatmateCard.live' : 'dash.flatmateCard.pending')}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-1 sm:shrink-0">
-                {onShare && (
-                  <ListingStatusAction action={{ kind: 'button', onClick: () => onShare(l, viewHref), icon: 'share-network', label: t('owner.listingStatus.actions.share') }} />
-                )}
-                {(tenantRoom || tenantGroup) && (
-                  <ListingStatusAction
-                    secondary
-                    action={{
-                      kind: 'link',
-                      href: `/dashboard?tab=documents&${flatmateKind}=${encodeURIComponent(l.id)}`,
-                      testId: `room-verification-${l.id}`,
-                      icon: 'shield-check',
-                      label: t(roomBadgeStatus === 'approved' ? 'dash.roomBadge.verified' : roomBadgeStatus === 'pending' ? 'dash.roomBadge.pendingAction' : 'dash.roomBadge.getBadge'),
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
+          <ListingStatusCard
+            listing={{ ...l, reviewStatus: undefined }}
+            review={review}
+            variant="slim"
+            testId={`flatmate-status-${l.id}`}
+            viewHref={viewHref}
+            omitView
+            onOpenReview={hasReview ? () => openReview(flatmateCaseKey(l)) : undefined}
+            onShare={onShare ? () => onShare(l, viewHref) : undefined}
+            flatmate={{
+              idVerified: personKind && idVerified,
+              badge: (tenantRoom || tenantGroup) ? {
+                href: `/dashboard?tab=documents&${flatmateKind}=${encodeURIComponent(l.id)}`,
+                testId: `room-verification-${l.id}`,
+                label: t(roomBadgeStatus === 'approved' ? 'dash.roomBadge.verified' : roomBadgeStatus === 'pending' ? 'dash.roomBadge.pendingAction' : 'dash.roomBadge.getBadge'),
+              } : personKind && !idVerified ? {
+                href: `/dashboard?tab=documents&${flatmateKind}=${encodeURIComponent(l.id)}`,
+                testId: `id-verification-${l.id}`,
+                label: t('dash.idBadge.cta'),
+              } : null,
+            }}
+            t={t}
+          />
         </div>
       )}
 

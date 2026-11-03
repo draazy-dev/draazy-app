@@ -18,6 +18,8 @@ import {
   toModerationItemViewModel,
   toModerationRowViewModel,
   toModerationSummaryViewModel,
+  toCaseSummaryViewModel,
+  toCaseViewModel,
   toReviewRowViewModel,
   toReviewViewModel,
   toViewModelPage,
@@ -85,6 +87,8 @@ function roomBody(room) {
     lat: room.lat,
     lng: room.lng,
     gatedCommunity: room.gatedCommunity,
+    parking: vocab('parking', room.parking),
+    amenities: room.amenities || [],
     details: room.details && clean(room.details),
   });
 }
@@ -373,9 +377,11 @@ export async function feed(tab = 'move-in', filters = {}, page = 0, size = 24, {
   }), { auth, signal, ttl });
   const { items, ...rest } = unwrapPage(res, { page, size });
   const matches = res?.matches || {};
+  const sharedVibes = res?.sharedVibes || {};
   const withMatch = (vm, kind) => {
     const styleMatch = matches[`${kind}:${vm.id}`];
-    return Number.isFinite(styleMatch) ? { ...vm, styleMatch } : vm;
+    const shared = sharedVibes[`${kind}:${vm.id}`];
+    return { ...vm, ...(Number.isFinite(styleMatch) && { styleMatch }), ...(shared?.length && { sharedVibes: shared }) };
   };
   return {
     items: items.map((r) => {
@@ -516,6 +522,7 @@ const toModerationDetail = (res) => ({
   post: res?.post ? toSeekerPostViewModel(res.post) : null,
   review: res?.review ? toReviewViewModel(res.review) : null,
   livingStyle: res?.livingStyle || {},
+  caseFile: toCaseViewModel(res?.caseFile),
 });
 
 export async function getFlatmateModerationDetail(id) {
@@ -526,11 +533,35 @@ export async function editFlatmateAsModerator(id, changes) {
   return toModerationDetail(await patch(`/admin/flatmates/${encodeURIComponent(id)}`, changes));
 }
 
-export async function moderateFlatmatePost(id, modStatus, note) {
+export async function moderateFlatmatePost(id, modStatus, note, reasonCode) {
   await patch(`/admin/flatmates/${encodeURIComponent(id)}/moderation`, clean({
     modStatus,
     note: String(note || '').trim() || undefined,
+    reasonCode: reasonCode || undefined,
   }));
+}
+
+export async function tickFlatmateChecklist(id, item, pass) {
+  return toModerationDetail(await patch(`/admin/flatmates/${encodeURIComponent(id)}/moderation/checklist`, { item, pass: !!pass }));
+}
+
+const casePath = (kind, id) => `/flatmates/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/verification`;
+
+export async function getFlatmateCase(kind, id) {
+  return toCaseViewModel(await get(casePath(kind, id)));
+}
+
+export async function replyToFlatmateCase(kind, id, body) {
+  return toCaseViewModel(await post(`${casePath(kind, id)}/messages`, { body }));
+}
+
+export async function markFlatmateCaseRead(kind, id) {
+  await post(`${casePath(kind, id)}/read`);
+}
+
+export async function listMyFlatmateCases() {
+  if (!signedIn()) return [];
+  return toList(await get('/me/flatmate-reviews', undefined, { ttl: PAGE_LOAD_TTL }), toCaseSummaryViewModel);
 }
 
 export async function listGroupApplications({ modStatus, sort, page = 0, size = 20 } = {}) {

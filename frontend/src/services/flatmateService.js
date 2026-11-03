@@ -61,7 +61,13 @@ export const listFlatmateModeration = async (params) => (await provider()).listF
 export const getFlatmateModerationSummary = async () => (await provider()).getFlatmateModerationSummary();
 export const getFlatmateModerationDetail = async (id) => (await provider()).getFlatmateModerationDetail(id);
 export const editFlatmateAsModerator = async (id, changes) => (await provider()).editFlatmateAsModerator(id, changes);
-export const moderateFlatmatePost = async (id, modStatus, note) => (await provider()).moderateFlatmatePost(id, modStatus, note);
+export const moderateFlatmatePost = async (id, modStatus, note, reasonCode) => (await provider()).moderateFlatmatePost(id, modStatus, note, reasonCode);
+export const tickFlatmateChecklist = async (id, item, pass) => (await provider()).tickFlatmateChecklist(id, item, pass);
+
+export const getFlatmateCase = async (kind, id) => (await provider()).getFlatmateCase(kind, id);
+export const replyToFlatmateCase = async (kind, id, body) => (await provider()).replyToFlatmateCase(kind, id, body);
+export const markFlatmateCaseRead = async (kind, id) => (await provider()).markFlatmateCaseRead(kind, id);
+export const listMyFlatmateCases = async () => (await provider()).listMyFlatmateCases();
 
 export const listGroupApplications = async (params) => (await provider()).listGroupApplications(params);
 export const moderateGroupApplication = async (id, modStatus, note) => (await provider()).moderateGroupApplication(id, modStatus, note);

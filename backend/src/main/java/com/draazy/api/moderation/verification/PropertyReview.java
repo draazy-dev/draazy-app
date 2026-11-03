@@ -19,8 +19,14 @@ import lombok.Setter;
 @Table(name = "property_reviews")
 @Getter
 public class PropertyReview extends AuditedEntity {
-    @Column(name = "property_id", nullable = false, unique = true, updatable = false)
+    @Column(name = "property_id", unique = true, updatable = false)
     private UUID propertyId;
+
+    @Column(name = "flatmate_post_id", unique = true, updatable = false)
+    private UUID flatmatePostId;
+
+    @Column(name = "flatmate_kind", updatable = false)
+    private String flatmateKind;
 
     @Column(name = "status", nullable = false)
     @Setter
@@ -55,6 +61,13 @@ public class PropertyReview extends AuditedEntity {
 
     public PropertyReview(UUID propertyId) {
         this.propertyId = propertyId;
+    }
+
+    static PropertyReview forFlatmate(String kind, UUID postId) {
+        PropertyReview review = new PropertyReview();
+        review.flatmateKind = kind;
+        review.flatmatePostId = postId;
+        return review;
     }
 
     public void addChecklistItem(String item) {
