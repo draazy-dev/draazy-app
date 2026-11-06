@@ -579,6 +579,43 @@ class SavedSearchMatchCountTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("bhk, vegOnly, parking, age band and minOpenSeats narrow an alert exactly as they narrow the board")
+    void flatmateTabFacetsNarrowAlerts() {
+        User host = owner("9869400001");
+        seedLocality();
+        String place = "D227 Flatmate Town";
+        jdbc.update("insert into flatmate_rooms (host_id, room_type, locality, budget, mod_status, bhk, food, parking)"
+                + " values (?, 'Private room', ?, 15000, 'approved', '2', 'veg', 'bike')", host.getId(), place);
+        jdbc.update("insert into flatmate_rooms (host_id, room_type, locality, budget, mod_status, bhk, food, parking)"
+                + " values (?, 'Private room', ?, 15000, 'approved', '3', 'any', 'car')", host.getId(), place);
+        String[] seekerMobiles = {"9869400002", "9869400003"};
+        int[] ages = {23, 33};
+        for (int i = 0; i < ages.length; i++) {
+            jdbc.update("insert into flatmate_seeker_posts (user_id, name, age, budget, localities, mod_status)"
+                    + " values (?, 'Seeker', ?, 15000, ?::jsonb, 'approved')",
+                    owner(seekerMobiles[i]).getId(), ages[i], "[\"" + place + "\"]");
+        }
+        jdbc.update("insert into flatmate_groups (host_id, title, locality, localities, rent, seats_total,"
+                + " seats_open, pref_bhk, mod_status, hunting) values (?, 'Team', ?, ?::jsonb, 30000, 4, 2,"
+                + " '[\"3\"]'::jsonb, 'approved', true)", host.getId(), place, "[\"" + place + "\"]");
+        jdbc.update("insert into flatmate_groups (host_id, title, locality, localities, rent, seats_total,"
+                + " seats_open, pref_bhk, mod_status, hunting) values (?, 'Team', ?, ?::jsonb, 30000, 3, 1,"
+                + " '[\"2\"]'::jsonb, 'approved', true)", host.getId(), place, "[\"" + place + "\"]");
+        em.flush();
+        em.clear();
+
+        assertThat(flatmateCount("9869400011", board("move-in", "bhk", "2"))).isEqualTo(1);
+        assertThat(flatmateCount("9869400012", board("move-in", "vegOnly", true))).isEqualTo(1);
+        assertThat(flatmateCount("9869400013", board("move-in", "parking", "bike"))).isEqualTo(2);
+        assertThat(flatmateCount("9869400014", board("move-in", "parking", "car"))).isEqualTo(1);
+        assertThat(flatmateCount("9869400015", board("people", "minAge", 18, "maxAge", 24))).isEqualTo(1);
+        assertThat(flatmateCount("9869400016", board("people", "minAge", 31))).isEqualTo(1);
+        assertThat(flatmateCount("9869400017", board("teams", "bhk", "3"))).isEqualTo(1);
+        assertThat(flatmateCount("9869400018", board("teams", "minOpenSeats", 2))).isEqualTo(1);
+        assertThat(flatmateCount("9869400019", board("teams", "vegOnly", true, "minAge", 31))).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("the created row already carries its count, so the card never renders a stale zero")
     void createReturnsTheCount() {
         User user = owner("9820600011");

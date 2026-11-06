@@ -44,6 +44,12 @@ public class FlatmateFeedController {
             @RequestParam(required = false) String furnishing,
             @RequestParam(required = false) String gated,
             @RequestParam(required = false) Integer sharing,
+            @RequestParam(required = false) String bhk,
+            @RequestParam(required = false) String vegOnly,
+            @RequestParam(required = false) String parking,
+            @RequestParam(required = false) Integer minAge,
+            @RequestParam(required = false) Integer maxAge,
+            @RequestParam(required = false) Integer minOpenSeats,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) List<String> meLocalities,
             @RequestParam(required = false) Long meBudget,
@@ -55,7 +61,8 @@ public class FlatmateFeedController {
                 minBudget, maxBudget == null ? budget : maxBudget,
                 gender, verifiedOnly, moveInDays, VibeFilter.parse(vibe), attachedBath, sharing,
                 sort, meLocalities, meBudget, meGender, null, "true".equalsIgnoreCase(strictGender), roomType, furnishing,
-                "true".equalsIgnoreCase(gated));
+                "true".equalsIgnoreCase(gated),
+                new FlatmateTabFacets(bhk, "true".equalsIgnoreCase(vegOnly), parking, minAge, maxAge, minOpenSeats));
 
         FlatmateFeedService.FeedResult result = service.feed(
                 principal == null ? null : principal.userId(), facets, Pageables.unsorted(pageable));

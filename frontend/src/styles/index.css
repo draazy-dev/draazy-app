@@ -2112,8 +2112,7 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     text-underline-offset: 3px;
   }
   .dz-property :is(.detail-card, .amenity-card, .highlight-pill)[data-tip]:focus-visible { border-radius: 0; }
-  .dz-assured-list>*:not(button),
-  .dz-share-split>* {
+  .dz-assured-list>*:not(button) {
     padding: 0.35rem 0;
     border: 0;
     border-radius: 0;

@@ -1,5 +1,6 @@
 import { inr, BUDGET_MIN, BUDGET_MAX } from './helpers.js';
 import { TAB_MOVE_IN, TAB_TEAMS, TAB_TEAM_UP, TAB_PEOPLE, normalizeTab } from './model.js';
+import { AGE_BANDS } from '../../../lib/flatmates/filterState.js';
 
 const budgetFields = (budget) => ({
   budget: budget[1] < BUDGET_MAX ? budget[1] : undefined,
@@ -26,6 +27,13 @@ const GENDER_LBL = { female: 'Women', male: 'Men' };
 const ONLY_LBL = { female: 'Women-only homes', male: 'Men-only homes' };
 const ROOM_LBL = { private: 'Private room', shared: 'Shared room' };
 const FURN_LBL = { furnished: 'Furnished', semi: 'Semi-furnished' };
+const PARKING_LBL = { bike: 'Bike parking', car: 'Car parking' };
+const bhkText = (bhk) => (bhk === '4' ? '4+ BHK' : `${bhk} BHK`);
+const ageText = (rec) => {
+  if (rec.minAge && rec.maxAge) return `Age ${rec.minAge}–${rec.maxAge}`;
+  if (rec.minAge) return `Age ${rec.minAge}+`;
+  return rec.maxAge ? `Age ≤ ${rec.maxAge}` : null;
+};
 const VIBE_LBL = {
   food: ['Veg only', 'Eggs ok', 'Non-veg ok'],
   smoking: ['Smoke-free', 'Smoking outside only', 'Smoking ok'],
@@ -70,6 +78,11 @@ export function flatmateAlertLabel(rec) {
   if (rec.roomType) parts.push(ROOM_LBL[rec.roomType]);
   if (rec.furnishing) parts.push(FURN_LBL[rec.furnishing]);
   if (hasSharing(rec.tab) && rec.sharing) parts.push(`${rec.sharing} sharing`);
+  if (rec.bhk) parts.push(bhkText(rec.bhk));
+  if (rec.minOpenSeats) parts.push(`${rec.minOpenSeats}+ seats open`);
+  if (ageText(rec)) parts.push(ageText(rec));
+  if (rec.vegOnly) parts.push('Veg-only');
+  if (rec.parking) parts.push(PARKING_LBL[rec.parking]);
   if (rec.attachedBath) parts.push('Attached bath');
   if (rec.gated) parts.push('Gated');
   if (rec.verifiedOnly) parts.push('Verified');
@@ -77,6 +90,7 @@ export function flatmateAlertLabel(rec) {
 }
 
 export function buildFlatmateAlertRecord(filters, tab) {
+  const [minAge, maxAge] = tab === TAB_PEOPLE ? AGE_BANDS[filters.age] || [] : [];
   const rec = {
     kind: 'flatmates',
     tab,
@@ -91,6 +105,12 @@ export function buildFlatmateAlertRecord(filters, tab) {
     sharing: hasSharing(tab) ? (filters.sharing || '') : '',
     attachedBath: tab === TAB_MOVE_IN ? !!filters.attachedBath : false,
     gated: tab === TAB_MOVE_IN ? !!filters.gated : false,
+    bhk: tab === TAB_PEOPLE ? '' : (filters.bhk || ''),
+    vegOnly: tab === TAB_MOVE_IN ? !!filters.vegOnly : false,
+    parking: tab === TAB_MOVE_IN ? (filters.parking || '') : '',
+    ...(minAge && { minAge }),
+    ...(maxAge && { maxAge }),
+    ...(hasSharing(tab) && filters.roomForTwo && { minOpenSeats: 2 }),
     verifiedOnly: !!filters.verifiedOnly,
     vibe: [...(filters.vibe || [])],
   };
@@ -113,6 +133,11 @@ export function flatmateCriteriaChips(rec) {
   if (rec.roomType) chips.push({ icon: 'door-open', text: ROOM_LBL[rec.roomType] });
   if (rec.furnishing) chips.push({ icon: 'sofa', text: FURN_LBL[rec.furnishing] });
   if (hasSharing(rec.tab) && rec.sharing) chips.push({ icon: 'users-round', text: `${rec.sharing} sharing` });
+  if (rec.bhk) chips.push({ icon: 'building-2', text: bhkText(rec.bhk) });
+  if (rec.minOpenSeats) chips.push({ icon: 'user-plus', text: `${rec.minOpenSeats}+ seats open` });
+  if (ageText(rec)) chips.push({ icon: 'user', text: ageText(rec) });
+  if (rec.vegOnly) chips.push({ icon: 'utensils', text: 'Veg-only home' });
+  if (rec.parking) chips.push({ icon: 'car', text: PARKING_LBL[rec.parking] });
   if (rec.attachedBath) chips.push({ icon: 'bath', text: 'Attached bath' });
   if (rec.gated) chips.push({ icon: 'lock-keyhole', text: 'Gated society' });
   if (rec.verifiedOnly) chips.push({ icon: 'shield-check', text: 'Verified only' });

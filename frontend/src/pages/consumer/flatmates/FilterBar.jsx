@@ -37,9 +37,14 @@ function FilterControls({ filters, setF, seg, budgetLbl, genderLabel, tab, varia
   const showBath = tab === TAB_MOVE_IN;
   const showRoomType = tab !== TAB_TEAMS;
   const showHomeOnly = tab !== TAB_PEOPLE && !!filters.gender;
+  const showBhk = tab !== TAB_PEOPLE;
+  const showAge = tab === TAB_PEOPLE;
   const genderOptions = [['', t('flatmates.gEveryone')], ['female', t('flatmates.gWomen')], ['male', t('flatmates.gMen')]];
   const roomTypes = [['private', t('flatmates.roomPrivate')], ['shared', t('flatmates.roomShared')]];
   const furnishings = [['furnished', t('flatmates.furnFurnished')], ['semi', t('flatmates.furnSemi')]];
+  const bhks = ['1', '2', '3', '4'].map((n) => [n, n === '4' ? t('flatmates.bhk4Plus') : t('flatmates.bhkN', { n })]);
+  const parkings = [['bike', t('flatmates.parking_bike')], ['car', t('flatmates.parking_car')]];
+  const ageBands = [['18-24', '18–24'], ['25-30', '25–30'], ['31-', '31+']];
   const homeOnlyLabel = t(filters.gender === 'male' ? 'flatmates.menOnlyHomes' : 'flatmates.womenOnlyHomes');
   const labelOf = (pairs, v) => (pairs.find(([k]) => k === v) || [])[1] || '';
   const summaries = {
@@ -50,7 +55,10 @@ function FilterControls({ filters, setF, seg, budgetLbl, genderLabel, tab, varia
     gender: !filters.gender ? '' : showHomeOnly && filters.genderOnly ? homeOnlyLabel : labelOf(genderOptions, filters.gender),
     roomType: labelOf(roomTypes, filters.roomType),
     furnishing: labelOf(furnishings, filters.furnishing),
-    sharing: filters.sharing ? t('flatmates.nSharing', { n: filters.sharing }) : '',
+    sharing: [filters.sharing && t('flatmates.nSharing', { n: filters.sharing }), filters.roomForTwo && t('flatmates.seatsForTwo')].filter(Boolean).join(' · '),
+    bhk: labelOf(bhks, filters.bhk),
+    homeExtras: [filters.vegOnly && t('flatmates.vegOnlyHome'), labelOf(parkings, filters.parking)].filter(Boolean).join(' · '),
+    age: labelOf(ageBands, filters.age),
     vibe: filters.vibe.length ? t('flatmates.ls.fSelected', { count: filters.vibe.length }) : '',
     trust: [filters.verifiedOnly && t('flatmates.verifiedOnly'), showBath && filters.gated && t('flatmates.gatedSociety')].filter(Boolean).join(' · '),
     bath: filters.attachedBath ? t('flatmates.attachedOnly') : '',
@@ -112,10 +120,24 @@ function FilterControls({ filters, setF, seg, budgetLbl, genderLabel, tab, varia
           {showHomeOnly && <button type="button" onClick={() => setF({ genderOnly: !filters.genderOnly })} aria-pressed={filters.genderOnly} className={seg(filters.genderOnly) + ' inline-flex items-center gap-1.5'}><Icon name={filters.gender === 'male' ? 'mars' : 'venus'} className="w-3.5 h-3.5" /> {homeOnlyLabel}</button>}
         </div>
       </Section>
+      {showAge && (
+        <Section sheet={sheet} icon="user" label={t('flatmates.fAge')} summary={summaries.age}>
+          <div className="flex flex-wrap gap-2">
+            {ageBands.map(([v, label]) => <button key={v} type="button" onClick={() => setF({ age: filters.age === v ? '' : v })} aria-pressed={filters.age === v} className={seg(filters.age === v)}>{label}</button>)}
+          </div>
+        </Section>
+      )}
       {showRoomType && (
         <Section sheet={sheet} icon="door-open" label={t('flatmates.fRoomType')} summary={summaries.roomType}>
           <div className="flex gap-2">
             {roomTypes.map(([v, label]) => <button key={v} type="button" onClick={() => setF({ roomType: filters.roomType === v ? '' : v })} aria-pressed={filters.roomType === v} className={seg(filters.roomType === v)}>{label}</button>)}
+          </div>
+        </Section>
+      )}
+      {showBhk && (
+        <Section sheet={sheet} icon="building-2" label={t('flatmates.fBhk')} summary={summaries.bhk}>
+          <div className="flex flex-wrap gap-2">
+            {bhks.map(([v, label]) => <button key={v} type="button" onClick={() => setF({ bhk: filters.bhk === v ? '' : v })} aria-pressed={filters.bhk === v} className={seg(filters.bhk === v)}>{label}</button>)}
           </div>
         </Section>
       )}
@@ -127,8 +149,11 @@ function FilterControls({ filters, setF, seg, budgetLbl, genderLabel, tab, varia
         </Section>
       )}
       {showSharing && (
-        <Section sheet={sheet} icon="users" label={t('flatmates.fSharing')} summary={summaries.sharing}>
-          <div className="w-full lg:w-3/4"><NativeSelect value={filters.sharing} onChange={(e) => setF({ sharing: e.target.value })} className="field w-full rounded-full px-4 py-2 text-sm"><option value="">{t('flatmates.anySize')}</option>{[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{t('flatmates.nSharing', { n })}</option>)}</NativeSelect></div>
+        <Section sheet={sheet} icon="users" label={t('flatmates.fTeamSize')} summary={summaries.sharing}>
+          <div className="w-full lg:w-3/4 flex flex-wrap items-center gap-2">
+            <div className="flex-1 min-w-[8rem]"><NativeSelect value={filters.sharing} onChange={(e) => setF({ sharing: e.target.value })} aria-label={t('flatmates.fTeamSize')}><option value="">{t('flatmates.anySize')}</option>{[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{t('flatmates.nSharing', { n })}</option>)}</NativeSelect></div>
+            <button type="button" onClick={() => setF({ roomForTwo: !filters.roomForTwo })} aria-pressed={filters.roomForTwo} className={seg(filters.roomForTwo) + ' shrink-0 inline-flex items-center gap-1.5'}><Icon name="user-plus" className="w-3.5 h-3.5" /> {t('flatmates.seatsForTwo')}</button>
+          </div>
         </Section>
       )}
       <Section sheet={sheet} icon="heart-handshake" label={t('flatmates.ls.fTitle')} summary={summaries.vibe} className="lg:col-span-3">
@@ -143,6 +168,14 @@ function FilterControls({ filters, setF, seg, budgetLbl, genderLabel, tab, varia
       {showBath && (
         <Section sheet={sheet} icon="bath" label={t('flatmates.fWashroom')} summary={summaries.bath}>
           <button onClick={() => setF({ attachedBath: !filters.attachedBath })} aria-pressed={filters.attachedBath} className={seg(filters.attachedBath) + ' inline-flex items-center gap-1.5'}><Icon name="bath" className="w-3.5 h-3.5" /> {t('flatmates.attachedOnly')}</button>
+        </Section>
+      )}
+      {showBath && (
+        <Section sheet={sheet} icon="utensils" label={t('flatmates.fHomeExtras')} summary={summaries.homeExtras}>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setF({ vegOnly: !filters.vegOnly })} aria-pressed={filters.vegOnly} className={seg(filters.vegOnly)}>{t('flatmates.vegOnlyHome')}</button>
+            {parkings.map(([v, label]) => <button key={v} type="button" onClick={() => setF({ parking: filters.parking === v ? '' : v })} aria-pressed={filters.parking === v} className={seg(filters.parking === v)}>{label}</button>)}
+          </div>
         </Section>
       )}
     </>

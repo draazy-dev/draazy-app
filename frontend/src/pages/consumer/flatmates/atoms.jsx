@@ -14,7 +14,7 @@ const SaveBtn = ({ k, saved, onSave, className }) => {
 };
 const TileChip = ({ icon, children }) => <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[11px] text-gray-300">{icon && <Icon name={icon} className="w-3 h-3 text-teal-400" />} {children}</span>;
 const TrustTag = ({ label }) => (label
-  ? <span className="dz-tag badge-seeker font-bold uppercase tracking-wider text-white"><Icon name="shield-check" /> {label}</span>
+  ? <span className="dz-tag shrink-0 font-semibold text-teal-200 bg-teal-500/10 border border-teal-400/30"><Icon name="shield-check" /> {label}</span>
   : null);
 const Facts = ({ items }) => {
   const list = items.filter(([, label]) => label);

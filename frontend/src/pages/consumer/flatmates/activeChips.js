@@ -24,6 +24,11 @@ export default function flatmateActiveChips(filters, tab, t, budgetLbl, setF) {
     ['verifiedOnly', filters.verifiedOnly && t('flatmates.verifiedOnly'), { verifiedOnly: false }],
     ['gated', place && filters.gated && t('flatmates.gatedSociety'), { gated: false }],
     ['attachedBath', place && filters.attachedBath && t('flatmates.attachedBath'), { attachedBath: false }],
+    ['bhk', tab !== TAB_PEOPLE && filters.bhk && (filters.bhk === '4' ? t('flatmates.bhk4Plus') : t('flatmates.bhkN', { n: filters.bhk })), { bhk: '' }],
+    ['vegOnly', place && filters.vegOnly && t('flatmates.vegOnlyHome'), { vegOnly: false }],
+    ['parking', place && filters.parking && t(`flatmates.parking_${filters.parking}`), { parking: '' }],
+    ['age', tab === TAB_PEOPLE && filters.age && t('flatmates.chipAge', { band: filters.age === '31-' ? '31+' : filters.age.replace('-', '–') }), { age: '' }],
+    ['roomForTwo', tab === TAB_TEAMS && filters.roomForTwo && t('flatmates.seatsForTwo'), { roomForTwo: false }],
     ...filters.vibe.map((token) => {
       const [key, answer] = token.split(':');
       return ['vibe:' + token, t(`flatmates.ls.a_${key}_${answer}`), { vibe: filters.vibe.filter((x) => x !== token) }];

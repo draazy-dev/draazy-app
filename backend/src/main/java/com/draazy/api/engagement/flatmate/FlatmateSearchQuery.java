@@ -27,7 +27,8 @@ public record FlatmateSearchQuery(
         boolean strictGender,
         String roomType,
         String furnishing,
-        boolean gated) {
+        boolean gated,
+        FlatmateTabFacets tabFacets) {
     public static final double MAX_RADIUS_KM = 50.0;
 
     public static final double MIN_RADIUS_KM = 0.5;
@@ -62,6 +63,7 @@ public record FlatmateSearchQuery(
         meLocalities = cleanList(meLocalities);
         meGender = FlatmateVocabulary.blankToNull(meGender);
         meStyle = meStyle == null ? LivingStyleViewer.NONE : meStyle;
+        tabFacets = tabFacets == null ? FlatmateTabFacets.NONE : tabFacets;
     }
 
     public FlatmateSearchQuery(String tab, String q, String locality, Double nearLat, Double nearLng,
@@ -70,7 +72,7 @@ public record FlatmateSearchQuery(
             List<String> meLocalities, Long meBudget, String meGender) {
         this(tab, q, locality, nearLat, nearLng, nearRadiusKm, minBudget, maxBudget, gender, verifiedOnly,
                 moveInDays, vibe, attachedBath, sharing, sort, meLocalities, meBudget, meGender, null,
-                false, null, null, false);
+                false, null, null, false, null);
     }
 
     private static String oneOf(String value, java.util.Set<String> allowed) {
@@ -103,13 +105,13 @@ public record FlatmateSearchQuery(
                 otherTab,
                 q, locality, nearLat, nearLng, nearRadiusKm, minBudget, maxBudget, gender,
                 verifiedOnly, moveInDays, vibe, attachedBath, sharing, sort, meLocalities,
-                meBudget, meGender, meStyle, strictGender, roomType, furnishing, gated);
+                meBudget, meGender, meStyle, strictGender, roomType, furnishing, gated, tabFacets);
     }
 
     public FlatmateSearchQuery withStyle(LivingStyleViewer viewer) {
         return new FlatmateSearchQuery(tab, q, locality, nearLat, nearLng, nearRadiusKm, minBudget,
                 maxBudget, gender, verifiedOnly, moveInDays, vibe, attachedBath, sharing, sort,
-                meLocalities, meBudget, meGender, viewer, strictGender, roomType, furnishing, gated);
+                meLocalities, meBudget, meGender, viewer, strictGender, roomType, furnishing, gated, tabFacets);
     }
 
     public boolean hasNearPoint() {

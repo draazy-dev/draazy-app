@@ -1,4 +1,5 @@
 import { BUDGET_MIN, BUDGET_MAX } from './helpers.js';
+import { AGE_BANDS } from '../../../lib/flatmates/filterState.js';
 
 const budgetOf = (x) => {
   if (!x) return undefined;
@@ -20,6 +21,7 @@ const meFacets = (myPost) => {
 
 export default function toFlatmateQuery(filters = {}, { sort, myPost = null } = {}) {
   const [lo, hi] = filters.budget || [];
+  const [minAge, maxAge] = AGE_BANDS[filters.age] || [];
   return {
     q: filters.q || undefined,
     locality: filters.locality || undefined,
@@ -33,6 +35,12 @@ export default function toFlatmateQuery(filters = {}, { sort, myPost = null } = 
     verifiedOnly: filters.verifiedOnly || undefined,
     gated: filters.gated || undefined,
     attachedBath: filters.attachedBath || undefined,
+    bhk: filters.bhk || undefined,
+    vegOnly: filters.vegOnly || undefined,
+    parking: filters.parking || undefined,
+    minAge,
+    maxAge,
+    minOpenSeats: filters.roomForTwo ? 2 : undefined,
     vibe: filters.vibe?.length ? [...filters.vibe] : undefined,
     near: filters.near || undefined,
     nearRadius: filters.near ? filters.nearRadius : undefined,

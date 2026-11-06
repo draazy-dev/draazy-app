@@ -296,6 +296,7 @@ public class FlatmateSearchQueries {
         if (f.gated()) {
             sql.append(" and r.gated_community");
         }
+        f.tabFacets().appendRoom(sql, params);
         if (f.moveInDays() != null) {
             sql.append(" and (r.available_from is null or r.available_from <= ")
                     .append(moveInHorizon());
@@ -364,6 +365,7 @@ public class FlatmateSearchQueries {
             sql.append(" and g.seats_total = :sharing");
             params.put("sharing", f.sharing());
         }
+        f.tabFacets().appendGroup(sql, params);
         if (f.moveInDays() != null) {
             sql.append(" and (g.move_in_by is null or g.move_in_by <= ").append(moveInHorizon());
             params.put("moveInDays", f.moveInDays());
@@ -416,6 +418,7 @@ public class FlatmateSearchQueries {
             sql.append(" and p.room_pref in (:roomPref, 'any')");
             params.put("roomPref", f.roomType());
         }
+        f.tabFacets().appendPost(sql, params);
         if (f.moveInDays() != null) {
             sql.append(" and (p.move_in_at is null or p.move_in_at <= ")
                     .append(moveInHorizon());

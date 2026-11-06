@@ -11,12 +11,15 @@ const LEGACY_HABITS = { 'non-smoker': ['smoking:0'], vegetarian: ['food:0'], 'pe
 const VALID_ROOM_TYPES = new Set(['private', 'shared']);
 const VALID_FURNISHINGS = new Set(['furnished', 'semi']);
 const VALID_NEAR_MODES = new Set(['km', 'min']);
+const VALID_BHK = new Set(['1', '2', '3', '4']);
+const VALID_PARKING = new Set(['bike', 'car']);
+export const AGE_BANDS = { '18-24': [18, 24], '25-30': [25, 30], '31-': [31, undefined] };
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const NEAR_RE = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/;
 
 const FILTER_PARAM_KEYS = [
   'q', 'loc', 'g', 'gonly', 'room', 'furn', 'budget', 'movein', 'sharing', 'v', 'gated', 'bath', 'vibe',
-  'near', 'nearlabel', 'nearr', 'nearmode',
+  'bhk', 'veg', 'park', 'age', 'seats', 'near', 'nearlabel', 'nearr', 'nearmode',
 ];
 const STATE_PARAM_KEYS = [...FILTER_PARAM_KEYS, 'habits', 'sort', 'view', '__proto__', 'prototype', 'constructor'];
 
@@ -85,6 +88,11 @@ export function flatmateFiltersFromParams(params, defaults) {
   if (filters.gender && get('gonly') === '1') filters.genderOnly = true;
   if (VALID_ROOM_TYPES.has(get('room'))) filters.roomType = get('room');
   if (VALID_FURNISHINGS.has(get('furn'))) filters.furnishing = get('furn');
+  if (VALID_BHK.has(get('bhk'))) filters.bhk = get('bhk');
+  if (get('veg') === '1') filters.vegOnly = true;
+  if (VALID_PARKING.has(get('park'))) filters.parking = get('park');
+  if (Object.hasOwn(AGE_BANDS, get('age'))) filters.age = get('age');
+  if (get('seats') === '2') filters.roomForTwo = true;
   filters.vibe = normalizeVibe([...splitCsv(get('vibe')), ...vibeFromLegacyHabits(splitCsv(get('habits')))]);
 
   const near = get('near').trim();
@@ -114,6 +122,11 @@ export function flatmateFiltersToParams(filters, defaults) {
   if (filters.verifiedOnly) params.v = '1';
   if (filters.gated) params.gated = '1';
   if (filters.attachedBath) params.bath = '1';
+  if (filters.bhk) params.bhk = filters.bhk;
+  if (filters.vegOnly) params.veg = '1';
+  if (filters.parking) params.park = filters.parking;
+  if (filters.age) params.age = filters.age;
+  if (filters.roomForTwo) params.seats = '2';
   if (filters.vibe.length) params.vibe = filters.vibe.join(',');
   if (filters.near) {
     params.near = filters.near;
@@ -137,6 +150,11 @@ export function flatmateFiltersEqual(a, b) {
     && a.verifiedOnly === b.verifiedOnly
     && a.gated === b.gated
     && a.attachedBath === b.attachedBath
+    && a.bhk === b.bhk
+    && a.vegOnly === b.vegOnly
+    && a.parking === b.parking
+    && a.age === b.age
+    && a.roomForTwo === b.roomForTwo
     && a.near === b.near
     && a.nearLabel === b.nearLabel
     && a.nearRadius === b.nearRadius
@@ -186,6 +204,11 @@ export function readRememberedFlatmateSearch(defaults) {
     if (filters.gender && Object.hasOwn(source, 'genderOnly')) filters.genderOnly = source.genderOnly === true;
     if (VALID_ROOM_TYPES.has(source.roomType)) filters.roomType = source.roomType;
     if (VALID_FURNISHINGS.has(source.furnishing)) filters.furnishing = source.furnishing;
+    if (VALID_BHK.has(source.bhk)) filters.bhk = source.bhk;
+    if (Object.hasOwn(source, 'vegOnly')) filters.vegOnly = source.vegOnly === true;
+    if (VALID_PARKING.has(source.parking)) filters.parking = source.parking;
+    if (typeof source.age === 'string' && Object.hasOwn(AGE_BANDS, source.age)) filters.age = source.age;
+    if (Object.hasOwn(source, 'roomForTwo')) filters.roomForTwo = source.roomForTwo === true;
     filters.vibe = normalizeVibe([
       ...(Array.isArray(source.vibe) ? source.vibe : []),
       ...vibeFromLegacyHabits(Array.isArray(source.habits) ? source.habits : []),
@@ -225,6 +248,11 @@ export function saveRememberedFlatmateSearch(filters, defaults) {
         verifiedOnly: filters.verifiedOnly,
         gated: filters.gated,
         attachedBath: filters.attachedBath,
+        bhk: filters.bhk,
+        vegOnly: filters.vegOnly,
+        parking: filters.parking,
+        age: filters.age,
+        roomForTwo: filters.roomForTwo,
         vibe: [...filters.vibe],
         near: filters.near,
         nearLabel: filters.nearLabel,

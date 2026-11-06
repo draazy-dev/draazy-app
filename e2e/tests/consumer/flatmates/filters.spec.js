@@ -29,23 +29,30 @@ const openTab = async (page, key) => {
 
 test('each intent tab shows only the filters it can narrow', async ({ page }) => {
   test.slow();
-  await test.step('Rooms shows Move-in and hides the teams-only Sharing filter', async () => {
+  await test.step('Rooms shows Move-in and its own facets, and hides the other tabs\' ones', async () => {
     await openTab(page, MOVE_IN_TAB);
     await expect(visibleLabel(page, 'Move-in')).toHaveCount(1);
-    await expect(visibleLabel(page, 'Sharing')).toHaveCount(0);
+    await expect(visibleLabel(page, 'Team size')).toHaveCount(0);
+    await expect(visibleLabel(page, 'Flat size')).toHaveCount(1);
+    await expect(visibleLabel(page, 'Food & parking')).toHaveCount(1);
+    await expect(visibleLabel(page, /^Age$/)).toHaveCount(0);
   });
 
-  await test.step('Flatmates shows Move-in and hides the teams-only Sharing filter', async () => {
+  await test.step('Flatmates shows Age and hides the home-only facets', async () => {
     await tabButton(page, PEOPLE_TAB).click();
     await page.locator('.sf-card').first().waitFor({ timeout: 10000 });
-    await expect(visibleLabel(page, 'Sharing')).toHaveCount(0);
+    await expect(visibleLabel(page, 'Team size')).toHaveCount(0);
     await expect(visibleLabel(page, 'Move-in')).toHaveCount(1);
+    await expect(visibleLabel(page, /^Age$/)).toHaveCount(1);
+    await expect(visibleLabel(page, 'Flat size')).toHaveCount(0);
+    await expect(visibleLabel(page, 'Food & parking')).toHaveCount(0);
   });
 
-  await test.step('Teams shows Sharing alongside Move-in', async () => {
+  await test.step('Teams shows Team size and Flat size alongside Move-in', async () => {
     await tabButton(page, TEAMS_TAB).click();
     await page.locator('.sf-card').first().waitFor({ timeout: 10000 });
-    await expect(visibleLabel(page, 'Sharing')).toHaveCount(1);
+    await expect(visibleLabel(page, 'Team size')).toHaveCount(1);
+    await expect(visibleLabel(page, 'Flat size')).toHaveCount(1);
     await expect(visibleLabel(page, 'Move-in')).toHaveCount(1);
   });
 
@@ -57,8 +64,8 @@ test('each intent tab shows only the filters it can narrow', async ({ page }) =>
     await expect(visibleLabel(page, 'Vibe')).toHaveCount(1);
   });
 
-  await test.step('switching Teams to Rooms drops the teams-only Sharing filter', async () => {
-    await expect(visibleLabel(page, 'Sharing')).toHaveCount(0);
+  await test.step('switching Teams to Rooms drops the teams-only Team size filter', async () => {
+    await expect(visibleLabel(page, 'Team size')).toHaveCount(0);
     await expect(visibleLabel(page, 'Move-in')).toHaveCount(1);
   });
 });

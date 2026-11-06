@@ -31,6 +31,18 @@ const FILTERS = [
   ['roomType=shared', { roomType: 'shared' }, (it, tab) => roomOnly(it, tab, () => /^shared/i.test(it.roomType), () => ['shared', 'any'].includes(it.roomPref))],
   ['furnishing=furnished', { furnishing: 'furnished' }, (it, tab) => roomOnly(it, tab, () => it.furnishing === 'furnished')],
   ['gated', { gated: true }, (it, tab) => roomOnly(it, tab, () => it.gatedCommunity === true)],
+  ['bhk=3', { bhk: '3' }, (it) => (kindOf(it) === 'room' ? it.bhk === '3' : kindOf(it) === 'group' && it.preferences ? !it.preferences.bhk?.length || it.preferences.bhk.includes('3') : null)],
+  ['vegOnly', { vegOnly: true }, (it) => (kindOf(it) === 'room' ? it.food === 'veg' : null)],
+  ['parking=car', { parking: 'car' }, (it) => (kindOf(it) === 'room' ? it.parking === 'car' : null)],
+  ['parking=bike', { parking: 'bike' }, (it) => (kindOf(it) === 'room' ? ['bike', 'car'].includes(it.parking) : null)],
+  ['age 25-30', { minAge: 25, maxAge: 30 }, (it) => (kindOf(it) === 'post' ? it.age >= 25 && it.age <= 30 : null)],
+  ['minOpenSeats=2', { minOpenSeats: 2 }, (it) => (kindOf(it) === 'group' ? it.seatsOpen >= 2 : null)],
+];
+
+/* Tab-specific facets must bite on their own tab, or a silently ignored param would pass the rules above. */
+const TAB_FACETS = [
+  ['move-in', { bhk: '3' }], ['move-in', { vegOnly: true }], ['move-in', { parking: 'car' }],
+  ['people', { minAge: 25, maxAge: 30 }], ['teams', { bhk: '2' }], ['teams', { minOpenSeats: 2 }],
 ];
 
 /* A housed team can't answer a room-only question, so on Rooms it must drop out rather than slip through. */
@@ -60,6 +72,16 @@ test.describe('LIVE: flatmate filters narrow every tab honestly', () => {
       expect(failures, failures.join('\n')).toEqual([]);
     });
   }
+
+  test('tab-specific facets narrow their own tab without emptying it', async () => {
+    const failures = [];
+    for (const [tab, params] of TAB_FACETS) {
+      const all = (await feed(tab)).totalElements;
+      const some = (await feed(tab, params)).totalElements;
+      if (!(some > 0 && some < all)) failures.push(`${tab} ${JSON.stringify(params)}: ${some} of ${all}`);
+    }
+    expect(failures, failures.join('\n')).toEqual([]);
+  });
 
   test('move-in dates widen monotonically and the budget sorts order by the shown price', async () => {
     const counts = [];
@@ -98,11 +120,11 @@ test.describe('LIVE: flatmate filters narrow every tab honestly', () => {
 
   /* Each tap must reach the wire: a control that tints but never filters is the failure users can't see. */
   const CONTROLS = {
-    'move-in': [['Women', 'gender', 'female'], ['Women-only homes', 'strictGender', 'true'], ['Private', 'roomType', 'private'], ['Furnished', 'furnishing', 'furnished'], ['Immediate', 'moveInDays', '0'], ['Verified only', 'verifiedOnly', 'true'], ['Gated society', 'gated', 'true'], ['Attached only', 'attachedBath', 'attached']],
-    people: [['Men', 'gender', 'male'], ['Shared', 'roomType', 'shared'], ['Immediate', 'moveInDays', '0'], ['Verified only', 'verifiedOnly', 'true']],
-    teams: [['Women', 'gender', 'female'], ['Women-only homes', 'strictGender', 'true'], ['Verified only', 'verifiedOnly', 'true']],
+    'move-in': [['Women', 'gender', 'female'], ['Women-only homes', 'strictGender', 'true'], ['Private', 'roomType', 'private'], ['Furnished', 'furnishing', 'furnished'], ['Immediate', 'moveInDays', '0'], ['Verified only', 'verifiedOnly', 'true'], ['Gated society', 'gated', 'true'], ['Attached only', 'attachedBath', 'attached'], ['3 BHK', 'bhk', '3'], ['Veg-only home', 'vegOnly', 'true'], ['Car parking', 'parking', 'car']],
+    people: [['Men', 'gender', 'male'], ['Shared', 'roomType', 'shared'], ['Immediate', 'moveInDays', '0'], ['Verified only', 'verifiedOnly', 'true'], ['25–30', 'minAge', '25']],
+    teams: [['Women', 'gender', 'female'], ['Women-only homes', 'strictGender', 'true'], ['Verified only', 'verifiedOnly', 'true'], ['2 BHK', 'bhk', '2'], ['2+ seats open', 'minOpenSeats', '2']],
   };
-  const ONLY_ON = { Washroom: ['move-in'], Furnishing: ['move-in'], Sharing: ['teams'], Room: ['move-in', 'people'] };
+  const ONLY_ON = { Washroom: ['move-in'], Furnishing: ['move-in'], 'Team size': ['teams'], Room: ['move-in', 'people'], 'Flat size': ['move-in', 'teams'], Age: ['people'], 'Food & parking': ['move-in'] };
   for (const [tab, controls] of Object.entries(CONTROLS)) {
     test(`${tab}: every control on the board sends its filter`, async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 900 });
@@ -122,10 +144,40 @@ test.describe('LIVE: flatmate filters narrow every tab honestly', () => {
       }
       if (tab === 'teams') {
         const sent = page.waitForRequest((r) => r.url().includes('/flatmates/feed') && new URL(r.url()).searchParams.get('sharing') === '3');
-        await grid.getByRole('button', { name: /Any size/ }).click();
+        await grid.getByRole('button', { name: 'Team size' }).click();
         await page.getByRole('option', { name: /^3\b/ }).click();
         await sent;
       }
     });
   }
+
+  test('tab facets live in the URL, and a tab switch drops the ones the new tab cannot use', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openFlatmates(page, '?view=move-in');
+    await openFlatmateFilters(page);
+    const grid = page.locator('#sf-desktop-filters');
+    const url = () => Object.fromEntries(new URL(page.url()).searchParams);
+    await grid.getByRole('button', { name: '3 BHK', exact: true }).click();
+    await grid.getByRole('button', { name: 'Veg-only home', exact: true }).click();
+    await expect.poll(url).toMatchObject({ bhk: '3', veg: '1' });
+
+    await page.reload();
+    await openFlatmateFilters(page);
+    await expect(grid.getByRole('button', { name: '3 BHK', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+    await page.locator('button[data-tab="teams"]').click();
+    await expect.poll(url).toMatchObject({ view: 'teams', bhk: '3' });
+    expect(url().veg, 'veg-only is a Rooms facet').toBeUndefined();
+    await grid.getByRole('button', { name: '2+ seats open', exact: true }).click();
+    await expect.poll(() => url().seats).toBe('2');
+
+    await page.locator('button[data-tab="people"]').click();
+    await expect.poll(url).toMatchObject({ view: 'people' });
+    expect(url().bhk, 'people have no flat size').toBeUndefined();
+    expect(url().seats).toBeUndefined();
+    const sent = page.waitForRequest((r) => r.url().includes('/flatmates/feed') && new URL(r.url()).searchParams.get('maxAge') === '24');
+    await grid.getByRole('button', { name: '18–24', exact: true }).click();
+    await sent;
+    await expect.poll(() => url().age).toBe('18-24');
+  });
 });

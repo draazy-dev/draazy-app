@@ -23,7 +23,7 @@ import useLivingStyle from './livingStyle/useLivingStyle.js';
 import { MIN_COMMON } from './livingStyle/questions.js';
 import LivingStyleEntry from './livingStyle/LivingStyleEntry.jsx';
 
-export const emptyFilters = { q: '', locality: '', budget: [BUDGET_MIN, BUDGET_MAX], moveIn: '', gender: '', genderOnly: false, roomType: '', furnishing: '', sharing: '', verifiedOnly: false, gated: false, attachedBath: false, vibe: [], near: '', nearLabel: '', nearRadius: 5, nearMode: 'km' };
+export const emptyFilters = { q: '', locality: '', budget: [BUDGET_MIN, BUDGET_MAX], moveIn: '', gender: '', genderOnly: false, roomType: '', furnishing: '', sharing: '', verifiedOnly: false, gated: false, attachedBath: false, bhk: '', vegOnly: false, parking: '', age: '', roomForTwo: false, vibe: [], near: '', nearLabel: '', nearRadius: 5, nearMode: 'km' };
 const NEAR_TUNING_KEYS = ['nearLabel', 'nearRadius', 'nearMode'];
 
 const LIST_PAGE = 24;
@@ -80,6 +80,11 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
       gated: next === TAB_MOVE_IN ? f.gated : false,
       roomType: next === TAB_TEAMS ? '' : f.roomType,
       genderOnly: next === TAB_PEOPLE ? false : f.genderOnly,
+      bhk: next === TAB_PEOPLE ? '' : f.bhk,
+      vegOnly: next === TAB_MOVE_IN ? f.vegOnly : false,
+      parking: next === TAB_MOVE_IN ? f.parking : '',
+      age: next === TAB_PEOPLE ? f.age : '',
+      roomForTwo: next === TAB_TEAMS ? f.roomForTwo : false,
     }));
   };
 

@@ -4,6 +4,7 @@ import com.draazy.api.catalog.property.ListingFacets;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertySearchQuery;
 import com.draazy.api.engagement.flatmate.FlatmateGroup;
+import com.draazy.api.engagement.flatmate.FlatmateTabFacets;
 import com.draazy.api.engagement.livingstyle.LivingStyleService;
 import com.draazy.api.engagement.livingstyle.VibeFilter;
 import jakarta.persistence.EntityManager;
@@ -167,6 +168,7 @@ class SavedSearchMatcher {
         if (Boolean.TRUE.equals(booleanValue(criteria, "gated"))) {
             sql.append(" and r.gated_community");
         }
+        tabFacets(criteria).appendRoom(sql, params);
         Integer days = moveInDays(text(criteria, "moveIn"));
         if (days != null) {
             sql.append(" and (r.available_from is null or r.available_from <= ")
@@ -212,6 +214,7 @@ class SavedSearchMatcher {
             sql.append(" and g.seats_total = :sharing");
             params.put("sharing", sharing);
         }
+        tabFacets(criteria).appendGroup(sql, params);
         Integer days = moveInDays(text(criteria, "moveIn"));
         if (days != null) {
             sql.append(" and (g.move_in_by is null or g.move_in_by <= ")
@@ -251,6 +254,7 @@ class SavedSearchMatcher {
             sql.append(" and p.room_pref in (:roomPref, 'any')");
             params.put("roomPref", roomType);
         }
+        tabFacets(criteria).appendPost(sql, params);
         Integer days = moveInDays(text(criteria, "moveIn"));
         if (days != null) {
             sql.append(" and (p.move_in_at is null or p.move_in_at <= ")
@@ -282,6 +286,12 @@ class SavedSearchMatcher {
             params.put("locality", locality);
         }
         sql.append(VibeFilter.sql("p".equals(alias) ? "p.user_id" : alias + ".host_id", vibe.wanted(), vibe.mine(), params));
+    }
+
+    private static FlatmateTabFacets tabFacets(Map<String, Object> criteria) {
+        return new FlatmateTabFacets(text(criteria, "bhk"), Boolean.TRUE.equals(booleanValue(criteria, "vegOnly")),
+                text(criteria, "parking"), intValue(criteria, "minAge"), intValue(criteria, "maxAge"),
+                intValue(criteria, "minOpenSeats"));
     }
 
     private static boolean strictGender(Map<String, Object> criteria) {
