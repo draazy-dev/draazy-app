@@ -186,6 +186,29 @@ class DataExportCoverageTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("a tenant sees only registered agreements, and never the owner-typed document link")
+    void aTenantSeesWhatTheProductShowsThemOfARentAgreement() throws Exception {
+        User subject = user(SUBJECT_MOBILE, SUBJECT_NAME);
+        User other = counterparty();
+        UUID theirs = property(other.getId(), "A flat in Baner belonging to somebody else");
+        for (Object[] row : new Object[][] {
+                {"draft", 4242421L, "https://owner-typed.example/draft.pdf"},
+                {"registered", 1313131L, "https://owner-typed.example/registered.pdf"}}) {
+            jdbc.update("""
+                    insert into rent_agreements (property_id, owner_id, tenant_mobile, rent, status,
+                                                 document_url)
+                    values (?, ?, ?, ?, ?, ?)
+                    """, theirs, other.getId(), subject.getMobile(), row[1], row[0], row[2]);
+        }
+
+        String body = export(subject);
+
+        assertThat(body).contains("1313131")
+                .doesNotContain("4242421")
+                .doesNotContain("owner-typed.example");
+    }
+
+    @Test
     @DisplayName("the subject's own data comes back, across every domain they have data in")
     void theSubjectsOwnDataComesBack() throws Exception {
         User subject = user(SUBJECT_MOBILE, SUBJECT_NAME);

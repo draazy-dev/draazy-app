@@ -311,7 +311,7 @@ public final class DataExportScope {
                 select id, title, deal, property_type, bhk, price, locality, locality_slug,
                        society, area, area_unit, furnishing, visibility, status, rented,
                        tenant_name, tenant_mobile, tenant_since, monthly_rent, due_day, lease_end, deposit,
-                       police_intimated_on, landlord_pan, valuation,
+                       landlord_pan, valuation,
                        published_listing_id, source_room_id, address_fingerprint,
                        created_at, updated_at
                   from managed_properties
@@ -324,7 +324,7 @@ public final class DataExportScope {
                 "Owners' rent records that name your number as the tenant.",
                 """
                 select id, locality, rented, tenant_name, tenant_mobile, tenant_since, monthly_rent, due_day,
-                      lease_end, deposit, police_intimated_on, created_at, updated_at,
+                      lease_end, deposit, created_at, updated_at,
                       owner_id as party_ref_src
                  from managed_properties
                 where tenant_mobile = :subjectMobile
@@ -693,16 +693,25 @@ public final class DataExportScope {
                         + "agreement.")));
 
         out.add(new Dataset("agreements", "rent_agreements_as_tenant",
-                "Rent agreements where the tenant's number is yours.",
+                "Registered or active rent agreements where the tenant's number is yours.",
                 """
                 select id, property_id, tenant_mobile, rent, deposit, start_date, duration_months,
-                       status, document_url, created_at, updated_at,
+                       status, final_document_id, created_at, updated_at,
                        owner_id as party_ref_src
                   from rent_agreements
                  where tenant_mobile = :subjectMobile
+                   and status in ('registered', 'active')
                  order by created_at desc
                 """,
-                withheld("owner_id", "Replaced by partyRef.")));
+                withheld(
+                        "owner_id", "Replaced by partyRef.",
+                        "drafts and expired agreements", "An owner types the tenant's number "
+                                + "while drafting, so until registration the number may be "
+                                + "somebody else's. RentAgreementService.mine shows a tenant only "
+                                + "registered and active rows; the export does the same.",
+                        "document_url", "A link the owner typed, which the product never shows "
+                                + "the tenant. final_document_id is the registered copy Draazy "
+                                + "produced.")));
     }
 
     private static void messaging(List<Dataset> out) {
@@ -897,8 +906,8 @@ public final class DataExportScope {
         out.add(new Dataset("support", "support_ticket_messages",
                 "Messages on your support tickets, including our replies.",
                 """
-                select m.id, m.ticket_id, m.author_role, m.body, m.attachments, m.created_at,
-                       m.author_id as party_ref_src
+                select m.id, m.ticket_id, m.author_role, m.body, m.attachments, m.about_type, m.about_id,
+                       m.created_at, m.author_id as party_ref_src
                   from support_ticket_messages m
                   join support_tickets t on t.id = m.ticket_id
                  where t.user_id = :subjectId
@@ -907,6 +916,18 @@ public final class DataExportScope {
                 withheld("author_id", "Replaced by partyRef. Where the author was a staff member "
                         + "the role is still returned, so you can tell our replies from your own; "
                         + "which employee wrote it is not.")));
+
+        out.add(new Dataset("support", "support_conversations",
+                "Where your single support chat with us stands: its status, when it last moved and a "
+                        + "preview of the latest message.",
+                """
+                select status, user_unread, last_at, last_preview, last_from, last_about_type,
+                       last_about_id, created_at, updated_at
+                  from support_conversations
+                 where user_id = :subjectId
+                """,
+                withheld("assignee_id / staff_unread", "Which employee holds your chat, and whether "
+                        + "our team has read it. Both are internal.")));
 
         out.add(new Dataset("support", "tickets",
                 "Ops tickets raised about something you asked for, matched by your account or your "
