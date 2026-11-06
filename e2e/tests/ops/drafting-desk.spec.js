@@ -266,9 +266,15 @@ test.describe('Ops → Drafting desk (live)', () => {
     await openRow(rowFor(page, request.property));
 
     const dialog = page.getByRole('dialog').first();
-    await dialog.getByLabel('Reply to customer').fill('Please call the desk before 5pm.');
-    await dialog.getByRole('button', { name: 'Send' }).click();
-    await expect(dialog.getByText('Please call the desk before 5pm.')).toBeVisible();
+    await dialog.getByTestId('open-support-chat').click();
+    const chat = page.getByTestId('staff-dock-window').filter({ has: page.getByTestId('staff-chat') });
+    await expect(chat.getByLabel('Reply about')).toContainText(/Valuation #/);
+    await chat.getByTestId('staff-chat-input').fill('Please call the desk before 5pm.');
+    const sent = page.waitForResponse((r) => r.request().method() === 'POST' && /\/admin\/support\/chats\/[^/]+\/messages$/.test(r.url()));
+    await chat.getByTestId('staff-chat-send').click();
+    expect((await sent).ok()).toBe(true);
+    await expect(chat.getByTestId('staff-chat-msg').filter({ hasText: 'Please call the desk before 5pm.' })).toBeVisible();
+    await chat.getByRole('button', { name: 'Close chat', exact: true }).click();
 
     await dialog.getByRole('button', { name: 'Cancel request' }).click();
     const cancellation = page.getByRole('dialog').filter({ hasText: 'Reason for cancellation' });
@@ -286,7 +292,7 @@ test.describe('Ops → Drafting desk (live)', () => {
     // Read back as the customer: the reason must reach their thread and their inbox, not only audit_log.
     const mine = await (await fetch(`${API}/service-requests/${request.id}`, { headers: request.auth })).json();
     expect(mine.status).toBe('cancelled');
-    expect((mine.messages || []).map((m) => m.body)).toContain(reason);
+    expect((mine.messages || []).map((m) => m.body)).toEqual(expect.arrayContaining(['Please call the desk before 5pm.', reason]));
     const inbox = await (await fetch(`${API}/notifications?size=100`, { headers: request.auth })).json();
     expect((inbox.content || []).some((n) => n.type === 'service.cancelled' && String(n.body).includes(reason))).toBe(true);
   });

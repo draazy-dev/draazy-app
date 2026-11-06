@@ -24,7 +24,7 @@ import BadgeSection from './review-modal/BadgeSection.jsx';
 import BadgeRequestBanner from './review-modal/BadgeRequestBanner.jsx';
 import DecisionSection from './review-modal/DecisionSection.jsx';
 import ChecklistSection from './review-modal/ChecklistSection.jsx';
-import CaseThread from './review-modal/CaseThread.jsx';
+import OpenSupportChat from '../../../components/admin/support-chat/OpenSupportChat.jsx';
 
 const KIND_LABEL = { post: 'Seeker post', room: 'Room', group: 'Group' };
 const PUBLIC = ['approved', 'live'];
@@ -289,7 +289,7 @@ export default function FlatmateReviewModal({ entry, onClose, onChanged }) {
           rail={(
             <>
               {review ? <BadgeSection key={`${review.id}:${review.status}`} review={review} busy={busy || editing} onDecide={decideBadge} onRevoke={revokeBadge} /> : null}
-              {d?.caseFile ? <CaseThread messages={d.caseFile.messages} /> : null}
+              {item ? <OpenSupportChat about={{ type: `flatmate_${item.kind}`, id: item.id, label: item.headline || summary.title }} label={item.kind === 'post' ? 'Chat with seeker' : 'Chat with host'} /> : null}
               {item && item.checklistRequired && d?.caseFile && !live ? (
                 <ChecklistSection items={d.caseFile.checklist} busy={busy || editing} onTick={tick} />
               ) : null}

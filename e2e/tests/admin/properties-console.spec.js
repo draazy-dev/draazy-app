@@ -348,10 +348,15 @@ test.describe('LIVE: the properties console', () => {
     await dialog.getByTestId('review-section-badge').click();
     await expect(dialog.getByRole('region', { name: 'Ownership document checks' })).toBeVisible();
     await dialog.getByTestId('review-section-messages').click();
-    const composer = dialog.getByPlaceholder(/Share a note/);
+    await dialog.getByTestId('open-support-chat').click();
+    const chat = page.getByTestId('staff-dock-window').filter({ has: page.getByTestId('staff-chat') });
+    await expect(chat.getByLabel('Reply about')).toContainText(listing.title);
+    const composer = chat.getByTestId('staff-chat-input');
     await composer.click();
     await page.keyboard.type('needs a clearer photo');
     await expect(composer).toHaveValue('needs a clearer photo');
+    await expect(dialog, 'typing in the chat must not close the review behind it').toBeVisible();
+    await chat.getByRole('button', { name: 'Close chat', exact: true }).click();
 
     const bare = await conciergeListing('no photo');
     await page.goto('/admin/properties', { waitUntil: 'commit' });

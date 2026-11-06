@@ -110,7 +110,10 @@ test.describe('Ops → flatmate desk publication parity (live)', () => {
     await dialog.getByLabel('Internal note').fill('Please confirm the monthly rent.');
     await ask.click();
     await expect(dialog.getByTestId('case-needs-info')).toBeVisible();
-    await expect(dialog.getByTestId('flatmate-case-thread')).toContainText('Please confirm the monthly rent.');
+    await dialog.getByTestId('open-support-chat').click();
+    const chat = page.getByTestId('staff-dock-window').filter({ has: page.getByTestId('staff-chat') });
+    await expect(chat.getByTestId('staff-chat-msg').filter({ hasText: 'Please confirm the monthly rent.' })).toBeVisible();
+    await chat.getByRole('button', { name: 'Close chat', exact: true }).click();
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(card(page, title)).toContainText('Needs info');
 

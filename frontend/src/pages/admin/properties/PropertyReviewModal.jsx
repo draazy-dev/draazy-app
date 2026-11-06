@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import {
   CheckCircle, ExternalLink, FileCheck2, HelpCircle, MapPin, Pencil,
-  Send, XCircle, History, ArrowRight, AlertTriangle, TrendingDown, User,
+  XCircle, History, ArrowRight, AlertTriangle, TrendingDown, User,
 } from 'lucide-react';
 import {
   startPropertyReview, beginPropertyReview,
-  setPropertyReviewChecklistItem, addPropertyReviewMessage, decidePropertyReview, recordPropertyReraCheck,
+  setPropertyReviewChecklistItem, decidePropertyReview, recordPropertyReraCheck,
 } from '../../../services/propertyReviewService.js';
 import { setListingStatus } from '../../../services/propertyService.js';
 import { getLocality } from '../../../services/localityService.js';
@@ -28,6 +28,7 @@ import {
 import WhatsappTemplates from './review-modal/WhatsappTemplates.jsx';
 import CommunicationLog from './review-modal/CommunicationLog.jsx';
 import OwnershipEvidencePanel from './review-modal/OwnershipEvidencePanel.jsx';
+import OpenSupportChat from '../../../components/admin/support-chat/OpenSupportChat.jsx';
 import BadgeRequestBanner from './review-modal/BadgeRequestBanner.jsx';
 import { OWNERSHIP_REVIEW_ITEM, seeksOwnershipBadge } from '../../../lib/recheckFields.js';
 import { SubmittedPhotos, SubmittedDescription, SubmittedLocation } from './review-modal/SubmittedContent.jsx';
@@ -67,7 +68,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
   const [decisionMode, setDecisionMode] = useState(null);
   const [reasonCode, setReasonCode] = useState('');
   const [reasonNote, setReasonNote] = useState('');
-  const [msg, setMsg] = useState('');
   const [internalNote, setInternalNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [badgeCase, setBadgeCase] = useState(null);
@@ -128,7 +128,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     setDecisionMode(null);
     setReasonCode('');
     setReasonNote('');
-    setMsg('');
     setInternalNote('');
     setWaOpen(false);
     setWaPreview(null);
@@ -253,25 +252,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       return;
     }
     toast(err?.message || fallback, 'error');
-  };
-
-  const reviewSend = async (clarificationRequested = false) => {
-    const v = msg.trim();
-    if (!v) return;
-    try {
-      const caseFile = await addPropertyReviewMessage(pid(review), v, clarificationRequested);
-      setMsg('');
-      setThread(caseFile);
-      toast(clarificationRequested
-        ? 'Needs info sent \u2014 returned to the owner'
-        : 'Message sent to owner');
-      if (clarificationRequested) {
-        setReview((current) => current ? { ...current, status: 'needs_info' } : current);
-        onRefresh();
-      }
-    } catch (err) {
-      toast(err?.message || 'Could not send the message', 'error');
-    }
   };
 
   const reviewApprove = async () => {
@@ -432,7 +412,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     ['details', 'Details'],
     ownerEdited(review) ? ['changes', 'Changes'] : null,
     ['badge', 'Verified badge'],
-    ['messages', thread.messages.length ? `Messages (${thread.messages.length})` : 'Messages'],
+    ['messages', 'Messages'],
   ].filter(Boolean);
   const activeSection = sections.some(([key]) => key === section) ? section : 'overview';
 
@@ -588,64 +568,20 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
 
             {activeSection === 'messages' ? (
               <div className="space-y-4">
-                <div className="overflow-hidden rounded-xl border border-white/10 focus-within:border-brand-teal/60">
-                  <div className="flex max-h-72 min-h-[96px] flex-col gap-2 overflow-y-auto bg-black/20 p-3">
-                    {thread.messages.length ? (
-                      thread.messages.map((m) => {
-                        if (m.internal) {
-                          return (
-                            <div key={m.id} className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">
-                              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-300">
-                                <AlertTriangle className="h-3.5 w-3.5" /> Staff only {'\u00B7'} not shown to the owner
-                              </div>
-                              <div className="whitespace-pre-wrap">{m.body}</div>
-                              <div className="mt-1 text-[11px] text-amber-200/70">{fmtAgo(m.at)}</div>
-                            </div>
-                          );
-                        }
-                        const me = m.from === 'ops';
-                        return (
-                          <div key={m.id} className={classNames('flex', me && 'justify-end')}>
-                            <div className={classNames('max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm', me ? 'rounded-br-sm bg-teal-500/20 text-teal-50' : 'rounded-bl-sm bg-white/[0.07] text-gray-100')}>
-                              {m.body}
-                              <div className="mt-1 text-[11px] text-gray-400">{me ? 'You (Draazy)' : review.owner} {'\u00B7'} {fmtAgo(m.at)}</div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p className="m-auto text-center text-sm text-gray-500">No messages yet. Ask the owner anything before deciding.</p>
-                    )}
+                <OpenSupportChat about={{ type: 'property', id: pid(review), label: review.title }} label="Chat with owner" />
+                {thread.messages.some((m) => m.internal) ? (
+                  <div className="space-y-2" data-testid="review-staff-notes">
+                    {thread.messages.filter((m) => m.internal).map((m) => (
+                      <div key={m.id} className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">
+                        <div className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-300">
+                          <AlertTriangle className="h-3.5 w-3.5" /> Staff only {'\u00B7'} not shown to the owner
+                        </div>
+                        <div className="whitespace-pre-wrap">{m.body}</div>
+                        <div className="mt-1 text-[11px] text-amber-200/70">{fmtAgo(m.at)}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="border-t border-white/10 bg-white/[0.02] px-3 py-2.5">
-                    <textarea
-                      value={msg}
-                      onChange={(e) => setMsg(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); reviewSend(false); } }}
-                      rows={2}
-                      aria-label="Message to the owner"
-                      placeholder={'Share a note, or ask for a clarification to hand the listing back for correction\u2026'}
-                      className="block w-full resize-none bg-transparent text-sm leading-relaxed text-white outline-none placeholder:text-gray-500"
-                    />
-                    <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-                      <span className="mr-auto hidden text-[11px] text-gray-500 sm:inline">Enter to send · Shift + Enter for a new line</span>
-                      <button
-                        type="button"
-                        onClick={() => reviewSend(true)}
-                        disabled={maker || !(review.status === 'pending' || thread.status === 'in_review')}
-                        title={maker ? MAKER_REASON : review.status === 'pending' || thread.status === 'in_review'
-                          ? 'Hands the listing back to the owner to correct'
-                          : 'Only a listing still awaiting review can be handed back'}
-                        className="dz-btn dz-btn-ghost dz-btn-sm"
-                      >
-                        <HelpCircle className="h-3.5 w-3.5" /> Ask for clarification
-                      </button>
-                      <button type="button" onClick={() => reviewSend(false)} className="dz-btn dz-btn-primary dz-btn-sm">
-                        <Send className="h-3.5 w-3.5" /> Send
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                ) : null}
 
                 <div className="divide-y divide-white/10 rounded-xl border border-white/10">
                   {review.ownerMobile && (

@@ -18,6 +18,8 @@ import { useHelpIndex } from '../../lib/useHelp.js';
 import { AdminFlagsProvider, useAdminFlags } from '../../context/AdminFlagsContext.jsx';
 import AdminTopbarTools from './AdminTopbarTools.jsx';
 import BrowserAlertsPrompt from '../BrowserAlertsPrompt.jsx';
+import { StaffSupportChatProvider } from '../../context/StaffSupportChatContext.jsx';
+import StaffSupportDock from '../admin/support-chat/StaffSupportDock.jsx';
 
 export default function AdminLayout() {
   return (
@@ -71,7 +73,10 @@ function AdminLayoutInner() {
     );
   };
 
+  const supportChats = canAccessModule(user, 'support');
+
   return (
+    <StaffSupportChatProvider enabled={supportChats}>
     <div className="ph-no-capture min-h-[100dvh] bg-ink lg:flex">
       <ConnectivityBanner />
       <aside
@@ -212,6 +217,8 @@ function AdminLayoutInner() {
         </main>
       </div>
       <BrowserAlertsPrompt staff />
+      {supportChats ? <StaffSupportDock hidden={pageModule === 'support'} inboxPath={portalPath(user, '/admin/support')} /> : null}
     </div>
+    </StaffSupportChatProvider>
   );
 }

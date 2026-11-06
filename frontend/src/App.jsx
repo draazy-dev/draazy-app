@@ -130,7 +130,7 @@ const OpsRefunds = preloadable(() => import('./pages/ops/OpsRefunds.jsx'));
 const AdminLeads = preloadable(() => import('./pages/admin/leads/AdminLeads.jsx'));
 const OpsFlatmateReview = lazyPage(() => import('./pages/ops/OpsFlatmateReview.jsx'), 'flatmates');
 const OpsIdentityReview = preloadable(() => import('./pages/ops/OpsIdentityReview.jsx'));
-const OpsSupportQueue = preloadable(() => import('./pages/ops/OpsSupportQueue.jsx'));
+const SupportChatsInbox = preloadable(() => import('./pages/ops/support-chats/SupportChatsInbox.jsx'));
 const OpsDraftingDesk = lazyPage(() => import('./pages/ops/OpsDraftingDesk.jsx'), 'services');
 const RentAgreementDesk = lazyPage(() => import('./pages/ops/rent-agreement/RentAgreementDesk.jsx'), 'services');
 
@@ -221,7 +221,7 @@ const BACK_OFFICE_ROUTES = [{
     { path: 'packers', element: <ModuleRoute moduleKey="desk:packers"><OpsDraftingDesk key="packers" desk="packers" /></ModuleRoute> },
     { path: 'valuation', element: <ModuleRoute moduleKey="desk:valuation"><OpsDraftingDesk key="valuation" desk="valuation" /></ModuleRoute> },
     { path: 'drafting-desk', element: <DeskRedirect /> },
-    { path: 'support', element: <ModuleRoute moduleKey="support"><FlagRoute flag="support"><OpsSupportQueue /></FlagRoute></ModuleRoute> },
+    { path: 'support', element: <ModuleRoute moduleKey="support"><FlagRoute flag="support"><SupportChatsInbox /></FlagRoute></ModuleRoute> },
     { path: 'enquiries', element: <ModuleRoute moduleKey="enquiries"><AdminEnquiries /></ModuleRoute> },
     { path: 'referrals', element: <ModuleRoute moduleKey="referrals"><OpsReferrals /></ModuleRoute> },
     { path: 'refunds', element: <ModuleRoute moduleKey="refunds"><OpsRefunds /></ModuleRoute> },
@@ -330,7 +330,7 @@ export default function App() {
           <Route path="/locality" element={<LocalityIndex />} />
           <Route path="/locality/:slug" element={<Locality />} />
           <Route path="/map" element={<Navigate to="/listings?view=map" replace />} />
-          <Route path="/messages" element={<AppFlagRoute flag="inAppMessaging"><ProtectedRoute><Messages /></ProtectedRoute></AppFlagRoute>} />
+          <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
           <Route path="/flatmates" element={<Suspense fallback={<FlatmatesSkeleton />}><Flatmates /></Suspense>} />
           <Route path="/flatmates/:kind/:id" element={<FlatmateDetail />} />
           <Route path="/flatmates/:place" element={<FlatmateLanding />} />

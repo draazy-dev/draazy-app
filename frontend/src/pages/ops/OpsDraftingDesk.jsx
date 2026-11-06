@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Hand, RefreshCw } from 'lucide-react';
 import {
-  addServiceRequestMessage, cancelServiceRequestAsOps, getServiceRequest, getServiceRequestQueueSummary,
+  cancelServiceRequestAsOps, getServiceRequest, getServiceRequestQueueSummary,
   readServiceRequestChecklist, shareServiceRequestDraft,
   takeServiceRequest, uploadServiceRequestFinalDoc,
 } from '../../services/serviceRequestService.js';
@@ -21,7 +21,7 @@ import AdminServices from '../admin/AdminServices.jsx';
 import useDeskTickets from '../admin/useDeskTickets.js';
 import AgeTone from './service-queue/AgeTone.jsx';
 import CancelDialog from './service-queue/CancelDialog.jsx';
-import MessageThread from './service-queue/MessageThread.jsx';
+import OpenSupportChat from '../../components/admin/support-chat/OpenSupportChat.jsx';
 import DocumentChecklist from './service-queue/DocumentChecklist.jsx';
 import ServiceDocuments from './service-queue/ServiceDocuments.jsx';
 import StaffWorkflowActions from './service-queue/StaffWorkflowActions.jsx';
@@ -206,15 +206,6 @@ export default function OpsDraftingDesk({ desk }) {
 
   const docUnavailable = () => toast('This document cannot be previewed in local development. Download or open it in the deployed environment.', 'info');
 
-  const sendMessage = async (text) => {
-    try {
-      applyUpdate(await addServiceRequestMessage(detail.id, text));
-    } catch (err) {
-      toast(err?.message || 'The message could not be sent.', 'error');
-      throw err;
-    }
-  };
-
   const cancel = async (reason) => {
     try {
       const updated = await cancelServiceRequestAsOps(detail.id, reason);
@@ -345,7 +336,7 @@ export default function OpsDraftingDesk({ desk }) {
 
             <StaffWorkflowActions request={detail} onShareDraft={shareDraft} onUploadFinal={uploadFinal} />
 
-            <MessageThread messages={detail.messages} onSend={sendMessage} />
+            <OpenSupportChat about={{ type: 'request', id: detail.id, label: detail.service }} label="Chat with customer" />
 
             <div className="rounded-2xl border border-white/10 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">

@@ -29,27 +29,29 @@ async function needsInfoListing() {
   return { id, title, ownerMobile, ownerHeaders };
 }
 
-test('the owner reads the question as Draazy Support and can reopen the thread after replying', async ({ page }) => {
-  const { id, title, ownerMobile } = await needsInfoListing();
+test('the owner answers the question in the Draazy support thread and gets back to it from the listing card', async ({ page }) => {
+  const { id, title, ownerMobile, ownerHeaders } = await needsInfoListing();
   await signedInAs(page, ownerMobile);
 
   await page.goto(`/dashboard?review=${id}#properties`);
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByText(QUESTION)).toBeVisible({ timeout: 20_000 });
-  await expect(dialog.getByText(/^Draazy Support/)).toBeVisible();
-  await expect(page).not.toHaveURL(/review=/);
+  await expect(page).toHaveURL(/\/messages\?support=property/);
+  const thread = page.getByTestId('support-thread');
+  await expect(thread).toHaveAttribute('data-topic', `property:${id}`);
+  await expect(thread.getByTestId('support-review-card')).toContainText(QUESTION, { timeout: 20_000 });
+  await expect(thread.locator('.pc-msgs').getByText(QUESTION)).toBeVisible();
 
-  await dialog.getByPlaceholder('Reply to Draazy Support…').fill(ANSWER);
-  await dialog.getByRole('button', { name: 'Send' }).click();
-  await expect(dialog.getByText(ANSWER)).toBeVisible();
-  await expect(dialog.getByText(/^You/)).toBeVisible();
-  await page.keyboard.press('Escape');
+  await thread.getByRole('textbox', { name: 'Message Draazy support' }).fill(ANSWER);
+  await thread.getByRole('button', { name: 'Send message' }).click();
+  await expect(thread.getByText(ANSWER)).toBeVisible();
+  await expect.poll(async () => (await api('GET', `/properties/${id}/verification`, ownerHeaders)).body?.messages?.map((m) => m.body))
+    .toContain(ANSWER);
 
-  await page.reload();
+  await page.goto('/dashboard#properties');
   const card = page.locator('.rounded-xl', { hasText: title }).first();
   await card.getByTestId('support-thread-link').click();
-  await expect(page.getByRole('dialog').getByText(QUESTION)).toBeVisible();
-  await expect(page.getByRole('dialog').getByText(ANSWER)).toBeVisible();
+  await expect(page.getByTestId('support-thread').getByTestId('support-review-card')).toContainText('Under review');
+  await expect(page.getByTestId('support-thread').locator('.pc-msgs').getByText(QUESTION)).toBeVisible();
+  await expect(page.getByTestId('support-thread').getByText(ANSWER)).toBeVisible();
 });
 
 test('staff see an owner reply on the bell and the card, and opening it clears both', async ({ page, login }) => {
@@ -74,7 +76,8 @@ test('staff see an owner reply on the bell and the card, and opening it clears b
   await expect(bell.getByText(/^Owner replied \(\d+\)$/)).toBeVisible();
   await bell.getByRole('button', { name: new RegExp(title) }).filter({ hasText: ANSWER }).click();
   await page.getByTestId('review-section-messages').click();
-  await expect(page.getByRole('dialog').getByText(ANSWER)).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('dialog').getByTestId('open-support-chat').click();
+  await expect(page.getByTestId('staff-dock-window').getByTestId('staff-chat-msg').filter({ hasText: ANSWER })).toBeVisible({ timeout: 20_000 });
   await expect(card.getByTestId('owner-replied')).toHaveCount(0);
 
   const after = await api('GET', '/admin/bell', await authHeaders(ACTORS.admin));

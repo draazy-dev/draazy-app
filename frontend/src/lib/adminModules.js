@@ -47,7 +47,7 @@ export const ADMIN_MODULES = [
   { key: 'flatmates', label: 'Flatmates', path: '/admin/flatmates', icon: Users, group: 'listings', flagKey: 'flatmates', atom: 'flatmates:read', writeAtom: 'flatmates:write' },
   ...DESK_MODULES,
   { key: 'leads', label: 'Leads', path: '/admin/leads', icon: PhoneCall, group: 'sales', atom: 'leads:read', writeAtom: 'leads:write' },
-  { key: 'support', label: 'Support queue', path: '/admin/support', icon: LifeBuoy, group: 'support', flagKey: 'support', atom: 'tickets:read', writeAtom: 'tickets:write' },
+  { key: 'support', label: 'Support chats', path: '/admin/support', icon: LifeBuoy, group: 'support', flagKey: 'support', atom: ['tickets:read', 'properties:moderate', 'properties:verify', 'flatmates:read', 'identity:read', 'refunds:read', 'services:read'], writeAtom: 'tickets:write' },
   { key: 'enquiries', label: 'Enquiries', path: '/admin/enquiries', icon: MessageSquare, group: 'support', atom: 'enquiries:read' },
   { key: 'reports', label: 'Reports', path: '/admin/reports', icon: Flag, group: 'support', flagKey: 'reports', atom: ['reports:read', 'reviews:read'], writeAtom: 'reports:write' },
   { key: 'finance', label: 'Finance', path: '/admin/finance', icon: IndianRupee, group: 'money', flagKey: 'finance', adminOnly: true, atom: 'finance:read' },

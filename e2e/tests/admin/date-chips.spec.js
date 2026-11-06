@@ -16,7 +16,6 @@ const PAGES = [
   // A desk renders the ticket board instead of the request queue when its ticket tracking is switched on.
   { url: '/admin/legal', api: /\/api\/(service-requests\/queue|tickets)\?/ },
   { url: '/admin/rent-agreement', api: /\/api\/(service-requests\/queue|tickets)\?/ },
-  { url: '/admin/support', api: /\/api\/admin\/support-tickets\?/ },
   { url: '/admin/kyc-review', api: /\/api\/moderation\/identity-reviews\?/ },
   { url: '/admin/referrals', api: /\/api\/referrals\?/ },
   { url: '/admin/refunds', api: /\/api\/admin\/refunds\?/ },

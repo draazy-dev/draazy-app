@@ -9,7 +9,7 @@ const navLink = (page, name) => page.locator('nav').getByRole('link', { name, ex
 const ALL_TABS = [
   'Dashboard', 'KYC Review', 'Analytics', 'Post on Behalf', 'Team Activity',
   'Properties', 'Users', 'Rent Agreement', 'Property & Legal', 'Home Loans', 'Interior & Renovation',
-  'Packers & Movers', 'Property Valuation', 'Support queue', 'Enquiries',
+  'Packers & Movers', 'Property Valuation', 'Support chats', 'Enquiries',
   'Referrals', 'Finance', 'Content', 'Reports', 'Flatmates',
   'Team & Access', 'Places', 'Settings', 'Integrations',
 ];

@@ -83,7 +83,7 @@ test('the owner is told of an approval and a rejection by listing name, with the
   const rejected = await notice('listing.rejected');
   expect(rejected?.body).toContain('"Owner is told" in Baner');
   expect(rejected.body).toContain('Rent is wrong\nEdit the listing and resubmit it for review.');
-  expect(rejected.link).toBe(`/dashboard?review=${id}`);
+  expect(rejected.link).toBe(`/messages?support=property:${id}`);
 });
 
 test('the status route refuses the two decisions that belong to other routes', async ({ request }) => {
