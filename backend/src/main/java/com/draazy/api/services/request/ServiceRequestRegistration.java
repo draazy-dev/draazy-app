@@ -28,12 +28,6 @@ public class ServiceRequestRegistration extends BaseEntity {
     @Column(name = "grn", nullable = false, updatable = false, length = 25)
     private String grn;
 
-    @Column(name = "stamp_duty", nullable = false, updatable = false)
-    private long stampDuty;
-
-    @Column(name = "registration_fee", nullable = false, updatable = false)
-    private long registrationFee;
-
     @Column(name = "recorded_by", updatable = false)
     private UUID recordedBy;
 
@@ -47,8 +41,6 @@ public class ServiceRequestRegistration extends BaseEntity {
         this.sro = particulars.sro();
         this.registeredOn = particulars.registeredOn();
         this.grn = particulars.grn();
-        this.stampDuty = particulars.stampDuty();
-        this.registrationFee = particulars.registrationFee();
         this.recordedBy = recordedBy;
     }
 }

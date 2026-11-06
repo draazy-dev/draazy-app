@@ -2,6 +2,7 @@ export const DEFAULT_MAX_PHOTOS = 10;
 export const MAX_PHOTOS_CEILING = 20;
 export const MIN_PHOTOS_CAP = 3;
 export const MAX_UPLOAD_BYTES = 1_000_000;
+export const REGISTERED_COPY_MAX_BYTES = 2_000_000;
 export const MAX_INPUT_BYTES = 25_000_000;
 export const PHOTO_ACCEPT = '.heif,.heic,.jpeg,.jpg,.png,image/heif,image/heic,image/jpeg,image/png';
 export const DOCUMENT_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf';

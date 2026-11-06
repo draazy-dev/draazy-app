@@ -1,4 +1,5 @@
 import { PAGE_LOAD_TTL, del, get, patch, post, postMultipart, put } from '../../http.js';
+import { MAX_UPLOAD_BYTES, REGISTERED_COPY_MAX_BYTES } from '../../../lib/uploads/policy.js';
 import {
   toChecklist, toIdentityList, toViewModel, toViewModelList, toQueueRowPage, toCreate, toWireType,
 } from './serviceRequestMapper.js';
@@ -31,10 +32,10 @@ export async function takeServiceRequest(id) {
   );
 }
 
-const uploadStaffDocument = async (id, path, file, fields = {}) => {
+const uploadStaffDocument = async (id, path, file, fields = {}, maxBytes = MAX_UPLOAD_BYTES) => {
   if (!file) throw new Error('Choose a document to upload.');
   const { prepareUpload } = await import('../../../lib/uploads/prepareUpload.js');
-  const prepared = await prepareUpload(file, { document: true });
+  const prepared = await prepareUpload(file, { document: true, maxBytes });
   const form = new FormData();
   form.append('file', prepared);
   Object.entries(fields).forEach(([key, value]) => {
@@ -51,7 +52,7 @@ export async function shareServiceRequestDraft(id, { file, note, checks } = {}) 
 }
 
 export async function uploadServiceRequestFinalDoc(id, file, registration = {}) {
-  await uploadStaffDocument(id, '/final-doc', file, registration);
+  await uploadStaffDocument(id, '/final-doc', file, registration, REGISTERED_COPY_MAX_BYTES);
   return getServiceRequest(id);
 }
 
@@ -119,13 +120,6 @@ export async function requestServiceRequestRefund(id, { amount, dutyPaid, grn, r
 
 export async function decideServiceRequestRefund(id, refundId, decision, note) {
   return post(`${refundsPath(id)}/${encodeURIComponent(refundId)}/${decision}`, note ? { note } : {});
-}
-
-export async function confirmServiceRequestPoliceIntimation(id, { reference, submittedOn } = {}) {
-  return toViewModel(await post(`/service-requests/${encodeURIComponent(id)}/police-intimation`, {
-    reference: reference || undefined,
-    submittedOn: submittedOn || undefined,
-  }));
 }
 
 export async function getServiceRequestDocumentUrl(id, docId) {
@@ -201,6 +195,10 @@ export async function cancelServiceRequest(id) {
   return toViewModel(await post(`/service-requests/${encodeURIComponent(id)}/cancel`, {}));
 }
 
+export async function deleteServiceRequest(id) {
+  await del(`/service-requests/${encodeURIComponent(id)}`);
+}
+
 export async function withdrawServiceRequestParty(id, partyId) {
   await del(`/service-requests/${encodeURIComponent(id)}/parties/${encodeURIComponent(partyId)}`);
   return getServiceRequest(id);
@@ -248,13 +246,6 @@ export async function readMaskedServiceRequestIdentities(id) {
   const rows = await get(`/service-requests/${encodeURIComponent(id)}/identities/masked`);
   return Object.fromEntries((Array.isArray(rows) ? rows : [])
     .map((r) => [`${r.partyRole}-${r.partyIndex}`, { pan: r.pan || '', aadhaar: r.aadhaar || '' }]));
-}
-
-export async function addServiceRequestMessage(id, text) {
-  const body = String(text || '').trim();
-  if (!body) return getServiceRequest(id);
-  await post(`/service-requests/${encodeURIComponent(id)}/messages`, { body });
-  return getServiceRequest(id);
 }
 
 export async function decideServiceRequestDraft(id, decision, note) {

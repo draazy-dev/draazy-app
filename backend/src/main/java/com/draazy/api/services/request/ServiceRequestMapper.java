@@ -37,7 +37,6 @@ public class ServiceRequestMapper {
     private final UserRepository users;
     private final ServiceRequestRegistrationRepository registrations;
     private final ServiceRequestAmendmentRepository amendments;
-    private final ServiceRequestPoliceIntimationRepository policeIntimations;
     private final ServiceRequestDraftApprovalRepository draftApprovals;
     private final ServiceRequestDraftApprovals approvalSummary;
     private final RentAgreementReadiness readiness;
@@ -50,7 +49,6 @@ public class ServiceRequestMapper {
             UserRepository users,
             ServiceRequestRegistrationRepository registrations,
             ServiceRequestAmendmentRepository amendments,
-            ServiceRequestPoliceIntimationRepository policeIntimations,
             ServiceRequestDraftApprovalRepository draftApprovals,
             ServiceRequestDraftApprovals approvalSummary,
             RentAgreementReadiness readiness) {
@@ -62,7 +60,6 @@ public class ServiceRequestMapper {
         this.users = users;
         this.registrations = registrations;
         this.amendments = amendments;
-        this.policeIntimations = policeIntimations;
         this.draftApprovals = draftApprovals;
         this.approvalSummary = approvalSummary;
         this.readiness = readiness;
@@ -90,12 +87,9 @@ public class ServiceRequestMapper {
                 registrations.findByServiceRequestIdIn(ids).stream().collect(Collectors.toMap(ServiceRequestRegistration::getServiceRequestId, g -> g));
         Map<UUID, ServiceRequestAmendment> proposed =
                 amendments.findByServiceRequestIdInAndStatus(ids, ServiceRequestAmendment.PROPOSED).stream().collect(Collectors.toMap(ServiceRequestAmendment::getServiceRequestId, a -> a));
-        Map<UUID, ServiceRequestPoliceIntimation> police =
-                policeIntimations.findByServiceRequestIdIn(ids).stream().collect(Collectors.toMap(ServiceRequestPoliceIntimation::getServiceRequestId, p -> p));
         Map<UUID, List<ServiceRequestDraftApproval>> approvals =
                 draftApprovals.findByRequestIdIn(ids).stream().collect(Collectors.groupingBy(ServiceRequestDraftApproval::getRequestId));
-        Map<UUID, String> names = names(requests, threads.values(), sides.values(), registered.values(),
-                police.values());
+        Map<UUID, String> names = names(requests, threads.values(), sides.values(), registered.values());
         Instant now = Instant.now();
 
         return requests.stream().map(r -> {
@@ -119,8 +113,7 @@ public class ServiceRequestMapper {
                         r.getCreatedAt(),
                         r.getAmount(),
                         null,
-                        registration(registered.get(r.getId()), r, names),
-                        policeIntimation(police.get(r.getId()), names),
+                        registration(registered.get(r.getId()), names),
                         RentAgreementSla.of(r, now, readiness.waitingOnTenant(r)),
                         amendment(proposed.get(r.getId())),
                         approvalSummary.summary(r, approvals.getOrDefault(r.getId(), List.of()), viewer),
@@ -217,30 +210,15 @@ public class ServiceRequestMapper {
                         && viewer.userId().equals(p.getUserId()));
     }
 
-    private static PoliceIntimationDto policeIntimation(ServiceRequestPoliceIntimation p,
-            Map<UUID, String> names) {
-        return p == null ? PoliceIntimationDto.pending()
-                : new PoliceIntimationDto(true, p.getConfirmedAt(), names.get(p.getConfirmedBy()),
-                        p.getReference(), p.getSubmittedOn());
-    }
-
     private static ServiceRequestDto.Amendment amendment(ServiceRequestAmendment a) {
         return a == null ? null : new ServiceRequestDto.Amendment(a.getId().toString(), a.getTerms(),
                 a.getReason(), a.getAmountBefore(), a.getAmountAfter(), a.delta(), a.getPaymentRef() != null,
                 a.getCreatedAt());
     }
 
-    private static RegistrationDto registration(ServiceRequestRegistration g, ServiceRequest request,
-            Map<UUID, String> names) {
-        if (g == null) {
-            return null;
-        }
-        LeaveAndLicenceCharges.Charges quoted = ServiceRequestPricing.quotedCharges(request.getDetails());
-        return new RegistrationDto(g.getDocumentNo(), g.getSro(), g.getRegisteredOn(), g.getGrn(),
-                g.getStampDuty(), g.getRegistrationFee(),
-                quoted == null ? null : quoted.stampDuty(),
-                quoted == null ? null : quoted.registration(),
-                names.get(g.getRecordedBy()), g.getCreatedAt());
+    private static RegistrationDto registration(ServiceRequestRegistration g, Map<UUID, String> names) {
+        return g == null ? null : new RegistrationDto(g.getDocumentNo(), g.getSro(), g.getRegisteredOn(),
+                g.getGrn(), names.get(g.getRecordedBy()), g.getCreatedAt());
     }
 
     private DocumentSummary toDocumentSummary(Document d, ServiceRequest request,
@@ -300,8 +278,7 @@ public class ServiceRequestMapper {
     }
 
     public MessageDto toMessageDto(ServiceRequestMessage message) {
-        return toMessageDto(message, names(List.of(), List.of(List.of(message)), List.of(), List.of(),
-                List.of()));
+        return toMessageDto(message, names(List.of(), List.of(List.of(message)), List.of(), List.of()));
     }
 
     private MessageDto toMessageDto(ServiceRequestMessage m, Map<UUID, String> names) {
@@ -319,8 +296,7 @@ public class ServiceRequestMapper {
     private Map<UUID, String> names(List<ServiceRequest> requests,
             Iterable<List<ServiceRequestMessage>> threads,
             Iterable<List<ServiceRequestParty>> sides,
-            Iterable<ServiceRequestRegistration> registered,
-            Iterable<ServiceRequestPoliceIntimation> police) {
+            Iterable<ServiceRequestRegistration> registered) {
         Set<UUID> ids = new HashSet<>();
         requests.stream().map(ServiceRequest::getAssigneeId).filter(Objects::nonNull).forEach(ids::add);
         requests.stream().map(ServiceRequest::getPayerId).filter(Objects::nonNull).forEach(ids::add);
@@ -330,7 +306,6 @@ public class ServiceRequestMapper {
             ids.add(p.getInvitedBy());
         }));
         registered.forEach(g -> ids.add(g.getRecordedBy()));
-        police.forEach(p -> ids.add(p.getConfirmedBy()));
         ids.removeIf(Objects::isNull);
         Map<UUID, String> names = new HashMap<>();
         if (ids.isEmpty()) {

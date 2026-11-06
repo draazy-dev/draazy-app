@@ -86,7 +86,7 @@ public class DocumentService {
     @Transactional
     public DocumentSummary upload(UUID ownerId, String propId, String category, MultipartFile file) {
         UUID propertyId = ownedProperty(ownerId, propId);
-        byte[] bytes = readBytes(file);
+        byte[] bytes = readBytes(file, DocumentUploads.MAX_BYTES);
         String type = DocumentUploads.validate(file.getContentType(), file.getSize(), bytes);
         scan(file.getOriginalFilename(), type, bytes);
 
@@ -102,9 +102,9 @@ public class DocumentService {
 
     @Transactional
     public DocumentDto uploadForServiceRequest(UUID propertyId, UUID serviceRequestId,
-            String category, MultipartFile file) {
-        byte[] bytes = readBytes(file);
-        String type = DocumentUploads.validate(file.getContentType(), file.getSize(), bytes);
+            String category, MultipartFile file, long maxBytes) {
+        byte[] bytes = readBytes(file, maxBytes);
+        String type = DocumentUploads.validate(file.getContentType(), file.getSize(), bytes, maxBytes);
         scan(file.getOriginalFilename(), type, bytes);
 
         String key = (propertyId == null ? "documents/service-requests/" + serviceRequestId : "documents/" + propertyId)
@@ -158,7 +158,7 @@ public class DocumentService {
 
     @Transactional
     public DocumentSummary uploadPersonal(UUID ownerId, String category, MultipartFile file) {
-        byte[] bytes = readBytes(file);
+        byte[] bytes = readBytes(file, DocumentUploads.MAX_BYTES);
         String type = DocumentUploads.validate(file.getContentType(), file.getSize(), bytes);
         scan(file.getOriginalFilename(), type, bytes);
 
@@ -202,7 +202,7 @@ public class DocumentService {
     public DocumentSummary uploadManaged(UUID ownerId, String managedId, String category,
             MultipartFile file) {
         UUID recordId = ownedManaged(ownerId, managedId);
-        byte[] bytes = readBytes(file);
+        byte[] bytes = readBytes(file, DocumentUploads.MAX_BYTES);
         String type = DocumentUploads.validate(file.getContentType(), file.getSize(), bytes);
         scan(file.getOriginalFilename(), type, bytes);
 
@@ -223,6 +223,14 @@ public class DocumentService {
                 .orElseThrow(() -> NotFoundException.of("Document"));
         managedDocuments.delete(doc);
         purgeIfUnreferenced(doc.getStorageKey());
+    }
+
+    @Transactional
+    public void deleteFiledOn(UUID serviceRequestId) {
+        List<Document> filed = documents.findByServiceRequestIdOrderByUploadedAtDesc(serviceRequestId);
+        documents.deleteAll(filed);
+        documents.flush();
+        filed.stream().map(Document::getStorageKey).distinct().forEach(this::purgeIfUnreferenced);
     }
 
     private void purgeIfUnreferenced(String key) {
@@ -247,9 +255,9 @@ public class DocumentService {
                 .orElseThrow(() -> NotFoundException.of("Property"));
     }
 
-    private static byte[] readBytes(MultipartFile file) {
-        if (file.getSize() >= DocumentUploads.MAX_BYTES) {
-            throw new PayloadTooLargeException("Files must be smaller than 1,000,000 bytes (1 MB)");
+    private static byte[] readBytes(MultipartFile file, long maxBytes) {
+        if (file.getSize() >= maxBytes) {
+            throw DocumentUploads.tooLarge(maxBytes);
         }
         try {
             return file.getBytes();

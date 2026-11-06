@@ -12,6 +12,7 @@ import com.draazy.api.common.web.Ids;
 import com.draazy.api.documents.vault.DocumentDto;
 import com.draazy.api.documents.vault.DocumentUrl;
 import com.draazy.api.documents.vault.DocumentService;
+import com.draazy.api.documents.vault.DocumentUploads;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.provider.PaymentGateway;
@@ -428,7 +429,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
             MultipartFile file) {
         ServiceRequest request = visible(caller, id);
         return storeDocument(caller, request, filedCategory(caller, request, category), file,
-                "document.uploaded");
+                "document.uploaded", DocumentUploads.MAX_BYTES);
     }
 
     @Transactional
@@ -496,6 +497,10 @@ public class ServiceRequestService implements AbandonedCheckouts {
             throw new BadRequestException(
                     "Say what should change in the draft — our team revises it from your reason.");
         }
+        if (!approve && draftApprovals.approvedBy(caller, request)) {
+            throw new ConflictException(
+                    "You have already approved this draft, so you can't request changes to it.");
+        }
         if (approve) {
             if (ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())) {
                 if (!draftApprovals.approveInApp(caller, request)) {
@@ -535,12 +540,12 @@ public class ServiceRequestService implements AbandonedCheckouts {
     }
 
     DocumentDto storeDocument(AuthPrincipal caller, ServiceRequest request, String category,
-            MultipartFile file, String event) {
+            MultipartFile file, String event, long maxBytes) {
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("Attach a file to upload.");
         }
         DocumentDto dto = documents.uploadForServiceRequest(
-                request.getPropertyId(), request.getId(), category, file);
+                request.getPropertyId(), request.getId(), category, file, maxBytes);
         if (event != null) {
             record(request, event, displayName(caller.userId()));
         }

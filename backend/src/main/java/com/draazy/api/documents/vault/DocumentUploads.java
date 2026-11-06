@@ -3,6 +3,7 @@ package com.draazy.api.documents.vault;
 import com.draazy.api.common.error.PayloadTooLargeException;
 import com.draazy.api.common.error.UnsupportedMediaTypeException;
 import com.draazy.api.common.validation.MediaSignatures;
+import java.util.Locale;
 import java.util.Set;
 
 public final class DocumentUploads {
@@ -10,6 +11,7 @@ public final class DocumentUploads {
     }
 
     public static final long MAX_BYTES = 1_000_000L;
+    public static final long REGISTERED_COPY_MAX_BYTES = 2_000_000L;
 
     static final String PDF = MediaSignatures.PDF;
     static final String JPEG = MediaSignatures.JPEG;
@@ -18,6 +20,10 @@ public final class DocumentUploads {
     private static final Set<String> ALLOWED = Set.of(PDF, JPEG, PNG, HEIC);
 
     public static String validate(String contentType, long sizeBytes, byte[] content) {
+        return validate(contentType, sizeBytes, content, MAX_BYTES);
+    }
+
+    public static String validate(String contentType, long sizeBytes, byte[] content, long maxBytes) {
         String declared = switch (MediaSignatures.normalise(contentType)) {
             case "image/jpg" -> JPEG;
             case "image/heif" -> HEIC;
@@ -27,8 +33,8 @@ public final class DocumentUploads {
             throw new UnsupportedMediaTypeException(
                     "Upload a PDF or an image (JPEG, JPG, PNG, HEIC or HEIF)");
         }
-        if (sizeBytes >= MAX_BYTES || (content != null && content.length >= MAX_BYTES)) {
-            throw new PayloadTooLargeException("Files must be smaller than 1,000,000 bytes (1 MB)");
+        if (sizeBytes >= maxBytes || (content != null && content.length >= maxBytes)) {
+            throw tooLarge(maxBytes);
         }
 
         String actual = sniff(content);
@@ -41,6 +47,11 @@ public final class DocumentUploads {
                     "That file is a " + actual + ", not the " + declared + " it claims to be.");
         }
         return actual;
+    }
+
+    static PayloadTooLargeException tooLarge(long maxBytes) {
+        return new PayloadTooLargeException(String.format(Locale.ROOT,
+                "Files must be smaller than %,d bytes (%d MB)", maxBytes, maxBytes / 1_000_000));
     }
 
     static String sniff(byte[] b) {

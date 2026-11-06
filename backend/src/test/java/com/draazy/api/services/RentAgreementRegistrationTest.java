@@ -207,7 +207,7 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
     }
 
     @Test
-    @DisplayName("the registered copy carries what the Sub-Registrar gave it, beside what the customer was billed")
+    @DisplayName("the registered copy carries what the Sub-Registrar gave it")
     void registrationRecordIsRequiredAndShown() throws Exception {
         User owner = customer("9820004061");
         User desk = staff("9820004062", Teams.RENTAL);
@@ -239,9 +239,7 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.registration.documentNo").value(record.get("documentNo").toUpperCase()))
                 .andExpect(jsonPath("$.registration.sro").value("Haveli 11"))
                 .andExpect(jsonPath("$.registration.grn").value(record.get("grn")))
-                .andExpect(jsonPath("$.registration.stampDuty").value(1100))
-                .andExpect(jsonPath("$.registration.quotedStampDuty").isNumber())
-                .andExpect(jsonPath("$.registration.quotedRegistrationFee").value(1000))
+                .andExpect(jsonPath("$.registration.stampDuty").doesNotExist())
                 .andExpect(jsonPath("$.registration.recordedBy").isNotEmpty());
 
         User other = customer("9820004063");
@@ -551,6 +549,39 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
     }
 
     @Test
+    @DisplayName("a nameless owner verified by the agreement takes the licensor name, since a verified name is locked")
+    void namelessOwnerTakesTheLicensorName() throws Exception {
+        User owner = customer("9820004503");
+        user(TENANT_ONE, Roles.Wire.BUYER, null, "Kiran Tenant");
+        User desk = staff("9820004504", Teams.RENTAL);
+        String state = onFlat("\"owner\":{\"oName\":\"Asha Licensor\",\"oMobile\":\"" + owner.getMobile() + "\"}," + TENANTS);
+        String id = raise(owner, null, state);
+        jdbc.update("update users set name = null where id = ?", owner.getId());
+
+        complete(id, owner, desk);
+
+        assertThat(jdbc.queryForMap("select name, verified from users where id = ?", owner.getId()))
+                .containsEntry("name", "Asha Licensor").containsEntry("verified", true);
+    }
+
+    @Test
+    @DisplayName("a nameless owner with no licensor name stays unverified, so they can still set their name")
+    void namelessOwnerWithoutLicensorNameIsNotVerified() throws Exception {
+        User owner = customer("9820004505");
+        user(TENANT_ONE, Roles.Wire.BUYER, null, "Kiran Tenant");
+        User desk = staff("9820004506", Teams.RENTAL);
+        String id = raise(owner, null, onFlat("\"owner\":{\"oMobile\":\"" + owner.getMobile() + "\"}," + TENANTS));
+        jdbc.update("update users set name = null where id = ?", owner.getId());
+
+        complete(id, owner, desk);
+
+        assertThat(jdbc.queryForObject("select verified from users where id = ?", Boolean.class, owner.getId())).isFalse();
+        mvc.perform(patch(Routes.Auth.ME).header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Asha Owner\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("a registered agreement puts the flat in the owner's hub and the rent on the tenant's dashboard")
     void registeredAgreementSeedsBothDashboards() throws Exception {
         User owner = customer("9820004501");
@@ -592,36 +623,30 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
                 .andExpect(jsonPath("$[0].leaseEnd").value("2027-03-01"));
         assertThat(jdbc.queryForObject("select count(*) from notifications where user_id = ? and type = ?",
                 Long.class, tenant.getId(), "rent.tracking")).isEqualTo(1);
+        assertThat(home.path("agreementVerified").asBoolean()).isTrue();
+        assertThat(jdbc.queryForObject("select verified from users where id = ?", Boolean.class, owner.getId()))
+                .isTrue();
+        mvc.perform(get(Routes.Verification.IDENTITY).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("verified"));
     }
 
     @Test
-    @DisplayName("the deposit and the police intimation reach both cards once the desk confirms it")
+    @DisplayName("registration marks the police informed on both cards, with no desk step")
     void depositAndPoliceIntimationReachBothCards() throws Exception {
         User owner = customer("9820004531");
         User tenant = user(TENANT_ONE, Roles.Wire.BUYER, null, "Kiran Tenant");
         User desk = staff("9820004532", Teams.RENTAL);
-        String id = complete(raise(owner, null, ownedBy(owner, TENANTS)), owner, desk);
+        complete(raise(owner, null, ownedBy(owner, TENANTS)), owner, desk);
 
         JsonNode home = homesOf(owner).get(0);
         assertThat(home.path("deposit").asLong()).isEqualTo(100000);
-        assertThat(home.path("policeIntimation").asText()).isEqualTo("pending");
+        assertThat(home.path("policeIntimation").asText()).isEqualTo("done");
+        assertThat(home.has("policeIntimatedOn")).isFalse();
         mvc.perform(get(Routes.MeManagedProperties.TRACKED_RENT).header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
                 .andExpect(jsonPath("$[0].deposit").value(100000))
-                .andExpect(jsonPath("$[0].policeIntimation").value("pending"));
-
-        String filed = LocalDate.now(PlatformTime.IST).minusDays(1).toString();
-        mvc.perform(post(Routes.ServiceRequests.POLICE_INTIMATION, id)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reference\":\"PI-77\",\"submittedOn\":\"" + filed + "\"}"))
-                .andExpect(status().isOk());
-
-        home = homesOf(owner).get(0);
-        assertThat(home.path("policeIntimation").asText()).isEqualTo("done");
-        assertThat(home.path("policeIntimatedOn").asText()).isEqualTo(filed);
-        mvc.perform(get(Routes.MeManagedProperties.TRACKED_RENT).header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
                 .andExpect(jsonPath("$[0].policeIntimation").value("done"))
-                .andExpect(jsonPath("$[0].policeIntimatedOn").value(filed));
+                .andExpect(jsonPath("$[0].policeIntimatedOn").doesNotExist());
     }
 
     @Test
@@ -676,6 +701,31 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
         assertThat(homes.get(0).path("publishedListingId").asText()).isEqualTo(p.getId().toString());
         assertThat(homes.get(0).path("rented").asBoolean()).isTrue();
         assertThat(homes.get(0).path("tenantMobile").asText()).isEqualTo(TENANT_ONE);
+        assertThat(jdbc.queryForObject("select ownership_verified from properties where id = ?", Boolean.class,
+                p.getId())).isTrue();
+    }
+
+    @Test
+    @DisplayName("listing an agreement-backed private home later gives the new listing the verified-property badge")
+    void publishingAnAgreementHomeVerifiesTheListing() throws Exception {
+        User owner = customer("9820004541");
+        User desk = staff("9820004542", Teams.RENTAL);
+        complete(raise(owner, null, ownedBy(owner, TENANTS)), owner, desk);
+        String homeId = homesOf(owner).get(0).path("id").asText();
+
+        mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + homeId + "/listing")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"2 BHK in Kothrud\",\"deal\":\"rent\",\"propertyType\":\"apartment\","
+                                + "\"price\":25000,\"locality\":\"Kothrud\",\"city\":\"Pune\","
+                                + listingImages(owner) + "}"))
+                .andExpect(status().isCreated());
+
+        assertThat(jdbc.queryForObject("""
+                select p.ownership_verified from properties p
+                  join managed_properties m on m.published_listing_id = p.id
+                 where m.id = ?::uuid
+                """, Boolean.class, homeId)).isTrue();
     }
 
     @Test

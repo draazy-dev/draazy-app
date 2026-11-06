@@ -30,13 +30,14 @@ async function ok(method, path, token, body) {
   return res.body;
 }
 
-const upload = (name, fields = {}) => {
+const upload = (name, fields = {}, bytes = PNG) => {
   const form = new FormData();
-  form.append('file', new Blob([PNG], { type: 'image/png' }), name);
+  form.append('file', new Blob([bytes], { type: 'image/png' }), name);
   Object.entries(fields).forEach(([key, value]) => [value].flat().forEach((item) => form.append(key, item)));
   return form;
 };
 const CHECKS = { checks: ['identity', 'title', 'poa', 'address', 'terms'] };
+const padded = (size) => Buffer.concat([PNG, Buffer.alloc(size - PNG.length)]);
 
 async function fileAndVerify(requestId, desk, { licensor, tenant = licensor }) {
   const { items } = await ok('GET', `/service-requests/${requestId}/checklist`, licensor);
@@ -56,7 +57,7 @@ const record = () => {
   const n = `${Date.now()}${Math.floor(Math.random() * 1e4)}`;
   return {
     documentNo: `HVL11-${n.slice(-8)}-2026`, sro: 'Haveli 11', registeredOn: today(),
-    grn: `MH${n.padStart(17, '0').slice(-17)}`, stampDuty: '1100', registrationFee: '1000',
+    grn: `MH${n.padStart(17, '0').slice(-17)}`,
   };
 };
 
@@ -205,7 +206,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     await ok('POST', `/service-requests/${request.id}/draft/decision`, customer, { decision: 'approve' });
   });
 
-  test('a flat that was never listed completes, and prepares no badge rows', async () => {
+  test('a flat that was never listed completes, and prepares no badge rows; only the registered copy may exceed 1 MB', async () => {
     const mobile = uniqueMobile();
     const customer = (await apiLogin(mobile)).accessToken;
     const request = await ok('POST', '/service-requests', customer, {
@@ -223,13 +224,19 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     expect(unverified.status, unverified.text).toBe(409);
     expect(unverified.text).toContain('Verify every document before');
     await fileAndVerify(request.id, admin, { licensor: customer });
+    const heavyDraft = await call('POST', `/service-requests/${request.id}/draft`, admin, upload('draft.png', CHECKS, padded(1_500_000)));
+    expect(heavyDraft.status, heavyDraft.text).toBe(413);
+    expect(heavyDraft.text).toContain('1 MB');
     await ok('POST', `/service-requests/${request.id}/draft`, admin, upload('draft.png', CHECKS));
     await ok('POST', `/service-requests/${request.id}/draft/opened`, customer);
     await ok('POST', `/service-requests/${request.id}/draft/decision`, customer, { decision: 'approve' });
     const bare = await call('POST', `/service-requests/${request.id}/final-doc`, admin, upload('registered.png'));
     expect(bare.status, bare.text).toBe(422);
     expect(bare.text).toContain('GRAS challan GRN');
-    const final = await call('POST', `/service-requests/${request.id}/final-doc`, admin, upload('registered.png', record()));
+    const tooHeavy = await call('POST', `/service-requests/${request.id}/final-doc`, admin, upload('registered.png', record(), padded(2_000_000)));
+    expect(tooHeavy.status, tooHeavy.text).toBe(413);
+    expect(tooHeavy.text).toContain('2 MB');
+    const final = await call('POST', `/service-requests/${request.id}/final-doc`, admin, upload('registered.png', record(), padded(1_500_000)));
     expect(final.status, final.text).toBe(201);
 
     expect((await ok('GET', `/service-requests/${request.id}`, admin)).status).toBe('completed');
@@ -249,18 +256,16 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     await dialog.getByLabel('Document number').fill(entry.documentNo);
     await dialog.getByLabel('Sub-Registrar office').fill(entry.sro);
     await pickDate(page, '[aria-label="Registration date"]:visible', entry.registeredOn);
-    await dialog.getByLabel('GRAS challan GRN').fill(entry.grn.toLowerCase());
-    await dialog.getByLabel('Stamp duty paid (₹)').fill('1');
     await expect(submit).toBeDisabled();
-    await dialog.getByLabel('Registration fee paid (₹)').fill(entry.registrationFee);
+    await dialog.getByLabel('GRAS challan GRN').fill(entry.grn.toLowerCase());
+    await expect(dialog.getByLabel(/Stamp duty|Registration fee/)).toHaveCount(0);
     await submit.click();
     await expect(page.getByRole('alert').filter({ hasText: 'The registered copy was uploaded' })).toBeVisible();
 
     const shown = dialog.getByRole('region', { name: 'Registration check' }).getByTestId('registration-record');
     await expect(shown).toContainText(entry.documentNo);
     await expect(shown).toContainText(entry.grn);
-    await expect(shown.getByRole('note')).toContainText('Stamp duty paid ₹1 differs from');
-    await expect(shown.getByRole('note')).not.toContainText('Registration fee');
+    await expect(shown).not.toContainText('Duty / fee');
   });
 
   test('the desk shows the deed particulars with full mobiles, and will not share a draft until every check is ticked', async ({ page }) => {
@@ -670,21 +675,36 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     expect(forced.status, forced.text).toBe(422);
   });
 
-  test('staff records police intimation confirmation and the customer read turns done', async ({ page }) => {
-    const { id, customer } = await completedAgreement((await apiLogin(STAFF.rental)).accessToken);
+  test('registration completes police intimation with nothing for the desk or the customer to file', async ({ page, browser }) => {
+    const { id, customer, ownerMobile } = await completedAgreement((await apiLogin(STAFF.rental)).accessToken);
 
     await signIn(page, STAFF.rental, { screen: 'staff' });
-    const dialog = await openCase(page, id, 'closed');
-    const panel = dialog.getByRole('region', { name: 'Police intimation' });
-    await expect(panel).toContainText('Pending');
-    await panel.getByLabel('Reference / acknowledgement no.').fill('PCMC-LIVE-42');
-    await pickDate(page, '[aria-label="Submission date"]:visible', today());
-    await panel.getByRole('button', { name: 'Owner confirmed they submitted it' }).click();
-    await expect(panel).toContainText('Confirmed');
+    await openRentDesk(page, 'closed');
+    await page.getByPlaceholder('Name, mobile or request id').fill(id);
+    const row = page.getByTestId('ra-row');
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText('Step 7 of 7 · Police intimation');
+    await expect(row).toContainText('All done');
+    await row.getByRole('button', { name: /^Open case/ }).click();
+    await expect(page.getByRole('dialog').getByRole('region', { name: 'Registration check' })).toBeVisible();
+    await expect(page.getByRole('dialog').getByRole('region', { name: 'Police intimation' })).toHaveCount(0);
 
     const read = await ok('GET', `/service-requests/${id}`, customer);
-    expect(read.policeIntimation).toMatchObject({ confirmed: true, reference: 'PCMC-LIVE-42', submittedOn: today() });
-    expect(read.timeline.map((entry) => entry.event)).toContain('police-intimation.confirmed');
+    expect(read).not.toHaveProperty('policeIntimation');
+    expect((await call('POST', `/service-requests/${id}/police-intimation`, customer, {})).status).toBe(404);
+
+    const context = await browser.newContext();
+    try {
+      const customerPage = await context.newPage();
+      await signIn(customerPage, ownerMobile);
+      await customerPage.goto('/services/rent-agreement');
+      const step = customerPage.getByTestId('police-intimation-step');
+      await expect(step).toContainText('Police informed');
+      await expect(step).toContainText('shares your tenant\'s details with the police automatically');
+      await expect(step.getByRole('link')).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
   });
 
   test('confirming needs the Rent Agreement desk, not a maker\'s services:write held through another desk', async ({ page }) => {
@@ -721,7 +741,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     const owner = (await apiLogin(ownerMobile)).accessToken;
     const homes = await ok('GET', '/me/managed-properties', owner);
     const home = (homes.content ?? homes).find((h) => h.tenantMobile === tenantMobile);
-    expect(home).toMatchObject({ rented: true, tenantName: TENANT_NAME, deposit: 150000, policeIntimation: 'pending' });
+    expect(home).toMatchObject({ rented: true, tenantName: TENANT_NAME, deposit: 150000, policeIntimation: 'done' });
     expect(home.leaseEnd.slice(0, 7)).toBe(endMonth);
     const docs = await ok('GET', `/me/documents/managed/${home.id}`, owner);
     expect((docs.content ?? docs).map((d) => d.category)).toContain('Rent Agreement');
@@ -736,7 +756,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     await page.goto(`/owner-hub/property/${home.id}`);
     await expect(page.getByTestId('rent-lease-end')).toContainText('Registered agreement till');
     await expect(page.getByTestId('rent-deposit')).toContainText('Security deposit ₹1,50,000');
-    await expect(page.getByTestId('rent-police')).toContainText('Police intimation being filed');
+    await expect(page.getByTestId('rent-police')).toContainText('Police informed at registration');
     await expect(page.getByText('Rent Agreement', { exact: true }).first()).toBeVisible();
 
     const other = await browser.newContext();
@@ -746,7 +766,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
       await tenantPage.goto('/dashboard#rental');
       await expect(tenantPage.getByTestId('tracked-rent-lease-end')).toContainText('Registered agreement till');
       await expect(tenantPage.getByTestId('tracked-rent-deposit')).toContainText('Security deposit ₹1,50,000');
-      await expect(tenantPage.getByTestId('tracked-rent-police')).toContainText('Police intimation being filed');
+      await expect(tenantPage.getByTestId('tracked-rent-police')).toContainText('Police informed at registration');
     } finally {
       await other.close();
     }

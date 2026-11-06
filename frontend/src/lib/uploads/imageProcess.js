@@ -40,19 +40,19 @@ function scaleTo(image, edge) {
   return canvas;
 }
 
-async function compressUnderCap(source, { minEdge, qualities }) {
+async function compressUnderCap(source, { minEdge, qualities }, maxBytes) {
   let frame = source;
   try {
     for (;;) {
       let smallest;
       for (const quality of qualities) {
         smallest = await encodeJpeg(frame, quality);
-        if (smallest.size < MAX_UPLOAD_BYTES) return smallest;
+        if (smallest.size < maxBytes) return smallest;
       }
       const edge = Math.max(frame.width, frame.height);
       if (edge <= minEdge) return smallest;
       if (frame !== source) release(frame);
-      const predicted = Math.round(edge * Math.min(0.8, Math.sqrt((MAX_UPLOAD_BYTES * 0.8) / smallest.size)));
+      const predicted = Math.round(edge * Math.min(0.8, Math.sqrt((maxBytes * 0.8) / smallest.size)));
       frame = scaleTo(source, Math.max(minEdge, predicted));
     }
   } finally {
@@ -66,7 +66,7 @@ export const imageErrorMessage = (error) => {
   return /48 megapixels|480 px/.test(message) ? message : 'Could not decode this photo. Export a single still image as JPEG or PNG and try again.';
 };
 
-export async function processImage(file, type, document) {
+export async function processImage(file, type, document, maxBytes = MAX_UPLOAD_BYTES) {
   let bitmap;
   try {
     await checkImageDimensions(file, type);
@@ -81,7 +81,7 @@ export async function processImage(file, type, document) {
     const source = scaleTo(bitmap, MAX_EDGE);
     bitmap.close(); bitmap = null;
     const look = document ? null : readLook(source);
-    return { blob: await compressUnderCap(source, document ? DOCUMENT : PHOTO), look };
+    return { blob: await compressUnderCap(source, document ? DOCUMENT : PHOTO, maxBytes), look };
   } finally {
     bitmap?.close();
   }

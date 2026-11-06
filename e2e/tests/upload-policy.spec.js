@@ -39,26 +39,26 @@ async function openPhotos(page) {
   await expect(page.locator('[data-err="photos"]')).toBeVisible();
 }
 
-async function prepare(page, buffer, name, mimeType, document = false) {
-  return page.evaluate(async ({ base64, name, mimeType, document }) => {
+async function prepare(page, buffer, name, mimeType, document = false, maxBytes = undefined) {
+  return page.evaluate(async ({ base64, name, mimeType, document, maxBytes }) => {
     const { prepareUpload } = await import('/src/lib/uploads/prepareUpload.js');
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
     const input = new File([bytes], name, { type: mimeType });
     try {
-      const output = await prepareUpload(input, { document });
+      const output = await prepareUpload(input, { document, maxBytes });
       return { size: output.size, type: output.type, name: output.name, unchanged: output === input,
         base64: btoa(String.fromCharCode(...new Uint8Array(await output.slice(0, 100).arrayBuffer()))) };
     } catch (error) { return { error: error.message }; }
-  }, { base64: buffer.toString('base64'), name, mimeType, document });
+  }, { base64: buffer.toString('base64'), name, mimeType, document, maxBytes });
 }
 
-async function pdf({ large = false, signed = false, incompressible = false } = {}) {
+async function pdf({ large = false, signed = false, incompressible = 0 } = {}) {
   const doc = await PDFDocument.create();
   doc.addPage().drawText('Ownership proof: all text must remain selectable.');
   if (large) doc.catalog.set(PDFName.of('TestPayload'), PDFString.of('property record '.repeat(100_000)));
   if (signed) doc.catalog.set(PDFName.of('TestSignature'), doc.context.obj({ Type: 'Sig', ByteRange: [0, 10, 20, 30] }));
   if (incompressible) {
-    const bytes = new Uint8Array(1_100_000);
+    const bytes = new Uint8Array(incompressible);
     let seed = 71;
     for (let i = 0; i < bytes.length; i += 1) { seed = (Math.imul(seed, 1664525) + 1013904223) | 0; bytes[i] = seed >>> 24; }
     doc.catalog.set(PDFName.of('TestStream'), doc.context.register(doc.context.flateStream(bytes)));
@@ -237,7 +237,15 @@ test.describe('upload preparation in the real browser', () => {
       expect(await prepare(page, signed, 'signed.pdf', 'application/pdf', true))
         .toMatchObject({ size: signed.length, unchanged: true });
       expect((await prepare(page, Buffer.from('%PDF-1.7 invalid'), 'broken.pdf', 'application/pdf', true)).error).toMatch(/PDF/i);
-      expect((await prepare(page, await pdf({ incompressible: true }), 'scan.pdf', 'application/pdf', true)).error).toMatch(/1 MB|smaller/i);
+      expect((await prepare(page, await pdf({ incompressible: 1_100_000 }), 'scan.pdf', 'application/pdf', true)).error).toMatch(/1 MB|smaller/i);
+    });
+
+    await test.step('the registered copy keeps a 1.5 MB PDF unchanged and refuses one that cannot fit under 2 MB', async () => {
+      const midsize = await pdf({ incompressible: 1_500_000 });
+      expect(await prepare(page, midsize, 'registered.pdf', 'application/pdf', true, 2_000_000))
+        .toMatchObject({ size: midsize.length, unchanged: true });
+      expect((await prepare(page, await pdf({ incompressible: 2_100_000 }), 'registered.pdf', 'application/pdf', true, 2_000_000)).error)
+        .toMatch(/cannot fit under 2 MB/i);
     });
   });
   test('cancelling preparation aborts, terminates its worker and gives hidden videos no completion credit', async ({ page }) => {
@@ -321,7 +329,7 @@ test('the vault reports a rejected document instead of silently filing it', asyn
     const { post } = await import('/src/services/http.js');
     return (await post('/me/listings', { title: 'Upload policy vault home', deal: 'rent', propertyType: 'Flat', price: 23000, locality: 'Baner', city: 'Pune', images })).id;
   }, images);
-  const rejected = await pdf({ incompressible: true });
+  const rejected = await pdf({ incompressible: 1_100_000 });
   expect(rejected.length).toBeGreaterThan(CAP);
   const card = await openBadgeVault(page, id);
   const row = card.locator('li[data-doc="Electricity Bill"]');

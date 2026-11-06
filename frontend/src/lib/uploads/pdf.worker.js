@@ -1,5 +1,4 @@
 import { PDFDocument, PDFDict, PDFArray, PDFName } from 'pdf-lib';
-import { MAX_UPLOAD_BYTES } from './policy.js';
 
 function rejectSignatureFields(pdf) {
   const pending = pdf.context.enumerateIndirectObjects().map(([, value]) => value);
@@ -20,11 +19,11 @@ function rejectSignatureFields(pdf) {
   }
 }
 
-self.onmessage = async ({ data: { file } }) => {
+self.onmessage = async ({ data: { file, maxBytes } }) => {
   try {
     const pdf = await PDFDocument.load(await file.arrayBuffer(), { updateMetadata: false, throwOnInvalidObject: true });
     if (pdf.getPageCount() < 1 || pdf.getPageCount() > 100) throw new Error('Please upload a PDF with 1 to 100 pages.');
-    if (file.size < MAX_UPLOAD_BYTES) { self.postMessage({ unchanged: true }); return; }
+    if (file.size < maxBytes) { self.postMessage({ unchanged: true }); return; }
     rejectSignatureFields(pdf);
     const bytes = await pdf.save({ useObjectStreams: true, updateFieldAppearances: false, addDefaultPage: false });
     self.postMessage({ blob: new Blob([bytes], { type: 'application/pdf' }) });

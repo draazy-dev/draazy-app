@@ -243,8 +243,7 @@ abstract class ServiceFixtures extends AbstractApiTest {
         LocalDate today = LocalDate.now(PlatformTime.IST);
         return new LinkedHashMap<>(Map.of("documentNo", "HVL11-" + n % 1_000_000 + "-" + today.getYear(),
                 "sro", "Haveli 11", "registeredOn", today.toString(),
-                "grn", "MH" + String.format("%016d", n % 10_000_000_000_000_000L) + "E",
-                "stampDuty", "1100", "registrationFee", "1000"));
+                "grn", "MH" + String.format("%016d", n % 10_000_000_000_000_000L) + "E"));
     }
 
     ResultActions finalDoc(User staff, String id, Map<String, String> fields, int expected)

@@ -10,8 +10,6 @@ const REGISTRATION_FIELDS = [
   { key: 'sro', label: 'Sub-Registrar office', placeholder: 'Haveli 11', maxLength: 60 },
   { key: 'registeredOn', label: 'Registration date', type: 'date' },
   { key: 'grn', label: 'GRAS challan GRN', placeholder: 'MH0045…', maxLength: 30 },
-  { key: 'stampDuty', label: 'Stamp duty paid (₹)', inputMode: 'numeric', maxLength: 11 },
-  { key: 'registrationFee', label: 'Registration fee paid (₹)', inputMode: 'numeric', maxLength: 11 },
 ];
 const EMPTY_REGISTRATION = Object.fromEntries(REGISTRATION_FIELDS.map(({ key }) => [key, '']));
 
