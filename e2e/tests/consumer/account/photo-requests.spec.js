@@ -109,7 +109,8 @@ test('a buyer asking for photos reaches the owner, and asking twice does not', a
   expect(afterFirst[0].propertyId).toBe(listing.id);
   expect(afterFirst[0].status).toBe('pending');
   /* De-dupe settled by the owner's inbox rather than by re-reading what this browser just wrote. */
-  await expect(page.getByRole('alert')).toBeHidden({ timeout: 8000 });
+  await page.getByTestId('toasts').getByRole('button', { name: 'Dismiss' }).click();
+  await expect(page.getByRole('alert')).toBeHidden();
   const secondAsk = page.waitForResponse((response) =>
     /\/photo-requests$/.test(new URL(response.url()).pathname) &&
     response.request().method() === 'POST');

@@ -6,7 +6,14 @@ import { SESSION_ENDED_EVENT } from '../services/http.js';
 const ToastContext = createContext(null);
 let nextId = 0;
 
-const AUTO_DISMISS_MS = 3000;
+const STICKY_TYPES = new Set(['error', 'warning']);
+const MAX_VISIBLE = 3;
+
+// Paced for a second-language English reader (~150 wpm) plus time to notice the toast.
+function autoDismissMs(message) {
+  const words = typeof message === 'string' ? message.trim().split(/\s+/).length : 0;
+  return Math.min(12000, Math.max(5000, 1500 + words * 400));
+}
 
 const TOAST_CONFIG = {
   success: {
@@ -41,12 +48,16 @@ const TOAST_CONFIG = {
   },
 };
 
-function Toast({ toast: t, onDismiss }) {
+function Toast({ toast: t, onDismiss, onPause, onResume }) {
   const config = TOAST_CONFIG[t.type] || TOAST_CONFIG.info;
   const Icon = config.icon;
 
   return (
     <div
+      onPointerEnter={() => onPause(t.id)}
+      onPointerLeave={() => onResume(t.id)}
+      onFocus={() => onPause(t.id)}
+      onBlur={() => onResume(t.id)}
       className={`
         flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-2xl shadow-black/30
         backdrop-blur-xl bg-ink-2/90 min-w-[280px] max-w-[420px]
@@ -76,29 +87,44 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const timers = useRef(new Map());
   const shown = useRef(new Map());
+  const durations = useRef(new Map());
+  const order = useRef([]);
 
   const dismiss = useCallback((id) => {
-    const timer = timers.current.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      timers.current.delete(id);
-    }
+    clearTimeout(timers.current.get(id));
+    timers.current.delete(id);
+    durations.current.delete(id);
+    order.current = order.current.filter((x) => x !== id);
     shown.current.forEach((v, k) => { if (v === id) shown.current.delete(k); });
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
+  const pause = useCallback((id) => {
+    clearTimeout(timers.current.get(id));
+    timers.current.delete(id);
+  }, []);
+  const resume = useCallback((id) => {
+    const ms = durations.current.get(id);
+    if (!ms) return;
+    clearTimeout(timers.current.get(id));
+    timers.current.set(id, setTimeout(() => dismiss(id), ms));
+  }, [dismiss]);
   const toast = useCallback(
     (message, type = 'info') => {
       const key = typeof message === 'string' ? `${type}:${message}` : null;
       const live = key && shown.current.get(key);
       const id = live || ++nextId;
-      clearTimeout(timers.current.get(id));
       if (!live) {
         if (key) shown.current.set(key, id);
+        order.current.push(id);
+        if (order.current.length > MAX_VISIBLE) dismiss(order.current[0]);
         setToasts((t) => [...t, { id, message, type }]);
       }
-      timers.current.set(id, setTimeout(() => dismiss(id), AUTO_DISMISS_MS));
+      if (!STICKY_TYPES.has(type)) {
+        durations.current.set(id, autoDismissMs(message));
+        resume(id);
+      }
     },
-    [dismiss],
+    [dismiss, resume],
   );
 
   useEffect(() => {
@@ -123,7 +149,7 @@ export function ToastProvider({ children }) {
       <div data-testid="toasts" className="fixed bottom-24 right-5 z-[1600] flex flex-col-reverse gap-2.5 pointer-events-none">
         {toasts.map((t) => (
           <div key={t.id} className="pointer-events-auto">
-            <Toast toast={t} onDismiss={dismiss} />
+            <Toast toast={t} onDismiss={dismiss} onPause={pause} onResume={resume} />
           </div>
         ))}
       </div>
