@@ -17,3 +17,6 @@ export function passportPercent(prop, docCount = 0) {
   const items = passportChecklist(prop, docCount);
   return Math.round((items.filter((i) => i.done).length / items.length) * 100);
 }
+
+export const publishHref = (prop) =>
+  `/list-property?${new URLSearchParams({ deal: prop.deal === 'rent' ? 'rent' : 'buy', home: prop.id || prop.managedId })}`;

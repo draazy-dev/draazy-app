@@ -144,12 +144,6 @@ public class ListingService {
         return announced(createOnBehalf(userId, in, userId));
     }
 
-    @Transactional
-    public Property createWithinAllowance(UUID userId, ListingCreate in, String existingLocalitySlug) {
-        requirePace(userId, in);
-        return announced(createOnBehalf(userId, in, existingLocalitySlug, userId));
-    }
-
     private Property announced(Property p) {
         propertyLifecycle.announceSubmitted(p);
         return p;
@@ -163,11 +157,6 @@ public class ListingService {
 
     @Transactional
     public Property createOnBehalf(UUID userId, ListingCreate in, UUID... uploadOwnerIds) {
-        return createOnBehalf(userId, in, null, uploadOwnerIds);
-    }
-
-    @Transactional
-    public Property createOnBehalf(UUID userId, ListingCreate in, String existingLocalitySlug, UUID... uploadOwnerIds) {
         photoLimit.require("A listing", in.images());
         List<UUID> allowedUploadOwners = Arrays.stream(uploadOwnerIds).filter(Objects::nonNull).distinct().toList();
         photoSources.requireUploaded(in.images(), List.of(), allowedUploadOwners);
@@ -175,7 +164,7 @@ public class ListingService {
                 List.of(), allowedUploadOwners);
         User owner = users.findById(userId)
                 .orElseThrow(() -> NotFoundException.of("Owner"));
-        LocalityBinding.Bound locality = localities.require(in.localitySlug(), in.locality(), existingLocalitySlug);
+        LocalityBinding.Bound locality = localities.require(in.localitySlug(), in.locality());
         Property p = new Property(owner, in.title(), in.deal(), in.propertyType(),
                 in.price(), locality.name(), in.city());
 

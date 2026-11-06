@@ -43,20 +43,18 @@ public class ManagedPropertyMapper {
                 m.getDeposit(),
                 m.getLandlordPan(),
                 policeIntimation(m),
-                m.getPoliceIntimatedOn(),
                 pendingClaims,
                 m.getValuation(),
                 Objects.toString(m.getPublishedListingId(), null),
                 Objects.toString(m.getSourceRoomId(), null),
                 m.getCreatedAt(),
-                m.getUpdatedAt());
+                m.getUpdatedAt(),
+                m.getAgreementRequestId() != null);
     }
 
+    // Registering on the IGR portal informs the police (i-SARITA → CCTNS), so a Draazy agreement is done.
     static String policeIntimation(ManagedProperty m) {
-        if (m.getAgreementRequestId() == null) {
-            return null;
-        }
-        return m.getPoliceIntimatedOn() == null ? "pending" : "done";
+        return m.getAgreementRequestId() == null ? null : "done";
     }
 
     public List<ManagedPropertyDto> toDtos(List<ManagedProperty> records) {

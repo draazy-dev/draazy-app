@@ -45,24 +45,29 @@ class RentAgreementHomes {
     private record Terms(long rent, Long deposit, LocalDate start, LocalDate end) {
     }
 
+    private record Seeded(UUID homeId, UUID ownerId, UUID listingId) {
+    }
+
     private final ServiceRequestPartyRepository parties;
     private final RentAgreementOwnerSide ownerSide;
     private final PropertyRepository properties;
     private final UserRepository users;
     private final DocumentRepository documents;
     private final ManagedAgreementHomes homes;
+    private final RentAgreementBadges badges;
     private final DataSource dataSource;
     private final JdbcTemplate jdbc;
 
     RentAgreementHomes(ServiceRequestPartyRepository parties, RentAgreementOwnerSide ownerSide,
             PropertyRepository properties, UserRepository users, DocumentRepository documents,
-            ManagedAgreementHomes homes, DataSource dataSource) {
+            ManagedAgreementHomes homes, RentAgreementBadges badges, DataSource dataSource) {
         this.parties = parties;
         this.ownerSide = ownerSide;
         this.properties = properties;
         this.users = users;
         this.documents = documents;
         this.homes = homes;
+        this.badges = badges;
         this.dataSource = dataSource;
         this.jdbc = new JdbcTemplate(dataSource);
     }
@@ -72,24 +77,42 @@ class RentAgreementHomes {
         if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())) {
             return;
         }
-        UUID homeId;
+        Seeded seeded;
         try {
-            homeId = seed(request, finalDocumentId);
+            seeded = seed(request, finalDocumentId);
         } catch (RuntimeException e) {
             log.warn("Could not seed dashboards for rent agreement {}", request.getId(), e);
             return;
         }
-        if (homeId != null) {
-            try {
-                UUID announced = homeId;
-                Savepoints.isolated(dataSource, () -> homes.announce(announced));
-            } catch (RuntimeException e) {
-                log.warn("Could not announce the managed home for rent agreement {}", request.getId(), e);
-            }
+        if (seeded == null) {
+            return;
+        }
+        isolated(request, "announce the managed home", seeded.homeId(), () -> homes.announce(seeded.homeId()));
+        isolated(request, "badge the owner", seeded.ownerId(),
+                () -> badges.verifyOwner(seeded.ownerId(), request.getId(), licensorName(request)));
+        isolated(request, "badge the listing", seeded.listingId(),
+                () -> badges.verifyListing(seeded.listingId(), seeded.ownerId(), request.getId()));
+    }
+
+    private static String licensorName(ServiceRequest request) {
+        Map<String, Object> details = request.getDetails() == null ? Map.of() : request.getDetails();
+        Object name = ServiceRequestPricing.childObject(
+                ServiceRequestPricing.childObject(details, "_state"), "owner").get("oName");
+        return name instanceof String s ? s : null;
+    }
+
+    private void isolated(ServiceRequest request, String step, UUID subject, Runnable work) {
+        if (subject == null) {
+            return;
+        }
+        try {
+            Savepoints.isolated(dataSource, work);
+        } catch (RuntimeException e) {
+            log.warn("Could not {} for rent agreement {}", step, request.getId(), e);
         }
     }
 
-    private UUID seed(ServiceRequest request, UUID finalDocumentId) {
+    private Seeded seed(ServiceRequest request, UUID finalDocumentId) {
         Map<String, Object> details = request.getDetails() == null ? Map.of() : request.getDetails();
         Terms terms = termsOf(details);
         if (terms == null) {
@@ -125,7 +148,9 @@ class RentAgreementHomes {
         } finally {
             DataSourceUtils.releaseConnection(con, dataSource);
         }
-        return homeId;
+        UUID listingId = listing != null && ownerId != null && listing.getOwner().getId().equals(ownerId)
+                ? listing.getId() : null;
+        return new Seeded(homeId, ownerId, listingId);
     }
 
     private static Map.Entry<String, String> primaryTenant(List<User> tenants, Map<String, String> formTenants) {

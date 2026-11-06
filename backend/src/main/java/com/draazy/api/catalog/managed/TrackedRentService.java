@@ -120,7 +120,6 @@ public class TrackedRentService {
         return new TrackedRentDto(m.getId().toString(), m.getTitle(), ManagedRentReceipt.addressOf(m),
                 landlordName(m.getOwnerId()), m.getMonthlyRent(), dueDay(m), status, due, m.getLeaseEnd(),
                 m.getDeposit(), m.getLandlordPan(), ManagedPropertyMapper.policeIntimation(m),
-                m.getPoliceIntimatedOn(),
                 mapper.toReceiptDtos(receipts.findByManagedPropertyIdAndCreatedAtGreaterThanEqualOrderByRentMonthDesc(
                         m.getId(), m.getTenantSince(), Limit.of(TENANT_RECEIPTS))));
     }

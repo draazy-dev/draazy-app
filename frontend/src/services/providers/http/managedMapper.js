@@ -58,11 +58,11 @@ export function toManaged(dto) {
     deposit: Number(dto.deposit) || 0,
     landlordPan: dto.landlordPan || '',
     policeIntimation: dto.policeIntimation || '',
-    policeIntimatedOn: dto.policeIntimatedOn || '',
     rentClaims: Array.isArray(dto.rentClaims) ? dto.rentClaims : [],
     valuation: dto.valuation || null,
     publishedListingId: dto.publishedListingId || '',
     sourceRoomId: dto.sourceRoomId || '',
+    agreementVerified: !!dto.agreementVerified,
     createdAt: toMillis(dto.createdAt),
     updatedAt: toMillis(dto.updatedAt),
   };
@@ -98,7 +98,6 @@ export const toTrackedRent = (dto) => ({
   deposit: Number(dto.deposit) || 0,
   landlordPan: dto.landlordPan || '',
   policeIntimation: dto.policeIntimation || '',
-  policeIntimatedOn: dto.policeIntimatedOn || '',
   receipts: toRentReceiptList(dto.receipts),
 });
 

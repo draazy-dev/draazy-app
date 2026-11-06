@@ -73,11 +73,6 @@ public class MeManagedPropertiesController {
         trackedRent.rejectClaim(principal.userId(), id, month);
     }
 
-    @PostMapping(Routes.MeManagedProperties.PUBLISH)
-    public ManagedPropertyDto publish(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
-        return service.publish(principal.userId(), id);
-    }
-
     @PostMapping(Routes.MeManagedProperties.LISTING)
     @ResponseStatus(HttpStatus.CREATED)
     public ListingWriteResult publishWith(@CurrentUser AuthPrincipal principal, @PathVariable String id,

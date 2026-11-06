@@ -180,22 +180,4 @@ class LeaseEndTest extends AbstractApiTest {
         mvc.perform(get(HOME_RENEWAL, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isNotFound());
     }
-
-    @Test
-    @DisplayName("listing a rented home again makes it available from the lease end")
-    void publishCarriesTheLeaseEnd() throws Exception {
-        User owner = user("9820008005", "owner", "Asha Patil");
-        LocalDate end = LocalDate.now(PlatformTime.IST).plusDays(45);
-        UUID id = home(owner, "E-1", end);
-
-        mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/publish")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk());
-
-        assertThat(jdbc.queryForObject("""
-                select p.available_on from properties p
-                  join managed_properties m on m.published_listing_id = p.id
-                 where m.id = ?
-                """, LocalDate.class, id)).isEqualTo(end);
-    }
 }

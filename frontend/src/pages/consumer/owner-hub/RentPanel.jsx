@@ -30,7 +30,7 @@ const blankForm = (prop) => ({
   landlordPan: prop.landlordPan || '',
 });
 
-export default function RentPanel({ prop, onChange, onPublish }) {
+export default function RentPanel({ prop, onChange }) {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const rentStr = (n) => t('ownerHub.rentPerMo', { amount: fmtNum(n) });
@@ -309,7 +309,7 @@ export default function RentPanel({ prop, onChange, onPublish }) {
         )}
       </div>
       <LeaseFacts home={prop} testId="rent" className="mb-4 -mt-1" />
-      <LeaseEndActions home={prop} onPublish={onPublish} />
+      <LeaseEndActions home={prop} />
       {!prop.landlordPan && prop.monthlyRent * 12 > PAN_NEEDED_ABOVE && (
         <div className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 flex items-start justify-between gap-3" data-testid="rent-pan-hint">
           <p className="text-xs text-amber-200">{t('ownerHub.panHint')}</p>

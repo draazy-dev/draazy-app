@@ -3,7 +3,7 @@ package com.draazy.api.catalog.managed;
 import com.draazy.api.catalog.listing.ListingCreate;
 import com.draazy.api.catalog.listing.ListingService;
 import com.draazy.api.catalog.locality.LocalityBinding;
-import com.draazy.api.catalog.property.AvailableOn;
+import com.draazy.api.catalog.property.AgreementOwnership;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -15,15 +15,10 @@ import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.ConstraintViolationException;
-import jakarta.validation.Validator;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
@@ -31,8 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ManagedPropertyService {
-    private static final String CITY = "Pune";
-
     private final ManagedPropertyRepository records;
     private final ManagedRentReceiptRepository receipts;
     private final ManagedPropertyMapper mapper;
@@ -40,15 +33,16 @@ public class ManagedPropertyService {
     private final ListingService listingService;
     private final PropertyRepository properties;
     private final UserRepository users;
-    private final Validator validator;
     private final SocietyReference societyReference;
     private final TrackedRentService trackedRent;
+    private final AgreementOwnership agreementOwnership;
 
     public ManagedPropertyService(ManagedPropertyRepository records,
             ManagedRentReceiptRepository receipts, ManagedPropertyMapper mapper,
             LocalityBinding localities, ListingService listingService,
-            PropertyRepository properties, UserRepository users, Validator validator,
-            SocietyReference societyReference, TrackedRentService trackedRent) {
+            PropertyRepository properties, UserRepository users,
+            SocietyReference societyReference, TrackedRentService trackedRent,
+            AgreementOwnership agreementOwnership) {
         this.records = records;
         this.receipts = receipts;
         this.mapper = mapper;
@@ -56,9 +50,9 @@ public class ManagedPropertyService {
         this.listingService = listingService;
         this.properties = properties;
         this.users = users;
-        this.validator = validator;
         this.societyReference = societyReference;
         this.trackedRent = trackedRent;
+        this.agreementOwnership = agreementOwnership;
     }
 
     @Transactional(readOnly = true)
@@ -237,54 +231,18 @@ public class ManagedPropertyService {
     }
 
     @Transactional
-    public ManagedPropertyDto publish(UUID ownerId, String id) {
-        ManagedProperty m = ownedRecordForUpdate(ownerId, id);
-        if (m.getPublishedListingId() != null) {
-            return mapper.toDto(m);
-        }
-        ListingCreate listing = new ListingCreate(
-                m.getTitle(), m.getDeal(), m.getPropertyType(), m.getBhk(), m.getPrice(),
-                null, null, null, m.getArea(), m.getAreaUnit(), m.getFurnishing(),
-                m.getLocality(), m.getLocalitySlug(), CITY, null, null, null, null, null, null, null,
-
-                null, null, null,
-
-                null, null, null, null,
-
-                null, null, null, null, null, null, null,
-
-                null, null, null, null, null, availableOn(m), null, null, null);
-
-        Set<ConstraintViolation<ListingCreate>> violations = validator.validate(listing);
-        if (!violations.isEmpty()) {
-            throw new ConstraintViolationException(violations);
-        }
-        Property created = listingService.createWithinAllowance(ownerId, listing, m.getLocalitySlug());
-        m.markPublished(created.getId());
-        return mapper.toDto(records.saveAndFlush(m));
-    }
-
-    @Transactional
     public Property publishWith(UUID ownerId, String id, ListingCreate body) {
         ManagedProperty m = ownedRecordForUpdate(ownerId, id);
-        if (m.getAddressFingerprint() == null) {
-            throw NotFoundException.of("Managed property");
-        }
         if (m.getPublishedListingId() != null) {
             throw new ConflictException("This home is already listed.");
         }
         Property created = listingService.create(ownerId, body);
+        if (m.getAgreementRequestId() != null && agreementOwnership.verify(created, m.getAgreementRequestId())) {
+            properties.saveAndFlush(created);
+        }
         m.markPublished(created.getId());
         records.saveAndFlush(m);
         return created;
-    }
-
-    // A tenanted home goes back on the market from the day the lease ends, within the rent horizon.
-    private static String availableOn(ManagedProperty m) {
-        LocalDate end = m.getLeaseEnd();
-        LocalDate today = AvailableOn.today();
-        return m.isRented() && end != null && end.isAfter(today)
-                && !end.isAfter(today.plusDays(AvailableOn.MAX_RENT_DAYS_AHEAD)) ? end.toString() : null;
     }
 
     // Row lock so two concurrent publishes of one record cannot both see it unpublished.

@@ -127,10 +127,6 @@ public class ManagedProperty extends AuditedEntity {
     @Column(name = "agreement_request_id", insertable = false)
     private UUID agreementRequestId;
 
-    @Setter
-    @Column(name = "police_intimated_on", insertable = false)
-    private LocalDate policeIntimatedOn;
-
     @Column(name = "landlord_pan")
     @Setter
     private String landlordPan;
@@ -165,7 +161,6 @@ public class ManagedProperty extends AuditedEntity {
         this.leaseEnd = null;
         this.deposit = null;
         this.agreementRequestId = null;
-        this.policeIntimatedOn = null;
         return mobile != null;
     }
 

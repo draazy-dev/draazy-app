@@ -43,8 +43,6 @@ public class ManagedAgreementHomes {
                                               then null else renewal_reminded_at end,
                    lease_end = cast(? as date),
                    deposit = cast(? as bigint),
-                   police_intimated_on = case when agreement_request_id is distinct from cast(? as uuid)
-                                              then null else police_intimated_on end,
                    agreement_request_id = cast(? as uuid),
                    published_listing_id = coalesce(published_listing_id, cast(? as uuid)),
                    agreement_flat_key = coalesce(agreement_flat_key, cast(? as text))
@@ -103,7 +101,7 @@ public class ManagedAgreementHomes {
             id = existing.getFirst();
             jdbc.update(UPDATE, lease.tenantName(), lease.tenantMobile(), lease.tenantMobile(), lease.monthlyRent(),
                     lease.monthlyRent(), lease.dueDay(), lease.leaseEnd(), lease.leaseEnd(), lease.deposit(),
-                    lease.agreementRequestId(), lease.agreementRequestId(), lease.listingId(), lease.flatKey(), id);
+                    lease.agreementRequestId(), lease.listingId(), lease.flatKey(), id);
         }
         if (paper != null) {
             jdbc.update(PAPER, id, AGREEMENT_CATEGORY, paper.fileName(), paper.storageKey(), paper.sizeBytes(),
@@ -120,10 +118,6 @@ public class ManagedAgreementHomes {
                     m.getTitle() + " now tracks rent, the tenant and the registered agreement in one place.",
                     "/owner-hub/property/" + m.getId());
         });
-    }
-
-    public void policeIntimated(UUID agreementRequestId, LocalDate on) {
-        records.findByAgreementRequestId(agreementRequestId).forEach(m -> m.setPoliceIntimatedOn(on));
     }
 
     private static String titleOf(Lease lease) {

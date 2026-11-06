@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { addDaysIso, istToday, MAX_AVAILABLE_DAYS } from '../../../lib/availability.js';
 import { getFlatmateDetail, getOwnerHomePrefill } from '../../../services/flatmateService.js';
-import { HOME_TYPE_PILLS } from './constants.js';
+import { getManaged } from '../../../services/managedService.js';
+import { HOME_TYPE_PILLS, homeTypeLabelFor } from './constants.js';
 import { initialForm } from './initialForm.js';
 import { roomHeadline } from './submit.js';
 
@@ -66,14 +68,50 @@ const HOME_FIELDS = ['propertyType', 'homeTypeLabel', 'bhk', 'bathrooms', 'balco
   'floorsInHouse', 'gatedCommunity', 'furnishing', 'furniture', 'locality', 'localitySlug', 'society', 'societyId',
   'flatNumber', 'tower', 'street', 'landmark', 'pincode', 'pinPlaced', 'propLat', 'propLng'];
 
-export const homeToForm = (home) => {
+const homeFields = (home) => {
   const asRoom = roomToForm({ ...home, host: { details: home } });
   return {
-    ...initialForm,
-    deal: 'rent',
     ...Object.fromEntries(HOME_FIELDS.map((key) => [key, asRoom[key]])),
     facing: home.facing || initialForm.facing,
     overlooking: home.overlooking || initialForm.overlooking,
+  };
+};
+
+const PROPERTY_TYPE_OF = [[/villa/i, 'villa'], [/independent|bungalow|row/i, 'independent'],
+  [/commercial|office|shop|retail/i, 'commercial'], [/farm/i, 'farmland'], [/plot/i, 'openplot']];
+const propertyTypeOf = (type) => PROPERTY_TYPE_OF.find(([re]) => re.test(type || ''))?.[1] || 'flat';
+
+const furnishingOf = (value) => {
+  const v = String(value || '').toLowerCase();
+  if (v.includes('semi')) return 'semi';
+  if (v.startsWith('furnished') || v === 'fully') return 'furnished';
+  return initialForm.furnishing;
+};
+
+const availableAfterLease = (leaseEnd) => {
+  const today = istToday();
+  return leaseEnd && leaseEnd > today && leaseEnd <= addDaysIso(today, MAX_AVAILABLE_DAYS) ? leaseEnd : '';
+};
+
+export const managedToForm = (home) => {
+  const deal = home.deal === 'rent' ? 'rent' : 'buy';
+  const propertyType = propertyTypeOf(home.type);
+  const price = home.price ? String(home.price) : '';
+  return {
+    ...initialForm,
+    deal,
+    propertyType,
+    homeTypeLabel: homeTypeLabelFor(propertyType) || initialForm.homeTypeLabel,
+    bhk: home.bhkNum ? String(Math.min(home.bhkNum, 5)) : '',
+    furnishing: furnishingOf(home.furnishing),
+    locality: home.locality || '',
+    localitySlug: home.localitySlug || '',
+    society: home.society || '',
+    carpetArea: home.area ? String(home.area) : '',
+    areaUnit: home.areaUnit || initialForm.areaUnit,
+    ...(deal === 'rent'
+      ? { monthlyRent: price, deposit: home.deposit ? String(home.deposit) : '', availableFrom: availableAfterLease(home.leaseEnd) }
+      : { price }),
   };
 };
 
@@ -81,9 +119,12 @@ export function useHomePrefill({ homeId, canLoad, setForm }) {
   useEffect(() => {
     if (!homeId || !canLoad) return undefined;
     let live = true;
-    getOwnerHomePrefill(homeId)
-      .then((home) => { if (live) setForm(homeToForm(home)); })
-      .catch(() => {});
+    (async () => {
+      const record = await getManaged(homeId);
+      if (!record) return;
+      const room = record.sourceRoomId ? await getOwnerHomePrefill(homeId).catch(() => null) : null;
+      if (live) setForm({ ...managedToForm(record), ...(room ? homeFields(room) : {}) });
+    })().catch(() => {});
     return () => { live = false; };
   }, [homeId, canLoad, setForm]);
 }

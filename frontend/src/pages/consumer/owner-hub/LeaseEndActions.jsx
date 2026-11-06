@@ -4,11 +4,12 @@ import Icon from '../../../components/Icon.jsx';
 import { daysUntil, SOON_DAYS } from '../../../components/LeaseFacts.jsx';
 import { usePricing } from '../../../context/PricingContext.jsx';
 import { fmtDate } from '../../../lib/format.js';
+import { publishHref } from './helpers.js';
 
 const GRACE_DAYS = 30;
 const SECONDARY = 'min-h-[44px] px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 text-sm font-semibold inline-flex items-center justify-center gap-2';
 
-export default function LeaseEndActions({ home, onPublish }) {
+export default function LeaseEndActions({ home }) {
   const { t } = useTranslation();
   const { fee } = usePricing();
   if (!home.rented || !home.leaseEnd) return null;
@@ -27,8 +28,8 @@ export default function LeaseEndActions({ home, onPublish }) {
         </Link>
         {relistTo ? (
           <Link to={relistTo} data-testid="lease-end-relist" className={SECONDARY}><Icon name="megaphone" className="w-4 h-4" /> {t('ownerHub.leaseRelistCta')}</Link>
-        ) : onPublish && (
-          <button type="button" onClick={onPublish} data-testid="lease-end-list" className={SECONDARY}><Icon name="megaphone" className="w-4 h-4" /> {t('ownerHub.leaseListCta', { date: fmtDate(home.leaseEnd) })}</button>
+        ) : (
+          <Link to={publishHref(home)} data-testid="lease-end-list" className={SECONDARY}><Icon name="megaphone" className="w-4 h-4" /> {t('ownerHub.leaseListCta', { date: fmtDate(home.leaseEnd) })}</Link>
         )}
       </div>
     </div>

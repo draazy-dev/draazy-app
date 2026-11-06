@@ -501,8 +501,8 @@ class FlatmateOwnerHomeTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("publishing through the wizard is only for a flatmate owner home, not any private record")
-    void publishWithRefusesARecordThatIsNotAFlatmateHome() throws Exception {
+    @DisplayName("any private record, not only a flatmate owner home, can be published through the wizard")
+    void publishWithAcceptsARecordThatIsNotAFlatmateHome() throws Exception {
         User owner = existingOwner(31);
         UUID recordId = jdbc.queryForObject("""
                 insert into managed_properties (owner_id, title, deal, property_type, price, locality)
@@ -515,9 +515,9 @@ class FlatmateOwnerHomeTest extends AbstractApiTest {
                         .content("{\"title\":\"Sunny 2 BHK\",\"deal\":\"rent\",\"propertyType\":\"apartment\","
                                 + "\"price\":25000,\"locality\":\"Baner\",\"city\":\"Pune\"," + listingImages(owner)
                                 + "}"))
-                .andExpect(status().isNotFound());
-        assertThat(jdbc.queryForObject("select count(*) from properties where owner_id = ?", Integer.class,
-                owner.getId())).isZero();
+                .andExpect(status().isCreated());
+        assertThat(jdbc.queryForObject("select published_listing_id from managed_properties where id = ?",
+                UUID.class, recordId)).isNotNull();
     }
 
     @Test

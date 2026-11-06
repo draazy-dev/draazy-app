@@ -58,11 +58,6 @@ export async function recordRentReceipt(id, rentMonth) {
   return receipt;
 }
 
-export async function publishManaged(id, { published = false } = {}) {
-  const after = toManaged(await post(`/me/managed-properties/${encodeURIComponent(id)}/publish`, {}));
-  return { id: after?.publishedListingId || '', already: published, record: after };
-}
-
 export async function ensureManagedForListing(listing) {
   if (!listing || !listing.id) return null;
   if (listing.flatmate || listing.flatmatePost || listing.flatmateGroup) return null;

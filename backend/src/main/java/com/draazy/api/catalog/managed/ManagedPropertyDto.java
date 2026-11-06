@@ -30,11 +30,11 @@ public record ManagedPropertyDto(
         Long deposit,
         String landlordPan,
         String policeIntimation,
-        LocalDate policeIntimatedOn,
         List<String> rentClaims,
         Map<String, Object> valuation,
         String publishedListingId,
         String sourceRoomId,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        boolean agreementVerified) {
 }

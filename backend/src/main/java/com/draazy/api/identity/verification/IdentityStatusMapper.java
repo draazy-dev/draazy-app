@@ -17,6 +17,11 @@ class IdentityStatusMapper {
                 null, null, null, null, null, IdentityVerificationService.MAX_ATTEMPTS_PER_WINDOW, null, null, false);
     }
 
+    IdentityVerificationResponse granted() {
+        return new IdentityVerificationResponse(VerificationStatuses.VERIFIED, null, null, null,
+                null, null, null, null, null, 0, null, null, false);
+    }
+
     IdentityVerificationResponse toStatus(IdentityVerification v, Instant now) {
         if (VerificationStatuses.WITHDRAWN.equals(v.getStatus())) {
             return none();

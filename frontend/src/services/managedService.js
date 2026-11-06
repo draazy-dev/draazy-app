@@ -14,8 +14,6 @@ export const deleteManaged = async (id) => (await provider()).deleteManaged(id);
 
 export const stopRentTracking = async (id) => (await provider()).stopRentTracking(id);
 
-export const publishManaged = async (id, known) => (await provider()).publishManaged(id, known);
-
 export const ensureManagedForListing = async (listing) =>
   (await provider()).ensureManagedForListing(listing);
 

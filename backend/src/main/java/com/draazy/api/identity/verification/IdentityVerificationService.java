@@ -92,6 +92,15 @@ public class IdentityVerificationService {
                 .orElseGet(statusMapper::none);
     }
 
+    // The badge can also come from staff or a registered rent agreement, with no KYC case behind it.
+    @Transactional(readOnly = true)
+    public IdentityVerificationResponse badge(UUID userId) {
+        IdentityVerificationResponse own = status(userId);
+        boolean granted = !VerificationStatuses.VERIFIED.equals(own.status())
+                && users.findById(userId).map(User::isVerified).orElse(false);
+        return granted ? statusMapper.granted() : own;
+    }
+
     @Transactional(readOnly = true)
     public boolean isVerified(UUID userId) {
         return verifications.findByUserId(userId)

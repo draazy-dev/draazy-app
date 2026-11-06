@@ -26,7 +26,7 @@ public class IdentityVerificationController {
 
     @GetMapping(Routes.Verification.IDENTITY)
     public IdentityVerificationResponse status(@CurrentUser AuthPrincipal principal) {
-        return service.status(principal.userId());
+        return service.badge(principal.userId());
     }
 
     @PostMapping(Routes.Verification.IDENTITY_CHALLENGE)

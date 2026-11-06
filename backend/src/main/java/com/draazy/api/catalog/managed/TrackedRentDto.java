@@ -16,6 +16,5 @@ public record TrackedRentDto(
         Long deposit,
         String landlordPan,
         String policeIntimation,
-        LocalDate policeIntimatedOn,
         List<ManagedRentReceiptDto> receipts) {
 }
