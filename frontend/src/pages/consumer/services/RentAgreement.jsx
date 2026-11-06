@@ -68,7 +68,7 @@ function RentAgreement() {
       <div>
         <Hero />
 
-        <ServiceTracker key={done ? 'done' : 'open'} typeFilter="rental" title={tr('services.ra.trackerTitle')} onCancelled={requestCancelled} onView={viewSubmitted} canView={canView} />
+        <ServiceTracker key={done ? 'done' : 'open'} typeFilter="rental" title={tr('services.ra.trackerTitle')} onCancelled={requestCancelled} onView={viewSubmitted}         canView={canView} />
 
         <section ref={formRef} id="ra-form" className="scroll-mt-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-y">
           <p role="status" aria-live="polite" className="sr-only" data-testid="ra-error-count">{Object.keys(errors).length ? tr('services.ra.errorCount', { count: Object.keys(errors).length }) : ''}</p>
@@ -90,7 +90,7 @@ function RentAgreement() {
                 {STEP_LABELS.map((s, i) => {
                   const awaitingStep = viewOnly ? -1 : invitingOwner ? 1 : inviting ? 2 : -1;
                   const isLocked = gated && i > LAST_PUBLIC_STEP;
-                  const st = isLocked ? 'locked' : (i === step ? 'active' : (i === awaitingStep ? 'pending' : (i < step ? 'done' : '')));
+                  const st = isLocked ? 'locked' : (i === step ? 'active' : (i === awaitingStep ? 'pending' : (i < step || viewOnly ? 'done' : '')));
                   return (
                   <div key={s} className={'flex items-start ' + (i < STEP_LABELS.length - 1 ? 'flex-1' : '')}>
                     <div className="flex flex-col items-center flex-shrink-0">
@@ -100,7 +100,7 @@ function RentAgreement() {
                       >{st === 'locked' ? <Icon name="lock" className="w-4 h-4" /> : st === 'done' ? <Icon name="check" className="w-4 h-4" /> : st === 'pending' ? <Icon name="clock" className="w-4 h-4" /> : i + 1}</div>
                       <span className={'text-[10px] mt-1.5 whitespace-nowrap ' + (st === 'active' ? 'text-teal-400' : st === 'pending' ? 'text-amber-400' : 'text-gray-500')}>{tr(`services.ra.stepLabel.${i}`)}</span>
                     </div>
-                    {i < STEP_LABELS.length - 1 && <div className={'step-line flex-1 h-0.5 mx-1 sm:mx-2 mt-[17px] ' + (i < step ? 'done' : '')} />}
+                    {i < STEP_LABELS.length - 1 && <div className={'step-line flex-1 h-0.5 mx-1 sm:mx-2 mt-[17px] ' + (i < step || viewOnly ? 'done' : '')} />}
                   </div>
                   );
                 })}
@@ -295,7 +295,7 @@ function RentAgreement() {
                   )}
 
                   <fieldset disabled={sharedReadOnly} className="contents">
-                    <StepProperty step={step} prop={prop} setP={setP} setProp={setProp} setSelectedPropertyId={setSelectedPropertyId} pickListing={pickListing} myProperties={myProperties} errors={errors} fc={fc} clearErr={clearErr} onLocalityBusy={setLocalityBusy} />
+                    <StepProperty step={step} prop={prop} setP={setP} setProp={setProp} setSelectedPropertyId={setSelectedPropertyId} pickListing={pickListing} myProperties={myProperties} readOnly={sharedReadOnly} errors={errors} fc={fc} clearErr={clearErr} onLocalityBusy={setLocalityBusy} />
                   </fieldset>
 
                   <fieldset disabled={ownerReadOnly} className="contents">

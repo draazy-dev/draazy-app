@@ -127,6 +127,8 @@ services:
         value: draazy_identity_decision
       - key: WHATSAPP_OWNER_NOTICE_TEMPLATE_NAME
         value: draazy_owner_room_notice
+      - key: WHATSAPP_AGREEMENT_INVITE_TEMPLATE_NAME
+        value: draazy_agreement_invite
       - key: WHATSAPP_APP_SECRET
         type: SECRET
         value: "${WHATSAPP_APP_SECRET}"

@@ -13,7 +13,7 @@ import { COMMERCIAL_ROUTE, MAX_FLOOR, RESIDENTIAL_PROPERTY_TYPES } from './const
 import IgrPropertyFields from './IgrPropertyFields.jsx';
 import AreaField from './AreaField.jsx';
 
-export default function StepProperty({ step, prop, setP, setProp, setSelectedPropertyId, pickListing, myProperties = [], errors = {}, fc, clearErr, onLocalityBusy }) {
+export default function StepProperty({ step, prop, setP, setProp, setSelectedPropertyId, pickListing, myProperties = [], readOnly = false, errors = {}, fc, clearErr, onLocalityBusy }) {
   const { t } = useTranslation();
   const clearPropertyBinding = () => setSelectedPropertyId(null);
   const societyPickSeq = useRef(0);
@@ -57,6 +57,21 @@ export default function StepProperty({ step, prop, setP, setProp, setSelectedPro
       <h2 className="text-xl font-bold text-white mb-1">{t('services.ra.property.title')}</h2>
       <p className="text-gray-500 text-sm mb-6">{t('services.ra.property.subtitle')}</p>
       {(() => {
+        if (readOnly) {
+          const address = [prop.flatNo, prop.society].filter(Boolean).join(', ');
+          if (!address) return null;
+          const where = [prop.propType, [prop.locality, prop.pincode].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+          return (
+            <div className="mb-6 flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/4" data-testid="ra-property-summary">
+              <Icon name="building-2" className="w-4 h-4 text-teal-400 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[11px] text-gray-500">{t('services.ra.property.agreementFor')}</p>
+                <p className="text-sm font-semibold text-white truncate">{address}</p>
+                {where && <p className="text-xs text-gray-400 truncate">{where}</p>}
+              </div>
+            </div>
+          );
+        }
         const myListings = myProperties.filter((l) => l.deal === 'rent' || l.deal === 'buy');
         if (!myListings.length) return null;
         return (

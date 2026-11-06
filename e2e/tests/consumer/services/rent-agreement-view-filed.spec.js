@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 import { STAFF } from '../../../fixtures/live.js';
 import { API, apiLogin, authHeaders, signedInAs, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { active, clickNext, fillOwner, fillProperty, fillTerms, inviteTenant, payAndSubmit } from '../../../helpers/rentAgreementWizard.js';
-import { sql } from '../../../helpers/monetisation.js';
+import { newListing, sql } from '../../../helpers/monetisation.js';
 import { trackErrors } from '../../../helpers/console.js';
 import { gotoSettled, reloadSettled } from '../../../helpers/settle.js';
 
@@ -90,6 +90,7 @@ test.describe('Rent Agreement — a submitted side opens as a locked wizard', ()
       await expect(note.getByTestId('ra-view-close'), 'the invitee can close the view, like the owner').toBeVisible();
       await expect(t.locator('.step-dot'), 'the step bar is there to step through').toHaveCount(5);
       await expect(t.locator('.step-dot').nth(0)).toHaveClass(/\bactive\b/);
+      for (const i of [1, 2, 3, 4]) await expect(t.locator('.step-dot').nth(i), `a filed form shows step ${i + 1} as filled`).toHaveClass(/\bdone\b/);
       await clickNext(t, 1);
       await clickNext(t, 2);
       const name = active(t).getByPlaceholder('As per PAN/Aadhaar').first();
@@ -224,14 +225,21 @@ test.describe('Rent Agreement — a submitted side opens as a locked wizard', ()
     await expect.poll(async () => ((await read()).documents || []).length, { message: 'the ownership proof finished filing', timeout: 30_000 }).toBeGreaterThan(0);
 
     settle(id);
+    await newListing(ownerMobile, { title: 'Owner listing for the picker' });
     await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await expect(page.locator('.step-dot'), 'an active request starts on the lock panel').toHaveCount(0);
     const viewDetails = page.getByTestId('tracker-view-details');
     await viewDetails.click();
     const note = page.getByTestId('ra-view-note');
     await expect(note).toBeVisible();
+    const summary = active(page).getByTestId('ra-property-summary');
+    await expect(summary, 'a view names the agreement\'s property in short').toContainText('B-1204');
+    await expect(active(page).getByText('Which property is this agreement for?'), 'no listing picker on a view, even for an owner with listings').toHaveCount(0);
     await expect(active(page).getByPlaceholder('e.g. B-1204')).toHaveValue('B-1204');
     await expect(active(page).getByPlaceholder('e.g. B-1204'), 'shared fields are locked on a view').toBeDisabled();
+    const opacity = (loc) => loc.evaluate((el) => getComputedStyle(el).opacity);
+    expect(await opacity(active(page).getByPlaceholder('Search your society on Google Maps')), 'the society field is dimmed like every other locked field')
+      .toBe(await opacity(active(page).getByPlaceholder('e.g. B-1204')));
     await clickNext(page, 1);
     const ownerName = active(page).getByPlaceholder('As per PAN/Aadhaar').first();
     await expect(ownerName).toHaveValue('Anita Verma');

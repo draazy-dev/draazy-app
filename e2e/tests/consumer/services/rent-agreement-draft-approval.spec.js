@@ -88,6 +88,7 @@ async function approveFromTracker(page, mobile, id) {
   const mine = card(page, id);
   const approve = mine.getByRole('button', { name: /^Approve$/ });
   await expect(approve, 'the other party opening the draft does not unlock this one').toBeDisabled({ timeout: 15000 });
+  await expect(mine.getByRole('button', { name: /Request changes/ }), 'a party yet to approve can still ask for changes').toBeVisible();
   await mine.getByRole('button', { name: /View draft/ }).click();
   await expect(approve).toBeEnabled({ timeout: 15000 });
   await approve.click();
@@ -95,6 +96,16 @@ async function approveFromTracker(page, mobile, id) {
 }
 
 test.describe('Rent Agreement — each party approves the draft on their own', () => {
+  test('sharing the draft tells both the owner and the joined tenant', async () => {
+    const r = await sharedDraft();
+    for (const side of ['owner', 'tenant']) {
+      const { content } = await ok('GET', '/notifications?size=100', r[side]);
+      const shared = content.filter((n) => n.type === 'service.draft-shared');
+      expect(shared, `the ${side} is told the draft is ready`).toHaveLength(1);
+      expect(shared[0].link).toBe('/services/rent-agreement');
+    }
+  });
+
   for (const first of ['owner', 'tenant']) {
     test(`the ${first} approves first, sees a locked "Approved" button, and the other party still has to open and approve`, async ({ browser }) => {
       const r = await sharedDraft();
@@ -108,6 +119,13 @@ test.describe('Rent Agreement — each party approves the draft on their own', (
       await expect(approved).toBeVisible({ timeout: 15000 });
       await expect(approved).toBeDisabled();
       await expect(mine.getByRole('button', { name: /^Approve$/ })).toHaveCount(0);
+      await expect(mine.getByRole('button', { name: /Request changes/ }), 'an approved party cannot ask for changes').toHaveCount(0);
+      const late = await fetch(`${API}/service-requests/${r.id}/draft/decision`, {
+        method: 'POST',
+        headers: { ...bearer(r[first]), 'content-type': 'application/json' },
+        body: JSON.stringify({ decision: 'reject', note: 'Second thoughts' }),
+      });
+      expect(late.status, 'the server refuses changes from a party who approved').toBe(409);
       const held = await ok('GET', `/service-requests/${r.id}`, r[first]);
       expect(held.status, 'one approval of two does not approve the draft').toBe('draft-shared');
       expect(held.draftApproval.approved).toBe(1);

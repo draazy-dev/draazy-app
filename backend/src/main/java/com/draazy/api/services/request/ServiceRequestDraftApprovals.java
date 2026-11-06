@@ -114,6 +114,13 @@ public class ServiceRequestDraftApprovals {
         return required(request).stream().anyMatch(p -> METHOD_IN_APP.equals(p.method()) && caller.userId().equals(p.userId()));
     }
 
+    boolean approvedBy(AuthPrincipal caller, ServiceRequest request) {
+        RequiredApproval party = inAppParty(caller, request);
+        return party != null && approvals.findByRequestIdAndDraftVersionAndPartyKey(
+                        request.getId(), currentVersion(request), party.key())
+                .map(r -> r.getApprovedAt() != null).orElse(false);
+    }
+
     @Transactional(noRollbackFor = {OtpSender.DeliveryFailedException.class,
             UnauthorizedException.class, RateLimitedException.class})
     public boolean confirmOtp(AuthPrincipal caller, ServiceRequest visible, String partyKey, String code) {

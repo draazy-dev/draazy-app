@@ -42,17 +42,22 @@ class WhatsAppSendersTest {
 
     private static WhatsAppProperties props(String otpName, String otpLang, String idName, String idLang) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                otpName, otpLang, idName, idLang, null, null, null, null, null, null, null);
+                otpName, otpLang, idName, idLang, null, null, null, null, null, null, null, null, null);
     }
 
     private static WhatsAppProperties digestProps(String name, String lang) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                "login", "en_US", null, null, name, lang, null, null, null, null, null);
+                "login", "en_US", null, null, name, lang, null, null, null, null, null, null, null);
     }
 
     private static WhatsAppProperties noticeProps(String noticeNumberId) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                "login", "en_US", null, null, null, null, "notice", "en", noticeNumberId, null, null);
+                "login", "en_US", null, null, null, null, "notice", "en", noticeNumberId, null, null, null, null);
+    }
+
+    private static WhatsAppProperties inviteProps(String name, String lang) {
+        return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
+                "login", "en_US", null, null, null, null, null, null, null, null, null, name, lang);
     }
 
     @SuppressWarnings("unchecked")
@@ -183,7 +188,8 @@ class WhatsAppSendersTest {
         when(optOuts.isOptedOut(MOBILE)).thenReturn(true);
         WhatsAppDecisionMessenger messenger = new WhatsAppDecisionMessenger(client,
                 new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                        "login", "en_US", "decision", "en", "waiting", "en_US", "notice", "en", null, null, null), calls, optOuts);
+                        "login", "en_US", "decision", "en", "waiting", "en_US", "notice", "en", null, null, null,
+                        null, null), calls, optOuts);
 
         assertThat(messenger.sendWaitingDigest(MOBILE, "3 requests")).isFalse();
         assertThat(messenger.sendOwnerNotice(MOBILE, "Asha", "Baner", "https://draazy.test/owner-confirm#t")).isFalse();
@@ -204,5 +210,40 @@ class WhatsAppSendersTest {
         new WhatsAppDecisionMessenger(client, noticeProps(" "), calls, optOuts)
                 .sendOwnerNotice(MOBILE, "Asha", "Baner", "https://draazy.test/owner-confirm#t");
         verify(client).post(eq("/PNID/messages"), any());
+    }
+
+    @Test
+    @DisplayName("the agreement invite carries inviter, side, place and link as its four body parameters")
+    void agreementInvitePayload() {
+        String link = "https://draazy.test/services/rent-agreement?party=p&request=r";
+        assertThat(new WhatsAppDecisionMessenger(client, inviteProps("agreement_invite", "en_US"), calls, optOuts)
+                .sendAgreementInvite(MOBILE, "Asha Patil", "tenant", "B-1204, Baner", link)).isTrue();
+
+        Map<String, Object> payload = postedPayload();
+        assertThat(payload).containsEntry("to", "91" + MOBILE);
+        Map<String, Object> template = templateOf(payload);
+        assertThat(template).containsEntry("name", "agreement_invite");
+        assertThat(template.get("components")).isEqualTo(List.of(Map.of("type", "body",
+                "parameters", List.of(
+                        Map.of("type", "text", "text", "Asha Patil"),
+                        Map.of("type", "text", "text", "tenant"),
+                        Map.of("type", "text", "text", "B-1204, Baner"),
+                        Map.of("type", "text", "text", link)))));
+    }
+
+    @Test
+    @DisplayName("the agreement invite is skipped while its template is unset, or for a number that replied STOP")
+    void agreementInviteSkipped() {
+        assertThat(new WhatsAppDecisionMessenger(client, inviteProps(" ", "en_US"), calls, optOuts)
+                .sendAgreementInvite(MOBILE, "Asha", "owner", "Baner", "https://draazy.test/x")).isFalse();
+        when(optOuts.isOptedOut(MOBILE)).thenReturn(true);
+        assertThat(new WhatsAppDecisionMessenger(client, inviteProps("agreement_invite", "en_US"), calls, optOuts)
+                .sendAgreementInvite(MOBILE, "Asha", "owner", "Baner", "https://draazy.test/x")).isFalse();
+
+        verify(client, never()).post(anyString(), any());
+        verify(calls).record(eq(ProviderCalls.WHATSAPP), eq("agreement-invite"),
+                eq(ProviderCalls.Outcome.SKIPPED), eq(MOBILE), any(), eq("template unset"), any());
+        verify(calls).record(eq(ProviderCalls.WHATSAPP), eq("agreement-invite"),
+                eq(ProviderCalls.Outcome.SKIPPED), eq(MOBILE), any(), eq("opted out"), any());
     }
 }

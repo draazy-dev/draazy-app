@@ -19,7 +19,9 @@ public record WhatsAppProperties(
         String ownerNoticeTemplateLang,
         String ownerNoticePhoneNumberId,
         String serviceTemplateName,
-        String serviceTemplateLang) {
+        String serviceTemplateLang,
+        String agreementInviteTemplateName,
+        String agreementInviteTemplateLang) {
     public String ownerNoticeSender() {
         return ownerNoticePhoneNumberId == null || ownerNoticePhoneNumberId.isBlank()
                 ? phoneNumberId : ownerNoticePhoneNumberId;
@@ -43,6 +45,8 @@ public record WhatsAppProperties(
                 + ", ownerNoticeTemplateLang=" + ownerNoticeTemplateLang
                 + ", ownerNoticePhoneNumberId=" + ownerNoticePhoneNumberId
                 + ", serviceTemplateName=" + serviceTemplateName
-                + ", serviceTemplateLang=" + serviceTemplateLang + "]";
+                + ", serviceTemplateLang=" + serviceTemplateLang
+                + ", agreementInviteTemplateName=" + agreementInviteTemplateName
+                + ", agreementInviteTemplateLang=" + agreementInviteTemplateLang + "]";
     }
 }

@@ -290,7 +290,7 @@
 .ra-page .qty-btn:disabled,
 .ra-page .fr-remove:disabled,
 .ra-page .upload-box:has(input:disabled),
-.ra-page :is(input, textarea):disabled:not(.dz-dropdown *) {
+.ra-page :is(input, textarea):disabled:not(.dz-dropdown__menu *) {
   opacity: 0.55;
   cursor: not-allowed;
 }

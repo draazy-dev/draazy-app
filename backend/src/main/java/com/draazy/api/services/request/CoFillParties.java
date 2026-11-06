@@ -40,6 +40,13 @@ class CoFillParties {
         return all.stream().filter(p -> p.getUserId() != null && ACCEPTED.equals(p.getStatus()));
     }
 
+    static Set<UUID> customers(ServiceRequest request, List<ServiceRequestParty> all) {
+        Set<UUID> to = new LinkedHashSet<>();
+        to.add(request.getRequesterId());
+        joined(all).forEach(p -> to.add(p.getUserId()));
+        return to;
+    }
+
     private final ServiceRequestPartyRepository parties;
     private final ServiceRequestRepository requests;
     private final DocumentRepository documents;
@@ -48,6 +55,7 @@ class CoFillParties {
     private final Notifier notifier;
     private final AuditLogRepository auditLog;
     private final RentAgreementOwnerTakeover takeover;
+    private final CoFillInviteWhatsApp whatsApp;
 
     CoFillParties(ServiceRequestPartyRepository parties,
             ServiceRequestRepository requests,
@@ -56,7 +64,8 @@ class CoFillParties {
             AuditService audit,
             Notifier notifier,
             AuditLogRepository auditLog,
-            RentAgreementOwnerTakeover takeover) {
+            RentAgreementOwnerTakeover takeover,
+            CoFillInviteWhatsApp whatsApp) {
         this.parties = parties;
         this.requests = requests;
         this.documents = documents;
@@ -65,6 +74,7 @@ class CoFillParties {
         this.notifier = notifier;
         this.auditLog = auditLog;
         this.takeover = takeover;
+        this.whatsApp = whatsApp;
     }
 
     @Transactional
@@ -113,7 +123,9 @@ class CoFillParties {
         audit.record(caller, "service-request.party-invited", "service_request",
                 request.getId().toString(), "role", side, "party", invitee.getId().toString());
         notifyInvitee(request, saved, invitee.getId(), side);
-        return toDto(saved, request.getType(), invitee.getName(), displayName(caller.userId()));
+        String inviterName = displayName(caller.userId());
+        whatsApp.send(request, saved, normalised, inviterName);
+        return toDto(saved, request.getType(), invitee.getName(), inviterName);
     }
 
     private void notifyInvitee(ServiceRequest request, ServiceRequestParty saved, UUID inviteeId,
@@ -140,7 +152,9 @@ class CoFillParties {
                 partyIndex, caller.userId()));
         audit.record(caller, "service-request.party-invited", "service_request",
                 request.getId().toString(), "role", side, "party", MobileMask.mask(normalised));
-        return toDto(saved, request.getType(), null, displayName(caller.userId()));
+        String inviterName = displayName(caller.userId());
+        whatsApp.send(request, saved, normalised, inviterName);
+        return toDto(saved, request.getType(), null, inviterName);
     }
 
     private void purgeSlotIdentityScans(UUID requestId, String side, int partyIndex) {

@@ -59,6 +59,13 @@ class WhatsAppDecisionMessenger implements DecisionMessenger {
                 List.of(service));
     }
 
+    @Override
+    public boolean sendAgreementInvite(String mobile, String inviter, String side, String place, String link) {
+        return send(DecisionMessenger.AGREEMENT_INVITE, "Agreement invite", "agreement-invite-template-name",
+                props.agreementInviteTemplateName(), props.agreementInviteTemplateLang(), props.phoneNumberId(),
+                mobile, List.of(inviter, side, place, link));
+    }
+
     private boolean send(String operation, String what, String property, String template, String lang,
             String fromNumberId, String mobile, List<String> parameters) {
         if (isBlank(template) || isBlank(lang)) {

@@ -211,10 +211,6 @@ public class ServiceRequestDeskEdits {
     }
 
     private Set<UUID> customers(ServiceRequest request) {
-        Set<UUID> to = new LinkedHashSet<>();
-        to.add(request.getRequesterId());
-        CoFillParties.joined(parties.findByRequestId(request.getId()))
-                .forEach(p -> to.add(p.getUserId()));
-        return to;
+        return CoFillParties.customers(request, parties.findByRequestId(request.getId()));
     }
 }

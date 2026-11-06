@@ -5,6 +5,7 @@ import { SOCIETY_PLACEHOLDER, active, clickNext, fillOwner, fillPartyIgr, fillPr
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 import { gotoSettled, reloadSettled } from '../../../helpers/settle.js';
+import { ACTORS } from '../../../fixtures/live.js';
 // Co-fill must be live: it spans two accounts and browser contexts.
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
@@ -91,6 +92,32 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     expect(secondInvite?.partyIndex).toBe(1);
   });
 
+  test('the server sends the invitee a WhatsApp invite, whether or not their number has an account yet', async () => {
+    const registered = uniqueMobile();
+    await apiLogin(registered, { api: API });
+    const unregistered = uniqueMobile();
+    const { accessToken: ownerToken } = await apiLogin(uniqueMobile(), { api: API });
+    const admin = await authHeaders(ACTORS.admin);
+    /* e2e runs the log-only sender, which records each send it would have made; `q` matches the
+       recipient's full number, so a row here is the server addressing that exact person. */
+    const invitesLogged = async (mobile) => {
+      const res = await fetch(`${API}/admin/integrations/calls?provider=whatsapp&size=50&q=${mobile}`, { headers: admin });
+      expect(res.status, 'an admin can read the provider call log').toBe(200);
+      return (await res.json()).content.filter((c) => c.operation === 'agreement-invite').length;
+    };
+
+    const { requestId } = await coFillOverHttp(ownerToken, registered);
+    const second = await fetch(`${API}/service-requests/${requestId}/parties`, {
+      method: 'POST',
+      headers: authed(ownerToken),
+      body: JSON.stringify({ role: 'tenant', partyIndex: 1, mobile: unregistered }),
+    });
+    expect(second.status, 'a number with no account can be invited too').toBe(201);
+
+    await expect.poll(() => invitesLogged(registered), { message: 'the registered tenant was sent the invite' }).toBe(1);
+    await expect.poll(() => invitesLogged(unregistered), { message: 'the new number was sent the invite' }).toBe(1);
+  });
+
   test('the owner\'s invite becomes a row the SERVER addressed to the tenant\'s account, and the tenant opens it from a different browser with only their own section editable', async ({ page, browser }) => {
     /* Two actors, a full wizard run and a second browser context. */
     test.slow();
@@ -142,7 +169,7 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
       'the owner is told they are waiting on a reply, not on a signup',
     ).toBeVisible();
 
-    const href = await page.getByRole('link', { name: /Send invite on WhatsApp/ }).getAttribute('href');
+    const href = await page.getByRole('link', { name: /Send it yourself on WhatsApp/ }).getAttribute('href');
     const decoded = decodeURIComponent(href || '');
     expect(decoded).toContain('wa.me/91');
     expect(decoded, 'the live invite is addressed to a party, not carried as a token').toContain('?party=');
@@ -222,7 +249,13 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     const created = page.waitForResponse(
       (r) => r.request().method() === 'POST' && /\/service-requests\/co-fill$/.test(new URL(r.url()).pathname),
     );
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    await page.route('**/service-requests/co-fill', async (route) => { await held; await route.continue(); }, { times: 1 });
     await review.getByRole('button', { name: /Generate Agreement & Proceed/ }).click();
+    await expect(review.getByRole('button', { name: 'Submitting…' }), 'a submit that takes no payment does not announce one').toBeVisible();
+    await expect(review.getByText('Opening secure payment…')).toHaveCount(0);
+    release();
     const res = await created;
     expect(res.status(), 'the server accepted the tenant-started co-fill').toBe(201);
     const body = await res.json();

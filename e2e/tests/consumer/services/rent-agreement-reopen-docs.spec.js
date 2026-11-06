@@ -50,7 +50,12 @@ test('an invited tenant who reopens their submitted invite finds their documents
     await clickNext(t, 4);
     await active(t).getByRole('checkbox').check();
     const filled = t.waitForResponse((r) => r.request().method() === 'PUT' && /\/party-details$/.test(new URL(r.url()).pathname));
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    await t.route('**/party-details', async (route) => { await held; await route.continue(); }, { times: 1 });
     await active(t).getByRole('button', { name: /Generate Agreement & Proceed/ }).click();
+    await expect(active(t).getByRole('button', { name: 'Submitting…' }), 'the owner already paid, so the tenant\'s submit is not a payment').toBeVisible();
+    release();
     expect((await filled).status()).toBe(200);
     await expect.poll(async () => {
       const res = await fetch(`${API}/service-requests/${body.id}`, { headers: await authHeaders(tenantMobile) });

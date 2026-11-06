@@ -11,6 +11,7 @@ public interface DecisionMessenger {
     String WAITING_DIGEST = "waiting-digest";
     String OWNER_NOTICE = "owner-notice";
     String SERVICE_ATTENTION = "service-attention";
+    String AGREEMENT_INVITE = "agreement-invite";
 
     void sendIdentityDecision(String mobile, String line);
 
@@ -20,6 +21,10 @@ public interface DecisionMessenger {
     boolean sendOwnerNotice(String mobile, String tenantName, String place, String link);
 
     default boolean sendServiceAttention(String mobile, String service) {
+        return false;
+    }
+
+    default boolean sendAgreementInvite(String mobile, String inviter, String side, String place, String link) {
         return false;
     }
 }
@@ -63,6 +68,15 @@ class LoggingDecisionMessenger implements DecisionMessenger {
     public boolean sendServiceAttention(String mobile, String service) {
         log.info("[MOCK WHATSAPP] {} needs attention, to {}", service, MobileMask.mask(mobile));
         calls.record(ProviderCalls.WHATSAPP, SERVICE_ATTENTION, ProviderCalls.Outcome.SKIPPED, mobile, null,
+                "mock", null);
+        return false;
+    }
+
+    @Override
+    public boolean sendAgreementInvite(String mobile, String inviter, String side, String place, String link) {
+        log.info("[MOCK WHATSAPP] agreement invite to {} as {} from {}: {}", MobileMask.mask(mobile), side,
+                inviter, link);
+        calls.record(ProviderCalls.WHATSAPP, AGREEMENT_INVITE, ProviderCalls.Outcome.SKIPPED, mobile, null,
                 "mock", null);
         return false;
     }
