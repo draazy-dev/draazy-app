@@ -66,7 +66,7 @@ function monthLabel(iso) {
 function Attention({ attention: a }) {
   const items = [
     a.refundRequests > 0 && { key: 'refunds', to: '/admin/refunds', text: `${fmtNum(a.refundRequests)} refund request${a.refundRequests === 1 ? '' : 's'} to decide`, amount: a.refundRequestAmount },
-    a.serviceRefunds > 0 && { key: 'service-refunds', to: '/admin/rent-agreement', text: `${fmtNum(a.serviceRefunds)} service refund${a.serviceRefunds === 1 ? '' : 's'} to decide`, amount: a.serviceRefundAmount },
+    a.serviceRefunds > 0 && { key: 'service-refunds', to: '/admin/refunds', text: `${fmtNum(a.serviceRefunds)} service refund${a.serviceRefunds === 1 ? '' : 's'} to decide`, amount: a.serviceRefundAmount },
     a.openDisputes > 0 && { key: 'disputes', to: '/admin/refunds?tab=disputes', text: `${fmtNum(a.openDisputes)} open payment dispute${a.openDisputes === 1 ? '' : 's'}`, amount: a.openDisputeAmount },
   ].filter(Boolean);
   if (!items.length) return null;

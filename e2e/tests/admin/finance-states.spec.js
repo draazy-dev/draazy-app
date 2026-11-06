@@ -67,11 +67,14 @@ test.describe('finance console: staged states', () => {
     await openFinance(page);
     const strip = page.getByTestId('finance-attention');
     await expect(strip.getByRole('link', { name: /2 refund requests to decide/ })).toHaveAttribute('href', '/admin/refunds');
-    await expect(strip.getByRole('link', { name: /1 service refund to decide/ })).toHaveAttribute('href', '/admin/rent-agreement');
+    await expect(strip.getByRole('link', { name: /1 service refund to decide/ })).toHaveAttribute('href', '/admin/refunds');
     await expect(strip.getByRole('link', { name: /1 open payment dispute/ })).toHaveAttribute('href', '/admin/refunds?tab=disputes');
     await expect(strip).toContainText('₹1,398');
     await expect(strip).toContainText('₹4,001');
     await expect(strip).toContainText('₹2,499');
+    await strip.getByRole('link', { name: /1 service refund to decide/ }).click();
+    await expect(page, 'rent-agreement refunds are decided on the Refunds desk').toHaveURL(/\/admin\/refunds$/);
+    await expect(page.getByText('Review pass and rent-agreement refunds, automatic refunds and disputes.')).toBeVisible();
   });
 
   test('a month whose refunds exceed its fees reads as a negative net, with the drop against last month', async ({ page }) => {
