@@ -57,14 +57,15 @@ const soloRatio = (page, labelText) => page.evaluate((text) => {
   return control.getBoundingClientRect().width / card.getBoundingClientRect().width;
 }, labelText);
 
-test('a fresh Details step: unselected deal and BHK, strength meter, StepNav and compact layout', async ({ page }) => {
+test('a fresh Details step: Pune-market defaults, strength meter, StepNav and compact layout', async ({ page }) => {
   test.slow();
   await gotoFlow(page);
   const meter = page.locator('.lp-meter');
 
-  await test.step('deal and BHK are not pre-filled', async () => {
-    await expect(page.locator('[data-err="deal"] .radio-pill.selected')).toHaveCount(0);
-    await expect(page.locator('[data-err="bhk"] .radio-pill.selected')).toHaveCount(0);
+  await test.step('a new listing opens as a semi-furnished 2 BHK flat for sale', async () => {
+    await expect(page.locator('[data-err="deal"] .radio-pill.selected')).toHaveText(['Sale']);
+    await expect(page.locator('[data-err="bhk"] .radio-pill.selected')).toHaveText(['2']);
+    await expect(page.getByRole('button', { name: 'Semi-Furnished', exact: true })).toHaveAttribute('aria-pressed', 'true');
   });
 
   await test.step('BHK pills read as numbers, consistent with Bathrooms/Balconies', async () => {
@@ -144,8 +145,9 @@ test('a fresh Details step: unselected deal and BHK, strength meter, StepNav and
     expect(await pctOf(page)).toBeGreaterThan(start);
   });
 
-  await test.step('a flatmate post takes four steps, like the property form: details, location, price, then photos', async () => {
+  await test.step('Rent opens on the whole place; a flatmate post takes four steps: details, location, price, then photos', async () => {
     await page.locator('.radio-pill', { hasText: 'Rent' }).first().click();
+    await expect(page.locator('.radio-pill.selected', { hasText: 'Rent out the whole place' })).toHaveCount(1);
     await page.locator('.radio-pill', { hasText: 'Find a flatmate' }).first().click();
     await expect(page.locator('.lp-steps__item')).toHaveText([/Details/, /Location/, /Price/, /Photos/]);
   });
@@ -347,9 +349,6 @@ test('filling only the mandatory fields keeps the meter above where it started a
   await page.locator('[data-err="ownership"]').click();
   await menuOpen(page);
   await page.locator('.dz-dropdown__option').first().click();
-  // Possession is mandatory and not pre-selected, so leaving it blank would make this a test about an
-  // incomplete form rather than about a complete-but-minimal one.
-  await page.getByRole('button', { name: 'Ready to Move', exact: true }).click();
   /* The final `pctOf` read does not retry, so the meter has to be known-settled first. `Select.jsx` drops
      `is-placeholder` only once a value is selected, the closest thing to a commit signal this control has. */
   await expect(page.locator('[data-err="ownership"] .dz-dropdown__value')).not.toHaveClass(/is-placeholder/);

@@ -110,3 +110,19 @@ export const initialForm = {
   ownerConsent: false,
   attachedPropertyId: '',
 };
+
+// Most common Pune choices, for new listings only: edits and prefills spread initialForm, so a default
+// there would silently invent facts on an existing listing.
+export const NEW_LISTING_DEFAULTS = {
+  deal: 'buy',
+  propertyType: 'flat',
+  bhk: '2',
+  bathrooms: '2',
+  parkingSpaces: '1',
+  furnishing: 'semi',
+  construction: 'ready',
+  rentMaintMode: 'included',
+  preferredTenants: ['anyone'],
+};
+
+export const newListingForm = { ...initialForm, ...NEW_LISTING_DEFAULTS };

@@ -52,13 +52,14 @@ test('Furniture picker: titled by what the owner declares, tiles are keyboard-op
   const picker = page.getByTestId('in-flat-features');
 
   await test.step('one in-flat picker for every furnishing, titled by what the owner is declaring', async () => {
-    await expect(picker.getByText("What's already fitted?")).toBeVisible();
-    await expect(picker.locator('.furn-tile', { hasText: 'Modular Kitchen' })).toBeVisible();
-
-    await page.getByText('Furnishing Status').locator('..').getByText('Furnished', { exact: true }).click();
+    const furnishing = (label) => page.getByText('Furnishing Status').locator('..').getByText(label, { exact: true });
     await expect(picker.getByText("What's included?")).toBeVisible();
     await expect(picker.locator('.furn-tile', { hasText: 'Modular Kitchen' })).toBeVisible();
-    await page.getByText('Furnishing Status').locator('..').getByText('Furnished', { exact: true }).click();
+
+    await furnishing('Unfurnished').click();
+    await expect(picker.getByText("What's already fitted?")).toBeVisible();
+    await expect(picker.locator('.furn-tile', { hasText: 'Modular Kitchen' })).toBeVisible();
+    await furnishing('Furnished').click();
     await expect(picker.getByText("What's included?")).toBeVisible();
     await expect(picker.locator('.furn-tile', { hasText: 'Modular Kitchen' })).toBeVisible();
   });

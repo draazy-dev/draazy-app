@@ -3,6 +3,7 @@ import {
   isLandType, isCommercialType, isResidentialType, isHouseType, commercialSpecsFor,
   amenitiesFor, STRONG_PHOTO_COUNT,
 } from './constants.js';
+import { newListingForm } from './initialForm.js';
 
 export const MILESTONES = [20, 40, 60, 80, 100];
 
@@ -127,31 +128,6 @@ const TIERS = [
 ];
 
 const NUDGE_ORDER = ['photos', 'description', 'amenities'];
-const EMPTY_DEFAULTS = {
-  balconies: '1',
-  furnishing: 'unfurnished',
-  areaUnit: 'sqft',
-  propLat: 18.5590,
-  propLng: 73.7760,
-  pinPlaced: false,
-  priceNegotiable: false,
-  pantry: false,
-  cornerPlot: false,
-  boundaryWall: false,
-  electricity: false,
-  roadAccess: false,
-  vegOnly: false,
-  petsAllowed: false,
-  agreementDuration: '11',
-  lockIn: '0',
-  noticePeriod: '1',
-  bestTimeToCall: 'anytime',
-  foodPref: 'any',
-  lookingFor: 'any',
-  hostRole: 'owner',
-  agreementDeclared: false,
-  ownerConsent: false,
-};
 
 const sameDefault = (value, def) => Array.isArray(def)
   ? Array.isArray(value) && value.length === def.length && value.every((v, i) => v === def[i])
@@ -160,7 +136,7 @@ const sameDefault = (value, def) => Array.isArray(def)
 const hasMeaningfulInput = (form, photos) => {
   if (photos.length) return true;
   return Object.entries(form || {}).some(([key, value]) => {
-    if (Object.prototype.hasOwnProperty.call(EMPTY_DEFAULTS, key) && sameDefault(value, EMPTY_DEFAULTS[key])) return false;
+    if (Object.prototype.hasOwnProperty.call(newListingForm, key) && sameDefault(value, newListingForm[key])) return false;
     if (Array.isArray(value)) return value.length > 0;
     if (typeof value === 'boolean') return value;
     return filled(value);

@@ -20,7 +20,7 @@ import {
   leaseKindOf, LEASE_DEFAULTS, defaultAreaUnitFor, FLOOR_PLAN_CATEGORY, photoCategoriesFor,
   homeTypeLabelFor, withInFlatAsFurniture,
 } from './constants.js';
-import { initialForm } from './initialForm.js';
+import { initialForm, newListingForm, NEW_LISTING_DEFAULTS } from './initialForm.js';
 import { classifyChanges } from './editPolicy.js';
 import { scrollToError, validateStep1, validateLocationStep, validatePricingStep, validateStep3, validateFlatmateRoom, validateFlatmateLocation, validateFlatmatePricing } from './validation.js';
 import { triggerConfetti } from './confetti.js';
@@ -40,16 +40,14 @@ const LEGACY_LIST_PROPERTY_DRAFT_KEY = `${LIST_PROPERTY_DRAFT_PREFIX}:v2`;
 const DRAFT_STEP_KEY = '__currentStep';
 const DRAFT_PHOTOS_KEY = '__photos';
 const DRAFT_RENT_MODE_KEY = '__rentMode';
-const dealPreset = (searchParams, flatmateMode, editId) => {
-  if (editId) return '';
+const dealPreset = (searchParams, flatmateMode) => {
   const deal = searchParams.get('deal');
   if (deal === 'buy' || deal === 'rent') return deal;
-  return flatmateMode ? 'rent' : '';
+  return flatmateMode ? 'rent' : NEW_LISTING_DEFAULTS.deal;
 };
-const initialForEntry = (searchParams, flatmateMode, editId) => ({
-  ...initialForm,
-  deal: dealPreset(searchParams, flatmateMode, editId),
-});
+const initialForEntry = (searchParams, flatmateMode, editId) => (editId
+  ? { ...initialForm }
+  : { ...newListingForm, deal: dealPreset(searchParams, flatmateMode) });
 const bathroomsForBhk = (bhk) => {
   const n = Number(bhk);
   if (!Number.isFinite(n) || n <= 1) return '1';
@@ -180,7 +178,8 @@ export default function useListProperty() {
       setForm((previous) => ({
         ...previous,
         bhk: value,
-        bathrooms: previous.bathrooms || bathroomsForBhk(value),
+        bathrooms: previous.bathrooms && previous.bathrooms !== bathroomsForBhk(previous.bhk)
+          ? previous.bathrooms : bathroomsForBhk(value),
       }));
       if (errors.bhk || errors.bathrooms) {
         setErrors((previous) => {
@@ -353,7 +352,7 @@ export default function useListProperty() {
   const leaveGuardActive = useMemo(() => {
     if (showSuccess || skipLeaveGuard.current) return false;
     const baseline = editRoomId ? roomEdit.baseline || initialForm
-      : editId && editListing?.form ? editListing.form : initialForm;
+      : editId ? editListing?.form || initialForm : entryForm.current;
     const savedPhotoUrls = editRoomId ? roomEdit.photoUrls
       : editId ? (editListing?.images || editListing?.gallery || []).filter(Boolean) : [];
     const photoUrls = durablePhotos(photos).map((photo) => photo.url);

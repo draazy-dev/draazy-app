@@ -84,17 +84,12 @@ test('a flat cannot leave step 1 without a floor, and Ground survives as an answ
   await page.waitForSelector('.gm-style', { timeout: 30000 });
 });
 
-test('possession is an unanswered required choice, and the answer drives the search facet', async ({ page, request }) => {
+test('possession defaults to Ready to Move, and that answer drives the search facet', async ({ page, request }) => {
   const mobile = await gotoPricing(page);
   await page.locator('input[data-err="price"]').fill('9500000');
   await pickOption(page, 'ownership', 'Freehold');
-  // No pre-selection: a pre-filled "Ready to Move" would make the requirement unfailable, so every sale
-  // would publish the default as though the owner had chosen it.
-  await expect(page.locator('[data-err="possession"] .radio-pill[aria-pressed="true"]')).toHaveCount(0);
-  await page.getByRole('button', { name: /Next Step/i }).click();
-  await expect(page.getByText('Select the possession status.', { exact: true })).toBeVisible();
+  await expect(page.locator('[data-err="possession"] .radio-pill[aria-pressed="true"]')).toHaveText(['Ready to Move']);
   // Age stayed blank on step 1 and is never revisited: it does not govern the facet.
-  await page.getByRole('button', { name: 'Ready to Move', exact: true }).click();
   await page.getByRole('button', { name: /Next Step/i }).click();
   await page.waitForSelector('text=/Photos & description/i', { timeout: 15000 });
   await uploadPublishablePhotos(page);
