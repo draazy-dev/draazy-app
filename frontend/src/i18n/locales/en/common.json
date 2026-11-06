@@ -182,8 +182,6 @@
     "endsIn_other": "Agreement ends in {{count}} days · {{date}}",
     "ended": "Agreement ended on {{date}}",
     "deposit": "Security deposit ₹{{amount}}",
-    "policePending": "Police intimation being filed by Draazy",
-    "policeDone": "Police intimation filed",
-    "policeDoneOn": "Police intimation filed on {{date}}"
+    "policeDone": "Police informed at registration"
   }
 }

@@ -3,7 +3,7 @@ import { API, apiLogin, authHeaders, signIn, uniqueMobile } from '../../helpers/
 
 const STAFFER = { mobile: '9383334640' };
 const ROW_KEYS = ['id', 'type', 'status', 'details', 'requesterName', 'requesterMobile', 'assignee', 'assignedToMe', 'createdAt', 'amount', 'sla',
-  'policeConfirmed', 'approvedAt'];
+  'approvedAt'];
 const OWNER_PAN = 'ZZZQA1234Z';
 const OWNER_AADHAAR = '999988887779';
 

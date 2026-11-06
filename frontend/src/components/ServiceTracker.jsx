@@ -5,8 +5,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { STEPS, stepStates, statusMeta, isActive, progressPct } from '../lib/serviceRequestStatus.js';
 import {
-  listServiceRequests, decideServiceRequestDraft, approveServiceRequestDraftParty, markServiceRequestRead, markServiceRequestDraftOpened,
-  getServiceRequestDocumentUrl, cancelServiceRequest,
+  listServiceRequests, decideServiceRequestDraft, approveServiceRequestDraftParty, markServiceRequestDraftOpened,
+  getServiceRequestDocumentUrl, cancelServiceRequest, deleteServiceRequest,
 } from '../services/serviceRequestService.js';
 import { openDocFrom } from '../lib/openDoc.js';
 import { timeAgo } from '../lib/format.js';
@@ -14,7 +14,8 @@ import useScrollLock from '../hooks/useScrollLock.js';
 import RejectedPapers from './RejectedPapers.jsx';
 import RevisedTerms from './RevisedTerms.jsx';
 import AttentionNeeded from './AttentionNeeded.jsx';
-import TrackerChat from './TrackerChat.jsx';
+import { Link } from 'react-router';
+import { supportLink } from '../lib/supportLink.js';
 import IdentityRefill, { needsIdentityRefill } from './IdentityRefill.jsx';
 import { REVISIT_READ } from '../services/http.js';
 
@@ -58,31 +59,13 @@ function Progress({ status }) {
 
 function PoliceIntimationStep({ request, t }) {
   if (request.type !== 'rental' || request.status !== 'completed') return null;
-  const done = !!request.policeIntimation?.confirmed;
   return (
-    <div className={`mt-3 rounded-xl border p-3 ${done ? 'border-emerald-500/25 bg-emerald-500/8' : 'border-amber-500/25 bg-amber-500/8'}`}>
+    <div className="mb-3 rounded-xl border border-emerald-500/25 bg-emerald-500/8 p-3" data-testid="police-intimation-step">
       <p className="text-sm font-semibold text-white flex items-center gap-2">
-        <Icon name={done ? 'check-circle-2' : 'shield-alert'} className={`w-4 h-4 ${done ? 'text-emerald-300' : 'text-amber-300'}`} />
+        <Icon name="check-circle-2" className="w-4 h-4 text-emerald-300" />
         {t('services.ra.police.title')}
       </p>
-      <p className="mt-1 text-xs leading-relaxed text-gray-300">
-        {done ? t('services.ra.police.done') : t('services.ra.police.pending')}
-      </p>
-      {!done ? (
-        <>
-          <p className="mt-2 text-xs leading-relaxed text-gray-400">{t('services.ra.police.copyNote')}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <a href="https://punepolice.gov.in" target="_blank" rel="noopener noreferrer" className="btn-outline px-3 py-2 rounded-lg text-xs text-gray-200 inline-flex items-center gap-1.5">
-              {t('services.ra.police.pune')} <Icon name="external-link" className="w-3 h-3" />
-            </a>
-            <a href="https://pcpc.gov.in" target="_blank" rel="noopener noreferrer" className="btn-outline px-3 py-2 rounded-lg text-xs text-gray-200 inline-flex items-center gap-1.5">
-              {t('services.ra.police.pcmc')} <Icon name="external-link" className="w-3 h-3" />
-            </a>
-          </div>
-        </>
-      ) : request.policeIntimation?.reference ? (
-        <p className="mt-2 text-xs text-gray-400">{t('services.ra.police.reference', { ref: request.policeIntimation.reference })}</p>
-      ) : null}
+      <p className="mt-1 text-xs leading-relaxed text-gray-300">{t('services.ra.police.done')}</p>
     </div>
   );
 }
@@ -90,7 +73,7 @@ function PoliceIntimationStep({ request, t }) {
 function FormCStep({ request, t }) {
   if (request.type !== 'rental' || request.status !== 'completed' || !hasForeignTenant(request)) return null;
   return (
-    <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/8 p-3">
+    <div className="mb-3 rounded-xl border border-amber-500/25 bg-amber-500/8 p-3">
       <p className="text-sm font-semibold text-white flex items-center gap-2"><Icon name="shield-alert" className="w-4 h-4 text-amber-300" /> {t('services.ra.formC.title')}</p>
       <p className="mt-1 text-xs leading-relaxed text-gray-300">{t('services.ra.formC.tracker')}</p>
     </div>
@@ -103,13 +86,12 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
   const { toast } = useToast();
   const mobile = user?.mobile || '';
   const [tick, setTick] = useState(0);
-  const [openId, setOpenId] = useState(null);
   const [changeReq, setChangeReq] = useState(null);
   const [changeNote, setChangeNote] = useState('');
   const [otpDraft, setOtpDraft] = useState({});
   const [showCancelled, setShowCancelled] = useState(false);
-  const [cancelArmed, setCancelArmed] = useState(null);
-  const [cancelling, setCancelling] = useState(null);
+  const [armed, setArmed] = useState(null);
+  const [busy, setBusy] = useState(null);
   const refresh = () => setTick((t) => t + 1);
 
   useScrollLock(Boolean(changeReq));
@@ -183,9 +165,9 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
     } catch (e) { console.warn('[service-tracker] request-changes failed', e); toast('Could not send the change request. Please try again.', 'error'); }
   };
   const cancelUnpaid = async (r) => {
-    if (cancelling) return;
-    if (cancelArmed !== r.id) { setCancelArmed(r.id); return; }
-    setCancelling(r.id);
+    if (busy) return;
+    if (armed !== r.id) { setArmed(r.id); return; }
+    setBusy(r.id);
     try {
       await cancelServiceRequest(r.id);
       toast('Request cancelled.', 'success');
@@ -194,18 +176,25 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
       console.warn('[service-tracker] cancel failed', e);
       toast('Could not cancel this request. Please try again.', 'error');
     } finally {
-      setCancelling(null);
-      setCancelArmed(null);
+      setBusy(null);
+      setArmed(null);
       refresh();
     }
   };
-  const openThread = async (r) => {
-    setOpenId((current) => (current === r.id ? null : r.id));
+  const deleteCancelled = async (r) => {
+    if (busy) return;
+    if (armed !== r.id) { setArmed(r.id); return; }
+    setBusy(r.id);
     try {
-      await markServiceRequestRead(r.id);
-      refresh();
-    } catch (error) {
-      console.warn('[service-tracker] mark-read failed', error);
+      await deleteServiceRequest(r.id);
+      setRequests((prev) => prev.filter((x) => x.id !== r.id));
+      toast('Request deleted.', 'success');
+    } catch (e) {
+      console.warn('[service-tracker] delete failed', e);
+      toast('Could not delete this request. Please try again.', 'error');
+    } finally {
+      setBusy(null);
+      setArmed(null);
     }
   };
 
@@ -215,8 +204,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
   const shown = showCancelled ? requests : requests.filter((r) => r.status !== 'cancelled');
 
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pt">
-      <div className="glass-card rounded-2xl p-5 sm:p-6">
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8     section-pt">      <div className="glass-card rounded-2xl p-4 sm:p-6">
         <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
           <h2 className="text-white font-bold text-lg flex items-center gap-2"><Icon name="list-checks" className="w-5 h-5 text-teal-400" /> {title}</h2>
         </div>
@@ -238,7 +226,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
                 : statusMeta(r.status);
               const unreadStaff = (r.messages || []).filter((x) => x.from === 'staff' && !x.read).length;
               return (
-                <div key={r.id} className="rounded-xl border border-white/10 border-l-4 bg-white/[0.03] p-4" style={{ borderLeftColor: m.color }}>
+                <div key={r.id} className="rounded-xl border border-white/10 border-l-4 bg-white/[0.03] p-3 sm:p-4" style={{ borderLeftColor: m.color }}>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <span className="dz-tag font-semibold" style={{ background: m.bg, color: m.color }}><Icon name={m.icon} className="w-3.5 h-3.5 flex-shrink-0" /> {m.label}</span>
                     {r.updatedAt ? <span className="text-[11px] text-gray-500 flex-shrink-0 mt-1">{timeAgo(r.updatedAt)}</span> : null}
@@ -281,45 +269,50 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
 
                   {(() => {
                   const view = !!onView && !!canView && r.status !== 'cancelled' && canView(r);
-                  const soloMsg = !view && r.status !== 'draft_shared' && !(r.status === 'completed' && r.finalDoc) && !r.cancellable;
                   const draft = myDraft(r);
                   return (
-                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                  <>
+                  {r.status === 'draft_shared' && !draft.opened ? <p className="mb-2 text-[11px] text-gray-500">Open the draft to approve it.</p> : null}
+                  <div className="btn-row" data-testid="tracker-actions">
                     {r.status === 'draft_shared' ? (
                       <>
-                        <button onClick={() => openDraft(r)} className="btn-outline w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-gray-200 text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="file-text" className="w-3.5 h-3.5" /> View draft{r.draft?.version ? ' v' + r.draft.version : ''}</button>
+                        <button type="button" onClick={() => openDraft(r)} className="btn-outline"><Icon name="file-text" className="w-3.5 h-3.5" /> View draft{r.draft?.version ? ' v' + r.draft.version : ''}</button>
                         {draft.approved ? (
-                          <button type="button" disabled data-testid="tracker-approved" className="btn-teal w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"><Icon name="check-circle-2" className="w-3.5 h-3.5" /> Approved</button>
+                          <button type="button" disabled data-testid="tracker-approved" className="btn-teal"><Icon name="check-circle-2" className="w-3.5 h-3.5" /> Approved</button>
                         ) : (
-                          <button onClick={() => approve(r)} disabled={!draft.opened} title={draft.opened ? undefined : 'Open the draft first'} className="btn-teal w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>
+                          <button type="button" onClick={() => approve(r)} disabled={!draft.opened} title={draft.opened ? undefined : 'Open the draft first'} className="btn-teal"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>
                         )}
-                        <button onClick={() => requestChanges(r)} className="btn-outline w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-gray-200 text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="rotate-ccw" className="w-3.5 h-3.5" /> Request changes</button>
-                        {!draft.opened ? <p className="col-span-2 sm:basis-full text-[11px] text-gray-500">Open the draft to approve it.</p> : null}
+                        {draft.approved ? null : (
+                          <button type="button" onClick={() => requestChanges(r)} className="btn-outline"><Icon name="rotate-ccw" className="w-3.5 h-3.5" /> Request changes</button>
+                        )}
                       </>
                     ) : null}
                     {r.status === 'completed' && r.finalDoc ? (
-                      <button onClick={() => openFinal(r)} className="btn-teal w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="download" className="w-3.5 h-3.5" /> Download registered copy</button>
+                      <button type="button" onClick={() => openFinal(r)} className="btn-teal btn-row-full"><Icon name="download" className="w-3.5 h-3.5" /> Download registered copy</button>
                     ) : null}
                     {r.cancellable ? (
-                      <button type="button" onClick={() => cancelUnpaid(r)} disabled={cancelling === r.id} data-testid="tracker-cancel-unpaid"
-                        className="btn-outline w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-rose-300 text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
-                        <Icon name="x" className="w-3.5 h-3.5" /> {cancelArmed === r.id ? 'Tap again to cancel' : 'Cancel request'}
+                      <button type="button" onClick={() => cancelUnpaid(r)} disabled={busy === r.id} data-testid="tracker-cancel-unpaid" className="btn-outline text-rose-300">
+                        <Icon name="x" className="w-3.5 h-3.5" /> {armed === r.id ? 'Tap again to cancel' : 'Cancel request'}
+                      </button>
+                    ) : null}
+                    {r.status === 'cancelled' ? (
+                      <button type="button" onClick={() => deleteCancelled(r)} disabled={busy === r.id} data-testid="tracker-delete" className="btn-outline text-rose-300">
+                        <Icon name="trash-2" className="w-3.5 h-3.5" /> {armed === r.id ? 'Tap again to delete' : 'Delete'}
                       </button>
                     ) : null}
                     {view ? (
-                      <button type="button" onClick={() => onView(r)} data-testid="tracker-view-details" className="btn-outline text-gray-200 w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">
+                      <button type="button" onClick={() => onView(r)} data-testid="tracker-view-details" className="btn-outline">
                         <Icon name="eye" className="w-3.5 h-3.5" /> View details
                       </button>
                     ) : null}
-                    <button onClick={() => openThread(r)} className={'btn-outline w-full sm:w-auto justify-center relative px-3 py-2 rounded-lg text-gray-200 text-xs font-semibold inline-flex items-center gap-1.5 ' + (soloMsg ? 'col-span-2 sm:col-span-1' : '')}>
-                      <Icon name="message-square" className="w-3.5 h-3.5" /> Messages
+                    <Link to={supportLink('request', r.id)} data-testid="tracker-support" className="btn-outline relative">
+                      <Icon name="message-square" className="w-3.5 h-3.5" /> Message support
                       {unreadStaff ? <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] flex items-center justify-center font-bold">{unreadStaff}</span> : null}
-                    </button>
+                    </Link>
                   </div>
+                  </>
                   );
                   })()}
-
-                  {openId === r.id ? <TrackerChat request={r} open={isActive(r.status)} onSent={refresh} /> : null}
                 </div>
               );
             })}

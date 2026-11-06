@@ -142,13 +142,6 @@ export function toViewModel(dto) {
     propertyId: dto.propertyId ?? null,
     paymentSessionId: dto.paymentSessionId ?? null,
     registration: dto.registration ?? null,
-    policeIntimation: {
-      confirmed: !!dto.policeIntimation?.confirmed,
-      confirmedAt: epoch(dto.policeIntimation?.confirmedAt) || null,
-      confirmedBy: dto.policeIntimation?.confirmedBy || null,
-      reference: dto.policeIntimation?.reference || null,
-      submittedOn: dto.policeIntimation?.submittedOn || null,
-    },
     sla: dto.sla ? { waitingOn: dto.sla.waitingOn, dueAt: epoch(dto.sla.dueAt) || null, overdue: !!dto.sla.overdue } : null,
     amendment: dto.amendment ? {
       id: dto.amendment.id,
@@ -204,7 +197,6 @@ export function toQueueRow(row) {
     createdAt: created,
     amount: row.amount ?? null,
     sla: row.sla ? { waitingOn: row.sla.waitingOn, dueAt: epoch(row.sla.dueAt) || null, overdue: !!row.sla.overdue } : null,
-    policeIntimation: { confirmed: !!row.policeConfirmed },
     timeline: approvedAt ? [{ stage: 'draft.approved', by: '', at: approvedAt }] : [],
     updatedAt: Math.max(created, approvedAt),
   };

@@ -11,7 +11,7 @@ export function stagesDone(request, checklist) {
     case 'draft_shared':
     case 'changes_requested': return 4;
     case 'approved': return 5;
-    case 'completed': return request.policeIntimation?.confirmed ? 7 : 6;
+    case 'completed': return 7;
     default: return 0;
   }
 }
@@ -29,9 +29,7 @@ export function nextStep(request, checklist) {
     case 'draft_shared': return { who: 'customer', text: 'Waiting for every party to approve the draft' };
     case 'changes_requested': return { who: 'desk', text: 'Customer asked for changes — revise and re-share the draft' };
     case 'approved': return { who: 'desk', text: 'Book the registration, then upload the registered copy' };
-    case 'completed': return request.policeIntimation?.confirmed
-      ? { who: 'done', text: 'All done' }
-      : { who: 'desk', text: 'Confirm police intimation to close the case' };
+    case 'completed': return { who: 'done', text: 'All done' };
     case 'cancelled': return { who: 'done', text: 'Cancelled' };
     default: return { who: 'customer', text: 'Awaiting payment' };
   }

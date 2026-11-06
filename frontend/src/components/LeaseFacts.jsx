@@ -21,7 +21,7 @@ function Line({ icon, tone = 'text-gray-400', testId, children }) {
 
 export default function LeaseFacts({ home, testId, className = '' }) {
   const { t, i18n } = useTranslation();
-  const { leaseEnd, deposit, policeIntimation, policeIntimatedOn } = home;
+  const { leaseEnd, deposit, policeIntimation } = home;
   if (!leaseEnd && !deposit && !policeIntimation) return null;
   const left = leaseEnd ? daysUntil(leaseEnd) : null;
   return (
@@ -37,12 +37,7 @@ export default function LeaseFacts({ home, testId, className = '' }) {
         <Line icon="piggy-bank" testId={testId + '-deposit'}>{t('leaseFacts.deposit', { amount: fmtNum(deposit) })}</Line>
       )}
       {policeIntimation === 'done' && (
-        <Line icon="shield-check" tone="text-emerald-300" testId={testId + '-police'}>
-          {policeIntimatedOn ? t('leaseFacts.policeDoneOn', { date: fmtDate(policeIntimatedOn) }) : t('leaseFacts.policeDone')}
-        </Line>
-      )}
-      {policeIntimation === 'pending' && (
-        <Line icon="shield" testId={testId + '-police'}>{t('leaseFacts.policePending')}</Line>
+        <Line icon="shield-check" tone="text-emerald-300" testId={testId + '-police'}>{t('leaseFacts.policeDone')}</Line>
       )}
     </div>
   );

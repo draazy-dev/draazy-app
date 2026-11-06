@@ -24,7 +24,6 @@ public record ServiceRequestDto(
         Long amount,
         String paymentSessionId,
         RegistrationDto registration,
-        PoliceIntimationDto policeIntimation,
         Sla sla,
         Amendment amendment,
         DraftApproval draftApproval,
@@ -67,7 +66,7 @@ public record ServiceRequestDto(
     public ServiceRequestDto withPaymentSessionId(String sessionId) {
         return new ServiceRequestDto(id, type, team, status, propertyId, ticketId, details, assignee,
                 assignedToMe, timeline, documents, messages, parties, createdAt, amount, sessionId, registration,
-                policeIntimation, sla, amendment, draftApproval, charges, attention, cancellable, editableByMe,
+                sla, amendment, draftApproval, charges, attention, cancellable, editableByMe,
                 mySideSubmitted, myPartyId, payableByMe, paidBy);
     }
 }

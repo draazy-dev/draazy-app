@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Hand } from 'lucide-react';
 import {
-  addServiceRequestMessage, cancelServiceRequestAsOps, getServiceRequest, getServiceRequestRefunds, readServiceRequestChecklist,
+  cancelServiceRequestAsOps, getServiceRequest, getServiceRequestRefunds, readServiceRequestChecklist,
   shareServiceRequestDraft, takeServiceRequest, uploadServiceRequestFinalDoc,
 } from '../../../services/serviceRequestService.js';
 import { classNames, fmtINR } from '../../../lib/format.js';
@@ -13,10 +13,9 @@ import InternalNote, { saveNoteIfAny } from '../../../components/ui/InternalNote
 import AgeTone from '../service-queue/AgeTone.jsx';
 import AmendTerms from '../service-queue/AmendTerms.jsx';
 import CancelDialog from '../service-queue/CancelDialog.jsx';
-import MessageThread from '../service-queue/MessageThread.jsx';
+import OpenSupportChat from '../../../components/admin/support-chat/OpenSupportChat.jsx';
 import OverlapCheck from '../service-queue/OverlapCheck.jsx';
 import PartyIdentities from '../service-queue/PartyIdentities.jsx';
-import PoliceIntimation from '../service-queue/PoliceIntimation.jsx';
 import Refunds from '../service-queue/Refunds.jsx';
 import RegistrationCheck from '../service-queue/RegistrationCheck.jsx';
 import SendBackForCorrection from '../service-queue/SendBackForCorrection.jsx';
@@ -142,7 +141,6 @@ function CaseView({ initial, checklistRead, onChanged }) {
   const shareDraft = act(shareServiceRequestDraft, 'The draft was shared with the customer.', 'Draft shared');
 
   const uploadFinal = act(uploadServiceRequestFinalDoc, 'The registered copy was uploaded.', 'Registered copy uploaded');
-  const sendMessage = act(addServiceRequestMessage);
   const cancel = async (reason) => {
     await act(cancelServiceRequestAsOps, null, 'Cancelled')(reason);
     const after = await getServiceRequestRefunds(detail.id).catch(() => null);
@@ -197,7 +195,7 @@ function CaseView({ initial, checklistRead, onChanged }) {
             terms: <AmendTerms key={`amend-${detail.id}`} request={detail} onUpdated={applyUpdate} />,
           }}
           tabs={[
-            { id: 'messages', title: 'Messages', count: detail.messages?.length, countLabel: 'messages', body: <MessageThread messages={detail.messages} onSend={sendMessage} /> },
+            { id: 'messages', title: 'Messages', body: <OpenSupportChat about={{ type: 'request', id: detail.id, label: detail.service || 'Rent agreement' }} label="Chat with customer" /> },
             detail.amount > 0 ? {
               id: 'payment', title: 'Payment',
               body: <><PaymentCard request={detail} /><Refunds key={`refunds-${detail.id}`} request={detail} /></>,
@@ -238,10 +236,7 @@ function CaseView({ initial, checklistRead, onChanged }) {
         <SendBackForCorrection key={`attention-${detail.id}`} request={detail} checklist={checklist} onUpdated={applyUpdate} />
 
         {detail.status === 'completed' ? (
-          <>
-            <RegistrationCheck key={`reg-${detail.id}`} request={detail} onError={toastError} onUnavailable={docUnavailable} />
-            <PoliceIntimation key={`police-${detail.id}`} request={detail} onUpdated={applyUpdate} onError={toastError} />
-          </>
+          <RegistrationCheck key={`reg-${detail.id}`} request={detail} onError={toastError} onUnavailable={docUnavailable} />
         ) : null}
 
         <div className={card}>

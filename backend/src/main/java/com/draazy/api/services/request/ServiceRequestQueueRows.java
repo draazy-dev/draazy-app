@@ -26,15 +26,12 @@ class ServiceRequestQueueRows {
             "timeline", "ptype", "area", "purpose", "from", "to", "moveDate", "homeSize");
 
     private final UserRepository users;
-    private final ServiceRequestPoliceIntimationRepository policeIntimations;
     private final ServiceRequestEventRepository events;
     private final RentAgreementReadiness readiness;
 
-    ServiceRequestQueueRows(UserRepository users,
-            ServiceRequestPoliceIntimationRepository policeIntimations, ServiceRequestEventRepository events,
+    ServiceRequestQueueRows(UserRepository users, ServiceRequestEventRepository events,
             RentAgreementReadiness readiness) {
         this.users = users;
-        this.policeIntimations = policeIntimations;
         this.events = events;
         this.readiness = readiness;
     }
@@ -43,16 +40,12 @@ class ServiceRequestQueueRows {
         if (requests.isEmpty()) {
             return List.of();
         }
-        List<UUID> completed = idsWhere(requests, ServiceRequestStatus.COMPLETED);
         List<UUID> approvedRentals = requests.stream()
                 .filter(r -> r.getStatus() == ServiceRequestStatus.APPROVED
                         && ServiceRequestTypes.RENT_AGREEMENT.equals(r.getType()))
                 .map(ServiceRequest::getId).toList();
 
         Map<UUID, User> people = people(requests);
-        Set<UUID> confirmed = completed.isEmpty() ? Set.of()
-                : policeIntimations.findByServiceRequestIdIn(completed).stream()
-                        .map(ServiceRequestPoliceIntimation::getServiceRequestId).collect(Collectors.toSet());
         Map<UUID, Instant> approvedAt = approvedRentals.isEmpty() ? Map.of() : approvedAt(approvedRentals);
         Instant now = Instant.now();
 
@@ -68,12 +61,7 @@ class ServiceRequestQueueRows {
                 r.getCreatedAt(),
                 r.getAmount(),
                 RentAgreementSla.of(r, now, readiness.waitingOnTenant(r)),
-                confirmed.contains(r.getId()),
                 approvedAt.get(r.getId()))).toList();
-    }
-
-    private static List<UUID> idsWhere(List<ServiceRequest> requests, ServiceRequestStatus status) {
-        return requests.stream().filter(r -> r.getStatus() == status).map(ServiceRequest::getId).toList();
     }
 
     private Map<UUID, User> people(List<ServiceRequest> requests) {

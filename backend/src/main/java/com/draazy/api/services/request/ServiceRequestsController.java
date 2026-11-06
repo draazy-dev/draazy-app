@@ -56,6 +56,7 @@ public class ServiceRequestsController {
     private final ServiceRequestDocumentReviews documentReviews;
     private final ServiceRequestDraftApprovals draftApprovals;
     private final RentAgreementDetailsEdits detailsEdits;
+    private final ServiceRequestDeletion deletion;
 
     private static final String CANCEL = Routes.ServiceRequests.BY_ID + "/cancel";
 
@@ -79,7 +80,8 @@ public class ServiceRequestsController {
             ServiceRequestDrafting drafting,
             ServiceRequestDocumentReviews documentReviews,
             ServiceRequestDraftApprovals draftApprovals,
-            RentAgreementDetailsEdits detailsEdits) {
+            RentAgreementDetailsEdits detailsEdits,
+            ServiceRequestDeletion deletion) {
         this.service = service;
         this.staffTransitions = staffTransitions;
         this.identities = identities;
@@ -91,6 +93,7 @@ public class ServiceRequestsController {
         this.documentReviews = documentReviews;
         this.draftApprovals = draftApprovals;
         this.detailsEdits = detailsEdits;
+        this.deletion = deletion;
     }
 
     @GetMapping(Routes.ServiceRequests.BASE)
@@ -300,6 +303,12 @@ public class ServiceRequestsController {
     @PostMapping(CANCEL)
     public ServiceRequestDto cancel(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         return service.cancelUnpaid(principal, id);
+    }
+
+    @DeleteMapping(Routes.ServiceRequests.BY_ID)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
+        deletion.delete(principal, id);
     }
 
     @PostMapping(Routes.ServiceRequests.PARTIES)

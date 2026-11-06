@@ -65,9 +65,6 @@ export const requestServiceRequestRefund = async (id, refund) =>
 export const decideServiceRequestRefund = async (id, refundId, decision, note) =>
   (await provider()).decideServiceRequestRefund(id, refundId, decision, note);
 
-export const confirmServiceRequestPoliceIntimation = async (id, payload) =>
-  (await provider()).confirmServiceRequestPoliceIntimation(id, payload);
-
 export const verifyRentAgreement = async (agreementId, status) =>
   (await provider()).verifyRentAgreement(agreementId, status);
 
@@ -94,6 +91,8 @@ export const simulateServiceRequestPayment = async (id, outcome) =>
   (await provider()).simulateServiceRequestPayment(id, outcome);
 export const cancelServiceRequest = async (id) =>
   (await provider()).cancelServiceRequest(id);
+export const deleteServiceRequest = async (id) =>
+  (await provider()).deleteServiceRequest(id);
 
 export const withdrawServiceRequestParty = async (id, partyId) =>
   (await provider()).withdrawServiceRequestParty(id, partyId);
@@ -112,9 +111,6 @@ export const recordServiceRequestIdentities = async (id, parties) =>
 
 export const readMaskedServiceRequestIdentities = async (id) =>
   (await provider()).readMaskedServiceRequestIdentities(id);
-
-export const addServiceRequestMessage = async (id, text) =>
-  (await provider()).addServiceRequestMessage(id, text);
 
 export const decideServiceRequestDraft = async (id, decision, note) =>
   (await provider()).decideServiceRequestDraft(id, decision, note);

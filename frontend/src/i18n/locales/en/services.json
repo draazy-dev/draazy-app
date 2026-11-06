@@ -11,7 +11,7 @@
       "spotlight": {
         "badge": "Most booked service",
         "title": "Rent Agreement, done online",
-        "sub": "Registered with Maharashtra, zero office trips. We handle stamp duty, biometric and delivery.",
+        "sub": "Registered with Maharashtra, zero office trips. We handle the draft, stamp duty and e-registration.",
         "chip": {
           "govt": "Govt-registered",
           "doorstep": "Doorstep biometric",
@@ -63,7 +63,7 @@
         },
         "packersMovers": {
           "name": "Packers & Movers",
-          "desc": "Vetted relocation partners at negotiated, transparent, all-inclusive rates."
+          "desc": "Relocation partners at negotiated, transparent, all-inclusive rates."
         },
         "interior": {
           "name": "Interior & Renovation",
@@ -97,19 +97,19 @@
         "clean": "Deep Cleaning",
         "agreement": "Rent Agreement (registered)",
         "paint": "Painting touch-up",
-        "verify": "Tenant/Owner Verification",
+        "verify": "Tenant/Owner ID check",
         "internet": "Wi-Fi & utilities setup"
       },
       "packItemDesc": {
-        "movers": "Vetted crew, transport & insurance",
+        "movers": "Packing crew & transport",
         "clean": "Sanitised deep clean before move-in",
         "agreement": "Registered on the Maharashtra portal",
         "paint": "Touch-ups & minor wall repairs",
-        "verify": "Police + ID background check",
+        "verify": "ID document check before you sign",
         "internet": "Broadband, electricity & gas setup"
       },
       "finalizeRentTitle": "Rental finalized — let's complete the paperwork!",
-      "finalizeRentSub": "Create a legally-valid rent agreement and verify your tenant, all online.",
+      "finalizeRentSub": "Create a legally valid rent agreement, all online.",
       "finalizeSaleTitle": "Sale finalized — let's complete the registration!",
       "finalizeSaleSub": "Get title due-diligence, sale-deed drafting and sub-registrar assistance — end to end.",
       "ourServices": "Our services",
@@ -143,7 +143,7 @@
       "packBookedToast": "Move-in Pack booked! Our team will call to schedule.",
       "packFailed": "We couldn't book your Move-in Pack just now. Your selection is still here — please try again in a moment.",
       "ctaTitle": "Ready to start your home journey?",
-      "ctaSub": "Browse verified homes, or let us handle the rest.",
+      "ctaSub": "Browse owner-direct homes, or let us handle the rest.",
       "ctaBrowse": "Browse Properties",
       "ctaList": "List Your Property"
     },
@@ -180,13 +180,8 @@
       "donePaymentPendingDesc": "Your rent agreement details are saved. If you've just paid, your bank may still be confirming it — check your requests in a few minutes before paying again. Our team starts drafting once the payment is confirmed.",
       "donePaymentPendingCta": "Complete payment",
       "police": {
-        "title": "Tell the police about your tenant",
-        "pending": "After registration, the owner must submit tenant information to the police commissionerate. Draazy does not file it; our team marks this done after the owner confirms.",
-        "done": "Owner confirmation recorded. This post-registration step is complete.",
-        "copyNote": "Use the registered agreement copy — that is what the police portal will ask for.",
-        "pune": "Pune City Police tenant information",
-        "pcmc": "Pimpri-Chinchwad Police tenant information",
-        "reference": "Reference: {{ref}}"
+        "title": "Police informed",
+        "done": "Registering on the government IGR portal shares your tenant's details with the police automatically. Nothing to file."
       },
       "formC": {
         "title": "Form C / FRRO reminder",
@@ -194,9 +189,9 @@
         "tracker": "Foreign national tenant: after registration, the owner must submit Form C to FRRO on indiafrro.gov.in within 24 hours of the foreigner's arrival or occupation. Draazy does not file this for you."
       },
       "invite": {
-        "sendTitle": "Send the invite to your tenant",
-        "sendDesc": "Request saved. Send the secure link to {{mobile}} so they can add their details & documents.",
-        "sendWhatsapp": "Send invite on WhatsApp",
+        "sendTitle": "Invite sent to your tenant",
+        "sendDesc": "Request saved. We've sent the secure link to {{mobile}} on WhatsApp so they can add their details & documents. Not there? Send it yourself below.",
+        "sendWhatsapp": "Send it yourself on WhatsApp",
         "copyLink": "Copy invite link",
         "copied": "Link copied",
         "copyFail": "Couldn't copy — long-press the link to copy it.",
@@ -211,7 +206,7 @@
         "readonlyDesc": "You can review every part of this agreement, but only your Tenant details can be edited here.",
         "editableTitle": "Your details — please complete this step",
         "editableDesc": "Add your tenant information and documents. This is the only section you need to fill in.",
-        "sendTitle_owner": "Send the invite to the owner",
+        "sendTitle_owner": "Invite sent to the owner",
         "sendNote_owner": "The owner opens the link, signs in and checks the whole agreement. Once it's complete, either of you can pay. You'll be notified as it moves.",
         "readonlyTitle_owner": "Set up by the tenant — view only",
         "readonlyDesc_owner": "You can review every part of this agreement, but only your Owner details can be edited here.",
@@ -228,9 +223,9 @@
         "badge": "Maharashtra Leave & License",
         "title1": "Online Rent Agreement",
         "titleAccent": "drafted, e-registered, doorstep",
-        "subtitle": "Govt-approved draft, stamp duty and e-registration, all handled. Optional biometric at your doorstep.",
-        "chip1": "100% Legal Format",
-        "chip2": "Stamp Duty Included",
+        "subtitle": "Online draft, stamp duty and IGR e-registration, all handled. We visit your doorstep for the biometric.",
+        "chip1": "Legal Format",
+        "chip2": "Stamp Duty Handled",
         "chip3": "Biometric e-Registration",
         "step1Title": "Share details",
         "step1Desc": "Property, parties & rent",
@@ -248,6 +243,7 @@
         "subtitle": "Tell us about the property being rented.",
         "pickerQuestion": "Which property is this agreement for?",
         "enterManually": "Or enter details manually below ↓",
+        "agreementFor": "This agreement is for",
         "propertyType": "Property Type",
         "flatNo": "Flat / House No.",
         "flatNoPlaceholder": "e.g. B-1204",
@@ -351,7 +347,7 @@
         "mobileErr": "Enter a valid 10-digit mobile number.",
         "mobileNotYou": "Only the owner fills this part. Use your own number if you own the flat, or invite the owner.",
         "uploadDocs": "Upload Documents",
-        "uploadHint": "JPG, PNG or PDF — up to 2MB each.",
+        "uploadHint": "JPG, PNG or PDF. We compress each file to under 1 MB.",
         "doc": {
           "o-passport": "Passport Scan",
           "o-visa": "Visa / OCI Scan",
@@ -645,6 +641,7 @@
         "payAndSubmit": "Pay {{amount}} & Submit",
         "payNote": "Your request reaches our team only after payment.",
         "generating": "Opening secure payment…",
+        "submitting": "Submitting…",
         "residential": "Residential",
         "rowCoOwners": "Co-owners",
         "rowOwnerIdentity": "Owner identity",
@@ -725,7 +722,7 @@
         "item": [
           {
             "name": "Leave & License drafting",
-            "desc": "Govt-approved residential format."
+            "desc": "Maharashtra Leave & License format."
           },
           {
             "name": "Online e-registration",
@@ -744,8 +741,8 @@
             "desc": "Renew before it expires."
           },
           {
-            "name": "Police verification help",
-            "desc": "Tenant verification, where required."
+            "name": "Police informed, automatically",
+            "desc": "IGR registration shares tenant details with the police."
           }
         ],
         "faq": [
@@ -822,8 +819,8 @@
         "title_joined": "You're part of a rent agreement",
         "desc": "You have a rent agreement in progress. The details you submitted are now locked so they can be drafted and registered accurately.",
         "desc_joined": "Someone added you to their rent agreement. Tap View details on the request above to see it or fill in your part.",
-        "changesHint": "Need to change something? Use the request tracker above — open Messages to talk to our team, or choose \"Request changes\" when we share the draft for your approval.",
-        "changesHint_joined": "Questions about this agreement? Open Messages on the request above to talk to our team.",
+        "changesHint": "Need to change something? Use the request tracker above — tap Message support to talk to our team, or choose \"Request changes\" when we share the draft for your approval.",
+        "changesHint_joined": "Questions about this agreement? Tap Message support on the request above to talk to our team.",
         "startNew": "Start a new agreement",
         "startNewHint": "For a different property",
         "continue": "Add what's missing to this request",
@@ -844,7 +841,7 @@
         "viewTitle_pending": "This agreement — view only",
         "editableDesc": "You can still change your details until our team starts on the agreement.",
         "editableDesc_pending": "Check what's filled in so far, then add your details.",
-        "lockedDesc": "Our team has started on this agreement, so your details are locked. To change anything, open Messages on the request tracker above.",
+        "lockedDesc": "Our team has started on this agreement, so your details are locked. To change anything, tap Message support on the request tracker above.",
         "edit": "Edit my details",
         "edit_pending": "Fill my details",
         "close": "Close",
@@ -981,7 +978,7 @@
             "Modular kitchen + wardrobes",
             "Laminate finishes",
             "Essential false ceiling & lighting",
-            "5-year warranty"
+            "Warranty written into your quote"
           ]
         },
         {
@@ -1019,7 +1016,7 @@
         },
         {
           "t": "Production",
-          "d": "Vetted partners manufacture and execute with quality checks."
+          "d": "Partner workshops manufacture and install your interiors."
         },
         {
           "t": "Move In",
@@ -1027,7 +1024,7 @@
         }
       ],
       "trackerTitle": "Your interior & renovation requests",
-      "consultBadge1": "10-yr warranty",
+      "consultBadge1": "Warranty in your quote",
       "consultBadge2": "No hidden costs",
       "consultImgAlt": "Designed living room",
       "consultPromo": "Free 3D design and an itemised quote",
@@ -1100,15 +1097,15 @@
       "lightboxAlt": "Project preview"
     },
     "valuation": {
-      "rateBasedComparables": "≈ ₹{{rate}} / sq.ft · based on {{comps}} comparables in {{loc}}",
+      "rateBasedComparables": "≈ ₹{{rate}} / sq.ft · based on {{loc}} locality rates",
       "rateBasedCityAvg": "≈ ₹{{rate}} / sq.ft · based on Pune city-average rates for {{loc}}",
-      "heroBadge": "Data-backed · Qualified valuers",
+      "heroBadge": "Instant estimate · Qualified valuers",
       "heroTitle1": "Know what your",
       "heroTitleAccent": "property is really worth",
-      "heroSubtitle": "Get an instant ballpark estimate for free, then request a certified valuation report — accepted by banks, courts and tax authorities. Our valuers analyse real Pune comparables, not guesswork.",
+      "heroSubtitle": "Get an instant ballpark estimate for free, then request a certified valuation report from a qualified valuer, who inspects the property and works from recent comparables.",
       "heroChip1": "Instant estimate",
       "heroChip2": "Signed valuer report",
-      "heroChip3": "Real local comparables",
+      "heroChip3": "Inspection-based report",
       "widgetTitle": "Instant Valuation Estimate",
       "widgetSub": "A free, indicative range based on current Pune market rates.",
       "locality": "Locality",
@@ -1130,21 +1127,19 @@
       "floorTop": "Top / Penthouse",
       "aiEstLabel": "Estimated Market Value",
       "confidence": "Confidence",
-      "comparables": "Comparables",
-      "trendYoY": "Trend (YoY)",
       "getCertified": "Get a Certified Report",
       "indicativeOnly": "Indicative only. A certified valuation requires a physical inspection.",
       "stat": {
         "estimate": "Instant estimate",
-        "comparables": "Local comparables",
+        "comparables": "Locality rates",
         "callback": "Callback",
         "fees": "Fee shared upfront"
       },
       "servicesTitle": "Valuation Reports We Provide",
       "servicesSub": "A certified, purpose-specific valuation for whatever you need it for.",
       "trend": {
-        "title": "Pune locality price trends",
-        "sub": "Indicative average rates and year-on-year growth across popular Pune micro-markets — a quick read on where prices are heading.",
+        "title": "Pune locality rates",
+        "sub": "Indicative average rates across popular Pune micro-markets — the base the instant estimate starts from.",
         "perSqft": "/ sq.ft",
         "note": "Indicative averages from recent deals and ready-reckoner rates. Your actual valuation depends on the specific property, floor, condition and comparables."
       },
@@ -1155,7 +1150,7 @@
         },
         {
           "name": "Bank / Mortgage Valuation",
-          "desc": "Lender-accepted valuation for home loans, balance transfers and top-ups."
+          "desc": "A bank-style valuation for home loans, balance transfers and top-ups. Ask your lender if they need their own panel valuer."
         },
         {
           "name": "Capital Gains / Tax",
@@ -1231,8 +1226,8 @@
           "d": "Every report is signed by the valuer who inspected the property."
         },
         {
-          "t": "Data-backed",
-          "d": "Valuations use real recent comparables and ready-reckoner rates — not gut feel."
+          "t": "Inspection-based",
+          "d": "Certified reports use a site inspection, recent comparables and ready-reckoner rates."
         },
         {
           "t": "Clear Timeline",
@@ -1272,14 +1267,10 @@
       "ctaCall": "Call {{phone}}"
     },
     "homeLoans": {
-      "compareTitle": "Compare Home Loan Rates",
-      "compareSub": "Indicative interest rates from our top lending partners.",
-      "onwards": "onwards",
-      "ratesNote": "*Rates are indicative and subject to lender approval based on your profile.",
       "emiTitle": "Know your EMI first",
       "emiSub": "Use our interactive calculator to plan repayments before you apply.",
       "openEmi": "Open EMI Calculator",
-      "badge": "Interest rates from 8.45% p.a.",
+      "badge": "Compare offers from banks & NBFCs",
       "titleTop": "Home loans made",
       "titleAccent": "simple & affordable",
       "subtitle": "Share a few details and our loan desk compares offers from partner banks & NBFCs for your profile, and calls you back — paperwork handled at your doorstep.",
@@ -1339,7 +1330,7 @@
         },
         {
           "t": "Offers Side by Side",
-          "d": "See rates, fees and EMIs from different lenders together before you choose."
+          "d": "Compare offers, fees and EMIs from different lenders before you choose."
         },
         {
           "t": "Eligibility Check",
@@ -1417,7 +1408,7 @@
       "timeline": [
         {
           "t": "Title Verification",
-          "d": "We run a 30-year title search and pull the Encumbrance Certificate to confirm a clear, marketable title."
+          "d": "We run a 30-year title search and pull the Encumbrance Certificate to check the title history."
         },
         {
           "t": "Sale Deed Drafting",
@@ -1450,11 +1441,11 @@
         "Passport-size photos of all parties",
         "Power of Attorney (if applicable)"
       ],
-      "badge": "Verified advocates · IGR Maharashtra process",
+      "badge": "IGR Maharashtra registration process",
       "titleTop": "Property registration,",
       "titleAccent": "made effortless",
       "subtitle": "From title verification to your registered sale deed — our legal experts handle drafting, stamp duty, the Sub-Registrar appointment and every formality. Share your details and we'll call you back to get started.",
-      "feature1": "Verified advocates",
+      "feature1": "Title search & due diligence",
       "feature2": "Transparent fixed fees",
       "feature3": "End-to-end paperwork",
       "quoteTitle": "Talk to a Legal Expert",
@@ -1484,7 +1475,7 @@
         },
         {
           "name": "Title Search & Due Diligence",
-          "desc": "30-year title search and encumbrance check so you buy with a clear, litigation-free title."
+          "desc": "30-year title search and encumbrance check so you know what you are buying."
         },
         {
           "name": "Stamp Duty & Registration",
@@ -1505,8 +1496,8 @@
       ],
       "trust": [
         {
-          "t": "Verified Advocates",
-          "d": "Every deed is drafted and checked by a property advocate."
+          "t": "Title Checked",
+          "d": "A title search and encumbrance check so you know what you are buying."
         },
         {
           "t": "Transparent Fixed Fees",
@@ -1532,7 +1523,7 @@
         },
         {
           "q": "Why is title verification important?",
-          "a": "A 30-year title search and Encumbrance Certificate confirm the seller's ownership and that the property is free of loans, disputes or charges — protecting you before you pay."
+          "a": "A 30-year title search and Encumbrance Certificate help check the seller's ownership history and any recorded loans, disputes or charges. Draazy does not guarantee title."
         },
         {
           "q": "How long does registration take?",
@@ -1557,12 +1548,12 @@
       }
     },
     "packers": {
-      "badge": "Registered moving partners",
+      "badge": "Moving partners in Pune",
       "titleTop": "Stress-free home shifting",
       "titleAccent": "in & from Pune",
       "subtitle": "Share your moving details and our relocation desk negotiates transparent, all-inclusive rates with trusted movers — then calls you back with the best quote. No haggling, no hidden charges.",
       "trackerTitle": "Your packers & movers requests",
-      "feature1": "Transit insurance",
+      "feature1": "Free survey & quote",
       "feature2": "Transparent pricing",
       "feature3": "One point of contact",
       "quoteTitle": "Get a Free Quote",
@@ -1593,11 +1584,11 @@
         },
         {
           "name": "Intercity Relocation",
-          "desc": "Moving to or from another city? Insured, GPS-tracked transport with timely delivery to any city across India."
+          "desc": "Moving to or from another city? Door-to-door transport to any city across India."
         },
         {
           "name": "Packing & Unpacking",
-          "desc": "5-layer quality packing for fragiles, electronics and furniture — plus dismantling, reassembly and unpacking at the new home."
+          "desc": "Packing for fragiles, electronics and furniture — plus dismantling, reassembly and unpacking at the new home."
         },
         {
           "name": "Office / Commercial",
@@ -1605,25 +1596,25 @@
         },
         {
           "name": "Vehicle Transport",
-          "desc": "Safe car & bike transportation in enclosed carriers with full transit insurance and real-time tracking."
+          "desc": "Car and bike transport, booked alongside your home move."
         },
         {
           "name": "Storage & Warehousing",
-          "desc": "Clean, secure, CCTV-monitored short or long-term storage for when your move-in and move-out dates don't line up."
+          "desc": "Short or long-term storage for when your move-in and move-out dates don't line up."
         }
       ],
       "trust": [
         {
-          "t": "Registered Partners",
-          "d": "We only recommend registered movers, and we go through every quote with you before you confirm."
+          "t": "Quote Walkthrough",
+          "d": "We go through every quote with you before you confirm a mover."
         },
         {
           "t": "Transparent Rates",
           "d": "We negotiate all-inclusive quotes — no hidden labour, toll or last-minute charges."
         },
         {
-          "t": "Transit Insurance",
-          "d": "Optional all-risk insurance covers your belongings end to end during the move."
+          "t": "Free Survey",
+          "d": "A quick video or in-person survey before we quote, at no cost to you."
         },
         {
           "t": "One Point of Contact",
@@ -1654,12 +1645,12 @@
           "a": "No. Getting a quote and our relocation-desk assistance is completely free — you only pay the moving partner for the service you confirm."
         },
         {
-          "q": "How are the moving partners verified?",
-          "a": "We only recommend registered moving partners, and we go through every quote with you before you confirm."
+          "q": "How do you pick the moving partner?",
+          "a": "We collect quotes from moving partners and go through every quote with you before you confirm."
         },
         {
           "q": "Are my belongings insured during the move?",
-          "a": "Yes — optional all-risk transit insurance is available on every move and is strongly recommended for intercity relocations."
+          "a": "Ask for transit insurance when you get your quote. Whether it is offered, and what it covers, depends on the mover; it is worth taking for intercity moves."
         },
         {
           "q": "How soon will someone contact me?",

@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
@@ -24,6 +25,9 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
               and (:type is null or r.type = :type)
               and (:status is null or r.status = :status)
               and (:ticketId is null or r.ticketId = :ticketId)
+              and not exists (select 1 from ServiceRequestDismissal d
+                              where d.requestId = r.id
+                                and d.userId = :requesterId)
             order by r.createdAt desc
             """)
     Page<ServiceRequest> findForRequester(@Param("requesterId") UUID requesterId,
@@ -49,6 +53,25 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             where r.id = :id
             """)
     Optional<ServiceRequest> findByIdForUpdate(@Param("id") UUID id);
+
+    @Modifying
+    @Query(value = """
+            insert into service_request_dismissals (request_id, user_id)
+            values (:id, :userId)
+            on conflict (request_id, user_id) do nothing
+            """, nativeQuery = true)
+    void dismiss(@Param("id") UUID id, @Param("userId") UUID userId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            with messages as (delete from service_request_messages where request_id = :id),
+                 timeline as (delete from service_request_timeline where request_id = :id),
+                 parties as (delete from service_request_parties where request_id = :id),
+                 approvals as (delete from service_request_draft_approvals where request_id = :id),
+                 checks as (delete from service_request_draft_checks where request_id = :id)
+            delete from service_requests where id = :id
+            """, nativeQuery = true)
+    void purge(@Param("id") UUID id);
 
     @Query(value = "select id from users where id = :id for update", nativeQuery = true)
     Optional<UUID> lockUser(@Param("id") UUID id);

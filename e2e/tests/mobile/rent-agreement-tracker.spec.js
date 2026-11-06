@@ -90,6 +90,86 @@ test.describe('Rent agreement tracker on a phone', () => {
     expect(errors).toEqual([]);
   });
 
+  test('a cancelled request is deleted with a second tap and stays gone', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedConsent(page);
+    await signedInAsNew(page);
+    await page.goto('/services/rent-agreement');
+    const ids = await fileRequests(page);
+    await page.reload();
+
+    await tracker(page).getByRole('button', { name: 'Show 1 cancelled request' }).click();
+    const card = tracker(page).locator('.border-l-4').filter({ hasText: ids.cancelled.slice(0, 10) });
+    const remove = card.getByTestId('tracker-delete');
+    await expect(remove).toHaveText('Delete');
+    await expect(card.getByTestId('tracker-support')).toBeVisible();
+    await remove.click();
+    await expect(remove, 'one stray tap must not delete').toHaveText('Tap again to delete');
+    await remove.click();
+
+    await expect(card).toHaveCount(0);
+    await expect(tracker(page).getByRole('button', { name: /cancelled request/ })).toHaveCount(0);
+    await page.reload();
+    await expect(tracker(page).locator('.border-l-4').filter({ hasText: ids.live.slice(0, 10) })).toBeVisible({ timeout: 15000 });
+    await expect(tracker(page).getByRole('button', { name: /cancelled request/ }), 'deleted, not just hidden for this visit').toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('every request state lays its actions out in full rows with no clipped label', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedConsent(page);
+    await signedInAsNew(page);
+    const at = new Date().toISOString();
+    const row = (id, status, extra = {}) => ({
+      id, type: 'rent-agreement', status, details: { property: `Flat ${id}, Baner, Pune`, _state: {} }, mySideSubmitted: true,
+      createdAt: at, documents: [], messages: [], timeline: [], parties: [], ...extra,
+    });
+    const rows = [
+      row('layout0001', 'completed', { documents: [{ id: 'f1', category: 'final-document', fileName: 'registered.pdf', uploadedAt: at }] }),
+      row('layout0002', 'draft-shared', {
+        documents: [{ id: 'd1', category: 'draft', fileName: 'draft.pdf', uploadedAt: at }],
+        draftApproval: { version: 1, approved: 0, total: 1, parties: [{ key: 'owner', label: 'Owner', method: 'session', mine: true }] },
+      }),
+      row('layout0003', 'awaiting-payment', { cancellable: true }),
+      row('layout0004', 'cancelled'),
+    ];
+    await page.route(/\/api\/service-requests\?type=rent-agreement/, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) }));
+    await page.route(/\/api\/service-requests\/layout\d+\/checklist/, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"items":[]}' }));
+    await page.goto('/services/rent-agreement');
+
+    await tracker(page).getByRole('button', { name: 'Show 1 cancelled request' }).click();
+    const groups = tracker(page).getByTestId('tracker-actions');
+    await expect(groups).toHaveCount(rows.length, { timeout: 15000 });
+    await expect(tracker(page).getByRole('button', { name: 'Download registered copy' })).toBeVisible();
+    await expect(tracker(page).getByTestId('tracker-view-details')).toHaveCount(3);
+
+    for (const group of await groups.all()) {
+      const layout = await group.evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        const items = [...el.children].map((c) => {
+          const r = c.getBoundingClientRect();
+          return { label: c.textContent.trim(), left: r.left, right: r.right, top: Math.round(r.top), height: r.height, clipped: c.scrollWidth > c.clientWidth };
+        });
+        const lines = Object.values(items.reduce((acc, i) => ({ ...acc, [i.top]: [...(acc[i.top] || []), i] }), {}));
+        return { left: box.left, right: box.right, items, lines };
+      });
+      for (const item of layout.items) {
+        expect(item.clipped, `"${item.label}" fits its button`).toBe(false);
+        expect(Math.round(item.height), `"${item.label}" is a 44px tap target`).toBe(44);
+      }
+      for (const line of layout.lines) {
+        const labels = line.map((i) => i.label).join(' + ');
+        expect(Math.abs(line[0].left - layout.left), `${labels} starts at the card edge`).toBeLessThanOrEqual(1);
+        expect(Math.abs(line[line.length - 1].right - layout.right), `${labels} fills the row`).toBeLessThanOrEqual(1);
+      }
+      const download = layout.lines.find((line) => line.some((i) => i.label === 'Download registered copy'));
+      if (download) expect(download, 'the registered copy is the lead action on its own row').toHaveLength(1);
+    }
+    expect(errors).toEqual([]);
+  });
+
   test('the hero starts with the breadcrumb, not a blank band', async ({ page }) => {
     await seedConsent(page);
     await page.goto('/services/rent-agreement');

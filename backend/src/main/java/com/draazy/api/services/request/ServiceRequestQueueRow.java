@@ -17,6 +17,5 @@ public record ServiceRequestQueueRow(
         Instant createdAt,
         Long amount,
         ServiceRequestDto.Sla sla,
-        boolean policeConfirmed,
         Instant approvedAt) {
 }

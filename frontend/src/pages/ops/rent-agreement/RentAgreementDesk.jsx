@@ -87,7 +87,7 @@ export default function RentAgreementDesk() {
     <div className="pb-20">
       <PageHeader
         title="Rent Agreement"
-        subtitle="Paid rent agreements, from pick-up to police intimation."
+        subtitle="Paid rent agreements, from pick-up to registration."
         actions={<button type="button" onClick={reload} className="dz-btn dz-btn-ghost"><RefreshCw className="h-4 w-4" /> Refresh</button>}
       />
 
