@@ -23,13 +23,9 @@ public class LocalityPlaceService {
 
     static final String CLOSED_MESSAGE = "That area isn't open for new listings.";
 
-    static final String OUTSIDE_AREA_MESSAGE = "Pick a locality in Pune.";
+    static final String OUTSIDE_AREA_MESSAGE = "Pick a locality in an area we serve.";
 
     private static final String ACTIVE_CITY = "Pune";
-    private static final double SOUTH = 18.25;
-    private static final double NORTH = 18.95;
-    private static final double WEST = 73.30;
-    private static final double EAST = 74.35;
     private static final double NEARBY_KM = 2.5;
     private static final double EARTH_RADIUS_KM = 6371.0;
     private static final int MAX_SLUG_ATTEMPTS = 20;
@@ -41,12 +37,15 @@ public class LocalityPlaceService {
 
     private final LocalityRepository localities;
     private final PlacesLookup places;
+    private final ServedArea servedArea;
     private final TransactionTemplate tx;
     private final RejectedPlaces rejected = new RejectedPlaces(REJECTED_CAPACITY, Duration.ofHours(24), Clock.systemUTC());
 
-    public LocalityPlaceService(LocalityRepository localities, PlacesLookup places, TransactionTemplate tx) {
+    public LocalityPlaceService(LocalityRepository localities, PlacesLookup places, ServedArea servedArea,
+            TransactionTemplate tx) {
         this.localities = localities;
         this.places = places;
+        this.servedArea = servedArea;
         this.tx = tx;
     }
 
@@ -114,13 +113,15 @@ public class LocalityPlaceService {
             if (sameSlug.isPresent() && sameSlug.get().isActive() && sameSlug.get().isArchived()) {
                 throw new ValidationException(CLOSED_MESSAGE);
             }
-            if (sameSlug.isPresent() && localities.adopt(slug, place.placeId(), place.name(), place.lat(), place.lng()) == 1) {
+            if (sameSlug.isPresent()
+                    && localities.adopt(slug, place.placeId(), place.name(), place.lat(), place.lng(), place.district()) == 1) {
                 return LocalitySummary.of(localities.findById(slug).orElseThrow());
             }
         }
         for (int n = RESERVED_SLUGS.contains(slug) ? 2 : 1, tried = 0; tried < MAX_SLUG_ATTEMPTS; n++, tried++) {
             String candidate = n == 1 ? slug : slug + "-" + n;
-            if (localities.mint(candidate, place.name(), ACTIVE_CITY, place.placeId(), place.lat(), place.lng()) == 1) {
+            if (localities.mint(candidate, place.name(), ACTIVE_CITY, place.placeId(), place.lat(), place.lng(),
+                    place.district()) == 1) {
                 return LocalitySummary.of(localities.findById(candidate).orElseThrow());
             }
             known = known(place.placeId());
@@ -140,7 +141,7 @@ public class LocalityPlaceService {
         if (rejected.contains(placeId)) {
             throw new ValidationException(PICK_MESSAGE);
         }
-        Place hint = new Place(placeId, request.name(), request.lat(), request.lng(), null, request.types());
+        Place hint = new Place(placeId, request.name(), request.lat(), request.lng(), null, request.types(), null);
         Place place;
         try {
             place = places.details(placeId, hint).orElseThrow(() -> refused(placeId, PICK_MESSAGE));
@@ -152,7 +153,7 @@ public class LocalityPlaceService {
                 || place.name().strip().equalsIgnoreCase(ACTIVE_CITY)) {
             throw refused(placeId, PICK_MESSAGE);
         }
-        if (!served(place)) {
+        if (place.lat() == null || place.lng() == null || !servedArea.covers(place)) {
             throw refused(placeId, OUTSIDE_AREA_MESSAGE);
         }
         return place;
@@ -161,12 +162,6 @@ public class LocalityPlaceService {
     private ValidationException refused(String placeId, String message) {
         rejected.add(placeId);
         return new ValidationException(message);
-    }
-
-    private static boolean served(Place place) {
-        return place.lat() != null && place.lng() != null
-                && place.lat() >= SOUTH && place.lat() <= NORTH
-                && place.lng() >= WEST && place.lng() <= EAST;
     }
 
     private static boolean isLocalityType(String type) {

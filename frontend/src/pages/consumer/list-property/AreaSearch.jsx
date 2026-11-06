@@ -39,7 +39,7 @@ export default function AreaSearch({
     setLoading(true);
     const id = ++reqIdRef.current;
     debounceRef.current = setTimeout(async () => {
-      const list = await fetchSuggestions(q, ensureSession());
+      const list = await fetchSuggestions(q, ensureSession(), { servedArea: true });
       if (id !== reqIdRef.current) return;
       setSuggestions(list);
       setActive(-1);

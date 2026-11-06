@@ -31,17 +31,19 @@ public interface LocalityRepository extends JpaRepository<Locality, String> {
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
-            insert into localities (slug, name, city, lat, lng, place_id, active)
-            values (:slug, :name, :city, :lat, :lng, :placeId, true)
+            insert into localities (slug, name, city, lat, lng, place_id, active, district, district_checked_at)
+            values (:slug, :name, :city, :lat, :lng, :placeId, true, :district, now())
             on conflict do nothing""", nativeQuery = true)
     int mint(@Param("slug") String slug, @Param("name") String name, @Param("city") String city,
-            @Param("placeId") String placeId, @Param("lat") double lat, @Param("lng") double lng);
+            @Param("placeId") String placeId, @Param("lat") double lat, @Param("lng") double lng,
+            @Param("district") String district);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             update localities
-            set place_id = :placeId, name = :name, lat = :lat, lng = :lng, active = true, archived_at = null
+            set place_id = :placeId, name = :name, lat = :lat, lng = :lng, active = true, archived_at = null,
+                district = :district, district_checked_at = now()
             where slug = :slug and place_id is null and active = false""", nativeQuery = true)
     int adopt(@Param("slug") String slug, @Param("placeId") String placeId, @Param("name") String name,
-            @Param("lat") double lat, @Param("lng") double lng);
+            @Param("lat") double lat, @Param("lng") double lng, @Param("district") String district);
 }

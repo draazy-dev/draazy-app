@@ -60,7 +60,7 @@ class SocietyAdminEditTest extends AbstractApiTest {
         ResultActions minted = mvc.perform(post("/societies")
                         .header(HttpHeaders.AUTHORIZATION, bearer(author))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"placeId\":\"test-" + name.trim().toLowerCase().replaceAll("\\s+", "-") + "\",\"name\":\"" + name + "\"}"))
+                        .content("{\"placeId\":\"test-" + name.trim().toLowerCase().replaceAll("\\s+", "-") + "\",\"name\":\"" + name + "\",\"lat\":18.56,\"lng\":73.80}"))
                 .andExpect(status().isCreated());
         String json = minted.andReturn().getResponse().getContentAsString();
         int at = json.indexOf("\"slug\":\"") + 8;

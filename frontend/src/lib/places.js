@@ -1,6 +1,4 @@
-import { activeLocationConstraint, enforcedCityBounds, withinBounds, filterSuggestions, geoPolicySettled, PUNE_BOUNDS as GEO_PUNE_BOUNDS, PUNE_REGION_BOUNDS } from './geoConfig.js';
-
-export const PUNE_BOUNDS = GEO_PUNE_BOUNDS;
+import { activeLocationConstraint, enforcedServedBounds, withinAnyBounds, filterSuggestions, geoPolicySettled, servedBoundsList, servedSearchBox } from './geoConfig.js';
 
 export const LOCALITY_TYPES = ['locality', 'sublocality', 'neighborhood'];
 
@@ -90,14 +88,13 @@ async function resolvePredictionLocation(pred) {
   return loc;
 }
 
-async function fenceToActiveCity(list) {
-  const fence = enforcedCityBounds();
-  if (!fence || !list.length) return list;
+async function fenceTo(list, fences) {
+  if (!fences?.length || !list.length) return list;
   const located = await Promise.all(list.map(async (s) => [s, await resolvePredictionLocation(s)]));
-  const kept = located.filter(([, loc]) => withinBounds(loc?.lat, loc?.lng, fence)).map(([s]) => s);
+  const kept = located.filter(([, loc]) => withinAnyBounds(loc?.lat, loc?.lng, fences)).map(([s]) => s);
   if (import.meta.env?.DEV && list.length && !kept.length) {
     // eslint-disable-next-line no-console
-    console.warn('[places] city fence dropped all suggestions — check Admin ▸ Settings ▸ Maps city bounds.');
+    console.warn('[places] fence dropped all suggestions — check Admin ▸ Settings ▸ Maps served districts.');
   }
   return kept;
 }
@@ -108,14 +105,18 @@ export async function fetchSuggestions(input, sessionToken, opts = {}) {
   const places = await getPlacesLib();
   if (!places || !places.AutocompleteSuggestion) return [];
 
+  if (!opts.ignoreCityLimit && !opts.crossCity) await geoPolicySettled();
+  const servedBox = opts.servedArea ? servedSearchBox() : null;
   const base = {
     input: q,
     sessionToken: sessionToken || undefined,
     includedRegionCodes: ['in'],
+    ...(opts.language ? { language: opts.language } : {}),
     ...(opts.ignoreCityLimit || opts.crossCity
       ? {}
-      : opts.servedArea ? { locationRestriction: PUNE_REGION_BOUNDS }
-      : (opts.locationBias ? { locationBias: opts.locationBias } : activeLocationConstraint())),
+      : opts.locationBias ? { locationBias: opts.locationBias }
+      : opts.servedArea ? (servedBox ? { locationRestriction: servedBox } : {})
+      : activeLocationConstraint()),
   };
   const withTypes = opts.includedPrimaryTypes?.length ? { ...base, includedPrimaryTypes: opts.includedPrimaryTypes } : base;
 
@@ -133,7 +134,10 @@ export async function fetchSuggestions(input, sessionToken, opts = {}) {
     if (opts.ignoreCityLimit) return mapped;
     await geoPolicySettled();
     const filtered = filterSuggestions(mapped);
-    return opts.crossCity || opts.servedArea ? filtered : fenceToActiveCity(filtered);
+    if (opts.crossCity) return filtered;
+    if (!opts.servedArea) return fenceTo(filtered, enforcedServedBounds());
+    const boxes = servedBoundsList();
+    return opts.locationBias || boxes.length > 1 ? fenceTo(filtered, boxes) : filtered;
   };
 
   try {

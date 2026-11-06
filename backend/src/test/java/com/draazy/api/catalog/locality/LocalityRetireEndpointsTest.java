@@ -44,7 +44,8 @@ class LocalityRetireEndpointsTest extends AbstractApiTest {
         jdbc.update("delete from audit_log where entity = 'locality'");
         when(places.details(any(), any())).thenAnswer(call -> {
             Place hint = call.getArgument(1);
-            return Optional.of(hint);
+            return Optional.of(new Place(hint.placeId(), hint.name(), hint.lat(), hint.lng(), hint.pincode(),
+                    hint.types(), "Pune"));
         });
     }
 

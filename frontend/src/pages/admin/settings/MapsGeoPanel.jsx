@@ -1,47 +1,36 @@
 import { useState, useEffect, useRef, useId } from 'react';
-import { Globe, MapPin, Ban, Plus, Trash2, RotateCcw, Save, Search, Loader2 } from 'lucide-react';
+import { Globe, MapPin, Ban, Trash2, Search, Loader2, Type } from 'lucide-react';
 import { classNames } from '../../../lib/format.js';
-import { CITY_GEO, DEFAULT_CITY, cityLiveFrom } from '../../../lib/geoConfig.js';
 import { fetchAdminSuggestions, newAutocompleteSession } from '../../../lib/places.js';
 import Switch from '../../../components/ui/Switch.jsx';
-import MapBoundaryEditor from './MapBoundaryEditor.jsx';
+import PoweredByGoogle from '../../../components/ui/PoweredByGoogle.jsx';
+import ServedAreaCard from './ServedAreaCard.jsx';
 
-const num = (v) => (v === '' || v == null ? '' : String(v));
-const toNum = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
-
-function cityValues(geo, city) {
-  const base = CITY_GEO[city] || CITY_GEO[DEFAULT_CITY];
-  const ov = (geo.cities && geo.cities[city]) || {};
-  return { center: ov.center || base.center, bounds: ov.bounds || base.bounds };
-}
-
-const BOUND_FIELDS = [['north', 'North'], ['south', 'South'], ['east', 'East'], ['west', 'West']];
-
-function BlacklistPlaceSearch({ onPick }) {
+function BlacklistSearch({ onPickPlace, onAddTerm }) {
   const [q, setQ] = useState('');
   const [suggs, setSuggs] = useState([]);
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
   const listId = useId();
   const tokenRef = useRef(null);
   const boxRef = useRef(null);
   const reqRef = useRef(0);
+  const term = q.trim();
 
   useEffect(() => {
-    const s = q.trim();
-    if (s.length < 2) { setSuggs([]); setOpen(false); setLoading(false); return undefined; }
+    if (term.length < 2) { setSuggs([]); setLoading(false); return undefined; }
     setLoading(true);
     const id = ++reqRef.current;
     const t = setTimeout(async () => {
       if (!tokenRef.current) tokenRef.current = newAutocompleteSession();
-      const list = await fetchAdminSuggestions(s, tokenRef.current);
+      const list = await fetchAdminSuggestions(term, tokenRef.current);
       if (id !== reqRef.current) return;
       setSuggs(list);
-      setOpen(list.length > 0);
       setLoading(false);
     }, 220);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [term]);
 
   useEffect(() => {
     const onDown = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
@@ -49,138 +38,100 @@ function BlacklistPlaceSearch({ onPick }) {
     return () => document.removeEventListener('mousedown', onDown);
   }, []);
 
-  const pick = (s) => {
-    onPick({ placeId: s.placeId, term: s.mainText, note: s.secondaryText || '' });
+  const options = term.length < 2 ? [] : [...suggs.map((s) => ({ place: s })), { term }];
+  const showList = open && options.length > 0;
+
+  const done = () => {
     tokenRef.current = null;
-    setQ(''); setSuggs([]); setOpen(false);
+    setQ(''); setSuggs([]); setOpen(false); setActive(-1);
+  };
+  const choose = (opt) => {
+    if (opt.place) onPickPlace({ placeId: opt.place.placeId, term: opt.place.mainText, note: opt.place.secondaryText || '' });
+    else onAddTerm(opt.term);
+    done();
+  };
+
+  const onKeyDown = (e) => {
+    if (!options.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((i) => (i + 1) % options.length); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setOpen(true); setActive((i) => (i <= 0 ? options.length - 1 : i - 1)); }
+    else if (e.key === 'Enter' && showList && active >= 0) { e.preventDefault(); choose(options[active]); }
+    else if (e.key === 'Escape') setOpen(false);
   };
 
   return (
     <div className="relative" ref={boxRef}>
+      <label htmlFor={`${listId}-input`} className="mb-1 block text-xs font-medium text-gray-400">Hide a place</label>
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+        <Search className="pointer-events-none absolute inset-y-0 left-3 my-auto h-4 w-4 text-gray-500" aria-hidden="true" />
         <input
+          id={`${listId}-input`}
           value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onFocus={() => { if (suggs.length) setOpen(true); }}
-          placeholder="Search an exact place to blacklist (any city)…"
-          className="dz-input pl-9"
+          onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(-1); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={onKeyDown}
+          placeholder="Search a locality, society or name"
+          className="dz-input !pl-9 !pr-10"
           role="combobox"
-          aria-expanded={open}
+          aria-expanded={showList}
           aria-controls={listId}
+          aria-activedescendant={showList && active >= 0 ? `${listId}-${active}` : undefined}
           autoComplete="off"
         />
-        {loading && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-brand-teal" />}
+        {loading && <Loader2 className="absolute inset-y-0 right-3 my-auto h-4 w-4 animate-spin text-teal-400" aria-hidden="true" />}
       </div>
-      {open && suggs.length > 0 && (
-        <ul className="dz-ac-list" role="listbox" id={listId}>
-          {suggs.map((s) => (
-            <li
-              key={s.placeId}
-              role="option"
-              aria-selected={false}
-              className="dz-ac-item"
-              onMouseDown={(e) => { e.preventDefault(); pick(s); }}
-            >
-              <MapPin className="dz-ac-pin" />
-              <span className="dz-ac-text">
-                <span className="dz-ac-main">{s.mainText}</span>
-                {s.secondaryText && <span className="dz-ac-sub">{s.secondaryText}</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
+      {showList && (
+        <div className="mt-1.5 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+          <ul role="listbox" id={listId}>
+            {options.map((opt, i) => (
+              <li
+                key={opt.place ? opt.place.placeId : 'term'}
+                id={`${listId}-${i}`}
+                role="option"
+                aria-selected={i === active}
+                className={classNames('flex min-h-11 cursor-pointer items-start gap-2 px-3 py-2 text-sm', i === active && 'bg-white/10', !opt.place && i > 0 && 'border-t border-white/10')}
+                onMouseDown={(e) => { e.preventDefault(); choose(opt); }}
+                onMouseEnter={() => setActive(i)}
+              >
+                {opt.place
+                  ? <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-teal-400" aria-hidden="true" />
+                  : <Type className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" aria-hidden="true" />}
+                <span className="min-w-0">
+                  <span className="block truncate text-gray-100">
+                    {opt.place ? opt.place.mainText : <>Hide every name containing &ldquo;{opt.term}&rdquo;</>}
+                  </span>
+                  <span className="block truncate text-xs text-gray-500">
+                    {opt.place ? opt.place.secondaryText : 'Broad: also hides places that only include it'}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {suggs.some((s) => s._p) && <div className="flex justify-end px-3 py-1.5"><PoweredByGoogle /></div>}
+        </div>
       )}
     </div>
   );
 }
 
-export default function MapsGeoPanel({
-  geo = {}, cities = [], citiesUnavailable = false, pendingCity = null, onSave, onToggleCityLive,
-}) {
-  const [city, setCity] = useState(DEFAULT_CITY);
-  const [center, setCenter] = useState({ lat: '', lng: '' });
-  const [bounds, setBounds] = useState({ north: '', south: '', east: '', west: '' });
-  const [term, setTerm] = useState('');
-  const [note, setNote] = useState('');
-  const [coverageError, setCoverageError] = useState('');
-
-  const cityRows = cities;
+export default function MapsGeoPanel({ geo = {}, onSave }) {
   const enforce = geo.enforceCityLimit !== false;
   const blacklist = Array.isArray(geo.blacklist) ? geo.blacklist : [];
-  const cityOverride = (geo.cities && geo.cities[city]) || {};
-  const { live: _staleLive, ...mapOverride } = cityOverride;
-  const hasOverride = !!(mapOverride.center || mapOverride.bounds);
-  const cityIsLive = cityLiveFrom(cityRows, city);
-  const selectedRow = cityRows.find((row) => row.name === city);
-  const togglePending = !!pendingCity;
-  const canToggleLive = !!selectedRow && !!onToggleCityLive && !togglePending;
 
-  useEffect(() => {
-    if (cityRows.length && !cityRows.some((row) => row.name === city)) {
-      setCity(cityRows[0]?.name || DEFAULT_CITY);
-    }
-  }, [city, cityRows]);
+  const toggleEnforce = () => onSave({ ...geo, enforceCityLimit: !enforce }, `Search limit ${!enforce ? 'enabled' : 'disabled'}`);
 
-  const centerNum = { lat: toNum(center.lat), lng: toNum(center.lng) };
-  const boundsNum = {
-    north: toNum(bounds.north), south: toNum(bounds.south),
-    east: toNum(bounds.east), west: toNum(bounds.west),
+  const addBlacklist = (entry) => {
+    onSave({ ...geo, blacklist: [{ id: 'bl' + Date.now().toString(36), at: Date.now(), ...entry }, ...blacklist] }, `Blacklisted "${entry.term}"`);
   };
 
-  useEffect(() => {
-    const v = cityValues(geo, city);
-    setCenter({ lat: num(v.center.lat), lng: num(v.center.lng) });
-    setBounds({
-      north: num(v.bounds.north), south: num(v.bounds.south),
-      east: num(v.bounds.east), west: num(v.bounds.west),
-    });
-  }, [city, geo]);
-
-  const applyGeo = ({ center: c, bounds: b }) => {
-    if (c) setCenter({ lat: num(c.lat), lng: num(c.lng) });
-    if (b) setBounds({ north: num(b.north), south: num(b.south), east: num(b.east), west: num(b.west) });
+  const addBlacklistTerm = (t) => {
+    if (t.length < 2 || blacklist.some((b) => !b.placeId && b.term.toLowerCase() === t.toLowerCase())) return;
+    addBlacklist({ term: t, note: '' });
   };
 
-  const saveCity = () => {
-    const c = { lat: toNum(center.lat), lng: toNum(center.lng) };
-    const b = {
-      north: toNum(bounds.north), south: toNum(bounds.south),
-      east: toNum(bounds.east), west: toNum(bounds.west),
-    };
-    if (c.lat == null || c.lng == null || Object.values(b).some((x) => x == null)) {
-      setCoverageError('Fill in the centre and all four bounds with numbers before saving.');
-      return;
-    }
-    setCoverageError('');
-    onSave({ ...geo, cities: { ...(geo.cities || {}), [city]: { ...mapOverride, center: c, bounds: b } } }, `Updated ${city} map coverage`);
-  };
-
-  const resetCity = () => {
-    onSave({ ...geo, cities: { ...(geo.cities || {}), [city]: null } }, `Reset ${city} map coverage to default`);
-  };
-
-  const toggleEnforce = () => onSave({ ...geo, enforceCityLimit: !enforce }, `City limit ${!enforce ? 'enabled' : 'disabled'}`);
-
-  const toggleLive = (name) => {
-    const target = cityRows.find((row) => row.name === name);
-    if (!target || !onToggleCityLive || togglePending) return;
-    void onToggleCityLive(target, !target.live);
-  };
-
-  const addBlacklist = () => {
-    const t = term.trim();
-    if (t.length < 2) return;
-    const entry = { id: 'bl' + Date.now().toString(36), term: t, note: note.trim(), at: Date.now() };
-    onSave({ ...geo, blacklist: [entry, ...blacklist] }, `Blacklisted "${t}"`);
-    setTerm('');
-    setNote('');
-  };
-
-  const addBlacklistPlace = ({ placeId, term: placeTerm, note: placeNote }) => {
+  const addBlacklistPlace = ({ placeId, term, note }) => {
     if (!placeId || blacklist.some((b) => b.placeId === placeId)) return;
-    const entry = { id: 'bl' + Date.now().toString(36), placeId, term: placeTerm, note: placeNote, at: Date.now() };
-    onSave({ ...geo, blacklist: [entry, ...blacklist] }, `Blacklisted "${placeTerm}"`);
+    addBlacklist({ placeId, term, note });
   };
 
   const removeBlacklist = (id) => {
@@ -190,182 +141,63 @@ export default function MapsGeoPanel({
 
   return (
     <div className="space-y-5">
-      <div className="dz-card p-5">
-        <div className="flex items-center justify-between gap-4">
+      <ServedAreaCard geo={geo} onSave={onSave} />
+
+      <section className="dz-card p-5" aria-labelledby="maps-limit-title">
+        <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Globe className="h-4 w-4 text-brand-teal" />
-              <h3 className="text-sm font-bold text-white">Restrict Places to the selected city</h3>
+              <Globe className="h-4 w-4 text-brand-teal" aria-hidden="true" />
+              <h3 id="maps-limit-title" className="text-sm font-bold text-white">Keep search inside served districts</h3>
             </div>
-            <p className="mt-1 text-xs text-gray-400 leading-relaxed">
-              When on, every locality / area / society search box across the app only suggests
-              places inside the shopper&rsquo;s selected city bounds. Off = results are merely
-              biased toward the city (Google may surface places elsewhere).
+            <p className="mt-1 text-xs text-gray-400">
+              On: shopper search suggests only places in the districts above. Off: they just rank first.
             </p>
           </div>
-          <Switch checked={enforce} onChange={toggleEnforce} label="Restrict Places to selected city" />
+          <Switch checked={enforce} onChange={toggleEnforce} label="Keep search inside served districts" />
         </div>
-      </div>
+      </section>
 
-      <div className="dz-card p-5">
+      <section className="dz-card p-5" aria-labelledby="maps-blacklist-title">
         <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-brand-teal" />
-          <h3 className="text-sm font-bold text-white">City coverage</h3>
+          <Ban className="h-4 w-4 text-rose-400" aria-hidden="true" />
+          <h3 id="maps-blacklist-title" className="text-sm font-bold text-white">
+            Blacklisted places
+            {blacklist.length ? <span className="ml-1.5 font-medium text-gray-500">({blacklist.length})</span> : null}
+          </h3>
         </div>
-        <p className="mt-1 mb-4 text-xs text-gray-400">Map centre and bounding box used to centre maps and bound Places suggestions.</p>
+        <p className="mt-1 mb-4 text-xs text-gray-400">Hidden from every search box in the app.</p>
 
-        <div className="mb-5 flex flex-wrap gap-2">
-          {cityRows.map((c) => (
-            <button
-              key={c.slug || c.name}
-              type="button"
-              aria-pressed={c.name === city}
-              onClick={() => setCity(c.name)}
-              className={classNames(
-                'flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition',
-                c.name === city ? 'border-brand-teal/40 bg-brand-teal/10 text-brand-teal' : 'border-white/10 bg-white/5 text-gray-300 hover:text-white',
-              )}
-            >
-              <span
-                aria-hidden="true"
-                className={classNames('inline-block h-2 w-2 rounded-full', c.live ? 'bg-emerald-400' : 'bg-gray-500')}
-              />
-              {c.name}
-              <span className="sr-only">{c.live ? ' — live' : ' — coming soon'}</span>
-            </button>
-          ))}
-        </div>
+        <BlacklistSearch onPickPlace={addBlacklistPlace} onAddTerm={addBlacklistTerm} />
 
-        {citiesUnavailable && (
-          <p className="mb-5 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200">
-            The city roster could not be loaded, so launch status cannot be shown or changed.
-            Map coverage and the blacklist below still save normally. Reload to try again.
-          </p>
-        )}
-
-        {selectedRow && (
-        <div className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className={classNames('grid h-8 w-8 shrink-0 place-items-center rounded-lg', cityIsLive ? 'bg-emerald-500/15' : 'bg-gray-500/15')}>
-              <span className={classNames('h-2.5 w-2.5 rounded-full', cityIsLive ? 'bg-emerald-400' : 'bg-gray-400')} />
-            </span>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-white">
-                {city} is {cityIsLive ? 'live' : 'coming soon'}
-              </div>
-              <p className="text-xs text-gray-500">
-                {cityIsLive
-                  ? 'Shoppers can select this city and browse its listings.'
-                  : 'Shoppers see a “join the waitlist” prompt instead of listings.'}
-              </p>
-            </div>
-          </div>
-          <Switch
-            checked={cityIsLive}
-            disabled={!canToggleLive}
-            onChange={() => toggleLive(city)}
-            label={`Set ${city} live`}
-          />
-        </div>
-        )}
-
-        <div className="mb-5">
-          <MapBoundaryEditor center={centerNum} bounds={boundsNum} onChange={applyGeo} />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="text-sm">
-            <span className="mb-1 block text-gray-400">Centre latitude</span>
-            <input value={center.lat} onChange={(e) => setCenter((s) => ({ ...s, lat: e.target.value }))} inputMode="decimal" className="dz-input" />
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block text-gray-400">Centre longitude</span>
-            <input value={center.lng} onChange={(e) => setCenter((s) => ({ ...s, lng: e.target.value }))} inputMode="decimal" className="dz-input" />
-          </label>
-          {BOUND_FIELDS.map(([k, label]) => (
-            <label key={k} className="text-sm">
-              <span className="mb-1 block text-gray-400">{label} bound</span>
-              <input value={bounds[k]} onChange={(e) => setBounds((s) => ({ ...s, [k]: e.target.value }))} inputMode="decimal" className="dz-input" />
-            </label>
-          ))}
-        </div>
-
-        <div className="mt-5 flex items-center gap-2">
-          <button onClick={saveCity} className="dz-btn dz-btn-primary">
-            <Save className="h-4 w-4" /> Save {city} coverage
-          </button>
-          {hasOverride ? (
-            <button onClick={resetCity} className="dz-btn dz-btn-ghost">
-              <RotateCcw className="h-4 w-4" /> Reset to default
-            </button>
-          ) : (
-            <span className="text-xs text-gray-500">Using built-in default</span>
-          )}
-        </div>
-        {coverageError ? <p role="alert" className="mt-3 text-xs text-rose-300">{coverageError}</p> : null}
-      </div>
-
-      <div className="dz-card p-5">
-        <div className="flex items-center gap-2">
-          <Ban className="h-4 w-4 text-rose-400" />
-          <h3 className="text-sm font-bold text-white">Blacklisted localities &amp; societies</h3>
-        </div>
-        <p className="mt-1 mb-4 text-xs text-gray-400">
-          Any Places suggestion whose name contains one of these terms is hidden everywhere in the app
-          (consumer search, filters, list-property, and society pickers).
-        </p>
-
-        <div className="mb-3">
-          <BlacklistPlaceSearch onPick={addBlacklistPlace} />
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addBlacklist(); }}
-            placeholder="…or a name/term to hide (matches any place containing it)"
-            className="dz-input flex-1"
-          />
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addBlacklist(); }}
-            placeholder="Reason (optional)"
-            className="dz-input flex-1"
-          />
-          <button onClick={addBlacklist} disabled={term.trim().length < 2} className="dz-btn dz-btn-primary shrink-0 disabled:opacity-50">
-            <Plus className="h-4 w-4" /> Add
-          </button>
-        </div>
-        <p className="mt-2 text-[11px] text-gray-500">
-          Tip: a short term hides <em>every</em> place whose name contains it (e.g. “Camp” also hides
-          “Camp Road”). Prefer the exact-place search above when you mean one specific place.
-        </p>
-
-        <div className="mt-4 space-y-2">
-          {blacklist.length === 0 ? (
-            <p className="text-xs text-gray-500">No blacklisted terms yet.</p>
-          ) : (
-            blacklist.map((b) => (
-              <div key={b.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5">
+        {blacklist.length === 0 ? (
+          <p className="mt-4 text-xs text-gray-500">Nothing hidden yet.</p>
+        ) : (
+          <ul className="mt-4 space-y-2">
+            {blacklist.map((b) => (
+              <li key={b.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5">
                 <div className="min-w-0">
-                  <span className="text-sm font-medium text-gray-200">{b.term}</span>
-                  {b.placeId ? (
-                    <span className="dz-tag ml-2 font-semibold text-brand-teal" style={{ background: 'rgb(var(--dz-c-teal-500) / 0.12)' }}>
-                      <MapPin className="h-3 w-3" /> exact place
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-gray-200">{b.term}</span>
+                    <span className={classNames('rounded px-1.5 py-0.5 text-[11px] font-semibold', b.placeId ? 'bg-brand-teal/10 text-brand-teal' : 'bg-white/5 text-gray-400')}>
+                      {b.placeId ? 'Exact place' : 'Name contains'}
                     </span>
-                  ) : null}
-                  {b.note ? <span className="ml-2 text-xs text-gray-500">— {b.note}</span> : null}
+                  </div>
+                  {b.note ? <p className="mt-0.5 truncate text-xs text-gray-500">{b.note}</p> : null}
                 </div>
-                <button onClick={() => removeBlacklist(b.id)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-gray-400 hover:bg-rose-500/10 hover:text-rose-300 transition" aria-label={`Remove ${b.term}`}>
-                  <Trash2 className="h-4 w-4" />
+                <button
+                  type="button"
+                  onClick={() => removeBlacklist(b.id)}
+                  className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg text-gray-400 transition-colors hover:bg-rose-500/10 hover:text-rose-300"
+                  aria-label={`Remove ${b.term}`}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

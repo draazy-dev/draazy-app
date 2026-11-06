@@ -3,6 +3,7 @@ package com.draazy.api.admin;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.PreconditionFailedException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.settings.GeoPolicyController;
 import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.settings.Setting;
 import com.draazy.api.common.settings.SettingRepository;
@@ -12,8 +13,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -41,6 +44,12 @@ public class AdminSettingsService {
     private static final int MAX_OFFICER_NAME = 80;
 
     private static final int MAX_OFFICER_EMAIL = 120;
+
+    private static final String SERVED_DISTRICTS = GeoPolicyController.SERVED_DISTRICTS_KEY;
+
+    private static final int MAX_SERVED_DISTRICTS = 40;
+
+    private static final int MAX_DISTRICT_NAME = 80;
 
     private static final java.util.regex.Pattern OFFICER_EMAIL =
             java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
@@ -136,6 +145,7 @@ public class AdminSettingsService {
             }
         }
         rejectRetiredCityLive(patch);
+        rejectBadServedDistricts(patch);
         rejectNonBooleanFlags(patch);
         rejectOutOfRange(patch, PlatformSettings.LISTINGS_KEY, "maxPhotos",
                 PlatformSettings.MIN_LISTING_PHOTOS, PlatformSettings.MAX_LISTING_PHOTOS);
@@ -201,6 +211,56 @@ public class AdminSettingsService {
                         + "do nothing. Nothing was saved.");
             }
         }
+    }
+
+    private static void rejectBadServedDistricts(Map<String, Object> patch) {
+        if (!(patch.get("geo") instanceof Map<?, ?> geo) || geo.get(SERVED_DISTRICTS) == null) {
+            return;
+        }
+        if (!(geo.get(SERVED_DISTRICTS) instanceof List<?> list) || list.isEmpty()
+                || list.size() > MAX_SERVED_DISTRICTS) {
+            throw badServedDistricts("must be a list of 1 to " + MAX_SERVED_DISTRICTS + " districts");
+        }
+        Set<String> seen = new HashSet<>();
+        for (Object entry : list) {
+            String name = entry instanceof Map<?, ?> area ? validDistrictArea(area) : servedDistrictName(entry);
+            if (!seen.add(name.toLowerCase(Locale.ROOT))) {
+                throw badServedDistricts("lists '" + name + "' twice");
+            }
+        }
+    }
+
+    private static String validDistrictArea(Map<?, ?> area) {
+        String name = servedDistrictName(area.get("name"));
+        if (area.get("placeId") != null && !(area.get("placeId") instanceof String)) {
+            throw badServedDistricts("has a non-text placeId for '" + name + "'");
+        }
+        if (area.get("bounds") != null && !(area.get("bounds") instanceof Map<?, ?> b && validBounds(b))) {
+            throw badServedDistricts("has a bounds box for '" + name + "' that encloses nothing");
+        }
+        return name;
+    }
+
+    private static String servedDistrictName(Object value) {
+        String name = value instanceof String s ? s.strip() : "";
+        if (name.length() < 2 || name.length() > MAX_DISTRICT_NAME) {
+            throw badServedDistricts("needs each district named in 2 to " + MAX_DISTRICT_NAME + " characters");
+        }
+        return name;
+    }
+
+    private static boolean validBounds(Map<?, ?> b) {
+        if (!(b.get("north") instanceof Number n && b.get("south") instanceof Number s
+                && b.get("east") instanceof Number e && b.get("west") instanceof Number w)) {
+            return false;
+        }
+        return Math.abs(n.doubleValue()) <= 90 && Math.abs(s.doubleValue()) <= 90
+                && Math.abs(e.doubleValue()) <= 180 && Math.abs(w.doubleValue()) <= 180
+                && n.doubleValue() > s.doubleValue() && e.doubleValue() > w.doubleValue();
+    }
+
+    private static ValidationException badServedDistricts(String problem) {
+        return new ValidationException("'geo." + SERVED_DISTRICTS + "' " + problem + ". Nothing was saved.");
     }
 
     private static void rejectRetiredCityLive(Map<String, Object> patch) {

@@ -23,6 +23,9 @@ import org.springframework.web.client.RestClientException;
 public class GooglePlacesLookup implements PlacesLookup {
     private static final String FIELDS = "id,displayName,location,types,addressComponents";
 
+    // In India level 2 is the revenue division ("Pune Division" also holds Satara); level 3 is the district.
+    private static final String DISTRICT_TYPE = "administrative_area_level_3";
+
     private static final Pattern REASON = Pattern.compile("\"(?:reason|status)\"\\s*:\\s*\"([A-Z_]+)\"");
     private static final Pattern KEY_PROBLEM = Pattern.compile("API_KEY|PERMISSION_DENIED|REQUEST_DENIED|UNAUTHENTICATED|SERVICE_DISABLED|BILLING");
 
@@ -48,7 +51,7 @@ public class GooglePlacesLookup implements PlacesLookup {
     public Optional<Place> details(String placeId, Place hint) {
         Map<?, ?> body;
         try {
-            body = http.get().uri("/v1/places/{id}", placeId).retrieve().body(Map.class);
+            body = http.get().uri("/v1/places/{id}?languageCode=en", placeId).retrieve().body(Map.class);
         } catch (HttpClientErrorException e) {
             int status = e.getStatusCode().value();
             String reason = reason(e.getResponseBodyAsString());
@@ -83,7 +86,9 @@ public class GooglePlacesLookup implements PlacesLookup {
             lng = number(location.get("longitude"));
         }
         String canonical = body.get("id") instanceof String id && !id.isBlank() ? id.trim() : placeId;
-        return new Place(canonical, name.trim(), lat, lng, pincode(body.get("addressComponents")), strings(body.get("types")));
+        Object components = body.get("addressComponents");
+        return new Place(canonical, name.trim(), lat, lng, component(components, "postal_code"),
+                strings(body.get("types")), component(components, DISTRICT_TYPE));
     }
 
     private static String text(Object displayName) {
@@ -106,12 +111,12 @@ public class GooglePlacesLookup implements PlacesLookup {
         return out;
     }
 
-    private static String pincode(Object components) {
+    private static String component(Object components, String type) {
         if (components instanceof List<?> list) {
             for (Object item : list) {
-                if (item instanceof Map<?, ?> c && strings(c.get("types")).contains("postal_code")
-                        && c.get("longText") instanceof String s) {
-                    return s;
+                if (item instanceof Map<?, ?> c && strings(c.get("types")).contains(type)
+                        && c.get("longText") instanceof String s && !s.isBlank()) {
+                    return s.trim();
                 }
             }
         }

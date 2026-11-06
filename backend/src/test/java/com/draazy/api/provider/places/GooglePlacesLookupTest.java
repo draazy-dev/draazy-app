@@ -23,12 +23,14 @@ class GooglePlacesLookupTest {
     private final AtomicReference<Integer> status = new AtomicReference<>(200);
     private final AtomicReference<String> body = new AtomicReference<>("{}");
     private final AtomicReference<String> seenKey = new AtomicReference<>();
+    private final AtomicReference<String> seenQuery = new AtomicReference<>();
 
     @BeforeEach
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             seenKey.set(exchange.getRequestHeaders().getFirst("X-Goog-Api-Key"));
+            seenQuery.set(exchange.getRequestURI().getQuery());
             byte[] bytes = body.get().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(status.get(), bytes.length);
@@ -63,6 +65,35 @@ class GooglePlacesLookupTest {
 
         assertThat(place).get().extracting(Place::placeId, Place::name).containsExactly("canonical-id", "Kumar Pinnacle");
         assertThat(seenKey.get()).isEqualTo("secret-key");
+    }
+
+    @Test
+    @DisplayName("names are asked for in English, so a Pune place never comes back as पुणे")
+    void asksForEnglish() {
+        respond(200, "{\"id\":\"p\",\"displayName\":{\"text\":\"Baner\"}}");
+
+        lookup().details("p", null);
+
+        assertThat(seenQuery.get()).isEqualTo("languageCode=en");
+    }
+
+    @Test
+    @DisplayName("the district is the level-3 area, never the level-2 division")
+    void districtIsLevelThree() {
+        respond(200, """
+                {"id":"p","displayName":{"text":"Satara Road"},"location":{"latitude":17.7,"longitude":74.0},
+                 "types":["locality"],"addressComponents":[
+                   {"longText":"Satara","types":["administrative_area_level_3","political"]},
+                   {"longText":"Pune Division","types":["administrative_area_level_2","political"]},
+                   {"longText":"415001","types":["postal_code"]}]}""");
+
+        assertThat(lookup().details("p", null)).get()
+                .extracting(Place::district, Place::pincode).containsExactly("Satara", "415001");
+
+        respond(200, """
+                {"id":"p","displayName":{"text":"Somewhere"},"location":{"latitude":17.7,"longitude":74.0},
+                 "types":["locality"]}""");
+        assertThat(lookup().details("p", null)).get().extracting(Place::district).isNull();
     }
 
     @Test

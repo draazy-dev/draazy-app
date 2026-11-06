@@ -171,7 +171,7 @@ class SocietyGoogleIdentityTest extends AbstractApiTest {
         mvc.perform(post("/societies")
                         .header(HttpHeaders.AUTHORIZATION, bearer(member))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"placeId\":\"gid-p-held\",\"name\":\"Gid Held Court\"}"))
+                        .content("{\"placeId\":\"gid-p-held\",\"name\":\"Gid Held Court\",\"lat\":18.56,\"lng\":73.80}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.slug").value(org.hamcrest.Matchers.startsWith("gid-held-court")));
     }

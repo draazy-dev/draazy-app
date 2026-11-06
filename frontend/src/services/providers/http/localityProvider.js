@@ -40,6 +40,27 @@ export const retireLocality = async (slug) => toAdminRow(await post(`/admin/loca
 
 export const restoreLocality = async (slug) => toAdminRow(await post(`/admin/localities/${encodeURIComponent(slug)}/restore`));
 
+const toOutsideRow = (row) => ({
+  kind: row?.kind === 'society' ? 'society' : 'locality',
+  slug: String(row?.slug || ''),
+  name: String(row?.name || ''),
+  district: row?.district ? String(row.district) : null,
+});
+
+export async function getServedAreaReport() {
+  const r = await get('/admin/served-area');
+  return {
+    servedDistricts: Array.isArray(r?.servedDistricts) ? r.servedDistricts.map(String) : [],
+    outside: (Array.isArray(r?.outside) ? r.outside : []).map(toOutsideRow),
+    unchecked: Number(r?.unchecked) || 0,
+  };
+}
+
+export async function recheckServedArea() {
+  const r = await post('/admin/served-area/recheck');
+  return { checked: Number(r?.checked) || 0, remaining: Number(r?.remaining) || 0 };
+}
+
 export async function getLocality(slug) {
   return toLocality(await get(`/localities/${encodeURIComponent(slug)}`));
 }

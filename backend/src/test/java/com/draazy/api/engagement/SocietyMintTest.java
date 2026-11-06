@@ -42,8 +42,12 @@ class SocietyMintTest extends AbstractApiTest {
         when(places.details(any(), any())).thenAnswer(call -> {
             Place hint = call.getArgument(1);
             return hint != null && hint.name() != null && !hint.name().isBlank()
-                    ? Optional.of(hint) : Optional.empty();
+                    ? Optional.of(inPune(hint)) : Optional.empty();
         });
+    }
+
+    private static Place inPune(Place hint) {
+        return new Place(hint.placeId(), hint.name(), hint.lat(), hint.lng(), hint.pincode(), hint.types(), "Pune");
     }
 
     // Mobile block 98660000xx must stay unique to this class; the DB is shared across test classes.
@@ -183,7 +187,7 @@ class SocietyMintTest extends AbstractApiTest {
     void mintUsesWhatGoogleSays() throws Exception {
         User author = user("9866000071", "Quin Mint");
         when(places.details(eq("test-g-1"), any())).thenReturn(Optional.of(
-                new Place("test-g-1", "Google Named Towers D241", 18.5601, 73.8002, "411045", List.of("premise"))));
+                new Place("test-g-1", "Google Named Towers D241", 18.5601, 73.8002, "411045", List.of("premise"), "Pune")));
 
         ResultActions created = mint(author, "{\"placeId\":\"test-g-1\",\"name\":\"Client Typed Name\","
                 + "\"lat\":18.6,\"lng\":73.9}")
@@ -217,7 +221,7 @@ class SocietyMintTest extends AbstractApiTest {
         User author = user("9866000074", "Tai Mint");
         for (String id : List.of("test-twin-a", "test-twin-b")) {
             when(places.details(eq(id), any())).thenReturn(Optional.of(
-                    new Place(id, "Twin Court D241", 18.5, 73.8, null, List.of("premise"))));
+                    new Place(id, "Twin Court D241", 18.5, 73.8, null, List.of("premise"), "Pune")));
         }
         String a = slugOf(mint(author, "{\"placeId\":\"test-twin-a\"}").andExpect(status().isCreated()));
         String b = slugOf(mint(author, "{\"placeId\":\"test-twin-b\"}").andExpect(status().isCreated()));
@@ -230,7 +234,7 @@ class SocietyMintTest extends AbstractApiTest {
     void areaTypesAreRefused() throws Exception {
         User author = user("9866000075", "Uma Mint");
         when(places.details(eq("test-area"), any())).thenReturn(Optional.of(
-                new Place("test-area", "Baner", 18.559, 73.78, null, List.of("sublocality_level_1", "political"))));
+                new Place("test-area", "Baner", 18.559, 73.78, null, List.of("sublocality_level_1", "political"), "Pune")));
 
         mint(author, "{\"placeId\":\"test-area\",\"name\":\"Baner\"}")
                 .andExpect(status().isUnprocessableEntity());
@@ -595,7 +599,7 @@ class SocietyMintTest extends AbstractApiTest {
     void canonicalIdIsStored() throws Exception {
         User author = user("9866000077", "Canon Mint");
         when(places.details(any(), any())).thenReturn(Optional.of(
-                new Place("test-canonical-1", "Canon Towers D254", 18.5601, 73.8002, null, List.of("premise"))));
+                new Place("test-canonical-1", "Canon Towers D254", 18.5601, 73.8002, null, List.of("premise"), "Pune")));
 
         String id = idOf(mint(author, "{\"placeId\":\"test-alias-1\",\"name\":\"Canon Towers D254\"}")
                 .andExpect(status().isCreated()));
@@ -623,8 +627,12 @@ class SocietyMintTest extends AbstractApiTest {
     }
 
     private void googleSays(String name, double lat, double lng, String... types) {
+        googleSaysIn("Pune", name, lat, lng, types);
+    }
+
+    private void googleSaysIn(String district, String name, double lat, double lng, String... types) {
         when(places.details(any(), any())).thenReturn(Optional.of(
-                new Place(placeIdOf(name), name, lat, lng, null, List.of(types))));
+                new Place(placeIdOf(name), name, lat, lng, null, List.of(types), district)));
     }
 
     @Test
@@ -653,25 +661,30 @@ class SocietyMintTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("a pin outside the served city is refused before Google is asked")
-    void outOfAreaHintNeverReachesGoogle() throws Exception {
+    @DisplayName("a building Google puts in a neighbouring district is refused, however close its pin")
+    void neighbouringDistrictIsRefused() throws Exception {
         User member = user("9866000073", "Away Mint");
+        googleSaysIn("Raigad", "Khopoli Court D253", 18.7900, 73.3400, "premise");
 
-        mint(member, bodyAt("Marine Drive Court D253", 19.0760, 72.8777))
+        mint(member, bodyAt("Khopoli Court D253", 18.7900, 73.3400))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.message").value("We only list societies in cities we serve."));
-        verify(places, never()).details(any(), any());
+                .andExpect(jsonPath("$.message").value("We only list societies in areas we serve."));
     }
 
     @Test
-    @DisplayName("a place Google locates outside the served city is refused too")
+    @DisplayName("a place Google locates outside the served district, or in no district, is refused")
     void outOfAreaGoogleLocationIsRefused() throws Exception {
         User member = user("9866000074", "Far Mint");
-        googleSays("Faraway Heights D253", 19.0760, 72.8777, "premise");
+        googleSaysIn("Mumbai", "Faraway Heights D253", 19.0760, 72.8777, "premise");
 
         mint(member, body("Faraway Heights D253"))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.message").value("We only list societies in cities we serve."));
+                .andExpect(jsonPath("$.message").value("We only list societies in areas we serve."));
+
+        googleSaysIn(null, "Nowhere Heights D253", 18.5204, 73.8567, "premise");
+        mint(member, body("Nowhere Heights D253"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("We only list societies in areas we serve."));
     }
 
     @Test

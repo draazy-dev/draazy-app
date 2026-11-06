@@ -8,6 +8,10 @@ export const retireLocality = async (slug) => (await provider()).retireLocality(
 
 export const restoreLocality = async (slug) => (await provider()).restoreLocality(slug);
 
+export const getServedAreaReport = async () => (await provider()).getServedAreaReport();
+
+export const recheckServedArea = async () => (await provider()).recheckServedArea();
+
 export const getLocality = async (slug) => (await provider()).getLocality(slug);
 
 export const resolveLocality = async (place) => (await provider()).resolveLocality(place);

@@ -1,9 +1,7 @@
 package com.draazy.api.common.settings;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -15,6 +13,10 @@ public class GeoPolicyController {
     private static final Logger log = LoggerFactory.getLogger(GeoPolicyController.class);
 
     private static final String GEO_KEY = "geo";
+
+    public static final String SERVED_DISTRICTS_KEY = "servedDistricts";
+
+    public static final List<String> DEFAULT_SERVED_DISTRICTS = List.of("Pune");
 
     private static final int MIN_BLACKLIST_TERM = 2;
 
@@ -32,13 +34,57 @@ public class GeoPolicyController {
     public GeoPolicyResponse geo() {
         JsonNode stored = storedGeo();
         if (stored == null) {
-            return new GeoPolicyResponse(null, Map.of(), List.of());
+            return new GeoPolicyResponse(null, List.of(), DEFAULT_SERVED_DISTRICTS, List.of());
         }
         JsonNode enforce = stored.get("enforceCityLimit");
+        JsonNode served = stored.get(SERVED_DISTRICTS_KEY);
         return new GeoPolicyResponse(
                 enforce != null && enforce.isBoolean() ? enforce.booleanValue() : null,
-                cities(stored.get("cities")),
-                blacklist(stored.get("blacklist")));
+                blacklist(stored.get("blacklist")),
+                servedDistricts(served),
+                districtAreas(served));
+    }
+
+    public List<String> servedDistricts() {
+        JsonNode stored = storedGeo();
+        return stored == null ? DEFAULT_SERVED_DISTRICTS : servedDistricts(stored.get(SERVED_DISTRICTS_KEY));
+    }
+
+    private static List<String> servedDistricts(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return DEFAULT_SERVED_DISTRICTS;
+        }
+        List<String> out = new ArrayList<>();
+        for (JsonNode entry : node) {
+            String name = districtName(entry);
+            if (name != null && out.stream().noneMatch(name::equalsIgnoreCase)) {
+                out.add(name);
+            }
+        }
+        return out.isEmpty() ? DEFAULT_SERVED_DISTRICTS : List.copyOf(out);
+    }
+
+    private static List<GeoPolicyResponse.DistrictArea> districtAreas(JsonNode node) {
+        List<GeoPolicyResponse.DistrictArea> out = new ArrayList<>();
+        if (node == null || !node.isArray()) {
+            return out;
+        }
+        for (JsonNode entry : node) {
+            String name = districtName(entry);
+            if (name == null || !entry.isObject() || out.stream().anyMatch(a -> a.name().equalsIgnoreCase(name))) {
+                continue;
+            }
+            String placeId = text(entry.get("placeId"));
+            GeoPolicyResponse.Bounds bounds = bounds(entry.get("bounds"));
+            if (placeId != null || bounds != null) {
+                out.add(new GeoPolicyResponse.DistrictArea(name, placeId, bounds));
+            }
+        }
+        return out;
+    }
+
+    private static String districtName(JsonNode entry) {
+        return entry != null && entry.isObject() ? text(entry.get("name")) : text(entry);
     }
 
     private JsonNode storedGeo() {
@@ -58,38 +104,6 @@ public class GeoPolicyController {
             }
             return parsed;
         }).orElse(null);
-    }
-
-    private static Map<String, GeoPolicyResponse.CityGeo> cities(JsonNode node) {
-        Map<String, GeoPolicyResponse.CityGeo> out = new LinkedHashMap<>();
-        if (node == null || !node.isObject()) {
-            return out;
-        }
-        node.properties().forEach(entry -> {
-            JsonNode city = entry.getValue();
-            if (city == null || !city.isObject()) {
-                return;
-            }
-            GeoPolicyResponse.CityGeo projected = new GeoPolicyResponse.CityGeo(
-                    latLng(city.get("center")),
-                    bounds(city.get("bounds")));
-            if (projected.center() != null || projected.bounds() != null) {
-                out.put(entry.getKey(), projected);
-            }
-        });
-        return out;
-    }
-
-    private static GeoPolicyResponse.LatLng latLng(JsonNode node) {
-        if (node == null || !node.isObject()) {
-            return null;
-        }
-        Double lat = coordinate(node.get("lat"), MAX_LATITUDE);
-        Double lng = coordinate(node.get("lng"), MAX_LONGITUDE);
-        if (lat == null || lng == null) {
-            return null;
-        }
-        return new GeoPolicyResponse.LatLng(lat, lng);
     }
 
     private static GeoPolicyResponse.Bounds bounds(JsonNode node) {

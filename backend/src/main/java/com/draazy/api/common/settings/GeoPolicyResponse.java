@@ -2,18 +2,15 @@ package com.draazy.api.common.settings;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
-import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record GeoPolicyResponse(
         Boolean enforceCityLimit,
-        Map<String, CityGeo> cities,
-        List<BlacklistEntry> blacklist) {
+        List<BlacklistEntry> blacklist,
+        List<String> servedDistricts,
+        List<DistrictArea> districtAreas) {
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record CityGeo(LatLng center, Bounds bounds) {
-    }
-
-    public record LatLng(double lat, double lng) {
+    public record DistrictArea(String name, String placeId, Bounds bounds) {
     }
 
     public record Bounds(double north, double south, double east, double west) {

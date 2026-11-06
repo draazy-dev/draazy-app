@@ -54,6 +54,7 @@ export default function SocietySelect({
     const timer = setTimeout(async () => {
       if (!sessionRef.current) sessionRef.current = newAutocompleteSession();
       const out = await fetchSuggestions(q, sessionRef.current, {
+        servedArea: true,
         includedPrimaryTypes: GOOGLE_TYPES,
         ...(lat != null && lng != null ? { locationBias: { center: { lat: Number(lat), lng: Number(lng) }, radius: GOOGLE_BIAS_RADIUS_M } } : {}),
       });

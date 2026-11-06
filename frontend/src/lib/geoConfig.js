@@ -32,8 +32,47 @@ export const CITY_GEO = {
 
 export const DEFAULT_CITY = 'Pune';
 
-export const PUNE_BOUNDS = CITY_GEO.Pune.bounds;
-export const PUNE_REGION_BOUNDS = { north: 18.95, south: 18.25, east: 74.35, west: 73.30 };
+const BUILT_IN_DISTRICTS = {
+  pune: { placeId: 'ChIJQ97RPE_AwjsR5zbDDbo3wHI', bounds: { north: 19.40, south: 17.89, east: 75.17, west: 73.32 } },
+};
+
+export const validBounds = (b) => !!b && [b.north, b.south, b.east, b.west].every(Number.isFinite)
+  && b.north > b.south && b.east > b.west;
+
+// Admin settings store entries as a name or {name, placeId, bounds};
+// the public policy splits them into names + districtAreas.
+export function servedDistrictAreasOf(geo) {
+  const raw = Array.isArray(geo?.servedDistricts) ? geo.servedDistricts : [];
+  const published = Array.isArray(geo?.districtAreas) ? geo.districtAreas : [];
+  const out = [];
+  for (const entry of raw) {
+    const meta = entry && typeof entry === 'object' ? entry : {};
+    const name = String(typeof entry === 'string' ? entry : meta.name || '').trim();
+    const key = name.toLowerCase();
+    if (!name || out.some((d) => d.name.toLowerCase() === key)) continue;
+    const area = published.find((a) => String(a?.name || '').toLowerCase() === key) || meta;
+    const builtIn = BUILT_IN_DISTRICTS[key] || {};
+    out.push({
+      name,
+      placeId: area.placeId || builtIn.placeId || null,
+      bounds: validBounds(area.bounds) ? area.bounds : builtIn.bounds || null,
+    });
+  }
+  return out.length ? out : [{ name: 'Pune', ...BUILT_IN_DISTRICTS.pune }];
+}
+
+export const servedDistrictsOf = (geo) => servedDistrictAreasOf(geo).map((d) => d.name);
+
+export function unionBounds(list) {
+  const boxes = (list || []).filter(validBounds);
+  if (!boxes.length) return null;
+  return {
+    north: Math.max(...boxes.map((b) => b.north)),
+    south: Math.min(...boxes.map((b) => b.south)),
+    east: Math.max(...boxes.map((b) => b.east)),
+    west: Math.min(...boxes.map((b) => b.west)),
+  };
+}
 
 export function getActiveCity() {
   try {
@@ -106,18 +145,11 @@ function readGeoSettings() {
 
 export function getActiveCityGeo() {
   const name = getActiveCity();
-  const geo = readGeoSettings();
   const base = CITY_GEO[name] || CITY_GEO[DEFAULT_CITY];
-  const override = (geo.cities && geo.cities[name]) || {};
-  return {
-    name,
-    center: override.center || base.center,
-    bounds: override.bounds || base.bounds,
-    enforce: geo.enforceCityLimit !== false,
-  };
+  return { name, center: base.center, bounds: base.bounds };
 }
 
-export function cityLiveFrom(cities, name) {
+function cityLiveFrom(cities, name) {
   const city = (Array.isArray(cities) ? cities : []).find(
     (row) => String(row?.name || '').toLowerCase() === String(name || '').toLowerCase(),
   );
@@ -142,20 +174,25 @@ export function cityLabelFor(listing) {
   return c ? String(c) : getActiveCity();
 }
 
+export function servedBoundsList() {
+  return servedDistrictAreasOf(readGeoSettings()).map((d) => d.bounds).filter(validBounds);
+}
+
+export const servedSearchBox = () => unionBounds(servedBoundsList());
+
+const limitOn = () => readGeoSettings().enforceCityLimit !== false;
+
 export function activeLocationConstraint() {
-  const { bounds, enforce } = getActiveCityGeo();
-  if (!bounds) return {};
-  return enforce ? { locationRestriction: bounds } : { locationBias: bounds };
+  const box = servedSearchBox();
+  if (!box) return {};
+  return limitOn() ? { locationRestriction: box } : { locationBias: box };
 }
 
-export function enforcedCityBounds() {
-  const { bounds, enforce } = getActiveCityGeo();
-  return enforce && bounds ? bounds : null;
-}
+export const enforcedServedBounds = () => (limitOn() ? servedBoundsList() : null);
 
-export function withinBounds(lat, lng, b) {
-  if (!b || lat == null || lng == null) return true;
-  return lat <= b.north && lat >= b.south && lng <= b.east && lng >= b.west;
+export function withinAnyBounds(lat, lng, boxes) {
+  if (!boxes?.length || lat == null || lng == null) return true;
+  return boxes.some((b) => lat <= b.north && lat >= b.south && lng <= b.east && lng >= b.west);
 }
 
 export function getBlacklist() {

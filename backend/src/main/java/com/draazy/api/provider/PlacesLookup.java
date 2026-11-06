@@ -14,7 +14,8 @@ import org.springframework.stereotype.Component;
 public interface PlacesLookup {
     Optional<Place> details(String placeId, Place hint);
 
-    record Place(String placeId, String name, Double lat, Double lng, String pincode, List<String> types) {
+    record Place(String placeId, String name, Double lat, Double lng, String pincode, List<String> types,
+            String district) {
         public Place {
             types = types == null ? List.of() : List.copyOf(types);
         }
@@ -36,7 +37,14 @@ class DevPlacesLookup implements PlacesLookup {
         if (hint == null || hint.name() == null || hint.name().isBlank()) {
             return Optional.empty();
         }
-        return Optional.of(new Place(placeId, hint.name().trim(), hint.lat(), hint.lng(), hint.pincode(), hint.types()));
+        return Optional.of(new Place(placeId, hint.name().trim(), hint.lat(), hint.lng(), hint.pincode(), hint.types(),
+                district(hint.lat(), hint.lng())));
+    }
+
+    // Without Google there is no district, so a box around Pune district stands in for it.
+    static String district(Double lat, Double lng) {
+        boolean inPune = lat != null && lng != null && lat >= 17.85 && lat <= 19.40 && lng >= 73.30 && lng <= 75.20;
+        return inPune ? "Pune" : null;
     }
 }
 

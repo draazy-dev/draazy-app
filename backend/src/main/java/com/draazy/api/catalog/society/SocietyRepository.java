@@ -117,12 +117,12 @@ public interface SocietyRepository
     @Query(value = """
             insert into societies
                 (id, slug, name, place_id, locality_slug, lat, lng, registration, conveyance,
-                 amenities, source, mint_origin, created_by, created_at, updated_at)
+                 amenities, source, mint_origin, created_by, created_at, updated_at, district, district_checked_at)
             values
                 (gen_random_uuid(), :slug, :name, :placeId, cast(:localitySlug as text),
                  cast(:lat as double precision), cast(:lng as double precision),
                  false, false, '[]'::jsonb, 'community', cast(:mintOrigin as text),
-                 :createdBy, now(), now())
+                 :createdBy, now(), now(), cast(:district as text), now())
             on conflict do nothing""", nativeQuery = true)
     int mintCommunity(@Param("slug") String slug,
             @Param("name") String name,
@@ -131,7 +131,8 @@ public interface SocietyRepository
             @Param("lat") Double lat,
             @Param("lng") Double lng,
             @Param("mintOrigin") String mintOrigin,
-            @Param("createdBy") UUID createdBy);
+            @Param("createdBy") UUID createdBy,
+            @Param("district") String district);
 
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """

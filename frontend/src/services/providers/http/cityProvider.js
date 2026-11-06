@@ -1,14 +1,9 @@
-import { get, patch, post } from '../../http.js';
+import { get, post } from '../../http.js';
 import { bootstrapSection } from './bootstrap.js';
 
 export async function listCities() {
   const rows = await bootstrapSection('cities');
   return Array.isArray(rows) ? rows : [];
-}
-
-export async function updateCity(slug, body) {
-  await patch(`/admin/cities/${encodeURIComponent(slug)}`, body);
-  window.dispatchEvent(new CustomEvent('draazy-settings-change'));
 }
 
 export async function joinCityWaitlist({ city, mobile, email, turnstileToken }) {

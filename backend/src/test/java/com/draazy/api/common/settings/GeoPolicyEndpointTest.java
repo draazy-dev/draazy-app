@@ -58,23 +58,22 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
     void anonymousCallersGetAnEmptyPolicyOnAnUnconfiguredInstall() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.geo.cities").isMap())
-                .andExpect(jsonPath("$.geo.cities").isEmpty())
+                .andExpect(jsonPath("$.geo.cities").doesNotExist())
+                .andExpect(jsonPath("$.geo.districtAreas").isArray())
+                .andExpect(jsonPath("$.geo.districtAreas").isEmpty())
                 .andExpect(jsonPath("$.geo.blacklist").isArray())
                 .andExpect(jsonPath("$.geo.blacklist").isEmpty())
                 .andExpect(jsonPath("$.geo.enforceCityLimit").doesNotExist());
     }
 
     @Test
-    void cityMapOverridesAreVisibleToAnAnonymousClient() throws Exception {
+    void retiredCityBoxesAreNoLongerPublished() throws Exception {
         save("""
                 {"cities":{"Mumbai":{"center":{"lat":19.076,"lng":72.8777}}}}""");
 
         mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.geo.cities.Mumbai.center.lat").value(19.076))
-                .andExpect(jsonPath("$.geo.cities.Mumbai.center.lng").value(72.8777))
-                .andExpect(jsonPath("$.geo.cities.Mumbai.live").doesNotExist());
+                .andExpect(jsonPath("$.geo.cities").doesNotExist());
     }
 
     @Test
@@ -93,47 +92,6 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
     }
 
     @Test
-    void anIncompleteBoundingBoxIsDroppedRatherThanForwarded() throws Exception {
-        save("""
-                {"cities":{"Pune":{"bounds":{"north":18.7,"east":74.0,"west":73.6}}}}""");
-
-        mvc.perform(get(Routes.Bootstrap.BASE))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.geo.cities.Pune.bounds").doesNotExist());
-    }
-
-    @Test
-    void anInvertedBoundingBoxEnclosesNothingAndIsDropped() throws Exception {
-        save("""
-                {"cities":{"Pune":{\
-                "bounds":{"north":18.4,"south":18.7,"east":74.0,"west":73.6}}}}""");
-
-        mvc.perform(get(Routes.Bootstrap.BASE))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.geo.cities.Pune.bounds").doesNotExist());
-    }
-
-    @Test
-    void aCoordinateOffTheGlobeIsDroppedRatherThanClamped() throws Exception {
-        save("""
-                {"cities":{"Pune":{"center":{"lat":200,"lng":73.85}}}}""");
-
-        mvc.perform(get(Routes.Bootstrap.BASE))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.geo.cities.Pune.center").doesNotExist());
-    }
-
-    @Test
-    void aCityWhoseEveryOverrideWasRefusedIsOmitted() throws Exception {
-        save("""
-                {"cities":{"Nashik":{"center":{"lat":"north"}}}}""");
-
-        mvc.perform(get(Routes.Bootstrap.BASE))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.geo.cities.Nashik").doesNotExist());
-    }
-
-    @Test
     void blacklistEntriesThatCouldMatchNothingAreOmitted() throws Exception {
         save("""
                 {"blacklist":[{"id":"bl1","term":"a"},{"id":"bl2","term":"Skyline"},\
@@ -148,18 +106,65 @@ class GeoPolicyEndpointTest extends AbstractApiTest {
     }
 
     @Test
-    void editingOneCityLeavesTheOthersStanding() throws Exception {
-        save("""
-                {"enforceCityLimit":false,"cities":{"Pune":{"center":{"lat":18.55,"lng":73.86}},
-                "Nashik":{"bounds":{"north":20.1,"south":19.9,"east":73.9,"west":73.6}}}}""");
-        save("""
-                {"cities":{"Nashik":{"center":{"lat":19.99,"lng":73.79}}}}""");
+    void theServedDistrictsDefaultToPune() throws Exception {
+        mvc.perform(get(Routes.Bootstrap.BASE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.geo.servedDistricts.length()").value(1))
+                .andExpect(jsonPath("$.geo.servedDistricts[0]").value("Pune"));
+    }
+
+    @Test
+    void storedDuplicateDistrictsArePublishedOnce() throws Exception {
+        jdbc.update("insert into settings (key, value) values ('geo', '{\"servedDistricts\":[\"Pune\",\" pune \"]}'::jsonb) "
+                + "on conflict (key) do update set value = excluded.value");
 
         mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.geo.enforceCityLimit").value(false))
-                .andExpect(jsonPath("$.geo.cities.Pune.center.lat").value(18.55))
-                .andExpect(jsonPath("$.geo.cities.Nashik.bounds.north").value(20.1))
-                .andExpect(jsonPath("$.geo.cities.Nashik.center.lat").value(19.99));
+                .andExpect(jsonPath("$.geo.servedDistricts.length()").value(1))
+                .andExpect(jsonPath("$.geo.servedDistricts[0]").value("Pune"));
+    }
+
+    @Test
+    void anyDistrictCanBeServedWithItsMapArea() throws Exception {
+        save("""
+                {"servedDistricts":["Pune",{"name":"Satara","placeId":"ChIJsatara",\
+                "bounds":{"north":18.2,"south":17.1,"east":74.9,"west":73.6}}]}""");
+
+        mvc.perform(get(Routes.Bootstrap.BASE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.geo.servedDistricts.length()").value(2))
+                .andExpect(jsonPath("$.geo.servedDistricts[1]").value("Satara"))
+                .andExpect(jsonPath("$.geo.districtAreas.length()").value(1))
+                .andExpect(jsonPath("$.geo.districtAreas[0].name").value("Satara"))
+                .andExpect(jsonPath("$.geo.districtAreas[0].placeId").value("ChIJsatara"))
+                .andExpect(jsonPath("$.geo.districtAreas[0].bounds.north").value(18.2));
+    }
+
+    @Test
+    void savingTheDistrictListReplacesItWhole() throws Exception {
+        save("""
+                {"servedDistricts":["Pune",{"name":"Satara","placeId":"ChIJsatara"}]}""");
+        save("""
+                {"servedDistricts":["Pune"]}""");
+
+        mvc.perform(get(Routes.Bootstrap.BASE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.geo.servedDistricts.length()").value(1))
+                .andExpect(jsonPath("$.geo.districtAreas").isEmpty());
+    }
+
+    @Test
+    void badServedDistrictsAreRefused() throws Exception {
+        for (String bad : new String[] {
+                "[]", "\"Pune\"", "[42]", "[\"P\"]", "[\"  \"]", "[\"Pune\",\" pune \"]",
+                "[{\"placeId\":\"ChIJx\"}]", "[{\"name\":\"Satara\",\"placeId\":7}]",
+                "[{\"name\":\"Satara\",\"bounds\":{\"north\":17,\"south\":18,\"east\":74,\"west\":73}}]",
+                "[{\"name\":\"Satara\",\"bounds\":{\"north\":18}}]"}) {
+            mvc.perform(put(Routes.Admin.SETTINGS)
+                            .header(HttpHeaders.AUTHORIZATION, adminToken())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"geo\":{\"servedDistricts\":" + bad + "}}"))
+                    .andExpect(status().isUnprocessableContent());
+        }
     }
 }

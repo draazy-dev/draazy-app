@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Save, AlertTriangle } from 'lucide-react';
-import { listCities, updateCityLive } from '../../services/cityService.js';
-import { onGeoChange } from '../../lib/geoConfig.js';
 import { getSettings, updateSettings } from '../../services/settingsService.js';
 import { DEFAULT_MAX_PHOTOS, MAX_PHOTOS_CEILING, MIN_PHOTOS_CAP } from '../../lib/uploads/policy.js';
 import { classNames } from '../../lib/format.js';
@@ -81,9 +79,11 @@ const GRIEVANCE_NAME_MAX = 80;
 const GRIEVANCE_EMAIL_MAX = 120;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const saveError = (err) => (err?.status === 412
-  ? 'Someone else changed these settings — reload to see their changes.'
-  : 'That change was not saved. Please try again.');
+const saveError = (err) => {
+  if (err?.status === 412) return 'Someone else changed these settings — reload to see their changes.';
+  if (err?.isValidation || err?.name === 'NetworkError') return err.message;
+  return 'That change was not saved. Please try again.';
+};
 
 const SITE_FIELDS = [
   ['name', 'Site name'],
@@ -113,37 +113,10 @@ const humanize = (k) =>
     .replace('Sms', 'SMS')
     .replace('Emi', 'EMI');
 
-const sortCities = (rows = []) => [...rows].sort(
-  (a, b) => String(a.name || '').localeCompare(String(b.name || '')),
-);
-
-function stripGeoLive(geo = {}) {
-  const { cities: _oldCities, ...restGeo } = geo;
-  const cities = geo.cities && typeof geo.cities === 'object'
-    ? Object.fromEntries(
-      Object.entries(geo.cities)
-        .filter(([, value]) => value === null || (value && typeof value === 'object'))
-        .map(([name, value]) => {
-          if (value === null) return [name, null];
-          const { live: _live, ...rest } = value;
-          return [name, rest];
-        })
-        .filter(([, value]) => value === null || Object.keys(value).length),
-    )
-    : undefined;
-  return {
-    ...restGeo,
-    ...(cities ? { cities } : {}),
-  };
-}
-
 export default function AdminSettings() {
   const { toast } = useToast();
   const { adminFlags, setFlag } = useAdminFlags();
   const [settings, setSettings] = useState(null);
-  const [cityRoster, setCityRoster] = useState([]);
-  const [cityRosterError, setCityRosterError] = useState(false);
-  const [pendingCity, setPendingCity] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [tab, setTab] = useTabParam(TABS.map(([id]) => id), 'general');
   const [flagSubTab, setFlagSubTab] = useState('application');
@@ -157,21 +130,6 @@ export default function AdminSettings() {
       .catch(() => { if (alive) setLoadError(true); });
     return () => { alive = false; };
   }, []);
-
-  const loadCityRoster = useCallback(async () => {
-    try {
-      const rows = await listCities();
-      setCityRoster(sortCities(Array.isArray(rows) ? rows : []));
-      setCityRosterError(false);
-    } catch {
-      setCityRoster([]);
-      setCityRosterError(true);
-    }
-  }, []);
-
-  useEffect(() => { loadCityRoster(); }, [loadCityRoster]);
-
-  useEffect(() => onGeoChange(loadCityRoster), [loadCityRoster]);
 
   const geo = useMemo(() => settings?.geo || {}, [settings?.geo]);
 
@@ -286,34 +244,14 @@ export default function AdminSettings() {
         'Move-in Pack saved',
       );
 
-  const saveGeo = (nextGeo, detail) => {
-    const sanitized = stripGeoLive(nextGeo);
+  const saveGeo = async (nextGeo, detail) => {
+    // Retired city boxes may linger in the stored doc; echoing them back would re-save dead keys.
+    const { cities: _retired, ...sanitized } = nextGeo;
+    const prior = settings.geo;
     setSettings((s) => ({ ...s, geo: sanitized }));
-    persist(
-      { geo: sanitized },
-      detail || 'Maps settings saved',
-    );
-  };
-
-  const saveCityLaunchState = async (city, live) => {
-    if (pendingCity) return false;
-    setPendingCity(city.slug);
-    setCityRoster((rows) => sortCities(rows.map((row) => (
-      row.slug === city.slug ? { ...row, live } : row
-    ))));
-    try {
-      await updateCityLive(city.slug, live);
-    } catch {
-      setCityRoster((rows) => sortCities(rows.map((row) => (
-        row.slug === city.slug ? { ...row, live: !live } : row
-      ))));
-      toast('That change was not saved. Please try again.', 'error');
-      return false;
-    } finally {
-      setPendingCity(null);
-    }
-    toast(`${city.name} marked ${live ? 'live' : 'coming soon'}`);
-    return true;
+    const ok = await persist({ geo: sanitized }, detail || 'Maps settings saved');
+    if (!ok) setSettings((s) => ({ ...s, geo: prior }));
+    return ok;
   };
 
   const requestAppFlagToggle = (k) => {
@@ -509,17 +447,9 @@ export default function AdminSettings() {
       {tab === 'maps' && (
         <div>
           <p className="mb-4 text-sm text-gray-400">
-            Control the Google Places API: limit suggestions to the shopper&rsquo;s selected city and
-            blacklist localities or societies. Applies to every locality / area search across the app.
+            Where new places are accepted, how far search reaches, and what stays hidden.
           </p>
-          <MapsGeoPanel
-            geo={geo}
-            cities={cityRoster}
-            citiesUnavailable={cityRosterError}
-            pendingCity={pendingCity}
-            onSave={saveGeo}
-            onToggleCityLive={saveCityLaunchState}
-          />
+          <MapsGeoPanel geo={geo} onSave={saveGeo} />
         </div>
       )}
 

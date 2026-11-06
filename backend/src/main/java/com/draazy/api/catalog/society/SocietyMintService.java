@@ -1,6 +1,7 @@
 package com.draazy.api.catalog.society;
 
 import com.draazy.api.catalog.locality.LocalityBinding;
+import com.draazy.api.catalog.locality.ServedArea;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.RateLimitedException;
@@ -42,6 +43,8 @@ public class SocietyMintService {
 
     private static final Set<String> RESERVED_SLUGS = Set.of("resolve", "top");
 
+    static final String OUTSIDE_AREA_MESSAGE = "We only list societies in areas we serve.";
+
     private static final Logger log = LoggerFactory.getLogger(SocietyMintService.class);
 
     private final SocietyRepository societies;
@@ -49,17 +52,19 @@ public class SocietyMintService {
     private final SocietyMapper societyMapper;
     private final LocalityBinding localities;
     private final PlacesLookup places;
+    private final ServedArea servedArea;
     private final TransactionTemplate tx;
     private final WriteRateLimitStore lookupBudget;
 
     public SocietyMintService(SocietyRepository societies, SocietyService societyService,
-            SocietyMapper societyMapper, LocalityBinding localities, PlacesLookup places,
+            SocietyMapper societyMapper, LocalityBinding localities, PlacesLookup places, ServedArea servedArea,
             TransactionTemplate tx, WriteRateLimitStore.Factory stores) {
         this.societies = societies;
         this.societyService = societyService;
         this.societyMapper = societyMapper;
         this.localities = localities;
         this.places = places;
+        this.servedArea = servedArea;
         this.tx = tx;
         this.lookupBudget = stores.create("sm", LOOKUPS_PER_DAY, Duration.ofDays(1));
     }
@@ -71,7 +76,6 @@ public class SocietyMintService {
             throw new ValidationException("Pick the society on Google Maps.");
         }
         String origin = mintOrigin(request.mintOrigin());
-        SocietyPlaceRules.requireServed(request.lat(), request.lng());
 
         MintedSociety known = tx.execute(status -> known(placeId));
         if (known != null) {
@@ -118,12 +122,12 @@ public class SocietyMintService {
 
     private int insert(String slug, Place place, String locality, String origin, UUID authorId) {
         return societies.mintCommunity(slug, place.name(), place.placeId(), locality,
-                place.lat(), place.lng(), origin, authorId);
+                place.lat(), place.lng(), origin, authorId, place.district());
     }
 
     private Place verified(String placeId, SocietyMintRequest request, AuthPrincipal caller) {
         spendLookup(caller);
-        Place hint = new Place(placeId, request.name(), request.lat(), request.lng(), null, List.of());
+        Place hint = new Place(placeId, request.name(), request.lat(), request.lng(), null, List.of(), null);
         Place place;
         try {
             place = places.details(placeId, hint)
@@ -132,7 +136,9 @@ public class SocietyMintService {
             log.warn("Places lookup unavailable: {}", e.getMessage());
             throw new ValidationException("Adding societies is temporarily unavailable.");
         }
-        SocietyPlaceRules.requireServed(place.lat(), place.lng());
+        if (!servedArea.covers(place)) {
+            throw new ValidationException(OUTSIDE_AREA_MESSAGE);
+        }
         SocietyPlaceRules.requireBuilding(place);
         return place;
     }

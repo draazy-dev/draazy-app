@@ -26,17 +26,23 @@ import org.springframework.test.web.servlet.ResultActions;
 class LocalityResolveEndpointsTest extends AbstractApiTest {
 
     private static final String PICK = "Pick the locality from the suggestions.";
-    private static final String OUTSIDE = "Pick a locality in Pune.";
+    private static final String OUTSIDE = "Pick a locality in an area we serve.";
 
     @MockitoBean PlacesLookup places;
 
     @BeforeEach
     void googleEchoesTheHint() {
-        when(places.details(any(), any())).thenAnswer(call -> {
+        googlePutsItIn("Pune");
+    }
+
+    private void googlePutsItIn(String district) {
+        doAnswer(call -> {
             Place hint = call.getArgument(1);
             return hint != null && hint.name() != null && !hint.name().isBlank()
-                    ? Optional.of(hint) : Optional.empty();
-        });
+                    ? Optional.of(new Place(hint.placeId(), hint.name(), hint.lat(), hint.lng(), hint.pincode(),
+                            hint.types(), district))
+                    : Optional.empty();
+        }).when(places).details(any(), any());
     }
 
     private ResultActions resolve(String placeId, String name, double lat, double lng, String type) throws Exception {
@@ -149,13 +155,54 @@ class LocalityResolveEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void refusesAPlaceOutsideThePuneMetropolitanRegion() throws Exception {
+    void refusesAPlaceGoogleSaysIsOutsideTheServedDistrict() throws Exception {
+        googlePutsItIn("Mumbai");
         resolve("ChIJ-mumbai", "Zzmumbai Colony", 19.07, 72.87, "sublocality_level_1")
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message").value(OUTSIDE));
-        resolve("ChIJ-edge", "Zzedge Colony", 18.96, 73.80, "sublocality_level_1")
+
+        googlePutsItIn("Raigad");
+        resolve("ChIJ-khopoli", "Zzkhopoli Colony", 18.79, 73.34, "locality")
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message").value(OUTSIDE));
+    }
+
+    @Test
+    void refusesAPlaceGoogleGivesNoDistrict() throws Exception {
+        googlePutsItIn(null);
+        resolve("ChIJ-nodistrict", "Zznodistrict Colony", 18.52, 73.85, "locality")
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(OUTSIDE));
+    }
+
+    @Test
+    void acceptsAFarCornerOfTheDistrictAndRecordsIt() throws Exception {
+        googlePutsItIn("Pune");
+        resolve("ChIJ-baramati", "Zzbaramati", 18.15, 74.58, "locality").andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject("select district from localities where place_id='ChIJ-baramati'",
+                String.class)).isEqualTo("Pune");
+    }
+
+    @Test
+    void theServedDistrictsComeFromSettings() throws Exception {
+        String original = jdbc.query("select value::text from settings where key = 'geo'",
+                rs -> rs.next() ? rs.getString(1) : null);
+        jdbc.update("insert into settings (key, value) values ('geo', '{\"servedDistricts\":[{\"name\":\"Satara\",\"placeId\":\"ChIJsatara\"}]}'::jsonb) "
+                + "on conflict (key) do update set value = excluded.value");
+        try {
+            googlePutsItIn("Satara");
+            resolve("ChIJ-satara", "Zzsatara Peth", 17.68, 74.0, "locality").andExpect(status().isOk());
+            googlePutsItIn("pune");
+            resolve("ChIJ-now-out", "Zznowout Peth", 18.52, 73.85, "locality")
+                    .andExpect(status().isUnprocessableEntity());
+        } finally {
+            if (original == null) {
+                jdbc.update("delete from settings where key = 'geo'");
+            } else {
+                jdbc.update("update settings set value = ?::jsonb where key = 'geo'", original);
+            }
+        }
     }
 
     @Test
@@ -181,7 +228,10 @@ class LocalityResolveEndpointsTest extends AbstractApiTest {
         when(places.details(any(), any())).thenThrow(new PlacesLookup.UnavailableException("down", null));
         resolve("ChIJ-flaky", "Zzflaky Nagar", 18.52, 73.85, "locality").andExpect(status().isServiceUnavailable());
 
-        doAnswer(call -> Optional.of(call.getArgument(1, Place.class))).when(places).details(any(), any());
+        doAnswer(call -> {
+            Place hint = call.getArgument(1, Place.class);
+            return Optional.of(new Place(hint.placeId(), hint.name(), hint.lat(), hint.lng(), null, hint.types(), "Pune"));
+        }).when(places).details(any(), any());
         resolve("ChIJ-flaky", "Zzflaky Nagar", 18.52, 73.85, "locality").andExpect(status().isOk());
     }
 
