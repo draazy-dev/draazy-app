@@ -152,6 +152,16 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
               {view === 'map' && flagEnabled('mapSearch') ? (
                 mapGated ? (
                   <MapGate localities={localities} f={f} set={set} locNameBySlug={locNameBySlug} maxAreas={mapMaxAreas} setView={setView} suggestedLocalities={suggestedMapLocalities} onAddLocality={onAddLocality} />
+                ) : loaded && !searching && !loadFailed && count === 0 ? (
+                  <div className="glass rounded-2xl px-5 py-8 sm:p-12 text-center" data-testid="map-empty">
+                    <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3"><Icon name="map-pin" className="w-6 h-6 text-gray-500" /></div>
+                    <p className="text-white font-semibold mb-1">{t('listings.mapEmptyTitle')}</p>
+                    <p className="text-gray-500 text-sm mb-5">{t('listings.mapEmptyText')}</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <Button icon="map-pin" onClick={() => set({ localities: new Set() })}>{t('listings.changeAreas')}</Button>
+                      <Button variant="secondary" icon="x-circle" onClick={clearAll}>{t('listings.clearAllFiltersBtn')}</Button>
+                    </div>
+                  </div>
                 ) : (
                   <>
                     {mapCapped && (

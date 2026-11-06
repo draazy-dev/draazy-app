@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { focusFlatmateMap } from '../../../helpers/locality.js';
+import { focusFlatmateMap, mintLocality, uniqueLocalityName } from '../../../helpers/locality.js';
 
 /* Map view gates on a "Focus your map" locality search; a ?near=lat,lng&nearr=km deep link self-focuses it and
    narrows posts to the radius deterministically, with no live Places call. */
@@ -55,4 +55,24 @@ test('a proximity deep link self-focuses the map (no gate)', async ({ page }) =>
   // Near is set, so the map opens straight to bubbles — no focus gate.
   await expect(page.locator('[data-fm-pin]').first()).toBeVisible({ timeout: 20000 });
   await expect(page.getByRole('heading', { name: /Focus your map/i })).toHaveCount(0);
+});
+
+test('a map focused on an area with no posts offers to change the areas', async ({ page }) => {
+  const { name } = await mintLocality(uniqueLocalityName('Zzempty Flat'));
+  await page.goto(`${BASE}/flatmates?view=flatmates`);
+  await page.getByRole('button', { name: 'Map' }).click();
+  await focusFlatmateMap(page, [name]);
+  await expect(page.getByText('No flatmates in the focused areas')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Change areas' }).click();
+  await expect(page.getByRole('heading', { name: /Focus your map/i })).toBeVisible();
+  await expect(page.getByPlaceholder('Search any Pune locality')).toBeVisible();
+});
+
+test('a near-a-place map with nothing nearby offers to change the place', async ({ page }) => {
+  await page.goto(`${BASE}/flatmates?view=flatmates&near=19.9,75.3&nearlabel=Nowhere&nearr=1`);
+  await page.getByRole('button', { name: 'Map' }).click();
+  await expect(page.getByText('No flatmates near Nowhere')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Change place' }).click();
+  await expect(page.getByRole('heading', { name: /Focus your map/i })).toBeVisible();
+  await expect(page).not.toHaveURL(/[?&]near=/);
 });

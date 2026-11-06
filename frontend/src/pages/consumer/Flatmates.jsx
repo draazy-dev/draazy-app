@@ -67,6 +67,14 @@ export default function Flatmates() {
                 icon="map-pin"
                 title={filters.near ? t('flatmates.noKindNearPlace', { kind: t('flatmates.kind_' + kindWord), place: filters.nearLabel || t('flatmates.thatPlace') }) : t('flatmates.noKindFocused', { kind: t('flatmates.kind_' + kindWord) })}
                 text={filters.near ? t('flatmates.widenRadius') : t('flatmates.widenBudgetArea')}
+                primary={{
+                  icon: filters.near ? 'map-pinned' : 'map-pin',
+                  label: filters.near ? t('flatmates.changePlace') : t('flatmates.changeAreas'),
+                  onClick: () => {
+                    if (filters.near || filters.locality) setF({ near: '', nearLabel: '', locality: '' });
+                    setMapAreas(new Set());
+                  },
+                }}
                 filtersActive={filtersActive}
                 onClearFilters={clearFilters}
               />
