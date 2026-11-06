@@ -6,6 +6,8 @@ function epoch(iso) {
 
 const STAFF_ROLES = new Set(['staff', 'manager', 'admin']);
 
+const toAbout = (a) => (a?.type && a?.id ? { type: a.type, id: String(a.id) } : null);
+
 export function toMessage(m) {
   if (!m) return null;
   return {
@@ -26,6 +28,7 @@ export function toViewModel(t) {
     id: t.id,
     subject: t.subject || '',
     category: t.category || 'other',
+    about: toAbout(t.about),
     status: t.status || 'open',
     priority: '',
     unread: !!t.unread,
@@ -43,6 +46,7 @@ export function toSummary(t) {
     id: t.id,
     subject: t.subject || '',
     category: t.category || 'other',
+    about: toAbout(t.about),
     status: t.status || 'open',
     unread: !!t.unread,
     createdAt: created,
@@ -58,36 +62,11 @@ export function toSummaryList(rows) {
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-export function toQueueRow(t) {
-  if (!t) return null;
-  return {
-    id: t.id,
-    subject: t.subject || '',
-    category: t.category || 'other',
-    status: t.status || 'open',
-    raiser: t.raiser || '',
-    raiserMobile: t.raiserMobile || '',
-    awaitingReply: !!t.awaitingReply,
-    unread: !!t.unread,
-    createdAt: epoch(t.createdAt),
-  };
-}
-
-export function toQueuePage(res, fallback = {}) {
-  const rows = Array.isArray(res?.content) ? res.content : [];
-  return {
-    items: rows.map(toQueueRow).filter(Boolean),
-    total: res?.totalElements ?? rows.length,
-    counts: res?.counts,
-    page: res?.page ?? res?.number ?? fallback.page ?? 0,
-    size: res?.size ?? fallback.size ?? rows.length,
-  };
-}
-
 export function toTicketCreate(ticket) {
   return {
     subject: String(ticket?.subject || '').trim(),
     category: ticket?.category || 'other',
     body: String(ticket?.message || '').trim(),
+    ...(ticket?.about ? { about: ticket.about } : {}),
   };
 }

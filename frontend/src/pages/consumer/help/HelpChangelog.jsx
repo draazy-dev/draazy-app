@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import { supportLink } from '../../../lib/supportLink.js';
 import HelpLayout from '../../../components/help/HelpLayout.jsx';
 import ArticleProse from '../../../components/help/ArticleProse.jsx';
 import { Breadcrumbs, EmptyState } from '../../../components/help/HelpCards.jsx';
@@ -44,7 +45,7 @@ export default function HelpChangelog() {
 
         <p className="mt-12 border-t border-white/5 pt-6 text-xs text-gray-500">
           {t('help.changelogRegression')}{' '}
-          <Link to="/support?cat=other" className="text-teal-400 hover:underline">{t('help.changelogTellUs')}</Link>
+          <Link to={supportLink('general')} className="text-teal-400 hover:underline">{t('help.changelogTellUs')}</Link>
           {' '}{t('help.changelogTriage')}
         </p>
       </div>

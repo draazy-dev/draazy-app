@@ -57,8 +57,8 @@ test.describe('Help article feedback', () => {
     // The thank-you comes from the local record, so the upload failing is ours
     // to notice and not the reader's.
     await expect(feedback(page).getByText(/Thanks/i)).toBeVisible();
-    // Still offers the ticket route — "helpful" is not the same as "solved".
-    await expect(feedback(page).getByRole('link', { name: /ticket/i })).toBeVisible();
+    // Still offers the support chat — "helpful" is not the same as "solved".
+    await expect(feedback(page).getByRole('link', { name: 'Chat with Draazy support' })).toHaveAttribute('href', '/messages?support=general');
 
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('dz_help_feedback_v1') || '{}'));
     expect(stored['what-is-draazy']).toMatchObject({ helpful: true });

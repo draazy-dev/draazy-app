@@ -19,7 +19,7 @@ function faqEntries(faqs) {
     keywords: tokenize(f.question + ' ' + f.answer),
     q: f.question,
     a: f.answer,
-    actions: [{ label: 'More help', to: '/support', icon: 'ticket-plus' }],
+    actions: [{ label: 'More help', to: '/support', icon: 'life-buoy' }],
     isFaq: true,
   }));
 }

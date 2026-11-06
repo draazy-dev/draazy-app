@@ -10,6 +10,7 @@ import CookieConsent from '../CookieConsent.jsx';
 import InstallPrompt from '../InstallPrompt.jsx';
 import BrowserAlertsPrompt from '../BrowserAlertsPrompt.jsx';
 import AssistantWidget from '../assistant/AssistantWidget.jsx';
+import SupportDock from '../support/SupportDock.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { AppFlagsProvider, useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { PricingProvider } from '../../context/PricingContext.jsx';
@@ -66,6 +67,7 @@ function ConsumerLayoutContent() {
           {!authRoute && <InstallPrompt />}
           {!authRoute && !chatRoute && <BrowserAlertsPrompt />}
           {showBottomNav && <BottomNav />}
+          <SupportDock hidden={chatRoute || authRoute} />
         </div>
       </PostChooserProvider>
     </PricingProvider>

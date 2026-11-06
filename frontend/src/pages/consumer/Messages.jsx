@@ -19,11 +19,15 @@ import {
   updateConversationState,
 } from '../../services/conversationService.js';
 import { useConversationUnread } from '../../context/ConversationContext.jsx';
-import Inbox from './messages/Inbox.jsx';
+import Inbox, { SUPPORT_ID } from './messages/Inbox.jsx';
 import RequestThread from './messages/RequestThread.jsx';
+import SupportThread from './messages/SupportThread.jsx';
 import Thread from './messages/Thread.jsx';
 import { quickReplies } from './messages/quickReplies.js';
 import { useRequestThreads } from './messages/useRequestThreads.js';
+import { contextKey, parseContextKey } from '../../lib/supportLink.js';
+import { useSupportChat } from '../../context/SupportChatContext.jsx';
+import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { targetSlug } from './requests/requestMeta.js';
 import { useRequestActions } from './requests/useRequestActions.js';
 
@@ -38,7 +42,30 @@ const mergeMessages = (serverMessages = [], localMessages = []) => {
   return [...serverMessages, ...localOnly];
 };
 
+const linkedContext = (param) => (param ? contextKey(parseContextKey(param)) : null);
+
 export default function Messages() {
+  const { flagEnabled } = useAppFlags();
+  return flagEnabled('inAppMessaging') ? <Conversations /> : <SupportOnly />;
+}
+
+function SupportOnly() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  return (
+    <div className="messages-page pt-2 pb-6">
+      <div className="pc-shell max-w-3xl mx-auto px-3 sm:px-6">
+        <div className="pc-wrap is-narrow show-thread">
+          <SupportThread t={t} user={user} contextKey={linkedContext(params.get('support'))} onBack={() => navigate(-1)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Conversations() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -48,7 +75,11 @@ export default function Messages() {
   const navigate = useNavigate();
   const wantId = params.get('c');
   const openProp = params.get('openProp');
+  const supportParam = params.get('support');
   const [activeId, setActiveId] = useState(null);
+  const [supportKey, setSupportKey] = useState(null);
+  const support = useSupportChat(true);
+  const supportOpened = useRef(null);
   const [search, setSearch] = useState('');
   const [narrow, setNarrow] = useState(false);
   const [showThread, setShowThread] = useState(false);
@@ -229,7 +260,7 @@ export default function Messages() {
       autoOpened.current = true;
       openConv(target.id);
     }
-    else if (!activeId && !pickedFirst.current && (wrapRef.current?.clientWidth || window.innerWidth) >= 720) {
+    else if (!activeId && !supportParam && !pickedFirst.current && (wrapRef.current?.clientWidth || window.innerWidth) >= 720) {
       const first = convs.find((c) => !c.staged && !c.archived);
       if (first) {
         pickedFirst.current = true;
@@ -239,16 +270,34 @@ export default function Messages() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-open only follows list and link changes
   }, [convs.length, threads.length, wantId, openProp, loading, sentStatus]);
 
-  const openConv = (id, opts = {}) => {
-    if (opts.report) setReportOpen(true);
-    patchConv(id, (c) => ({ ...c, unread: 0 }));
-    hydrate(id);
-    setActiveId(id);
+  const showPane = () => {
     if ((wrapRef.current?.clientWidth || window.innerWidth) < 720) {
       window.history.pushState({ pcThread: true }, '');
       setShowThread(true);
     } else setShowThread(true);
   };
+
+  const openConv = (id, opts = {}) => {
+    if (opts.report) setReportOpen(true);
+    patchConv(id, (c) => ({ ...c, unread: 0 }));
+    hydrate(id);
+    setActiveId(id);
+    showPane();
+  };
+
+  const openSupport = (key) => {
+    setSupportKey(key || null);
+    if (activeId === SUPPORT_ID) return;
+    setActiveId(SUPPORT_ID);
+    showPane();
+  };
+
+  useEffect(() => {
+    if (!supportParam || supportOpened.current === supportParam) return;
+    supportOpened.current = supportParam;
+    openSupport(linkedContext(supportParam));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- opens once per deep link
+  }, [supportParam]);
 
   const hydrateUnlessHas = useCallback((id, sentId) => {
     window.setTimeout(() => {
@@ -448,17 +497,21 @@ export default function Messages() {
             t={t}
             items={convs}
             requests={threads}
+            support={support.chat}
             activeId={activeId}
             search={search}
             setSearch={setSearch}
             onOpen={openConv}
+            onOpenSupport={openSupport}
             onRetry={() => reload().catch(() => {})}
             onState={changeState}
             onBlock={block}
             loading={loading}
             error={error}
           />
-          {active?.request ? (
+          {activeId === SUPPORT_ID ? (
+            <SupportThread t={t} user={user} contextKey={supportKey} onBack={closeThread} />
+          ) : active?.request ? (
             <RequestThread key={active.id} t={t} thread={active} actions={requestActions} onBack={closeThread} />
           ) : (
             <Thread

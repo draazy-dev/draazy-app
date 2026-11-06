@@ -37,7 +37,7 @@ test.describe('Route redirects', () => {
   test('/admin/support is the support queue, not a forward to a service desk', async ({ page, login }) => {
     await login.asAdmin();
     await page.goto('/admin/support');
-    await expect(page.getByRole('heading', { name: 'Support queue' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: 'Support chats' })).toBeVisible({ timeout: 15_000 });
     expect(new URL(page.url()).pathname).toBe('/admin/support');
   });
 });

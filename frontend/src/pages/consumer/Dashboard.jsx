@@ -7,7 +7,6 @@ import { useSaved } from '../../context/SavedContext.jsx';
 import { useFollows } from '../../context/FollowContext.jsx';
 import { useSavedSearches } from '../../context/SavedSearchContext.jsx';
 import { firstName } from '../../lib/auth.js';
-import { flatmateCaseKey } from '../../lib/data/myListings.js';
 import { useVerification } from '../../context/VerificationContext.jsx';
 import { listRecentSearches } from '../../services/recentSearchService.js';
 import { dashboardCaps, primeMeDashboard } from '../../services/meDashboardService.js';
@@ -29,7 +28,6 @@ import BillingPanel from './dashboard/BillingPanel.jsx';
 import ActivityPanel from './dashboard/ActivityPanel.jsx';
 import MobileNav from './dashboard/MobileNav.jsx';
 import DashboardSidebar from './dashboard/DashboardSidebar.jsx';
-import DashboardReviewModal from './dashboard/DashboardReviewModal.jsx';
 import { useDashboardData } from './dashboard/useDashboardData.js';
 import { attentionFromItems, buildActionItems, buildDocGroups, buildOwnerStats, buildSeekerStats, countUpcomingVisits } from './dashboard/dashboardData.js';
 import { DashboardOverviewSkeleton } from './dashboard/DashboardSkeleton.jsx';
@@ -78,8 +76,8 @@ export default function Dashboard() {
   const {
     listings, listingsLoaded, visits, recent, recommended, alertMatches,
     contactReqs, photoReqs, flatmateReqs, docReqs, serviceReqs,
-    reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
-    apps, offers, mutateVisit, openReview, sendReview,
+    reviewsByProp,
+    apps, offers, mutateVisit, openReview,
     dataStatus, dataError, retryData,
     refreshData, refreshRequests, setListings,
   } = useDashboardData({ user, toast, ownsProperty: caps.ownsProperty });
@@ -118,12 +116,8 @@ export default function Dashboard() {
 
   const reviewParam = new URLSearchParams(location.search).get('review');
   useEffect(() => {
-    if (!reviewParam) return;
-    openReview(reviewParam);
-    const rest = new URLSearchParams(location.search);
-    rest.delete('review');
-    navigate({ search: rest.toString() ? `?${rest}` : '', hash: location.hash }, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- review deep-link is consumed once
+    if (reviewParam) openReview(reviewParam, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- old notification links land here once
   }, [reviewParam]);
 
   const docGroups = useMemo(() => buildDocGroups(docReqs, listings), [docReqs, listings]);
@@ -218,17 +212,6 @@ export default function Dashboard() {
           </section>
         </div>
       </div>
-
-      <DashboardReviewModal
-        reviewProp={reviewProp}
-        setReviewProp={setReviewProp}
-        thread={reviewThread}
-        listing={(listings || []).find((l) => l.id === reviewProp || l.uuid === reviewProp || flatmateCaseKey(l) === reviewProp)}
-        reviewInput={reviewInput}
-        setReviewInput={setReviewInput}
-        sendReview={sendReview}
-        REVIEW_STATUS={REVIEW_STATUS}
-      />
     </div>
   );
 }

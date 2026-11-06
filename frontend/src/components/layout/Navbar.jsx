@@ -11,6 +11,7 @@ import { useConversationUnread } from '../../context/ConversationContext.jsx';
 import { TOPBAR_SCROLL } from '../../lib/chrome.js';
 import { firstName, initial, roleLabel } from '../../lib/auth.js';
 import { setAppPrefs } from '../../lib/localPrefs.js';
+import { supportLink } from '../../lib/supportLink.js';
 import { useIsLightTheme } from '../../lib/themeColour.js';
 import useScrollLock from '../../hooks/useScrollLock.js';
 import NotificationBell from '../notifications/NotificationBell.jsx';
@@ -116,7 +117,7 @@ export default function Navbar() {
       <Link to="/dashboard#profile" onClick={close} className={rowCls}><Icon name="user-cog" className="w-4 h-4 text-gray-400" /> Profile &amp; Settings</Link>
       <Link to="/dashboard#billing" onClick={close} className={rowCls}><Icon name="receipt-indian-rupee" className="w-4 h-4 text-gray-400" /> Plan &amp; Billing</Link>
       <Link to="/help" onClick={close} className={rowCls}><Icon name="book-open" className="w-4 h-4 text-gray-400" /> Help centre</Link>
-      <Link to="/support" onClick={close} className={rowCls}><Icon name="life-buoy" className="w-4 h-4 text-gray-400" /> Contact support</Link>
+      <Link to={supportLink('general')} onClick={close} className={rowCls}><Icon name="life-buoy" className="w-4 h-4 text-gray-400" /> Contact support</Link>
       <Link to="/plans" onClick={close} className={rowCls}><Icon name="tag" className="w-4 h-4 text-gray-400" /> Pricing &amp; Plans</Link>
     </>
   );

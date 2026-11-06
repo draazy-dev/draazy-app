@@ -3,6 +3,7 @@ import Icon from '../Icon.jsx';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { IDENTITY_DOCUMENTS } from '../../lib/identity-verification/documents.js';
+import { supportLink } from '../../lib/supportLink.js';
 
 export function VerifyShell({ title, stepIndex, onBack, onClose, children }) {
   const { t } = useTranslation();
@@ -338,7 +339,7 @@ function DuplicateState({ conflict, onOpenDispute, reportRef }) {
             : t('verifyIdentity.dispute.duplicate')}
       </p>
       {done ? (
-        <Link to="/support" className="mt-2 inline-flex min-h-[36px] items-center text-[var(--teal-3)] underline-offset-4 hover:underline">
+        <Link to={supportLink('general')} className="mt-2 inline-flex min-h-[36px] items-center text-[var(--teal-3)] underline-offset-4 hover:underline">
           {t('verifyIdentity.dispute.supportLink')}
         </Link>
       ) : (

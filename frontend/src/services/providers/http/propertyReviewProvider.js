@@ -54,10 +54,6 @@ export async function beginPropertyReview(propertyId) {
   return toCaseFile(await post(`${caseFilePath(propertyId)}/start`));
 }
 
-export async function addPropertyReviewMessage(propertyId, body, clarificationRequested = false) {
-  return toCaseFile(await post(`${caseFilePath(propertyId)}/messages`, { body, clarificationRequested }));
-}
-
 export async function markPropertyReviewRead(propertyId) {
   await post(`${caseFilePath(propertyId)}/read`);
 }

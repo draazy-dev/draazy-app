@@ -4,15 +4,35 @@ const provider = createProvider('support');
 
 export const listTickets = async () => (await provider()).listTickets();
 
-export const getTicket = async (id) => (await provider()).getTicket(id);
-
-// Not `listTickets` with a wider scope, which would be a PII export. Staff-only: never call from a consumer surface.
-export const listSupportQueue = async (opts) => (await provider()).listSupportQueue(opts);
-
 export const createTicket = async (ticket) => (await provider()).createTicket(ticket);
 
 export const replyToTicket = async (id, text) => (await provider()).replyToTicket(id, text);
 
 export const markTicketRead = async (id) => (await provider()).markTicketRead(id);
 
-export const closeTicket = async (id) => (await provider()).closeTicket(id);
+export const getSupportChat = async () => (await provider()).getSupportChat();
+
+export const sendSupportChatMessage = async (text, about) => (await provider()).sendSupportChatMessage(text, about);
+
+export const markSupportChatRead = async () => (await provider()).markSupportChatRead();
+
+// Staff-only from here down.
+export const listSupportChats = async (opts) => (await provider()).listSupportChats(opts);
+
+export const supportChatCounts = async () => (await provider()).supportChatCounts();
+
+export const getStaffSupportChat = async (userId) => (await provider()).getStaffSupportChat(userId);
+
+export const replyToSupportChat = async (userId, text, about) => (await provider()).replyToSupportChat(userId, text, about);
+
+export const assignSupportChat = async (userId, assigneeId) => (await provider()).assignSupportChat(userId, assigneeId);
+
+export const resolveSupportChat = async (userId) => (await provider()).resolveSupportChat(userId);
+
+export const markStaffSupportChatRead = async (userId) => (await provider()).markStaffSupportChatRead(userId);
+
+export const locateSupportChat = async (about) => (await provider()).locateSupportChat(about);
+
+export const createServiceTicketFromChat = async (userId, data) => (await provider()).createServiceTicketFromChat(userId, data);
+
+export const openSupportChatStream = async (opts) => (await provider()).openSupportChatStream(opts);

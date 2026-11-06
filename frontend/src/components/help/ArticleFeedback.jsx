@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
+import { supportLink } from '../../lib/supportLink.js';
 import { getFeedback, saveFeedback } from '../../lib/help.js';
 import { submitHelpFeedback } from '../../services/contentService.js';
 
@@ -57,7 +58,7 @@ export default function ArticleFeedback({ slug, title }) {
             <p className="mt-1 text-xs text-gray-500">
               {choice ? t('help.thanksPositive') : t('help.thanksNegative')}
               {' '}{t('help.stillStuck')}{' '}
-              <Link to={`/support?cat=other&ref=${encodeURIComponent(slug)}`} onClick={ignoreEarlyTap} className="text-teal-400 hover:underline">
+              <Link to={supportLink('general')} onClick={ignoreEarlyTap} className="text-teal-400 hover:underline">
                 {t('help.raiseTicket')}
               </Link>.
             </p>
@@ -95,7 +96,7 @@ export default function ArticleFeedback({ slug, title }) {
               {t('help.cancel')}
             </button>
             <Link
-              to={`/support?cat=other&ref=${encodeURIComponent(slug)}`}
+              to={supportLink('general')}
               className="ml-auto text-xs font-medium text-teal-400 hover:underline"
             >
               {t('help.contactSupportInstead')}

@@ -1,9 +1,9 @@
 import { test, expect } from '../../../fixtures/live.js';
 import { API, authHeaders, signedInAsNew } from '../../../helpers/liveAuth.js';
 
-/* Empty-state and create tests use throwaway accounts so seeded actors are never mutated. */
+/* Every test uses a throwaway account so seeded actors are never mutated. */
 
-/** The cookie-consent banner is also role="dialog"; seed it before load so it cannot hit the thread lookup. */
+/** The cookie-consent banner is also role="dialog"; seed it before load so it cannot cover the page. */
 async function seedConsent(page) {
   await page.addInitScript(() => {
     localStorage.setItem(
@@ -21,17 +21,19 @@ async function ticketsOf(mobile) {
   return JSON.parse(body);
 }
 
-/** Open `/support` for a mobile already signed in, and wait for the list read rather than a paint. */
-async function openSupport(page) {
-  const loaded = page.waitForResponse((response) =>
-    new URL(response.url()).pathname.endsWith('/api/support/tickets') &&
-    response.request().method() === 'GET' &&
-    response.status() === 200,
-  );
-  await page.goto('/support');
-  await loaded;
-  await expect(page.getByRole('heading', { name: 'Help & Support' })).toBeVisible();
+async function raiseTicket(mobile, subject) {
+  const response = await fetch(`${API}/support/tickets`, {
+    method: 'POST',
+    headers: { ...(await authHeaders(mobile)), 'content-type': 'application/json' },
+    body: JSON.stringify({ subject, category: 'other', body: `${subject} body` }),
+  });
+  const body = await response.text();
+  expect(response.status, body).toBe(201);
+  return JSON.parse(body);
 }
+
+const thread = (page) => page.getByTestId('support-thread');
+const composer = (page) => thread(page).getByRole('textbox', { name: 'Message Draazy support' });
 
 /** One seeded question, quoted exactly. Chosen because its answer is the platform's core claim. */
 const ANCHOR_Q = 'Is Draazy really zero brokerage?';
@@ -56,121 +58,67 @@ test.describe('Consumer support — live API', () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test('a new account sees the support shell and the empty state for a ticket list the server holds nothing for', async ({ page, consoleErrors }) => {
+  test('/support is help only, and on desktop its chat button opens the Draazy support chat docked over the page', async ({ page, consoleErrors }) => {
     await seedConsent(page);
-    const mobile = await signedInAsNew(page);
-    await openSupport(page);
+    await signedInAsNew(page);
+    await page.goto('/support');
 
-    await expect(page.getByRole('heading', { name: 'Raise a new ticket' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Submit ticket' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Your tickets' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Help & Support' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Frequently asked questions' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Submit ticket' })).toHaveCount(0);
 
-    /* Assert the premise: a throwaway account can't hold a ticket from another spec. */
-    expect(await ticketsOf(mobile), 'a brand-new account starts with no tickets').toHaveLength(0);
-
-    await expect(page.getByText('No tickets yet')).toBeVisible();
-    await expect(page.getByText("Raise a ticket and it'll show up here.")).toBeVisible();
+    const cta = page.getByTestId('support-chat-cta');
+    await expect(cta).toHaveAttribute('href', '/messages?support=general');
+    await cta.click();
+    await expect(page).toHaveURL(/\/support$/);
+    await expect(page.getByTestId('support-dock').getByTestId('support-thread')).toHaveAttribute('data-topic', 'general');
+    await expect(composer(page)).toBeVisible();
     expect(consoleErrors).toEqual([]);
   });
 
-  test('creating a ticket opens the thread carrying the id the server minted, and lists it', async ({ page }) => {
+  test('an old /support?open= link lands on that ticket in Messages, and ?invoice= on the invoice topic', async ({ page }) => {
     await seedConsent(page);
     const mobile = await signedInAsNew(page);
-    await openSupport(page);
-    await expect(page.getByText('No tickets yet')).toBeVisible();
+    const ticket = await raiseTicket(mobile, 'Legacy deep link');
 
-    /* Mobile is prefilled and disabled; the NAME is empty and required (`Support.jsx:140`). */
-    const subject = 'Refund not received for booking';
-    const message = 'I paid for a visit booking but the refund has not arrived yet.';
-    await page.getByPlaceholder('e.g. Rahul Sharma').fill('E2E Support Writer');
-    await page.getByPlaceholder('Brief summary of your issue').fill(subject);
-    await page.getByPlaceholder('Share as much detail as you can so we can help faster.').fill(message);
+    await page.goto(`/support?open=${ticket.id}`);
+    await expect(page).toHaveURL(new RegExp(`/messages\\?support=ticket%3A${ticket.id}`));
+    await expect(thread(page)).toHaveAttribute('data-topic', 'general');
+    await expect(thread(page)).toContainText('Legacy deep link body');
 
-    const created = page.waitForResponse((response) =>
-      new URL(response.url()).pathname.endsWith('/api/support/tickets') &&
-      response.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: 'Submit ticket' }).click();
-    /* The status of the write, not the state of the control: a 201 here is what makes every
-       assertion below a statement about a row rather than about a form that cleared itself. */
-    expect((await created).status(), 'the ticket create was refused').toBe(201);
-
-    /* Both ticket components render `{t.id}` raw, so fetch the expected id; never assert its shape. */
-    const [ticket] = await ticketsOf(mobile);
-    expect(ticket, 'the create did not reach the database').toBeTruthy();
-    expect(ticket.subject).toBe(subject);
-
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(ticket.id, { exact: true })).toBeVisible();
-    await expect(dialog.getByText(message)).toBeVisible();
-
-    await page.keyboard.press('Escape');
-    await expect(dialog).toHaveCount(0);
-    await expect(page.getByText('No tickets yet')).toHaveCount(0);
-    await expect(page.getByText(subject)).toBeVisible();
-    /* The list shows the same id as the thread did — the assertion the shape-match was standing in
-       for, and the one that would catch a list keyed off a client-minted stand-in. */
-    await expect(page.getByText(ticket.id, { exact: true }).first()).toBeVisible();
+    await page.goto('/support?cat=payment&invoice=DZ-INV-0001');
+    await expect(page).toHaveURL(/\/messages\?support=invoice%3ADZ-INV-0001/);
   });
 
-  test('a double-click on Submit raises one ticket', async ({ page }) => {
+  test('a double-click on Send raises one ticket', async ({ page }) => {
     await seedConsent(page);
     const mobile = await signedInAsNew(page);
-    await openSupport(page);
+    await page.goto('/messages?support=general');
 
-    await page.getByPlaceholder('e.g. Rahul Sharma').fill('E2E Double Click');
-    await page.getByLabel('Subject').fill('Double click guard check');
-    await page.getByLabel('Describe your issue').fill('Pressing submit twice must not raise two tickets.');
-    await page.getByRole('button', { name: 'Submit ticket' }).dblclick();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await composer(page).fill('Pressing send twice must not raise two tickets.');
+    await thread(page).getByRole('button', { name: 'Send message' }).dblclick();
+    await expect(thread(page)).toContainText('Pressing send twice must not raise two tickets.');
 
-    expect(await ticketsOf(mobile)).toHaveLength(1);
-  });
-
-  test('the form fields are labelled and show the length limits, and a refused field is named', async ({ page }) => {
-    await seedConsent(page);
-    await signedInAsNew(page);
-    await openSupport(page);
-
-    await expect(page.getByLabel('Your name')).toBeVisible();
-    await expect(page.getByLabel('Mobile number')).toBeVisible();
-    await page.getByLabel('Subject').fill('s'.repeat(300));
-    await expect(page.getByLabel('Subject')).toHaveValue('s'.repeat(120));
-    await expect(page.getByText('120/120')).toBeVisible();
-
-    await page.getByLabel('Describe your issue').fill('d'.repeat(4100));
-    await expect(page.getByLabel('Describe your issue')).toHaveValue('d'.repeat(4000));
-    await expect(page.getByText('4000/4000')).toBeVisible();
-
-    await page.route('**/api/support/tickets', (route) => route.request().method() === 'POST'
-      ? route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: 'validation_failed', fields: [{ field: 'body', message: 'size must be between 0 and 4000' }] }) })
-      : route.continue());
-    await page.getByPlaceholder('e.g. Rahul Sharma').fill('E2E Limits');
-    await page.getByRole('button', { name: 'Submit ticket' }).click();
-    await expect(page.getByText(/description must be 8 to 4,000 characters/)).toBeVisible();
+    await expect.poll(async () => (await ticketsOf(mobile)).length).toBe(1);
   });
 
   test('an ended session signs the user out in the UI and sends them to sign-in', async ({ page }) => {
     await seedConsent(page);
     await signedInAsNew(page);
-    await openSupport(page);
+    await page.goto('/messages?support=general');
+    await expect(composer(page)).toBeVisible();
 
-    await page.route('**/api/support/tickets', (route) => route.request().method() === 'POST'
+    await page.route('**/api/support/chat/messages', (route) => route.request().method() === 'POST'
       ? route.fulfill({ status: 401, contentType: 'application/json', body: '{}' })
       : route.continue());
     await page.route('**/api/auth/refresh', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: '{}' }));
 
-    await page.getByPlaceholder('e.g. Rahul Sharma').fill('E2E Session End');
-    await page.getByLabel('Subject').fill('Session ended check');
-    await page.getByLabel('Describe your issue').fill('The session ends while this is submitted.');
-    await page.getByRole('button', { name: 'Submit ticket' }).click();
+    await composer(page).fill('The session ends while this is sent.');
+    await thread(page).getByRole('button', { name: 'Send message' }).click();
 
     await expect(page.getByText('Your session ended. Please sign in again.')).toBeVisible();
-    await expect(page).toHaveURL(/\/signin\?next=%2Fsupport/);
+    await expect(page).toHaveURL(/\/signin\?next=%2Fmessages/);
   });
-
   /* Copy is identical in mock and server, so provenance is the `GET /api/faqs` wait, armed before navigation as it
      fires from an effect during first paint; the API half is read without a browser. */
   test('the FAQ list is a public read that needs no session, and the help page renders what the server returned', async ({ page, login }) => {
@@ -216,23 +164,4 @@ test.describe('Consumer support — live API', () => {
       await expect(page.getByText('zero brokerage', { exact: false }).first()).toBeVisible();
     });
   });
-
-  test('typing a subject surfaces matching FAQs under it, and clearing it hides them', async ({ page }) => {
-    await seedConsent(page);
-    await signedInAsNew(page);
-    const faqsRead = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/api/faqs') && r.status() === 200);
-    await openSupport(page);
-    await faqsRead;
-
-    const subject = page.getByPlaceholder('Brief summary of your issue');
-    const suggestions = page.getByTestId('faq-suggestions');
-    await subject.fill('Was I charged brokerage');
-    await expect(suggestions).toContainText(ANCHOR_Q);
-    await suggestions.getByText(ANCHOR_Q).click();
-    await expect(suggestions.getByText('zero brokerage', { exact: false }).last()).toBeVisible();
-
-    await subject.fill('');
-    await expect(suggestions).toHaveCount(0);
-  });
 });
-

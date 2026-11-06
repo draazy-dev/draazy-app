@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import { supportLink } from '../../../lib/supportLink.js';
 import HelpLayout from '../../../components/help/HelpLayout.jsx';
 import HelpSearch from '../../../components/help/HelpSearch.jsx';
 import { ArticleCard, CategoryCard } from '../../../components/help/HelpCards.jsx';
@@ -106,10 +107,10 @@ export default function HelpHome() {
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
             <Link
-              to="/support"
+              to={supportLink('general')}
               className="h-btn inline-flex items-center gap-1.5 rounded-lg bg-teal-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-teal-400"
             >
-              <Icon name="life-buoy" className="w-4 h-4" /> {t('help.raiseATicket')}
+              <Icon name="message-square" className="w-4 h-4" /> {t('help.raiseATicket')}
             </Link>
             <Link
               to="/contact"

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import LegalPage from '../../components/LegalPage.jsx';
+import { supportLink } from '../../lib/supportLink.js';
 import { usePricing } from '../../context/PricingContext.jsx';
 import { GRIEVANCE_OFFICER_DEFAULT, getGrievanceOfficer } from '../../services/settingsService.js';
 
@@ -91,8 +92,8 @@ export default function RefundPolicy() {
       <ol>
         <li>Open <strong>Dashboard → Plan &amp; Billing</strong>. If the purchase qualifies, you will see a <strong>Refund</strong> button.</li>
         <li>
-          If it does not qualify but you think it should, choose <strong>Ask for a review</strong>, or raise a ticket
-          from the <Link to="/support">Support</Link> page with the invoice number.
+          If it does not qualify but you think it should, choose <strong>Ask for a review</strong>. It opens a chat
+          with <Link to={supportLink('general')}>Draazy support</Link> about that invoice.
         </li>
         <li>Our team reviews every request within 2 business days and keeps you updated.</li>
       </ol>

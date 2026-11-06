@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import { supportLink } from '../../../lib/supportLink.js';
 import HelpLayout from '../../../components/help/HelpLayout.jsx';
 import { Breadcrumbs, EmptyState } from '../../../components/help/HelpCards.jsx';
 import { listFaqs } from '../../../services/contentService.js';
@@ -121,10 +122,10 @@ export default function HelpFaq() {
           <p className="text-sm font-semibold text-white">{t('help.faqNotAnswered')}</p>
           <p className="mt-1.5 text-xs leading-relaxed text-gray-500">{t('help.faqNotAnsweredBody')}</p>
           <Link
-            to="/support"
+            to={supportLink('general')}
             className="h-btn-sm mt-3 inline-flex items-center gap-1.5 rounded-lg bg-teal-500 px-4 text-xs font-semibold text-white transition-colors hover:bg-teal-400"
           >
-            <Icon name="life-buoy" className="w-4 h-4" /> {t('help.raiseATicket')}
+            <Icon name="message-square" className="w-4 h-4" /> {t('help.raiseATicket')}
           </Link>
         </div>
       </div>

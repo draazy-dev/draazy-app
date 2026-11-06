@@ -6,6 +6,7 @@ import LoadError from '../../../components/LoadError.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { listMyPayments, requestRefund } from '../../../services/refundService.js';
 import { fmtDate, fmtINR } from '../../../lib/format.js';
+import { supportLink } from '../../../lib/supportLink.js';
 
 const STATUS_TONE = {
   paid: 'bg-emerald-500/15 text-emerald-300',
@@ -18,7 +19,7 @@ const REFUNDABLE_KINDS = ['listing_pass', 'contact_pack'];
 const isRent = (p) => p.kind === 'rent_agreement' || p.kind === 'ra_amendment';
 const newAttemptId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-const reviewHref = (p) => `/support?cat=payment${p.invoiceNo ? `&invoice=${encodeURIComponent(p.invoiceNo)}` : ''}`;
+const reviewHref = (p) => (p.invoiceNo ? supportLink('invoice', p.invoiceNo) : supportLink('general'));
 const fmtWhen = (ms) => new Date(ms).toLocaleString('en-IN', {
   timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit',
 });

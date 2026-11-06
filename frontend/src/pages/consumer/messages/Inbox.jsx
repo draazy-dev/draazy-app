@@ -17,6 +17,7 @@ const displayPrice = (p) => {
 
 const lineOf = (c) => [c.property?.bhk, c.property?.loc, displayPrice(c.property)].filter(Boolean).join(' · ');
 const isServerId = (id) => id && !/^(staged|request):/.test(String(id));
+export const SUPPORT_ID = 'support';
 const matches = (q) => (c) => !q || c.party.name.toLowerCase().includes(q) || c.property.title.toLowerCase().includes(q);
 
 function RequestRow({ c, active, onOpen }) {
@@ -39,14 +40,34 @@ function RequestRow({ c, active, onOpen }) {
   );
 }
 
+function SupportRow({ support, active, onOpen }) {
+  return (
+    <div className="pc-conv-wrap is-support">
+      <button data-testid="support-row" className={'pc-conv' + (active ? ' active' : '')} onClick={onOpen}>
+        <div className="pc-conv-av"><div className="pc-av pc-av-support"><Icon name="headset" className="w-5 h-5" /></div></div>
+        <div className="pc-conv-main">
+          <div className="pc-conv-top"><span className="pc-conv-name">Draazy support</span><span className="pc-conv-time">{support.at ? relTime(support.at) : ''}</span></div>
+          <div className="pc-conv-bot">
+            <span className="pc-conv-last">{support.last || 'Ask about a listing, payment or request'}</span>
+            {support.unread ? <span className="pc-unread">{support.unread}</span> : null}
+          </div>
+          <div className="pc-conv-prop">Official Draazy team</div>
+        </div>
+      </button>
+    </div>
+  );
+}
+
 export default function Inbox({
   t,
   items,
   requests,
+  support,
   activeId,
   search,
   setSearch,
   onOpen,
+  onOpenSupport,
   onRetry,
   onState,
   onBlock,
@@ -111,6 +132,7 @@ export default function Inbox({
         ) : null}
       </div>
       <div className="pc-convs">
+        {!archived && (!q || 'draazy support'.includes(q)) ? <SupportRow support={support} active={activeId === SUPPORT_ID} onOpen={() => onOpenSupport()} /> : null}
         {loading && Array.from({ length: 6 }, (_, i) => <div key={i} className="pc-conv pc-skel" />)}
         {!loading && error ? <div className="pc-empty-list"><p>Couldn't load chats</p><button type="button" onClick={onRetry}>Retry</button></div> : null}
         {!loading && !error && visible.length ? visible.map((c, index) => {

@@ -476,7 +476,8 @@ test.describe('LIVE: service requests against the real API', () => {
 
     const threaded = await page.evaluate(async (id) => {
       const svc = await import('/src/services/serviceRequestService.js');
-      await svc.addServiceRequestMessage(id, 'Following up from the live suite.');
+      const support = await import('/src/services/supportService.js');
+      await support.sendSupportChatMessage('Following up from the live suite.', { type: 'request', id });
       const r = await svc.getServiceRequest(id);
       return r ? { count: r.messages.length, last: r.messages[r.messages.length - 1] } : null;
     }, created.id);
@@ -527,16 +528,19 @@ test.describe('LIVE: service requests against the real API', () => {
 
     const card = page.locator('div.rounded-xl.border-white\\/10').filter({ hasText: created.id.slice(0, 10) });
     await expect(card).toHaveCount(1);
-  const messages = card.getByRole('button', { name: /^Messages/ });
+  const messages = card.getByRole('link', { name: /^Message support/ });
     await expect(messages.locator('span.bg-rose-500')).toHaveText('1');
 
     const marked = page.waitForResponse((response) =>
-      new URL(response.url()).pathname === `/api/service-requests/${created.id}/read`
+      new URL(response.url()).pathname === '/api/support/chat/read'
         && response.request().method() === 'POST' && response.status() === 204,
     );
     await messages.click();
-    await expect(card.getByText('The drafting desk needs one clarification.')).toBeVisible();
+    await expect(page.getByTestId('support-thread')).toHaveAttribute('data-topic', `request:${created.id}`);
+    await expect(page.getByTestId('support-thread').getByText('The drafting desk needs one clarification.')).toBeVisible();
     await marked;
+    await page.goto('/services/property-valuation');
+    await expect(card.getByRole('link', { name: /^Message support/ })).toBeVisible();
     await expect(messages.locator('span.bg-rose-500')).toHaveCount(0);
   });
 

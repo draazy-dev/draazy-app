@@ -43,7 +43,7 @@ test.describe('Draaz assistant', () => {
 
     await test.step('a low-confidence query offers human-support escalation', async () => {
       await ask('zzqqxx nonsense');
-      await expect(box.getByRole('button', { name: /Raise a support ticket/i })).toBeVisible({ timeout: 5000 });
+      await expect(box.getByRole('button', { name: /Chat with Draazy support/i })).toBeVisible({ timeout: 5000 });
     });
 
     await test.step('a how-to query is answered and its action deep-links', async () => {

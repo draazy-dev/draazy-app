@@ -12,6 +12,7 @@ import { SavedSearchProvider } from './context/SavedSearchContext.jsx';
 import { VerificationProvider } from './context/VerificationContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { ConversationProvider } from './context/ConversationContext.jsx';
+import { SupportChatProvider } from './context/SupportChatContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { SignInGateProvider } from './context/SignInGateContext.jsx';
 import { installMapsLoader } from './lib/mapsConfig.js';
@@ -53,6 +54,7 @@ const app = (
               <FollowProvider>
               <VerificationProvider>
               <ConversationProvider>
+                <SupportChatProvider>
                 <NotificationProvider>
                   <CompareProvider>
                     <ToastProvider>
@@ -62,6 +64,7 @@ const app = (
                     </ToastProvider>
                   </CompareProvider>
                 </NotificationProvider>
+                </SupportChatProvider>
               </ConversationProvider>
               </VerificationProvider>
               </FollowProvider>

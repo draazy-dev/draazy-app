@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import useAsyncList from '../../../hooks/useAsyncList.js';
 import { MAX_PAGE_SIZE } from '../../../services/apiLimits.js';
 import { PAGE_LOAD_TTL, PUBLIC_READ_TTL, REVISIT_MAX_AGE } from '../../../services/http.js';
@@ -7,15 +8,14 @@ import { listPropertiesByIds, searchListings } from '../../../services/propertyS
 import { listVisits, myVisitRequests, rescheduleVisit, updateVisitStatus } from '../../../services/visitService.js';
 import { myContactRequests } from '../../../services/contactService.js';
 import { listDocRequests } from '../../../services/documentService.js';
-import { listMyGroupApplications, myRequests, getFlatmateCase, listMyFlatmateCases, markFlatmateCaseRead, replyToFlatmateCase } from '../../../services/flatmateService.js';
+import { listMyGroupApplications, myRequests, listMyFlatmateCases } from '../../../services/flatmateService.js';
 import { myPhotoRequests } from '../../../services/photoRequestService.js';
 import { offersOnMine } from '../../../services/dealService.js';
 import { listServiceRequests } from '../../../services/serviceRequestService.js';
-import {
-  listMyPropertyReviews, getPropertyReview, markPropertyReviewRead, addPropertyReviewMessage,
-} from '../../../services/propertyReviewService.js';
+import { listMyPropertyReviews } from '../../../services/propertyReviewService.js';
 import { getRecentProps } from '../../../lib/localPrefs.js';
 import { loadMyListings, parseFlatmateCaseKey } from '../../../lib/data/myListings.js';
+import { supportLink } from '../../../lib/supportLink.js';
 import { searchHref } from '../listings/alertCriteria.js';
 import { useSavedSearches } from '../../../context/SavedSearchContext.jsx';
 
@@ -55,6 +55,7 @@ async function loadFeed(withRecommended) {
 }
 
 export function useDashboardData({ user, toast, ownsProperty }) {
+  const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [listingsLoaded, setListingsLoaded] = useState(false);
   const ownerReads = !!user?.mobile && (ownsProperty !== false || listings.some((l) => !l.flatmate));
@@ -63,11 +64,8 @@ export function useDashboardData({ user, toast, ownsProperty }) {
   const [recent, setRecent] = useState([]);
   const [recommended, setRecommended] = useState([]);
   const [alertMatches, setAlertMatches] = useState([]);
-  const [reviewProp, setReviewProp] = useState(null);
-  const [reviewInput, setReviewInput] = useState('');
   const [reviewRows, setReviewRows] = useState([]);
   const [caseRows, setCaseRows] = useState([]);
-  const [reviewThread, setReviewThread] = useState(null);
   const [busyIds, setBusyIds] = useState(() => new Set());
   const busyRef = useRef(new Set());
   const setBusy = useCallback((ids, value) => {
@@ -150,39 +148,10 @@ export function useDashboardData({ user, toast, ownsProperty }) {
       .finally(() => setBusy(`visit:${id}`, false));
   };
 
-  const openReview = async (pid) => {
-    setReviewProp(pid);
-    setReviewInput('');
-    setReviewThread(null);
+  const openReview = (pid, opts) => {
     const fm = parseFlatmateCaseKey(pid);
-    try {
-      if (fm) {
-        await markFlatmateCaseRead(fm.kind, fm.id);
-        setReviewThread(await getFlatmateCase(fm.kind, fm.id));
-      } else {
-        await markPropertyReviewRead(pid);
-        setReviewThread(await getPropertyReview(pid));
-      }
-      refreshReviews(fm ? 'flatmate' : 'property');
-    } catch (err) {
-      toast(`Could not open that verification thread: ${err.message}`, 'error');
-      setReviewProp(null);
-    }
-  };
-  const sendReview = async () => {
-    const body = reviewInput.trim();
-    if (!body || !reviewProp) return;
-    setReviewInput('');
-    const fm = parseFlatmateCaseKey(reviewProp);
-    try {
-      setReviewThread(fm
-        ? await replyToFlatmateCase(fm.kind, fm.id, body)
-        : await addPropertyReviewMessage(reviewProp, body));
-      refreshReviews(fm ? 'flatmate' : 'property');
-    } catch (err) {
-      setReviewInput(body);
-      toast(`Could not send that reply: ${err.message}`, 'error');
-    }
+    const property = fm ? null : listings.find((l) => l.id === pid || l.uuid === pid);
+    navigate(fm ? supportLink(`flatmate_${fm.kind}`, fm.id) : supportLink('property', property?.uuid || pid), opts);
   };
 
   const [bundle, dataStatus, , retryData, dataError, refreshData] = useAsyncList(
@@ -252,10 +221,10 @@ export function useDashboardData({ user, toast, ownsProperty }) {
   }, [refreshRequests]);
 
   const hasFlatmateListings = listings.some((l) => l.flatmate);
-  const refreshReviews = useCallback((scope) => Promise.all([
-    ownerReads && scope !== 'flatmate'
+  const refreshReviews = useCallback(() => Promise.all([
+    ownerReads
       && listMyPropertyReviews({ size: MAX_PAGE_SIZE }).then((r) => setReviewRows(r.items), () => setReviewRows([])),
-    hasFlatmateListings && scope !== 'property'
+    hasFlatmateListings
       && listMyFlatmateCases().then(setCaseRows, () => setCaseRows([])),
   ]), [ownerReads, hasFlatmateListings]);
 
@@ -280,8 +249,8 @@ export function useDashboardData({ user, toast, ownsProperty }) {
   return {
     listings, listingsLoaded, visits, recent, recommended, alertMatches,
     contactReqs, photoReqs, flatmateReqs, docReqs, serviceReqs,
-    reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
-    apps, offers, mutateVisit, openReview, sendReview,
+    reviewsByProp,
+    apps, offers, mutateVisit, openReview,
     busyIds, refreshData, refreshRequests, setListings,
     dataStatus, dataError, retryData,
   };

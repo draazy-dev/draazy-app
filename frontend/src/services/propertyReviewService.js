@@ -46,10 +46,6 @@ export async function beginPropertyReview(propertyId) {
   return (await provider()).beginPropertyReview(propertyId);
 }
 
-export async function addPropertyReviewMessage(propertyId, body, clarificationRequested) {
-  return (await provider()).addPropertyReviewMessage(propertyId, body, clarificationRequested);
-}
-
 export async function markPropertyReviewRead(propertyId) {
   return (await provider()).markPropertyReviewRead(propertyId);
 }

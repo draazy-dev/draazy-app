@@ -63,12 +63,17 @@ test.describe('LIVE: flatmate status card and Support thread', () => {
     await page.reload();
     await expect(statusCard.getByTestId('support-thread-link')).toBeVisible();
     await statusCard.getByTestId('support-thread-link').click();
-    const modal = page.getByRole('dialog');
-    await expect(modal).toContainText('Please confirm the monthly rent.');
+    const support = page.getByTestId('support-thread');
+    await expect(support).toHaveAttribute('data-topic', `flatmate_room:${group.id}`);
+    await expect(support).toContainText('Please confirm the monthly rent.');
+    await expect(support.getByTestId('support-review-card')).toBeVisible();
 
-    await modal.getByPlaceholder('Reply to Draazy Support…').fill('Rent is 30,000.');
-    await modal.getByPlaceholder('Reply to Draazy Support…').press('Enter');
-    await expect(modal).toContainText('Rent is 30,000.');
+    await support.getByRole('textbox', { name: 'Message Draazy support' }).fill('Rent is 30,000.');
+    const posted = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/support/chat/messages')
+      && r.request().method() === 'POST');
+    await support.getByRole('button', { name: 'Send message' }).click();
+    expect((await posted).ok()).toBe(true);
+    await expect(support.locator('.pc-msgs')).toContainText('Rent is 30,000.');
 
     const thread = await send('GET', `/flatmates/room/${group.id}/verification`, accessToken);
     expect(thread.json.status).toBe('in_review');

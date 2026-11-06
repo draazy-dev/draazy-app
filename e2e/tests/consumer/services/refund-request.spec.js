@@ -118,7 +118,8 @@ test.describe('LIVE: a customer asks for a refund', () => {
     const pack = rowFor(page, 'Contact Pack');
     await expect(pack).toContainText('Refund declined', { timeout: 20000 });
     await expect(pack.getByTestId('refund-open')).toHaveCount(0);
-    await expect(pack.getByRole('link', { name: 'Ask for a review' })).toHaveAttribute('href', /\/support\?cat=payment/);
+    const reviewTopic = after.invoiceNo ? encodeURIComponent(`invoice:${after.invoiceNo}`) : 'general';
+    await expect(pack.getByRole('link', { name: 'Ask for a review' })).toHaveAttribute('href', `/messages?support=${reviewTopic}`);
 
     const again = await requestRefund(mobile, orderId);
     expect(again.status).toBe(422);

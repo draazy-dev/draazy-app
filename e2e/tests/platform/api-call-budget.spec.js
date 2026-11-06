@@ -251,11 +251,11 @@ const DESKS = [
     },
   },
   {
-    name: 'support reads the queue once, with the tab counts on it',
+    name: 'support chats reads the inbox once and the tab counts once',
     url: '/admin/support',
-    ready: /Support/,
-    once: ['/api/admin/support-tickets'],
-    never: [],
+    ready: /Support chats/,
+    once: ['/api/admin/support/chats', '/api/admin/support/chats/counts'],
+    never: ['/api/admin/support-tickets'],
     check: (gets) => expect(gets.keys().filter((k) => /[?&]size=1(&|$)/.test(k))).toEqual([]),
   },
   {
