@@ -395,6 +395,22 @@ allows WhatsApp. The in-app notification and the tracker banner go out regardles
 | Template name | `WHATSAPP_SERVICE_TEMPLATE_NAME`; blank means in-app only |
 | Language | `WHATSAPP_SERVICE_TEMPLATE_LANG`, default `en_US` |
 
+**WhatsApp rent-agreement invite template.** Sent when an owner invites the tenant, or a tenant the owner,
+to fill their side of a rent agreement (`POST /service-requests/co-fill` and
+`POST /service-requests/{id}/parties`). It goes to the typed number whether or not it has an account yet;
+a registered invitee with WhatsApp off in settings, or any number that replied STOP, gets none. The
+in-app notification and the inviter's own "Send on WhatsApp" / "Copy link" buttons work regardless.
+
+| Setting | Value |
+|---|---|
+| Meta category | `UTILITY`; submitted 2026-11-04 as `draazy_agreement_invite` (en_US), in review |
+| Body parameters | `{{1}}` inviter name, `{{2}}` invitee's side (`owner` or `tenant`), `{{3}}` property, `{{4}}` agreement link |
+| Suggested name | `draazy_agreement_invite` |
+| Suggested body text | `Hi, {{1}} has added you as the {{2}} on a rent agreement for {{3}} on Draazy.` ⏎⏎ `Open the agreement to add your details: {{4}}` ⏎⏎ `If you were not expecting this message, you can ignore it.` (Meta refuses a variable at the very start or end, and reads "sign in" wording as an Authentication template) |
+| Review samples | `Asha Patil` / `tenant` / `B-1204, Skyline Heights, Baner, Pune` / `https://draazy.com/services/rent-agreement?party=1f0e2c&request=9a2b7d` |
+| Template name | `WHATSAPP_AGREEMENT_INVITE_TEMPLATE_NAME`; blank means no WhatsApp is sent |
+| Language | `WHATSAPP_AGREEMENT_INVITE_TEMPLATE_LANG`, default `en_US` |
+
 **WhatsApp webhook (STOP replies and failed deliveries).** Optional, but set it before WhatsApp
 messages anyone beyond OTPs. A reply of exactly STOP (or UNSUBSCRIBE, CANCEL…) opts that number out of
 every non-OTP template; START opts it back in. A `failed` delivery lands in the provider call log as
@@ -422,9 +438,10 @@ route answers 404. Meta delivers real callbacks only to a published app (Draazy'
 Rotating the pair invalidates every stored subscription: they are removed as the push service answers
 404/410 or they re-subscribe.
 
-**Email (Zoho ZeptoMail via CPaaS).** Sender: `provider/zeptomail/ZeptoMailEmailSender.java`. It only
-emails staff invite and password-reset links (`StaffInviteMailer`) to the account's own address; the
-admin's copy-link dialog is unchanged and stays the fallback.
+**Email (Zoho ZeptoMail via CPaaS).** Sender: `provider/zeptomail/ZeptoMailEmailSender.java`. It
+emails staff invite and password-reset links (`StaffInviteMailer`) to the account's own address, and a copy of
+each bell alert to live `staff` accounts (`StaffEmailCopy`; never managers or admins). The admin's copy-link
+dialog is unchanged and stays the fallback.
 
 | Setting | Value |
 |---|---|

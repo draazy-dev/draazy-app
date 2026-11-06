@@ -35,7 +35,7 @@ const SERVICES = [
   ['Locality Insights', 'trending-up', 'discover', '1486406146926-c627a92ad1ab', 'Price trends, livability scores and connectivity for every Pune locality.', '/locality/baner', 'localityInsights'],
   ['Home Loans & EMI', 'badge-percent', 'finance', '1554224155-6726b3ff858f', 'Compare offers from partner banks, check eligibility and plan repayments with a built-in EMI calculator.', '/home-loans', 'homeLoans'],
   ['Property & Legal', 'scale', 'finance', '1589829545856-d10d557cf95f', 'Title verification, due diligence and end-to-end registration assistance.', '/services/property-legal', 'propertyLegal'],
-  ['Packers & Movers', 'truck', 'move', '1600518464441-9154a4dea21b', 'Vetted relocation partners at negotiated, transparent, all-inclusive rates.', '/services/packers-movers', 'packersMovers'],
+  ['Packers & Movers', 'truck', 'move', '1600518464441-9154a4dea21b', 'Relocation partners at negotiated, transparent, all-inclusive rates.', '/services/packers-movers', 'packersMovers'],
   ['Interior & Renovation', 'paint-roller', 'move', '1618221195710-dd6b41faaea6', 'Interiors designed in 3D by partner designers, with an itemised quote upfront.', '/services/interior-renovation', 'interior'],
   ['Property Valuation', 'calculator', 'discover', '1460925895917-afdab827c52f', 'Get a free instant estimate, then a certified valuation report from a registered valuer.', '/services/property-valuation', 'valuation'],
 ];

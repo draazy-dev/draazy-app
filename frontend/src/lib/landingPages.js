@@ -94,7 +94,7 @@ export function flatmateCopy({ women, place }) {
       ? 'Flats and rooms in Pune where the host is looking for women flatmates. Posts are moderated and there is no brokerage.'
       : `Flats and rooms to share in ${place.name}, Pune, posted by hosts looking for flatmates. Posts are moderated and there is no brokerage.`,
     intro: women
-      ? ['Flats and rooms across Pune where the host has chosen women flatmates.', 'Every post is reviewed before it goes live, and you pay no brokerage.']
+      ? ['Flats and rooms across Pune where the host has chosen women flatmates.', 'Posts are moderated, and you pay no brokerage.']
       : [`Flats and rooms to share in ${place.name}, posted by hosts looking for flatmates.`, `About ${place.name}: ${place.tagline}.`],
   };
 }

@@ -907,7 +907,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/LocalitySummary' }
         '422':
-          description: Not a locality Google knows ("Pick the locality from the suggestions.") outside the served area ("Pick a locality in Pune."), or retired ("That area isn't open for new listings.")
+          description: Not a locality Google knows ("Pick the locality from the suggestions.") outside the served districts ("Pick a locality in an area we serve."), or retired ("That area isn't open for new listings.")
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1024,7 +1024,7 @@ paths:
             `lat`/`lng` out of range, `name` carrying contact details, unknown to Google, an area (neighbourhood, city, ...) rather
             than a building ("Pick your building, not an area."), a shop, restaurant, bank or office
             ("Pick your building, not a shop or office."), a pin or Google location outside the cities
-            we serve ("We only list societies in cities we serve."), an unknown `mintOrigin`, or
+            we serve ("We only list societies in areas we serve."), an unknown `mintOrigin`, or
             Google could not be reached or is not configured ("Adding societies is temporarily
             unavailable.").
           content:
@@ -1761,23 +1761,6 @@ paths:
       operationId: deleteManagedProperty
       responses:
         '204': { description: Deleted }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /me/managed-properties/{id}/publish:
-    parameters:
-      - { $ref: '#/components/parameters/PropertyId' }
-    post:
-      tags: [Listings]
-      summary: Publish a managed property into the marketplace
-      description: >-
-        Spawns a normal pending listing and links back to it. Idempotent — a record already
-        published is returned unchanged with its `publishedListingId` set.
-      operationId: publishManagedProperty
-      responses:
-        '200':
-          description: Published
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ManagedProperty' }
         '404': { $ref: '#/components/responses/NotFound' }
   /me/managed-properties/{id}/listing:
     parameters:
@@ -6875,6 +6858,9 @@ paths:
     post:
       tags: [Services & Support]
       summary: Create support ticket
+      description: >-
+        With `about`, an open ticket on the same subject is resumed instead: the body is appended to
+        it and that ticket is returned.
       operationId: createSupportTicket
       requestBody:
         required: true
@@ -6977,6 +6963,284 @@ paths:
                       content:
                         type: array
                         items: { $ref: '#/components/schemas/AdminSupportTicket' }
+  /support/chat:
+    get:
+      tags: [Services & Support]
+      summary: My support chat — one continuous timeline with Draazy
+      description: >-
+        Every user has a single chat with the support desk. Messages stay where their case lives (support
+        tickets, property review threads, flatmate case threads, service-request threads, identity cases) and
+        are merged here, oldest first, capped at the newest 300. `status` is `none` until the first message.
+        `unread` counts staff messages not yet read. `cases` are the user's open things that have a staff
+        thread, so the client can offer them as a context for the next message.
+      operationId: getSupportChat
+      responses:
+        '200':
+          description: The chat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportChat' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /support/chat/messages:
+    post:
+      tags: [Services & Support]
+      summary: Send a message in my support chat
+      description: >-
+        Routed by `about`. `request` writes to that service request (409 `request_closed` once it is
+        completed or cancelled). `property` and `flatmate_*` with an open review/case write into that case;
+        otherwise, like `general` and `invoice`, into the user's single chat ticket, which is resumed or
+        reopened rather than a second one created. `identity` replies on that open identity case.
+      operationId: sendSupportChatMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupportChatPost' }
+      responses:
+        '201':
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportChatMessage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /support/chat/read:
+    post:
+      tags: [Services & Support]
+      summary: Mark every staff message in my support chat read
+      description: Idempotent, and safe to call concurrently.
+      operationId: markSupportChatRead
+      responses:
+        '204': { description: Marked }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /admin/support/chats:
+    get:
+      tags: [Services & Support]
+      summary: Support inbox — one row per user, newest activity first
+      operationId: adminSupportChats
+      x-roles: [staff, admin]
+      parameters:
+        - name: view
+          in: query
+          schema: { type: string, enum: [awaiting, mine, all], default: all }
+          description: "`awaiting` = the user spoke last; `mine` = assigned to the caller and not resolved."
+        - name: context
+          in: query
+          schema: { type: string, enum: [general, property, flatmate, request, invoice, identity] }
+          description: Narrow to chats whose latest message is about this context. `flatmate` matches room, group and post.
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+      responses:
+        '200':
+          description: Inbox rows
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/AdminSupportChatRow' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/support/chats/counts:
+    get:
+      tags: [Services & Support]
+      summary: Support inbox tab totals
+      operationId: adminSupportChatCounts
+      x-roles: [staff, admin]
+      responses:
+        '200':
+          description: Totals
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSupportChatCounts' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/support/chats/locate:
+    get:
+      tags: [Services & Support]
+      summary: Find the customer behind a desk subject and how many chat messages mention it
+      description: >-
+        Resolves the owner of a property, flatmate room, group or post, service request, identity case or
+        invoice number, so a desk can jump to that customer's chat. The subject's context must be in the
+        caller's scope, and a request must sit on one of their desks.
+      operationId: adminLocateSupportChat
+      x-roles: [staff, admin]
+      parameters:
+        - { name: type, in: query, required: true, schema: { type: string, enum: [property, flatmate_room, flatmate_group, flatmate_post, request, identity, invoice] } }
+        - { name: id, in: query, required: true, schema: { type: string, maxLength: 64 } }
+      responses:
+        '200':
+          description: The customer and their messages about this subject
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userId, name, count]
+                properties:
+                  userId: { type: string, format: uuid }
+                  name: { type: [string, 'null'] }
+                  count: { type: integer }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/support/chats/stream:
+    get:
+      tags: [Services & Support]
+      summary: Live support inbox updates (SSE)
+      description: >-
+        Server-sent events for staff allowed to read support. Event `chat` carries the inbox row of the chat
+        that just moved. In memory per instance, so clients also poll.
+      operationId: adminSupportChatStream
+      x-roles: [staff, admin]
+      responses:
+        '200':
+          description: "Server-sent events: `chat`."
+          headers:
+            X-Accel-Buffering:
+              schema: { type: string, enum: ['no'] }
+            Cache-Control:
+              schema: { type: string, enum: [no-cache] }
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: "event: chat\ndata: {\"userId\":\"...\",\"status\":\"awaiting\"}\n\n"
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/support/chats/{userId}:
+    parameters: [ { $ref: '#/components/parameters/SupportChatUserId' } ]
+    get:
+      tags: [Services & Support]
+      summary: One user's support chat, as the desk sees it
+      operationId: adminSupportChat
+      x-roles: [staff, admin]
+      responses:
+        '200':
+          description: The chat; `from` is `user` or `staff`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSupportChatDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/support/chats/{userId}/messages:
+    parameters: [ { $ref: '#/components/parameters/SupportChatUserId' } ]
+    post:
+      tags: [Services & Support]
+      summary: Reply to a user in their support chat
+      description: >-
+        Same routing as `sendSupportChatMessage`, except a flatmate context goes to the chat ticket. A
+        staff-started chat is allowed. Claims the chat when nobody holds it.
+      operationId: adminSendSupportChatMessage
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupportChatPost' }
+      responses:
+        '201':
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportChatMessage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/support/chats/{userId}/assign:
+    parameters: [ { $ref: '#/components/parameters/SupportChatUserId' } ]
+    post:
+      tags: [Services & Support]
+      summary: Assign a support chat (null takes it over)
+      operationId: adminAssignSupportChat
+      x-roles: [staff, admin]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assigneeId: { type: [string, 'null'], format: uuid, description: A staff, manager or admin user; null assigns the caller. }
+      responses:
+        '204': { description: Assigned }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/support/chats/{userId}/resolve:
+    parameters: [ { $ref: '#/components/parameters/SupportChatUserId' } ]
+    post:
+      tags: [Services & Support]
+      summary: Resolve a support chat
+      description: The user's next message reopens it.
+      operationId: adminResolveSupportChat
+      x-roles: [staff, admin]
+      responses:
+        '204': { description: Resolved }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/support/chats/{userId}/read:
+    parameters: [ { $ref: '#/components/parameters/SupportChatUserId' } ]
+    post:
+      tags: [Services & Support]
+      summary: Mark a user's messages read for the desk
+      operationId: adminReadSupportChat
+      x-roles: [staff, admin]
+      responses:
+        '204': { description: Marked }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/support/chats/{userId}/service-ticket:
+    parameters: [ { $ref: '#/components/parameters/SupportChatUserId' } ]
+    post:
+      tags: [Services & Support]
+      summary: Raise an internal service-team ticket for a chat customer
+      description: >-
+        Support only. The ticket is requested by the customer but is never shown to them and nothing is posted
+        into their chat.
+      operationId: adminCreateServiceTicketFromChat
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [team, subject]
+              properties:
+                team: { type: string, maxLength: 32 }
+                subject: { type: string, minLength: 1, maxLength: 200 }
+                note: { type: [string, 'null'], maxLength: 4000 }
+                propertyId: { type: [string, 'null'], maxLength: 64 }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, team]
+                properties:
+                  id: { type: string }
+                  team: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /service-waitlist:
     post:
       tags: [Services & Support]
@@ -7256,6 +7520,21 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Services & Support]
+      summary: Delete a cancelled request from the caller's list
+      operationId: deleteServiceRequest
+      description: >
+        Only a `cancelled` request can be deleted. When the requester deletes a request no money was
+        ever taken for, the request, its messages, timeline, parties and filed documents are erased.
+        A request that was paid, or a delete by an accepted party, only hides it from that caller's
+        `listServiceRequests`; the record stays for the payment trail and for the other side.
+      responses:
+        '204':
+          description: Deleted, or hidden for this caller
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The request is not cancelled
   /service-requests/{id}/docs/{docId}/url:
     parameters:
       - { $ref: '#/components/parameters/GenericId' }
@@ -7604,7 +7883,7 @@ paths:
         '400':
           description: Unknown decision, or a rejection with no reason
         '409':
-          description: No draft awaits a decision, or the requester approved a version they never opened
+          description: No draft awaits a decision, the caller approved a version they never opened, or a rent-agreement party who already approved this version asks for changes
   /service-requests/{id}/draft/otp:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -7869,10 +8148,15 @@ paths:
 
 
         A rent agreement also needs the registration record the Sub-Registrar gave the deed:
-        document number, office, date, the GRAS challan GRN and the duty and fee actually paid. They
+        document number, office, date and the GRAS challan GRN. They
         are checked before the file is stored — 422 naming every bad field (the date may not be in
         the future or before the request was raised), 409 when the GRN or the office + document
         number + year is already on another request. Other request types ignore these fields.
+
+
+        The registered copy must be strictly smaller than 2000000 bytes (413 otherwise), double the
+        1000000-byte cap on every other service-request upload: IGR copies carry party photos and
+        thumbprints.
       operationId: uploadServiceRequestFinalDoc
       x-roles: [staff, admin]
       requestBody:
@@ -7888,8 +8172,6 @@ paths:
                 sro: { type: string, maxLength: 60, example: Haveli 11 }
                 registeredOn: { type: string, format: date }
                 grn: { type: string, example: MH004512345678202627E }
-                stampDuty: { type: string, description: 'Whole rupees; commas allowed.' }
-                registrationFee: { type: string, description: 'Whole rupees; commas allowed.' }
       responses:
         '201':
           description: Uploaded
@@ -7897,6 +8179,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Document' }
         '409': { description: 'Not the holder, not approved, a rent-agreement paper not yet verified, or the GRN / document number is already recorded' }
+        '413': { description: 'The file is not strictly smaller than 2000000 bytes' }
         '422': { description: 'A rent agreement''s registration record is missing or invalid' }
   /service-requests/{id}/rent-agreements:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
@@ -8235,34 +8518,6 @@ paths:
           description: No such open refund
         '422':
           description: No note
-  /service-requests/{id}/police-intimation:
-    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
-    post:
-      tags: [Services & Support]
-      summary: Confirm owner-submitted police tenant information (staff)
-      description: >
-        After the registered copy is uploaded, Pune and Pimpri-Chinchwad landlords still have their
-        own tenant-information duty with the police commissionerate. Draazy does not file it; the
-        holder or an admin records only that the owner confirmed submission, with an optional
-        acknowledgement/reference and submission date. Re-recording overwrites the confirmation
-        details and appends another timeline event.
-      operationId: confirmServiceRequestPoliceIntimation
-      x-roles: [staff, admin]
-      requestBody:
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/ServiceRequestPoliceIntimationConfirm' }
-      responses:
-        '200':
-          description: 'Confirmed; the request carries `policeIntimation.confirmed: true`'
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ServiceRequest' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409':
-          description: Not a completed rent agreement, or not held by the caller
-        '422':
-          description: Reference too long or submittedOn is in the future
   /service-requests/{id}/parties:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -9302,6 +9557,12 @@ paths:
           schema: { type: integer, format: int64, minimum: 0 }
         - { name: gender, in: query, schema: { type: string, enum: [male, female] } }
         - { name: sharing, in: query, description: '`team-up` only — seats in the group.', schema: { type: integer, minimum: 1 } }
+        - { name: bhk, in: query, description: '`move-in` rooms in a flat of this size (`4` is 4+); `teams` hunting this size or any size. Ignored on `people`.', schema: { type: string, enum: ['1', '2', '3', '4'] } }
+        - { name: vegOnly, in: query, description: '`move-in` rooms in a vegetarian household only.', schema: { type: boolean, default: false } }
+        - { name: parking, in: query, description: '`move-in` rooms with this parking; `bike` also matches a car spot.', schema: { type: string, enum: [bike, car] } }
+        - { name: minAge, in: query, description: '`people` seekers at least this old. Seekers without an age drop out. Below 18 is ignored; a band with min above max is ignored.', schema: { type: integer, minimum: 18 } }
+        - { name: maxAge, in: query, description: '`people` seekers at most this old. See `minAge`.', schema: { type: integer, minimum: 18 } }
+        - { name: minOpenSeats, in: query, description: '`teams` with at least this many open seats. Values below 2 are ignored (every listed team has one); capped at 10.', schema: { type: integer, minimum: 2, maximum: 10 } }
         - name: attachedBath
           in: query
           description: >
@@ -11025,6 +11286,39 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/LocalityAdminRow' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /admin/served-area:
+    get:
+      tags: [Admin & Analytics]
+      summary: Live places Google puts outside the served districts
+      operationId: adminServedAreaReport
+      x-roles: [staff, admin]
+      description: >
+        Live localities and societies whose stored Google district is not one of `geo.servedDistricts`,
+        at most 200. New places outside the districts are refused at resolve and mint; these rows predate
+        the rule or the districts changed since. Rows never checked are only counted in `unchecked`.
+      responses:
+        '200':
+          description: The served districts, out-of-area rows and the unchecked count
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServedAreaReport' }
+  /admin/served-area/recheck:
+    post:
+      tags: [Admin & Analytics]
+      summary: Look up the district of up to 50 unchecked places
+      operationId: adminRecheckServedArea
+      x-roles: [staff, admin]
+      description: >
+        Asks Google Places for the district of the next 50 live rows that have a place ID and were never
+        checked, and stores it. A place Google no longer knows is stored with no district, so it reports
+        as outside. Audited as `servedArea.recheck`.
+      responses:
+        '200':
+          description: How many were checked and how many remain
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServedAreaRecheck' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /admin/societies:
     get:
       tags: [Admin & Analytics]
@@ -12635,6 +12929,11 @@ components:
       in: path
       required: true
       schema: { type: string }
+    SupportChatUserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     ReqId:
       name: reqId
       in: path
@@ -14796,6 +15095,27 @@ components:
         lng: { type: [number, 'null'] }
         archived: { type: boolean }
         liveListings: { type: integer, format: int64 }
+    ServedAreaReport:
+      type: object
+      description: Places outside the served districts, for the Maps & geo panel.
+      properties:
+        servedDistricts: { type: array, items: { type: string } }
+        outside: { type: array, items: { $ref: '#/components/schemas/ServedAreaRow' } }
+        unchecked: { type: integer, description: Live rows with a place ID whose district was never looked up }
+    ServedAreaRow:
+      type: object
+      properties:
+        kind: { type: string, enum: [locality, society] }
+        slug: { type: string }
+        name: { type: string }
+        district: { type: [string, 'null'], description: Google's district; null when it gave none }
+        lat: { type: [number, 'null'] }
+        lng: { type: [number, 'null'] }
+    ServedAreaRecheck:
+      type: object
+      properties:
+        checked: { type: integer }
+        remaining: { type: integer }
     SocietyDirectoryRow:
       type: object
       description: A row of the staff society directory.
@@ -16522,8 +16842,7 @@ components:
         leaseEnd: { type: [string, 'null'], format: date, readOnly: true, description: The registered agreement's end date; null for a tenant named by hand. }
         deposit: { type: [integer, 'null'], format: int64, readOnly: true, description: Security deposit from the registered agreement, whole INR. }
         landlordPan: { type: [string, 'null'], example: ABCDE1234F, description: Printed on the tenant's rent receipts for HRA. }
-        policeIntimation: { type: [string, 'null'], enum: [pending, done, null], readOnly: true, description: Null unless the tenancy came from a Draazy rent agreement. }
-        policeIntimatedOn: { type: [string, 'null'], format: date, readOnly: true }
+        policeIntimation: { type: [string, 'null'], enum: [done, null], readOnly: true, description: 'Done once registered on the IGR portal, which informs the police. Null unless the tenancy came from a Draazy rent agreement.' }
         rentClaims:
           type: array
           readOnly: true
@@ -16631,8 +16950,7 @@ components:
         leaseEnd: { type: [string, 'null'], format: date }
         deposit: { type: [integer, 'null'], format: int64 }
         landlordPan: { type: [string, 'null'], description: For HRA; printed on receipts when set. }
-        policeIntimation: { type: [string, 'null'], enum: [pending, done, null] }
-        policeIntimatedOn: { type: [string, 'null'], format: date }
+        policeIntimation: { type: [string, 'null'], enum: [done, null] }
         receipts:
           type: array
           description: Newest month first, at most 24.
@@ -16829,6 +17147,7 @@ components:
             body: { type: string, maxLength: 160 }
             createdAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
+        about: { $ref: '#/components/schemas/SupportTicketAbout' }
     SupportTicket:
       type: object
       properties:
@@ -16841,6 +17160,16 @@ components:
           type: array
           items: { $ref: '#/components/schemas/SupportMessage' }
         createdAt: { type: string, format: date-time }
+        about: { $ref: '#/components/schemas/SupportTicketAbout' }
+    SupportTicketAbout:
+      type: [object, 'null']
+      description: >-
+        What the thread is about; null for a general question. The raiser must own the listing,
+        flatmate post or invoice, except that anyone may ask about a live listing (404 otherwise).
+      required: [type, id]
+      properties:
+        type: { type: string, enum: [property, flatmate_room, flatmate_group, flatmate_post, invoice] }
+        id: { type: string, maxLength: 64, description: The listing or post UUID, or the invoice number }
     AdminSupportTicket:
       type: object
       properties:
@@ -16859,6 +17188,103 @@ components:
             The other side: a staff reply the customer has not opened. Distinguishes "we have not
             answered" from "we answered and they have not looked".
         createdAt: { type: string, format: date-time }
+        about: { $ref: '#/components/schemas/SupportTicketAbout' }
+    SupportChatAbout:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [general, property, flatmate_room, flatmate_group, flatmate_post, request, invoice, identity] }
+        id: { type: [string, 'null'] }
+        label: { type: [string, 'null'], description: Property or post title, service name with a short id, invoice number; resolved server-side }
+    SupportChatMessage:
+      type: object
+      required: [id, from, text, at, about]
+      properties:
+        id: { type: string, description: "`<source>:<uuid>`; source is t (ticket), r (review thread), s (service request) or f (flatmate case)" }
+        from: { type: string, enum: [me, user, staff], description: "`me` or `staff` for the consumer, `user` or `staff` for the desk" }
+        staffName: { type: [string, 'null'] }
+        text: { type: string }
+        at: { type: string, format: date-time }
+        about: { $ref: '#/components/schemas/SupportChatAbout' }
+    SupportChatCase:
+      type: object
+      required: [type, id, label, status, replyable]
+      properties:
+        type: { type: string }
+        id: { type: string }
+        label: { type: [string, 'null'] }
+        status: { type: string }
+        replyable: { type: boolean }
+    SupportChatAssignee:
+      type: [object, 'null']
+      properties:
+        name: { type: string }
+    SupportChat:
+      type: object
+      required: [status, unread, messages, cases]
+      properties:
+        status: { type: string, enum: [none, awaiting, answered, resolved] }
+        unread: { type: integer }
+        assignee: { $ref: '#/components/schemas/SupportChatAssignee' }
+        messages:
+          type: array
+          items: { $ref: '#/components/schemas/SupportChatMessage' }
+        cases:
+          type: array
+          items: { $ref: '#/components/schemas/SupportChatCase' }
+    SupportChatPost:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, minLength: 1, maxLength: 4000 }
+        about:
+          type: [object, 'null']
+          required: [type]
+          properties:
+            type: { type: string, maxLength: 32 }
+            id: { type: [string, 'null'], maxLength: 64 }
+    AdminSupportChatPerson:
+      type: [object, 'null']
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: [string, 'null'] }
+    AdminSupportChatRow:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        name: { type: [string, 'null'] }
+        status: { type: string, enum: [awaiting, answered, resolved] }
+        assignee: { $ref: '#/components/schemas/AdminSupportChatPerson' }
+        staffUnread: { type: boolean }
+        lastAt: { type: string, format: date-time }
+        lastPreview: { type: [string, 'null'] }
+        lastFrom: { type: [string, 'null'], enum: [user, staff, null] }
+        lastAbout: { $ref: '#/components/schemas/SupportChatAbout' }
+    AdminSupportChatCounts:
+      type: object
+      properties:
+        awaiting: { type: integer }
+        mine: { type: integer }
+        all: { type: integer }
+    AdminSupportChatDetail:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: [string, 'null'] }
+            mobile: { type: [string, 'null'], description: Masked, e.g. 98XXXXX210 }
+            idVerified: { type: boolean }
+            roles: { type: array, items: { type: string } }
+        status: { type: string, enum: [none, awaiting, answered, resolved] }
+        assignee: { $ref: '#/components/schemas/AdminSupportChatPerson' }
+        messages:
+          type: array
+          items: { $ref: '#/components/schemas/SupportChatMessage' }
+        cases:
+          type: array
+          items: { $ref: '#/components/schemas/SupportChatCase' }
     SupportTicketCreate:
       type: object
       required: [subject, body]
@@ -16866,6 +17292,7 @@ components:
         subject: { type: string }
         category: { type: string }
         body: { type: string }
+        about: { $ref: '#/components/schemas/SupportTicketAbout' }
     ServiceRequestChecklist:
       type: object
       required: [ready, total, items]
@@ -16927,7 +17354,6 @@ components:
         paymentSessionId: { type: [string, 'null'] }
         registration:
           oneOf: [ { type: 'null' }, { $ref: '#/components/schemas/ServiceRequestRegistration' } ]
-        policeIntimation: { $ref: '#/components/schemas/ServiceRequestPoliceIntimation' }
         sla:
           oneOf: [ { type: 'null' }, { $ref: '#/components/schemas/ServiceRequestSla' } ]
         amendment:
@@ -16990,7 +17416,6 @@ components:
         amount: { type: [integer, 'null'], format: int64 }
         sla:
           oneOf: [ { type: 'null' }, { $ref: '#/components/schemas/ServiceRequestSla' } ]
-        policeConfirmed: { type: boolean, description: Police intimation confirmed; read only on completed rows }
         approvedAt: { type: [string, 'null'], format: date-time, description: When the customer approved the draft; read only on approved rent agreements }
     ServiceQueueSummary:
       type: object
@@ -17038,19 +17463,6 @@ components:
       properties:
         approvalRecorded: { type: boolean }
         resendAfterSeconds: { type: [integer, 'null'] }
-    ServiceRequestPoliceIntimation:
-      type: object
-      properties:
-        confirmed: { type: boolean }
-        confirmedAt: { type: [string, 'null'], format: date-time }
-        confirmedBy: { type: [string, 'null'] }
-        reference: { type: [string, 'null'], maxLength: 80 }
-        submittedOn: { type: [string, 'null'], format: date }
-    ServiceRequestPoliceIntimationConfirm:
-      type: object
-      properties:
-        reference: { type: [string, 'null'], maxLength: 80 }
-        submittedOn: { type: [string, 'null'], format: date }
     ServiceRequestAmendment:
       type: object
       description: >
@@ -17136,19 +17548,12 @@ components:
         overdue: { type: boolean }
     ServiceRequestRegistration:
       type: object
-      description: >
-        What the Sub-Registrar recorded for a completed rent agreement, beside what the customer was
-        quoted, so a checker can compare the duty paid with the duty billed. Quoted values are null
-        when the terms cannot be priced.
+      description: What the Sub-Registrar recorded for a completed rent agreement.
       properties:
         documentNo: { type: string }
         sro: { type: string }
         registeredOn: { type: string, format: date }
         grn: { type: string }
-        stampDuty: { type: integer, format: int64 }
-        registrationFee: { type: integer, format: int64 }
-        quotedStampDuty: { type: [integer, 'null'], format: int64 }
-        quotedRegistrationFee: { type: [integer, 'null'], format: int64 }
         recordedBy: { type: [string, 'null'] }
         recordedAt: { type: string, format: date-time }
     RentAgreementOverlap:
@@ -18795,6 +19200,12 @@ components:
         roomType: { type: string, enum: [private, shared], description: '`move-in` rooms and `people` seekers; `teams` ignores it.' }
         furnishing: { type: string, enum: [furnished, semi, unfurnished], description: '`move-in` only.' }
         gated: { type: boolean, description: '`move-in` only.' }
+        bhk: { type: string, enum: ['1', '2', '3', '4'], description: '`move-in` and `teams`; same semantics as the feed parameter.' }
+        vegOnly: { type: boolean, description: '`move-in` only.' }
+        parking: { type: string, enum: [bike, car], description: '`move-in` only.' }
+        minAge: { type: integer, minimum: 18, description: '`people` only.' }
+        maxAge: { type: integer, minimum: 18, description: '`people` only.' }
+        minOpenSeats: { type: integer, minimum: 2, maximum: 10, description: '`teams` only.' }
         verifiedOnly: { type: boolean }
         vibe:
           type: array
@@ -19480,38 +19891,21 @@ components:
     GeoPolicy:
       type: object
       description: >
-        Map coverage and place-suppression policy.
-
-
-        **Every field is an override.** The client ships a built-in centre and bounding box per city,
-        and merges this document over them. City launch status is the `cities` section of `GET /bootstrap`.
-        So an empty object is the correct answer for an install whose operator has never opened the
-        Maps panel — not a broken one — and an unreachable server leaves the client on its defaults
-        rather than on nothing.
+        Served districts and place-suppression policy.
 
 
         **Values that do not typecheck are dropped rather than forwarded**, as on the `flags` and
         `movePack` sections. The stored block is untyped and hand-editable, and a half-written bounding box
         passed through would be a response that disagrees with this schema.
-      required: [cities, blacklist]
+      required: [blacklist, servedDistricts, districtAreas]
       properties:
         enforceCityLimit:
           type: boolean
           description: >
-            Whether locality search is *restricted* to the active city's box rather than merely
-            biased toward it. Absent when the operator has never set it; the client's default is on,
+            Whether locality search is *restricted* to the served districts' boxes rather than merely
+            biased toward them. Absent when the operator has never set it; the client's default is on,
             because a search that can return an address in another state is worse than one that
             cannot find a legitimate fringe suburb.
-        cities:
-          type: object
-          description: >
-            Per-city overrides, keyed by the city name the client knows it by. Cities the operator
-            has never touched are absent rather than echoed back at their defaults, so this map is
-            usually much shorter than the city list. An entry with nothing set is omitted entirely.
-          additionalProperties: { $ref: '#/components/schemas/GeoCityOverride' }
-          example:
-            Pune:
-              center: { lat: 18.553, lng: 73.86 }
         blacklist:
           type: array
           description: >
@@ -19520,39 +19914,35 @@ components:
             — are omitted, because they are inert on the client and a list whose whole purpose is to
             be matched against should not carry rows that never will be.
           items: { $ref: '#/components/schemas/GeoBlacklistEntry' }
-    GeoCityOverride:
-      type: object
-      description: >
-        One city's map overrides. Both are independently optional because the panel writes them
-        independently: recentering a city and redrawing its box are separate edits, and an operator
-        who did one has implied nothing about the other.
-      properties:
-        center:
-          type: object
+        servedDistricts:
+          type: array
+          items: { type: string }
+          example: [Pune, Satara]
           description: >
-            Map centre. Dropped as a unit when either coordinate is missing, not a number, not
-            finite, or off the globe: half a point is not a point, and centring on a latitude and a
-            zero lands the map in the sea off West Africa. Out-of-range values are dropped rather
-            than clamped — clamping 200 to 90 invents a place at the North Pole that looks
-            deliberate. Absent falls back to the built-in centre, which is a place.
-          required: [lat, lng]
-          properties:
-            lat: { type: number, format: double, minimum: -90, maximum: 90 }
-            lng: { type: number, format: double, minimum: -180, maximum: 180 }
+            The districts new localities and societies must be in, as Google Places names them
+            (`administrative_area_level_3`, in English). The server enforces this at resolve and mint,
+            whatever the client sends. Always present: `[Pune]` when the operator has never set it.
+            Stored entries are a name or `{name, placeId, bounds}`; writes replace the whole list and
+            need 1 to 40 unique names.
+        districtAreas:
+          type: array
+          description: >
+            Map data for the served districts that have it, in `servedDistricts` order. The client
+            searches inside these boxes and outlines the districts by `placeId`; a district with
+            neither is absent, and the client falls back to its built-in box for Pune.
+          items: { $ref: '#/components/schemas/GeoDistrictArea' }
+    GeoDistrictArea:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        placeId: { type: string, description: Google place ID of the district. }
         bounds:
           type: object
           description: >
-            Coverage box, in the north/south/east/west vocabulary the Places request takes. Dropped
-            as a unit when any edge is missing, not a number or off the globe, and it matters more
-            than `center` does: with the city limit on, the client turns these into a hard
-            `locationRestriction`, and a box missing its south edge is not a smaller box but a fence
-            with a gap.
-
-
-            Also dropped when the box is inverted — `north` at or below `south`, or `east` at or
-            below `west`. Such a box encloses nothing, so every candidate is refused and the
-            suggestion box for that city goes permanently and silently empty. Absent hands the city
-            back its built-in bounds, which enclose the city.
+            The district's Google viewport. Dropped when any edge is missing, off the globe, or the
+            box is inverted, because the client turns it into a hard `locationRestriction` and a box
+            that encloses nothing empties every suggestion box.
           required: [north, south, east, west]
           properties:
             north: { type: number, format: double, minimum: -90, maximum: 90 }

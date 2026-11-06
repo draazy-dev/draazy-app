@@ -35,7 +35,7 @@ export default function PackersMovers() {
       titleTop={t('services.packers.titleTop')}
       titleAccent={t('services.packers.titleAccent')}
       subtitle={t('services.packers.subtitle')}
-      features={[['shield-check', t('services.packers.feature1')], ['indian-rupee', t('services.packers.feature2')], ['headset', t('services.packers.feature3')]]}
+      features={[['clipboard-list', t('services.packers.feature1')], ['indian-rupee', t('services.packers.feature2')], ['headset', t('services.packers.feature3')]]}
       quote={{
         icon: 'truck', title: t('services.packers.quoteTitle'), subtitle: t('services.packers.quoteSub'),
         serviceField: 'service', submitLabel: t('services.packers.submitLabel'),
@@ -62,9 +62,9 @@ export default function PackersMovers() {
       ]}
       extra={<PackersEstimator t={t} />}
       trust={[
-        [t('services.packers.trust.0.t'), 'badge-check', t('services.packers.trust.0.d')],
+        [t('services.packers.trust.0.t'), 'clipboard-list', t('services.packers.trust.0.d')],
         [t('services.packers.trust.1.t'), 'indian-rupee', t('services.packers.trust.1.d')],
-        [t('services.packers.trust.2.t'), 'shield-check', t('services.packers.trust.2.d')],
+        [t('services.packers.trust.2.t'), 'video', t('services.packers.trust.2.d')],
         [t('services.packers.trust.3.t'), 'headset', t('services.packers.trust.3.d')],
       ]}
       steps={[

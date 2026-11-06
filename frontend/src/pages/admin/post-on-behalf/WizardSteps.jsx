@@ -232,7 +232,7 @@ export function ReviewStep({ form }) {
         <ReviewRow label="Photos" value={`${form.photos.length} photo${form.photos.length === 1 ? '' : 's'} added`} />
       </div>
       <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-200 mt-6">
-        <strong>What happens next:</strong> The listing is saved as pending under the owner&apos;s mobile. Send them the claim link on WhatsApp from <span className="font-medium text-amber-100">Properties → Staff Posted</span>. It can go live only after they confirm it&apos;s their property.
+        <strong>What happens next:</strong> The listing is saved as pending under the owner&apos;s mobile. Send them the claim link on WhatsApp from the next screen; later you can find the listing under <span className="font-medium text-amber-100">Properties → All listings, Source: Staff posted</span>. It can go live only after they confirm it&apos;s their property.
       </div>
     </div>
   );

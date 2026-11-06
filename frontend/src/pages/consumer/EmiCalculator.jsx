@@ -9,7 +9,6 @@ import { cssColour } from '../../lib/themeColour';
 
 const fmt = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
 const fmtShort = (n) => (n >= 1e7 ? '₹' + (n / 1e7).toFixed(2) + ' Cr' : n >= 1e5 ? '₹' + (n / 1e5).toFixed(2) + ' L' : '₹' + Math.round(n).toLocaleString('en-IN'));
-const LENDERS = [{ n: 'SBI', r: 8.5 }, { n: 'HDFC', r: 8.6 }, { n: 'ICICI', r: 8.65 }, { n: 'Axis', r: 8.75 }, { n: 'LIC HFL', r: 8.45 }];
 
 const AMT = { min: 500000, max: 50000000, step: 100000 };
 const RATE = { min: 5, max: 15, step: 0.05 };
@@ -29,7 +28,6 @@ export default function EmiCalculator() {
   const [showSchedule, setShowSchedule] = useState(false);
 
   const reset = () => { setAmt(DEFAULTS.amt); setRate(DEFAULTS.rate); setTen(DEFAULTS.ten); };
-  const applyLender = (r) => setRate(r);
 
   const out = useMemo(() => {
     const P = Math.max(0, +amt || 0);
@@ -194,33 +192,6 @@ export default function EmiCalculator() {
               )}
             </div>
           )}
-
-          <div className="mt-10 reveal">
-            <h2 className="text-lg font-bold text-white mb-1">{t('misc1.emiCompareRates')}</h2>
-            <p className="text-gray-400 text-xs mb-4">{t('misc1.emiTapToApply')}</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              {LENDERS.map((l) => {
-                const active = Math.abs((+rate || 0) - l.r) < 0.001;
-                return (
-                  <button
-                    key={l.n}
-                    type="button"
-                    onClick={() => applyLender(l.r)}
-                    aria-pressed={active}
-                    aria-label={t('misc1.emiUseRate', { bank: l.n })}
-                    className={`glass-card rounded-xl p-4 text-center transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40 ${active ? 'border-teal-400 ring-1 ring-teal-400/40' : 'hover:border-teal-400/30'}`}
-                  >
-                    <div className="w-10 h-10 mx-auto mb-2 rounded-lg bg-gradient-to-br from-teal-400/20 to-teal-600/20 flex items-center justify-center relative">
-                      <Icon name="landmark" className="w-5 h-5 text-teal-400" />
-                      {active && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-teal-400 flex items-center justify-center"><Icon name="check" className="w-2.5 h-2.5 text-ink" /></span>}
-                    </div>
-                    <p className="text-white font-semibold text-sm">{l.n}</p>
-                    <p className="text-teal-400 text-xs mt-0.5">{l.r.toFixed(2)}% {t('misc1.emiOnwards')}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
       </div>
     </div>

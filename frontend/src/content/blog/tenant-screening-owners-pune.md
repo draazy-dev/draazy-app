@@ -2,7 +2,7 @@
 title: "How to screen a tenant in Pune: a fair, lawful checklist"
 description: How Pune owners can check a tenant's identity, income and references, complete police verification and decide fairly, without breaking the law.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-06
 author: Draazy Team
 topic: owners
 tags: [tenant screening, tenant verification, owners, landlords, police verification, references, Pune]
@@ -82,7 +82,7 @@ Indian law has no single rule on discrimination in private lettings, but some la
 
 ## How Draazy helps
 
-On Draazy you list directly and tenants contact you with no brokerage. Owner phone numbers stay private behind the contact gate, and listings are reviewed by our staff. See [how verification works](/how-verification-works), then [list your flat](/list-property).
+On Draazy you list directly and tenants contact you with no brokerage. Tenants send a contact request, and your phone number stays masked until you approve it. You can switch on a setting to accept contacts only from people with KYC done. Staff review each listing. See [how verification works](/how-verification-works), then [list your flat](/list-property).
 
 ## Sources
 

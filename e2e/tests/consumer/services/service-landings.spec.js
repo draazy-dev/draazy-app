@@ -141,6 +141,8 @@ test.describe('property valuation landing, live', () => {
     await widget.locator('input[type=number]').fill('2500');
     await expect(out).not.toHaveText(before);
     await expect(out).toContainText('₹');
+    await expect(page.getByRole('heading', { name: 'Pune locality rates' })).toBeVisible();
+    await expect(page.getByText(/YoY|year-on-year/i)).toHaveCount(0);
     expect(consoleErrors).toEqual([]);
   });
 
@@ -297,7 +299,7 @@ test.describe('home loans landing, live', () => {
     await page.goto(PAGE);
 
     await expect(page.getByRole('heading', { name: 'Check Your Eligibility' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Compare Home Loan Rates' })).toBeVisible();
+    await expect(page.getByText(/% onwards|rates from \d/i)).toHaveCount(0);
 
     const emiCalc = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Plan your EMI before you apply' }) });
     const emi = emiCalc.locator('.gradient-text');

@@ -2,7 +2,7 @@
 title: "Carpet area vs built-up area: what you pay for in Pune"
 description: What carpet, built-up and super built-up area mean, how RERA defines carpet area, what MahaRERA registration discloses and how to compare flat prices fairly.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-06
 author: Draazy Team
 topic: buying
 tags: [carpet area, built-up area, super built-up area, RERA, MahaRERA, price per sq ft, buying a flat, Pune]
@@ -68,7 +68,7 @@ The flat and the price are the same. Only the area used changed. If you compare 
 
 ## Does carpet area matter for rent too?
 
-Yes. A 2 BHK with a smaller carpet area can feel cramped even when the listing says 1,100 sq ft. When you list or search on Draazy, look for the carpet area. See the [Pune rent report](/blog/pune-rent-report-2026) for published rent ranges by locality, and use the [rental yield calculator](/tools/rental-yield-calculator) if you are buying to let.
+Yes. A 2 BHK with a smaller carpet area can feel cramped even when the listing says 1,100 sq ft. Draazy asks owners for the carpet area, shows it on the property page and lets you filter by it in search. See the [Pune rent report](/blog/pune-rent-report-2026) for published rent ranges by locality, and use the [rental yield calculator](/tools/rental-yield-calculator) if you are buying to let.
 
 ## What about stamp duty?
 

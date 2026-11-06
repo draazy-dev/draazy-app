@@ -116,20 +116,20 @@ display but not applied to the count.
 ### Flatmates alerts (`flatmates/alertCriteria.js`)
 - `buildFlatmateAlertRecord(filters, tab)` produces `{ kind: 'flatmates', tab, q, locality, budget,
   moveIn, gender, sharing, attachedBath, verifiedOnly, habits[], label }`, tab-gated so a stale value
-  for an inactive tab never rides along: `sharing` is captured only on `team-up`, `attachedBath` only
+  for an inactive tab never rides along: `sharing` is captured only on `teams`, `attachedBath` only
   on `move-in`. `BUDGET_MAX = 40000` is "any" and is omitted rather than stored.
-- **Tabs: `move-in` ("Move in now") and `team-up` ("Team up")** - the two live share intents. The
-  legacy `rooms` / `flatmates` / `groups` values survive as read-only aliases (`normalizeTab`), so an
-  alert saved before the redesign still resolves to a real tab instead of silently falling back;
-  `tabMeta` normalizes before labelling, so it is never mislabelled either.
+- **Tabs: `move-in` ("Rooms"), `people` ("Flatmates") and `teams` ("Teams")** - the three live share
+  intents; `tab` stores whichever is active. The legacy `rooms` / `flatmates` / `team-up` / `groups`
+  values survive as read-only aliases (`normalizeTab`: `rooms -> move-in`, `flatmates` and `team-up`
+  `-> people`, `groups -> teams`), so an alert saved with one still resolves to a real tab instead of
+  silently falling back; `tabMeta` normalizes before labelling, so it is never mislabelled either.
 - `flatmateCriteriaChips` renders these - on the alert card, in the dashboard Alerts panel, and as
   the "why is this empty" chips in the Flatmates empty state. The Alerts panel routes "View matches"
   to `` /flatmates?view=${normalizeTab(a.tab)} ``.
 - **Where the card appears (`FlatmateAlertCard`):** whenever the active list is empty **or** the
   seeker has narrowed with 2+ filters (`activeFilterCount >= 2`) - enough intent to want a ping.
   Its invitation copy swaps on the active tab and uses a plural noun for the subject ("the moment
-  *homes* match" / "*flatmates* match") rather than the tab label, so the sentence stays grammatical
-  after the two-tab rename. Channels offered are WhatsApp and SMS.
+  *homes* match" / "*flatmates* match" / "*teams* match") rather than the tab label, so the sentence stays grammatical. Channels offered are WhatsApp and SMS.
 
 ### Alerts panel (dashboard, `AlertsPanel.jsx`)
 - Lists all saved searches (property + flatmates). Header sub = `${activeCount} active` where

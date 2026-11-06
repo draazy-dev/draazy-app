@@ -2,7 +2,7 @@
 title: "Notice period and lock-in in a Pune rent agreement"
 description: How to write the lock-in and notice period in a Pune leave and licence agreement, what happens if either side leaves early, and the clauses to add.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-06
 author: Draazy Team
 topic: renting
 tags: [lock-in period, notice period, leave and licence, rent agreement, Pune, tenants, owners]
@@ -66,7 +66,7 @@ Copy the structure below into your agreement and fill in the numbers:
 6. **Rent increase on renewal.** A percentage, so there is no argument later.
 7. **Early exit by the owner.** Compensation and a refund timeline.
 
-Draazy's [rent agreement service](/services/rent-agreement) drafts and registers the agreement online, so these clauses are in writing before you move in.
+On Draazy's [rent agreement service](/services/rent-agreement), you enter the lock-in, deposit and yearly increase, and you can add anything else, such as the notice period, as a special clause. Read each clause in the draft before you approve it. When the term is ending, you can renew from your dashboard; it starts a new registered agreement with the details filled in.
 
 ## Before you sign
 

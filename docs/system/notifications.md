@@ -13,7 +13,7 @@ copy changes there, update the row here in the same commit.
 | Web push | Live when `PUSH_VAPID_PRIVATE_KEY` is set; otherwise logs only | Free | `PushSender` (`WebPushSender`, fallback `LoggingPushSender`) | New chat messages only; an open tab raises its own [in-tab alerts](#in-tab-browser-alerts) |
 | WhatsApp — Meta Cloud API | Live when `WHATSAPP_ENABLED=true` | ~₹0.115 + 18% GST per message | `WhatsAppOtpSender`, `WhatsAppDecisionMessenger` | One-time codes, identity rejected / revoked, the daily waiting-on-you digest |
 | WhatsApp — click-to-chat (`wa.me`) | Live | Free (sent from a person's own WhatsApp) | `ClickToChatSender` (staff), plain links (consumers) | Staff → owner outreach; consumer → consumer handoffs |
-| Email — ZeptoMail | Live when `ZEPTOMAIL_ENABLED=true` | Per-email credit | `EmailSender` (`ZeptoMailEmailSender`) | Staff invite and password reset only |
+| Email — ZeptoMail | Live when `ZEPTOMAIL_ENABLED=true` | Per-email credit | `EmailSender` (`ZeptoMailEmailSender`) | Staff invite, password reset, and a copy of each staff bell alert |
 | SMS | Not built | — | — | — |
 
 Configuration for the paid channels is in [DEPLOY.md](../DEPLOY.md) (WhatsApp identity template, ZeptoMail).
@@ -29,7 +29,8 @@ Configuration for the paid channels is in [DEPLOY.md](../DEPLOY.md) (WhatsApp id
 - **Retention.** The nightly `NotificationRetention` sweep deletes read rows after 30 days (they already left the
   list then) and every row after 90.
 - **Channel toggles.** The `whatsapp` toggle (`Notifier.allowsWhatsapp`) gates the paid identity and digest sends;
-  codes are never gated. The `email` and `sms` toggles are stored but read by nothing.
+  codes are never gated. The `email` toggle gates the [staff alert email](#email-zeptomail); `sms` is stored but
+  read by nothing.
 - **Chat bursts.** `message.received` writes one bell row per unread run (only when the recipient's unread count in
   that conversation is 1); push is scheduled for every message.
 - **Paid sends happen after commit** and are best-effort: a failed identity-decision WhatsApp is logged and the
@@ -174,10 +175,11 @@ item and the moment its clock started.
 
 | Level | Type | When | To |
 |---|---|---|---|
-| Arrival | `queue.{rule}` | Unassigned item younger than 1h | Live staff holding the queue's function; managers (else admins) when nobody does |
+| Arrival | `queue.{rule}` | Item younger than 1h: unassigned, or any item for `draft-decision` | The live assignee, else live staff holding the queue's function, else managers (else admins) |
 | Reminder | `sla.{rule}` | Item older than `remind` | The live assignee, else the function holders, else managers (else admins) |
 | Escalation | `escalation.{rule}` | Item older than `escalate` | Every live manager; every live admin when no manager is live |
 
+"Live" means not archived and not suspended. A rule with no `remind`/`escalate` only announces arrivals.
 An item first seen already overdue gets only the escalation. Items for the same recipient, rule and level in one run
 share a single notification ("3 new listings to review", body "Oldest: ? and 2 more").
 
@@ -197,6 +199,11 @@ queue, so it clears once no open item shares that link.
 | `flatmate-review` | Flatmate agreements to check | 48h | 72h | `flatmates` |
 | `refund-review` | Refund requests (no arrival: `RefundStaffAlerts` already announces) | 48h | 72h | `refunds` |
 | `erasure` | Account erasure requests | 7d | 20d | Admins at every level |
+| `draft-decision` | A customer approved a service draft or asked for changes; every round re-announces | — | — | The assignee, else `desk:{team}` |
+| `listing-recheck` | Live listings re-queued after an owner edits key fields (badge-only re-checks excluded) | 24h | 36h | `listingModeration` |
+| `badge-request` | Verified-badge (ownership) requests | 48h | 72h | `propertyVerification` |
+| `flatmate-post` | Flatmate posts, rooms and groups awaiting moderation or a re-check | 24h | 48h | `flatmates` |
+| `community-society` | Community-added societies awaiting a merge or keep decision | — | — | `societies` |
 
 Override any threshold with `draazy.staff-sla.{rule}.remind` / `.escalate` (a Duration such as `12h`).
 
@@ -474,6 +481,12 @@ Back-office only. No consumer email is sent: consumer email addresses are not ve
 |---|---|---|---|
 | Staff invite | Admin/manager creates a staff account | The new account's email | You're invited to the Draazy back office |
 | Password reset | Admin/manager reissues the invite (reset) | The account's email | Reset your Draazy back-office password |
+| Staff alert | Any bell row delivered to a `staff` account (queue arrivals, SLA reminders, hand-offs) | The staff account's email | Draazy: {bell title} |
+
+The staff alert (`StaffEmailCopy`, called by `NotificationPublisher`) goes only to live (active, unarchived) `staff`
+accounts with an email, never to managers or admins. The `email` toggle turns it off; quiet hours hold only the bell
+row, not the email. It is plain text, queued after commit on its own thread (500 pending, then dropped with a warning):
+the bell title, body and `{draazy.app.base-url}{link}`. A send failure is logged, never thrown.
 
 Body (`StaffInviteMailer`, plain text, sent after commit; skipped when the account has no email):
 ```
@@ -541,8 +554,8 @@ stream timeout.
   bell row covers both.
 - Everything else stays in-app, plus web push.
 - Staff → owner messaging stays on free click-to-chat.
-- The `whatsapp` toggle gates every paid send except codes. The `email` and `sms` toggles stay stored-only: wire them
-  before adding any new paid send on those channels.
+- The `whatsapp` toggle gates every paid send except codes; the `email` toggle gates the staff alert email. The `sms`
+  toggle stays stored-only: wire it before adding any paid SMS send.
 - Consumer email (receipts, refunds) only after consumer email verification exists.
 
 ## Adding a notification

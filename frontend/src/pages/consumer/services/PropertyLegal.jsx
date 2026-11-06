@@ -59,7 +59,7 @@ export default function PropertyLegal() {
       titleTop={t('services.legal.titleTop')}
       titleAccent={t('services.legal.titleAccent')}
       subtitle={t('services.legal.subtitle')}
-      features={[['shield-check', t('services.legal.feature1')], ['indian-rupee', t('services.legal.feature2')], ['file-check-2', t('services.legal.feature3')]]}
+      features={[['search-check', t('services.legal.feature1')], ['indian-rupee', t('services.legal.feature2')], ['file-check-2', t('services.legal.feature3')]]}
       quote={{
         icon: 'gavel', title: t('services.legal.quoteTitle'), subtitle: t('services.legal.quoteSub'),
         serviceField: 'service', submitLabel: t('services.legal.submitLabel'),
@@ -84,7 +84,7 @@ export default function PropertyLegal() {
       ]}
       extra={<>{<LegalCostCalc t={t} />}{registrationSection}</>}
       trust={[
-        [t('services.legal.trust.0.t'), 'badge-check', t('services.legal.trust.0.d')],
+        [t('services.legal.trust.0.t'), 'search-check', t('services.legal.trust.0.d')],
         [t('services.legal.trust.1.t'), 'indian-rupee', t('services.legal.trust.1.d')],
         [t('services.legal.trust.2.t'), 'workflow', t('services.legal.trust.2.d')],
         [t('services.legal.trust.3.t'), 'calendar-check', t('services.legal.trust.3.d')],

@@ -2,7 +2,7 @@
 title: "Rental scams in Pune: warning signs before you pay a token"
 description: Fake owners, "army officer" landlords and urgent token requests. How rental scams in Pune work, and how to check a flat and its owner before you pay.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-06
 author: Draazy Team
 topic: renting
 tags: [rental scam, fraud, token amount, tenants, Pune, safety]
@@ -18,7 +18,7 @@ Do not transfer any money before you have seen the flat and met the owner in per
 | Typical amounts | Small, such as a ₹5,000 token or a ₹10,000 "booking charge", so people pay without thinking |
 | UPI PIN | You enter it only to send money, never to receive it |
 | If you have paid | Call the national cyber crime helpline **1930** or report at cybercrime.gov.in, tell your bank and keep the evidence |
-| Draazy | We never collect rent, deposits or token amounts, and never ask for payment over WhatsApp or UPI |
+| Draazy | We never collect rent, deposits or token amounts for owners, and never ask you to pay over WhatsApp or to a personal UPI ID |
 
 The amounts are often small, which is exactly why people pay without thinking twice. This guide shows the patterns to look out for and the checks that protect you.
 
@@ -76,9 +76,9 @@ Act quickly. The first few hours matter.
 
 ## How Draazy helps
 
-On Draazy you contact owners directly. Owners who complete our online KYC, a government ID and a live selfie reviewed by our staff, carry a KYC done badge. Ownership papers earn a separate badge. Neither badge certifies legal title, so still do the checks above. [See how verification works](/how-verification-works).
+On Draazy you contact owners directly. An owner's phone number stays masked until the owner approves your contact request. Owners who complete our online KYC, a government ID and a live selfie reviewed by our staff, carry a "KYC done" badge. A listing with accepted ownership papers carries a "Verified property" badge. Neither badge certifies legal title, so still do the checks above. [See how verification works](/how-verification-works).
 
-We never collect rent, deposits or token amounts on behalf of owners, and we never ask for money over WhatsApp. If anyone asks you to pay a "Draazy fee" outside the app, it is a scam. Read [how we verify owners and listings](/help/a/how-we-verify) and [Spotting a rental scam](/help/a/spot-a-scam), and [report a listing](/help/a/report-a-listing) if something feels wrong.
+We never collect rent, deposits or token amounts on behalf of owners, and we never ask for money over WhatsApp. Draazy's paid services, such as a rent agreement, are paid inside the app. If anyone asks you to pay a "Draazy fee" outside the app, it is a scam. Read [how we verify owners and listings](/help/a/how-we-verify) and [Spotting a rental scam](/help/a/spot-a-scam), and use [report a listing](/help/a/report-a-listing) if something feels wrong.
 
 ## Sources
 

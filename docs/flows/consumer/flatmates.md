@@ -1,4 +1,4 @@
-# Flow: Flatmates (Move in now / Team up)
+# Flow: Flatmates (Rooms / Flatmates / Teams)
 
 > The flatmate marketplace: people who need a home browse **places** or **`people`**, hosts offer a
 > room / an open seat / a whole flat let room-by-room, and interest is shaped by an **L1 sign-in
@@ -6,7 +6,7 @@
 > Under **badge-not-gate (ADR-019)** posting and interest need only being signed in (L1); there is
 > **no identity posting/contact gate** — verification is an optional trust badge, and it is now the
 > **same reviewed identity badge** the rest of the app uses, not a separate seeker OTP.
-> **Status:** documented from React source · re-synced to the two-tab redesign + owner flat-split - **Primary role(s):** buyer/tenant (seeker + host), admin/ops (moderation)
+> **Status:** documented from React source · covers the three-tab board (Rooms / Flatmates / Teams) + owner flat-split - **Primary role(s):** buyer/tenant (seeker + host), admin/ops (moderation)
 
 ---
 
@@ -24,11 +24,12 @@
 - **Routes:** `/flatmates` (public browse; posting/interest require sign-in). `/share-flat` is a
   permanent redirect to `/flatmates` so links from before the rename still resolve
   (`App.jsx`). Query params:
-  `view=<move-in|team-up>` (legacy `flatmates|rooms|groups` still resolve via `normalizeTab`),
+  `view=<move-in|people|teams>` (legacy `rooms|flatmates|team-up|groups` still resolve via
+  `normalizeTab`; anything else falls back to `move-in`),
   `loc=<locality>`, `g=<male|female>`, `near=lat,lng` (+ `nearlabel`, `nearr`, `nearmode`),
   `post=<solo|group>` (open the seeker request or group form directly; legacy `post=1` still
-  resolves to the seeker form), `startGroup=1&title=&rent=&loc=` (seed a
-  Team-up group from a property detail page's "split the rent" card).
+  resolves to the seeker form). The property detail page's "sharing this flat" card links to
+  `view=teams&loc=<locality>`.
 - **Room listing** reuses the property wizard via `/list-property?flatmate=1` (see the list-property
   wizard doc). **Owner flat-split** is reached from that wizard's success screen and from
   Dashboard -> My Listings ("Let room by room") - see section 5.
@@ -82,38 +83,35 @@
 
 ## 5. Business rules & logic  *(the meat)*
 
-### Two tabs, split by one question (`model.js`)
-The page used to split by record type - **Flatmates / Rooms / Groups** - which asked the user to
-learn our storage model. It now splits by the one question a seeker can always answer instantly:
+### Three tabs (`tabs.js`, `model.js`)
+`TABS = ['move-in', 'people', 'teams']`, each with an icon (`door-open`, `user-search`,
+`users-round`) and a `KIND_WORD` (`homes`, `flatmates`, `teams`) that the alert invitation copy uses.
+The tab labels (`flatmates.tab_<tab>`) are **Rooms**, **Flatmates** and **Teams**; the board splits by
+the one question a seeker can always answer instantly: **"Is there a flat yet?"**
 
-> **"Is there a flat yet?"**
-
-- **`move-in` ("Move in now")** - you browse **places**: rooms only. Priced, dated, visitable, with
+- **`move-in` ("Rooms")** - you browse **places**: rooms only. Priced, dated, visitable, with
   the photos and flat details a room post carries.
-- **`team-up` ("Team up")** - you browse **`people`**: solo seekers, plus groups still hunting. You
+- **`people` ("Flatmates")** - you browse **people**: solo seeker posts, each a person who needs a room.
+- **`teams` ("Teams")** - you browse **groups still hunting** for a flat to rent together. You
   form a household first.
 
-A room is always `move-in`; a seeker post is always `team-up`; a group lists only while it is
-`hunting` (the server filters on that flag). A legacy group that already has its flat lists on no tab
-but stays readable by link: a place to move into is a room post. Owners never host a group (409
-`owner_lists_rooms`); an owner letting a flat room by room lists rooms. `team-up`
-is therefore a **mixed** list and is re-sorted **as one list** - merging two pre-sorted lists would
-stack every seeker above every group regardless of the chosen sort. `Results.renderCard` dispatches on
-`item.kind` (`room` | `group` | `seeker`).
+A room is always `move-in`; a seeker post is always `people`; a group lists only while it is
+`hunting` (the server filters on that flag), under `teams`. A legacy group that already has its flat
+lists on no tab but stays readable by link: a place to move into is a room post. Owners never host a
+group (409 `owner_lists_rooms`); an owner letting a flat room by room lists rooms. `Results.renderCard`
+dispatches on `item.kind` (`room` | `group` | `seeker`).
 
-Legacy `?view=` values are kept as read aliases (`normalizeTab`): `rooms -> move-in`,
-`flatmates -> team-up`, `groups -> team-up`, so old deep links, saved alerts and notification links
-resolve instead of silently falling back to the default. Tab counts are **rendered** (not just
-announced), because stock a seeker cannot see is stock they never switch tabs for; a zero count stays
-visible but dimmed.
+`normalizeTab` resolves `?view=` to a tab: the three tab values as-is, the legacy aliases
+`rooms -> move-in`, `flatmates -> people`, `team-up -> people`, `groups -> teams`, and `move-in` for
+anything else, so old deep links, saved alerts and notification links resolve instead of silently
+falling back to the default. Tab counts are **rendered** (not just announced), because stock a seeker
+cannot see is stock they never switch tabs for; a zero count stays visible but dimmed.
 
-The server also serves two finer tabs for the people-first board: **`people`** (seeker posts only) and
-**`teams`** (groups still hunting only), the two halves of `team-up`. `team-up` itself is unchanged, so
-old links keep working. The feed response carries `tabElements` `{ move-in, people, teams }`, every
+The feed endpoint also still accepts `team-up` (people and teams as one list, sorted as one list), which
+the board no longer requests. The feed response carries `tabElements` `{ move-in, people, teams }`, every
 count under the same facets (the current tab reuses `totalElements`; at most two extra counts),
-alongside the existing `otherTabElements` (`move-in` -> people + teams; any other tab -> move-in).
-Each half keeps the facet semantics it has under `team-up` (`sharing` still narrows only groups, for
-instance). Saved-search alerts with tab `people` / `teams` count the same halves.
+alongside `otherTabElements` (`move-in` -> people + teams; any other tab -> move-in). The board reads
+`tabElements`. `sharing` narrows only `teams`. Saved-search alerts count the tab they were saved on.
 
 ### Living style (optional profile answers)
 Twelve optional questions - `tidy, food, sleep, wfh, guests, visitors, smoking, drinks, pets, bills,
@@ -133,7 +131,7 @@ unknown key or a value outside `0..2` with 400, and an empty map deletes the row
   nothing new about the author is exposed; guests and viewers under three answers get `{}`. Cards render
   one line ("Both night owls · Both veg") from `flatmates.ls.both_<key>_<answer>`.
 - **Home tiles.** `GET /bootstrap` → `flatmatePulse.tabs` carries `{ move-in, people, teams }` live counts
-  (the same totals the board tabs show; `team-up` is `people + teams`). The Home Flatmates section draws
+  (the same totals the board tabs show). The Home Flatmates section draws
   one tile per case from it and opens `/flatmates?view=<tab>`; there is no extra request.
 - **`sort=match`.** A viewer with at least three answers gets a living-style term worth up to +4
   (100% match; 0 when unknown or the row is theirs) added to the SQL score. The viewer's values are bound
@@ -161,7 +159,7 @@ hero used to carry a third copy, landing in the same phone viewport ~150px above
 deleted as pure duplication.
 
 The hero (`Hero.jsx`, `.sf-hero`) frames the page as **flat sharing** — "Share a flat, split the
-rent.": take a room in a shared flat (Move in now) or team up to rent one (Team up). A shared-room
+rent.": take a room in a shared flat (Rooms) or team up to rent one (Teams). A shared-room
 photo sits under a left-to-right fade so the copy stays readable on a 360px phone. Its only action
 is **Get verified**, a solid nudge for signed-in, unverified users; it never gates posting or
 interest (ADR-019).
@@ -170,9 +168,9 @@ interest (ADR-019).
 What do you want to post?
   a property   -> /list-property                (whole-unit listing wizard)
   flatmates    -> Flatmates
-                    I have a room to fill   -> /list-property?flatmate=1   (supply for "Move in now")
-                    I need a room           -> /flatmates?post=solo        (seeker request, "Team up")
-                    team up to rent a flat  -> /flatmates?post=group       (a group others ask to join)
+                    I have a room to fill   -> /list-property?flatmate=1   (supply for "Rooms")
+                    I need a room           -> /flatmates?post=solo        (seeker request, "Flatmates")
+                    team up to rent a flat  -> /flatmates?post=group       (a group others ask to join, "Teams")
 ```
 
 The two seeker branches route by URL rather than calling this board's handlers directly, because the
@@ -302,7 +300,8 @@ Dashboard -> My Listings ("Let room by room"), and confirmed in `SplitFlatModal`
   the eligibility check runs for the active-post cap only. Server-side it posts as role `tenant`,
   tier `identity`, no property, no declaration — nothing to attest yet — and stores `rent` = the
   ceiling (so `per_head` keeps answering the budget filter and sort), `locality` = the first
-  shortlisted locality, `deposit` = null. It always lands on **Team up**.
+  shortlisted locality, `deposit` = null. It lists under **Teams**; saving leaves the board on whichever tab the user is on
+  and toasts that the group is live or in review.
 - The card shows a per-head budget range and "N BHK · N sharing", with no "Looking for a flat"
   chip since every listed team is hunting; the detail
   page adds "The flat we're looking for" and, for the owner and accepted members, **"Find flats for
@@ -418,7 +417,7 @@ The single decision point every supply path calls - group create, single-room po
 - **`emptyFilters`:** `q, locality, budget (40000 max), moveIn, gender, sharing, verifiedOnly,
   attachedBath, habits[], near, nearLabel, nearRadius (5), nearMode (km)`.
 - **Tab-gated filters:** switching tabs clears the filter the destination cannot honour - `sharing`
-  is `team-up`-only, `attachedBath` is `move-in`-only - so a stale value never lingers as an
+  is `teams`-only, `attachedBath` is `move-in`-only - so a stale value never lingers as an
   invisible, uncountable active filter after its control is hidden.
 - **Two counters, deliberately different:** `activeFilterCount` ignores the free-text `q` and the
   near-tuning keys (`nearLabel`/`nearRadius`/`nearMode`), and gates the alert CTA on narrowing intent;
@@ -453,18 +452,20 @@ The single decision point every supply path calls - group create, single-room po
 - **Empty-state intelligence:** when a tab is empty and budget is the binding constraint, `raiseHint`
   finds the cheapest post that *would* match at "Any" and offers a concrete "raise your budget to ₹X"
   instead of a dead end. When the other tab still holds stock for the same filters, the empty state
-  offers a **cross-tab rescue** (`otherCount` / `switchTab`) rather than "widen your budget". The
-  count arrives on the feed response itself (`otherTabElements`, same facets), not a second request.
+  offers a **cross-tab rescue** (`otherCount` / `switchTab`, pointing at whichever other tab holds the
+  most) rather than "widen your budget". The
+  counts arrive on the feed response itself (`tabElements`, same facets), not a second request.
 
 ### Alerts (`alertCriteria.js`, `FlatmateAlertCard`)
-- `buildFlatmateAlertRecord(filters, tab)` produces `{ kind: 'flatmates', tab, ...filters, label }`,
+- `buildFlatmateAlertRecord(filters, tab)` produces `{ kind: 'flatmates', tab, ...filters, label }`
+  where `tab` is the active board tab (`move-in`, `people` or `teams`),
   tab-gated per field so a stale value never rides along. `BUDGET_MAX = 40000` is treated as "Any"
   and omitted. `flatmateAlertLabel` / `flatmateCriteriaChips` render the same criteria everywhere -
   the alert card, the empty state's "why is this empty" chips, and the dashboard Alerts panel.
 - The card appears when the list is empty **or** `activeFilterCount >= 2` (enough narrowing intent to
   want a ping), mirroring the listings page. Channels offered are WhatsApp and SMS.
-- `tabMeta` runs values through `normalizeTab`, so an alert saved before the redesign is labelled
-  correctly instead of mislabelled.
+- `tabMeta` runs values through `normalizeTab` and labels the tab "Rooms", "Flatmates" or "Teams", so
+  an alert saved with a legacy tab value is labelled correctly instead of mislabelled.
 
 ### Map gate (`FlatmateMapGate`, `MAP_MAX_AREAS = 3`)
 - The map view stays legible by asking the user to focus on up to 3 areas first (mirrors the Listings
@@ -677,8 +678,8 @@ it lives with the flow it serves.
   to "no preference": a row stating `any` is matched by the query's own `or col = 'any'` clause, so
   without the collapse "any gender" would paradoxically return only the no-preference rows.
 
-- **The query record carries every facet, with per-kind semantics.** `tab` is `move-in` (rooms +
-  housed groups) or `team-up` (seeker posts + groups still hunting), or one half of it: `people` (posts) / `teams` (hunting groups). `q` is free text against stored
+- **The query record carries every facet, with per-kind semantics.** `tab` is `move-in` (rooms only),
+  `people` (seeker posts) or `teams` (hunting groups); the server also accepts `team-up` (posts + hunting groups). `q` is free text against stored
   columns only — deliberately not the derived English gender label ("Woman"/"Man"), which exists
   nowhere in the database while the `gender` facet expresses the same intent precisely.
   `minBudget`/`maxBudget` bound the *per-person* price, which neither table stores. `gender` is
@@ -695,8 +696,7 @@ it lives with the flow it serves.
   board the moment a user taps a chip. `strictGender` (with `gender`) drops the `any` rows too: rooms and
   posts by their `gender`, groups by `policy`. `roomType` (`private|shared`) narrows move-in rooms and
   matches `people` seekers by `room_pref` or `any`; `teams` ignores it. `furnishing`
-  (`furnished|semi|unfurnished`) and `gated` (`true`) are rooms-only. While any room-only facet
-  (`attachedBath`, `roomType`, `furnishing`, `gated`) is set, housed groups leave `move-in`. Saved-search
+  (`furnished|semi|unfurnished`) and `gated` (`true`) are rooms-only. Saved-search
   criteria carry the same four keys with the same per-tab meaning. `meLocalities`/`meBudget`/`meGender` are read only by
   `sort=match`, which ranks by fit to the searcher rather than by anything about the row.
 - **The public cards are a second, narrower shape (`FlatmateGroupFeedDto`).** A card cannot show a
@@ -775,8 +775,7 @@ the tap, that the home goes to a free account on their number; `homeSaved` drive
   `GET /me/owner-homes/{id}/prefill` (no draft), and saves through `POST /me/managed-properties/{id}/listing`, so
   the listing is linked to the same record (409 once listed).
 
-Deposit is required on every posting form: room `deposit`, a have-flat group's `deposit`, a team-up
-group's `preferences.depositMax`, and on-behalf rent listings. `0` is a valid answer.
+Deposit is required on every posting form: room `deposit`, a have-flat group's `deposit`, a hunting team's `preferences.depositMax`, and on-behalf rent listings. `0` is a valid answer.
 
 ### Seeker interest: contact, caps and withdrawal (`FlatmateSeekerService`)
 
@@ -920,7 +919,7 @@ Host eligibility:  evaluateHostEligibility -> blocked (cap/duplicate) | flagForR
   back to their own id for the occupancy ledger, so they stand alone instead of pooling.
 - **Owner controls on seed posts:** never shown (`ownsGroup`/`ownsRoom` require an exact mobile match
   or name fallback; seeds have no owner).
-- **Legacy `?view=` values and pre-redesign alerts:** resolved via `normalizeTab`, never dropped to
+- **Legacy `?view=` values and alerts saved with a legacy tab:** resolved via `normalizeTab`, never dropped to
   the default tab silently.
 - **Smart search that parses nothing:** the raw sentence is kept as a plain text filter; if anything
   parsed, it is cleared so it stops fighting the chips.
@@ -935,8 +934,8 @@ occupants, interest, agreement reissue), `/flatmates/groups` (+seats, join, owne
 `/properties/{id}/split`. The three resources are created and managed here; `/flatmates/feed` is
 the only list read.
 
-**Two tabs, three resources, and they do not map one-to-one.** "Move in" is rooms; "Team up" is
-seeker posts **and** groups, interleaved. `feed(tab)` does the interleaving. The feed and the
+**Three tabs, three resources, and they do not map one-to-one.** "Rooms" is rooms; "Flatmates" is
+seeker posts; "Teams" is hunting groups. The feed and the
 shortlist are heterogeneous, so rows are discriminated by shape rather than by a type field.
 
 **The feed is public, deliberately.** The Flatmates page exists to convert a signed-out

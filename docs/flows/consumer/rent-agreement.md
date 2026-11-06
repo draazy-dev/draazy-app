@@ -27,8 +27,8 @@
 - **Job-to-be-done:** "Fill one guided form (or invite the other party to fill their half), pay the
   statutory + service cost, and get a registered Leave & License delivered - biometric at doorstep,
   no office visit."
-- **Why it matters:** a flagship "under one roof" paid service (Rs 999 ticket value; statutory stamp
-  + registration passed through). It is a genuine maker-checker + co-fill workflow and the anchor of
+- **Why it matters:** a flagship "under one roof" paid service (Draazy's fee is a flat ₹499 platform fee; statutory stamp
+  duty and registration are passed through on top). It is a genuine maker-checker + co-fill workflow and the anchor of
   the tenancy relationship the rent flow then tracks ([`./rent-tenancy.md`](./rent-tenancy.md)).
 
 ## 2. Entry points
@@ -122,9 +122,9 @@
   **Draft approvals** (MC-4/MC-8). Every executing party approves the current draft version:
   in-app for account holders, by OTP for inline parties. Any rejection
   sends it back to changes-requested, and a new version resets every approval. A draft the holder shares goes to the customer at once; no second operator checks it first.
-  **Police intimation** (LEG-2). After the registered copy, the tracker links the Pune City and
-  Pimpri-Chinchwad Police portals; the step stays pending until ops records the owner's
-  confirmation (optional reference number and date).
+  **Police intimation** (LEG-2). Automatic: registering on the IGR portal (i-SARITA, linked to
+  police CCTNS) informs the police, so the step is done as soon as the registered copy is uploaded.
+  There is nothing for the owner, tenant or ops to file or confirm.
 - **Guards:** the page is publicly fillable; **generating** requires sign-in (the in-page sign-in
   sheet, which resumes the step). Invite mode forces sign-in (`reason=invite`,
   no mobile in the URL) and then resolves the invitation against the signed-in account. Guards are
@@ -275,11 +275,12 @@ total   = stamp + reg + dhc + service
   GRAS takes.
 - The FAQ states the same rule in words: stamp duty = 0.25% of (rent for the full period, including
   agreed increases, + non-refundable deposit + 10% of the refundable deposit per year of term);
-  rounded to the nearest rupee, minimum ₹100; registration Rs 1,000 urban / Rs 500 rural; DHC ₹300. `service` is admin-controlled and is the only Draazy
+  rounded to the nearest rupee, minimum ₹100; registration Rs 1,000 urban / Rs 500 rural; DHC ₹300.   `service` is the admin-controlled `rentAgreementPlatform` fee (₹499 by default) and is the only Draazy
   revenue line here; the government levies pass through.
 - The increment and its interval live only in `_state.terms` (`increment`, `incrementEvery`); the
   server refuses an interval other than 11 or 12 and an increment with more than two decimals.
-- The admin **ticket value** uses `cost.total`.
+- The request amount is priced on the server (`ServiceRequestPricing`: platform fee + stamp duty +
+  registration + handling) and equals `cost.total`.
 
 ### 5.3 Validation (`validation.js` → `stepErrors`)
 - Step 0: residential propType, flatNo, society, locality and area required (server: area 1..100000,
@@ -626,15 +627,18 @@ Request (server wire values):
   available" state; the request read 404s, so no data is exposed.
 - **Owner's invite was declined:** the locked panel offers re-invite or cancel (5.6).
 - **Tenant has accepted or finished:** the locked panel offers Pay; checkout's 409 is shown (5.6).
-- **Owner already has an active request:** wizard is locked to the tracker (Messages / draft
+- **Owner already has an active request:** wizard is locked to the tracker (Message support / draft
   approval); `startNew` is the explicit escape hatch.
 - **Field validation:** the rules in 5.3; declaration required at Review.
 - **Unfinished paperwork:** checkout 409 names the missing party or paper; the request stays
   `awaiting-payment` with no order. The sweep retires it 30 days after its last change, which frees
   the one-unpaid-request slot and discards its identity rows; the customer can cancel it sooner. A
   row whose checkout opened is retired on the abandoned-checkout TTL, counted from that opening.
-- **Document size/dupes:** oversize files (`tooLarge`) are excluded from `collectDocs` and vault
-  saves; duplicate vault docs (same category+name) are skipped.
+- **Document size/dupes:** every draft or party paper is compressed client-side (`prepareUpload`) to
+  under 1 MB, and the server refuses anything of 1 MB or more (`DocumentUploads.MAX_BYTES`). A file
+  that cannot fit is refused on its slot, and a paper already held there is kept. Only the registered
+  copy, uploaded from the back-office, may reach 2 MB. Duplicate vault docs (same category+name) are
+  reused rather than saved again.
 - **Submit failure:** `generate` wraps persistence in try/catch and toasts `saveError` without
   advancing.
 - **Autosave scope:** draft ignores `oName`, `oMobile`, `step` and is disabled in invite mode / after

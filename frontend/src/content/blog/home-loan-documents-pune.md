@@ -2,7 +2,7 @@
 title: Home loan documents checklist for buying a flat in Pune
 description: The identity, income and property documents banks ask for when you buy a flat in Pune, for salaried and self-employed buyers, new or resale.
 published: 2026-10-09
-updated: 2026-10-13
+updated: 2026-11-06
 author: Draazy Team
 topic: buying
 tags: [home loan, documents, checklist, LTV, resale flat, under construction, Pune]
@@ -90,7 +90,7 @@ Which regime suits you depends on your other deductions, so ask a tax adviser be
 
 ## Next steps
 
-Compare offers on Draazy's [home loans page](/home-loans), and when you have found the flat, have a lawyer check the papers through our [property legal services](/services/property-legal).
+Ask the loan desk on Draazy's [home loans page](/home-loans) for a callback to compare offers for your profile. When you have found the flat, have a lawyer check the papers through our [property legal services](/services/property-legal).
 
 ## Sources
 

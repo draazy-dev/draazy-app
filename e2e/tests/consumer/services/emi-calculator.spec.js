@@ -25,7 +25,7 @@ test.describe('EMI calculator', () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test('number input clamps out-of-range values, a lender card applies its rate, and reset restores defaults', async ({ page }) => {
+  test('number input clamps out-of-range values and reset restores defaults', async ({ page }) => {
     const amt = page.locator('input[type=number]').first();
 
     await test.step('number input clamps out-of-range values on blur', async () => {
@@ -37,17 +37,16 @@ test.describe('EMI calculator', () => {
       await expect(amt).toHaveValue('500000');
     });
 
-    await test.step('lender card applies its rate and shows active state', async () => {
-      const hdfc = page.locator('button:has-text("HDFC")');
-      await hdfc.click();
-      await expect(rateInput(page)).toHaveValue('8.6');
-      await expect(hdfc).toHaveAttribute('aria-pressed', 'true');
+    await test.step('no hard-coded lender rates are shown', async () => {
+      await expect(page.getByText(/% onwards/)).toHaveCount(0);
     });
 
     await test.step('reset restores defaults', async () => {
       await amt.fill('12000000');
+      await rateInput(page).fill('10');
       // Reset can only prove anything if the value it is resetting had actually landed first.
       await expect(amt).toHaveValue('12000000');
+      await expect(rateInput(page)).toHaveValue('10');
       await page.locator('button:has-text("Reset")').click();
       await expect(amt).toHaveValue('8000000');
       await expect(rateInput(page)).toHaveValue('8.5');

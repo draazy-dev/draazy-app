@@ -2,7 +2,7 @@
 title: "Renting out your flat in Pune: an owner's checklist"
 description: Everything to do before you hand over the keys, from setting the right rent and choosing a tenant to the registered agreement and police verification.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-06
 author: Draazy Team
 topic: owners
 tags: [owners, landlords, renting out, rent agreement, Pune]
@@ -16,7 +16,7 @@ To rent out a flat in Pune, set a market rent, get the flat ready, tell your soc
 |---|---|
 | Agreement | Must be a registered leave and licence agreement, even for 11 months; the landlord is responsible (Maharashtra Rent Control Act, 1999, section 55) |
 | Registration cost | Stamp duty of 0.25% of the agreement's value plus a ₹1,000 registration fee in PMC or PCMC |
-| Police | Submit tenant details separately from registering the agreement |
+| Police | Submit tenant details to the police; registering the agreement is a separate legal duty |
 | Society charge | A cooperative society's non-occupancy charge is capped at 10% of service charges under a 2001 Maharashtra government resolution |
 | Tax on rent | Taxable as income from house property, with a 30% standard deduction after municipal tax |
 | TDS | An individual tenant paying more than ₹50,000 a month deducts 2% TDS |
@@ -49,7 +49,7 @@ A cooperative housing society can charge a non-occupancy charge on a flat that i
 
 ## 4. List it and screen tenants
 
-[List your flat on Draazy](/list-property) for free. Tenants call you directly, so there is no broker and no brokerage on either side.
+[List your flat on Draazy](/list-property): your first live listing is free, and the [Plans page](/plans) shows what extra listings cost. Tenants send a contact request and you decide whether to approve it, so there is no broker and no brokerage on either side. Your phone number stays masked until you approve.
 
 When people call, meet them in person before you agree to anything. Useful questions:
 
@@ -77,7 +77,7 @@ In Maharashtra every leave and licence agreement must be registered, including a
 
 ## 7. Complete police verification
 
-Submit your tenant's details to the police before they move in. It is a separate step from registering the agreement. See our guide to [tenant police verification in Pune](/blog/tenant-police-verification-pune).
+Submit your tenant's details to the police before they move in. See our guide to [tenant police verification in Pune](/blog/tenant-police-verification-pune). If you use Draazy's rent agreement service, the tenant's police record details are collected up front, and registering the agreement on the government IGR portal shares them with the police.
 
 ## 8. Hand over properly
 

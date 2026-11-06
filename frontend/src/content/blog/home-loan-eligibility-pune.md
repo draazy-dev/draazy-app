@@ -2,7 +2,7 @@
 title: "Home loan eligibility in Pune: how banks decide"
 description: How banks work out how much home loan you can get: income ratio (FOIR), RBI's loan-to-value caps, CIBIL score and co-applicants, with a worked Pune example.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-06
 author: Draazy Team
 topic: buying
 tags: [home loan, eligibility, FOIR, LTV, CIBIL, co-applicant, EMI, Pune]
@@ -81,7 +81,7 @@ A spouse, parent or sibling with income can raise the loan you qualify for, as t
 
 ## Compare offers
 
-Interest rate, processing fee and prepayment terms vary by lender. Compare them on Draazy's [home loans page](/home-loans), and have the papers checked through our [property legal services](/services/property-legal) before you pay a token amount.
+Interest rate, processing fee and prepayment terms vary by lender. On Draazy's [home loans page](/home-loans) you can ask the loan desk for a callback to compare offers for your profile. Have the papers checked through our [property legal services](/services/property-legal) before you pay a token amount.
 
 ## Sources
 

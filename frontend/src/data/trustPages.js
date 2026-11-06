@@ -71,7 +71,7 @@ export const TRUST_PAGES = {
       {
         title: 'How we check listings',
         body: [
-          'Every new listing waits for staff review. The reviewer checks the photos, the details, the address and locality, and whether the same home is already listed. The listing is then approved, sent back to the owner with a reason, or rejected.',
+          'Every new listing waits for staff review. The reviewer checks that the photos look genuine and are not a duplicate, that the details are consistent, the address and locality, and whether the same home is already listed. The listing is then approved, sent back to the owner with a reason, or rejected.',
         ],
       },
       {
@@ -91,8 +91,9 @@ export const TRUST_PAGES = {
       {
         title: 'What verification does not mean',
         body: [
-          'A KYC done badge confirms who posted the listing. A Verified property badge means the accepted papers were current when reviewed. Neither certifies legal title, the condition of the building, society approvals or the final rent.',
-          'Before you pay for a purchase, get an independent title check.',
+          'A KYC done badge confirms who posted the listing. A Verified property badge means the accepted papers were current when reviewed. Neither certifies legal title, the condition of the building,           society approvals or the final rent. We do not check listing photos against the actual home.',
+                    'A RERA number on a listing is shared by the owner. Draazy does not verify it, so check it on MahaRERA. We never verify societies.',
+                    'Before you pay for a purchase, get an independent title check.',
         ],
         links: [['Full guide in the help centre', '/help/a/how-we-verify'], ['Spotting a rental scam', '/help/a/spot-a-scam']],
       },

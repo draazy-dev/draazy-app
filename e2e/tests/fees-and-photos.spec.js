@@ -227,7 +227,7 @@ test.describe('Pricing — the product quotes the database, not the bundle (live
     const body = page.locator('body');
     await expect(body).toContainText(rupees(prices.rentAgreementPlatform), { timeout: 20_000 });
     // Scoped: ₹1,999 is also the sale listing pass on this page.
-    const agreementLine = page.locator('p').filter({ hasText: 'Delivered to your doorstep' });
+    const agreementLine = page.locator('p').filter({ hasText: 'doorstep biometric visit' });
     await expect(agreementLine).toContainText(rupees(prices.rentAgreementPlatform));
     await expect(agreementLine).not.toContainText(STALE_RENT_FEE);
 

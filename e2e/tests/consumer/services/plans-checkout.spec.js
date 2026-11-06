@@ -350,7 +350,7 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
     const card = (name) => page.locator('h3', { hasText: new RegExp(`^${name}$`) }).locator('xpath=ancestor::div[contains(@class,"glass")][1]');
     const free = page.locator('h2', { hasText: /^Free$/ }).locator('xpath=ancestor::div[contains(@class,"glass")][1]');
     await expect(free).toContainText('15 owner contacts within 30 days of your first contact', { timeout: 20000 });
-    await expect(free).toContainText('Featured for 7 days after verification');
+    await expect(free).toContainText('Featured for 7 days after ownership is verified');
     await expect(free).toContainText('1 live listing at a time');
     await expect(card('Rent Contact Pack')).toContainText(`${pack.contactLimit} more contacts for rent listings`);
     await expect(card('Rent Contact Pack')).toContainText(`Valid for ${pack.termDays} days`);

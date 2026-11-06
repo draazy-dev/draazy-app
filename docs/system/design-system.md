@@ -159,8 +159,8 @@ is now the minority pattern and should not be used in new code.
 
 ### When NOT to use the default height
 
-- **Category tabs** (Flatmates "Move in now" / "Team up"): built on `.seg` with `py-2.5 rounded-xl`
-  and `flex-1` below `sm`, so two tabs fill a 360px row. They carry a **rendered** count badge, not
+- **Category tabs** (Flatmates "Rooms" / "Flatmates" / "Teams"): built on `.seg` with `py-2.5 min-h-11 rounded-xl`
+  and `flex-auto` below `sm` (icon hidden), so three tabs fill a 360px row. They carry a **rendered** count badge, not
   just an `aria-label` — stock a seeker cannot see is stock they never switch tabs for.
 - **Prominent / hero CTAs:** use `size="lg"` (`--btn-h-lg`, 48px), never a hand-rolled `py-*`.
 - **Compact inline actions:** `.btn-sm` (`--btn-h-sm`).

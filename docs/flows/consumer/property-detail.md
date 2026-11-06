@@ -130,9 +130,9 @@ keyboard way in.
 ### Flat-share teaser (`PropertyHeader.jsx`)
 Any **residential rent** listing with `bhkNum >= 2` and a positive price shows a "sharing this flat"
 card: three per-head price tiles (alone / 2 sharing / 3 sharing, computed as `price / n`), plus a
-**Find flatmates** CTA that deep-links to
-`/flatmates?startGroup=1&title=<title>&rent=<price>&loc=<locality>` - it pre-seeds a *Team up* group
-from this exact flat rather than dropping the user on a blank Flatmates page. The gate is
+**Find flatmates in <locality>** CTA that deep-links to
+`/flatmates?view=teams&loc=<locality>` - it opens the **Teams** tab (groups hunting for a flat)
+narrowed to this listing's locality, rather than dropping the user on a blank Flatmates page. The gate is
 deliberately by shape, not by a hardcoded type list (flats, apartments, row houses, penthouses and
 villas all qualify); a studio or 1 BHK is not practical to split, so 2+ BHK is the floor. See
 [`flatmates.md`](./flatmates.md).

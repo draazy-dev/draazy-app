@@ -17,11 +17,9 @@ import { SUPPORT_PHONE, SUPPORT_TEL } from '../../../lib/supportContact.js';
 import { useFormDraft, useFieldErrors } from '../../../lib/hooks.js';
 
 const RATES= { 'Koregaon Park': 16500, 'Kalyani Nagar': 15500, Kothrud: 13000, 'Viman Nagar': 12500, Baner: 11500, Aundh: 12000, Kharadi: 10500, Wakad: 9200, Hadapsar: 8800, Hinjawadi: 8200, Wagholi: 6800, Undri: 7200, Ravet: 7800 };
-const YOY = { 'Koregaon Park': 6.2, 'Kalyani Nagar': 6.8, Kothrud: 7.1, 'Viman Nagar': 7.5, Baner: 8.4, Aundh: 7.8, Kharadi: 9.6, Wakad: 8.9, Hadapsar: 7.2, Hinjawadi: 9.2, Wagholi: 10.1, Undri: 8.0, Ravet: 9.4 };
 const PUNE_AVG_RATE = Math.round(Object.values(RATES).reduce((a, b) => a + b, 0) / Object.values(RATES).length);
-const PUNE_AVG_YOY = +(Object.values(YOY).reduce((a, b) => a + b, 0) / Object.values(YOY).length).toFixed(1);
 const fmtShort = (n) => (n >= 1e7 ? '₹' + (n / 1e7).toFixed(2) + ' Cr' : '₹' + (n / 1e5).toFixed(1) + ' L');
-const TREND = Object.keys(RATES).map((k) => ({ k, rate: RATES[k], yoy: YOY[k] })).sort((a, b) => b.yoy - a.yoy);
+const LOCALITY_RATES = Object.entries(RATES).sort((a, b) => b[1] - a[1]);
 
 const SERVICES = [
   ['Market Value Estimate', 'line-chart', 'A fair, current market value based on recent sale comparables in your micro-market.'],
@@ -73,14 +71,12 @@ export default function PropertyValuation() {
     const rate = base * typeM * ageM * floorM * 1.15;
     const mid = rate * a;
     if (!a) return null;
-    const yoy = YOY[loc] ?? PUNE_AVG_YOY;
-    const comps = Math.min(180, 24 + Math.round(a / 40) + Math.round(base / 1000));
     let conf = 92;
     if (a < 400 || a > 3000) conf -= 12;
     if (ageM < 0.9) conf -= 3;
     if (!known) conf -= 8;
     conf = Math.max(72, Math.min(95, conf));
-    return { range: `${fmtShort(mid * 0.93)}  –  ${fmtShort(mid * 1.07)}`, rateValue: Math.round(rate).toLocaleString('en-IN'), known, loc, conf: conf + '%', comps, trend: '+' + yoy.toFixed(1) + '%' };
+    return { range: `${fmtShort(mid * 0.93)}  –  ${fmtShort(mid * 1.07)}`, rateValue: Math.round(rate).toLocaleString('en-IN'), known, loc, conf: conf + '%' };
   }, [loc, type, area, age, floor]);
 
   const submit = (e) => {
@@ -176,11 +172,9 @@ export default function PropertyValuation() {
                 <div className="mt-1 rounded-xl bg-teal-500/8 border border-teal-400/20 p-5 text-center">
                   <p className="text-xs text-gray-400 mb-1 flex items-center justify-center gap-1.5"><span className="dz-tag font-bold uppercase tracking-wider text-teal-200 bg-teal-500/25"><Icon name="sparkles" className="w-2.5 h-2.5" /> AI</span> {tr('services.valuation.aiEstLabel')}</p>
                   <p className="text-2xl font-extrabold gradient-text">{est ? est.range : '—'}</p>
-                  <p className="text-[11px] text-gray-500 mt-1.5">{est ? tr(est.known ? 'services.valuation.rateBasedComparables' : 'services.valuation.rateBasedCityAvg', { rate: est.rateValue, comps: est.comps, loc: est.loc }) : '—'}</p>
-                  <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-3 gap-2 text-center">
-                    <div><p className="text-[10px] text-gray-500">{tr('services.valuation.confidence')}</p><p className="text-sm font-bold text-teal-300">{est ? est.conf : '—'}</p></div>
-                    <div><p className="text-[10px] text-gray-500">{tr('services.valuation.comparables')}</p><p className="text-sm font-bold text-white">{est ? est.comps : '—'}</p></div>
-                    <div><p className="text-[10px] text-gray-500">{tr('services.valuation.trendYoY')}</p><p className="text-sm font-bold text-emerald-300">{est ? est.trend : '—'}</p></div>
+                  <p className="text-[11px] text-gray-500 mt-1.5">{est ? tr(est.known ? 'services.valuation.rateBasedComparables' : 'services.valuation.rateBasedCityAvg', { rate: est.rateValue, loc: est.loc }) : '—'}</p>
+                  <div className="mt-3 pt-3 border-t border-white/10 text-center">
+                    <p className="text-[10px] text-gray-500">{tr('services.valuation.confidence')}</p><p className="text-sm font-bold text-teal-300">{est ? est.conf : '—'}</p>
                   </div>
                 </div>
                 <button onClick={scrollToForm} className="btn-teal w-full py-3 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"><Icon name="file-badge" className="w-4 h-4" /> {tr('services.valuation.getCertified')}</button>
@@ -202,13 +196,10 @@ export default function PropertyValuation() {
             <p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.valuation.trend.sub')}</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 reveal">
-            {TREND.map(({ k, rate, yoy }) => (
-              <div key={k} className="rounded-xl bg-white/[.03] p-4 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-white text-sm font-semibold truncate">{k}</p>
-                  <p className="text-gray-500 text-xs mt-0.5">₹{rate.toLocaleString('en-IN')}<span className="text-[10px]"> {tr('services.valuation.trend.perSqft')}</span></p>
-                </div>
-                <span className="shrink-0 inline-flex items-center gap-0.5 text-xs font-bold text-emerald-400"><Icon name="trending-up" className="w-3.5 h-3.5" />{yoy}%</span>
+            {LOCALITY_RATES.map(([k, rate]) => (
+              <div key={k} className="rounded-xl bg-white/[.03] p-4">
+                <p className="text-white text-sm font-semibold truncate">{k}</p>
+                <p className="text-gray-500 text-xs mt-0.5">₹{rate.toLocaleString('en-IN')}<span className="text-[10px]"> {tr('services.valuation.trend.perSqft')}</span></p>
               </div>
             ))}
           </div>

@@ -6,9 +6,8 @@
 > because it must move server-side verbatim.
 > **Status:** documented from React source - **Primary role(s):** buyer/tenant/owner (all consumers)
 
-> **Runtime correction (2026-08-28).** References below to the former `serviceFlow.js` browser
-> workflow are historical. Service requests are now server-owned behind `serviceRequestService.js`;
-> the client no longer writes a concierge workflow or ticket mirror to `localStorage`.
+> Service requests are server-owned behind `serviceRequestService.js`; the client writes no
+> workflow or ticket state to `localStorage`.
 
 ---
 
@@ -19,7 +18,7 @@
   then hand off a lead to the right Draazy ops team."
 - **Why it matters:** the "everything under one roof, zero brokerage" promise. Calculators are the
   free, high-trust "customer touch" that converts a browser into a service lead; each page ends in a
-  `createServiceRequest` into the ops queue. The calculators are pure functions today so they are
+  `createTicket` (and, for valuation/interior/rent agreement, a server service request) into the ops queue. The calculators are pure functions today so they are
   testable - and portable to the backend unchanged.
 
 ## 2. Entry points
@@ -39,8 +38,8 @@
   full EMI page (`/emi-calculator`, gated by flag).
 - **Source components:** `Services.jsx`, `EmiCalculator.jsx`, `services/LoanEmiCalc.jsx`,
   `services/LegalCostCalc.jsx`, `services/PackersEstimator.jsx`, `services/PropertyValuation.jsx`;
-  catalog `src/data/services.json`; service requests through
-  `src/services/serviceRequestService.js`.
+  service requests through `src/services/serviceRequestService.js`, tickets through
+  `src/services/ticketService.js`.
 
 ## 3. Actors & roles
 - **All consumers** can open every calculator and see instant figures **without signing in** (the
@@ -52,16 +51,16 @@
 
 ## 4. Entities touched
 Link to [`../../system/data-model.md`](../../system/data-model.md).
-- **Service ticket** - `createServiceRequest({ team, service, customer, mobile, detail, value, ref })`
-  -> admin/ops services queue. Created by every lead form (legal/packers/valuation/
-  interior/rent-agreement/move-in-pack + waitlist).
+- **Service ticket** - `createTicket({ desk, subject, body })` (the Move-in Pack adds `quotedValue`)
+  -> admin/ops services queue. Raised by the lead forms (legal/packers/valuation/interior/
+  rent-agreement) and by the Move-in Pack booking.
 - **Service workflow request** - a server `service_requests` record for the customer tracker
   (valuation, rent agreement). See section 5 and [`./rent-agreement.md`](./rent-agreement.md).
-- **Service order** - `addServiceOrder({ type:'move-in-pack', items, total })`
-  (`dzServiceOrders:<mobile>`) for the Move-in Pack bundle.
+- **Service order** - none: the Move-in Pack booking is a `packers` ticket carrying the net total as
+  `quotedValue`; the waitlist is `joinServiceWaitlist({ service:'move-in-pack', name, mobile })`.
 - **Fees config** - `getFees()` (`settings.fees`, admin-controlled) supplies `rentAgreementPlatform`
-  and any dynamic charges; the Move-in Pack prices come from `settings.movePack.items`.
-- **Services catalog** - `src/data/services.json` (6 rows) drives the ops/admin service list.
+  (₹499 by default) and any dynamic charges; the Move-in Pack prices come from
+  `settings.movePack.items`.
 
 ## 5. Business rules & logic  *(the meat - calculator math)*
 
@@ -80,8 +79,7 @@ total    = EMI * n
 interest = max(total - P, 0)
 ```
 - Full page clamps: amount 5L..5Cr (step 1L, default 80L), rate 5..15% (step 0.05, default 8.5),
-  tenure 1..30y (default 20). Non-finite/negative EMI -> 0. Lender chips
-  (SBI 8.5, HDFC 8.6, ICICI 8.65, Axis 8.75, LIC HFL 8.45) just set the rate.
+  tenure 1..30y (default 20). Non-finite/negative EMI -> 0. No lender rates are shown.
 - **Year-wise amortization schedule** (full page): iterate months, `interest = balance*r`,
   `principal = min(EMI-interest, balance)`, `balance -= principal`; aggregate per year into
   `{ principal, interest, balance }`.
@@ -118,31 +116,30 @@ base   = RATES[loc] ?? PUNE_AVG_RATE            // Rs/sq.ft
 rate   = base * typeM * ageM * floorM * 1.15    // 1.15 = market/premium uplift
 mid    = rate * area                            // area in sq.ft; null if area == 0
 range  = fmtShort(mid*0.93) .. fmtShort(mid*1.07)   // +/- 7% band
-trend  = '+' + (YOY[loc] ?? PUNE_AVG_YOY) '%'
-comps  = min(180, 24 + round(area/40) + round(base/1000))
 conf   = clamp(72..95) of 92, minus 12 if area<400 or >3000, minus 3 if ageM<0.9, minus 8 if unknown locality
 ```
 - Multipliers: **type** Flat 1 / Villa 1.18 / Plot 0.55 (plot forces `floorM = 1`); **age** New 1.05
   / 0-5y 1 / 5-10y 0.92 / 10y+ 0.82; **floor** Ground 0.98 / Mid 1 / High 1.05 / Top 1.10.
 - `RATES` cover 13 hand-tuned localities; any other Pune locality (curated or user-minted) uses
-  `PUNE_AVG_RATE`/`PUNE_AVG_YOY` (means of the tuned sets). The estimate is public; the certified
+  `PUNE_AVG_RATE` (mean of the tuned set). No growth or YoY figure is shown. The estimate is public; the certified
   report is a signed-in lead.
 
 ### 5.5 Services hub - Move-in Pack bundle (`Services.jsx`)
-- Prices come from admin config `settings.movePack.items` (fallback `DEFAULT_PACK_PRICES` = movers
-  8000, clean 2500, agreement 1500, paint 6000, verify 999, internet 500) via `useMovePackConfig()`,
-  which live-reacts to `draazy-settings-change` and `storage` events.
+- Prices come from admin config `settings.movePack.items` (movers, clean, agreement, paint, verify,
+  internet) via `useMovePackConfig()`, which reads `getMovePack()` and live-reacts to
+  `draazy-settings-change` and `storage` events. An item with no configured price counts as 0.
 - **Bundle math:**
   ```
   total = sum of selected item prices
   save  = round(total * 0.12)     // 12% bundle discount
   net   = total - save            // "You pay"
   ```
-- `bookPack`: requires >=1 item and sign-in; persists `addServiceOrder({ type:'move-in-pack', items,
-  total: net })` AND `createServiceRequest({ team:'packers', service:'Move-in Pack', value: net })`.
+- `bookPack`: requires >=1 item and sign-in; raises `createTicket({ subject:'Move-in Pack booking',
+  desk:'packers', body: item names, quotedValue: net })`. The success toast waits on that call; a
+  failure toasts `packFailed` and keeps the selection.
 - When `settings.movePack.enabled` is false the section runs in "coming soon" mode: prices hidden,
   `submitNotify` captures a waitlist lead (valid mobile only, no forced sign-up) via
-  `createServiceRequest({ service:'Move-in Pack - waitlist' })`.
+  `joinServiceWaitlist({ service:'move-in-pack' })`.
 - The hub's animated stat counters (`Counter`) use an eased ramp (`1-(1-p)^3`) - display only.
 
 ### 5.6 Lead submission & the ops workflow bridge (shared)
@@ -165,8 +162,10 @@ conf   = clamp(72..95) of 92, minus 12 if area<400 or >3000, minus 3 if ageM<0.9
 - The workflow status ladder (shared): `STEPS = [Submitted, Documents, Draft & approval,
   Registration, Ready]`; `progressPct` maps Submitted 25% -> Draft 50% -> Registration 75% ->
   Ready 100%. `isActive(status)` = not completed/cancelled.
-- `createServiceRequest` reference values seen: legal Rs 2499, valuation Rs 499, rent agreement Rs 999
-  (from `services.json`); interior/packers are quote-based (price 0).
+- Only the rent agreement is priced by the server (`ServiceRequestPricing.priceFor`): the ₹499
+  `rentAgreementPlatform` fee plus stamp duty, registration and handling (see
+  [`./rent-agreement.md`](./rent-agreement.md)). Legal, valuation, interior and packers requests carry
+  no price; interior and packers are quoted by the desk.
 
 ## 6. Maker-checker / approval
 - The calculators themselves are stateless (no approval). The **service requests** they create are the
@@ -181,18 +180,19 @@ conf   = clamp(72..95) of 92, minus 12 if area<400 or >3000, minus 3 if ageM<0.9
 - **Workflow request (valuation/rent agreement):** `submitted -> docs_review -> draft_shared ->
   (changes_requested | approved) -> registration -> completed` (or `cancelled`); co-fill adds
   `awaiting_party` at the front. See [`./rent-agreement.md`](./rent-agreement.md) section 7.
-- **Move-in Pack order:** `placed` (single state today).
+- **Move-in Pack booking:** a `packers` ticket, so it follows the ticket states above.
 
 ## 8. Edge cases, validation & error states
 - **Zero/edge inputs:** EMI guards `n>0`, `r==0` (simple division), and non-finite results -> 0;
   valuation returns `null` (no estimate) when area is 0; packers rounds to Rs 500 and clamps unknown
   keys to factor 1.
-- **Unknown locality (valuation):** falls back to city-average rate/YoY and drops confidence by 8.
+- **Unknown locality (valuation):** falls back to the city-average rate and drops confidence by 8.
 - **Sign-in gate on submit:** valuation `submit` and rent-agreement `generate` open the in-page sign-in
   sheet and resume after OTP; the autosaved draft (`dzDraft:*`, `useFormDraft`) still covers a reload.
   `bookPack`/`waitlist` also gate/limit appropriately.
 - **Field validation:** valuation lead requires name, valid mobile `^[6-9]\d{9}$`, and a purpose;
   Move-in waitlist requires a valid mobile (`isValidMobile`).
-- **Admin config unavailable:** Move-in Pack uses `DEFAULT_PACK_PRICES` until `settings.movePack`
-  loads; if `enabled` is false the whole section is a waitlist.
+- **Admin config unavailable:** until `settings.movePack` loads (or if the read fails) the Move-in
+  Pack is disabled with no prices, so the section is the waitlist; it is also a waitlist whenever
+  `enabled` is false.
 - **Feature flags:** none — the EMI calculator is always on.

@@ -404,19 +404,19 @@ UPDATE public.properties p
 INSERT INTO public.faqs (id, question, answer, category) VALUES
   ('fa900001-0000-4000-8000-00000000f001',
    'Is Draazy really zero brokerage?',
-   'Yes — always. You connect directly with verified owners and pay zero brokerage on any rent or resale deal. We earn only from optional plans and add-on services like rent agreements, never a cut of your rent or deposit.',
+   'Yes — always. You deal directly with owners and pay zero brokerage on any rent or resale deal. We earn only from optional pay-per-use passes and packs and from services like rent agreements, never a cut of your rent or deposit.',
    'General'),
   ('fa900001-0000-4000-8000-00000000f002',
    'How are owners and listings verified?',
-   'Every verified owner has had an Aadhaar, PAN or other government ID and a live selfie reviewed by our trust team, and wherever possible we confirm ownership documents before a listing goes live. Verified listings carry a badge. If something looks off, use ''Report listing'' and our trust team reviews it within 24 hours.',
+   'There are two badges. ''KYC done'' means our team has checked that person''s government ID. ''Verified property'' means we have reviewed the owner''s ownership papers for that home. A RERA number is shared by the owner, so check it yourself on MahaRERA. If something looks off, tap ''Report listing'' and our trust team will review it.',
    'Trust'),
   ('fa900001-0000-4000-8000-00000000f003',
    'How do I contact an owner or schedule a visit?',
-   'Open any listing and tap ''Contact owner'' to send a contact request — the owner approves it and their number is revealed then, usually the same day. ''Schedule visit'' lets you pick a date and slot the same way. You''ll see the response in Messages and in your notifications — no broker sits in between.',
+   'Open any listing and tap ''Contact Owner'' to send a contact request. The owner''s number is revealed once they approve it. ''Schedule a Visit'' books a date and slot, and uses one owner contact, free if you''ve already contacted that owner. Every request and reply shows up under Requests in your dashboard and in Messages. No broker sits in between.',
    'Seekers'),
   ('fa900001-0000-4000-8000-00000000f004',
    'Can I list my property for free?',
-   'Yes. Owner Free lets you keep one live listing at no cost, with unlimited enquiries. Owner Plus and Owner Pro raise the listing limit and add featured placement, priority support and, on Pro, a dedicated manager — start free and upgrade any time from the Plans page.',
+   'Yes. Your first live listing is free, and so are the enquiries it gets. For more listings, buy a Rent Listing Pass or a Sale Listing Pass from the Plans page. You pay once, there''s no GST, and nothing renews automatically.',
    'Owners'),
   ('fa900001-0000-4000-8000-00000000f005',
    'Is my payment and deposit safe?',
@@ -424,7 +424,7 @@ INSERT INTO public.faqs (id, question, answer, category) VALUES
    'Payments'),
   ('fa900001-0000-4000-8000-00000000f006',
    'Do you offer rent agreements?',
-   'Yes — drafting, stamp duty and e-registration with a doorstep biometric visit. Our platform fee is ₹499, and government stamp duty and registration charges are added, worked out from your rent, deposit and term. You fill the details online and our team prepares the draft.',
+   'Yes. Owner and tenant each fill in their own details online, either side can pay, and our team prepares the draft and books the biometric e-registration at your doorstep. Our platform fee is ₹499. Government stamp duty and registration charges are added on top, worked out from your rent, deposit and term.',
    'Services'),
   ('fa900001-0000-4000-8000-00000000f007',
    'Which areas of Pune do you cover?',
@@ -432,15 +432,15 @@ INSERT INTO public.faqs (id, question, answer, category) VALUES
    'Coverage'),
   ('fa900001-0000-4000-8000-00000000f008',
    'How do refunds work?',
-   'Paid plans and services are refundable as per each plan''s terms. Approved refunds go back to your original payment method, typically within 5–7 working days. Raise a ticket above with your payment reference and we''ll track it for you.',
+   'Open Dashboard → Plan & Billing. A pass or pack that qualifies shows a Refund button with its deadline. Approved refunds go back to your original payment method within 5–7 business days. If a row doesn''t qualify, tap ''Ask for a review'' to message Draazy support in Messages.',
    'Payments'),
   ('fa900001-0000-4000-8000-00000000f009',
    'How do I report a suspicious listing or user?',
-   'Use ''Report'' on any listing or message, or raise a ticket here under ''Technical / Bug'' or ''Something else''. Our trust team investigates within 24 hours and removes anything that breaks our policies.',
+   'Tap ''Report'' on any listing, owner profile or flatmate post (you''ll need to be signed in). You can also message Draazy support from Messages. Our trust team investigates and removes anything that breaks our policies.',
    'Trust')
     ON CONFLICT DO NOTHING;
 
-UPDATE public.faqs SET translations = '{"mr": {"question": "पुणेनेस्ट खरंच शून्य दलाली आहे का?", "answer": "होय — नेहमीच. तुम्ही थेट पडताळणी केलेल्या मालकांशी संपर्क साधता आणि कोणत्याही भाडे किंवा पुनर्विक्री व्यवहारावर शून्य दलाली भरता.", "category": "सर्वसाधारण"}}'::jsonb
+UPDATE public.faqs SET translations = '{"mr": {"question": "Draazy खरंच शून्य दलाली आहे का?", "answer": "होय — नेहमीच. तुम्ही थेट मालकांशी संपर्क साधता आणि कोणत्याही भाडे किंवा पुनर्विक्री व्यवहारावर शून्य दलाली भरता.", "category": "सर्वसाधारण"}}'::jsonb
  WHERE id = 'fa900001-0000-4000-8000-00000000f001';
 
 UPDATE public.faqs SET translations = '{"mr": {"question": "मालक आणि जाहिराती कशा पडताळल्या जातात?"}}'::jsonb
@@ -1679,6 +1679,13 @@ SET available_from = CASE
         ELSE available_from
     END
 WHERE move_in IS NOT NULL AND btrim(move_in) <> '';
+
+-- The room inserts predate the parking column.
+UPDATE public.flatmate_rooms r
+   SET parking = v.parking
+  FROM (VALUES ('f1c7000b-0000-4000-8000-000000000008', 'car'),
+               ('f1c7000b-0000-4000-8000-000000000009', 'bike')) AS v(id, parking)
+ WHERE r.id = v.id::uuid AND r.parking IS NULL;
 
 -- Keep the lifetime listing count derived from all property rows after fixture inserts.
 update public.users u

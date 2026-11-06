@@ -4,11 +4,6 @@ import { useTranslation } from 'react-i18next';
 import ServiceLanding from '../../../components/ServiceLanding.jsx';
 import { SUPPORT_PHONE } from '../../../lib/supportContact.js';
 import LoanEmiCalc from './LoanEmiCalc.jsx';
-import Icon from '../../../components/Icon.jsx';
-
-const LENDERS = [
-  { n: 'SBI', r: '8.50%' }, { n: 'HDFC', r: '8.60%' }, { n: 'ICICI', r: '8.65%' }, { n: 'Axis', r: '8.75%' }, { n: 'LIC HFL', r: '8.45%' },
-];
 
 export default function HomeLoans() {
   const { t } = useTranslation();
@@ -23,25 +18,6 @@ export default function HomeLoans() {
       if (match) setPrefillType(match);
     }
   }, [searchParams]);
-
-  const compareSection = (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
-      <div className="glass-card rounded-2xl p-6 sm:p-7 reveal">
-        <h2 className="text-lg font-bold text-white mb-1">{t('services.homeLoans.compareTitle')}</h2>
-        <p className="text-gray-400 text-xs mb-5">{t('services.homeLoans.compareSub')}</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {LENDERS.map((l) => (
-            <div key={l.n} className="bg-white/[0.04] rounded-xl p-4 text-center hover:bg-white/[0.06] transition-all">
-              <div className="w-10 h-10 mx-auto mb-2 rounded-lg bg-gradient-to-br from-teal-400/20 to-teal-600/20 flex items-center justify-center"><Icon name="landmark" className="w-5 h-5 text-teal-400" /></div>
-              <p className="text-white font-semibold text-sm">{l.n}</p>
-              <p className="text-teal-400 text-xs mt-0.5">{l.r} {t('services.homeLoans.onwards')}</p>
-            </div>
-          ))}
-        </div>
-        <p className="text-gray-600 text-[11px] mt-4">{t('services.homeLoans.ratesNote')}</p>
-      </div>
-    </section>
-  );
 
   return (
     <ServiceLanding
@@ -78,7 +54,7 @@ export default function HomeLoans() {
         [t('services.homeLoans.service.4.name'), 'plus-circle', t('services.homeLoans.service.4.desc')],
         [t('services.homeLoans.service.5.name'), 'building', t('services.homeLoans.service.5.desc')],
       ]}
-      extra={<>{<LoanEmiCalc t={t} />}{compareSection}</>}
+      extra={<LoanEmiCalc t={t} />}
       trust={[
         [t('services.homeLoans.trust.0.t'), 'landmark', t('services.homeLoans.trust.0.d')],
         [t('services.homeLoans.trust.1.t'), 'indian-rupee', t('services.homeLoans.trust.1.d')],

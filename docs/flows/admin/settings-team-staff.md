@@ -60,7 +60,8 @@
   "Saved prices; status: Live|Coming soon". Read by the consumer `/services` bundle.
 
 ### 5.3 Maps & Places (geo policy)
-`MapsGeoPanel` edits `settings.geo` (city limit + blacklist for Google Places). `saveGeo(nextGeo, detail)`
+`MapsGeoPanel` edits `settings.geo`: served districts (`ServedAreaCard`; each entry a name or `{name, placeId, bounds}`,
+at least one), the search limit to those districts, and the Google Places blacklist. `saveGeo(nextGeo, detail)`
 optimistically sets state, `updateSettings({ geo })`, audits "Maps & Places" with a detail, and is read live by
 `lib/geoConfig.js` across every locality/area search.
 
