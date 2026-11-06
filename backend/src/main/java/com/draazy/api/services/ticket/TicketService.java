@@ -162,18 +162,39 @@ public class TicketService {
         if (priority != null && !TicketPriorities.isKnown(priority)) {
             throw new BadRequestException("Unknown priority: " + priority);
         }
-        UUID propertyId = body.propertyId() == null || body.propertyId().isBlank()
-                ? null
-                : Ids.parseUuid(body.propertyId()).orElseThrow(() -> new BadRequestException("propertyId must be a valid id"));
-
-        if (propertyId != null && !properties.existsById(propertyId)) {
-            throw NotFoundException.of("Property");
-        }
+        UUID propertyId = existingProperty(body.propertyId());
 
         User requester = users.findById(caller.userId()).orElseThrow(() -> NotFoundException.of("User"));
         return mapper.toCustomer(tickets.saveAndFlush(new Ticket(body.subject().trim(), team,
                 priority, propertyId, requester.getId(), requester.getName(),
                 requester.getMobile(), body.body(), body.quotedValue())));
+    }
+
+    /** An internal lead for a service team, raised from a customer's chat; the customer is never told. */
+    @Transactional
+    public CustomerTicketDto createForCustomer(UUID customerId, String subject, String team, String propertyId,
+            String note) {
+        String teamKey = blankToNull(team);
+        if (teamKey == null || !Teams.isKnown(teamKey)) {
+            throw new BadRequestException("Unknown team: " + team);
+        }
+        UUID property = existingProperty(propertyId);
+        User customer = users.findById(customerId).orElseThrow(() -> NotFoundException.of("Customer"));
+        if (Roles.isBackOffice(customer.getRole())) {
+            throw new BadRequestException("A service ticket needs a customer, not a back-office account");
+        }
+        return mapper.toCustomer(tickets.saveAndFlush(new Ticket(subject.trim(), teamKey, null, property,
+                customer.getId(), customer.getName(), customer.getMobile(), blankToNull(note), null)));
+    }
+
+    private UUID existingProperty(String raw) {
+        UUID propertyId = raw == null || raw.isBlank()
+                ? null
+                : Ids.parseUuid(raw).orElseThrow(() -> new BadRequestException("propertyId must be a valid id"));
+        if (propertyId != null && !properties.existsById(propertyId)) {
+            throw NotFoundException.of("Property");
+        }
+        return propertyId;
     }
 
     // Waitlist mobiles are unverified; never resolve requesterId from a typed number.

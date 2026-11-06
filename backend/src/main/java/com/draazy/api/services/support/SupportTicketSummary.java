@@ -9,7 +9,8 @@ public record SupportTicketSummary(
         String status,
         boolean unread,
         LastMessage lastMessage,
-        Instant createdAt) {
+        Instant createdAt,
+        SupportTicketAbout about) {
     public record LastMessage(String authorRole, String body, Instant createdAt) {
     }
 }

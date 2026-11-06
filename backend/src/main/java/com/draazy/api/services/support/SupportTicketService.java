@@ -4,6 +4,8 @@ import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.Notifier;
+import com.draazy.api.common.trust.SupportActivity;
+import com.draazy.api.common.trust.SupportActivity.Side;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.common.web.Pageables;
 import com.draazy.api.identity.user.User;
@@ -15,6 +17,9 @@ import com.draazy.api.security.Roles;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -28,16 +33,21 @@ public class SupportTicketService {
     private final UserRepository users;
     private final AccountPermissions permissions;
     private final Notifier notifier;
+    private final SupportTicketAbouts abouts;
+    private final ApplicationEventPublisher events;
 
     public SupportTicketService(SupportTicketRepository tickets,
             SupportTicketMessageRepository messages, SupportTicketMapper mapper,
-            UserRepository users, AccountPermissions permissions, Notifier notifier) {
+            UserRepository users, AccountPermissions permissions, Notifier notifier,
+            SupportTicketAbouts abouts, ApplicationEventPublisher events) {
         this.tickets = tickets;
         this.messages = messages;
         this.mapper = mapper;
         this.users = users;
         this.permissions = permissions;
         this.notifier = notifier;
+        this.abouts = abouts;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -68,11 +78,34 @@ public class SupportTicketService {
 
     @Transactional
     public SupportTicketDto create(AuthPrincipal caller, SupportTicketCreate body) {
-        SupportTicket raised = new SupportTicket(caller.userId(), body.subject(), body.category());
-        raised.setStaffUnread(true);
-        SupportTicket ticket = tickets.saveAndFlush(raised);
-        write(ticket, caller, body.body());
+        SupportTicketAbout about = body.about() == null ? null : abouts.check(caller.userId(), body.about());
+        SupportTicket ticket = SupportTicketStatuses.isIdentity(body.category()) ? null
+                : tickets.findOpenChat(caller.userId()).orElse(null);
+        if (ticket == null) {
+            ticket = new SupportTicket(caller.userId(), body.subject(), body.category(), about);
+        }
+        ticket.setStaffUnread(true);
+        ticket = tickets.saveAndFlush(ticket);
+        write(ticket, caller, body.body(), about);
         return mapper.toDto(ticket);
+    }
+
+    /** Posts into the user's one support-chat ticket: the open one, else the newest one reopened, else a new one. */
+    @Transactional
+    public void postToChat(AuthPrincipal author, UUID userId, String body, SupportTicketAbout about) {
+        SupportTicketAbout checked = about == null ? null : abouts.check(userId, about);
+        SupportTicket ticket = tickets.findOpenChat(userId).orElseGet(() -> resumeOrStart(userId));
+        write(ticket, author, body, checked);
+        settle(ticket, author, body);
+    }
+
+    private SupportTicket resumeOrStart(UUID userId) {
+        SupportTicket latest = tickets.findChatsNewestFirst(userId, Limit.of(1)).stream().findFirst().orElse(null);
+        if (latest == null) {
+            return tickets.saveAndFlush(new SupportTicket(userId, "Support chat", "other", null));
+        }
+        latest.reopen();
+        return tickets.saveAndFlush(latest);
     }
 
     @Transactional(readOnly = true)
@@ -84,20 +117,8 @@ public class SupportTicketService {
     @Transactional
     public MessageDto reply(AuthPrincipal caller, String id, String body) {
         SupportTicket ticket = readable(caller, id, BackOfficePermissions.TICKETS_WRITE);
-        SupportTicketMessage sent = write(ticket, caller, body);
-        if (ticket.getUserId().equals(caller.userId())) {
-            ticket.setStaffUnread(true);
-        } else {
-            ticket.setStaffUnread(false);
-            ticket.setUnread(true);
-            String snippet = body == null ? "" : body.strip();
-            String preview = snippet.length() > 100 ? snippet.substring(0, 97) + "..." : snippet;
-            notifier.notify(ticket.getUserId(), "support.reply",
-                    "New reply on your support ticket",
-                    preview,
-                    "/support?open=" + ticket.getId());
-        }
-        tickets.saveAndFlush(ticket);
+        SupportTicketMessage sent = write(ticket, caller, body, null);
+        settle(ticket, caller, body);
         User author = users.findById(caller.userId()).orElse(null);
         return new MessageDto(
                 sent.getId().toString(),
@@ -107,6 +128,22 @@ public class SupportTicketService {
                 sent.getCreatedAt());
     }
 
+    private void settle(SupportTicket ticket, AuthPrincipal caller, String body) {
+        if (ticket.getUserId().equals(caller.userId())) {
+            ticket.setStaffUnread(true);
+        } else {
+            ticket.setStaffUnread(false);
+            ticket.setUnread(true);
+            String snippet = body == null ? "" : body.strip();
+            String preview = snippet.length() > 100 ? snippet.substring(0, 97) + "..." : snippet;
+            notifier.notify(ticket.getUserId(), "support.reply",
+                    "New reply from Draazy support",
+                    preview,
+                    threadLink(ticket));
+        }
+        tickets.saveAndFlush(ticket);
+    }
+
     @Transactional
     public SupportTicketDto close(AuthPrincipal caller, String id) {
         SupportTicket ticket = readable(caller, id, BackOfficePermissions.TICKETS_WRITE);
@@ -114,8 +151,8 @@ public class SupportTicketService {
             ticket.close();
             ticket.setUnread(true);
             tickets.saveAndFlush(ticket);
-            notifier.notify(ticket.getUserId(), "support.closed", "Your support ticket was closed",
-                    ticket.getSubject(), "/support?open=" + ticket.getId());
+            notifier.notify(ticket.getUserId(), "support.closed", "Your support conversation was closed",
+                    ticket.getSubject(), threadLink(ticket));
         }
         return mapper.toDto(ticket);
     }
@@ -133,9 +170,22 @@ public class SupportTicketService {
         }
     }
 
-    private SupportTicketMessage write(SupportTicket ticket, AuthPrincipal author, String body) {
-        return messages.saveAndFlush(new SupportTicketMessage(
-                ticket.getId(), author.userId(), author.role(), body));
+    private static String threadLink(SupportTicket ticket) {
+        return "/messages?support=ticket:" + ticket.getId();
+    }
+
+    private SupportTicketMessage write(SupportTicket ticket, AuthPrincipal author, String body,
+            SupportTicketAbout about) {
+        SupportTicketMessage saved = messages.saveAndFlush(new SupportTicketMessage(
+                ticket.getId(), author.userId(), author.role(), body, about));
+        boolean identity = SupportTicketStatuses.isIdentity(ticket.getCategory());
+        boolean fromUser = ticket.getUserId().equals(author.userId());
+        events.publishEvent(new SupportActivity(ticket.getUserId(),
+                fromUser ? Side.USER : Side.STAFF, fromUser ? null : author.userId(),
+                identity ? "identity" : about == null ? "general" : about.type(),
+                identity ? ticket.getId().toString() : about == null ? null : about.id(),
+                body, saved.getCreatedAt() == null ? Instant.now() : saved.getCreatedAt()));
+        return saved;
     }
 
     private SupportTicket readable(AuthPrincipal caller, String id, String permission) {
@@ -147,9 +197,15 @@ public class SupportTicketService {
         if (!Roles.isBackOffice(caller.role())) {
             throw NotFoundException.of("Support ticket");
         }
-        if (!permissions.granted(caller, permission)) {
+        if (!permissions.granted(caller, permission) && !identityGranted(ticket, caller, permission)) {
             throw new ForbiddenException("Your account cannot access support tickets.");
         }
         return ticket;
+    }
+
+    private boolean identityGranted(SupportTicket ticket, AuthPrincipal caller, String permission) {
+        return SupportTicketStatuses.isIdentity(ticket.getCategory()) && permissions.granted(caller,
+                BackOfficePermissions.TICKETS_WRITE.equals(permission) ? BackOfficePermissions.IDENTITY_WRITE
+                        : BackOfficePermissions.IDENTITY_READ);
     }
 }

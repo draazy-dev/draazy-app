@@ -13,4 +13,12 @@ public final class SupportTicketStatuses {
     public static final String RESOLVED = "resolved";
 
     public static final String CLOSED = "closed";
+
+    public static final String IDENTITY_DISPUTE = "identity_dispute";
+
+    public static final String IDENTITY_APPEAL = "identity_appeal";
+
+    public static boolean isIdentity(String category) {
+        return IDENTITY_DISPUTE.equals(category) || IDENTITY_APPEAL.equals(category);
+    }
 }

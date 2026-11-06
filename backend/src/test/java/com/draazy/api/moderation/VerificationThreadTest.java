@@ -386,7 +386,7 @@ class VerificationThreadTest extends AbstractApiTest {
                     assertThat(row.get("title")).isEqualTo("Your listing needs info");
                     assertThat(row.get("body")).isEqualTo(
                             "Please add clear photos of the actual property. Use current photos.");
-                    assertThat(row.get("link")).isEqualTo("/dashboard?review=" + listing.getId());
+                    assertThat(row.get("link")).isEqualTo("/messages?support=property:" + listing.getId());
                 });
         assertThat(jdbc.queryForObject("select count(*) from notifications where user_id = ?",
                 Integer.class, ops.getId())).isZero();

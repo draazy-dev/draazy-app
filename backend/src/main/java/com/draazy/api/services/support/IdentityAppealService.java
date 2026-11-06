@@ -75,7 +75,7 @@ public class IdentityAppealService {
         }
         SupportTicketDto ticket = supportTickets.create(actor, new SupportTicketCreate(
                 "Identity check appeal", "identity_appeal",
-                "I'd like a second look at my rejected identity check.\n\nNote: " + note));
+                "I'd like a second look at my rejected identity check.\n\nNote: " + note, null));
         IdentityAppeal appeal = new IdentityAppeal(v.getId(), note);
         appeal.setTicketId(UUID.fromString(ticket.id()));
         appeals.saveAndFlush(appeal);

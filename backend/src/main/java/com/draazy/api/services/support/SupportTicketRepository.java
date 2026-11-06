@@ -2,7 +2,9 @@ package com.draazy.api.services.support;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,6 +13,20 @@ import org.springframework.data.repository.query.Param;
 
 public interface SupportTicketRepository extends JpaRepository<SupportTicket, UUID> {
     List<SupportTicket> findByUserIdOrderByCreatedAtDesc(UUID userId);
+
+    @Query("""
+            select t from SupportTicket t
+            where t.userId = :userId and (t.category is null or t.category not in ('identity_dispute', 'identity_appeal'))
+              and t.status not in ('resolved', 'closed')
+            """)
+    Optional<SupportTicket> findOpenChat(@Param("userId") UUID userId);
+
+    @Query("""
+            select t from SupportTicket t
+            where t.userId = :userId and (t.category is null or t.category not in ('identity_dispute', 'identity_appeal'))
+            order by t.updatedAt desc
+            """)
+    List<SupportTicket> findChatsNewestFirst(@Param("userId") UUID userId, Limit limit);
 
     @Query("""
             select t from SupportTicket t

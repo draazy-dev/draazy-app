@@ -95,6 +95,15 @@ public final class Routes {
         public static final String ANY_SINGLE = BASE + "/*";
     }
 
+    public static final class ServedArea {
+        private ServedArea() {
+        }
+
+        public static final String ADMIN = "/admin/served-area";
+
+        public static final String ADMIN_RECHECK = ADMIN + "/recheck";
+    }
+
     public static final class Societies {
         private Societies() {
         }
@@ -191,8 +200,6 @@ public final class Routes {
         public static final String BASE = "/me/managed-properties";
 
         public static final String BY_ID = BASE + "/{id}";
-
-        public static final String PUBLISH = BASE + "/{id}/publish";
 
         public static final String LISTING = BASE + "/{id}/listing";
 
@@ -305,6 +312,17 @@ public final class Routes {
         public static final String FLATMATE_REQUEST = BASE + "/flatmate-requests/{requestId}";
 
         public static final String LEAD_REQUEST = BASE + "/requests/{kind}/{requestId}";
+    }
+
+    public static final class SupportChat {
+        private SupportChat() {
+        }
+
+        public static final String BASE = "/support/chat";
+
+        public static final String MESSAGES = BASE + "/messages";
+
+        public static final String READ = BASE + "/read";
     }
 
     public static final class SupportTickets {
@@ -716,8 +734,6 @@ public final class Routes {
         public static final String REFUND_APPROVE = REFUNDS + "/{refundId}/approve";
         public static final String REFUND_REJECT = REFUNDS + "/{refundId}/reject";
 
-        public static final String POLICE_INTIMATION = BY_ID + "/police-intimation";
-
         public static final String PARTIES = BY_ID + "/parties";
 
         public static final String PARTY_BY_ID = PARTIES + "/{partyId}";
@@ -981,6 +997,26 @@ public final class Routes {
         public static final String ANALYTICS_FLATMATES = "/admin/analytics/flatmates";
 
         public static final String SUPPORT_TICKETS = "/admin/support-tickets";
+
+        public static final String SUPPORT_CHATS = "/admin/support/chats";
+
+        public static final String SUPPORT_CHATS_COUNTS = SUPPORT_CHATS + "/counts";
+
+        public static final String SUPPORT_CHATS_STREAM = SUPPORT_CHATS + "/stream";
+
+        public static final String SUPPORT_CHATS_LOCATE = SUPPORT_CHATS + "/locate";
+
+        public static final String SUPPORT_CHAT = SUPPORT_CHATS + "/{userId}";
+
+        public static final String SUPPORT_CHAT_MESSAGES = SUPPORT_CHAT + "/messages";
+
+        public static final String SUPPORT_CHAT_ASSIGN = SUPPORT_CHAT + "/assign";
+
+        public static final String SUPPORT_CHAT_RESOLVE = SUPPORT_CHAT + "/resolve";
+
+        public static final String SUPPORT_CHAT_READ = SUPPORT_CHAT + "/read";
+
+        public static final String SUPPORT_CHAT_SERVICE_TICKET = SUPPORT_CHAT + "/service-ticket";
 
         public static final String FINANCE = "/admin/finance";
 

@@ -23,13 +23,24 @@ public class SupportTicketMessage extends BaseEntity {
     @Column(name = "body", nullable = false, updatable = false)
     private String body;
 
+    @Column(name = "about_type", updatable = false)
+    private String aboutType;
+
+    @Column(name = "about_id", updatable = false)
+    private String aboutId;
+
     protected SupportTicketMessage() {
     }
 
-    SupportTicketMessage(UUID ticketId, UUID authorId, String authorRole, String body) {
+    SupportTicketMessage(UUID ticketId, UUID authorId, String authorRole, String body,
+            SupportTicketAbout about) {
         this.ticketId = ticketId;
         this.authorId = authorId;
         this.authorRole = authorRole;
         this.body = body;
+        if (about != null) {
+            this.aboutType = about.type();
+            this.aboutId = about.id();
+        }
     }
 }

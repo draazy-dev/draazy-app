@@ -254,8 +254,8 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             User asha = customer("9840000144");
             User desk = staff("9840000145", Teams.RENTAL);
             raiseTicket(asha, "First");
-            raiseTicket(asha, "Second");
-            raiseTicket(asha, "Third");
+            raiseTicket(customer("9840000921"), "Second");
+            raiseTicket(customer("9840000922"), "Third");
 
             mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(desk))
@@ -293,7 +293,7 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             User asha = customer("9840000147");
             User desk = staff("9840000148", Teams.RENTAL);
             String answered = raiseTicket(asha, "Already handled");
-            raiseTicket(asha, "Still waiting");
+            raiseTicket(customer("9840000923"), "Still waiting");
             markRead(desk, answered);
 
             mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
@@ -323,7 +323,7 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             long awaiting = countOf(desk, "awaiting");
             long answered = countOf(desk, "answered");
             String handled = raiseTicket(asha, "Handled soon");
-            raiseTicket(asha, "Waiting still");
+            raiseTicket(customer("9840000924"), "Waiting still");
             markRead(desk, handled);
 
             mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
@@ -352,7 +352,7 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             User asha = customer("9840000171");
             User desk = staff("9840000172", Teams.RENTAL);
             raiseTicket(asha, "Datewin today");
-            String old = raiseTicket(asha, "Datewin yesterday");
+            String old = raiseTicket(customer("9840000925"), "Datewin yesterday");
             Instant lateYesterday = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
                     .minus(1, ChronoUnit.MINUTES);
             jdbc.update("update support_tickets set created_at = ? where id = ?::uuid",
@@ -434,7 +434,7 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             expectAwaitingReply(desk, id, false);
             assertThat(jdbc.queryForObject("select link from notifications where user_id = ?::uuid "
                     + "and type = 'support.reply'", String.class, asha.getId().toString()))
-                    .isEqualTo("/support?open=" + id);
+                    .isEqualTo("/messages?support=ticket:" + id);
         }
 
         @Test

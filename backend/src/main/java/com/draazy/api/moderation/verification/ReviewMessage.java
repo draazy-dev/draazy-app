@@ -2,6 +2,7 @@ package com.draazy.api.moderation.verification;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -14,6 +15,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
+@EntityListeners(ReviewMessageActivity.class)
 @Table(name = "review_messages")
 @Getter
 public class ReviewMessage {
@@ -47,6 +49,10 @@ public class ReviewMessage {
     private Instant readAt;
 
     protected ReviewMessage() {
+    }
+
+    UUID reviewId() {
+        return review.getId();
     }
 
     ReviewMessage(PropertyReview review, UUID senderId, String body, boolean internal,

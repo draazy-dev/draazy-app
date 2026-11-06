@@ -47,7 +47,8 @@ public class SupportTicketMapper {
                             t.isUnread(),
                             m == null ? null : new SupportTicketSummary.LastMessage(
                                     m.getAuthorRole(), preview(m.getBody()), m.getCreatedAt()),
-                            t.getCreatedAt());
+                            t.getCreatedAt(),
+                            t.about());
                 })
                 .toList();
     }
@@ -91,7 +92,8 @@ public class SupportTicketMapper {
                                         m.getBody(),
                                         m.getCreatedAt()))
                                 .toList(),
-                        t.getCreatedAt()))
+                        t.getCreatedAt(),
+                        t.about()))
                 .toList();
     }
 
@@ -108,7 +110,8 @@ public class SupportTicketMapper {
                     raiser == null ? null : raiser.getMobile(),
                     t.isStaffUnread(),
                     t.isUnread(),
-                    t.getCreatedAt());
+                    t.getCreatedAt(),
+                    t.about());
         });
     }
 

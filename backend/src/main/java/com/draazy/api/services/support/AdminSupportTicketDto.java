@@ -11,5 +11,6 @@ public record AdminSupportTicketDto(
         String raiserMobile,
         boolean awaitingReply,
         boolean unread,
-        Instant createdAt) {
+        Instant createdAt,
+        SupportTicketAbout about) {
 }

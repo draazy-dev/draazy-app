@@ -58,6 +58,8 @@ public final class ErrorCodes {
 
     public static final String OWNER_CONSENT_SELF = "owner_consent_self";
 
+    public static final String REQUEST_CLOSED = "request_closed";
+
     public static final String OWNER_SIDE_REQUIRES_OWNER = "owner_side_requires_owner";
 
     public static final String OWNER_SIDE_PENDING = "owner_side_pending";

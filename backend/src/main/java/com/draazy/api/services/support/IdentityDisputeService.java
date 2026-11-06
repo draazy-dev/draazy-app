@@ -40,7 +40,7 @@ public class IdentityDisputeService {
         SupportTicketDto ticket;
         try {
             ticket = supportTickets.create(actor, new SupportTicketCreate(
-                    "Identity document already in use", "identity_dispute", visibleBody(note)));
+                    "Identity document already in use", "identity_dispute", visibleBody(note), null));
         } catch (DataIntegrityViolationException e) {
             throw new ConflictException(ErrorCodes.IDENTITY_DISPUTE_OPEN,
                     "An identity dispute is already open");

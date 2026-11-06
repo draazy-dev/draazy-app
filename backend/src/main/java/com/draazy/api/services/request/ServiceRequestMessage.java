@@ -3,12 +3,14 @@ package com.draazy.api.services.request;
 import com.draazy.api.common.persistence.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
 @Entity
+@EntityListeners(ServiceRequestMessageActivity.class)
 @Table(name = "service_request_messages")
 @Getter
 public class ServiceRequestMessage extends BaseEntity {

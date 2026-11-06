@@ -184,7 +184,7 @@ class ModerationRecordTest extends AbstractApiTest {
         assertThat(thread).doesNotContain("now live");
         Map<String, Object> told = notices(owner, "listing.approved_paused").get(0);
         assertThat((String) told.get("body")).contains("2BHK in Baner", "Baner");
-        assertThat(told.get("link")).isEqualTo("/dashboard?review=" + second.getId());
+        assertThat(told.get("link")).isEqualTo("/messages?support=property:" + second.getId());
     }
 
     @Test
@@ -231,7 +231,7 @@ class ModerationRecordTest extends AbstractApiTest {
         Map<String, Object> told = notices(owner, "listing.rejected").get(0);
         String body = (String) told.get("body");
         assertThat(body).contains("2BHK in Baner").contains("Rent is wrong\nEdit the listing and resubmit it for review.");
-        assertThat(told.get("link")).isEqualTo("/dashboard?review=" + listing.getId());
+        assertThat(told.get("link")).isEqualTo("/messages?support=property:" + listing.getId());
         mvc.perform(get("/properties/{id}/verification", listing.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.messages[0].body").value(
@@ -285,7 +285,7 @@ class ModerationRecordTest extends AbstractApiTest {
         assertThat(auditRows("property.status", listing.getId())).hasSize(2);
         Map<String, Object> told = notices(owner, "listing.reopened").get(0);
         assertThat((String) told.get("body")).contains("2BHK in Baner");
-        assertThat(told.get("link")).isEqualTo("/dashboard?review=" + listing.getId());
+        assertThat(told.get("link")).isEqualTo("/messages?support=property:" + listing.getId());
     }
 
     @Test

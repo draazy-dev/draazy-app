@@ -120,7 +120,7 @@ public class PropertyLifecycle {
     }
 
     public static String reviewLink(Property property) {
-        return "/dashboard?review=" + property.getId();
+        return "/messages?support=property:" + property.getId();
     }
 
     public static String label(Property property) {
