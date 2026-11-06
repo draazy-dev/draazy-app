@@ -3,8 +3,16 @@ import Icon from '../Icon.jsx';
 import ProgressTracker from './ProgressTracker.jsx';
 import { seeksOwnershipBadge } from '../../lib/recheckFields.js';
 import { isResubmittableReason } from '../../pages/admin/properties/reviewReasons.js';
+import { flatmateKindOf } from '../../lib/data/myListings.js';
+import { supportLink } from '../../lib/supportLink.js';
 
 const statusKey = (suffix) => ['owner', 'listingStatus', ...String(suffix).split('.')].join('.');
+
+function listingSupportLink(listing) {
+  if (!listing) return supportLink('general');
+  const kind = flatmateKindOf(listing);
+  return kind ? supportLink(`flatmate_${kind}`, listing.id) : supportLink('property', listing.uuid || listing.id);
+}
 
 const STATUS_ALIASES = {
   pending: 'pending',
@@ -100,7 +108,7 @@ const statusLine = (state, t, review) => {
     confirm: [statusKey('line.confirm'), 'Draazy posted this for you. Complete the details and photos, then confirm to send it for review.'],
     flagged: [statusKey('line.underReview'), 'This listing is off search while Draazy reviews it.'],
     live: [statusKey('line.live'), 'Buyers can now find and contact you.'],
-    paused: [statusKey('line.paused'), 'This listing is paused.'],
+    paused: [statusKey('line.paused'), 'Hidden from search. Resume it to show it to buyers again.'],
     sold: [statusKey('line.sold'), 'This listing is marked sold.'],
     rented: [statusKey('line.rented'), 'This listing is marked rented.'],
     archived: [statusKey('line.archived'), 'This listing is archived.'],
@@ -180,7 +188,7 @@ export default function ListingStatusCard({
   variant = 'slim',
   editHref,
   viewHref,
-  supportHref = '/support',
+  supportHref: supportHrefProp,
   onOpenReview,
   onShare,
   claimHref,
@@ -191,6 +199,7 @@ export default function ListingStatusCard({
   className = '',
 }) {
   const meta = getOwnerListingStatusMeta(listing, review, t);
+  const supportHref = supportHrefProp || listingSupportLink(listing);
   const unread = Number(review?.unread) || 0;
   const compact = variant === 'slim';
   const resolved = actionFor({ state: meta.state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, claimHref, flatmate, t });
@@ -217,12 +226,20 @@ export default function ListingStatusCard({
   return (
     <div data-testid={testId} className={`${wrapper} ${className}`}>
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-            <span className={`dz-tag relative border font-semibold ${meta.cls}`}>
-              <Icon name={meta.icon} className="h-3 w-3" /> {meta.label}
-              {unread ? <span aria-hidden="true" className="dz-count ml-0.5 bg-rose-500 text-white">{unread}</span> : null}
+        <div className="min-w-0 sm:flex-1">
+          <div className="flex items-start gap-3">
+            <span aria-hidden="true" className={`flex h-9 w-9 flex-none items-center justify-center rounded-full border ${meta.cls}`}>
+              <Icon name={meta.icon} className="h-4 w-4" />
             </span>
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-white">
+                {meta.label}
+                {unread ? <span aria-hidden="true" className="dz-count bg-rose-500 text-white">{unread}</span> : null}
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-gray-300">{line}</p>
+            </div>
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 empty:hidden">
             {flatmate?.idVerified ? (
               <span data-testid="id-verified-chip" className="dz-tag border border-brand-teal/25 bg-brand-teal/10 font-semibold text-brand-teal-3">
                 <Icon name="shield-check" className="h-3 w-3" /> {tr(t, 'dash.idBadge.verified', 'ID verified')}
@@ -241,19 +258,20 @@ export default function ListingStatusCard({
                 <Icon name="alert-circle" className="h-3 w-3" /> {tr(t, statusKey('badgeDeclined'), 'Badge not granted')}
               </span>
             ) : null}
-            <p className="text-xs leading-relaxed text-gray-300">{line}</p>
           </div>
           {TRACKED_STATES.has(meta.state) ? (
-            <ProgressTracker progress={listing?.progress} ownerView className="mt-2"
+            <ProgressTracker progress={listing?.progress} ownerView className="mt-2.5"
               rejectedLabel={mayResubmit(meta.state, review) ? tr(t, statusKey('status.changesNeeded'), 'Changes needed') : meta.label} />
           ) : null}
           {onOpenReview && review?.lastMessage ? (
-            <button type="button" onClick={onOpenReview} data-testid="support-thread-link" className="tap-coarse mt-1 inline-flex min-h-[32px] items-center gap-1 text-xs font-semibold text-brand-teal-3 hover:underline">
-              <Icon name="message-square" className="h-3.5 w-3.5" /> {tr(t, statusKey('actions.supportMessages'), 'Messages from Draazy Support')}
+            <button type="button" onClick={onOpenReview} data-testid="support-thread-link" className="tap-coarse mt-2.5 flex min-h-[44px] w-full items-center gap-2 rounded-lg border border-brand-teal/25 bg-brand-teal/10 px-3 text-left text-xs font-semibold text-brand-teal-3 transition-colors hover:bg-brand-teal/20 sm:w-auto">
+              <Icon name="message-square" className="h-4 w-4 flex-none" aria-hidden="true" />
+              <span className="flex-1">{tr(t, statusKey('actions.supportMessages'), 'Messages from Draazy Support')}</span>
+              <Icon name="chevron-right" className="h-4 w-4 flex-none" aria-hidden="true" />
             </button>
           ) : null}
         </div>
-        <div className={`flex ${flatmate ? '' : 'flex-wrap '}items-center gap-1 sm:shrink-0`}>
+        <div className={`flex ${flatmate ? '' : 'flex-wrap '}items-center gap-2 empty:hidden sm:shrink-0`}>
           {action ? <ListingStatusAction action={action} /> : null}
           {getBadge ? <ListingStatusAction action={getBadge} secondary /> : null}
           {reportWrong ? <ListingStatusAction action={reportWrong} secondary /> : null}

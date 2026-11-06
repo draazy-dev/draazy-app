@@ -118,6 +118,10 @@ test('a paused card offers View listing once', async ({ page, request }) => {
   await page.getByTestId('confirm-modal-ok').click();
   await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'View listing' })).toHaveCount(1);
+  await page.setViewportSize({ width: 360, height: 800 });
+  const status = page.getByTestId('listing-status-card').first();
+  await expect(status).toContainText('Paused');
+  await expect(status, 'the explanation adds to the title rather than repeating it').toContainText('Hidden from search');
 });
 
 test('a rejected card offers no Edit, since the server refuses edits on it', async ({ page, request }) => {
@@ -131,7 +135,7 @@ test('a rejected card offers no Edit, since the server refuses edits on it', asy
   await expect(page.getByRole('link', { name: 'Edit', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
   await expect(page.getByTestId('progress-tracker')).toContainText('Not approved');
-  await expect(page.getByRole('link', { name: 'Contact support', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Contact support', exact: true })).toHaveAttribute('href', `/messages?support=${encodeURIComponent(`property:${me.id}`)}`);
 });
 
 test('a fixable rejection reads Changes needed, and an edit sends the listing back to review', async ({ page, request }) => {

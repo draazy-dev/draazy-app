@@ -1,24 +1,40 @@
+import { Link } from 'react-router';
 import Icon from '../../../../components/Icon.jsx';
 import PropertyImage from '../../../../components/ui/PropertyImage.jsx';
-import { fmtINR } from '../../../../lib/format.js';
+import { fmtArea, fmtDate, fmtINR } from '../../../../lib/format.js';
+import { publishHref } from '../../owner-hub/helpers.js';
 import { FURNISH_LABEL, LISTING_STATUS_CLS } from './helpers.js';
 import CardActions from './CardActions.jsx';
 import HomeRooms from './HomeRooms.jsx';
 
-export default function PrivateListingCard({ l, home, onPublish, onDelete }) {
+export default function PrivateListingCard({ l, home, onDelete }) {
   const fromRoom = !!l.sourceRoomId;
   const bhk = home?.bhk ?? l.bhk;
   const furnishing = home?.furnishing ?? l.furnishing;
+  const detailsHref = `/owner-hub/property/${l.managedId}`;
+  const facts = [
+    bhk && (/BHK|RK/i.test(bhk) ? bhk : `${bhk} BHK`),
+    l.area && fmtArea(l.area, l.areaUnit),
+    furnishing && (FURNISH_LABEL[String(furnishing).toLowerCase()] || furnishing),
+  ].filter(Boolean);
   return (
-    <div className="rounded-xl bg-white/[0.03] overflow-hidden" data-testid={fromRoom ? 'owner-home-card' : undefined}>
+    <div className="rounded-2xl border border-white/10 bg-ink-card shadow-[var(--tile-shadow)] overflow-hidden" data-testid={fromRoom ? 'owner-home-card' : 'private-listing-card'}>
       <div className="flex items-start gap-3 p-3 sm:gap-4 sm:p-4">
-        <PropertyImage src={l.image} alt={l.title} className="w-24 h-24 rounded-xl object-cover flex-shrink-0 sm:w-20 sm:h-20 sm:rounded-lg" />
+        <Link to={detailsHref} className="flex-shrink-0" aria-label={l.title}>
+          <PropertyImage src={l.image} alt={l.title} className="w-24 h-24 rounded-xl object-cover sm:w-20 sm:h-20 sm:rounded-lg" />
+        </Link>
         <div className="flex min-w-0 flex-1 flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0 sm:flex-1">
-            <p className="text-white text-sm font-semibold sm:truncate">{l.title}</p>
-            {(bhk || furnishing) && (
-              <p className="text-gray-500 text-[11px] mt-0.5">
-                {[bhk && (/BHK|RK/i.test(bhk) ? bhk : `${bhk} BHK`), furnishing && (FURNISH_LABEL[String(furnishing).toLowerCase()] || furnishing)].filter(Boolean).join(' · ')}
+            <Link to={detailsHref} className="block text-white text-sm font-semibold hover:text-brand-teal-2 sm:truncate">{l.title}</Link>
+            {facts.length > 0 && <p className="text-gray-500 text-[11px] mt-0.5">{facts.join(' · ')}</p>}
+            {l.agreementVerified && (
+              <span className="dz-tag font-semibold mt-1.5 bg-emerald-500/15 text-emerald-300" data-testid="private-agreement-verified">
+                <Icon name="badge-check" className="w-3 h-3" />Agreement verified
+              </span>
+            )}
+            {l.rented && l.tenantName && (
+              <p className="text-[11px] text-gray-400 mt-1" data-testid="private-tenant">
+                Rented to {l.tenantName}{l.leaseEnd ? ` till ${fmtDate(l.leaseEnd)}` : ''}
               </p>
             )}
             <p className="text-xs mt-0.5">
@@ -43,9 +59,9 @@ export default function PrivateListingCard({ l, home, onPublish, onDelete }) {
       <CardActions
         primary={fromRoom
           ? { label: 'Complete & publish', icon: 'pencil', tone: 'emerald', to: `/list-property?deal=rent&home=${encodeURIComponent(l.managedId)}` }
-          : { label: 'Publish to buyers', icon: 'globe', tone: 'emerald', onClick: () => onPublish(l) }}
+          : { label: 'Add photos & publish', icon: 'globe', tone: 'emerald', to: publishHref(l) }}
         items={[
-          { icon: 'gauge', label: 'Property tools', to: `/owner-hub/property/${l.managedId}` },
+          { icon: 'eye', label: 'View details', to: detailsHref },
           { icon: 'trash-2', label: 'Delete', tone: 'danger', onClick: () => onDelete(l) },
         ]}
       />

@@ -159,11 +159,46 @@ test('on a phone the identity banner and listing status card leave no dead rows'
   await expect(banner).toHaveCount(0);
 
   const status = page.getByTestId('listing-status-card').first();
-  const pill = await status.getByText('Live', { exact: true }).boundingBox();
+  const title = await status.getByText('Live', { exact: true }).boundingBox();
   const line = await status.getByText('Buyers can now find and contact you.').boundingBox();
   const card = await status.boundingBox();
   const badge = await status.getByRole('link', { name: 'Get Verified property badge' }).boundingBox();
   const share = await status.getByRole('button', { name: 'Share listing' }).boundingBox();
-  expect(line.y, 'the status line shares the pill row').toBeLessThan(pill.y + pill.height);
+  expect(line.y, 'the explanation sits under the status title').toBeGreaterThanOrEqual(title.y + title.height - 1);
+  expect(Math.abs(line.x - title.x), 'title and explanation share one left edge').toBeLessThan(2);
   expect(share.width + badge.width, 'Share and the badge link fill the action row').toBeGreaterThan(card.width * 0.8);
+
+  const tiles = await page.getByTestId('listing-facts').first().getByRole('listitem').evaluateAll((els) => els.map((el) => {
+    const r = el.getBoundingClientRect();
+    return { y: r.y, h: r.height, w: r.width, clipped: el.scrollWidth > el.clientWidth };
+  }));
+  expect(tiles.length, 'the listing facts show as tiles').toBeGreaterThanOrEqual(1);
+  for (const tile of tiles) {
+    expect(tile.clipped).toBe(false);
+    expect(Math.abs(tile.y - tiles[0].y), 'the fact tiles share one row').toBeLessThan(1);
+    expect(Math.abs(tile.w - tiles[0].w), 'the fact tiles split the row evenly').toBeLessThan(2);
+  }
+});
+
+test('on a phone each owned listing reads as its own card', async ({ page, request }) => {
+  const owner = await newActor(`Zztest Dashboard Cards ${letterTag()}`);
+  await createApprovedListing(request, owner);
+  await createApprovedListing(request, owner);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await signedInAs(page, owner.mobile);
+  await page.goto('/dashboard#properties');
+  const cards = page.getByTestId('owner-listing-card');
+  await expect(cards).toHaveCount(2);
+
+  const looks = await cards.evaluateAll((els) => els.map((el) => {
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, border: parseFloat(s.borderTopWidth), bg: s.backgroundColor };
+  }));
+  for (const card of looks) {
+    expect(card.border, 'each card has its own outline').toBeGreaterThanOrEqual(1);
+    expect(card.bg, 'each card sits on a solid surface, not a faint tint').not.toMatch(/rgba\(.*, 0\.0\d+\)/);
+  }
+  expect(looks[1].top - looks[0].bottom, 'a clear gap separates one listing from the next').toBeGreaterThanOrEqual(16);
 });

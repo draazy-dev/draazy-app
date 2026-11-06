@@ -167,6 +167,34 @@
     background: rgb(var(--dz-c-rose-500) / .25);
   }
 }
+
+/* Buttons share each line equally; one whose label would not fit drops to its own line instead of clipping. */
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.btn-row > * {
+  flex: 1 1 0;
+  min-width: max-content;
+}
+
+@media (max-width: 639px) {
+  .btn-row > .btn-teal,
+  .btn-row > .btn-outline {
+    padding: 0 .625rem;
+    gap: .375rem;
+    font-size: .8125rem;
+  }
+
+  .btn-row > .btn-row-full { flex-basis: 100%; }
+}
+
+@media (min-width: 640px) {
+  .btn-row > * { flex: 0 1 auto; }
+}
+
 .send-otp-btn {
   background: linear-gradient(135deg, rgb(var(--dz-c-teal-500) / .15), rgb(var(--dz-c-indigo-600) / .15));
   border: 1px solid rgb(var(--dz-c-teal-500) / .3);

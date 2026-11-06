@@ -35,10 +35,6 @@ export default function ListingCard({
   const qScore = !l.flatmate && Number.isFinite(l.qualityScore) ? l.qualityScore : null;
   const qMeta = qScore === null ? null : qualityColor(qScore);
   const qTone = qScore >= 80 ? 'emerald' : qScore >= 60 ? 'amber' : 'rose';
-  const specs = [
-    l.bhk && (/BHK|RK/i.test(l.bhk) ? l.bhk : `${l.bhk} BHK`),
-    l.furnishing && (FURNISH_LABEL[String(l.furnishing).toLowerCase()] || l.furnishing),
-  ].filter(Boolean).join(' · ');
   const hasReview = !closed && !reserved && !!review;
   const ownerStatusMeta = !l.flatmate && !closed && !reserved ? getOwnerListingStatusMeta(l, review, t) : null;
   const resubmittable = mayResubmit(ownerStatusMeta?.state, review);
@@ -58,6 +54,11 @@ export default function ListingCard({
   const movedIn = isSplit ? split.movedIn : 0;
   const listingId = l.uuid || l.id;
   const availability = !l.flatmate && !closed && l.deal === 'rent' ? availabilityLabel(t, l) : '';
+  const facts = [
+    !l.flatmate && l.bhk && { icon: 'bed-double', text: /BHK|RK/i.test(l.bhk) ? l.bhk : `${l.bhk} BHK` },
+    !l.flatmate && l.furnishing && { icon: 'sofa', text: FURNISH_LABEL[String(l.furnishing).toLowerCase()] || l.furnishing },
+    availability && { icon: 'calendar-days', text: availability },
+  ].filter(Boolean);
   const passTill = !l.flatmate && quota?.passes ? fmtDate(quota.passes[String(listingId)]) : '';
   const needsPass = !l.flatmate && l.status === 'paused' && !passTill && quota?.full;
   const flatmateKind = l.flatmateGroup ? 'group' : l.flatmatePost ? 'post' : l.flatmate ? 'room' : null;
@@ -132,17 +133,20 @@ export default function ListingCard({
   );
 
   return (
-    <div className="rounded-xl bg-white/[0.03] overflow-hidden">
+    <div className="rounded-2xl border border-white/10 bg-ink-card shadow-[var(--tile-shadow)] overflow-hidden" data-testid="owner-listing-card">
       <div className="flex items-start gap-3 p-3 sm:gap-4 sm:p-4">
-        <PropertyImage src={l.image} alt={l.title} className="w-24 h-24 rounded-xl object-cover flex-shrink-0 sm:w-20 sm:h-20 sm:rounded-lg" />
+        <PropertyImage src={l.image} alt={l.title} className="w-20 h-20 rounded-xl object-cover flex-shrink-0" />
         <div className="flex min-w-0 flex-1 flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0 sm:flex-1">
-            <p className="text-white text-sm font-semibold sm:truncate">{l.title}</p>
-            {!l.flatmate && specs && <p className="text-gray-500 text-[11px] mt-0.5">{specs}</p>}
-            {availability && <p className="text-gray-500 text-[11px] mt-0.5">{availability}</p>}
-            <p className="text-xs mt-0.5">
-              {l.locality && <span className="text-gray-500">{l.locality} · </span>}
-              <span className="text-white font-semibold">{fmtINR(l.price)}{l.deal === 'rent' ? '/mo' : ''}</span>
+            <p className="text-white text-sm font-semibold leading-snug line-clamp-2">{l.title}</p>
+            {l.locality && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-gray-400">
+                <Icon name="map-pin" className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+                <span className="truncate">{l.locality}</span>
+              </p>
+            )}
+            <p className="mt-1 text-base font-bold tabular-nums text-white">
+              {fmtINR(l.price)}{l.deal === 'rent' ? <span className="text-xs font-medium text-gray-400">/mo</span> : null}
             </p>
             {l.flatmate && (
               <div className="mt-1.5">
@@ -183,6 +187,17 @@ export default function ListingCard({
           </div>
         </div>
       </div>
+
+      {facts.length > 0 && (
+        <ul className="flex gap-2 px-3 pb-3 sm:max-w-lg sm:px-4" data-testid="listing-facts">
+          {facts.map((f) => (
+            <li key={f.icon} className="flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg border border-white/8 bg-white/[0.04] px-1.5 py-2 text-center">
+              <Icon name={f.icon} className="w-4 h-4 text-brand-teal-3" aria-hidden="true" />
+              <span className="text-xs font-semibold leading-tight text-white">{f.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {l.flatmate && (
         <div className="px-3 pb-3 sm:px-4">

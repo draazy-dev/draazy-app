@@ -14,7 +14,7 @@ import { composeOwnerProperties } from '../../../lib/data/ownerProperties.js';
 import { referralShareUrlNow } from '../../../lib/referralShare.js';
 import { usePrefetchReferralCode } from '../../../lib/usePrefetchReferralCode.js';
 import { flatmateCaseKey, getMyRooms, withRooms } from '../../../lib/data/myListings.js';
-import { publishManaged, deleteManaged, ensureManagedForListing } from '../../../services/managedService.js';
+import { deleteManaged, ensureManagedForListing } from '../../../services/managedService.js';
 import { listingFreshness } from '../../../lib/freshness.js';
 import { loadListingQuota } from '../../../lib/data/listingQuota.js';
 import { istToday } from '../../../lib/availability.js';
@@ -382,19 +382,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     else dropRow(l);
   };
 
-  const handlePublish = async (l) => {
-    let res;
-    try {
-      res = await publishManaged(l.managedId);
-    } catch (e) {
-      toast(e?.message || 'Could not publish this property. Please check its details.', 'error');
-      return;
-    }
-    if (res?.already) { toast('This property is already listed.', 'info'); return; }
-    toast('Submitted for review — buyers will see it once verified.', 'success');
-    await Promise.all([onManagedChanged?.(), onChanged?.()]);
-  };
-
   return (
     <>
       <Card className="px-3 py-4 sm:p-6">
@@ -445,14 +432,13 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
         ) : visibleListings.length === 0 ? (
           <p className="text-gray-500 text-sm text-center py-8">Nothing in this category yet. Try a different type.</p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {visibleListings.map((l) => (
               l.private ? (
                 <PrivateListingCard
                   key={l.id}
                   l={l}
                   home={homes.byManaged.get(l.managedId)}
-                  onPublish={handlePublish}
                   onDelete={handleDelete}
                 />
               ) : (
