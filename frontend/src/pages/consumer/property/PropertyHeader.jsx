@@ -10,8 +10,11 @@ import { OwnerCard } from './OwnerCard.jsx';
 import { DealPanel } from './DealPanel.jsx';
 import { GroupApplyCard } from './GroupApplyCard.jsx';
 import { VisitCta } from './ActionCtas.jsx';
+import { TAB_TEAMS } from '../flatmates/tabs.js';
 
 const FRESH_TONE = { emerald: 'text-emerald-300', gray: 'text-slate-400', amber: 'text-amber-300' };
+const SHARE_SPLITS = [[1, 'property.shareAlone'], [2, 'property.share2'], [3, 'property.share3']];
+const SHARE_TONE = { 1: 'text-white', 2: 'text-brand-teal-3', 3: 'text-emerald-400' };
 
 export default function PropertyHeader({ ctx, priceOnHero = false }) {
   const {
@@ -110,7 +113,7 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                 <MobileCollapse
                   className="mt-5 glass-strong rounded-2xl px-3.5 py-[5px] lg:p-5"
                   label={tr('property.sharingFlatTitle')}
-                  summary={'₹' + (p.price / 2 / 1000).toFixed(0) + 'k'}
+                  summary={tr('property.sharePerPerson', { value: fmtINR(Math.round(p.price / 3)) })}
                   header={(
                     <div>
                       <h3 className="font-semibold text-white flex items-center gap-2"><Icon name="users" className="w-4 h-4 text-brand-teal-2" /> {tr('property.sharingFlatTitle')}</h3>
@@ -118,21 +121,25 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                     </div>
                   )}
                 >
-                  <div className="dz-share-split mt-3.5 pb-3 lg:pb-0 grid grid-cols-3 gap-3">
-                    <div className="glass-strong rounded-xl p-3 text-center">
-                      <p className="text-xs text-slate-400 mb-1">{tr('property.shareAlone')}</p>
-                      <p className="text-lg font-bold text-white">₹{(p.price / 1000).toFixed(0)}k</p>
+                  <div className="pb-3 lg:pb-0">
+                    <div data-testid="share-split" className="mt-3 grid grid-cols-3 divide-x divide-white/10 overflow-hidden rounded-xl border border-white/10">
+                      {SHARE_SPLITS.map(([n, key]) => {
+                        const each = Math.round(p.price / n);
+                        return (
+                          <div key={n} className={'px-1.5 py-2.5 text-center' + (n === 3 ? ' bg-emerald-500/10' : '')}>
+                            <p className="text-[11px] font-medium text-slate-400">{tr(key)}</p>
+                            <p className={'mt-0.5 text-base sm:text-lg font-bold tabular-nums ' + SHARE_TONE[n]}>{fmtINR(each)}</p>
+                            <p className={'text-[11px] tabular-nums ' + (n === 1 ? 'text-slate-500' : 'font-semibold text-emerald-400')}>
+                              {n === 1 ? tr('property.sharePerMonth') : tr('property.shareSave', { value: fmtINR(p.price - each) })}
+                            </p>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="glass-strong rounded-xl p-3 text-center">
-                      <p className="text-xs text-slate-400 mb-1">{tr('property.share2')}</p>
-                      <p className="text-lg font-bold text-brand-teal-3">₹{(p.price / 2 / 1000).toFixed(0)}k</p>
-                    </div>
-                    <div className="glass-strong rounded-xl p-3 text-center">
-                      <p className="text-xs text-slate-400 mb-1">{tr('property.share3')}</p>
-                      <p className="text-lg font-bold text-emerald-400">₹{(p.price / 3 / 1000).toFixed(0)}k</p>
-                    </div>
+                    <Link to={`/flatmates?${new URLSearchParams({ view: TAB_TEAMS, loc: p.locality })}`} data-testid="share-find-flatmates" className="h-btn mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-brand-teal-2/30 bg-brand-teal-1/10 text-brand-teal-3 text-sm font-semibold hover:bg-brand-teal-1/20 transition-smooth">
+                      <Icon name="users-round" className="w-4 h-4" /> {tr('property.findFlatmatesIn', { locality: p.locality })} <Icon name="arrow-right" className="w-4 h-4" />
+                    </Link>
                   </div>
-                  <Link to={`/flatmates?startGroup=1&title=${encodeURIComponent(title)}&rent=${p.price}&loc=${encodeURIComponent(p.locality)}`} className="h-btn mt-3.5 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-brand-teal-2/30 bg-brand-teal-1/10 text-brand-teal-3 text-sm font-medium hover:bg-brand-teal-1/20 transition-smooth"><Icon name="users-round" className="w-4 h-4" /> {tr('property.findFlatmates')}</Link>
                 </MobileCollapse>
               ) : null}
 

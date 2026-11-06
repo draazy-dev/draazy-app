@@ -142,55 +142,51 @@ test.describe('LIVE: support tickets against the real API', () => {
     expect(errors.filter((e) => !IGNORE.test(e)), `failed API calls: ${apiFails.join(', ') || 'none'}`).toEqual([]);
   });
 
-  test('a ticket round-trips, and the controls the API cannot carry are not offered', async ({ page }) => {
-    await signedInAs(page, CHATTER.mobile);
+  test('a support chat round-trips, and the controls the API cannot carry are not offered', async ({ page }) => {
+    await signedInAsNew(page);
 
     const listed = page.waitForResponse(
-      (r) => /\/api\/support\/tickets(\?|$)/.test(r.url()) && r.request().method() === 'GET' && r.status() === 200,
+      (r) => new URL(r.url()).pathname === '/api/support/chat' && r.request().method() === 'GET' && r.status() === 200,
       { timeout: 20000 },
     );
-    await page.goto('/support');
+    await page.goto('/messages?support=general');
 
     const body = await (await listed).json();
-    expect(Array.isArray(body)).toBe(true);
+    expect(body.status).toBe('none');
+    expect(body.messages).toEqual([]);
 
-    await expect(page.getByText('Priority', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('Attach screenshots')).toHaveCount(0);
-    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+    const thread = page.getByTestId('support-thread');
+    const composer = thread.getByRole('textbox', { name: 'Message Draazy support' });
+    await expect(composer).toBeVisible();
+    await expect(thread.getByText('Priority', { exact: true })).toHaveCount(0);
+    await expect(thread.locator('input[type="file"]')).toHaveCount(0);
 
-    const subject = `Parity check ${Date.now()}`;
-    const created = page.waitForResponse(
-      (r) => /\/api\/support\/tickets$/.test(r.url()) && r.request().method() === 'POST',
+    const sent = () => page.waitForResponse(
+      (r) => new URL(r.url()).pathname === '/api/support/chat/messages' && r.request().method() === 'POST',
       { timeout: 20000 },
     );
-
-    await page.getByPlaceholder('Brief summary of your issue').fill(subject);
-    await page.getByPlaceholder(/Share as much detail/i).fill('Raised by the live integration suite.');
-    await page.getByRole('button', { name: /submit ticket/i }).click();
+    const first = `Parity check ${Date.now()}`;
+    const created = sent();
+    await composer.fill(first);
+    await thread.getByRole('button', { name: 'Send message' }).click();
 
     const res = await created;
     expect(res.status()).toBe(201);
-    const ticket = await res.json();
-    expect(ticket.status).toBe('open');
-    expect(ticket).not.toHaveProperty('priority');
-    expect(ticket).not.toHaveProperty('mobile');
+    const msg = await res.json();
+    expect(msg).toMatchObject({ from: 'me', text: first, about: { type: 'general' } });
+    expect(msg).not.toHaveProperty('priority');
+    expect(msg).not.toHaveProperty('mobile');
+    await expect(thread.getByText(first)).toBeVisible({ timeout: 15000 });
 
-    await expect(page.getByText(subject).first()).toBeVisible({ timeout: 15000 });
-
-    const replied = page.waitForResponse(
-      (r) => /\/api\/support\/tickets\/[^/]+\/messages$/.test(r.url()) && r.request().method() === 'POST',
-      { timeout: 20000 },
-    );
+    const replied = sent();
     const reply = `Following up ${Date.now()}`;
-    await page.getByPlaceholder(/type your reply/i).fill(reply);
-    await page.getByRole('button', { name: /^send$/i }).click();
+    await composer.fill(reply);
+    await thread.getByRole('button', { name: 'Send message' }).click();
 
     expect((await replied).status()).toBe(201);
-    // The reply appears in both the thread and preview, so select the first match.
-    await expect(page.getByText(reply).first()).toBeVisible({ timeout: 15000 });
+    await expect(thread.getByText(reply)).toBeVisible({ timeout: 15000 });
   });
 });
-
 test.describe('LIVE: abuse reports against the real API', () => {
   let errors;
   let apiFails;
