@@ -102,6 +102,7 @@
 - **`spring.jpa.open-in-view=false` is a standing ruling (D185)**: fetch associations in the service; never re-enable OSIV.
 - **Default a policy lookup to the stricter branch**: `"buy".equals(deal) ? SALE_GATE : RENT_GATE` gave unknowns the weaker gate; compare against the named constant and test unknown values.
 - **`@Size` on a `@RequestParam` does nothing without class-level `@Validated`**; validate in the service.
+- **A `jdbc.update` on a row the test already saved via JPA is invisible to a later JPQL entity read in the same `@Transactional` test** (first-level cache wins); change the entity and `saveAndFlush`.
 
 ## Security and privacy
 
@@ -165,6 +166,7 @@
 - **One thing, one picker**: grep the wizard for an existing control asking about the same objects before adding a group (AC/geyser/wardrobe).
 - **An approve endpoint must apply what it approves** (flatmate request: add member, take seat, 409 on second decision); test the consequence.
 - **An approved number request reveals the owner's number to that buyer** unless `hide_number` (D5 reversed). Ask which way the rule goes before calling a reveal a leak.
+- **Staff alert emails go to `role='staff'` only, never managers or admins** (they keep the bell), and ignore quiet hours; queue alerts belong in `StaffSlaRule.CATALOGUE`, not new per-event hooks (user-directed).
 
 ## Environment and tooling
 
@@ -265,3 +267,7 @@ hunks with `git apply --cached <partial.patch>`, commit, drop the variable, then
 - Flow voice stretched Hinglish 'das' (ten) into 'daaas'; write Hindi numbers that look like English words in Devanagari ('दस', 'दो') in dialogue (user-directed). Reel 4 Ishaan: keep the pain mild and wry, never extra sad (user-directed).
 - Ops/admin work-queue cards (RowCard): never make the whole card clickable with an inset overlay; only the action button opens it, like the Properties queue cards (user-directed).
 - Rent agreement: the app collects no witnesses anywhere (wizard, desk, API); staff record them on the IGR portal at the doorstep visit (user-directed).
+- Rent-agreement upload limits: registered copy 2 MB; draft and party papers stay 1 MB, even though a draft once failed at 1 MB (user-directed, confirmed twice).
+- Rent-agreement registered copy: staff record only document no., SRO, date and GRN; no stamp duty or registration fee paid (user-directed).
+- Post-a-property wizard: a NEW listing pre-selects Pune-popular answers (Sale, flat, 2 BHK, semi-furnished, Ready to Move, whole-place rent); edits never inherit them, and legal/property facts stay blank (user-directed, overrides "deal/BHK/possession unselected").
+- **Run only the specs a change touches, even for an app-wide component like `ToastContext`**; never start `run-fast.ps1 -Full` unprompted (user-directed).
