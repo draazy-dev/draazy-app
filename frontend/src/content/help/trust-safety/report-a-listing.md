@@ -4,8 +4,8 @@ slug: report-a-listing
 category: trust-safety
 audience: everyone
 order: 3
-updated: 2026-10-10
-summary: How to report a fake, misleading or already-rented listing, what happens next, and what stays private.
+updated: 2026-11-06
+summary: How to report a fake, misleading or already-rented listing, flatmate post, person or review, what happens next, and what stays private.
 tags: [report, moderation, abuse]
 ---
 
@@ -13,14 +13,22 @@ Reporting is the fastest way to get a bad listing off the platform. Reports are 
 
 ## How to report
 
-1. Sign in and open the listing.
-2. In the **Draazy Assured** block, choose **Suspicious? Report & we re-verify**.
-3. Pick a reason and add details.
-4. Submit the report.
+1. Open the listing. If you are signed out, you are asked to sign in when you submit, so that our team can follow up and spam stays out.
+2. Choose **Suspicious? Report & we re-verify** in the **Draazy Assured** block, or **Report listing** further down the page.
+3. Pick a reason. Details are optional (up to 600 characters).
+4. Tap **Submit report**.
 
-You can also report a person from a message thread or owner profile, or raise a support ticket if the listing is already gone.
+You can also report from other places:
+
+- **A flatmate post**, from its detail page.
+- **A person**, from **Report this user** in the three-dot menu of a chat in [Messages](/help/a/messages-and-chat), or from the owner's profile.
+- **A society review**, from the review itself.
+
+If the listing is already gone, message Draazy support instead.
 
 ## What to report
+
+Listings use this reason list:
 
 | Reason | Examples |
 | --- | --- |
@@ -33,13 +41,13 @@ You can also report a person from a message thread or owner profile, or raise a 
 | Something else | Anything important that does not fit the other choices |
 
 > [!NOTE]
-> If the problem is abuse, advance payment, impersonation or harassment by a person rather than the listing itself, report the person from the message thread or profile. Those reports use a different reason list.
+> Reports about a person, a flatmate post or a review use their own reason lists. For a person these include **Fake or impersonated profile**, **Suspected fraud or scam**, **Asked for brokerage / advance payment** and **Abusive or harassing behaviour**. For a flatmate post they include **Broker or agent, not a genuine seeker** and **Inappropriate or offensive content**.
 
 ## What happens next
 
 - The report goes into review.
 - We may dismiss the report, hide the listing or post, or suspend the account behind it.
-- You cannot file the same report again while it is still being reviewed.
+- If you report the same thing again while it is still being reviewed, Draazy tells you it is already under review.
 
 We do not share the reported party's account details, and your identity is never disclosed to them.
 
@@ -47,4 +55,5 @@ We do not share the reported party's account details, and your identity is never
 
 - [Spotting a rental scam](/help/a/spot-a-scam)
 - [How we verify owners and listings](/help/a/how-we-verify)
+- [Messages and chat](/help/a/messages-and-chat)
 - [How verification works on Draazy](/how-verification-works)

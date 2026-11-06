@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 7
-updated: 2026-10-10
+updated: 2026-11-06
 summary: Internal procedure for creating an owner listing from a call or WhatsApp handoff.
 tags: [ops, listings, post-on-behalf, internal]
 modules: [postOnBehalf]
@@ -18,10 +18,10 @@ modules: [postOnBehalf]
 
 **Monitor**
 
-- **You have an unsaved draft** banner ? **Resume** or **Discard** it before starting another.
-- Properties ? **To verify** with the **Awaiting owner** chip ? staff-posted listings waiting on the owner.
-- **Link opened** chip ? the owner opened the claim link but has not confirmed.
-- **Reminded ?** count on a row ? how many nudges the owner has had.
+- **You have an unsaved draft** banner: **Resume** or **Discard** it before starting another.
+- Properties, **To verify**, with the **Awaiting owner** chip: listings waiting on the owner.
+- **Link opened** chip: the owner opened the claim link but has not confirmed.
+- **Reminded ×N** on a row: how many nudges the owner has had.
 
 **Work on**
 
@@ -40,10 +40,10 @@ The listing is created under the owner, not under staff. If the mobile does not 
 
 | Step | Staff action |
 | --- | --- |
-| **Details** | Capture owner name, 10-digit mobile, property type and core property facts |
+| **Details** | Capture owner name, 10-digit mobile, property type and the key facts (BHK for homes, carpet area). Take only the key facts on the call: the owner adds the rest and the photos when they confirm |
 | **Location** | Pick the locality, search the society on Google Maps (a pick sets its pin and pincode) and add the full address |
-| **Pricing** | Capture rent or sale price and deposit where applicable |
-| **Photos & Review** | Add photo URLs if supplied, review, then submit |
+| **Pricing** | Capture rent or sale price; deposit is required for rent only |
+| **Photos & Review** | Paste owner-provided photo URLs if supplied ("Add photo URL"), add **Internal Notes** on the Details step if needed, review, then **Send to Owner** |
 
 Choose **For Rent** or **For Sale** before entering details. The choice controls deposit and possession fields.
 
@@ -53,8 +53,10 @@ Choose **For Rent** or **For Sale** before entering details. The choice controls
 | --- | --- |
 | Owner mobile | Must be 10 digits starting with 6, 7, 8 or 9 |
 | Owner name | Required |
+| Property type | Required. Commercial also needs a type and a shell type; homes need BHK |
+| Carpet area | Required |
 | Locality | Required |
-| Price | Required |
+| Price | Required; deposit also required for rent |
 | Floor | Cannot be greater than total floors |
 | Land listings | Require NA status and other rights; farmland sale also requires buyer eligibility |
 | Photos | Optional URL entries; the owner must have at least three photos, two labelled by room, before they can confirm |
@@ -63,7 +65,7 @@ The browser autosaves a draft under `dz_pob_draft_v2`. Use **Resume** to continu
 
 ## Duplicate and plan warnings
 
-The desk checks pending listings under the same mobile and shows an advisory warning. It also checks the owner's listing allowance. Staff-posted creation is exempt from the freemium ceiling, but overage is a Listing Pass conversation before submission.
+The desk checks pending listings under the same mobile and shows an advisory warning ("This owner already has N pending listings. You can still continue if this is a different property."). It also checks the owner's listing allowance. Staff-posted creation is exempt from the freemium ceiling, but overage is a Listing Pass conversation before submission.
 
 Do not ignore a pending-listing warning. Open **Admin → Properties** and confirm you are not recreating the same property.
 

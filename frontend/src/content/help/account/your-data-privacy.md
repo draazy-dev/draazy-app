@@ -4,7 +4,7 @@ slug: your-data-privacy
 category: account
 audience: everyone
 order: 3
-updated: 2026-10-10
+updated: 2026-11-06
 summary: What we collect, who sees it, how long we keep it, and how to get it deleted.
 tags: [privacy, data, dpdp, deletion]
 ---
@@ -13,25 +13,27 @@ This is the plain-language version. The binding document is the Privacy Policy.
 
 ## What we collect
 
-- **Account data** - name, mobile number, optional email
-- **Identity data** - ID verification results for owners and, optionally, tenants
-- **Activity** - searches, saved properties, enquiries, visits, messages
-- **Device data** - approximate location (only if you allow it), device type, and diagnostics
-- **Analytics** - product usage events and masked session replays, only if you accept analytics cookies
+- **Account data**: name, mobile number, optional email, city and gender
+- **Identity data**: ID verification results for owners and, optionally, tenants
+- **Activity**: searches, saved properties, enquiries, visits, messages
+- **Documents**: files you add to your private Document Vault
+- **Device data**: approximate location (only if you allow it), device type, and diagnostics
+- **Analytics**: product usage events and masked session replays, only if you accept analytics cookies
 
 ## Who sees what
 
 | Data | Owner you enquire with | Other users | Draazy staff |
 | --- | --- | --- | --- |
-| Name & mobile | Name and masked mobile until the contact request is approved | No | Yes |
-| Tenant profile | A **Serious Buyer** badge if you verified your identity; not the profile details | No | Yes |
+| Name & mobile | Your name; your full mobile only after they approve your contact request | No | Yes |
+| Tenant profile | A **KYC done** tick if you verified your identity; not the profile details | No | Yes |
 | Search history | No | No | Aggregated or support-only |
-| Messages | Only your thread | No | On dispute or report |
+| Messages | Only your thread | No | On dispute or report, and in the support chat you start |
+| Documents | Only what you choose to share, one request at a time | No | On dispute or report |
 | ID documents | No | No | Verification team only |
 
-We do **not** sell your contact details to brokers or third parties. This is a structural commitment, not a policy preference - the business model does not depend on it.
+We do **not** sell your contact details to brokers or third parties. This is a structural commitment, not a policy preference: the business model does not depend on it.
 
-People you chat with can see when you are online and whether you have read their messages. Turn either off under **Dashboard > Profile > Chat privacy** - if you do, you stop seeing theirs too.
+People you chat with can see when you are online and whether you have read their messages. Turn either off under **Dashboard > Profile > Chat privacy** (**Show when I'm online** and **Read receipts**). If you do, you stop seeing theirs too.
 
 ## How long we keep it
 
@@ -54,7 +56,7 @@ Under India's DPDP Act you can ask us to:
 
 ## Contact
 
-Data protection queries go to [support@draazy.com](mailto:support@draazy.com), or raise a ticket through support.
+Data protection queries go to [support@draazy.com](mailto:support@draazy.com), or message Draazy support in Messages.
 
 ## Related
 

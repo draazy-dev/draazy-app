@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 10
-updated: 2026-10-10
+updated: 2026-11-06
 summary: How staff work rent-agreement drafting and other paid service-request queues.
 tags: [ops, services, rent-agreement, drafting, internal]
 modules: [desk:rental, desk:legal, desk:interior, desk:packers, desk:valuation]
@@ -18,16 +18,17 @@ modules: [desk:rental, desk:legal, desk:interior, desk:packers, desk:valuation]
 
 **Monitor**
 
-- **Overdue** button count ? rent-agreement cases past their desk target.
-- **SLA** cell on rent agreements: **Due in** turns warning at 2 h left, then **Overdue by**; **Customer's turn** has no desk timer.
+- **Overdue** button count: rent-agreement cases past their desk target.
+- **SLA** cell on rent agreements: **Due in** turns warning at 2 h left, then **Overdue by**; **Customer's turn** and **Waiting for tenant details** have no desk timer. An approved case also shows **register by** a date.
 - Targets: pick up within 4 h, first draft 48 h, revision 24 h, registration 7 days.
-- **To pick up** count. Other desks have no SLA cell: row age is amber after 24 h and rose after 72 h.
+- **To pick up** count. Other desks have no SLA cell: row age shows "due soon" (amber) after 24 h and "overdue" (rose) after 72 h.
 
 **Work on**
 
 - Work **Overdue** rent agreements first, then **To pick up** with **Take case**.
+- Rows marked **Our move** are yours to act on. **With customer** rows wait on the customer.
 - Finish first drafts and **changes-requested** revisions before the targets run out.
-- Upload the registered copy for **approved** cases, then run **Registration check** and **Police intimation**.
+- Upload the registered copy for **approved** cases, then run **Registration check**.
 
 ## Desk and access
 
@@ -41,10 +42,15 @@ A staff member sees only the service desks they were granted (**Rent Agreement**
 | --- | --- |
 | **To pick up / My cases / In progress / With customer / Closed / Cancelled** | Queue tabs with live counts (**My requests** on the other desks). **Closed** is completed work; **Cancelled** holds cases cancelled by the desk or withdrawn by the customer |
 | **Overdue** | Rent-agreement SLA breaches only |
+| **All / Today / 7d / 30d** | Date chips that narrow the list by when the request came in |
 | **Name, mobile or request id** | Server-side search |
 | **Customer tickets** | The desk's tickets tab (needs `tickets:read`) |
 
 The list is paged at 20 rows. A failed load is shown as an error, not as an empty queue.
+
+On the **Rent Agreement** desk each row shows an **Our move**, **With customer** or **Closed** chip, a **Yours** chip on cases you hold, and a **Step n of 7** line. The seven stages are Paid, Picked up, Papers verified, Draft shared, Approved, Registered and Police intimation. Inside a case, **Next case** jumps to the next one in the list. The **Messages** tab holds **Chat with customer** (the customer's support chat for that request), and a **Payment** tab appears on paid cases with the **Refunds** section. An **Activity** tab shows the history.
+
+**Home Loans** is a ticket-style desk without this case window. Work it from its own request list.
 
 ## Status states
 
@@ -58,7 +64,7 @@ The list is paged at 20 rows. A failed load is shown as an error, not as an empt
 | `changes-requested` | Customer rejects the draft | Revise or cancel |
 | `action-required` | **Send back for correction** | Owner or tenant fixes it; their **Done** returns it to `in-progress` |
 | `approved` | Customer approves the draft | Upload final or registered copy |
-| `completed` | Final document uploaded | Run registration and police checks if rental |
+| `completed` | Final document uploaded | Run the registration check if rental |
 | `cancelled` | Staff cancel with a reason | Terminal |
 
 Only `assigned`, `in-progress`, and `cancelled` are directly staff-settable. `draft-shared`, `approved`, `changes-requested`, `action-required`, and `completed` are created by draft upload, customer decision, send-back, and final upload.
@@ -75,7 +81,7 @@ Rent agreements carry server SLA due dates:
 | `approved` | Registration within 7 days |
 | `draft-shared` / `action-required` | Customer's turn; no desk timer |
 
-The **SLA** cell shows **Due in**, **Overdue by**, or **Customer's turn** from that SLA. It turns warning when two hours or less remain. Non-rental queues fall back to age colouring: amber after 24 hours and rose after 72 hours while not completed or cancelled.
+The **SLA** cell shows **Due in**, **Overdue by**, or **Customer's turn** from that SLA; **Waiting for tenant details** shows when the tenant has not yet filled their part. It turns warning when two hours or less remain. For an approved rental the statutory registration deadline (four months from approval) is also shown as **register by**, with a warning in the last 30 days. Non-rental queues fall back to age colouring: amber after 24 hours and rose after 72 hours while not completed or cancelled.
 
 ## Rent-agreement document procedure
 
@@ -100,7 +106,7 @@ A draft you share goes straight to the customer; no second operator checks it fi
 
 ## Registration and trust evidence
 
-After the customer approves the draft, upload the registered copy with the Sub-Registrar record: document number, Sub-Registrar office, registration date, GRAS GRN, stamp duty paid, and registration fee paid.
+After the customer approves the draft, upload the registered copy with the Sub-Registrar record: document number, Sub-Registrar office, registration date (not in the future) and GRAS GRN. The registered copy can be up to 2 MB; drafts and customer papers up to 1 MB.
 
 For Leave & Licence Article 36A pricing, the code charges stamp duty from rent, term, non-refundable deposit, and 10% of refundable deposit per chargeable year; registration is ₹1,000 urban or ₹500 rural, plus ₹300 handling. Correct the registration area with **Priced terms** before sharing a draft if the locality body is wrong.
 
@@ -108,14 +114,14 @@ After completion, use **Registration check**:
 
 1. Open the registered copy.
 2. Compare it with the approved draft and the registration record.
-3. Confirm each tenant only if the number was OTP-verified and you did not upload the copy.
+3. Confirm each tenant only if the number was OTP-verified and you did not upload the copy. A colleague with the registration-check permission has to confirm it.
 4. Use **Not on the copy** when the tenant is absent or not OTP-verified.
 
 Confirmed registered tenancies can become trust evidence. Typed tenant numbers that were never OTP-confirmed cannot earn that badge.
 
 ## Police intimation
 
-**Police intimation** appears after a rental request is completed. Draazy does not file tenant information with police. Record it only after the owner confirms submission to the relevant commissionerate. Add the acknowledgement reference and submission date when supplied.
+**Police intimation** is the last stage and completes on its own when you upload the registered copy. Registering on the IGR portal shares the tenant's details with the police, so there is nothing to file or record.
 
 ## Refunds and cancellation
 
@@ -128,9 +134,9 @@ Use **Cancel request** only before `completed` or `cancelled`. A cancellation re
 - Never ask for documents when the checklist failed to load
 - Never reveal identity numbers on a matter you do not hold
 - Never share a rent-agreement draft with unverified papers
-- Never approve your own refund or your own registered copy
+- Never approve your own registered copy
 - Never refund a cancelled customer by hand: approve the refund the cancel raised
-- Never mark police intimation filed by Draazy
+- Never ask the owner or tenant to file police intimation separately
 - Never use `registration` or `docs_review` as a staff status
 
 ## Related

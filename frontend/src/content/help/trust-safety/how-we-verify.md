@@ -5,31 +5,32 @@ category: trust-safety
 audience: everyone
 order: 1
 featured: true
-updated: 2026-10-22
-summary: Identity, listing, ownership and flatmate verification badges - what each proves and what it does not.
+updated: 2026-11-06
+summary: The two verification badges, KYC done and Verified property, what each proves and what it does not.
 tags: [verification, trust, kyc, badge, rera, ownership]
 ---
 
-Draazy uses separate badges for separate checks. A listing can be live with no badge, or carry identity and ownership badges together, plus a RERA number shared by the owner. Each badge is a meaningful signal, but none is a guarantee of ownership, condition or final terms - read on for exactly where the line is.
+Draazy uses two badges for two separate checks: **KYC done** (the person) and **Verified property** (the home). A listing can be live with no badge, or carry both, and it may also show a RERA number shared by the owner. Each badge is a meaningful signal, but none is a guarantee of ownership, condition or final terms. Read on for exactly where the line is.
 
 ## Verification is a badge, not a gate
 
 You never need a badge to use Draazy. Signing in with a verified mobile number is the only floor: you can search, contact owners, schedule visits, post a listing and post a flatmate share without ever submitting an ID.
 
-What a badge changes is how much other people trust you - owners approve verified enquirers faster, and verified listings rank higher. Two places where it is more than cosmetic:
+What a badge changes is how much other people trust you. Owners approve verified enquirers faster, and verified listings rank higher. Two places where it is more than cosmetic:
 
-- An owner can switch on **verified enquirers only**, and their listings then ask you for the badge before you can send a contact request.
-- Some flatmate posts with a flat wait for our team to publish them, and tenant or owner badges are checked separately from that publishing decision.
+- An owner can switch on **Accept verified contacts only** (Dashboard > Profile > Owner contact preferences). Only verified users can then ask to contact that owner or chat.
+- Some flatmate posts with a flat are shown as **Under review** to the poster only until our team publishes them. Badges are checked separately from that publishing decision.
 
-Start verification from **Verify identity** in your account. It is reviewed by a person, so submitting is not the same as passing.
+Start verification from **Verify identity** on your [Profile tab](/help/a/manage-profile) (the **KYC done badge** card). It is reviewed by a person, so submitting is not the same as passing.
 
 ## What we check
 
 ### Identity
 
 - Mobile number verified by OTP
-- A government ID - Aadhaar, PAN, driving licence or passport - captured with the camera alongside a live selfie, then read by a trained reviewer on our team. No badge is ever granted by software; the only other route is a staff member granting it by hand, and every such grant is recorded in an audit trail.
+- A government ID (Aadhaar, PAN, driving licence or passport) captured with the camera alongside a live selfie, then read by a trained reviewer on our team. No badge is ever granted by software; the only other route is a staff member granting it by hand, and every such grant is recorded in an audit trail.
 - An ID document that is already verified on another account is refused
+- ID images are deleted 7 days after the decision. See [Your data and privacy](/help/a/your-data-privacy)
 
 ### The listing itself
 
@@ -53,16 +54,16 @@ Owners are asked to confirm availability periodically. Listings that go unconfir
 
 For a sale, always run an independent title check before paying anything. We offer this as a paid service under [Home services](/help/c/services), but you are free to use your own lawyer.
 
-## Levels you will see
+## What you will see
 
-| Badge | Meaning |
+| Label | Meaning |
 | --- | --- |
-| KYC done | The person's ID and live selfie were reviewed and accepted. Shown on owners, tenants and flatmate seekers |
-| Verified property | Ownership or tenancy evidence for the home was accepted and is still current. Also shown on flatmate rooms and groups |
-| RERA shared | A MahaRERA registration number shared by owner, check it on MahaRERA - the number links to its MahaRERA search result |
-| No badge | Nobody has submitted anything yet. Common and not suspicious - treat with normal caution. |
+| **KYC done** (badge) | The person's ID and live selfie were reviewed and accepted. Shown on owners and tenants. On Flatmates the same badge reads **ID verified** |
+| **Verified property** (badge) | Ownership or tenancy evidence for the home was accepted and is still current. Also shown on flatmate rooms and groups |
+| RERA number (not a badge) | A MahaRERA registration number shared by the owner. Draazy does not check it, so check it on MahaRERA; the number links to its MahaRERA search result |
+| No badge | Nobody has submitted anything yet. Common and not suspicious, but treat with normal caution |
 
-A listing can carry several of these at once, and the search filters let you require any of them.
+A listing can carry both badges at once. Draazy verifies people and listings. We never verify societies.
 
 > [!NOTE]
 > **Verified property can lapse.** Documents are accepted for a period. When that period ends the badge disappears and the listing stops earning the ranking credit, until the owner re-submits. A badge you can see is always current.
@@ -70,4 +71,5 @@ A listing can carry several of these at once, and the search filters let you req
 ## Related
 
 - [Spotting a scam](/help/a/spot-a-scam)
+- [Managing your profile](/help/a/manage-profile)
 - [Reporting a listing or user](/help/a/report-a-listing)

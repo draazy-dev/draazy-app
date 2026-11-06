@@ -4,8 +4,8 @@ slug: contacting-owners
 category: renting
 audience: tenant
 order: 1
-updated: 2026-10-12
-summary: How owner approval, masked contact details, contact allowance and in-app chat work.
+updated: 2026-11-06
+summary: How owner approval, masked contact details, contact allowance, your Requests inbox and in-app chat work.
 tags: [enquiry, contact, owner, messaging, quota]
 ---
 
@@ -19,7 +19,7 @@ Tapping does not hand you a phone number. Sending an enquiry, starting a chat or
 | --- | --- |
 | Pending | Request sent. The owner has not answered yet. |
 | Approved | The contact path opens. You can message in-app, and any phone action shown for that owner appears only after approval. Some owners keep their number hidden even after approving — you then see "Approved — listing contact prefers in-app chat" and talk in the app. |
-| Contact returned | The owner declined, or did not reply in 7 days. The contact goes back to your allowance — nothing is used. |
+| Contact returned | The owner declined, did not reply in 7 days, or you withdrew the request. The contact goes back to your allowance. |
 
 Tapping again on the same listing does not send a second request — it shows you where the first one stands. If the owner does not reply within 7 days the request lapses and your contact comes back; you can ask again then, and the new request uses a contact like any other.
 
@@ -27,15 +27,28 @@ Too many requests waiting at once? Draazy limits how many unanswered requests an
 
 The owner's number is never shown before approval. For many listings the safe next step is in-app chat rather than taking the conversation off-platform.
 
+## Track, remind or withdraw
+
+Everything you have sent sits in **Dashboard → Requests**, next to anything sent to you. Tabs split it into All, Number requests, Photo requests, Documents, Flatmate, Visits and Offers. Each row is tagged Sent or Received and shows its state: Pending, Approved, Declined, Expired or Withdrawn.
+
+On a pending request you sent:
+
+- **Remind** sends the owner a reminder. After that it shows how long until you can remind again, and "You reminded them recently. Try again later." if you tap too soon.
+- **Withdraw** takes it back. The owner no longer sees it and your contact credit comes back. You can ask that owner again after 7 days.
+
+Once an owner approves, **Open chat** takes you to the conversation. **Clear** removes a finished request from your list, and **Show past requests** brings older ones back.
+
 ## Messages
 
-[Messages](/messages) has **Chats** for approved conversations and **Requests** for pending ones. You can archive or mute a thread, and block or report a person from the thread menu.
+[Messages](/messages) is one list. Requests you send or receive show up there and become chats once accepted. You can archive or mute a thread, and block or report a person from the thread menu. Archived threads sit under **Archived**.
+
+Draazy support is a chat in the same list. Use **About** at the top to say which listing or request you are asking about.
 
 ## Do I need to be identity-verified?
 
-No. The **Verified** badge is a trust signal, not a gate — you can search, enquire, schedule visits and post without one.
+No. The **KYC done** badge is a trust signal, not a gate — you can search, enquire, schedule visits and post without one. Getting it makes owners more likely to approve you.
 
-The single exception is an owner who has switched on **verified enquirers only**. On those listings you are sent to [identity verification](/verify-identity) first: one government ID and one live selfie, reviewed by a person. Submitting is not the same as passing, so allow for the review before you plan around it.
+The single exception is an owner who has chosen to accept contacts with KYC done only. On those listings you are sent to [identity verification](/verify-identity) first: one government ID and one live selfie, reviewed by a person. Submitting is not the same as passing, so allow for the review before you plan around it.
 
 ## How many owners can I contact?
 
@@ -65,7 +78,7 @@ A workable template:
 > Hi, I'm interested in your 2 BHK in Baner. I work at a product company in Hinjawadi, moving with my wife, and we're looking to shift by 15 August. The rent and deposit work for us. Could we visit this weekend — Saturday morning or Sunday afternoon?
 
 > [!TIP]
-> Owners see only your name, a masked mobile number and a Serious Buyer badge if your KYC is done. Your [tenant profile](/tenant-profile) is not shared, so use a short first message to say who will live in the home.
+> Owners see only your name, a masked mobile number and a **KYC done** badge if you have one. Your [tenant profile](/tenant-profile) is not shared, so use a short first message to say who will live in the home.
 
 ## If the request stays pending
 
@@ -74,6 +87,8 @@ A workable template:
 - Use [Report this listing](/help/a/report-a-listing) if it is clearly gone, so other tenants do not waste time on it.
 
 A declined request cannot be re-sent. That is deliberate: it stops a refusal being worn down by repetition. Your contact is returned, so you lose nothing by moving on.
+
+Looking for a room in a shared flat instead? That is a different flow, see [Finding flatmates and shared rooms](/help/a/finding-flatmates).
 
 ## Staying safe
 

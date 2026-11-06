@@ -4,7 +4,7 @@ slug: price-your-property
 category: listing
 audience: owner
 order: 3
-updated: 2026-10-10
+updated: 2026-11-06
 summary: How to price against real Pune comparables, and what an overpriced listing actually costs you.
 tags: [pricing, rent, valuation, owner]
 ---
@@ -34,9 +34,9 @@ The number that matters is what comparable units **rented for**, not what they w
 ## The cost of overpricing
 
 > [!IMPORTANT]
-> An overpriced listing does not simply take longer to rent — it goes stale. Fewer enquiries means lower ranking, which means fewer views, which compounds. Two months vacant at ₹30,000 costs ₹60,000; renting at ₹28,000 instead costs ₹24,000 over a year.
+> An overpriced listing does not simply take longer to rent. It sits empty while you wait, and a listing nobody has confirmed for a while slides toward Stale in search (see [Keeping a listing fresh](/help/a/listing-freshness)). Two months vacant at ₹30,000 costs ₹60,000; renting at ₹28,000 instead costs ₹24,000 over a year.
 
-If you have had fewer than five enquiries in two weeks, the price is the problem, not the market.
+Watch the **Views** and **Leads** counts on your card in **Dashboard → My Properties**. If people open the listing but few ask about it, or you have had fewer than five enquiries in two weeks, the price is the likely problem, not the market. You can edit the price on a live listing; it stays live while the change is re-checked.
 
 ## Deposit as a lever
 
@@ -48,8 +48,9 @@ Deposit is often more negotiable than rent, and tenants feel it more sharply. Of
 
 ## Tools
 
-- [Property valuation](/services/property-valuation) — a free instant estimate, with a paid valuer-signed report if you need one, for sale pricing
-- [EMI calculator](/emi-calculator) — useful when quoting to buyers
+- [Property valuation](/services/property-valuation): a free instant estimate of rent and sale price, with a paid valuer-signed report if you need one
+- [EMI calculator](/emi-calculator): useful when quoting to buyers
+- **Rent-o-meter** in your [managed home](/help/a/managed-homes) shows an estimated rent and sale price and the locality rate per sq ft
 
 ## Related
 

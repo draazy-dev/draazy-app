@@ -4,7 +4,7 @@ slug: home-loans-legal
 category: services
 audience: buyer
 order: 3
-updated: 2026-10-10
+updated: 2026-11-06
 summary: What to verify before buying a property in Pune, and how the loan and legal services fit together.
 tags: [home loan, legal, title, buying, emi]
 ---
@@ -22,7 +22,9 @@ Buying is where the money and the risk both scale. Two services matter here.
 - **Mutation and society transfer support** — municipal records, 7/12 records and society share-certificate transfer after registration
 - **Gift deed, power of attorney and will** — drafting and registration for family and estate transfers
 
-The legal desk confirms its terms with you before you proceed. Government stamp duty and registration charges are separate.
+The legal desk confirms its terms with you before you proceed. Government stamp duty and registration charges are separate. Once you are signed in, you can follow your request on the same page.
+
+Renting out a shop, office or godown, or letting to a company or firm, is also quoted by the legal desk. The online [rent agreement service](/help/a/rent-agreement-service) covers homes only, with individuals as parties.
 
 The page also has a stamp duty estimator. Within PMC and PCMC limits stamp duty is 7% and the registration fee is 1% of the value, capped at ₹30,000, on the higher of the agreement value or the ready-reckoner rate. The figure is indicative; the legal desk confirms the exact amount before registration.
 
@@ -57,5 +59,6 @@ Use the [EMI calculator](/emi-calculator) to sanity-check affordability before a
 
 ## Related
 
+- [The rent agreement service](/help/a/rent-agreement-service)
 - [Property valuation](/services/property-valuation)
 - [Invoices, refunds and receipts](/help/a/invoices-and-refunds)

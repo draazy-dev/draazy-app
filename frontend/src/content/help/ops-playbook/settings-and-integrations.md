@@ -5,8 +5,8 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 29
-updated: 2026-10-13
-summary: How admins change site settings, fees, maps and flags safely, and how to read provider status and the call log.
+updated: 2026-11-06
+summary: How admins change site settings, fees, served districts and flags safely, and how to read provider status and the call log.
 tags: [ops, internal, settings, integrations, flags, fees]
 modules: [settings, integrations]
 ---
@@ -46,25 +46,35 @@ A viewer without `settings:write` can open **Settings** but cannot save. The sys
 | Tab | What you can change | Button |
 | --- | --- | --- |
 | **General** | Site name, Legal name, Tagline, Support email, Support phone, WhatsApp, Support hours, Address | **Save details** |
+| **General** | **Grievance officer**: Name and Email, shown on the Refund Policy page | **Save officer** |
 | **General** | **Max photos per listing** (3 to 20) | **Save photo limit** |
 | **General** | **Max flatmate groups per person** (1 to 10) | **Save group limit** |
 | **Fees** | Rent and sale Listing Pass, rent and buy Contact Pack, rent agreement fee, free contact limit and a **Referrals** section (rewards, caps, hold and fraud-check windows) | **Save fees** |
 | **Fees** | **Move-in Pack**: a **Live** / **Coming soon** switch and six service prices | **Save Move-in Pack** |
-| **Maps** | **Restrict Places to the selected city**; per-city live switch, centre and bounds; blacklist | **Save** (with the city name) **coverage**, **Reset to default**, **Add** |
+| **Maps** | **Served districts**, **Keep search inside served districts**, **Blacklisted places** | Each change saves at once |
 | **Feature flags** | **Application** and **Admin Modules** switches | Each switch asks you to confirm |
 
 **Fees notes.** The four price fields must be whole numbers from 1 to 100000, or nothing is saved. Count fields such as the free contact limit show no ₹ sign. A blank field is refused with a message instead of being saved as 0. Subscribers already charged keep the amount they paid; **Finance** lists them by charged price.
 
-**Maps notes.** Turning a city live or coming soon changes whether people can use it. The blacklist hides places by exact place match, or any place containing a word you type. You can add a reason. The bin icon removes an entry.
+**Maps tab.** Nothing on this tab has a Save button; every change saves straight away and shows a toast.
 
-**Flags.** Each switch asks you to confirm (**Enable** or **Disable**) and shows a toast. The ones to treat with care:
+| Card | What it does |
+| --- | --- |
+| **Served districts** | New localities and societies are accepted only inside these districts. Search "Add a district, e.g. Satara" to add one; the **x** on a chip runs **Stop serving**. At least one district must stay served (the last **x** is disabled). Up to 40 districts. A map below shows the districts when a Google Maps key is set up |
+| **Listed places outside these districts** | Lists existing localities and societies that sit outside the served districts, or "None found." When some older places were never checked, **Check n older places** runs the check. If Google is unavailable, try again shortly |
+| **Keep search inside served districts** | On: shopper search suggests only places inside the served districts. Off: those places only rank first |
+| **Blacklisted places** | Hidden from every search box in the app. Add from **Hide a place**: pick a place (shown as **Exact place**) or choose "Hide every name containing …" (shown as **Name contains**, which is broad). The bin icon removes an entry |
+
+Removing a district does not delete places already listed in it; they appear under **Listed places outside these districts**. Review them in [Society moderation](/help/a/society-moderation) and the [Localities desk](/help/a/localities-desk).
+
+**Flags.** Each switch asks you to confirm (**Enable** or **Disable**) and shows a toast. Application flags sit in four groups: **Discovery & Engagement**, **Trust**, **Monetization & Payments** and **Platform & Access**. The ones to treat with care:
 
 | Flag | Effect |
 | --- | --- |
 | **Plan purchases** (off) | Pauses new purchases. Active plans keep working |
 | **Referral rewards** (off) | Hides referral routes. Earned bonuses still count |
 | **Public signups** (off) | Closes new registration |
-| **Staff login** (off) | Staff cannot sign in. Administrators always can |
+| **Staff login** (off) | Staff and managers cannot sign in. Administrators always can |
 | **Maintenance mode** (on) | Blocks all consumer access. Off by default. Turning it on asks for confirmation in red |
 | **Admin Modules** | Hides a module for everyone. **Properties** and **Users** are **Core** and cannot be switched |
 
@@ -72,7 +82,7 @@ A viewer without `settings:write` can open **Settings** but cannot save. The sys
 
 Three cards: **Email** (Zoho ZeptoMail), **WhatsApp** (Meta Cloud API) and **Payments** (Cashfree). Each shows:
 
-- A **Live** or **Mock** chip. It comes from the server setup, not from a live check. **Live** does not prove the provider is healthy.
+- A **Live** or **Mock** chip. It comes from the server setup, not from a live check. **Live** does not prove the provider is healthy. **Mock** means no real messages or payments go out through that provider.
 - **Last 24h** and **Last 7 days** counts of ok and failed calls.
 - **Last success**, **Last failure** and the failure detail.
 - An **Open** link (for example **Open Cashfree**) to the provider's own console.
@@ -82,12 +92,12 @@ The call log keeps 30 days. It has the search box "Full email, mobile or order i
 ## Steps: change a setting
 
 1. Write down the current value, and what you are changing it to and why.
-2. Ask another admin to check it before you save. The system does not require this, so do it as a team habit for **Fees**, **Maintenance mode**, **Public signups**, **Staff login**, **Plan purchases** and city live switches.
+2. Ask another admin to check it before you save. The system does not require this, so do it as a team habit for **Fees**, **Maintenance mode**, **Public signups**, **Staff login**, **Plan purchases**, served districts and blacklisted places.
 3. Save it. Then reload the page and confirm the new value shows.
-4. Verify the effect as a customer. For a fee, open the plan page. For a flag, check that the feature appears or hides. For a city, search that city.
+4. Verify the effect as a customer. For a fee, open the plan page. For a flag, check that the feature appears or hides. For a district or a blacklisted place, search for it in a shopper search box.
 5. Tell the team what changed and when.
 
-Small fixes to **General** text are low risk. Changes to prices, flags and cities affect customers at once.
+Small fixes to **General** text are low risk. Changes to prices, flags and districts affect customers at once.
 
 ## Steps: investigate a failure
 
@@ -102,7 +112,7 @@ Small fixes to **General** text are low risk. Changes to prices, flags and citie
 - Do not change a price while a customer is mid-payment.
 - Do not ignore **Someone else changed these settings — reload to see their changes.** Reload the page, check the current values, then make your change again.
 - Do not trust **Live** as proof. Read the call log.
-- Do not paste customer details into notes or the blacklist reason.
+- Do not paste customer details into the **Hide a place** search box.
 
 ## Related
 

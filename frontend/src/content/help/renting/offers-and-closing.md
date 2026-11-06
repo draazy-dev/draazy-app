@@ -4,7 +4,7 @@ slug: offers-and-closing
 category: renting
 audience: everyone
 order: 5
-updated: 2026-10-10
+updated: 2026-11-06
 summary: How to make and negotiate an offer, what Under Offer means, and how owner acceptance closes a rental.
 tags: [offer, negotiate, counter, finalize, under offer, deal]
 ---
@@ -28,6 +28,8 @@ You have **one offer per property**. Changing your mind does not create a second
 | Declined — try a new offer | Finished for that offer; you can send a new one |
 
 Owners see each offer as **Pending**, **You countered**, **Buyer countered** or **Accepted**, with **Accept**, **Counter** and **Decline** on open ones. Declined offers drop off the list.
+
+Your offers also show in **Dashboard → Requests** (Offers tab) as "Price offer". A pending one has **Remind** and **Withdraw**; "Withdraw this request? The owner won't see it any more." If the owner counters, the row shows **Respond**. Once an offer is agreed, **Open chat** takes you to the conversation with the owner.
 
 You can agree to the owner's counter amount or counter it back. Agreeing sends that amount back for the owner's acceptance, so the owner still has the final say. There is no limit on the rounds.
 

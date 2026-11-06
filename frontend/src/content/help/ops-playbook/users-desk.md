@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 20
-updated: 2026-10-18
+updated: 2026-11-06
 summary: How to look up owner and buyer accounts, read their activity, and what only an administrator can change.
 tags: [ops, internal, users, lookup, badges]
 modules: [users]
@@ -34,7 +34,7 @@ modules: [users]
 
 - Route: `/admin/users`. Staff open `/staff/users`.
 - Permission: `users:read` (the **User lookup** function). The Identity checks function also gives you this.
-- Staff and managers get a read-only list. **View activity**, staff notes and every change are **administrator only** (`users:write`).
+- Staff and managers get a read-only list. **View activity**, staff notes, suspend, archive and flag are **administrator only**. Granting or removing the Verified badge needs `users:write` and the manager or administrator role.
 - The page lists owners and buyers only. Staff accounts live in Team & Access.
 - Header: **Users**, with the account count.
 
@@ -43,20 +43,21 @@ modules: [users]
 | Part | What it does |
 |---|---|
 | Tabs | **All users**, **Active**, **Suspended**, **Archived**. Counts come from the server. **All users** does not include archived accounts. |
-| Search | Type the start of a name, or a full 10-digit mobile. Email and part of a number are not searched. |
-| Role chips | **All**, **Owners**, **Buyers**. |
+| Search | Type the start of a name, or a full 10-digit mobile ("Search name or mobile…"). Email and part of a number are not searched. |
+| Chips | **Role**: **All**, **Owners**, **Buyers**. **Joined**: date range. |
 | **Export CSV** | Shown only when that feature is switched on. Exports the first 100 matching rows, with full mobile numbers. |
-| Rows | Name, status, **Verified**, **Flagged** (with reason), **Badge pending**, full mobile, role, city, listings count, joined date. |
+| Rows | Name, status, **Verified**, **Flagged** (with the flag reason), full mobile, role, city, listings count, joined date. |
 
 The page shows 20 rows at a time.
 
 ## Look up a customer
 
 1. Open Users. Search by the start of the name, or the full mobile number.
-2. Check the status chips. Does the row say Suspended, Flagged or Badge pending? Read the flag reason.
+2. Check the status chips. Does the row say Suspended or Flagged? Read the flag reason.
 3. Check role, city and listings count against what the customer told you.
 4. If you need the full history, ask an administrator. Only administrators see **View activity**: staff notes plus a timeline of the last 50 events (Joined Draazy, Sent an enquiry, Booked a visit, Requested a service, Listed a property, Moderation action).
 5. If the account needs a change, pass it to an administrator with the account name and the reason.
+
 ## What an administrator can do
 
 | Action | Rule |

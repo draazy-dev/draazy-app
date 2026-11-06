@@ -5,7 +5,7 @@ category: payments
 audience: owner
 order: 1
 featured: true
-updated: 2026-10-13
+updated: 2026-11-06
 summary: What costs money, what is free, and how listing slots and contact allowances work.
 tags: [plans, pricing, owner, contacts, referral]
 ---
@@ -15,12 +15,12 @@ tags: [plans, pricing, owner, contacts, referral]
 ## What is free
 
 - One live listing at a time
-- Verification, and the badges it earns
-- Receiving and replying to enquiries — owners are never charged to answer
+- The **KYC done** badge, if you complete ID verification, and the **Verified property** badge, if you submit an ownership paper
+- Receiving and replying to enquiries; owners are never charged to answer
 - Featured placement for a limited time after your listing's ownership is verified (the [Plans page](/plans) shows how long)
 - Free flatmate posts
-- Site-visit scheduling and tenant profiles attached to every enquiry
-- 15 owner contacts, if you are the one searching — use them within 30 days of the first
+- Site-visit scheduling, and tracking a home you rent out with [managed homes](/help/a/managed-homes)
+- 15 owner contacts, if you are the one searching. Use them within 30 days of the first
 
 ## What costs money
 
@@ -36,7 +36,7 @@ tags: [plans, pricing, owner, contacts, referral]
 
 - **Brokers kept out:** broker listings are flagged and removed, so you deal with owners only.
 - **Every listing checked:** our team reviews each listing before it goes live.
-- **Verified seekers only:** owners get requests only from ID-verified seekers.
+- **Seekers can be verified:** tenants can earn the KYC done badge, and you can choose to accept requests only from tenants who have it.
 - **Your number stays private:** owners share their number only when they approve your request.
 - **No auto-renewal:** pay once, nothing renews on its own.
 
@@ -50,7 +50,7 @@ Posting is never blocked. A second live rent or sale listing is approved but sta
 
 The free account includes 15 owner contacts, usable within 30 days of your first, on rent and sale listings alike. If a serious search in a competitive locality spends them, buy a **Rent Contact Pack** (for rent listings) or a **Buy Contact Pack** (for sale listings). The 15 free contacts, referral bonuses and packs bought before the rent/buy split work on both. See [Contacting owners](/help/a/contacting-owners) for how the quota is counted.
 
-## Earning allowance instead of buying it
+## Saving money by inviting friends
 
 Referring a friend who is looking for a home adds owner contacts for free, and referring an owner earns a free rent agreement (it waives Draazy's service fee at checkout; government charges still apply). Your code is on the [Refer a friend](/refer) page. Referrals are checked for fraud, so a reward appears once the referral qualifies, not the moment someone signs up. See [Referrals and rewards](/help/a/referrals-and-rewards).
 

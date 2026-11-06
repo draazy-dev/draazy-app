@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 30
-updated: 2026-10-10
+updated: 2026-11-06
 summary: How admins review right-to-erasure requests, when to refuse, and what is deleted or kept.
 tags: [ops, internal, erasure, privacy, dpdp]
 modules: [erasure]
@@ -43,6 +43,7 @@ The subtitle reads: "Right-to-erasure requests. Erasing is permanent."
 | Item | What it shows |
 | --- | --- |
 | Chips **Pending**, **Erased**, **Rejected**, **All** | Filter by decision. **Pending** shows first |
+| **Filed** date chips (**All**, **Today**, **7d**, **30d**) | Narrow the list by when the request was filed |
 | Row title "Request" and a short id | The first 8 characters of the request id. The row does not show the person's name |
 | **Filed** / **Decided** | How long ago |
 | **Reason** | What the person wrote |
@@ -59,9 +60,10 @@ A decided request is final. If you try to decide it again the server refuses. A 
 
 When you choose **Erase permanently**, the system:
 
-- Deletes the person's sign-in codes, login sessions, push subscriptions, queued messages, notifications and identity check records.
-- Deletes their rental records, help article feedback, uploaded KYC documents (the files too, unless the same file was filed on a property or service request) and draft approvals for services. Unclaimed service-request parties are removed.
-- Blanks stored tax and ID numbers and personal fields on the identity, tenant and service profiles.
+- Deletes the person's sign-in codes, login sessions, push subscriptions, queued messages, notifications, identity check records and living-style answers.
+- Deletes their rental records, help article feedback, leads in the sales CRM, uploaded KYC documents (the files too, unless the same file was filed on a property or service request) and draft approvals for services. Unclaimed service-request parties are removed.
+- Blanks stored tax and ID numbers and personal fields on the identity, tenant and service profiles, and the tenant name, mobile and start date (and the landlord PAN, for the owner) on managed properties.
+- Takes the person out of flatmates: they leave every group, their rooms, groups and seeker post are archived, and pending flatmate requests, group applications and owner notices involving them are deleted.
 - Removes the person from page view records.
 - Replaces the account: the phone number becomes a made-up value, and the name, email, avatar, city and password are cleared. The account is archived and says "Erased on the account holder's request".
 
@@ -74,10 +76,10 @@ These are recorded on the request as the reason for keeping them:
 | Payments and invoices | Records the business must hold |
 | Rent agreements and rent receipts | Records tied to a signed agreement |
 | Closed deals and offers | Records involving the other party |
-| Audit log | Proof of who did what in the panel |
+| Audit log | Proof of who did what in the panel (kept 365 days) |
 | Abuse reports | Protects other users |
 | Reviews and ratings | Content others rely on |
-| Listings and property records | Property data, not only the person |
+| Listings and property records | Property data, not only the person. The name on ownership evidence behind a Verified property badge stays so the badge remains checkable |
 
 Some other personal data is not yet removed by the erasure: referral phone numbers and codes, flatmate group member names, contact names and phone numbers on tickets and service requests, deals, saved searches, city waitlist entries, managed property tenant names, and flatmate posts and consent records. Make sure your lead knows these gaps exist. Do not tell the person that everything was erased.
 
@@ -89,7 +91,7 @@ Some other personal data is not yet removed by the erasure: referral phone numbe
 4. If they do, choose **Reject** and write the reason in plain words, for example: "You have an active registered rent agreement, so we must keep it."
 5. If you cannot tell, leave it **Pending** and ask your lead. Do not guess.
 
-No deadline is enforced or shown on this page. Ask your lead for the legal time limit and treat it as the target.
+No deadline is enforced or shown on this page, but admins get a staff alert for a pending request after 7 days and an escalation after 20 days. Ask your lead for the legal time limit and treat it as the target.
 
 ## Never do
 

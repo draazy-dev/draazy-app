@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 14
-updated: 2026-10-13
+updated: 2026-11-06
 summary: How pass and contact-pack refund requests are decided, what the risk signals mean, and what never to promise.
 tags: [ops, refunds, payments, disputes, internal]
 modules: [refunds]
@@ -44,7 +44,9 @@ Use **Refunds** in the sidebar (`/admin/refunds`; staff open it under `/staff/re
 | **Automatic** | Refunds the system paid, such as a double charge |
 | **Disputes** | Chargebacks. Only that purchase is frozen, never the account |
 
-Only **Pending** rows can be approved or rejected; the other tabs are read-only. If a row was already decided or is under dispute, the desk tells you and reloads.
+Only **Pending** rows can be approved or rejected; the other tabs are read-only. If a row was already decided or is under dispute, the desk says "Already decided or under dispute" and reloads. If the facts changed since the request, it says so and the request can no longer be refunded.
+
+On **Automatic** and **Approved** rows, the **Refund** line shows where the money is: **Queued to send**, **Cashfree refused it, retrying** (with the failed attempts), **Sent to Cashfree** or **Confirmed by Cashfree**. A refund stuck on retrying is a finance question: pass it to the [Finance desk](/help/a/finance-desk).
 
 ## Reading the signals
 
@@ -65,8 +67,8 @@ The limits (reply window, refund windows, guarantee size) are set in **Settings 
 ## Steps: decide a request
 
 1. Open the **Pending** tab and read the row.
-2. To pay it, choose **Approve**. The refund goes to the original payment method in 5–7 business days, with a credit note.
-3. To refuse it, choose **Reject** and write a reason. The customer sees it, so state the policy point plainly.
+2. To pay it, choose **Approve** and confirm in the **Approve refund** window. The refund goes to the original payment method in 5–7 business days, with a credit note.
+3. To refuse it, choose **Reject**, write the **Reason (required)** and confirm. The customer sees it, so state the policy point plainly.
 4. The row leaves **Pending**. The customer is notified either way.
 
 While a request is pending, the pack's contacts are frozen or the pass's listing is paused. A rejection lets them resume.

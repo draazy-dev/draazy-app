@@ -5,7 +5,7 @@ category: getting-started
 audience: everyone
 order: 2
 featured: true
-updated: 2026-10-10
+updated: 2026-11-06
 summary: We never take a cut of your rent or sale price. Here is what is free, what is paid, and how Draazy makes money.
 tags: [brokerage, pricing, fees]
 ---
@@ -15,28 +15,28 @@ Zero brokerage means exactly one thing: **Draazy never takes a percentage of you
 ## What is always free
 
 - Browsing and searching every listing
-- Sending owner contact requests and chatting after the owner approves (the free allowance is 15 owner contacts; a Rent Contact Pack adds 15 for rent listings at ₹199, a Buy Contact Pack adds 15 for sale listings at ₹399)
+- Sending owner contact requests and chatting after the owner approves (your free allowance is 15 owner contacts, to use within 30 days of your first contact)
 - Shortlisting, comparing and saving searches
 - Scheduling a site visit
-- Posting one live property listing at a time as an owner
+- Posting one live property listing at a time as an owner, and posting flatmate posts
 - Pausing, resuming and editing your own listing
-- Raising a support ticket
+- Chatting with Draazy support
 - Home-loan eligibility check and advice
 
 ## What is paid, and why
 
-We charge for optional things that cost us real money to deliver. None renews by itself:
+We charge for optional things that cost us real money to deliver. None renews by itself, and you see the price before you pay:
 
 | What | Who buys it | Price |
 | --- | --- | --- |
-| Rent Listing Pass — one extra live rent listing for 60 days | Owners | ₹999 |
-| Sale Listing Pass — one extra live sale listing for 90 days | Owners | ₹1,999 |
-| Rent Contact Pack — 15 contacts for rent listings, 30 days | Seekers | ₹199 |
-| Buy Contact Pack — 15 contacts for sale listings, 60 days | Seekers | ₹399 |
+| Rent Listing Pass: one extra live rent listing for 60 days | Owners | ₹999 |
+| Sale Listing Pass: one extra live sale listing for 90 days | Owners | ₹1,999 |
+| Rent Contact Pack: 15 more contacts for rent listings, 30 days | Seekers | ₹199 |
+| Buy Contact Pack: 15 more contacts for sale listings, 60 days | Seekers | ₹399 |
 | Rent agreement with e-stamp and delivery | Either party | ₹499 plus government charges |
 | Packers & movers, interiors, valuation | Movers | Quote-based |
 
-The price you pay is shown on the plan or service checkout, and the detail is in [Plans explained](/help/a/plans-explained).
+These are the current prices. The live price is always on the [Plans page](/plans), and your balances and payments are under **Plan & Billing** on your [dashboard](/help/a/your-dashboard). The detail is in [Plans explained](/help/a/plans-explained).
 
 ## The catch people expect
 
@@ -52,4 +52,5 @@ There isn't a hidden one, but two things are worth knowing:
 
 - [What is Draazy?](/help/a/what-is-draazy)
 - [Plans explained](/help/a/plans-explained)
+- [Your dashboard](/help/a/your-dashboard)
 - [Invoices, refunds and receipts](/help/a/invoices-and-refunds)

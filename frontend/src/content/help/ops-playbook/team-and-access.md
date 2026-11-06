@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 24
-updated: 2026-10-10
+updated: 2026-11-06
 summary: How managers and admins add staff, give them desks, reset sign-in, and suspend accounts in Team & Access.
 tags: [ops, internal, team, access, permissions, 2fa]
 modules: [team]
@@ -63,13 +63,15 @@ Reset 2FA and Reissue invite are hidden for yourself and for suspended members. 
 
 ## Desks (functions) and permissions
 
-Staff get desks from **Back-office functions**, grouped under Verification, Listings, Service desks, Support, Trust & safety, Content and Insights. A function can open one or more modules.
+Staff get desks from **Back-office functions**, grouped under Verification, Listings, Service desks, Support, Trust & safety, Sales, Content and Insights. A function can open one or more modules.
 
 - Ticking a function replaces the person's whole set when you save. Check the full list each time.
-- Everyone who can sign in always gets the Dashboard.
+- Everyone who can sign in always gets the Dashboard and Runbooks.
 - Managers get every function by default.
 - A manager can only give functions the manager holds.
-- Examples: **User lookup** gives read-only Users. **Enquiries** gives read-only Enquiries. **Content** gives read and write on Content. **Support** gives tickets and notes.
+- Examples: **User lookup** gives read-only Users. **Enquiries** gives read-only Enquiries. **Content** gives read and write on Content. **Support** opens every [support chat](/help/a/support-chats) and the customer tickets. **Leads** opens the [Leads CRM](/help/a/leads-crm) with read and write.
+- A desk function gives a narrower view of support chats: Property verification and Listing moderation see property chats, Flatmates sees flatmate chats, a service desk sees request chats, KYC review sees identity chats and Refunds sees payment chats. Only Support, managers and admins see General chats.
+- Lead management (see everyone's leads and reassign them) is held by managers and admins only. It cannot be granted as a function.
 - Every change is recorded.
 
 ## Add a new staff member
@@ -117,4 +119,6 @@ A duplicate mobile or email is refused. The role cannot be changed later. To cha
 ## Related
 
 - [Staff desks](/help/a/staff-desks)
+- [Support chats](/help/a/support-chats)
+- [Leads CRM](/help/a/leads-crm)
 - [Users desk](/help/a/users-desk)

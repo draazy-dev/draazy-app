@@ -5,12 +5,12 @@ category: owner-tools
 audience: owner
 order: 1
 featured: true
-updated: 2026-10-10
-summary: Use the dashboard Action Center and Requests inbox to approve, decline and follow up on owner leads.
-tags: [leads, enquiries, requests, owner, dashboard]
+updated: 2026-11-06
+summary: Use the dashboard Action Center and Requests inbox to approve, decline and follow up on number, photo, document, flatmate, visit and offer requests.
+tags: [leads, enquiries, requests, owner, dashboard, visits, offers]
 ---
 
-Everything waiting on you appears first in **Dashboard → Home → Action Center**. The full queue is under **Dashboard → Requests**.
+Everything waiting on you appears first in **Dashboard → Home → Action Center**, under "Needs your attention". The full queue is under **Dashboard → Requests**, and visits have their own tab, **Dashboard → Visits**.
 
 ## The one number that matters
 
@@ -18,34 +18,51 @@ Everything waiting on you appears first in **Dashboard → Home → Action Cente
 
 Turn on in-app, email or WhatsApp alerts for new enquiries under [notification settings](/help/a/notifications-language).
 
-## One inbox, five filters
+## One inbox, seven tabs
 
-A request for your number, a request for more photos, a request to see documents, and a flatmate enquiry are all different things — but they all mean somebody is waiting on you, so they share a queue. Filter it by **All leads**, **Number requests**, **Photo requests**, **Documents** or **Flatmate**.
+A request for your number, a request for more photos, a request to see documents, a flatmate enquiry, a visit and a price offer are all different things, but they all mean somebody is waiting on you, so they share a queue. Filter it by **All**, **Number requests**, **Photo requests**, **Documents**, **Flatmate**, **Visits** or **Offers**. Each tab shows how many open requests you have received in it.
 
-The list sorts itself: anything awaiting a decision from you comes first, then whoever has waited longest. You do not have to hunt for the urgent one.
+Every card shows whether it is **Received** (someone asked you) or **Sent** (you asked someone), the message, and a status: Pending, Accepted, Declined, Expired, Withdrawn or Countered. Open requests come first, longest-waiting at the top. Anything answered, withdrawn or expired folds away behind **Show past requests**.
 
-Tap any row to open it. The detail sheet has the request, the person, and the actions — accept or decline, mark photos done or add photos, grant or decline documents. Once you accept a number request, **Call** and **Chat** buttons appear. Plain messages are not in this inbox; they live under **Dashboard → Messages**. Buttons stay disabled while a decision is being saved so a double tap cannot send two answers.
+### Answering a request
+
+| Request | Your buttons |
+| --- | --- |
+| Number request | **Approve & chat**, **Decline** |
+| Visit | **Confirm & chat**, **Decline** |
+| Photo request | **Photos added** (with an **Add photos** link), **Decline** |
+| Flatmate enquiry | **Accept & chat**, **Decline** |
+| Documents | **Share**, **Decline** |
+| Price offer | **Accept & chat**, **Counter**, **Decline** |
+
+Accepting a number request, flatmate enquiry, visit or offer opens a chat with that person straight away, and a number request also shows you their number. You can share your number only while the listing is live, so a paused or taken-down listing asks you to make it live first. Documents you share are view-only.
+
+Once you decide, the card keeps a status and an **Open chat** button, and **Clear** removes it from your list. Only you can decide on a request addressed to you. Repeating the same answer does nothing, and you cannot change your mind afterwards, so be sure before you tap.
+
+When you are the one asking, a sent card offers **Remind** (limited, so it tells you when you can nudge again), **Withdraw**, and **Respond** if the other side countered your offer. Withdrawing a number request returns the contact to your allowance.
+
+Received requests stay in your inbox for 90 days and sent ones for 30 days. Plain messages are not in this inbox; they live in **Messages** in the top bar.
 
 ## Triaging
 
-You do not see a tenant's occupation, income or household answers — only their name, their mobile after you accept, and a verified tick if the team has checked their ID (see [tenant profiles](/help/a/tenant-profiles)). So ask the rest yourself:
+You do not see a tenant's occupation, income or household answers. You see their name, their mobile after you accept, and a **KYC done** badge if the team has checked their ID (see [tenant profiles](/help/a/tenant-profiles)). So ask the rest yourself:
 
-- **Move-in date** — if it is three months out and you need someone next week, say so immediately rather than going quiet
-- **Household composition** — matches or does not match what the flat suits
-- **Verified tick** — a KYC-done tenant is worth more of your time
+- **Move-in date**: if it is three months out and you need someone next week, say so immediately rather than going quiet
+- **Household composition**: matches or does not match what the flat suits
+- **KYC done badge**: a KYC-done tenant is worth more of your time. If you want only those, switch on "Accept verified contacts only" in your settings; it is off by default
 
 ## Notes and follow-ups
 
-Inside the detail sheet you can leave yourself a **note** and set a **follow-up date**. These are private — they are yours, and they are never sent to the person or shown on any listing. Use them for the things you would otherwise keep in your head: what you quoted, what they asked for, when to chase.
+Tap a received card to open **Lead details**. There you can add a **Private note** and a **Follow-up date**. These are yours alone: they are never sent to the person or shown on any listing. Use them for the things you would otherwise keep in your head: what you quoted, what they asked for, when to chase.
 
 > [!TIP]
-> When you finalize a rental, the listing comes off the market. You need the agreed rent and the tenant's 10-digit mobile to do it. Do it promptly — stale listings get demoted in search. See [Keeping a listing fresh](/help/a/listing-freshness).
+> When you finalize a rental, the listing comes off the market. You need the agreed rent and the tenant's 10-digit mobile to do it. Do it promptly, because stale listings get demoted in search. See [Keeping a listing fresh](/help/a/listing-freshness).
 
 ## Site visits
 
-Visit requests have their own tab, **Dashboard → Visits**. Confirm or propose an alternative. Batch visits into one or two windows per week rather than one at a time.
+Visit requests show in the **Visits** tab of Requests and in **Dashboard → Visits**. A visit is Awaiting confirmation, Confirmed, Visited, Cancelled or No-show. As the host you can **Confirm**, **Reschedule** (the visitor is asked to confirm the new time again), **Cancel** or **Message**. Batch visits into one or two windows per week rather than one at a time.
 
-Only you can mark a visit completed, and only after it was due. That completion is what lets the visitor leave a review, so it matters. See [Scheduling a visit](/help/a/schedule-a-visit).
+After a confirmed visit's time has passed, tap **Mark visited**, or **Didn't come** if nobody turned up. Only the host can mark a visit completed. That completion is what lets the visitor leave a review, so it matters. See [Scheduling a visit](/help/a/schedule-a-visit).
 
 ## Closing
 
@@ -58,10 +75,11 @@ Once you have chosen a tenant:
 
 ## My Properties shortcuts
 
-Your property cards also show what is waiting on that listing: Edit, View listing, Tools, Pause or Resume, Mark under offer, Finalize rental or sale, Take down, and the moderation status if review needs information.
+Your property cards in **Dashboard → My Properties** show what is waiting on that listing ("{n} waiting") and carry Edit, View listing, Pause or Resume, Mark under offer, Finalize rental or sale, and Take down (Withdraw if it was never approved). A listing that was closed can be reopened. Homes you rent out and track privately sit in the same tab; see [Managed homes](/help/a/managed-homes).
 
 ## Related
 
 - [Reading tenant profiles](/help/a/tenant-profiles)
+- [Managed homes](/help/a/managed-homes)
 - [Pricing your property](/help/a/price-your-property)
 - [Offers and closing the deal](/help/a/offers-and-closing)

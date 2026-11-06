@@ -5,8 +5,8 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 4
-updated: 2026-10-10
-summary: Internal procedure for ownership evidence, ownership badges and manual verified badges.
+updated: 2026-11-06
+summary: Internal procedure for ownership evidence, the Verified property badge and manual KYC done badges.
 tags: [ops, ownership, badges, internal]
 modules: [properties, users]
 ---
@@ -18,9 +18,9 @@ modules: [properties, users]
 
 **Monitor**
 
-- **Badge requests** tab in Properties ? amber from 24 h, rose from 72 h.
-- **Owner is seeking the Verified property badge** banner ? the request waits for your answer.
-- **Current** or **Expired** chip on each evidence row ? only current proof counts.
+- **Badge requests** tab in Properties: "due soon" (amber) from 24 h, "overdue" (rose) from 72 h, oldest first.
+- **Owner is seeking the Verified property badge** banner: the request waits for your answer.
+- **Current** or **Expired** chip on each evidence row: only current proof counts.
 
 **Work on**
 
@@ -30,9 +30,11 @@ modules: [properties, users]
 
 ## Desks and access
 
-Review ownership evidence inside **Admin → Properties** (`/admin/properties`) in the listing review modal; staff open it under `/staff/properties`. You need the **Property verification** function (`properties:verify`). Use the **Ownership verification** section to read and record evidence, then grant, or withdraw a grant. Decline a badge request from the banner.
+Draazy shows two badges only. **Verified property** is the ownership badge, granted here. **KYC done** is the person badge, earned through [Identity review](/help/a/identity-review) or granted by hand in Users. Neither certifies legal title.
 
-Hand-granted verified badges live in **Admin → Users** (`/admin/users`). A manager or admin with `users:write` uses **Grant Verified badge** or **Remove Verified badge** with a reason, and it takes effect at once. You cannot badge yourself. Every grant and removal is audited.
+Review ownership evidence inside **Admin → Properties** (`/admin/properties`) in the listing review modal; staff open it under `/staff/properties`. You need the **Property verification** function (`properties:verify`). Use the **Ownership verification** section to read and record evidence, then grant, or withdraw a grant. Decline a badge request from the banner. The verdict strip shows **Ownership verified** with the date it is valid until, or the missing evidence that blocks it.
+
+Hand-granted **KYC done** badges live in **Admin → Users** (`/admin/users`). A manager or admin with `users:write` uses **Grant Verified badge** or **Remove Verified badge** with a reason, and it takes effect at once. You cannot badge yourself. Every grant and removal is audited.
 
 ## Ownership request states
 
@@ -44,7 +46,9 @@ Hand-granted verified badges live in **Admin → Users** (`/admin/users`). A man
 | Declined | **Decline badge request** → **Decline request** | No ownership badge; owner sees the reason |
 | Withdrawn | **Withdraw ownership verification** (reason required) | Badge is removed; evidence rows remain |
 
-Ownership review is separate from listing publication. Recording evidence does not grant a badge; staff must click **Grant ownership verification**.
+Ownership review is separate from listing publication. Recording evidence does not grant a badge; staff must click **Grant ownership verification**. The button stays disabled while evidence is missing (**Record the missing evidence first.**) and while the owner has not got **KYC done** (**Owner ID pending: verify the owner's ID first.**). Verify the owner in Identity review, then come back.
+
+A granted badge lapses when the documents expire, until the owner submits current ones. It is also removed if the listing's address, society or electricity meter number is changed later, until the listing is re-checked.
 
 ## Where badge requests come from
 
@@ -63,6 +67,8 @@ Accepted title proofs are Index II, share certificate, Satbara / 7-12 extract, 8
 
 Aadhaar and PAN are retired identity evidence for this desk. Do not accept them as ownership proof.
 
+A RERA number is shared by the owner: check it on MahaRERA with the review modal's **Open MahaRERA search** link and tick the RERA check. Draazy does not verify societies, so a society name or share certificate is evidence about the flat, not a society approval.
+
 ## Date and document checks
 
 1. Open every evidence row before deciding.
@@ -78,9 +84,9 @@ Use **Grant ownership verification** when required evidence is valid and matches
 
 Do not use listing approval as a shortcut for ownership proof. A listing can be live without ownership verification.
 
-## Manual verified badges
+## Manual KYC done badges
 
-A manager or admin grants or removes a manual badge in one step:
+A manager or admin grants or removes a manual **KYC done** badge in one step:
 
 | Rule | Requirement |
 | --- | --- |
@@ -89,7 +95,7 @@ A manager or admin grants or removes a manual badge in one step:
 | Self | You cannot badge your own account |
 | Already verified | A second grant is refused |
 
-Use this panel only for hand-granted verified badges. If the badge was earned through KYC, revoke through **Identity review**.
+Use this panel only for hand-granted badges. If the badge was earned through KYC, revoke through **Identity review**.
 
 ## Never do in ownership and badges
 
@@ -103,4 +109,4 @@ Use this panel only for hand-granted verified badges. If the badge was earned th
 
 - [Verification SLAs](/help/a/verification-sla)
 - [Identity review](/help/a/identity-review)
-- [Ticket handling and escalation](/help/a/ticket-escalation)
+- [Chats, tickets and escalation](/help/a/ticket-escalation)

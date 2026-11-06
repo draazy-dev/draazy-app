@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 5
-updated: 2026-10-10
+updated: 2026-11-06
 summary: Internal trust and safety procedure for report triage, chat reports, takedowns and dismissals.
 tags: [ops, reports, takedowns, internal]
 modules: [reports]
@@ -18,21 +18,21 @@ modules: [reports]
 
 **Monitor**
 
-- Tab counts on **Properties**, **Users & owners** and **Flatmate posts** ? reports not yet decided.
-- **Open** status chip ? nobody has decided it. **Being reviewed** may be with a colleague.
-- A red **3x** badge or higher ? three or more reports hit the same target. Treat it as an escalation signal.
-- **Reviews** tab, if you hold review access ? pending reviews to approve or reject.
+- Tab counts on **Properties**, **Users & owners** and **Flatmate posts**: reports not yet decided.
+- **Open** status chip: nobody has decided it. **Being reviewed** may be with a colleague.
+- A red **3x** badge or higher: three or more reports hit the same target. Treat it as an escalation signal.
+- **Reviews** tab, if you hold the **Review moderation** function: pending reviews to approve or reject.
 
 **Work on**
 
 - Filter **Open** and read **View details** before you act on any report.
-- Choose **Take down**, **Suspend**, **Resolve** or **Dismiss**; add a note when the reason is not obvious.
-- Use **Bulk Resolve** or **Bulk Dismiss** only on clearly no-action reports.
+- Choose **Take down**, **Suspend**, **Resolve** or **Dismiss**; a prompt asks for an optional internal note. Add one when the reason is not obvious.
+- Use **Bulk Resolve** or **Bulk Dismiss** (after **Select all open** or ticking rows) only on clearly no-action reports.
 - On **Reviews**, **Approve** or **Reject** each pending review.
 
 ## Desk and access
 
-Use **Admin → Reports** (`/admin/reports`) for Trust & Safety triage. You need the **Reports** function (`reports:read` to view, `reports:write` to decide); staff open it under `/staff/reports`.
+Use **Admin → Reports** (`/admin/reports`, page title **Reports & Moderation**) for Trust & Safety triage. You need the **Reports** function (`reports:read` to view, `reports:write` to decide); staff open it under `/staff/reports`. The **Reviews** tab needs the separate **Review moderation** function.
 
 Users can file listing reports, user reports and review reports. Chat can open a **Report user** modal for one-to-one conversations; group conversations do not expose user blocking or reporting.
 
@@ -45,7 +45,7 @@ Users can file listing reports, user reports and review reports. Chat can open a
 | **Flatmate posts** | Rooms, groups and seeker posts | **Take down** with `hide_content` |
 | **Reviews** | User reviews on listings and societies | **Approve** / **Reject** (not a report; see below) |
 
-Filter by status, reason and date range. Search only after checking whether an old tab or reason filter is hiding rows.
+Filter by **Status** chips, reason and **Reported** date range, or search "Item, reason or note". Check whether a filter is hiding rows before you decide a queue is clear. **Export CSV** downloads the rows in the current tab; the reporter shows as **Withheld**.
 
 ## Report states
 
@@ -79,13 +79,15 @@ Reporter identity is withheld from the queue and export. Use **Withheld** in not
 | **Resolve** | Stores a dismissed report with reviewed-no-action wording |
 | **Dismiss** | Stores a dismissed report without enforcement |
 
-The **Reviews** tab is a moderation list, not reports: filter Pending / Published / Rejected and use **Approve** (publishes) or **Reject** (hides the text and drops it from the rating). It shows only to accounts that also hold `properties:read`.
+The **Reviews** tab is a moderation list, not reports: filter Pending / Published / Rejected, search "Author, item or text", and use **Approve** (publishes) or **Reject** (hides the text and drops it from the rating). It shows only to accounts that hold the **Review moderation** function.
 
 ## Chat blocks and reports
 
 Blocking in Messages is pair-only. It prevents messaging both ways for that pair and can be undone with unblock. Deleting a message hides it only for the current user.
 
 Use chat user reports like any other user report: inspect the target, look for repeat reports, and suspend only when account-level action is justified.
+
+A customer writing to staff in **Support** is a [support chat](/help/a/support-chats), not a report. If it describes abuse, ask them to use the report option on the listing, user or post so it lands here.
 
 ## Never do in reports and takedowns
 
@@ -97,6 +99,7 @@ Use chat user reports like any other user report: inspect the target, look for r
 
 ## Related
 
-- [Ticket handling and escalation](/help/a/ticket-escalation)
+- [Support chats](/help/a/support-chats)
+- [Chats, tickets and escalation](/help/a/ticket-escalation)
 - [Verification SLAs](/help/a/verification-sla)
 - [Flatmate review](/help/a/flatmate-review)

@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 1
-updated: 2026-10-18
+updated: 2026-11-06
 summary: Internal queue rules for listing verification, live re-checks, duplicates and owner follow-up.
 tags: [ops, sla, verification, internal]
 modules: [properties]
@@ -23,6 +23,7 @@ modules: [properties]
 - **Flagged** tab count — every flagged listing is out of search until you clear or archive it.
 - **Duplicates** tab count — clusters still waiting for a decision.
 - **Follow-up** tab count — live listings the owner has not confirmed for over two weeks. It has no amber or rose.
+- Your bell alerts (also emailed to staff): **New …**, **Waiting …** and **Escalated: …** for the queues in "Queue alerts and escalations" below.
 - Every queue shows newest first, and each tile shows when the listing was created or last updated.
 
 **Work on**
@@ -52,6 +53,37 @@ Use the owner follow-up buttons only with the **Post on behalf** function (`post
 | **All listings** | Full moderation view, including archived rows when filtered | Use only to find or restore a known listing |
 
 The SLA panel is green at 90% or better, amber from 75% to 89%, and rose below 75%.
+
+## Queue alerts and escalations
+
+You do not have to watch the tabs all day. A sweep runs every 15 minutes and sends a bell alert for each queue below. On a staff account the same alert is also emailed to the address on the account (managers and admins get the bell only).
+
+| Alert | When | Goes to |
+| --- | --- | --- |
+| **New …** (arrival) | A new item arrives unassigned, in the first hour | Staff holding the function |
+| **Waiting 24h+** (reminder) | The item has waited the reminder time | The assignee, or the staff holding the function |
+| **Escalated: … untouched 36h+** | The item has waited the escalation time | Managers (admins if there are no managers) |
+
+| Queue | Reminder | Escalation | Function that gets it |
+| --- | --- | --- | --- |
+| Listing to review | 24h | 36h | Listing moderation |
+| Listing re-check | 24h | 36h | Listing moderation |
+| Owner reply to answer | 48h | 72h | Property verification |
+| Verified-badge request | 48h | 72h | Property verification |
+| ID check, identity appeal | 48h | 72h | KYC review |
+| Flatmate check | 48h | 72h | Flatmates |
+| Flatmate post to moderate | 24h | 48h | Flatmates |
+| Support chat waiting on us | 24h | 48h | Support |
+| Abuse report | 24h | 48h | Reports |
+| Refund request | 48h | 72h | Refunds |
+| Unassigned service request | 4h | 8h | That service desk |
+| Rent agreement | Past its stage deadline | 1.5 times the stage deadline | Rent Agreement desk |
+| Data-erasure request | 7 days | 20 days | Admins |
+| Customer draft decision, community society | Arrival alert only | None | The desk or Societies |
+
+An alert clears itself when the item is decided. Fix the queue, not the alert. A rent agreement that waits on the tenant's payment invite is shown as waiting, not late. Real alert emails need email delivery switched on in [Settings and integrations](/help/a/settings-and-integrations).
+
+The tab colours above (24h/48h, 24h/72h) are the desk's own colours; the bell alerts use the times in this table. Suspended accounts stop receiving alerts.
 
 ## Listing states
 
@@ -107,10 +139,11 @@ Use **Keep this, archive the rest** only when the cluster really points to the s
 
 ## Escalation path
 
-Escalate suspected organised fraud, legal or police references, minors, media contact, or repeated attempts to reopen rejected listings through the ticket ladder. Record the listing id, reason code, signals and action already taken.
+Escalate suspected organised fraud, legal or police references, minors, media contact, or repeated attempts to reopen rejected listings up the ladder in [Chats, tickets and escalation](/help/a/ticket-escalation), by phone for a P0. Record the listing id, reason code, signals and action already taken.
 
 ## Related
 
-- [Ticket handling and escalation](/help/a/ticket-escalation)
+- [Chats, tickets and escalation](/help/a/ticket-escalation)
+- [Support chats](/help/a/support-chats)
 - [Ownership and badges](/help/a/ownership-and-badges)
 - [Reports and takedowns](/help/a/reports-and-takedowns)

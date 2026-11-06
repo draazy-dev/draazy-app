@@ -5,8 +5,8 @@ category: getting-started
 audience: everyone
 order: 1
 featured: true
-updated: 2026-10-10
-summary: Draazy connects tenants and buyers directly with property owners in Pune — no brokers, no brokerage.
+updated: 2026-11-06
+summary: Draazy connects tenants and buyers directly with property owners in Pune, with no brokers and no brokerage.
 tags: [basics, overview, brokerage]
 ---
 
@@ -14,11 +14,11 @@ Draazy is a Pune-first property marketplace that puts you in touch with **owners
 
 ## How it is different
 
-Most portals sell your phone number to agents. We do the opposite — owners list their own property, broker listings are not allowed, and you contact the owner through Draazy.
+Most portals sell your phone number to agents. We do the opposite: owners list their own property, broker listings are not allowed, and you contact the owner through Draazy.
 
 - **Zero brokerage.** You never pay us a commission on rent or sale.
 - **Owner-only supply.** Owners, or a family member listing for them, can post. Agents and brokers cannot.
-- **Badges where checks are complete.** Identity and ownership badges are shown separately so you know what has been checked. A RERA number, where shown, is shared by the owner - you can check it yourself on MahaRERA.
+- **Two badges, each for a different check.** **KYC done** means a person's ID and selfie were reviewed by our team. **Verified property** means our team reviewed ownership evidence for that home. A RERA number, where shown, is shared by the owner, so you can check it yourself on MahaRERA.
 - **Real availability.** Owners confirm availability regularly; stale listings are pulled down.
 - **Local depth.** Smart search, live filter counts, locality guides, commute times and society-level data for Pune specifically.
 
@@ -26,15 +26,19 @@ Most portals sell your phone number to agents. We do the opposite — owners lis
 
 ### If you are looking for a home
 
-Search with filters that matter (budget, BHK, furnishing, pet-friendly, commute time), shortlist properties, save alerts, compare them side by side, and book a site visit — all without speaking to an agent.
+Search with filters that matter (budget, BHK, furnishing, pet-friendly, commute time), shortlist properties, save alerts, compare them side by side, and book a site visit, all without speaking to an agent. If you need a flatmate, you can also look at flatmate rooms and posts.
 
 Start at [Searching & visits](/help/c/search-visits).
 
 ### If you own a property
 
-List it in a few minutes, pause or resume it from your dashboard, add optional verification evidence, and receive contact requests that show the requester's name, a masked mobile number and a **Serious Buyer** badge if they have verified their identity.
+List it in a few minutes, add optional verification evidence, and manage it from your dashboard. Contact requests arrive in your **Requests** tab with the requester's name and a tick if they have **KYC done**. You approve or decline each one, and approving shares your number and opens a chat. Your [dashboard](/help/a/your-dashboard) also shows what is waiting on you.
 
 Start at [Listing your property](/help/c/listing).
+
+### Talk to people in one place
+
+[Messages](/help/a/messages-and-chat) holds your chats with owners and flatmates, your requests that are waiting for an answer, and a pinned thread with Draazy support.
 
 ### If you need help around the move
 
@@ -48,3 +52,4 @@ Rent agreements, packers and movers, legal title checks, home loans and valuatio
 - [How zero brokerage actually works](/help/a/zero-brokerage)
 - [How we verify owners and listings](/help/a/how-we-verify)
 - [Create your account](/help/a/create-account)
+- [Your dashboard](/help/a/your-dashboard)

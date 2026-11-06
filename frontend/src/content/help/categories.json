@@ -54,7 +54,7 @@
       "section": "basics",
       "order": 3,
       "title": "Account & privacy",
-      "description": "Sign-in, profile, notifications and your data.",
+      "description": "Sign-in, your dashboard, Messages, notifications and your data.",
       "icon": "user-circle"
     },
     {
@@ -62,7 +62,7 @@
       "section": "tenants",
       "order": 4,
       "title": "Searching & visits",
-      "description": "Filters, saved searches, map view, shortlists and scheduling site visits.",
+      "description": "Filters, map view, your Saved list, alerts and scheduling site visits.",
       "icon": "search"
     },
     {
@@ -86,7 +86,7 @@
       "section": "owners",
       "order": 7,
       "title": "Managing enquiries",
-      "description": "Leads, tenant profiles, visit scheduling and closing the deal.",
+      "description": "Requests, leads, visit scheduling, managed homes and closing the deal.",
       "icon": "users"
     },
     {
@@ -94,7 +94,7 @@
       "section": "services",
       "order": 8,
       "title": "Plans & payments",
-      "description": "Plan comparison, invoices, Rent Wallet, refunds and receipts.",
+      "description": "Pay-per-use passes and packs, invoices, refunds, Rent Wallet and referrals.",
       "icon": "credit-card"
     },
     {
@@ -110,7 +110,7 @@
       "section": "staff",
       "order": 10,
       "title": "Ops playbook",
-      "description": "Desk map, verification and KYC review, tickets, drafting desk, flatmate, referral and trust & safety runbooks.",
+      "description": "Desk map, verification and KYC review, support chats, drafting desk, flatmate, referral and trust & safety runbooks.",
       "icon": "clipboard-text",
       "access": "staff"
     }

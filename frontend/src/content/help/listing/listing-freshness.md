@@ -4,7 +4,7 @@ slug: listing-freshness
 category: listing
 audience: owner
 order: 4
-updated: 2026-10-10
+updated: 2026-11-06
 summary: Freshness, pausing, re-checks and what to do when your listing is no longer available.
 tags: [freshness, ranking, expiry, owner, pause]
 ---
@@ -22,7 +22,7 @@ Every listing carries a freshness state derived from when you last confirmed ava
 | Stale | 15–30 days | Demoted, and buyers see that availability is unconfirmed |
 | Dormant | Over 30 days | Hidden from search until you reconfirm |
 
-The state is recalculated on every read, so it is never stale in itself — and one tap on **Confirm available** (**Reactivate** on a dormant listing) from **Dashboard → My Properties** puts it straight back to Active. Your card shows Confirm soon when it is ageing.
+The state is recalculated on every read, so it is never stale in itself, and one tap on **Confirm available** (**Reactivate** on a dormant listing) from **Dashboard → My Properties** puts it straight back to Active. Your card shows **Active**, then **Confirm soon** when it is ageing, **Stale**, and **Paused** with a **Reactivate** button once it is dormant.
 
 ## Why we do this
 
@@ -52,13 +52,14 @@ Use **Pause** when you are temporarily not taking enquiries. A paused listing is
 
 Use **Resume** when you are ready again. It returns a paused live listing to search without a new moderation decision, unless an edit already queued a re-check.
 
-Use **Take down** when you are done with the listing for good. Buyers stop seeing it, pending contact requests go back to the buyers, chats about it close, and after 30 days its photos and details are deleted. You can't take it down while a deal, offer, confirmation or paid service on it is still open. Changed your mind within 30 days? Contact support.
+Use **Take down** (or **Withdraw**, if the listing was never approved) when you are done with the listing for good. Buyers stop seeing it, pending contact requests go back to the buyers, chats about it close, and after 30 days its photos and details are deleted. You can't take it down while a deal, offer, confirmation or paid service on it is still open. Changed your mind within 30 days? Contact support; after that, post it again.
 
 ## When you rent it out
 
-Finalize the rental (or sale) from the property card rather than letting the listing go dormant. You need the agreed price and the other party's 10-digit mobile, and the listing comes off the market cleanly.
+Finalize the rental (or sale) from the property card rather than letting the listing go dormant. You need the agreed price and the other party's 10-digit mobile, and the listing comes off the market cleanly. If the listing was published from a [managed home](/help/a/managed-homes), finalizing the rental fills in that home's tenant and rent for you.
 
 ## Related
 
 - [Posting your first listing](/help/a/post-a-listing)
-- [Managing enquiries](/help/a/managing-leads)
+- [Managing requests](/help/a/managing-leads)
+- [Managed homes](/help/a/managed-homes)

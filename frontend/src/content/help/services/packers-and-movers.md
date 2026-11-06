@@ -4,7 +4,7 @@ slug: packers-and-movers
 category: services
 audience: everyone
 order: 2
-updated: 2026-10-13
+updated: 2026-11-06
 summary: Request a callback from the relocation desk, compare mover quotes, and avoid the pricing games the industry is known for.
 tags: [packers, movers, shifting, quote]
 ---
@@ -13,7 +13,7 @@ tags: [packers, movers, shifting, quote]
 
 ## Getting a quote
 
-1. Choose the service you need — local shifting within Pune, intercity/domestic shifting, office/commercial shifting, vehicle transport (car or bike) or storage and warehousing.
+1. Choose the service you need: local shifting within Pune, intercity relocation, packing and unpacking, office or commercial shifting, vehicle transport (car or bike) or storage and warehousing.
 2. Search the area or city you are moving from and to.
 3. Add the home size and preferred move date.
 4. Submit the request. The desk calls you back within 24 hours, arranges a quick video or in-person survey and shares a quote.
@@ -25,7 +25,7 @@ tags: [packers, movers, shifting, quote]
 - Loading and unloading
 - Transport
 - Unpacking and reassembly, if included
-- Transit insurance
+- Transit insurance, if the mover offers it
 - Any lift-unavailability or long-carry surcharge
 
 > [!WARNING]
@@ -33,12 +33,9 @@ tags: [packers, movers, shifting, quote]
 
 ## Insurance
 
-Optional all-risk transit insurance is available on every move. It is worth taking for anything above roughly ₹1 lakh of contents. Two forms exist:
+Draazy does not insure your move. Ask the mover whether transit insurance is offered and have the quote say exactly what it covers. It is worth taking for intercity moves and for anything above roughly ₹1 lakh of contents. A narrower accident-and-fire policy is cheaper but may not pay for a dropped television.
 
-- **All-risk** — covers damage in handling and transit. The mover quotes it against your declared value.
-- **Transit-only** — covers accident and fire only, and is much cheaper. It will not cover a dropped television.
-
-Declare the value honestly; under-declaring voids the claim.
+Declare the value honestly; under-declaring can void a claim.
 
 ## On moving day
 
@@ -54,5 +51,5 @@ The page has an **Instant moving-cost estimate** — pick home size, distance, p
 
 ## Related
 
-- [The rent agreement service](/help/a/rent-agreement-service)
+- [The rent agreement service](/help/a/rent-agreement-service), for the paperwork on your new home
 - [Scheduling a site visit](/help/a/schedule-a-visit)

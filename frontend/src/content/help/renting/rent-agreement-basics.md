@@ -4,7 +4,7 @@ slug: rent-agreement-basics
 category: renting
 audience: everyone
 order: 3
-updated: 2026-10-10
+updated: 2026-11-06
 summary: Maharashtra leave-and-licence basics: Article 36A charges, registration and the details a draft needs.
 tags: [agreement, legal, stamp duty, registration, article 36a]
 ---
@@ -27,13 +27,19 @@ Costs are calculated under Maharashtra Article 36A. As a rough guide:
 - **Document handling charge** — ₹300, levied by the Sub-Registrar on every e-registered agreement
 - **Service fee** — the Draazy service fee, shown before you pay
 
+You and the owner decide who pays the stamp duty and registration: tenant, owner or split equally. The agreement can run from 1 to 60 months.
+
+## Rent above ₹50,000 a month
+
+Under section 194-IB of the Income-tax Act, an individual tenant paying more than ₹50,000 a month deducts 2% TDS and deposits it with Form 26QC against the owner's PAN. Draazy shows a reminder in the request form; it does not file this for you.
+
 ## What the agreement must contain
 
 - Full names, ages, addresses and PAN for licensors and licensees
 - Complete property address including unit number
 - Term: start and end date
 - Rent, due date and payment mode
-- Security deposit and refund timeline
+- Security deposit, how it was paid (mode and reference) and the refund timeline
 - Notice period for both parties
 - Lock-in period, if any
 - Maintenance responsibility, itemised
@@ -49,9 +55,14 @@ Costs are calculated under Maharashtra Article 36A. As a rough guide:
 - Only the tenant bound by the notice period
 - Wrong or incomplete unit number
 
+## After you sign
+
+- **Police verification.** In Maharashtra the owner must have the tenant verified with the police. If the agreement is registered through the Draazy service, registering on the government IGR portal shares the tenant's details with the police, so there is nothing separate to file.
+- **Foreign national tenant.** The owner must submit Form C to FRRO on indiafrro.gov.in within 24 hours of the foreigner's arrival or occupation. Draazy reminds you but does not file it.
+
 ## Getting one made
 
-You can use your own lawyer, or use the [Draazy rent agreement service](/services/rent-agreement) — co-fill, drafting, stamp-duty calculation, registration workflow and a registered copy once the Sub-Registrar step is complete. See [The rent agreement service](/help/a/rent-agreement-service).
+You can use your own lawyer, or use the [Draazy rent agreement service](/services/rent-agreement). The tenant or the owner can start the request and invite the other person by mobile number to fill only their own part, then either of you pays. A doorstep visit takes each party's biometrics and the witnesses, and you get a registered copy once the Sub-Registrar step is complete. See [The rent agreement service](/help/a/rent-agreement-service).
 
 > [!NOTE]
 > This article is general information, not legal advice. For anything contested, consult a lawyer.
@@ -60,3 +71,4 @@ You can use your own lawyer, or use the [Draazy rent agreement service](/service
 
 - [Deposits, rent and what is negotiable](/help/a/deposits-and-rent)
 - [The rent agreement service](/help/a/rent-agreement-service)
+- [Posting a room for flatmates](/help/a/posting-a-flatmate-room)

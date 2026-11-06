@@ -28,7 +28,7 @@ modules: [analytics]
 **Work on**
 
 - Open overdue listings from **Longest Waiting Listings** (each title opens it in Properties). Verification work follows [Verification SLAs](/help/a/verification-sla).
-- Tell the right desk about unassigned tickets that are past target: see [Ticket handling and escalation](/help/a/ticket-escalation).
+- Tell the right desk about unassigned tickets that are past target: see [Chats, tickets and escalation](/help/a/ticket-escalation).
 - Weekly: read **Supply Gap**, **Funnel** and **Pricing** and send your manager a short note with what changed and which locality or stage it concerns.
 - Weekly: check **City Expansion Requests** and **Demand Alerts by Locality** and pass the top names to your manager.
 
@@ -102,6 +102,6 @@ Tell your manager. For a stuck page or numbers that look wrong, include the tab,
 ## Related
 
 - [Verification SLAs](/help/a/verification-sla)
-- [Ticket handling and escalation](/help/a/ticket-escalation)
+- [Chats, tickets and escalation](/help/a/ticket-escalation)
 - [Team activity review](/help/a/team-activity)
 - [Staff desks](/help/a/staff-desks)

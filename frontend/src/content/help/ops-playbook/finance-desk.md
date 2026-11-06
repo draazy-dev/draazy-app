@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 28
-updated: 2026-10-10
+updated: 2026-11-06
 summary: How to read the Finance page, what each figure counts, and how to check it against the payment provider.
 tags: [ops, internal, finance, revenue, payments]
 modules: [finance]
@@ -34,7 +34,7 @@ modules: [finance]
 
 Use **Finance** at `/admin/finance`. It is admin only and staff do not see it under `/staff`. It needs `finance:read`. The page is read-only: you can look and download CSV files, not edit or refund anything.
 
-An admin can switch the module off in **Settings ? Feature flags ? Admin Modules**.
+An admin can switch the module off in **Settings → Feature flags → Admin Modules**.
 
 ## How the numbers are built
 
@@ -43,7 +43,7 @@ Money is read from **invoices** and **credit notes**. An invoice is issued only 
 - **Collected**: everything customers paid.
 - **Refunded**: everything paid back.
 - **Pass-through**: stamp duty and registration on rent agreements. We collect it for the government, so it is not revenue.
-- **Net revenue**: Draazy's own fees, less fees refunded. Collected ? Refunded ? Pass-through = Net revenue. It can be negative in a month with large refunds.
+- **Net revenue**: Draazy's own fees, less fees refunded. Collected - Refunded - Pass-through = Net revenue. It can be negative in a month with large refunds.
 
 Days are counted in Indian time.
 
