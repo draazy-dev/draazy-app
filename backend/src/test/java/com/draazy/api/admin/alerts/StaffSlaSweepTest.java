@@ -1,6 +1,7 @@
 package com.draazy.api.admin.alerts;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -13,6 +14,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +25,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 @DisplayName("Staff SLA sweep: announce, remind, escalate")
 class StaffSlaSweepTest extends AbstractApiTest {
     private static final Instant BASE = Instant.parse("2026-09-01T04:00:00Z");
+
+    // Arrival-only rules never reach the far-future backlog sweep, so their cases anchor after the seed data.
+    private static final Instant AFTER_SEED = Instant.now().truncatedTo(ChronoUnit.SECONDS).plus(Duration.ofDays(1));
 
     @Autowired
     StaffSlaSweep sweep;
@@ -173,6 +178,118 @@ class StaffSlaSweepTest extends AbstractApiTest {
         sweep.sweep(BASE.plus(Duration.ofMinutes(150)));
         assertThat(unreadLinks(moderator)).isEmpty();
         assertThat(types(moderator)).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("a customer's draft decision reaches the assignee, or the desk when nobody holds the case, every round")
+    void draftDecisionReachesTheDesk() {
+        User assignee = staff("9820000961", "desk:rental");
+        User colleague = staff("9820000962", "desk:rental");
+        User legal = staff("9820000963", "desk:legal");
+        User customer = account("9820000964", Roles.Wire.OWNER);
+        UUID agreement = serviceRequest(customer, "rent-agreement", "rental", "changes-requested", assignee);
+        serviceRequest(customer, "legal", "legal", "approved", null);
+
+        sweep.sweep(AFTER_SEED.plus(Duration.ofMinutes(10)));
+        assertThat(types(assignee)).containsExactly("queue.draft-decision");
+        assertThat(types(colleague)).isEmpty();
+        assertThat(bodies(assignee)).containsExactly("Rent Agreement: changes requested");
+        assertThat(bodies(legal)).containsExactly("Legal: draft approved");
+
+        Instant secondRound = AFTER_SEED.plus(Duration.ofHours(3));
+        jdbc.update("update service_requests set status_changed_at = ? where id = ?",
+                Timestamp.from(secondRound), agreement);
+        sweep.sweep(secondRound.plus(Duration.ofMinutes(10)));
+        assertThat(types(assignee)).containsExactly("queue.draft-decision", "queue.draft-decision");
+    }
+
+    @Test
+    @DisplayName("a live listing's edit re-check reaches listing moderation; a lapsed badge's renewal reaches verification")
+    void liveListingRecheckAndBadgeRequest() {
+        User moderator = staff("9820000971", "listingModeration");
+        User verifier = staff("9820000972", "propertyVerification");
+        User owner = account("9820000973", Roles.Wire.OWNER);
+        Property edited = pendingListing(owner, AFTER_SEED);
+        jdbc.update("""
+                update properties set status = 'approved', recheck_requested_at = ?, recheck_reason = 'Price'
+                 where id = ?
+                """, Timestamp.from(AFTER_SEED), edited.getId());
+        Property badge = pendingListing(owner, AFTER_SEED);
+        jdbc.update("""
+                update properties set status = 'approved', ownership_requested_at = ?, recheck_requested_at = ?,
+                                      recheck_reason = ?, ownership_verified = true,
+                                      ownership_verified_until = ?
+                 where id = ?
+                """, Timestamp.from(AFTER_SEED), Timestamp.from(AFTER_SEED), Property.OWNERSHIP_REVIEW_ITEM,
+                Timestamp.from(AFTER_SEED.minus(Duration.ofDays(1))), badge.getId());
+
+        sweep.sweep(AFTER_SEED.plus(Duration.ofMinutes(10)));
+
+        assertThat(types(moderator)).containsExactly("queue.listing-recheck");
+        assertThat(unreadLinks(moderator)).containsExactly("/admin/properties?review=" + edited.getId());
+        assertThat(types(verifier)).containsExactly("queue.badge-request");
+        assertThat(unreadLinks(verifier)).containsExactly("/admin/properties?review=" + badge.getId());
+    }
+
+    @Test
+    @DisplayName("a flatmate post awaiting moderation is announced; a community society is announced and never chased")
+    void flatmatePostAndCommunitySociety() {
+        User flatmates = staff("9820000981", "flatmates");
+        User societies = staff("9820000982", "societies");
+        jdbc.update("""
+                insert into flatmate_seeker_posts (user_id, name, budget, mod_status, created_at)
+                values (?, 'Asha Patil', 15000, 'pending', ?)
+                """, account("9820000983", Roles.Wire.BUYER).getId(), Timestamp.from(AFTER_SEED));
+        jdbc.update("insert into societies (slug, name, source, created_at) values (?, 'Green Meadows', 'community', ?)",
+                "green-meadows-" + UUID.randomUUID(), Timestamp.from(AFTER_SEED));
+
+        sweep.sweep(AFTER_SEED.plus(Duration.ofMinutes(10)));
+        assertThat(types(flatmates)).containsExactly("queue.flatmate-post");
+        assertThat(types(societies)).containsExactly("queue.community-society");
+
+        sweep.sweep(AFTER_SEED.plus(Duration.ofDays(30)));
+        assertThat(types(societies)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("a suspended holder is skipped, so the item falls back to the escalation audience")
+    void suspendedHolderIsSkipped() {
+        User suspended = staff("9820000991", "desk:valuation");
+        suspended.setStatus("suspended");
+        users.saveAndFlush(suspended);
+        jdbc.update("""
+                update back_office_permissions set permissions = '[]'::jsonb
+                 where permissions @> '["desk:valuation"]'::jsonb and user_id <> ?
+                """, suspended.getId());
+        User manager = account("9820000992", Roles.Wire.MANAGER);
+        jdbc.update("""
+                insert into tickets (id, subject, team, priority, status, created_at, updated_at)
+                values (?, 'Valuation for Aundh flat', 'valuation', 'medium', 'open', ?, ?)
+                """, UUID.randomUUID(), Timestamp.from(AFTER_SEED), Timestamp.from(AFTER_SEED));
+
+        sweep.sweep(AFTER_SEED.plus(Duration.ofMinutes(10)));
+
+        assertThat(types(suspended)).isEmpty();
+        assertThat(types(manager)).containsExactly("queue.desk-pickup");
+    }
+
+    @Test
+    @DisplayName("every rule's query runs, since the sweep only logs a failing rule")
+    void everyRuleQueryRuns() {
+        StaffSlaRule.CATALOGUE.forEach(rule ->
+                assertThatCode(() -> jdbc.queryForList(rule.sql())).as(rule.name()).doesNotThrowAnyException());
+    }
+
+    private UUID serviceRequest(User requester, String type, String team, String status, User assignee) {
+        return jdbc.queryForObject("""
+                insert into service_requests (requester_id, type, team, status, assignee_id, status_changed_at)
+                values (?, ?, ?, ?, ?, ?) returning id
+                """, UUID.class, requester.getId(), type, team, status,
+                assignee == null ? null : assignee.getId(), Timestamp.from(AFTER_SEED));
+    }
+
+    private List<String> bodies(User user) {
+        return jdbc.queryForList("select body from notifications where user_id = ?", String.class, user.getId());
     }
 
     private void archive(Property listing) {

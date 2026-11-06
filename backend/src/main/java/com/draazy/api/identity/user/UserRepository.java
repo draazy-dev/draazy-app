@@ -78,6 +78,12 @@ public interface UserRepository extends JpaRepository<User, UUID>, RoleSource {
     List<User> findBackOfficeAccounts();
 
     @Query("""
+            select u.email from User u
+            where u.id = :id and u.role = 'staff' and u.archived = false
+              and u.status = 'active' and u.email is not null and trim(u.email) <> ''""")
+    Optional<String> findLiveStaffEmail(@Param("id") UUID id);
+
+    @Query("""
             select u from User u
             where u.archived = :archived
               and (:role is null or u.role = :role)

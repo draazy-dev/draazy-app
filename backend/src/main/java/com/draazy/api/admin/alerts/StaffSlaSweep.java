@@ -3,6 +3,7 @@ package com.draazy.api.admin.alerts;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.identity.user.UserStatuses;
 import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.Roles;
 import com.draazy.api.services.request.ServiceRequestQueryService;
@@ -167,14 +168,18 @@ public class StaffSlaSweep {
             remind = threshold(rule, "remind", rule.remind());
             escalate = threshold(rule, "escalate", rule.escalate());
         }
-        if (age.compareTo(escalate) >= 0) {
+        if (escalate != null && age.compareTo(escalate) >= 0) {
             return Level.ESCALATION;
         }
-        if (age.compareTo(remind) >= 0) {
+        if (remind != null && age.compareTo(remind) >= 0) {
             return Level.REMINDER;
         }
-        boolean fresh = age.compareTo(ARRIVAL_WINDOW) < 0;
-        return rule.announces() && fresh && item.assignee() == null ? Level.ARRIVAL : null;
+        boolean announced = switch (rule.arrival()) {
+            case NONE -> false;
+            case UNASSIGNED -> item.assignee() == null;
+            case ANY -> true;
+        };
+        return announced && age.compareTo(ARRIVAL_WINDOW) < 0 ? Level.ARRIVAL : null;
     }
 
     private Duration threshold(StaffSlaRule rule, String kind, Duration fallback) {
@@ -220,7 +225,7 @@ public class StaffSlaSweep {
         List<UUID> admins = new ArrayList<>();
         Set<UUID> live = new HashSet<>();
         for (User account : users.findBackOfficeAccounts()) {
-            if (account.isArchived()) {
+            if (account.isArchived() || UserStatuses.SUSPENDED.equals(account.getStatus())) {
                 continue;
             }
             live.add(account.getId());
