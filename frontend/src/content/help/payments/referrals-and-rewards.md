@@ -4,52 +4,79 @@ slug: referrals-and-rewards
 category: payments
 audience: everyone
 order: 4
-updated: 2026-10-12
-summary: How the referral code works, what you and your friend each get, and why a reward can take a few days to land.
-tags: [referral, rewards, invite, contacts, free agreement, featured]
+updated: 2026-11-06
+summary: Invite a friend on WhatsApp and get 50% off the service fee of your next rent agreement. Your friend gets a welcome gift too.
+tags: [referral, rewards, invite, whatsapp, rent agreement, discount, featured]
 ---
 
-Inviting someone to Draazy earns you something useful, and your friend gets a welcome reward too. There is no cash reward, and there never has been.
+Invite a friend to Draazy. When your friend gets going, you get **50% off the Draazy service fee of your next rent agreement**. Your friend gets a welcome gift too. There is no cash reward.
 
-## Your code
+## How it works
 
-Open [Refer a friend](/refer). Your code is permanent and looks like `PUNE-AB12`. The page also gives you a share link, which is your code attached to the sign-up page.
-
-Share the link rather than the code where you can: a friend who follows it has the code filled in for them. Property links you share while signed in carry your code too, so a friend who signs up from a listing you shared is credited to you.
-
-> [!NOTE]
-> Copying your code or opening the share sheet does not count as an invite. The counter only moves when a real account redeems the code.
+1. **Invite.** Open [Refer a friend](/refer) and type your friend's mobile number. Draazy sends them your invite on WhatsApp. If Draazy cannot send it, your own WhatsApp opens with the message ready. You can also copy or share your link.
+2. **Your friend joins.** They sign up with your link, or just with the number you invited. No code is needed.
+3. **You get your reward.** It comes when your friend gets going:
+   - An **owner**: their listing passes ownership verification and goes live.
+   - A **tenant or buyer**: an owner accepts their first contact request.
 
 ## What each of you gets
 
-| You invite | Your friend gets | You get |
-| --- | --- | --- |
-| An owner | Longer Featured placement on their first listing | A free rent agreement |
-| A friend looking for a home | Extra free owner contacts | Owner contacts |
+| | What you get |
+| --- | --- |
+| **You** | 50% off the Draazy service fee of your next rent agreement, for each friend who gets going |
+| **Your friend, if an owner** | 14 days of Featured listing |
+| **Your friend, if a tenant or buyer** | 5 extra free contacts |
 
-The [Refer a friend](/refer) page always shows the current amounts. The first event decides the track: an owner's first listing being verified, or a seeker's first contact request being accepted by an owner.
+Your friend's gift arrives once they get going, not at sign-up. The [Refer a friend](/refer) page always shows the current amounts.
 
-## Invited, qualified and checking
+## About your discount
 
-The page shows three numbers:
+- It takes 50% off the Draazy **service fee** of one rent agreement. It shows at checkout.
+- Stamp duty and registration charges are government charges. They are not discounted.
+- One reward works on one agreement. Two rewards need two agreements.
+- Rewards do not expire.
+- If you cancel the agreement, the reward comes back.
+- Your Billing page shows how many rewards you have left.
 
-- **Invited** — people who have redeemed your code.
-- **Qualified** — referrals where the qualifying event has happened and the reward has been granted.
-- **Checking** — referrals held for a short automatic check before the reward lands. They usually clear on their own within a few days.
+## Invited, joined and checking
 
-Rewards are paid on **qualified**, not on invited. A batch of accounts created in one evening earns nothing, and rewards are limited per month and per year. A referral found to be fraudulent stops counting, and the reward is taken back.
+The [Refer a friend](/refer) page shows how many friends you invited, how many joined and how many got going. Some rewards are checked for up to 7 days before they are released. This is **Checking**. Most clear on their own.
 
-## Where the reward shows up
+You get an in-app notification when a reward is earned, held for checks, released or removed.
 
-- **Owner contacts** — added to your allowance. See [Contacting owners](/help/a/contacting-owners) for how contacts are counted.
-- **Free rent agreements** — counted on the [Refer a friend](/refer) page as earned and used. When you pay for a rent agreement with one available, checkout waives the Draazy service fee automatically and shows "Free with your referral reward"; stamp duty, registration and other government charges are still payable. If you cancel that request, the reward is returned.
-- **Featured placement** — applied to your friend's first listing after it is verified.
+## Fair-use rules
 
-## If a code does not work
+- Your friend must be new to Draazy. They must use your link or the number you invited within 24 hours of signing up, before they list or contact anyone.
+- You can earn up to 10 rewards a month and 50 a year.
+- Rewards from fake or abusive accounts are removed within 30 days. A reward you already used on an agreement is not taken back.
+- You can send up to 10 WhatsApp invites a day.
+- A number that anyone invited in the last 30 days will not get another invite.
+- Your friend can reply **STOP** to stop messages.
 
-A code can be refused for several reasons, and we do not say which. The usual ones: it is your own, the account was already referred, it was entered more than a day after sign-up, the account already has a listing or a contact request, or the friend signed up on the same device as you. Redemption happens at sign-up only, so send the link before your friend joins, not after. A code attached to a link is kept for 30 days after the first visit.
+When we use your friend's number: only to send the invite and to link their sign-up to you. See the [Privacy Policy](/privacy).
+
+## Questions
+
+**Do I need my friend to type a code?**
+No. Your link works, and so does signing up with the number you invited.
+
+**Why did my friend's sign-up not count?**
+The usual reasons: they already had a Draazy account, they signed up more than 24 hours before using the link, they already listed or contacted someone, or they used the same phone or device as you. We do not say which.
+
+**Can I send the invite myself?**
+Yes. If Draazy cannot send it, your own WhatsApp opens with the message ready. Copy and share also work.
+
+**When do I get my reward?**
+When your friend's listing goes live, or an owner accepts their first contact request. If we check it, wait up to 7 days.
+
+**Can I get cash instead?**
+No. The reward is a discount on your next rent agreement service fee.
+
+**What if I cancel the agreement?**
+The reward comes back to you.
 
 ## Related
 
+- [Rent agreement service](/help/a/rent-agreement-service)
 - [Plans explained](/help/a/plans-explained)
 - [Contacting owners](/help/a/contacting-owners)

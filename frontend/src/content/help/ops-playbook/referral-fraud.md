@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 13
-updated: 2026-10-12
+updated: 2026-11-06
 summary: How the automatic referral checks work and when staff audit, override or claw back a reward.
 tags: [ops, referrals, fraud, rewards, internal]
 modules: [referrals]
@@ -32,32 +32,36 @@ Referral rewards are decided automatically. The desk is an audit and override vi
 
 ## Desk and access
 
-Use **Referrals** in the sidebar (`/admin/referrals`; staff open it under `/staff/referrals`). You need the **Referrals** function (`referrals:read` to view, `referrals:write` to decide).
+Use **Referrals** in the sidebar (`/admin/referrals`, page title **Referral audit**; staff open it under `/staff/referrals`). You need the **Referrals** function (`referrals:read` to view, `referrals:write` to decide).
 
 The desk shows both mobiles in full but no raw device or IP evidence; work from the server-computed signals and the decision buttons.
 
 ## How a referral is decided
 
-1. **At redemption** the server refuses outright: the referrer's own code, an account that was already referred, a sign-up outside the allowed window, an account that already has a listing or contact request, the same first-party device id as the referrer, or referral rewards being switched off. Refused codes never become desk rows, and the person sees one generic message.
-2. **At qualification** the server scores risk from the shared network, shared browser, redemption velocity and the referrer's account age: low, medium or high.
-3. **Low** is granted immediately. **Medium** is `held` for the hold period, then released or rejected by the sweep. **High** is rejected automatically and the referrer is told to contact support.
-4. Monthly and yearly caps apply; overflow is rejected with the auto reason **Cap reached** and does not queue.
-5. A referee found to be abusive is suspended within the clawback window, which automatically reverses the reward and takes the qualifying listing down.
+1. **At redemption** the server refuses outright: the referrer's own code, an account that was already referred, a sign-up outside the allowed window, an account that already has a listing or contact request, the same first-party device id as the referrer, or referral rewards being switched off. Refused codes never become desk rows, and the person sees one generic message. After 5 failed redemptions in a day on one account, every further attempt gets the same generic refusal.
+2. **At sign-up by invited number**: when a new account's mobile was invited in the last 30 days, the earliest invite's referrer gets a `pending` referral automatically, with the same checks as a redeem. The friend types no code. A later code redeem by that person is refused as already referred.
+3. **At qualification** the server scores risk from the shared network, shared browser, redemption velocity and the referrer's account age: low, medium or high. An owner referral qualifies only when the listing is verified and live; until then the row stays `pending`.
+4. **Low** is granted immediately. **Medium** is `held` for the hold period, then released or rejected by the sweep. **High** is rejected automatically and the referrer is told to contact support. The friend's gift applies only while the row is `qualified` or `rewarded`.
+5. Monthly and yearly caps apply; overflow is rejected with the auto reason **Cap reached** and does not queue.
+6. A referee found to be abusive is suspended or archived (including by report enforcement) within the clawback window, which automatically reverses the reward and takes the qualifying listing down.
+7. The referrer gets an in-app notification when a reward is earned, held, released or removed, and when staff approve, reject or claw back.
 
-All limits, windows and reward sizes are set in **Settings → Fees → Referrals**.
+All limits, windows and reward sizes are set in **Settings → Fees → Referrals**. Signals are kept for 180 days.
 
 ## Tabs and counts
 
-Rows are paged 20 at a time, with server-side counts on each tab and a search box (referrer, referred or id).
+Rows are paged 20 at a time, with server-side counts on each tab, a search box (referrer, referred or id), **Date** chips, **Refresh** and **Export CSV** for the rows on screen.
 
 | Tab | What it shows |
 | --- | --- |
 | **Held** | `held` referrals, with the date the hold ends |
-| **Pending** | `pending` and `qualified` referrals |
+| **Pending** | `pending` referrals only |
 | **High risk** | Any referral with `risk = high` |
-| **Rewarded** | `rewarded` referrals |
+| **Rewarded** | `qualified` and `rewarded` referrals |
 | **Refused** | `rejected` or `clawed-back` referrals |
 | **All** | Every status |
+
+Each row shows both mobiles, the reward, the **Auto reason** and four signal chips: **Activated**, **Same device**, **Same IP** and **High velocity**. A green tick is good; a red cross is a risk signal.
 
 ## Status states
 
@@ -78,9 +82,9 @@ The **Auto reason** on a row is one of: High risk, Needs review (one risk signal
 
 ## Reward rules
 
-The reward label is server-composed, for example **+15 owner contacts** or **1 free rent agreement**. `rewardAmount` counts contacts or agreements, not rupees.
+The reward label is server-composed, for example **50% off next agreement fee**. The referrer's reward is the same for owner and tenant/buyer referrals: one referral credit, worth 50% (the setting) off the Draazy service fee of one future rent agreement. Stamp duty and registration are never discounted. `rewardAmount` counts credits, not rupees.
 
-A clawback removes the derived entitlement. An agreement already delivered stays with the user. Rows from before tracks existed have no track and earn contacts only.
+A clawback removes the credit and the friend's gift. A credit already spent on a delivered agreement is not recovered, and the agreement stays with the user. A credit on an agreement that is cancelled returns to the referrer.
 
 ## What never to do
 

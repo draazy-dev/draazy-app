@@ -4,7 +4,7 @@ import { SUPPORT_PHONE } from '../../lib/supportContact.js';
 
 export default function Privacy() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="10 October 2026" current="privacy">
+    <LegalPage title="Privacy Policy" lastUpdated="6 November 2026" current="privacy">
       <p>
         Draazy Technologies ("<strong>Draazy</strong>", "we", "us", or "our") operates the website
         draazy.com and associated mobile applications. This Privacy Policy explains how we collect, use, disclose, and
@@ -19,6 +19,7 @@ export default function Privacy() {
         <li><strong>Service requests</strong> — details submitted via our packers &amp; movers, home loans, legal assistance, rent agreement, interior renovation, or property valuation forms.</li>
         <li><strong>Payment data</strong> — billing name, address, UPI ID, or card details processed via our PCI-DSS compliant payment gateway. We do not store full card numbers on our servers.</li>
         <li><strong>Communications</strong> — messages exchanged with other users or our support team through the platform.</li>
+        <li><strong>Referral invites</strong> — when you invite a friend, we process their mobile number only to send that invite and to link their sign-up to you. We keep invite records for up to 12 months.</li>
       </ul>
 
       <h3>1.2 Information collected automatically</h3>

@@ -1,4 +1,5 @@
 import { SUPPORT_PHONE, SUPPORT_TEL } from '../lib/supportContact.js';
+import { supportLink } from '../lib/supportLink.js';
 
 export const ASSISTANT = {
   name: 'Draaz',
@@ -17,7 +18,7 @@ export const QUICK_ACTIONS = [
 export const ESCALATION = {
   intro: "Happy to hand you to a person. You can:",
   actions: [
-    { label: 'Raise a support ticket', to: '/support', icon: 'ticket-plus' },
+    { label: 'Chat with Draazy support', to: supportLink('general'), icon: 'message-square' },
     { label: 'Contact us', to: '/contact', icon: 'mail' },
     { label: `Call ${SUPPORT_PHONE}`, to: SUPPORT_TEL, icon: 'phone', external: true },
   ],
@@ -219,7 +220,7 @@ export const KB = [
     id: 'refer',
     keywords: ['refer', 'referral', 'invite', 'friend', 'reward', 'earn', 'bonus'],
     q: 'Is there a referral programme?',
-    a: "Yes — share your link from the Refer page. A referral counts once your friend qualifies — for an owner, when their first listing is verified. Refer an owner and you both get a reward when their first listing is verified: they get longer Featured placement, you get a free rent agreement. Refer a friend looking for a home and they get extra free contacts, you get owner contacts. The Refer page shows the current numbers; some referrals are checked briefly before the reward lands. Rewards are non-cash.",
+    a: "Yes. Open the Refer page and type your friend's mobile number. Draazy sends them your invite on WhatsApp. If it can't, your own WhatsApp opens with the message ready. When your friend gets going, you get 50% off the Draazy service fee of your next rent agreement. Stamp duty and registration charges are not discounted. Your friend gets a welcome gift too: extra free contacts, or Featured days for an owner. Some rewards are checked for a few days first. Rewards are non-cash.",
     actions: [{ label: 'Refer & earn', to: '/refer', icon: 'gift' }],
   },
   {
@@ -294,9 +295,9 @@ export const KB = [
     id: 'support',
     keywords: ['support', 'help', 'human', 'agent', 'talk', 'contact', 'ticket', 'complaint', 'issue', 'problem', 'stuck', 'call', 'reach', 'someone'],
     q: 'How do I reach a human / get support?',
-    a: "Raise a support ticket and track every reply, browse the Help Centre, or contact us directly. Our support team is available 9 AM – 8 PM, Monday to Saturday.",
+    a: "Chat with Draazy support in Messages and pick the property, post or payment it's about, browse the Help Centre, or contact us directly. Our support team is available 9 AM – 8 PM, Monday to Saturday.",
     actions: [
-      { label: 'Raise a ticket', to: '/support', icon: 'ticket-plus' },
+      { label: 'Chat with support', to: supportLink('general'), icon: 'message-square' },
       { label: 'Help Centre', to: '/help', icon: 'book-open' },
     ],
   },

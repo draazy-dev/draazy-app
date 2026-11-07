@@ -2,6 +2,12 @@
 
 What we shipped, newest first.
 
+## 1.13.0 — 6 November 2026
+
+**Referrals**
+
+- Simpler referrals: invite friends on WhatsApp by number, and earn 50% off your next rent agreement fee.
+
 ## 1.12.0 — 3 November 2026
 
 **Support**

@@ -81,7 +81,7 @@ These are recorded on the request as the reason for keeping them:
 | Reviews and ratings | Content others rely on |
 | Listings and property records | Property data, not only the person. The name on ownership evidence behind a Verified property badge stays so the badge remains checkable |
 
-Some other personal data is not yet removed by the erasure: referral phone numbers and codes, flatmate group member names, contact names and phone numbers on tickets and service requests, deals, saved searches, city waitlist entries, managed property tenant names, and flatmate posts and consent records. Make sure your lead knows these gaps exist. Do not tell the person that everything was erased.
+Some other personal data is not yet removed by the erasure: referral phone numbers and codes, fraud-check digests on referrals and refunds, flatmate group member names, flatmate owner-consent numbers, the name, age and occupation on a flatmate seeker post (the post itself is taken off the board) and the message on an answered flatmate request, contact names and phone numbers on tickets and service requests, deal party names and numbers, saved-search numbers and city waitlist entries. Make sure your lead knows these gaps exist. Do not tell the person that everything was erased.
 
 ## Steps: decide a request
 

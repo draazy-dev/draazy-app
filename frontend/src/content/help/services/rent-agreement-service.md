@@ -142,6 +142,10 @@ Close to the end date, your dashboard shows **Ends** and a **Renew** button. Ten
 
 Renewing starts a new agreement with the property, parties, rent, deposit, term and start date filled in. Check the rent and dates, then submit. It is a new registration, with stamp duty and registration fee again. If flatmates change, use **Request a new rent agreement** from the flat.
 
+## 50% off from a referral
+
+When a friend you invited gets going, you earn 50% off the Draazy service fee of your next rent agreement. It shows at checkout when you are the one paying. Stamp duty, registration fee and other government charges are not discounted. One reward works on one agreement, and rewards do not expire. Your dashboard Billing shows how many rewards you have left. If you cancel that request, the reward comes back. See [Referrals and rewards](/help/a/referrals-and-rewards).
+
 ## Cancel and refunds
 
 - While a request is unpaid, tap **Cancel request** (tap again to confirm) on the tracker. A cancelled request can be deleted.

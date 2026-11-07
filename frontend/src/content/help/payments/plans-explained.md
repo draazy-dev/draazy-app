@@ -48,11 +48,11 @@ Posting is never blocked. A second live rent or sale listing is approved but sta
 
 ## If you are searching, not listing
 
-The free account includes 15 owner contacts, usable within 30 days of your first, on rent and sale listings alike. If a serious search in a competitive locality spends them, buy a **Rent Contact Pack** (for rent listings) or a **Buy Contact Pack** (for sale listings). The 15 free contacts, referral bonuses and packs bought before the rent/buy split work on both. See [Contacting owners](/help/a/contacting-owners) for how the quota is counted.
+The free account includes 15 owner contacts, usable within 30 days of your first, on rent and sale listings alike. If a serious search in a competitive locality spends them, buy a **Rent Contact Pack** (for rent listings) or a **Buy Contact Pack** (for sale listings). The 15 free contacts, the friend welcome gift and packs bought before the rent/buy split work on both. See [Contacting owners](/help/a/contacting-owners) for how the quota is counted.
 
 ## Saving money by inviting friends
 
-Referring a friend who is looking for a home adds owner contacts for free, and referring an owner earns a free rent agreement (it waives Draazy's service fee at checkout; government charges still apply). Your code is on the [Refer a friend](/refer) page. Referrals are checked for fraud, so a reward appears once the referral qualifies, not the moment someone signs up. See [Referrals and rewards](/help/a/referrals-and-rewards).
+Invite a friend on the [Refer a friend](/refer) page. When your friend gets going, you get 50% off the Draazy service fee of your next rent agreement. Stamp duty and registration charges are not discounted. Your friend gets a welcome gift too. Some rewards are checked for a few days first. See [Referrals and rewards](/help/a/referrals-and-rewards).
 
 ## Billing
 

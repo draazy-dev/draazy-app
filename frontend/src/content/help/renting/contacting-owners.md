@@ -59,11 +59,11 @@ Owner contacts are counted per account, not per day:
 | Free | 15, usable within 30 days of your first contact |
 | Rent Contact Pack | 15 more, for rent listings only; valid 30 days; packs stack |
 | Buy Contact Pack | 15 more, for sale listings only; valid 60 days; packs stack |
-| Referral reward | Extra contacts for each qualified referral, usable on both (see [Refer](/refer)) |
+| Friend welcome gift | 5 extra contacts if a friend invited you, given after an owner accepts your first request; usable on both (see [Refer](/refer)) |
 
 A contact is used when you ask, and comes back if the owner declines or does not reply in 7 days. An approved request keeps it used. One listing costs one contact however many times you open it, and booking a visit there uses that same contact rather than a second one. A visit on a listing you have not contacted uses one.
 
-The listing shows "N owner contacts left" beside **Request number**, and the same line shows when your free contacts expire. When the allowance runs out the app says so and offers a referral link (while referral rewards are on) or a [Contact Pack](/plans) for that kind of listing (rent or buy).
+The listing shows "N owner contacts left" beside **Request number**, and the same line shows when your free contacts expire. When the allowance runs out the app says so and offers a [Contact Pack](/plans) for that kind of listing (rent or buy).
 
 ## Writing an enquiry that gets answered
 

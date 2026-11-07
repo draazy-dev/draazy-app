@@ -306,6 +306,15 @@ takes its contacts back with no grant to reverse. The old module now lives at
   yearly caps reject the overflow; suspension, take-down or revoked verification claws back within 30 days. The ops
   desk is audit plus override (an appeal needs a reason). The listing-slot reward is gone (pay-per-use, Q16b).
 
+### Q17c — One simple referrer reward, WhatsApp invites by number *(closed 2026-11-06, supersedes Q17a's rewards)*
+
+**Answer:** both tracks pay the referrer the same thing: one credit per qualified friend, worth
+`referralAgreementDiscountPercent` (50%) off the service fee of one future rent agreement (statutory charges never
+discounted). The 15-contact and free-agreement rewards are removed (pre-launch, no grandfathering). The friend's gift
+applies only once qualified; owner track also needs the listing live. Friends are invited from the Refer page by
+mobile (`POST /me/referrals/invites`, WhatsApp marketing template from the OTP sender, `wa.me` fallback), and an
+invited mobile auto-attributes at sign-up. Flow: `docs/flows/consumer/plans-billing-refer.md`.
+
 ### Q17b — Refunds: what comes back, and who decides? *(closed 2026-10-12)*
 
 **Answer:** refund only what was not delivered, decided from server facts; every number is a `settings.fees` key.

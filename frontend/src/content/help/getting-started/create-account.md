@@ -14,7 +14,7 @@ You can browse Draazy without an account. You need one to contact owners, save p
 ## Signing up
 
 1. Open **Sign up** from the public site.
-2. Enter your **full name**, optional email and **10-digit Indian mobile number**. This number is your login identity.
+2. Enter your **full name**, optional email and **10-digit Indian mobile number**. This number is your login identity. If a friend invited you, use their link or sign up with the number they invited. No code is needed. If you have a referral code, you can still enter it in the optional **Referral code** field.
 3. Accept the terms and tap **Send OTP**.
 4. Enter the 6-digit OTP we send to your number on WhatsApp to finish creating the account.
 

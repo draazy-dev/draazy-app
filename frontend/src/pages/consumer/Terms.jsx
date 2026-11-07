@@ -1,9 +1,11 @@
 import { Link } from 'react-router';
 import LegalPage from '../../components/LegalPage.jsx';
+import { usePricing } from '../../context/PricingContext.jsx';
 
 export default function Terms() {
+  const { referral } = usePricing();
   return (
-    <LegalPage title="Terms of Service" lastUpdated="10 October 2026" current="terms">
+    <LegalPage title="Terms of Service" lastUpdated="6 November 2026" current="terms">
       <p>
         These Terms of Service ("<strong>Terms</strong>") govern your access to and use of draazy.com and associated
         applications (the "<strong>Platform</strong>")         operated by Draazy Technologies
@@ -85,6 +87,18 @@ export default function Terms() {
         <li>Rent agreements also carry government charges — stamp duty, registration fee and document handling charge. We pay these to the government on behalf of the owner and tenant, in their names, and collect exactly the amount paid; they are not Draazy&apos;s fee.</li>
         <li>A Listing Pass ends early when its listing is rented, sold or archived, with no refund for unused days.</li>
         <li>Refunds, returned contacts and disputes are governed by our <Link to="/refund-policy">Refund Policy</Link>.</li>
+      </ul>
+
+      <h3>7.1 Referral rewards</h3>
+      <ul>
+        <li>You can invite a friend from the Refer page by typing their mobile number. We send the invite on WhatsApp. If we cannot, your own WhatsApp opens with the message ready. Send invites only to people you know, who would expect them.</li>
+        <li>Your friend must be new to Draazy. They must join with your link, or sign up with the number you invited, within {referral.signupWindowHours} hours of signing up and before they list a property or contact an owner.</li>
+        <li>You earn a reward when your friend qualifies. An owner qualifies when their listing passes ownership verification and goes live. A tenant or buyer qualifies when an owner accepts their first contact request.</li>
+        <li>The reward is {referral.agreementDiscountPercent}% off the Draazy service fee of one future rent agreement, for each friend who qualifies. Stamp duty, registration fee and other government charges are not discounted. One reward applies to one agreement. Rewards do not expire and have no cash value. If you cancel the agreement, the reward comes back to you.</li>
+        <li>Once your friend qualifies, they get a welcome gift: {referral.seekerBonusContacts} extra free contacts (tenant or buyer) or {referral.ownerFeaturedDays} days of Featured listing (owner).</li>
+        <li>You can earn up to {referral.qualifyPerMonth} rewards a month and {referral.qualifyPerYear} a year. Some rewards are checked for up to {referral.holdDays} days before they are released. Invites have a daily limit. A number that was invited recently will not get another invite. Your friend can reply STOP to stop our messages.</li>
+        <li>We remove rewards that come from fake, duplicate or abusive accounts, and any related welcome gift, within {referral.clawbackDays} days of the reward. A reward you have already used on an agreement is not taken back.</li>
+        <li>We may refuse or reverse a reward, or switch off the referral programme, if we find misuse of these rules.</li>
       </ul>
 
       <h2>8. Limitation of liability</h2>

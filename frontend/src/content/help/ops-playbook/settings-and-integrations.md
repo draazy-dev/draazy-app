@@ -49,12 +49,14 @@ A viewer without `settings:write` can open **Settings** but cannot save. The sys
 | **General** | **Grievance officer**: Name and Email, shown on the Refund Policy page | **Save officer** |
 | **General** | **Max photos per listing** (3 to 20) | **Save photo limit** |
 | **General** | **Max flatmate groups per person** (1 to 10) | **Save group limit** |
-| **Fees** | Rent and sale Listing Pass, rent and buy Contact Pack, rent agreement fee, free contact limit and a **Referrals** section (rewards, caps, hold and fraud-check windows) | **Save fees** |
+| **Fees** | Rent listing pass (60 days), Sale listing pass (90 days), Rent contact pack (15 contacts, 30 days), Buy contact pack (15 contacts, 60 days), Rent agreement platform fee, Free owner contacts, Featured days after verification | **Save fees** |
+| **Fees** | **Referrals**: **Agreement discount %** (`referralAgreementDiscountPercent`, default 50), **Invites per day** (`referralInvitesPerDay`, default 10), **Redeem failures per day** (`referralRedeemFailuresPerDay`, default 5), friend gifts, monthly and yearly caps, hold, clawback and redeem windows, fraud-signal retention (180 days) | **Save referrals** |
+| **Fees** | **Refunds**: owner reply window, open contacts and visits per seeker, contact pack refund window, listing pass guarantee | **Save refunds** |
 | **Fees** | **Move-in Pack**: a **Live** / **Coming soon** switch and six service prices | **Save Move-in Pack** |
 | **Maps** | **Served districts**, **Keep search inside served districts**, **Blacklisted places** | Each change saves at once |
 | **Feature flags** | **Application** and **Admin Modules** switches | Each switch asks you to confirm |
 
-**Fees notes.** The four price fields must be whole numbers from 1 to 100000, or nothing is saved. Count fields such as the free contact limit show no ₹ sign. A blank field is refused with a message instead of being saved as 0. Subscribers already charged keep the amount they paid; **Finance** lists them by charged price.
+**Fees notes.** Each card saves on its own. A blank field is refused with "Fill in every value. A blank field is not saved as 0." Referrals and Refunds fields have an allowed range; a value outside it shows "A value is outside its allowed range." Count fields such as **Free owner contacts** show no ₹ sign. Subscribers already charged keep the amount they paid; **Finance** lists them by charged price.
 
 **Maps tab.** Nothing on this tab has a Save button; every change saves straight away and shows a toast.
 
@@ -72,7 +74,7 @@ Removing a district does not delete places already listed in it; they appear und
 | Flag | Effect |
 | --- | --- |
 | **Plan purchases** (off) | Pauses new purchases. Active plans keep working |
-| **Referral rewards** (off) | Hides referral routes. Earned bonuses still count |
+| **Referral rewards** (off) | Hides referral routes and stops new invites. Earned rewards still count |
 | **Public signups** (off) | Closes new registration |
 | **Staff login** (off) | Staff and managers cannot sign in. Administrators always can |
 | **Maintenance mode** (on) | Blocks all consumer access. Off by default. Turning it on asks for confirmation in red |
@@ -87,7 +89,11 @@ Three cards: **Email** (Zoho ZeptoMail), **WhatsApp** (Meta Cloud API) and **Pay
 - **Last success**, **Last failure** and the failure detail.
 - An **Open** link (for example **Open Cashfree**) to the provider's own console.
 
-The call log keeps 30 days. It has the search box "Full email, mobile or order id" (people are stored masked, so use the full value), **Provider** chips, **Outcome** chips (**All**, **Failed**, **OK**, **Not sent**) and 20 rows per page. Operations are Email, Login OTP, KYC decision, Payment order, Refund and Payment webhook. **Not sent** means the call was skipped, for example in **Mock**.
+Email carries customer mail and the copy of each staff bell alert that is emailed to staff accounts (see [Verification SLAs](/help/a/verification-sla)). If **Email** shows **Mock**, no one receives those emails.
+
+**Referral invites on WhatsApp.** Referral invites use a Meta MARKETING-category template. It is set by `WHATSAPP_REFERRAL_INVITE_TEMPLATE_NAME`, `WHATSAPP_REFERRAL_INVITE_TEMPLATE_LANG` and `WHATSAPP_REFERRAL_INVITE_PHONE_NUMBER_ID`. The number id falls back to the main login-OTP sender number. Each delivered message costs about ₹1 including GST, and Meta may not deliver to people who have reached their marketing message limit. If the template is not set, the referrer's own WhatsApp opens instead. Invites go from the login-OTP number, so check its quality rating in WhatsApp Manager each week. If it drops to Low, turn off **Referral rewards** and tell an admin, because a restricted number also stops login codes.
+
+The call log keeps 30 days. It has the search box "Full email, mobile or order id" (people are stored masked, so use the full value), **Provider**, **Outcome** (**All**, **Failed**, **OK**, **Not sent**) and **Date** chips, and 20 rows per page. Operations are Email, Login OTP, KYC decision, Payment order, Refund and Payment webhook. **Not sent** means the call was skipped, for example in **Mock**. If a part of the page could not load, a red banner says so with **Retry**; that is missing data, not a quiet period.
 
 ## Steps: change a setting
 
