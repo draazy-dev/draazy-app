@@ -707,8 +707,8 @@ public final class DataExportScope {
                         "owner_id", "Replaced by partyRef.",
                         "drafts and expired agreements", "An owner types the tenant's number "
                                 + "while drafting, so until registration the number may be "
-                                + "somebody else's. RentAgreementService.mine shows a tenant only "
-                                + "registered and active rows; the export does the same.",
+                                + "somebody else's. A tenant's own agreements page shows only "
+                                + "registered and active agreements; the export does the same.",
                         "document_url", "A link the owner typed, which the product never shows "
                                 + "the tenant. final_document_id is the registered copy Draazy "
                                 + "produced.")));
@@ -988,7 +988,7 @@ public final class DataExportScope {
                 "Moderation reviews of flatmate listings you host, and their outcome.",
                 """
                 select id, kind, room_id, group_id, address, tier, owner_consent, status,
-                       created_at, updated_at
+                       created_at, updated_at, pending_since
                   from flatmate_reviews
                  where host_id = :subjectId
                  order by created_at desc

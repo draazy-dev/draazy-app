@@ -120,7 +120,7 @@ record StaffSlaRule(String name, String one, String many, Arrival arrival, Durat
                     """, fixed(BackOfficeFunctions.REPORTS), fixed("/admin/reports"), fixed("/admin/reports")),
             new StaffSlaRule("flatmate-review", "flatmate check", "flatmate checks", Arrival.UNASSIGNED,
                     ofHours(48), ofHours(72), """
-                    select cast(f.id as text), 'Flatmate ' || f.kind || ' check', f.created_at, cast(null as text),
+                    select cast(f.id as text), 'Flatmate ' || f.kind || ' check', f.pending_since, cast(null as text),
                            cast(null as uuid), cast(null as bigint)
                       from flatmate_reviews f
                      where f.status = 'pending'

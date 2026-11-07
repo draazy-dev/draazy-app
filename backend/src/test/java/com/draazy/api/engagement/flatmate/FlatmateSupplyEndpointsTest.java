@@ -1287,26 +1287,44 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(FlatmateApprovals.approve()))
                     .andExpect(status().isOk());
+            jdbc.update("update flatmate_reviews set created_at = now() - interval '5 days', "
+                    + "pending_since = now() - interval '5 days' where room_id = ?::uuid", roomId);
+            entityManager.clear();
 
-            mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, roomId)
-                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"roomType":"Private room","locality":"Baner",
-                                     "society":"Somewhere Else Entirely","rentShare":15000,"deposit":30000,
-                                     "hostRole":"tenant","ownerConsentMobile":"9890000001","agreementDeclared":true,
-                                     "photos":["%s"],%s}
-                                    """.formatted(photoOf(host), agreementEvidence(host))))
-                    .andExpect(status().isOk());
+            editSociety(host, roomId, "Somewhere Else Entirely");
 
             assertThat(jdbc.queryForObject(
                     "select status from flatmate_reviews where room_id = ?::uuid",
                     String.class, roomId)).isEqualTo("pending");
+            assertThat(jdbc.queryForObject("select pending_since > now() - interval '1 minute' "
+                    + "and created_at < now() - interval '4 days' from flatmate_reviews where room_id = ?::uuid",
+                    Boolean.class, roomId)).as("a reopened review restarts its SLA clock").isTrue();
+
+            jdbc.update("update flatmate_reviews set pending_since = now() - interval '1 hour' "
+                    + "where room_id = ?::uuid", roomId);
+            entityManager.clear();
+            editSociety(host, roomId, "Somewhere Else Again");
+            assertThat(jdbc.queryForObject("select pending_since < now() - interval '50 minutes' "
+                    + "from flatmate_reviews where room_id = ?::uuid", Boolean.class, roomId))
+                    .as("an edit while pending keeps its place in the queue").isTrue();
 
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "Baner")
                             .param("verifiedOnly", "true").param("size", "100"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[*].id", Matchers.not(Matchers.hasItem(roomId))));
+        }
+
+        private void editSociety(User host, String roomId, String society) throws Exception {
+            mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, roomId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"roomType":"Private room","locality":"Baner",
+                                     "society":"%s","rentShare":15000,"deposit":30000,
+                                     "hostRole":"tenant","ownerConsentMobile":"9890000001","agreementDeclared":true,
+                                     "photos":["%s"],%s}
+                                    """.formatted(society, photoOf(host), agreementEvidence(host))))
+                    .andExpect(status().isOk());
         }
 
         @Test

@@ -36,13 +36,28 @@ const isoInDays = (n) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+const scopeToTab = (f, tab) => ({
+  ...f,
+  sharing: tab === TAB_TEAMS ? f.sharing : '',
+  attachedBath: tab === TAB_MOVE_IN ? f.attachedBath : false,
+  furnishing: tab === TAB_MOVE_IN ? f.furnishing : '',
+  gated: tab === TAB_MOVE_IN ? f.gated : false,
+  roomType: tab === TAB_TEAMS ? '' : f.roomType,
+  genderOnly: tab === TAB_PEOPLE ? false : f.genderOnly,
+  bhk: tab === TAB_PEOPLE ? '' : f.bhk,
+  vegOnly: tab === TAB_MOVE_IN ? f.vegOnly : false,
+  parking: tab === TAB_MOVE_IN ? f.parking : '',
+  age: tab === TAB_PEOPLE ? f.age : '',
+  roomForTwo: tab === TAB_TEAMS ? f.roomForTwo : false,
+});
+
 export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, openPostModal, onPost, viewer }) {
   const [params, setParams] = useSearchParams();
   const { pathname } = useLocation();
   const style = useLivingStyle();
-  const initFromUrl = () => (hasFlatmateSearchParams(params)
+  const initFromUrl = () => scopeToTab(hasFlatmateSearchParams(params)
     ? flatmateFiltersFromParams(params, emptyFilters)
-    : readRememberedFlatmateSearch(emptyFilters) || { ...emptyFilters, budget: [...emptyFilters.budget], vibe: [] });
+    : readRememberedFlatmateSearch(emptyFilters) || { ...emptyFilters, budget: [...emptyFilters.budget], vibe: [] }, tab);
   const [mapAreas, setMapAreas] = useState(() => new Set());
   const [filters, setFilters] = useState(initFromUrl);
   const [sortMode, setSortMode] = useState(() => sortFromParams(params));
@@ -72,20 +87,7 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
     urlWriteModeRef.current = 'push';
     setTab(next);
     setMapAreas(new Set());
-    setFilters((f) => ({
-      ...f,
-      sharing: next === TAB_TEAMS ? f.sharing : '',
-      attachedBath: next === TAB_MOVE_IN ? f.attachedBath : false,
-      furnishing: next === TAB_MOVE_IN ? f.furnishing : '',
-      gated: next === TAB_MOVE_IN ? f.gated : false,
-      roomType: next === TAB_TEAMS ? '' : f.roomType,
-      genderOnly: next === TAB_PEOPLE ? false : f.genderOnly,
-      bhk: next === TAB_PEOPLE ? '' : f.bhk,
-      vegOnly: next === TAB_MOVE_IN ? f.vegOnly : false,
-      parking: next === TAB_MOVE_IN ? f.parking : '',
-      age: next === TAB_PEOPLE ? f.age : '',
-      roomForTwo: next === TAB_TEAMS ? f.roomForTwo : false,
-    }));
+    setFilters((f) => scopeToTab(f, next));
   };
 
   const activeFilterCount = useMemo(() => Object.keys(emptyFilters).filter((k) => {
@@ -106,15 +108,15 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
 
   const reconcileFromUrl = (source) => {
     lastWrittenRef.current = '';
-    const nextFilters = hasFlatmateSearchParams(source)
+    const nextTab = normalizeTab(source.get('view'));
+    const nextFilters = scopeToTab(hasFlatmateSearchParams(source)
       ? flatmateFiltersFromParams(source, emptyFilters)
-      : readRememberedFlatmateSearch(emptyFilters) || { ...emptyFilters, budget: [...emptyFilters.budget], vibe: [] };
+      : readRememberedFlatmateSearch(emptyFilters) || { ...emptyFilters, budget: [...emptyFilters.budget], vibe: [] }, nextTab);
     setFilters((current) => (flatmateFiltersEqual(current, nextFilters) ? current : nextFilters));
 
     const nextSort = sortFromParams(source);
     if (sortRef.current !== nextSort) setSortMode(nextSort);
 
-    const nextTab = normalizeTab(source.get('view'));
     if (tabRef.current !== nextTab) {
       setTab(nextTab);
       setMapAreas(new Set());

@@ -25,6 +25,7 @@ test.describe('LIVE: flatmates active filter chips', () => {
   test('Flatmates: chips follow the tab, so a rooms-only filter in the URL is not shown', async ({ page }) => {
     await page.goto('/flatmates?view=people&g=female&gonly=1&movein=now&room=shared&furn=semi');
     await expect(chips(page)).toHaveText(['Move-in: Immediate', 'Women', 'Shared room'], { timeout: 20_000 });
+    await expect.poll(() => [params(page).furn, params(page).gonly], 'a rooms-only facet does not ride along in the query').toEqual([undefined, undefined]);
 
     await row(page).getByRole('button', { name: 'Remove filter Move-in: Immediate' }).click();
     await expect.poll(() => params(page).movein).toBeUndefined();

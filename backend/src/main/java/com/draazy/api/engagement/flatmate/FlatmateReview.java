@@ -6,6 +6,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
@@ -70,6 +71,9 @@ public class FlatmateReview extends AuditedEntity {
     @Column(name = "status", nullable = false)
     private String status = FlatmateVocabulary.STATUS_PENDING;
 
+    @Column(name = "pending_since", nullable = false)
+    private Instant pendingSince = Instant.now();
+
     @Column(name = "reason")
     private String reason;
 
@@ -133,9 +137,16 @@ public class FlatmateReview extends AuditedEntity {
         }
         clearChecks();
         this.tenancyPropertyId = tenancyPropertyId;
-        this.status = FlatmateVocabulary.STATUS_PENDING;
+        backToPending();
         this.reason = null;
         this.decidedBy = null;
+    }
+
+    private void backToPending() {
+        if (!FlatmateVocabulary.STATUS_PENDING.equals(status)) {
+            this.pendingSince = Instant.now();
+        }
+        this.status = FlatmateVocabulary.STATUS_PENDING;
     }
 
     private void clearChecks() {
@@ -173,7 +184,7 @@ public class FlatmateReview extends AuditedEntity {
     void holdForReview(String why) {
         this.flagForReview = true;
         this.ownerConsent = false;
-        this.status = FlatmateVocabulary.STATUS_PENDING;
+        backToPending();
         this.reason = why;
         this.decidedBy = null;
     }
