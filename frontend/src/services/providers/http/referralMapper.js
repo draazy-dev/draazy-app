@@ -27,6 +27,49 @@ export function toViewModel(dto) {
 
 export const toDecision = (dto) => toViewModel(dto);
 
+const count = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+export function toSummary(s) {
+  if (!s) return s;
+  const rewards = s.rewards || {};
+  const friend = s.friendReward || {};
+  return {
+    code: s.code || '',
+    invited: count(s.invited),
+    joined: count(s.joined),
+    qualified: count(s.qualified),
+    checking: count(s.checking),
+    rewards: {
+      earned: count(rewards.earned),
+      used: count(rewards.used),
+      remaining: count(rewards.remaining),
+      discountPercent: count(rewards.discountPercent),
+    },
+    friendReward: {
+      redeemed: !!friend.redeemed,
+      status: friend.status || '',
+      contacts: count(friend.contacts),
+      featuredDays: count(friend.featuredDays),
+    },
+  };
+}
+
+export function toInviteResult(dto) {
+  const url = typeof dto?.whatsappUrl === 'string' ? dto.whatsappUrl : '';
+  if (dto?.delivery === 'sent' || !url) return { delivery: 'sent', whatsappUrl: '' };
+  if (!isWhatsAppUrl(url)) throw new Error('Refusing to open a non-WhatsApp invite link');
+  return { delivery: 'open_whatsapp', whatsappUrl: url };
+}
+
+function isWhatsAppUrl(url) {
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === 'https:' && hostname === 'wa.me';
+  } catch {
+    return false;
+  }
+}
+
 export function toViewModelPage(res, fallback = {}) {
   const rows = Array.isArray(res?.content) ? res.content : [];
   return {

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
-import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { usePricing } from '../../context/PricingContext';
 import { getEntitlements } from '../../services/entitlementService.js';
 import useScrollLock from '../../hooks/useScrollLock.js';
@@ -13,9 +12,7 @@ export default function ContactsExhaustedModal({ deal, onClose }) {
   const { t } = useTranslation();
   const buy = dealOf(deal) === 'buy';
   const { pathname, search } = useLocation();
-  const { fee, referral, refunds } = usePricing();
-  const { flagEnabled } = useAppFlags();
-  const canRefer = flagEnabled('referralRewards');
+  const { fee, refunds } = usePricing();
   const [counts, setCounts] = useState(null);
 
   useEffect(() => {
@@ -39,25 +36,6 @@ export default function ContactsExhaustedModal({ deal, onClose }) {
           </div>
           <button onClick={onClose} className="dz-modal-x" aria-label={t('property.close')}><Icon name="x" className="w-5 h-5" /></button>
         </div>
-
-        {canRefer && (
-          <Link
-            to="/refer"
-            onClick={onClose}
-            data-testid="contacts-exhausted-refer"
-            className="block rounded-xl border border-teal-500/30 bg-teal-500/[0.08] p-4 mb-3 transition-colors hover:bg-teal-500/[0.14]"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Icon name="gift" className="w-4 h-4 text-teal-300" />
-              <span className="text-sm font-bold text-white">{t('property.contactsExhausted.referTitle')}</span>
-              <span className="dz-tag ml-auto font-bold uppercase tracking-wider text-emerald-300 bg-emerald-500/15">{t('property.contactsExhausted.freeBadge')}</span>
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">{t('property.contactsExhausted.referBody', { count: referral.contactBonus })}</p>
-            <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-teal-300">
-              {t('property.contactsExhausted.referCta')} <Icon name="arrow-right" className="w-4 h-4" />
-            </span>
-          </Link>
-        )}
 
         <Link
           to={`/checkout?plan=${packSlug(deal)}&next=${encodeURIComponent(pathname + search)}`}

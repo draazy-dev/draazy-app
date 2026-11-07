@@ -184,7 +184,7 @@ export default function OpsReferrals() {
 
   const doExport = () => exportCsv('draazy-referrals.csv',
     ['ID', 'Referrer', 'Referred', 'Track', 'Reward', 'Amount', 'Risk', 'Status', 'Auto reason', 'Hold until', 'Same device', 'Same IP', 'High velocity', 'Redeemed'],
-    rows.map((r) => [r.id, r.referrer, r.referred, r.track || 'contacts only', r.reward, r.rewardAmount, r.risk, r.status, r.autoReason ? autoReasonLabel(r.autoReason) : '', r.holdUntil ? fmtDate(r.holdUntil) : '', r.sameDevice ? 'Yes' : 'No', r.sameIp ? 'Yes' : 'No', r.velocityHigh ? 'Yes' : 'No', fmtDate(r.at)]));
+    rows.map((r) => [r.id, r.referrer, r.referred, r.track || 'referral', r.reward, r.rewardAmount, r.risk, r.status, r.autoReason ? autoReasonLabel(r.autoReason) : '', r.holdUntil ? fmtDate(r.holdUntil) : '', r.sameDevice ? 'Yes' : 'No', r.sameIp ? 'Yes' : 'No', r.velocityHigh ? 'Yes' : 'No', fmtDate(r.at)]));
 
   const decisions = (r) => {
     const off = busyId === r.id;
@@ -236,7 +236,7 @@ export default function OpsReferrals() {
               id={r.id}
               title={<>{r.referrer} <span className="font-normal text-gray-500">→</span> {r.referred}</>}
               badges={<><Badge status={r.status} /><span className={classNames(CHIP, 'capitalize', RISK_TONE[r.risk] || CHIP_TONE.neutral)}>{r.risk} risk</span></>}
-              meta={<><span className="font-mono">{r.id}</span><Dot /><span>{TRACK_LABELS[r.track] || 'Contacts-only referral'}</span><Dot /><span>Redeemed {fmtDate(r.at)}</span></>}
+              meta={<><span className="font-mono">{r.id}</span><Dot /><span>{TRACK_LABELS[r.track] || 'Referral'}</span><Dot /><span>Redeemed {fmtDate(r.at)}</span></>}
               facts={(
                 <>
                   <FactRow label="Mobiles"><span className="col-span-full tabular-nums">{r.referrerMobile || '—'} → {r.referredMobile || '—'}</span></FactRow>

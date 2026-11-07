@@ -301,8 +301,8 @@ function PaymentCard({ request }) {
         <dl className="mt-2 space-y-1 text-sm">
           {rows.map(([l, v]) => (
             <div key={l} className="flex justify-between gap-2">
-              <dt className="text-gray-400">{l}</dt>
-              <dd className="text-gray-200">{l === 'Service fee' && c.referralCredit && !v ? 'Waived (referral)' : fmtINR(v)}</dd>
+              <dt className="text-gray-400">{l === 'Service fee' && c.referralCredit ? 'Service fee (after referral discount)' : l}</dt>
+              <dd className="text-gray-200">{fmtINR(v)}</dd>
             </div>
           ))}
         </dl>

@@ -671,7 +671,7 @@
         "exactDuty": "0.25% works out to {{amount}}; IGR rounds it to the nearest rupee.",
         "registrationFee": "Registration Fee",
         "serviceFee": "Draazy Service Fee",
-        "referralWaiver": "Free with your referral reward (\u2212{{amount}})",
+        "referralWaiver": "Referral reward: {{percent}}% off service fee (\u2212{{amount}})",
         "estimatedTotal": "Estimated Total",
         "totalPayable": "Total Payable",
         "loading": "Loading current charges\u2026",
@@ -883,7 +883,7 @@
         "eitherHint": "Either of you can pay. Whoever pays first settles it.",
         "desc": "Pay to send this agreement to our drafting team. If anything is still missing, we'll say exactly what.",
         "cta": "Pay {{amount}}",
-        "feeWaived": "Free (referral reward)",
+        "referralReward": "Referral reward: {{percent}}% off service fee",
         "paid": "Payment received — our drafting team will start on your agreement."
       },
       "docsRetry": "We saved your request but couldn't upload one or more documents. Please try again.",

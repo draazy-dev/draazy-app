@@ -1,5 +1,5 @@
 import { get, post } from '../../http.js';
-import { toDecision, toViewModelPage } from './referralMapper.js';
+import { toDecision, toInviteResult, toSummary, toViewModelPage } from './referralMapper.js';
 
 export async function listReferralQueue({ status, risk, q, days, page = 0, size = 20, counts = false } = {}) {
   const query = { page, size };
@@ -28,27 +28,12 @@ function reasonBody(reason) {
   return text ? { reason: text } : undefined;
 }
 
-const count = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-
 export async function getMyReferralSummary() {
-  const s = await get('/me/referrals');
-  if (!s) return s;
-  const earned = s.earned || {};
-  const friend = s.friendReward || {};
-  return {
-    code: s.code || '',
-    invited: count(s.invited),
-    converted: count(s.converted),
-    held: count(s.held),
-    earnedContacts: count(earned.seeker?.contacts),
-    earnedAgreements: count(earned.owner?.agreements),
-    friendReward: {
-      redeemed: !!friend.redeemed,
-      status: friend.status || '',
-      contacts: count(friend.contacts),
-      featuredDays: count(friend.featuredDays),
-    },
-  };
+  return toSummary(await get('/me/referrals'));
+}
+
+export async function sendReferralInvite(mobile) {
+  return toInviteResult(await post('/me/referrals/invites', { mobile }));
 }
 
 export async function redeemReferral(code, shareChannel) {

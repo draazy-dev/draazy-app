@@ -54,10 +54,11 @@ const FEE_FIELDS = [
   ['featuredDays', 'Featured days after verification', 1, 90],
 ];
 const REFERRAL_FIELDS = [
-  ['referralContactBonus', 'Contacts for the referrer', 0, 1000, 'Owner contacts earned per qualified seeker referral.'],
+  ['referralAgreementDiscountPercent', 'Rent agreement discount for the referrer (%)', 1, 100, 'Off the service fee of their next agreement. Stamp duty and registration are not discounted.'],
   ['referralSeekerBonusContacts', 'Contacts for an invited seeker', 0, 1000, 'Extra free contacts a referred seeker starts with.'],
   ['referralOwnerFeaturedDays', 'Featured days for an invited owner', 1, 90, 'Featured placement on their first verified listing.'],
-  ['referralOwnerRewardAgreements', 'Free agreements for the referrer', 0, 10, 'Per qualified owner referral.'],
+  ['referralInvitesPerDay', 'WhatsApp invites per user, per day', 1, 100, 'Stops people spamming friends.'],
+  ['referralRedeemFailuresPerDay', 'Failed code attempts per user, per day', 1, 50, 'Blocks guessing of referral codes.'],
   ['referralQualifyPerMonth', 'Rewards per referrer, per month', 1, 1000, 'Further referrals are rejected as over the cap.'],
   ['referralQualifyPerYear', 'Rewards per referrer, per year', 1, 10000, 'Calendar-year cap on rewarded referrals.'],
   ['referralHoldDays', 'Hold days (medium risk)', 1, 60, 'A held referral is released or rejected after this.'],

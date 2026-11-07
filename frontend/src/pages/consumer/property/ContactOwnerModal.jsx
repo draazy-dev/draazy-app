@@ -10,7 +10,6 @@ import { requestContact } from '../../../services/contactService.js';
 import { useContactGate } from './useContactGate.js';
 import { useEntitlements, contactsLeft, freeContactsTill } from './useEntitlements.js';
 import { useAppFlags } from '../../../context/AppFlagsContext.jsx';
-import { usePricing } from '../../../context/PricingContext.jsx';
 import { messagesLinkForProp } from '../../../lib/chatFormat.js';
 import { queuePendingChat } from '../../../services/conversationService.js';
 import { useVerification } from '../../../context/VerificationContext.jsx';
@@ -30,7 +29,6 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
   const [quotaOpen, setQuotaOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const { flagEnabled } = useAppFlags();
-  const { referral } = usePricing();
   const ownerMobile = String(p.ownerMobile || '');
   const propId = String(p.id || '');
   const routeId = propertyKey(useParams().id);
@@ -255,7 +253,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
                           {left > 0 ? (
                             <span className="text-slate-500">{freeTill ? t('property.contactsLeftTill', { count: left, date: freeTill }) : t('property.contactsLeft', { count: left })}</span>
                           ) : (
-                            <span className="text-amber-300">{t(flagEnabled('referralRewards') ? 'property.contactsLeftNoneReferHint' : 'property.contactsLeftNone', { count: referral.contactBonus })}</span>
+                            <span className="text-amber-300">{t('property.contactsLeftNone')}</span>
                           )}
                         </p>
                       )}

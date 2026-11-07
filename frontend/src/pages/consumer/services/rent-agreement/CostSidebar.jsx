@@ -41,8 +41,8 @@ function CostLines({ cost }) {
           {cost.exactPaise != null && <p className="text-[11px] text-gray-500 -mt-1.5">{t('services.ra.cost.exactDuty', { amount: fmtPaise(cost.exactPaise / 100) })}</p>}
           <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.registrationFee')}</span><span className="text-white font-medium">{fmtPaise(cost.reg)}</span></div>
           <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.handling')}</span><span className="text-white font-medium">{fmtPaise(cost.dhc)}</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.serviceFee')}</span><span className={cost.waived ? 'text-gray-500 line-through' : 'text-white font-medium'}>{fmtPaise(cost.service)}</span></div>
-          {cost.waived > 0 && <p className="text-xs text-emerald-400">{t('services.ra.cost.referralWaiver', { amount: fmtPaise(cost.waived) })}</p>}
+          <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.serviceFee')}</span><span className="text-white font-medium">{fmtPaise(cost.service)}</span></div>
+          {cost.waived > 0 && <p className="text-xs text-emerald-400" data-testid="ra-cost-referral">{t('services.ra.cost.referralWaiver', { percent: cost.discountPercent, amount: fmtPaise(cost.waived) })}</p>}
           <div className="h-px bg-white/8 my-1" />
           <div className="flex justify-between items-center"><span className="text-white font-semibold">{t(estimated ? 'services.ra.cost.estimatedTotal' : 'services.ra.cost.totalPayable')}</span><span className="text-lg font-bold gradient-text">{fmtPaise(cost.total)}</span></div>
         </>

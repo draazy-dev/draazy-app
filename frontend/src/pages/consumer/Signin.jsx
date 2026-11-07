@@ -20,6 +20,7 @@ import { resolveAuthIntent, postAuthDest } from '../../lib/authIntent.js';
 import { isValidName } from '../../lib/auth.js';
 import { classifyOtpVerifyError } from '../../lib/otpVerifyError.js';
 import { healStaleShell } from '../../lib/seamErrors.js';
+import { redeemOnNewAccount } from '../../lib/referralAttribution.js';
 import { cityHasData } from '../../lib/geoConfig.js';
 import { STATS } from '../../data/homeData.js';
 
@@ -123,7 +124,7 @@ export default function Signin() {
       const who = await login({ mobile: mobile.value, otp: otp.otp, remember });
       const claim = params.get('claim');
       if (claim) recordClaimLinkOpened(claim).catch(() => {});
-      if (who && !who.name?.trim()) { setNeedsProfile(true); return; }
+      if (who && !who.name?.trim()) { redeemOnNewAccount(); setNeedsProfile(true); return; }
       setDone(true);
       redirectTo(postAuthDest(params, claim ? '/dashboard#listings' : undefined));
     } catch (err) {

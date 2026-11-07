@@ -21,7 +21,7 @@ export const PRICING_DEFAULTS = Object.freeze({
   contactPackBuy: 399,
   rentAgreementPlatform: 499,
   referral: Object.freeze({
-    contactBonus: 15, seekerBonusContacts: 5, ownerFeaturedDays: 14, ownerRewardAgreements: 1,
+    seekerBonusContacts: 5, ownerFeaturedDays: 14, agreementDiscountPercent: 50,
     featuredDays: 7, qualifyPerMonth: 10, qualifyPerYear: 50, holdDays: 7, clawbackDays: 30, signupWindowHours: 24,
   }),
   refunds: Object.freeze({

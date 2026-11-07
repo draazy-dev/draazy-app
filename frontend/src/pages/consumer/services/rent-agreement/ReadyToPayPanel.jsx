@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../../components/Icon.jsx';
+import { usePricing } from '../../../../context/PricingContext.jsx';
 import ReviewRow from './ReviewRow.jsx';
 import { fmt, fmtPaise } from './helpers.js';
 
@@ -15,6 +16,8 @@ function ChargeRow({ k, v }) {
 
 export default function ReadyToPayPanel({ request, onPay, busy, unconfirmed }) {
   const { t } = useTranslation();
+  const { referral } = usePricing();
+  const discount = Number(request.charges?.referralDiscount) || 0;
   const state = request.details?._state;
   const tenantFillsLater = state?.tenantMode === 'invite' && state?.ownerMode !== 'invite';
   const shared = !tenantFillsLater && (!!request.myPartyId || (request.parties || []).some((p) => p.status === 'accepted'));
@@ -45,8 +48,10 @@ export default function ReadyToPayPanel({ request, onPay, busy, unconfirmed }) {
           {request.charges.exactDutyInPaise != null && <p className="text-[11px] text-gray-500">{t('services.ra.cost.exactDuty', { amount: fmtPaise(request.charges.exactDutyInPaise / 100) })}</p>}
           <ChargeRow k={t('services.ra.cost.registrationFee')} v={fmtPaise(request.charges.registration)} />
           <ChargeRow k={t('services.ra.cost.handling')} v={fmtPaise(request.charges.handling)} />
-          <ChargeRow k={t('services.ra.cost.serviceFee')}
-            v={request.charges.referralCredit && !request.charges.platformFee ? t('services.ra.pay.feeWaived') : fmtPaise(request.charges.platformFee)} />
+          <ChargeRow k={t('services.ra.cost.serviceFee')} v={fmtPaise((request.charges.platformFee || 0) + discount)} />
+          {request.charges.referralCredit && (discount > 0
+            ? <ChargeRow k={t('services.ra.pay.referralReward', { percent: referral.agreementDiscountPercent })} v={`\u2212${fmtPaise(discount)}`} />
+            : <p className="text-emerald-400" data-testid="ra-pay-referral">{t('services.ra.pay.referralReward', { percent: referral.agreementDiscountPercent })}</p>)}
           <div className="flex justify-between items-center pt-1.5 border-t border-white/8">
             <span className="text-white font-semibold text-sm">{t('services.ra.cost.totalPayable')}</span>
             <span className="text-white font-bold text-sm">{fmtPaise(request.amount)}</span>

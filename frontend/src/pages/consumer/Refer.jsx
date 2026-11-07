@@ -1,12 +1,10 @@
-import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
-import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import { useEffect, useState, useCallback } from 'react';
 import { getMyReferralSummary, referralLink } from '../../services/referralService.js';
-import { getEntitlements } from '../../services/entitlementService.js';
 import { usePricing } from '../../context/PricingContext.jsx';
+import InviteByMobile from './refer/InviteByMobile.jsx';
 
 const Stat = ({ value, label, tone = 'text-white', testId }) => (
   <div className="glass rounded-2xl px-4 py-3 min-w-0">
@@ -17,11 +15,8 @@ const Stat = ({ value, label, tone = 'text-white', testId }) => (
 
 export default function Refer() {
   const { t } = useTranslation();
-  const { hasEverListed, isIn } = useAuth();
   const { toast } = useToast();
   const { referral } = usePricing();
-  const { flagEnabled } = useAppFlags();
-  const contactRewards = flagEnabled('referralRewards');
 
   const [summary, setSummary] = useState(null);
   const [summaryFailed, setSummaryFailed] = useState(false);
@@ -37,17 +32,12 @@ export default function Refer() {
   const CODE = summary?.code || '';
   const LINK = referralLink(CODE);
   const [copied, setCopied] = useState(null);
-  const [agreements, setAgreements] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    getEntitlements().then((e) => { if (alive) setAgreements(e?.agreements ?? null); }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
   const joined = summary?.friendReward;
-  const showJoinedContacts = contactRewards && joined?.contacts > 0;
+  const showJoinedContacts = joined?.contacts > 0;
   const showJoinedFeatured = joined?.featuredDays > 0;
+  const rewards = summary?.rewards;
 
-  const shareText = () => t('misc1.referShareMsg', { code: CODE, link: LINK });
+  const shareText = (channel) => t('misc1.referShareMsg', { code: CODE, link: referralLink(CODE, channel) });
 
   const writeClipboard = async (text) => {
     try {
@@ -69,19 +59,19 @@ export default function Refer() {
     toast(t('misc1.referCodeCopied'), ok ? 'success' : 'error');
   };
   const copyLink = async () => {
-    const ok = await writeClipboard(LINK);
+    const ok = await writeClipboard(referralLink(CODE, 'copy'));
     if (ok) { setCopied('link'); setTimeout(() => setCopied((c) => (c === 'link' ? null : c)), 2000); }
     toast(t(ok ? 'misc1.referLinkCopied' : 'misc1.referCodeCopied'), ok ? 'success' : 'error');
   };
 
   const shareWA = () => {
     reloadSummary();
-    window.open('https://wa.me/?text=' + encodeURIComponent(shareText()), '_blank', 'noopener');
+    window.open('https://wa.me/?text=' + encodeURIComponent(shareText('whatsapp')), '_blank', 'noopener');
   };
   const shareNative = async () => {
     if (!navigator.share) { shareWA(); return; }
     try {
-      await navigator.share({ title: t('misc1.referBadge'), text: shareText(), url: LINK });
+      await navigator.share({ title: t('misc1.referBadge'), text: shareText('other'), url: referralLink(CODE, 'other') });
       reloadSummary();
     } catch { }
   };
@@ -95,7 +85,12 @@ export default function Refer() {
         <p className="text-gray-400 mt-2">{t('misc1.referSub')}</p>
       </div>
 
-      <section className="glass rounded-2xl p-5 sm:p-6 mb-5 min-w-0">
+      <section className="glass rounded-2xl p-5 sm:p-6 mb-5 min-w-0" data-testid="refer-invite">
+        <InviteByMobile onSent={reloadSummary} />
+      </section>
+
+      <section className="glass rounded-2xl p-5 sm:p-6 mb-5 min-w-0" data-testid="refer-share">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-3">{t('misc1.referOrShare')}</h2>
         {!CODE ? (
           <div className="py-8 text-center">
             {summaryFailed ? (
@@ -144,35 +139,37 @@ export default function Refer() {
         </section>
       )}
 
-      <section className={`grid gap-4 mb-5 ${contactRewards ? 'md:grid-cols-2' : ''}`}>
-        <div className="glass rounded-2xl p-5 relative" data-testid="refer-owner-track">
-          {hasEverListed && <span className="dz-tag absolute top-4 right-4 font-bold uppercase tracking-wider text-teal-300 bg-teal-500/15">{t('misc1.referForYou')}</span>}
-          <div className="w-10 h-10 rounded-xl bg-teal-500/15 flex items-center justify-center mb-3"><Icon name="file-check-2" className="w-5 h-5 text-teal-400" /></div>
-          <h2 className="text-lg font-extrabold">{t('misc1.referOwnerTitle')}</h2>
-          <p className="text-gray-300 text-sm mt-2">{t('misc1.referOwnerThey', { days: referral.ownerFeaturedDays })}</p>
-          <p className="text-teal-300 text-sm font-medium mt-1">{t('misc1.referOwnerYou', { count: referral.ownerRewardAgreements })}</p>
-        </div>
-        {contactRewards && (
-          <div className="glass rounded-2xl p-5 relative" data-testid="refer-seeker-track">
-            {isIn && !hasEverListed && <span className="dz-tag absolute top-4 right-4 font-bold uppercase tracking-wider text-teal-300 bg-teal-500/15">{t('misc1.referForYou')}</span>}
-            <div className="w-10 h-10 rounded-xl bg-teal-500/15 flex items-center justify-center mb-3"><Icon name="phone-call" className="w-5 h-5 text-teal-400" /></div>
-            <h2 className="text-lg font-extrabold">{t('misc1.referSeekerTitle')}</h2>
-            <p className="text-gray-300 text-sm mt-2">{t('misc1.referSeekerThey', { count: referral.seekerBonusContacts })}</p>
-            <p className="text-teal-300 text-sm font-medium mt-1">{t('misc1.referSeekerYou', { count: referral.contactBonus })}</p>
-          </div>
-        )}
+      <section className="glass rounded-2xl p-5 sm:p-6 mb-5" data-testid="refer-how">
+        <h2 className="text-lg font-extrabold mb-3">{t('misc1.referHowTitle')}</h2>
+        <ol className="space-y-3 text-sm text-gray-300">
+          {[
+            t('misc1.referStep1'),
+            t('misc1.referStep2'),
+            t('misc1.referStep3', { percent: referral.agreementDiscountPercent }),
+          ].map((step, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="w-6 h-6 shrink-0 rounded-full bg-teal-500/15 text-teal-300 text-xs font-bold flex items-center justify-center">{i + 1}</span>
+              <span className="min-w-0">{step}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="text-teal-300 text-sm mt-4" data-testid="refer-gift">
+          {t('misc1.referGift', { count: referral.seekerBonusContacts, days: referral.ownerFeaturedDays })}
+        </p>
+        <p className="text-xs text-gray-500 mt-2">{t('misc1.referFinePrint', { count: referral.qualifyPerMonth })}</p>
       </section>
 
       <section data-testid="refer-stats">
         <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-2"><Icon name="sparkles" className="w-4 h-4 text-teal-400" /> {t('misc1.referYourRewards')}</h2>
         <div className="grid grid-cols-3 gap-3">
           <Stat value={summary ? summary.invited : '—'} label={t('misc1.referStatInvited')} testId="refer-invited" />
-          <Stat value={summary ? summary.converted : '—'} label={t('misc1.referStatQualified')} tone="text-emerald-300" />
-          <Stat value={summary ? summary.held : '—'} label={t('misc1.referStatChecking')} tone="text-amber-300" testId="refer-held" />
+          <Stat value={summary ? summary.joined : '—'} label={t('misc1.referStatJoined')} tone="text-emerald-300" testId="refer-joined-count" />
+          <Stat value={summary ? summary.checking : '—'} label={t('misc1.referStatChecking')} tone="text-amber-300" testId="refer-held" />
         </div>
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          {contactRewards && <Stat value={summary?.earnedContacts ?? '—'} label={t('misc1.referContactsEarned')} tone="text-teal-300" testId="refer-contacts-earned" />}
-          <Stat value={agreements ? `${agreements.used} / ${agreements.free}` : '—'} label={t('misc1.referAgreementsUsed')} tone="text-emerald-300" testId="refer-agreements" />
+        <div className="grid grid-cols-3 gap-3 mt-3">
+          <Stat value={rewards ? rewards.earned : '—'} label={t('misc1.referRewardsEarned')} tone="text-teal-300" testId="refer-rewards-earned" />
+          <Stat value={rewards ? rewards.used : '—'} label={t('misc1.referRewardsUsed')} tone="text-emerald-300" testId="refer-rewards-used" />
+          <Stat value={rewards ? rewards.remaining : '—'} label={t('misc1.referRewardsLeft')} tone="text-teal-300" testId="refer-rewards-left" />
         </div>
         <p className="text-xs text-gray-500 mt-3">{t('misc1.referCheckingNote', { days: referral.holdDays })}</p>
       </section>

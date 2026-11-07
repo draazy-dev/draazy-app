@@ -18,8 +18,7 @@ import { cityHasData } from '../../lib/geoConfig.js';
 import { resolveAuthIntent, postAuthDest } from '../../lib/authIntent.js';
 import { classifyOtpVerifyError } from '../../lib/otpVerifyError.js';
 import { healStaleShell } from '../../lib/seamErrors.js';
-import { redeemReferral } from '../../services/referralService.js';
-import { clearReferral, isReferralCode, storedReferral } from '../../lib/referralAttribution.js';
+import { isReferralCode, redeemOnNewAccount, storedReferral } from '../../lib/referralAttribution.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { isValidName } from '../../lib/auth.js';
 import { track } from '../../lib/pmf.js';
@@ -142,10 +141,11 @@ export default function Signup() {
       setDone(true);
       const code = referral.trim();
       if (wasNew) track('signup_completed', { role, referred: Boolean(code) });
-      if (wasNew && code) {
-        redeemReferral(code, 'link').catch(() => toast(t('auth.referralNotApplied'), 'info'));
+      if (wasNew) {
+        redeemOnNewAccount(code).then((outcome) => {
+          if (outcome === 'refused' || outcome === 'invalid' || outcome === 'failed') toast(t('auth.referralNotApplied'), 'info');
+        });
       }
-      clearReferral();
       redirectTimer.current = setTimeout(
         () => navigate(postAuthDest(params, wasNew ? '/listings' : '/dashboard'), { replace: true }),
         1000,

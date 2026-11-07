@@ -88,7 +88,8 @@ export function useRentAgreement() {
   const [mode, setMode] = useState('owner');
   const [inviteCtx, setInviteCtx] = useState(null);
   const { entitlements, refresh: refreshEntitlements } = useEntitlements(isIn && !inviteCtx);
-  const referralCredit = (entitlements?.agreements?.remaining ?? 0) >= 1;
+  const discountPercent = entitlements?.agreements?.discountPercent ?? 0;
+  const referralCredit = (entitlements?.agreements?.remaining ?? 0) >= 1 && discountPercent > 0;
   const [inviteError, setInviteError] = useState(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
   const [myProperties, setMyProperties] = useState([]);
@@ -252,7 +253,7 @@ export function useRentAgreement() {
     setPaying(true);
     try {
       const checkout = await openServiceRequestCheckout(request.id, DECLARATION_VERSION);
-      const status = await payAndConfirm(checkout, referralCredit && !request.myPartyId ? null : Number(request.amount) || null);
+      const status = await payAndConfirm(checkout, Number(request.amount) || null);
       if (mountedRef.current && status === 'cancelled') toast(tr('services.ra.checkoutFailed'), 'error');
       else if (mountedRef.current && status && status !== 'awaiting_payment') toast(tr('services.ra.pay.paid'), 'success');
     } catch (err) {
@@ -558,16 +559,16 @@ export function useRentAgreement() {
     if (reg == null) { reg = regArea === 'rural' ? 500 : 1000; computed.push('reg'); }
     const dhc = 300;
     const service = feeRow.platformFee;
-    const waived = referralCredit ? service : 0;
+    const waived = referralCredit ? Math.floor((service * discountPercent) / 100) : 0;
     return {
       ...answers,
-      stamp, exactPaise, reg, dhc, service, waived,
+      stamp, exactPaise, reg, dhc, service, waived, discountPercent,
       total: service + stamp + reg + dhc - waived,
       computed,
       notes: feeRow.notes || null,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- retryFees is a stable state increment
-  }, [terms.rent, terms.deposit, terms.nrDeposit, terms.months, terms.increment, terms.incrementEvery, regArea, feeStatus, feeRow, referralCredit]);
+  }, [terms.rent, terms.deposit, terms.nrDeposit, terms.months, terms.increment, terms.incrementEvery, regArea, feeStatus, feeRow, referralCredit, discountPercent]);
 
   const propertyLine = () =>[prop.flatNo, prop.society, prop.locality, prop.city].filter(Boolean).join(', ');
   const invitedLabel = () => 'Invited: ' + (invite.invName || '••••••' + digits(invite.invMobile).slice(-4)) + ' (pending)';
@@ -923,7 +924,7 @@ export function useRentAgreement() {
       console.error('Rent Agreement checkout refused', err?.status);
       return err?.status === 409 && err?.message ? tr('services.ra.checkoutIncomplete', { detail: err.message }) : tr('services.ra.checkoutFailed');
     }
-    await payAndConfirm(checkout, referralCredit ? null : cost.total);
+    await payAndConfirm(checkout, cost.total);
     refreshEntitlements();
     return null;
   };

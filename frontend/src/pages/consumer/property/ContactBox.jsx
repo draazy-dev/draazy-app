@@ -10,8 +10,6 @@ import { useLatest, useSignInGate } from '../../../lib/useSignInGate.js';
 import { requestContact } from '../../../services/contactService.js';
 import { useContactGate } from './useContactGate.js';
 import { useEntitlements, contactsLeft, freeContactsTill } from './useEntitlements.js';
-import { useAppFlags } from '../../../context/AppFlagsContext.jsx';
-import { usePricing } from '../../../context/PricingContext.jsx';
 import { track, captureLead } from '../../../lib/pmf.js';
 import { dialableMobile, telHref } from './contactPhone.js';
 import { propertyKey } from '../../../lib/listingSeo.js';
@@ -19,8 +17,6 @@ import { propertyKey } from '../../../lib/listingSeo.js';
 export function ContactBox({ p, isIn, toast }) {
   const { t } = useTranslation();
   const sendToSignIn = useSignInGate();
-  const { flagEnabled } = useAppFlags();
-  const { referral } = usePricing();
   const ownerMobile = String(p.ownerMobile || '');
   const propId = p.id || '';
   const routeId = propertyKey(useParams().id);
@@ -122,7 +118,7 @@ export function ContactBox({ p, isIn, toast }) {
                   {left > 0 ? (
                     <span className="text-slate-500">{freeTill ? t('property.contactsLeftTill', { count: left, date: freeTill }) : t('property.contactsLeft', { count: left })}</span>
                   ) : (
-                    <span className="text-amber-300">{t(flagEnabled('referralRewards') ? 'property.contactsLeftNoneReferHint' : 'property.contactsLeftNone', { count: referral.contactBonus })}</span>
+                    <span className="text-amber-300">{t('property.contactsLeftNone')}</span>
                   )}
                 </p>
               )}

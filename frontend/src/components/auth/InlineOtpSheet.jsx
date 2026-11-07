@@ -13,6 +13,7 @@ import { useOtpFlow } from './useOtpFlow.js';
 import { sendOtp as sendOtpSvc } from '../../services/authService.js';
 import { classifyOtpVerifyError } from '../../lib/otpVerifyError.js';
 import { healStaleShell } from '../../lib/seamErrors.js';
+import { redeemOnNewAccount } from '../../lib/referralAttribution.js';
 import { isValidName } from '../../lib/auth.js';
 import useBackToClose from '../../hooks/useBackToClose.js';
 
@@ -90,6 +91,7 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
     try {
       const who = await login({ mobile: mobile.value, otp: otp.otp, remember: true });
       if (who && !who.name?.trim()) {
+        redeemOnNewAccount();
         verifiedUser.current = who;
         setNeedsProfile(true);
         return;

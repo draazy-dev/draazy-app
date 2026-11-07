@@ -41,7 +41,10 @@ export default function BillingPanel({ isOwner, listings = [] }) {
       value: Math.max(0, l.allowance - l.used), sub: usedOf(l.used, l.allowance),
     },
     passes.length > 0 && { key: 'passes', icon: 'ticket-plus', label: t('dash.billingPassesActive'), value: passes.length },
-    a?.free > 0 && { key: 'agreements', icon: 'file-text', label: t('dash.billingAgreementsLeft'), value: a.remaining, sub: usedOf(a.used, a.free) },
+    a?.credits > 0 && {
+      key: 'agreements', icon: 'file-text', label: t('dash.billingAgreementsLeft'), value: a.remaining,
+      sub: t('dash.billingAgreementSub', { used: a.used, total: a.credits, percent: a.discountPercent }),
+    },
   ].filter(Boolean);
 
   const freeTill = freeContactsTill(ent);
@@ -55,7 +58,6 @@ export default function BillingPanel({ isOwner, listings = [] }) {
   ].filter(Boolean);
   const sources = [
     freeTill && { key: 'free', text: t('dash.billingFreeTill', { date: freeTill }) },
-    c?.referralBonus > 0 && { key: 'referral', text: t('dash.billingReferralBonus', { count: c.referralBonus }) },
     c?.friendBonus > 0 && { key: 'friend', text: t('dash.billingFriendBonus', { count: c.friendBonus }) },
   ].filter(Boolean);
   const details = [...held, ...sources];
