@@ -78,3 +78,4 @@ Nothing.
 | 364 | Frontend read-cache residuals (30s staleness for the non-paying RA party, expired entries kept until the key is re-read, prefetch before token restore wasted) | Accepted: bounded by 30s and by key count |
 | 365 | Toast auto-close vs manual close | Errors and warnings stay until dismissed; success/info close after 1.5 s + 0.4 s/word (5–12 s, paced for second-language English readers), paused on hover/touch/focus; at most 3 on screen |
 | 366 | Partner claims (vetted, verified advocates, GPS, CCTV, transit insurance) and hard-coded lender rates / locality YoY on service pages | Not shown; one returns only with a contract or source behind it |
+| 367 | Moderate/low npm advisories in dev and build tooling (prod deps: 0) | Accepted risk: build-time only; revisit when a prod dependency is affected |

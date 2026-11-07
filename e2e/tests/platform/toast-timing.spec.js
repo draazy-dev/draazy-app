@@ -52,6 +52,19 @@ test('hovering a success toast holds it open', async ({ page }) => {
   await expect(toast).toHaveCount(0);
 });
 
+test('the same toast raised again while held does not restart its timer', async ({ page }) => {
+  await page.clock.install();
+  await stubClipboard(page, true);
+  await shareASociety(page);
+
+  const toast = page.getByTestId('toasts').getByRole('alert');
+  await expect(toast).toBeVisible();
+  await toast.getByRole('button', { name: 'Dismiss' }).focus();
+  await page.getByRole('button', { name: /^share$/i }).first().evaluate((b) => b.click());
+  await page.clock.fastForward(20_000);
+  await expect(toast, 'a repeat of a toast being read does not pull it away').toBeVisible();
+});
+
 test('an error toast stays until the user closes it', async ({ page }) => {
   await page.clock.install();
   await stubClipboard(page, false);

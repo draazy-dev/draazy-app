@@ -2,7 +2,7 @@ import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uploadedListingPhotos, uniqueMobile, signedInAs, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
-import { istInDays } from '../../../helpers/availability.js';
+import { istInDays, shortLabel } from '../../../helpers/availability.js';
 
 const FOLLOW_UP_ON = istInDays(131);
 
@@ -129,7 +129,7 @@ test('an owner note and follow-up date are stored on the server, not in the brow
 
   const otherLead = otherPage.getByTestId('request-card').filter({ hasText: buyer.name });
   await expect(otherLead).toBeVisible();
-  await expect(otherLead.getByTestId('request-follow-up'), 'the follow-up pill must render for the same owner in a fresh browser').toContainText('14 Mar');
+  await expect(otherLead.getByTestId('request-follow-up'), 'the follow-up pill must render for the same owner in a fresh browser').toContainText(shortLabel(FOLLOW_UP_ON));
 
   await otherLead.getByTestId('request-note').click();
   const otherSheet = otherPage.getByRole('dialog');

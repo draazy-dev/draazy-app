@@ -218,11 +218,16 @@ test.describe('Rent Agreement — a submitted side opens as a locked wizard', ()
     const createdRes = page.waitForResponse(
       (r) => r.request().method() === 'POST' && /\/service-requests\/co-fill$/.test(new URL(r.url()).pathname),
     );
+    // The browser opens checkout after filing; settling first would make that checkout a 409.
+    const checkoutRes = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && /\/service-requests\/[^/]+\/checkout$/.test(new URL(r.url()).pathname),
+    );
     await payAndSubmit(page);
     const { id } = await (await createdRes).json();
     const ownerAuth = await authHeaders(ownerMobile);
     const read = async () => (await fetch(`${API}/service-requests/${id}`, { headers: ownerAuth })).json();
     await expect.poll(async () => ((await read()).documents || []).length, { message: 'the ownership proof finished filing', timeout: 30_000 }).toBeGreaterThan(0);
+    expect((await checkoutRes).status(), 'the owner\'s checkout opened').toBe(200);
 
     settle(id);
     await newListing(ownerMobile, { title: 'Owner listing for the picker' });

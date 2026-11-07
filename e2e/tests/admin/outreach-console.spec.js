@@ -199,6 +199,8 @@ test('the follow-up board chases with the message the listing has actually earne
     );
     const popup = page.waitForEvent('popup');
 
+    // The last Remind's toast can land under the parked pointer, and a hovered toast never times out.
+    await page.mouse.move(0, 0);
     await card.getByRole('button', { name: 'Remind' }).click();
 
     const req = await posted;

@@ -67,6 +67,8 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
                 }
             });
 
+    private long generation;
+
     public PublicReadCacheFilter(@Value("${draazy.cache.public-reads.ttl:30s}") Duration ttl) {
         this.ttlMillis = ttl.toMillis();
     }
@@ -112,7 +114,10 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
         if (!caches(request)) {
             chain.doFilter(request, response);
             if (response.getStatus() < HttpServletResponse.SC_BAD_REQUEST) {
-                entries.clear();
+                synchronized (entries) {
+                    generation++;
+                    entries.clear();
+                }
             }
             return;
         }
@@ -120,6 +125,10 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
         long now = System.currentTimeMillis();
         Entry entry = wantsFresh(request) ? null : entries.get(key);
         if (entry == null || entry.expiresAt() <= now) {
+            long seen;
+            synchronized (entries) {
+                seen = generation;
+            }
             ContentCachingResponseWrapper buffer = new ContentCachingResponseWrapper(response);
             chain.doFilter(request, buffer);
             if (buffer.getStatus() != HttpServletResponse.SC_OK) {
@@ -129,7 +138,12 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
             byte[] body = buffer.getContentAsByteArray();
             entry = new Entry(body, buffer.getContentType(),
                     "W/\"" + DigestUtils.md5DigestAsHex(body) + '"', now + ttlMillis);
-            entries.put(key, entry);
+            // A write that committed mid-read may have been missed by this body; serve it but don't keep it.
+            synchronized (entries) {
+                if (generation == seen) {
+                    entries.put(key, entry);
+                }
+            }
         }
         serve(entry, now, request, response);
     }

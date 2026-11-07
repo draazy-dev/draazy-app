@@ -6,7 +6,7 @@ import { trackErrors } from '../../../helpers/console.js';
 import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
-import { istInDays } from '../../../helpers/availability.js';
+import { istInDays, shortLabel } from '../../../helpers/availability.js';
 
 const MOVE_IN = istInDays(28);
 
@@ -58,7 +58,7 @@ test.describe('LIVE: room card cover', () => {
     const img = card.locator('img').first();
     await expect(img).toHaveAttribute('src', COVER);
     await expect(img).not.toHaveAttribute('src', FALLBACK);
-    await expect(card.getByText('From 1 Dec')).toBeVisible();
+    await expect(card.getByText(`From ${shortLabel(MOVE_IN)}`)).toBeVisible();
     expect(errors.filter((e) => !/cdn\.example/.test(e)), `console errors: ${errors.join('\n')}`).toHaveLength(0);
   });
 });

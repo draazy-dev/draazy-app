@@ -66,7 +66,7 @@ test('reviewsEnabled flag shows and hides the reviews section', async ({ page, f
   await expect(page.locator('h2:has-text("Reviews")')).toHaveCount(0);
 });
 
-test('inAppMessaging flag shows and hides the messages link and guards its route', async ({ page, flags, login }) => {
+test('inAppMessaging flag shows and hides the messages link and leaves only support chat on its route', async ({ page, flags, login }) => {
   await flags.enable('inAppMessaging');
   await login.asBuyer();
   await expect(page.locator('a[href="/messages"]')).toBeVisible();
@@ -77,7 +77,9 @@ test('inAppMessaging flag shows and hides the messages link and guards its route
   await expect(page.locator('a[href="/messages"]')).toBeHidden();
 
   await page.goto('/messages');
-  await redirectsAway(page, '/messages');
+  await expect(page).toHaveURL(/\/messages/);
+  await expect(page.getByRole('textbox', { name: 'Message Draazy support' }), 'support chat outlives the messaging flag').toBeVisible();
+  await expect(page.locator('.pc-conv')).toHaveCount(0);
 });
 
 test('pay-rent is the coming-soon page for everyone, with no flag involved', async ({ page, login }) => {

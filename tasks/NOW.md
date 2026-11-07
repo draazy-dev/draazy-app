@@ -3,34 +3,34 @@
 > **Read this file first and nothing else.** It is the whole orientation a new session needs. Hard
 > cap: 60 lines. It holds *state*, never narrative — every line is either a standing rule, a pointer,
 > or a number with the date it was taken. Rewrite it at the end of a session; do not append to it.
-> Last written: **2026-11-03** on `feature/e2e-testing` after the PERF-1..10 sweep and two all-sessions commit batches (30 commits).
+> Last written: **2026-11-07** on `feature/e2e-testing`; REFER-SIMPLE, the REVIEW-1106 fixes, follow-ups and flake fixes are committed as 10 commits on top of `dd565f017`, not pushed.
 
 ## Lane
 
 | | |
 |---|---|
 | Branch | `feature/e2e-testing`, QA fixes lane; not pushed |
-| Commit policy | Commit only when the user asks; never push. 30 commits made 2026-11-03 cover every dirty path |
-| Working tree | Clean apart from `graphify-out/` (never committed) on 2026-11-03; one session only |
+| Commit policy | Commit only when the user asks; never push |
+| Working tree | 528 dirty paths on 2026-11-06, several sessions' uncommitted work; never revert, stash or reset what is not yours |
 
 ## The queue
 
-Open feature and verification work is indexed in [todo.md](todo.md); every item has a ruling (through 364). Built rulings are deleted, not kept.
-Committed but PENDING AGENT REVIEW: the `Committed slices` line, PERF-1/2, RA-LANDING-MOBILE, SERVICES-HUB-MOBILE in todo.md.
-Performance work: PERF-1..10 done; PERF-3 (Lighthouse) and PERF-LATER stay open in todo.md.
+Open feature and verification work is indexed in [todo.md](todo.md); every item has a ruling (through 367). Built rulings are deleted, not kept.
 UGC reels (Google Flow, separate lane): read `ugc-flow\00-HANDOFF-state.txt` then `ugc-flow\reels\00-CONTINUITY-RULES.txt`; next = reel 5; ask the user before every Generate.
 Social media: start at `social\README.md`; `ig-*` skills write to `social\instagram\`.
-Owner-only: todo.md `WA-WEBHOOK`.
+Owner-only: OWNER-CHECKLIST (WhatsApp/ZeptoMail webhooks, referral template, deploy, smoke, prod secrets and FAQs).
+REFER-SIMPLE built, reviewed and committed; its `-Full` run is below.
+`draazy_test` holds a stale checksum for another session's `26.11.41` (2026-11-06); backend tests fail to boot on it, so use `TEST_DB_URL` with a scratch DB until its owner repairs it.
 
 ## Open work — pointers, not restatements
 
 | What | Where | Size |
 |---|---|---|
 | Manual / smoke test plan | [docs/Draazy-Tester-Checklist.xlsx](../docs/Draazy-Tester-Checklist.xlsx) | 307 rows on 2026-10-15; stale, re-derive |
-| Open dev work and verification | [tasks/todo.md](todo.md) | 25 lines on 2026-11-03; grep slice IDs |
-| Standing rulings | [tasks/DECISIONS-NEEDED.md](DECISIONS-NEEDED.md) | 78 lines on 2026-11-03 |
-| Durable rules and house style | [tasks/lessons.md](lessons.md) | 256 lines on 2026-10-29; grep |
-| Owner-only actions | [tasks/OWNER-CHECKLIST.md](OWNER-CHECKLIST.md) | 37 lines on 2026-10-15; stale, re-derive |
+| Open dev work and verification | [tasks/todo.md](todo.md) | 10 lines on 2026-11-07 |
+| Standing rulings | [tasks/DECISIONS-NEEDED.md](DECISIONS-NEEDED.md) | 81 lines on 2026-11-07 |
+| Durable rules and house style | [tasks/lessons.md](lessons.md) | 273 lines on 2026-11-07; grep |
+| Owner-only actions | [tasks/OWNER-CHECKLIST.md](OWNER-CHECKLIST.md) | 60 lines on 2026-11-07 |
 | Backend tech debt | [docs/system/tech-debt.md](../docs/system/tech-debt.md) | highest **D264** on 2026-10-29 |
 
 ## Standing constraints
@@ -42,6 +42,7 @@ Owner-only: todo.md `WA-WEBHOOK`.
 - `DRAAZY_DEV_MACHINE` must be set for the `dev` profile to start.
 - **e2e: `e2e\run-fast.ps1` after each fix** (related specs only; `-Failed` reruns last reds), **`e2e\run-fast.ps1 -Full` before a commit** (4 isolated shards, fails on any red or missing test). See e2e/README.md "Fast runs".
 - **A new table needs seed rows or a WAIVED entry** in `e2e/scripts/check-seed-coverage.mjs`, and any new seed file must also be listed in `e2e/global-setup.live.js` `SEEDS` — else every shard dies in global setup and all tests report MISSING.
+- **e2e shard DBs (`draazy_e2e_sh1`-`sh4`) persist across runs**: if another session edits an applied migration, shards fail to boot on a checksum mismatch; repair the stored checksum (PGPASSWORD=postgres), never drop the DB.
 - `tasks/HANDOFF.md` was deleted 2026-08-20 and **must not be recreated**.
 - Cashfree sandbox-verify has no possible e2e coverage — do not chase it.
 
@@ -49,7 +50,7 @@ Owner-only: todo.md `WA-WEBHOOK`.
 
 | Fact | Value | Taken |
 |---|---|---|
-| Next free Flyway slot | `26.11.33__?` (no `V`) | 2026-11-03 |
-| e2e spec files | 470 under `e2e/tests` | 2026-11-03 |
-| Full e2e (`-Full`, 4 shards + nobackend) | 27 red, all fixed or flaky (green on rerun, flakes listed in todo.md); flatmate set 293/293 after the team retirement | 2026-11-03 |
+| Next free Flyway slot | `26.11.44__?` (no `V`) | 2026-11-07 |
+| e2e spec files | 474 under `e2e/tests` | 2026-11-06 |
+| Full e2e (`-Full`, 4 shards + nobackend) | 31 red: stale specs, flakes, a rent-ledger bug and a public-cache race; all fixed, every red green on rerun | 2026-11-07 |
 | Backend suite (full) | 4,577 tests; 139 reds were Postgres connection exhaustion plus one migration guard, all green on rerun | 2026-11-03 |

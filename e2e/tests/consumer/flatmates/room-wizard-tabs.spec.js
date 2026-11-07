@@ -27,7 +27,9 @@ test.describe('room wizard — four tabs like a property post', () => {
 
     await test.step('Details: the home and room basics are required', async () => {
       await nextStep(page);
-      for (const text of ['Select the flat type.', 'Select the number of bathrooms.', "Select a floor at or below the building's total floors.",
+      await expect(page.getByRole('group', { name: 'Size' }).getByRole('button', { name: '2 BHK' })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByRole('group', { name: 'Bathrooms' }).getByRole('button', { name: '2' })).toHaveAttribute('aria-pressed', 'true');
+      for (const text of ["Select a floor at or below the building's total floors.",
         'Select how many floors the building has.', "Choose the type of room you're offering.", 'Choose attached or shared washroom.']) {
         await expect(error(page, text)).toBeVisible();
       }
@@ -72,7 +74,7 @@ test.describe('room wizard — four tabs like a property post', () => {
       const room = await response.json();
       track('rooms', room.id, accessToken);
       expect(response.request().postDataJSON()).toMatchObject({
-        homeTypeLabel: 'Flat', bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'unfurnished',
+        homeTypeLabel: 'Flat', bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi',
         flatNumber: 'B-702', noticePeriodDays: 30, lockInMonths: 0,
         details: { bathrooms: 2, floor: '3', totalFloors: 10 },
       });

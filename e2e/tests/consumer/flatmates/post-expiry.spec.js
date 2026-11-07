@@ -54,7 +54,7 @@ test.describe('LIVE: flatmate post expiry', () => {
     });
 
     await page.goto('/dashboard#listings');
-    const card = page.locator('div.rounded-xl', { hasText: 'Looking to share — Baner' }).last();
+    const card = page.getByTestId('owner-listing-card').filter({ hasText: 'Looking to share — Baner' }).last();
     await expect(card.getByText('Expired', { exact: true })).toBeVisible({ timeout: 20_000 });
 
     const renew = page.waitForResponse((r) => r.url().includes('/renew') && r.request().method() === 'POST');
@@ -87,7 +87,7 @@ test.describe('LIVE: flatmate post expiry', () => {
     });
 
     await page.goto('/dashboard#listings');
-    const card = page.locator('div.rounded-xl', { hasText: 'Looking to share — Aundh' }).last();
+    const card = page.getByTestId('owner-listing-card').filter({ hasText: 'Looking to share — Aundh' }).last();
     await expect(card.getByText('Not approved', { exact: true })).toBeVisible({ timeout: 20_000 });
     await expect(card.getByText('Live', { exact: true })).toBeHidden();
   });

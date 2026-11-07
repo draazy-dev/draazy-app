@@ -57,7 +57,7 @@ test.describe('LIVE: flatmate detail page', () => {
     const errors = trackErrors(page);
 
     await page.goto('/dashboard#listings');
-    const card = page.locator('.rounded-xl').filter({ hasText: title }).first();
+    const card = page.getByTestId('owner-listing-card').filter({ hasText: title }).first();
     await card.getByRole('link', { name: 'View listing' }).click();
     await expect(page).toHaveURL(new RegExp(`/flatmates/group/${group.id}$`));
 

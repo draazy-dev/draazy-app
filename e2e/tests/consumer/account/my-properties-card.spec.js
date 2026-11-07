@@ -63,7 +63,7 @@ test('owner property card shows every action inline on mobile and counts pending
   await signedInAs(page, ownerMobile);
   await page.goto('/dashboard#properties');
 
-  const card = page.locator('.rounded-xl', { hasText: title }).first();
+  const card = page.getByTestId('owner-listing-card').filter({ hasText: title }).first();
   await expect(card).toBeVisible({ timeout: 20_000 });
   await expect(card.getByRole('button', { name: /^1 waiting$/ })).toBeVisible();
 

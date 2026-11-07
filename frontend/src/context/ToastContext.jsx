@@ -89,25 +89,32 @@ export function ToastProvider({ children }) {
   const shown = useRef(new Map());
   const durations = useRef(new Map());
   const order = useRef([]);
+  const held = useRef(new Set());
 
   const dismiss = useCallback((id) => {
     clearTimeout(timers.current.get(id));
     timers.current.delete(id);
     durations.current.delete(id);
+    held.current.delete(id);
     order.current = order.current.filter((x) => x !== id);
     shown.current.forEach((v, k) => { if (v === id) shown.current.delete(k); });
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
   const pause = useCallback((id) => {
+    held.current.add(id);
     clearTimeout(timers.current.get(id));
     timers.current.delete(id);
   }, []);
   const resume = useCallback((id) => {
     const ms = durations.current.get(id);
-    if (!ms) return;
+    if (!ms || held.current.has(id)) return;
     clearTimeout(timers.current.get(id));
     timers.current.set(id, setTimeout(() => dismiss(id), ms));
   }, [dismiss]);
+  const release = useCallback((id) => {
+    held.current.delete(id);
+    resume(id);
+  }, [resume]);
   const toast = useCallback(
     (message, type = 'info') => {
       const key = typeof message === 'string' ? `${type}:${message}` : null;
@@ -149,7 +156,7 @@ export function ToastProvider({ children }) {
       <div data-testid="toasts" className="fixed bottom-24 right-5 z-[1600] flex flex-col-reverse gap-2.5 pointer-events-none">
         {toasts.map((t) => (
           <div key={t.id} className="pointer-events-auto">
-            <Toast toast={t} onDismiss={dismiss} onPause={pause} onResume={resume} />
+            <Toast toast={t} onDismiss={dismiss} onPause={pause} onResume={release} />
           </div>
         ))}
       </div>

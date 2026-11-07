@@ -47,7 +47,7 @@ test('the owner answers the question in the Draazy support thread and gets back 
     .toContain(ANSWER);
 
   await page.goto('/dashboard#properties');
-  const card = page.locator('.rounded-xl', { hasText: title }).first();
+  const card = page.getByTestId('owner-listing-card').filter({ hasText: title });
   await card.getByTestId('support-thread-link').click();
   await expect(page.getByTestId('support-thread').getByTestId('support-review-card')).toContainText('Under review');
   await expect(page.getByTestId('support-thread').locator('.pc-msgs').getByText(QUESTION)).toBeVisible();

@@ -156,6 +156,7 @@ test('double-tapping Accept sends one successful contact decision', async ({ pag
   const accept = page.getByTestId('request-card').filter({ hasText: 'Zztest Double Buyer' }).getByRole('button', { name: 'Approve & chat' });
   await accept.evaluate((button) => { button.click(); button.click(); });
   await expect(page.getByText('Accepted — you can chat now and see their number.')).toBeVisible();
+  await expect(page).toHaveURL(/\/messages\?c=/);
   expect(successfulPatches).toHaveLength(1);
 
   await page.goto('/dashboard#leads');

@@ -53,24 +53,29 @@ test.describe('list property photo UX', () => {
         await expect(photos.locator('img')).toHaveCount(4);
         await expect(photos).toHaveAttribute('aria-busy', 'false');
         await expect(photos.getByRole('button', { name: /^move photo/i })).toHaveCount(0);
+        // Upload ids follow network arrival order, not tile order.
+        const [, second, , fourth] = await photos.locator('img').evaluateAll((els) => els.map((el) => el.getAttribute('src')));
         await photos.getByRole('button', { name: /set as cover/i }).nth(1).click();
-        await expect(photos.locator('img').first()).toHaveAttribute('src', /photo-3\.jpg/);
+        await expect(photos.locator('img').first()).toHaveAttribute('src', second);
 
         const tiles = photos.getByRole('group', { name: /^Photo \d of 4$/ });
         await tiles.first().focus();
         await page.keyboard.press('Space');
         await page.keyboard.press('ArrowRight');
         await page.keyboard.press('Space');
-        await expect(photos.locator('img').nth(1)).toHaveAttribute('src', /photo-3\.jpg/);
+        await expect(photos.locator('img').nth(1)).toHaveAttribute('src', second);
 
+        // The keyboard drop animates the tiles; measuring mid-animation drags from stale coordinates.
+        await expect.poll(() => tiles.evaluateAll((els) => els.every((el) => !el.style.transform && !el.style.transition)))
+          .toBe(true);
         const from = await tiles.nth(3).boundingBox();
         const to = await tiles.first().boundingBox();
         await page.mouse.move(from.x + from.width / 2, from.y + 30);
         await page.mouse.down();
         await page.mouse.move(to.x + to.width / 2, to.y + 30, { steps: 12 });
         await page.mouse.up();
-        await expect(photos.locator('img').first()).toHaveAttribute('src', /photo-4\.jpg/);
-        await expect(photos.locator('img').nth(2)).toHaveAttribute('src', /photo-3\.jpg/);
+        await expect(photos.locator('img').first()).toHaveAttribute('src', fourth);
+        await expect(photos.locator('img').nth(2)).toHaveAttribute('src', second);
         const draft = await readListPropertyDraft(page);
         expect(draft ?? '').not.toContain('data:');
     });

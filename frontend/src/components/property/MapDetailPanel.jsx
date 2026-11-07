@@ -276,7 +276,7 @@ export default function MapDetailPanel({ property: p, list, locName, activeIndex
       </aside>
 
       {contactOpen ? <ContactOwnerModal p={p} isIn={signedIn} onClose={() => setContactOpen(false)} toast={toast} /> : null}
-      {visitOpen && scheduleEnabled ? <ScheduleVisitModal p={p} isIn={signedIn} onClose={() => setVisitOpen(false)} toast={toast} /> : null}
+      {visitOpen && scheduleEnabled ? <ScheduleVisitModal p={p} isIn={signedIn} onClose={() => setVisitOpen(false)} /> : null}
       <InlineOtpSheet open={!!inlineOtpReason} reason={inlineOtpReason || 'contact'} onClose={() => { setInlineOtpReason(null); setResumeAction(null); }} onVerified={() => { resumeAfterInlineOtpCloses(); setInlineOtpReason(null); }} />
     </>
   );

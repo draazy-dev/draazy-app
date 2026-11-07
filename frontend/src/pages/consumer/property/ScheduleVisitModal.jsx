@@ -18,7 +18,7 @@ const nextDayIso = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
+export function ScheduleVisitModal({ p, isIn, onClose }) {
   const { t } = useTranslation();
   const { isIn: authIn, loading: authLoading } = useAuth();
   const sendToSignIn = useSignInGate();
@@ -67,7 +67,6 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
       });
       setDone(true);
       track('visit_requested', { id: p?.id });
-      toast(t('property.visitRequestedToast'), 'success');
     } catch (e) {
       if (e?.status === 401) {
         if (sendToSignIn('schedule', returnPath)) {

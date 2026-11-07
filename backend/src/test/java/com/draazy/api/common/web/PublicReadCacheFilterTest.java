@@ -117,6 +117,19 @@ class PublicReadCacheFilterTest {
     }
 
     @Test
+    void aReadThatOverlapsAnAdminWriteIsServedButNotRemembered() throws Exception {
+        FilterChain readSpanningAWrite = (req, res) -> {
+            filter.doFilter(new MockHttpServletRequest("PUT", "/admin/settings"), new MockHttpServletResponse(), controller);
+            controller.doFilter(req, res);
+        };
+        var overlapped = new MockHttpServletResponse();
+        filter.doFilter(get("/bootstrap"), overlapped, readSpanningAWrite);
+
+        assertThat(overlapped.getContentAsString()).isEqualTo("{\"n\":2}");
+        assertThat(send(get("/bootstrap")).getContentAsString()).isEqualTo("{\"n\":3}");
+    }
+
+    @Test
     void aSuccessfulModerationWriteEvictsTheListingEverywhere() throws Exception {
         int n = 1;
         for (String[] write : new String[][] {{"PATCH", "/properties/p1/status"},

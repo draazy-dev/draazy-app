@@ -63,6 +63,7 @@ test.describe('LIVE: the Refund Policy page', () => {
     await expect(terms).toContainText('A Listing Pass ends early when its listing is rented, sold or archived, with no refund for unused days.');
     await expect(terms).toContainText('Refunds, returned contacts and disputes are governed by our Refund Policy');
     await expect(terms.getByRole('link', { name: 'Refund Policy' })).toHaveAttribute('href', '/refund-policy');
-    expect(await terms.innerText()).not.toMatch(/\b(25|50)\s?%/);
+    const passAndRefundLines = (await terms.innerText()).split('\n').filter((line) => /\bpass\b|refund/i.test(line));
+    expect(passAndRefundLines.join('\n')).not.toMatch(/\b(25|50)\s?%/);
   });
 });

@@ -44,7 +44,7 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     const errors = trackErrors(page);
 
     await page.goto('/dashboard#properties');
-    const groupCard = page.locator('.rounded-xl').filter({ hasText: title }).first();
+    const groupCard = page.getByTestId('owner-listing-card').filter({ hasText: title }).first();
     await groupCard.getByRole('button', { name: 'Edit' }).click();
     const groupDialog = page.getByRole('dialog', { name: 'Edit group' });
     await expect(groupDialog).toBeVisible({ timeout: 20_000 });
@@ -58,9 +58,9 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     expect((await patched).status(), 'the group edit should reach the server').toBe(200);
     await expect(groupDialog).toHaveCount(0);
     await expect(page).toHaveURL(/\/dashboard#properties$/);
-    await expect(page.locator('.rounded-xl').filter({ hasText: renamed }).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('owner-listing-card').filter({ hasText: renamed }).first()).toBeVisible({ timeout: 20_000 });
 
-    const postCard = page.locator('.rounded-xl').filter({ hasText: 'Looking to share — Wakad' }).first();
+    const postCard = page.getByTestId('owner-listing-card').filter({ hasText: 'Looking to share — Wakad' }).first();
     await postCard.getByRole('button', { name: 'Edit' }).click();
     const postDialog = page.getByRole('dialog', { name: 'Edit your flatmate request' });
     await expect(postDialog).toBeVisible({ timeout: 20_000 });
@@ -87,7 +87,7 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     await signedInAs(page, mobile);
 
     await page.goto('/dashboard#listings');
-    await page.locator('.rounded-xl').filter({ hasText: title }).first().getByRole('button', { name: 'Edit' }).click();
+    await page.getByTestId('owner-listing-card').filter({ hasText: title }).first().getByRole('button', { name: 'Edit' }).click();
     const dialog = page.getByRole('dialog', { name: 'Edit group' });
     await expect(dialog).toBeVisible({ timeout: 20_000 });
     await expect(dialog.getByRole('button', { name: /I have a flat/i })).toHaveCount(0);
@@ -118,7 +118,7 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     const errors = trackErrors(page);
 
     await page.goto('/dashboard#properties');
-    const card = page.locator('.rounded-xl').filter({ hasText: society }).first();
+    const card = page.getByTestId('owner-listing-card').filter({ hasText: society }).first();
     await card.getByRole('link', { name: 'Edit' }).click();
     await expect(page).toHaveURL(new RegExp(`/list-property\\?flatmate=1&editRoom=${room.id}`));
     await expect(page.getByRole('heading', { name: 'Edit your room' })).toBeVisible({ timeout: 20_000 });
@@ -142,7 +142,7 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     expect(res.status(), `room edit refused: ${await res.text()}`).toBe(200);
     expect(await res.json()).toMatchObject({ id: room.id, budget: 19500, occupants: 9, society });
     await expect(page).toHaveURL(/\/dashboard#properties$/);
-    await expect(page.locator('.rounded-xl').filter({ hasText: society }).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('owner-listing-card').filter({ hasText: society }).first()).toBeVisible({ timeout: 20_000 });
 
     expect(errors, `console errors: ${errors.join('\n')}`).toHaveLength(0);
   });
@@ -216,18 +216,18 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
 
     await page.goto('/dashboard#properties');
     for (const [kind, id, text] of [['groups', group.id, title], ['posts', post.id, 'Looking to share — Kharadi']]) {
-      const card = page.locator('.rounded-xl').filter({ hasText: text }).first();
+      const card = page.getByTestId('owner-listing-card').filter({ hasText: text }).first();
       await expect(card).toBeVisible({ timeout: 20_000 });
       const deleted = page.waitForResponse((r) => r.url().endsWith(`/flatmates/${kind}/${id}`) && r.request().method() === 'DELETE');
       await card.getByRole('button', { name: 'Delete' }).click();
       await page.getByTestId('confirm-modal-ok').click();
       expect((await deleted).status(), `${kind} delete should reach the server`).toBeLessThan(300);
-      await expect(page.locator('.rounded-xl').filter({ hasText: text })).toHaveCount(0, { timeout: 20_000 });
+      await expect(page.getByTestId('owner-listing-card').filter({ hasText: text })).toHaveCount(0, { timeout: 20_000 });
     }
 
     await page.reload();
     await expect(page.getByText('My properties', { exact: true })).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('.rounded-xl').filter({ hasText: title })).toHaveCount(0);
-    await expect(page.locator('.rounded-xl').filter({ hasText: 'Looking to share — Kharadi' })).toHaveCount(0);
+    await expect(page.getByTestId('owner-listing-card').filter({ hasText: title })).toHaveCount(0);
+    await expect(page.getByTestId('owner-listing-card').filter({ hasText: 'Looking to share — Kharadi' })).toHaveCount(0);
   });
 });

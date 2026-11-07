@@ -107,8 +107,7 @@ test.describe('LIVE — an owner\'s listing before it is approved', () => {
 
     await signedInAs(page, me.mobile);
     await page.goto('/dashboard#listings');
-    const cardForTitle = () => page.getByText(posted.title, { exact: true })
-      .locator('xpath=ancestor::div[contains(@class,"rounded-xl") and contains(@class,"bg-white/")][1]');
+    const cardForTitle = () => page.getByTestId('owner-listing-card').filter({ hasText: posted.title });
     const card = cardForTitle();
     await expect(card.getByText('Under review', { exact: true }).first()).toBeVisible();
     await expect(card.getByText('Active', { exact: true })).toHaveCount(0);

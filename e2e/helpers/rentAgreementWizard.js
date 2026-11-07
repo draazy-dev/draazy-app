@@ -13,9 +13,25 @@ export const todayIso = () => { const d = new Date(); return `${d.getFullYear()}
 
 export const active = (page) => page.locator('.step-panel.active');
 
+// Next smooth-scrolls the form (or the first error) into view, and Playwright's own scroll-into-view
+// fights an animation still in flight until the next action fails as "element is not stable".
+async function scrollSettled(page) {
+  await page.evaluate(() => new Promise((done) => {
+    let last = window.scrollY;
+    let still = 0;
+    const tick = () => {
+      still = window.scrollY === last ? still + 1 : 0;
+      last = window.scrollY;
+      if (still >= 5) done(true); else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }));
+}
+
 // Shared placeholders would hide a failed Next until a later unrelated locator.
 export async function clickNext(page, expectStep) {
   await page.getByRole('button', { name: 'Next' }).click();
+  await scrollSettled(page);
   if (expectStep == null) return;
   await expect(page.locator('.step-dot').nth(expectStep), `wizard did not advance to step ${expectStep + 1}`).toHaveClass(/\bactive\b/);
 }

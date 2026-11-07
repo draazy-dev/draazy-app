@@ -1,13 +1,12 @@
 import { test as base, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders } from '../../helpers/liveAuth.js';
 
-/** Operator geo policy against the real server: console writes (`PUT /admin/settings`, `PATCH /admin/cities/{slug}`) must reach what visitors read from `GET /bootstrap`.
- * Restore is per key because `PUT /admin/settings` deep-merges (arrays replace); the snapshot comes from `GET /admin/settings`, since the `geo` projection withholds blacklist `note`s. */
+// Restore is per key because `PUT /admin/settings` deep-merges (arrays replace); the snapshot is read from
+// `GET /admin/settings` because the public `geo` projection withholds blacklist `note`s.
 
 const test = base.extend({
   geo: async ({}, use) => {
     let before;
-    const touchedCities = new Set();
     let touchedBlacklist = false;
     let touchedEnforce = false;
 
@@ -28,7 +27,6 @@ const test = base.extend({
         if (!res.ok) throw new Error(`reading admin settings failed (${res.status})`);
         before = (await res.json())?.geo ?? {};
       }
-      Object.keys(value.cities ?? {}).forEach((name) => touchedCities.add(name));
       if (value.blacklist !== undefined) touchedBlacklist = true;
       if (value.enforceCityLimit !== undefined) touchedEnforce = true;
       await write(value);
@@ -38,32 +36,22 @@ const test = base.extend({
 
     if (before !== undefined) {
       const restore = {};
-      if (touchedCities.size) {
-        restore.cities = Object.fromEntries(
-          [...touchedCities].map((name) => [
-            name,
-            before.cities?.[name] ?? { center: null, bounds: null },
-          ]),
-        );
-      }
       if (touchedBlacklist) restore.blacklist = before.blacklist ?? [];
-      // Absent means enforced (`geo.enforceCityLimit !== false`), so restore to `true`, not `false`, which would unfence locality search for later specs.
+      // Absent means enforced, so restore `true`: `false` would unfence locality search for later specs.
       if (touchedEnforce) restore.enforceCityLimit = before.enforceCityLimit ?? true;
       if (Object.keys(restore).length) await write(restore);
     }
   },
 });
 
-/* The `cities` fixture lives in `fixtures/live.js`: two copies would be two writers of one shared row with independent teardowns. */
+// The `cities` fixture lives in `fixtures/live.js`: a second copy would be another writer of one shared row.
 
-/** Read the `geo` section of `GET /bootstrap` from the page's own origin, unauthenticated — the request the client makes. */
 const fetchGeo = (page) =>
   page.evaluate(async () => {
     const res = await fetch('/api/bootstrap');
     return { status: res.status, json: (await res.json()).geo };
   });
 
-/** Read the `cities` section of `GET /bootstrap` from the page's own origin, unauthenticated — the roster the client makes from. */
 const fetchCities = (page) =>
   page.evaluate(async () => {
     const res = await fetch('/api/bootstrap');
@@ -72,7 +60,7 @@ const fetchCities = (page) =>
 
 test.describe('geo policy reaches the browser', () => {
   test('the route is public, and publishes nothing but the geo block', async ({ page, geo }) => {
-    await geo.set({ enforceCityLimit: true, cities: { Mumbai: { center: { lat: 19.076, lng: 72.8777 } } } });
+    await geo.set({ enforceCityLimit: true });
 
     // A real navigation first: `page.evaluate` on `about:blank` has no origin to resolve `/api`
     // against, and the failure ("Failed to parse URL") looks nothing like the missing page it is.
@@ -81,8 +69,8 @@ test.describe('geo policy reaches the browser', () => {
 
     expect(status).toBe(200);
     expect(json.enforceCityLimit).toBe(true);
-    expect(json.cities.Mumbai.center.lat).toBe(19.076);
-    expect(json.cities.Mumbai.live).toBeUndefined();
+    expect(Array.isArray(json.servedDistricts)).toBe(true);
+    expect(json.cities, 'served districts replaced the per-city coverage boxes').toBeUndefined();
     // The settings document also holds fees, flags, movePack and the site block. None of them are
     // this route's business, and an anonymous caller must not receive them by accident.
     expect(json.fees).toBeUndefined();
@@ -108,7 +96,7 @@ test.describe('geo policy reaches the browser', () => {
     const entry = json.blacklist.find((b) => b.id === 'geo-policy-spec');
     expect(entry.term).toBe('Test Tower');
     expect(entry.placeId).toBe('ChIJ_test_geo_policy');
-    // The operator's internal `note` must not be published: asserted where it would sit and across the whole document, so a `note` at another depth is caught.
+    // Checked in place and across the whole document, so a `note` at another depth is caught too.
     expect(entry.note).toBeUndefined();
     expect(JSON.stringify(json)).not.toContain('duplicate of an existing society');
   });
@@ -141,8 +129,7 @@ test.describe('geo policy reaches the browser', () => {
 
     await cities.set('mumbai', true);
 
-    // Fired by the admin console on save: the client must re-read `GET /bootstrap` on that signal and the roster follow,
-    // rather than keep the policy fetched at boot.
+    // The admin console fires this on save; the client must re-read `GET /bootstrap` rather than keep its boot copy.
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('draazy-settings-change')));
 
     const pill = page.getByRole('button', { name: /^City: / }).first();
@@ -183,12 +170,10 @@ test.describe('geo policy reaches the browser', () => {
   });
 
   test('a city the operator has never touched keeps its built-in policy', async ({ page, cities }) => {
-    // `settings.geo` has no seeded row (defaults live in the client's `CITY_GEO`), so one city's override must say nothing about another and unconfigured Pune stays live.
+    // Defaults live in the client's `CITY_GEO`: one city going live must leave unconfigured Pune live.
     await cities.set('mumbai', true);
 
     await page.goto('/');
-    const { json } = await fetchGeo(page);
-    expect(json.cities.Pune).toBeUndefined();
 
     const { status, json: cityJson } = await fetchCities(page);
     expect(status).toBe(200);
