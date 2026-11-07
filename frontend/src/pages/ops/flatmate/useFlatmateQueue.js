@@ -7,6 +7,7 @@ import {
 } from '../../../services/flatmateService.js';
 
 import { claimLabel } from './board.jsx';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const KINDS = ['post', 'room', 'group'];
 const PUBLISHED = ['approved', 'live'];
@@ -117,7 +118,7 @@ export default function useFlatmateQueue(tab) {
         if (alive) setState({ status: 'ready', ...buildQueue(results, tab), counts: summary, error: '' });
       })
       .catch((e) => {
-        if (alive) setState({ status: 'error', items: [], truncated: false, counts: null, error: e.message || 'Could not read this queue.' });
+        if (alive) setState({ status: 'error', items: [], truncated: false, counts: null, error: userMessage(e, 'Could not read this queue.') });
       });
     return () => { alive = false; };
   }, [tab, nonce]);

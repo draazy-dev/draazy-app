@@ -17,6 +17,7 @@ import Loading from '../../components/ui/Loading.jsx';
 import {
   BTN, CHIP, CHIP_TONE, Cell, Chips, ClearFilters, DATE_CHIPS, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const STATUS_TABS = [
   { key: 'open', label: 'Open' },
@@ -109,7 +110,7 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
     const timer = setTimeout(() => {
       listTicketQueue({ ...filters(), page: page - 1, size: PAGE_SIZE })
         .then((res) => { if (alive) { setResult(res); setLoadError(''); } })
-        .catch((e) => { if (alive) setLoadError(e?.message || 'The service requests could not be read.'); });
+        .catch((e) => { if (alive) setLoadError(userMessage(e, 'The service requests could not be read.')); });
     }, q.trim() ? 300 : 0);
     return () => {
       alive = false;
@@ -183,7 +184,7 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
         res.items.map((t) => [t.id, titleOf(t), DESK_LABEL[t.desk] || t.desk, t.customer, t.mobile, t.detail, t.priority, t.assignedTo || '', t.status, asDate(t.createdAt)]),
       );
     } catch (e) {
-      toast(e?.message || 'The export could not be read.', 'error');
+      toast(userMessage(e, 'The export could not be read.'), 'error');
     }
   };
 
@@ -194,7 +195,7 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
       await setTicketStatus(t.id, 'in-progress');
       toast('Marked in progress');
     } catch (e) {
-      toast(e?.message || 'That request could not be started.', 'error');
+      toast(userMessage(e, 'That request could not be started.'), 'error');
     }
     reload();
   };
@@ -204,7 +205,7 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
       await claimTicket(t.id, user?.id);
       toast('Assigned to you');
     } catch (e) {
-      toast(e?.message || 'That request could not be claimed.', 'error');
+      toast(userMessage(e, 'That request could not be claimed.'), 'error');
     }
     reload();
   };
@@ -214,7 +215,7 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
       await setTicketStatus(t.id, 'resolved');
       toast('Request resolved');
     } catch (e) {
-      toast(e?.message || 'That request could not be resolved.', 'error');
+      toast(userMessage(e, 'That request could not be resolved.'), 'error');
     }
     reload();
   };
@@ -246,7 +247,7 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
       reload();
       toast('Request updated');
     } catch (e) {
-      toast(e?.message || 'That request could not be updated.', 'error');
+      toast(userMessage(e, 'That request could not be updated.'), 'error');
     }
   };
   const notice = (body) => {

@@ -21,6 +21,7 @@ import { PropertyFlagModal, PropertyArchiveModal, PropertyViewModal, PropertyRec
 import PropertyEditModal from './properties/PropertyEditModal.jsx';
 import { basicsOf, editPatch } from './properties/editForm.js';
 import { statusQuery, PAGE_LIMIT, exportCsv, isMadeBy, MAKER_REASON } from './properties/constants.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const PropertyReviewModal = preloadable(() => import('./properties/PropertyReviewModal.jsx'));
 const DuplicatesTab = lazy(() => import('./properties/DuplicatesTab.jsx'));
@@ -214,7 +215,7 @@ export default function AdminProperties() {
         if (ticket !== detailTicket.current) return;
         if (full) show(full); else toast(`No listing ${l.title || pid(l)} — it may have been removed`, 'error');
       })
-      .catch((err) => { if (ticket === detailTicket.current) toast(`Could not open the listing: ${err.message}`, 'error'); });
+      .catch((err) => { if (ticket === detailTicket.current) toast(`Could not open the listing: ${userMessage(err, 'please try again.')}`, 'error'); });
   };
   const openReview = (l) => withDetail(l, showReview);
   const openView = (l) => withDetail(l, setView);
@@ -231,7 +232,7 @@ export default function AdminProperties() {
         if (l) showReview(l);
         else toast(`No listing ${reviewParam} — it may have been archived`, 'error');
       })
-      .catch((err) => { if (live) toast(`Could not open listing ${reviewParam}: ${err.message}`, 'error'); });
+      .catch((err) => { if (live) toast(`Could not open listing ${reviewParam}: ${userMessage(err, 'please try again.')}`, 'error'); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewParam, toast]);
@@ -241,7 +242,7 @@ export default function AdminProperties() {
     try {
       await clearFlag(l.id);
     } catch (err) {
-      toast(`Could not clear the flag: ${err.message}`, 'error');
+      toast(`Could not clear the flag: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     }
     toast('Flag cleared — back in the review queue', 'success');
@@ -256,7 +257,7 @@ export default function AdminProperties() {
       try {
         await setListingStatus(l.id, 'approved', { expectedStatus: l.status });
       } catch (err) {
-        toast(`Could not clear the re-check: ${err?.message || 'please refresh and try again.'}`, 'error');
+        toast(`Could not clear the re-check: ${userMessage(err, 'please refresh and try again.')}`, 'error');
         return;
       }
       toast('Re-check cleared — listing stays live', 'success');
@@ -276,7 +277,7 @@ export default function AdminProperties() {
       await startPropertyReview(pid(l));
       await decidePropertyReview(pid(l), 'reject', { reasonCode: code, note: note || undefined, expectedStatus: l.status });
     } catch (err) {
-      toast(`Could not reject: ${err.message}`, 'error');
+      toast(`Could not reject: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     }
     setRecheckRejectFor(null);
@@ -291,7 +292,7 @@ export default function AdminProperties() {
     try {
       await archiveListing(archiveFor.id, archiveReason.trim() || undefined);
     } catch (err) {
-      toast(`Could not archive: ${err.message}`, 'error');
+      toast(`Could not archive: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     }
     const noted = await saveNoteIfAny('listing', archiveFor.id, internalNote, 'Archived');
@@ -304,7 +305,7 @@ export default function AdminProperties() {
     try {
       await restoreListing(l.id);
     } catch (err) {
-      toast(`Could not restore: ${err.message}`, 'error');
+      toast(`Could not restore: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     }
     toast('Listing restored — moved to pending review', 'success');
@@ -317,7 +318,7 @@ export default function AdminProperties() {
     try {
       await flagListing(flagFor.id, r);
     } catch (err) {
-      toast(`Could not flag: ${err.message}`, 'error');
+      toast(`Could not flag: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     }
     const noted = await saveNoteIfAny('listing', flagFor.id, internalNote, 'Flagged');
@@ -340,7 +341,7 @@ export default function AdminProperties() {
       if (Object.keys(nextPatch).length) await updateListingAsModerator(edit.id, nextPatch);
       if (canModerate && edit.status && edit.status !== edit._ref.status) await setListingStatus(edit.id, edit.status, { expectedStatus: edit._ref.status });
     } catch (err) {
-      toast(`Could not save: ${err.message}`, 'error');
+      toast(`Could not save: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     } finally {
       setSavingEdit(false);
@@ -364,7 +365,7 @@ export default function AdminProperties() {
       refresh();
     } catch (err) {
       if (handoff) handoff.close();
-      toast(err?.message || 'Could not write this chaser', 'error');
+      toast(userMessage(err, 'Could not write this chaser'), 'error');
     }
   };
   const handleReminder = (l) => chase(l, 'wa-gentle');
@@ -378,7 +379,7 @@ export default function AdminProperties() {
         ['ID', 'Title', 'BHK', 'Type', 'Locality', 'Price', 'Deal', 'Status', 'Owner', 'Mobile', 'Submitted', 'Re-check fields', 'Re-check queued at', 'Featured'],
         res.items.map((l) => [l.id, l.title, l.bhk, l.type, l.locality, l.price, l.deal, l.status, l.owner, l.ownerMobile, l.createdAt, l.recheckReason || '', l.recheckRequestedAt || '', l.featured ? 'Yes' : 'No']));
     } catch (err) {
-      toast(`Could not export: ${err.message}`, 'error');
+      toast(`Could not export: ${userMessage(err, 'please try again.')}`, 'error');
     }
   };
 

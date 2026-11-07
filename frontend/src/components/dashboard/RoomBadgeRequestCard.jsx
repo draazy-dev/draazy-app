@@ -6,6 +6,7 @@ import DateField from '../ui/DateField.jsx';
 import IdGateStep, { useIdGate } from './IdGateStep.jsx';
 import AgreementUpload from '../../pages/consumer/flatmates/AgreementUpload.jsx';
 import { getFlatmateDetail, requestGroupBadge, requestRoomBadge } from '../../services/flatmateService.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const STATE_CHIP = {
   approved: ['dash.roomBadge.approved', 'bg-emerald-500/15 text-emerald-300'],
@@ -156,7 +157,7 @@ export default function RoomBadgeRequestCard({ kind = 'room', roomId, personalDo
       await load();
       onRequested?.();
     } catch (err) {
-      toast(err?.message || t('dash.roomBadge.requestFailed'), 'error');
+      toast(userMessage(err, t('dash.roomBadge.requestFailed')), 'error');
     } finally {
       setBusy(false);
     }

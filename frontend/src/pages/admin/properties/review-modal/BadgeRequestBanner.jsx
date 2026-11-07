@@ -3,6 +3,7 @@ import { ShieldCheck } from 'lucide-react';
 import { declineOwnershipVerification } from '../../../../services/propertyReviewService.js';
 import { useToast } from '../../../../context/ToastContext.jsx';
 import { fmtAgo } from '../constants.js';
+import { userMessage } from '../../../../lib/userMessage.js';
 
 export default function BadgeRequestBanner({ propertyId, requestedAt, onDeclined, disabledReason }) {
   const { toast } = useToast();
@@ -18,7 +19,7 @@ export default function BadgeRequestBanner({ propertyId, requestedAt, onDeclined
       toast('Badge request declined - the owner has been told why', 'success');
       onDeclined();
     } catch (err) {
-      toast(err?.message || 'Could not decline the badge request', 'error');
+      toast(userMessage(err, 'Could not decline the badge request'), 'error');
       setBusy(false);
     }
   };

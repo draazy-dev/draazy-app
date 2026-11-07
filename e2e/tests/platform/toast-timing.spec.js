@@ -65,6 +65,23 @@ test('the same toast raised again while held does not restart its timer', async 
   await expect(toast, 'a repeat of a toast being read does not pull it away').toBeVisible();
 });
 
+test('a toast still focused stays open when the pointer leaves it', async ({ page }) => {
+  await page.clock.install();
+  await stubClipboard(page, true);
+  await shareASociety(page);
+
+  const toast = page.getByTestId('toasts').getByRole('alert');
+  await expect(toast).toBeVisible();
+  await toast.hover();
+  await toast.getByRole('button', { name: 'Dismiss' }).focus();
+  await page.mouse.move(0, 0);
+  await page.clock.fastForward(20_000);
+  await expect(toast, 'keyboard focus still holds it').toBeVisible();
+  await page.getByRole('button', { name: /^share$/i }).first().focus();
+  await page.clock.fastForward(5_500);
+  await expect(toast).toHaveCount(0);
+});
+
 test('an error toast stays until the user closes it', async ({ page }) => {
   await page.clock.install();
   await stubClipboard(page, false);

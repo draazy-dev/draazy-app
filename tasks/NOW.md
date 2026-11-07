@@ -3,7 +3,7 @@
 > **Read this file first and nothing else.** It is the whole orientation a new session needs. Hard
 > cap: 60 lines. It holds *state*, never narrative — every line is either a standing rule, a pointer,
 > or a number with the date it was taken. Rewrite it at the end of a session; do not append to it.
-> Last written: **2026-11-07** on `feature/e2e-testing`; REFER-SIMPLE, the REVIEW-1106 fixes, follow-ups and flake fixes are committed as 10 commits on top of `dd565f017`, not pushed.
+> Last written: **2026-11-07** on `feature/e2e-testing`; 10 commits on top of `dd565f017` plus one closing the remaining items (userMessage, invite-queued, toast hold, tracker guard); not pushed.
 
 ## Lane
 
@@ -20,14 +20,13 @@ UGC reels (Google Flow, separate lane): read `ugc-flow\00-HANDOFF-state.txt` the
 Social media: start at `social\README.md`; `ig-*` skills write to `social\instagram\`.
 Owner-only: OWNER-CHECKLIST (WhatsApp/ZeptoMail webhooks, referral template, deploy, smoke, prod secrets and FAQs).
 REFER-SIMPLE built, reviewed and committed; its `-Full` run is below.
-`draazy_test` holds a stale checksum for another session's `26.11.41` (2026-11-06); backend tests fail to boot on it, so use `TEST_DB_URL` with a scratch DB until its owner repairs it.
 
 ## Open work — pointers, not restatements
 
 | What | Where | Size |
 |---|---|---|
 | Manual / smoke test plan | [docs/Draazy-Tester-Checklist.xlsx](../docs/Draazy-Tester-Checklist.xlsx) | 307 rows on 2026-10-15; stale, re-derive |
-| Open dev work and verification | [tasks/todo.md](todo.md) | 10 lines on 2026-11-07 |
+| Open dev work and verification | [tasks/todo.md](todo.md) | nothing open on 2026-11-07 |
 | Standing rulings | [tasks/DECISIONS-NEEDED.md](DECISIONS-NEEDED.md) | 81 lines on 2026-11-07 |
 | Durable rules and house style | [tasks/lessons.md](lessons.md) | 273 lines on 2026-11-07; grep |
 | Owner-only actions | [tasks/OWNER-CHECKLIST.md](OWNER-CHECKLIST.md) | 60 lines on 2026-11-07 |
@@ -52,5 +51,6 @@ REFER-SIMPLE built, reviewed and committed; its `-Full` run is below.
 |---|---|---|
 | Next free Flyway slot | `26.11.44__?` (no `V`) | 2026-11-07 |
 | e2e spec files | 474 under `e2e/tests` | 2026-11-06 |
+| Targeted e2e after the userMessage sweep | 154/154 green over 20 spec files | 2026-11-07 |
 | Full e2e (`-Full`, 4 shards + nobackend) | 31 red: stale specs, flakes, a rent-ledger bug and a public-cache race; all fixed, every red green on rerun | 2026-11-07 |
 | Backend suite (full) | 4,577 tests; 139 reds were Postgres connection exhaustion plus one migration guard, all green on rerun | 2026-11-03 |

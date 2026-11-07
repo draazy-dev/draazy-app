@@ -4,6 +4,7 @@ import { askServiceRequestAttention } from '../../../services/serviceRequestServ
 import { useToast } from '../../../context/ToastContext.jsx';
 import { classNames } from '../../../lib/format.js';
 import { fmtAgo } from './helpers.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const ASKABLE = new Set(['docs_review', 'changes_requested']);
 const PARTIES = [['owner', 'Owner'], ['tenant', 'Tenant']];
@@ -54,7 +55,7 @@ export default function SendBackForCorrection({ request, checklist, onUpdated })
       setReason('');
       setPapers([]);
     } catch (err) {
-      toast(err?.message || 'It was not sent back.', 'error');
+      toast(userMessage(err, 'It was not sent back.'), 'error');
     } finally {
       setBusy(false);
     }

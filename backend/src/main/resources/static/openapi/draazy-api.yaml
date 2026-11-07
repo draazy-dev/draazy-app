@@ -13533,6 +13533,13 @@ components:
             `pending: false, status: invited`.
         invitedBy: { type: [string, 'null'], description: Display name of the requester who sent it }
         createdAt: { type: string, format: date-time }
+        whatsappQueued:
+          type: boolean
+          description: >
+            Only on the party just invited by `inviteServiceRequestParty` or `createCoFillServiceRequest`:
+            true when Draazy queued the invite link to that number on WhatsApp. False when it did not
+            (opted out, a send cap is spent, or WhatsApp is not configured), so the requester must send
+            the link themselves. Absent everywhere else.
     MessageCreate:
       type: object
       required: [body]

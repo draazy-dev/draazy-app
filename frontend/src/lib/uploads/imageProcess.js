@@ -2,6 +2,7 @@ import heicDecoderUrl from 'heic-to/csp?url';
 import { MAX_UPLOAD_BYTES } from './policy.js';
 import { checkImageDimensions, MAX_IMAGE_PIXELS } from './imageDimensions.js';
 import { photoLook } from './photoLook.js';
+import { UserError } from '../userError.js';
 
 const MAX_EDGE = 2560;
 const MIN_PHOTO_EDGE = 480;
@@ -61,10 +62,9 @@ async function compressUnderCap(source, { minEdge, qualities }, maxBytes) {
   }
 }
 
-export const imageErrorMessage = (error) => {
-  const message = error?.message || '';
-  return /48 megapixels|480 px/.test(message) ? message : 'Could not decode this photo. Export a single still image as JPEG or PNG and try again.';
-};
+export const imageErrorMessage = (error) => (error instanceof UserError
+  ? error.message
+  : 'Could not decode this photo. Export a single still image as JPEG or PNG and try again.');
 
 export async function processImage(file, type, document, maxBytes = MAX_UPLOAD_BYTES) {
   let bitmap;
@@ -74,9 +74,9 @@ export async function processImage(file, type, document, maxBytes = MAX_UPLOAD_B
       const { heicTo } = await import(/* @vite-ignore */ heicDecoderUrl);
       bitmap = await heicTo({ blob: file, type: 'bitmap' });
     } else bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-    if (!bitmap.width || bitmap.width * bitmap.height > MAX_IMAGE_PIXELS) throw new Error('Choose an image no larger than 48 megapixels.');
+    if (!bitmap.width || bitmap.width * bitmap.height > MAX_IMAGE_PIXELS) throw new UserError('Choose an image no larger than 48 megapixels.');
     if (!document && Math.min(bitmap.width, bitmap.height) < MIN_PHOTO_EDGE) {
-      throw new Error('Use a photo at least 480 px on its shorter side.');
+      throw new UserError('Use a photo at least 480 px on its shorter side.');
     }
     const source = scaleTo(bitmap, MAX_EDGE);
     bitmap.close(); bitmap = null;

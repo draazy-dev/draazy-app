@@ -3,6 +3,7 @@ import { Pencil } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { updateKycProfile } from '../../../services/identityReviewService.js';
 import { Field } from './KycActionRail.jsx';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export default function KycAccountEditor({ detail, canWrite, onSaved }) {
   const { toast } = useToast();
@@ -41,7 +42,7 @@ export default function KycAccountEditor({ detail, canWrite, onSaved }) {
       toast('Account details updated', 'success');
       setForm(null);
     } catch (err) {
-      toast(err?.message || 'Could not update the account', 'error');
+      toast(userMessage(err, 'Could not update the account'), 'error');
     } finally {
       setSaving(false);
     }

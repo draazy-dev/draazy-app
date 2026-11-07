@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { listServiceRequestOverlaps } from '../../../services/serviceRequestService.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const MATCH_LABEL = { listing: 'same listing', address: 'same flat, society and pincode', record: 'filed agreement record' };
 const shortId = (id) => id.slice(0, 8);
@@ -15,7 +16,7 @@ export default function OverlapCheck({ request }) {
     let current = true;
     listServiceRequestOverlaps(request.id)
       .then((list) => { if (current) setRows(list); })
-      .catch((err) => { if (current) setFailure(err?.message || 'Other agreements on this flat could not be checked.'); });
+      .catch((err) => { if (current) setFailure(userMessage(err, 'Other agreements on this flat could not be checked.')); });
     return () => { current = false; };
   }, [request.id]);
 

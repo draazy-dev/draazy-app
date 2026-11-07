@@ -43,15 +43,15 @@ class CoFillInviteWhatsApp {
         this.platform = stores.create("ai-all", maxPerHour, Duration.ofHours(1));
     }
 
-    void send(ServiceRequest request, ServiceRequestParty party, String mobile, String inviterName) {
+    boolean send(ServiceRequest request, ServiceRequestParty party, String mobile, String inviterName) {
         if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())) {
-            return;
+            return false;
         }
         if (party.getUserId() != null && !notifier.allowsWhatsapp(party.getUserId())) {
-            return;
+            return false;
         }
         if (!withinBudget(mobile, request.getRequesterId())) {
-            return;
+            return false;
         }
         String side = party.getRole();
         String named = oneLine(inviterName);
@@ -62,6 +62,7 @@ class CoFillInviteWhatsApp {
         String link = baseUrl + ServiceRequestTypes.pageFor(request.getType())
                 + "?party=" + party.getId() + "&request=" + request.getId();
         AfterCommit.run(() -> dispatch(mobile, inviter, side, place, link));
+        return messenger.agreementInviteDeliverable(mobile);
     }
 
     private boolean withinBudget(String mobile, UUID inviter) {

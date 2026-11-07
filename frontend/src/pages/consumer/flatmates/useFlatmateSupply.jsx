@@ -10,6 +10,7 @@ import { GROUP_OPENER } from './openers.js';
 import { MIN_AGE, MAX_AGE, MAX_LOCALITIES } from './constants.js';
 import { hasContactDetails } from '../list-property/contactDetails.js';
 import { headlineOf } from '../../../lib/headline.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const leaksContact = (...texts) => texts.some(hasContactDetails);
 
@@ -134,7 +135,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
       setEditingGroupId(g.id);
       setGroupOpen(true);
     })
-    .catch((err) => toast(err?.message || t('common.somethingWentWrong'), 'error'));
+    .catch((err) => toast(userMessage(err, t('common.somethingWentWrong')), 'error'));
   const editGroupIntent = params.get('editGroup');
   const handledEditGroup = useRef(null);
   useEffect(() => {
@@ -197,7 +198,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
         await flatmateService.createPost(data);
       }
     } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     await refresh();
@@ -212,7 +213,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     try {
       await flatmateService.deletePost(editingId);
     } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     await refresh();
@@ -266,7 +267,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
       if (editedId) await flatmateService.updateGroup(editedId, group);
       else created = await flatmateService.createGroup(group);
     } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     await refresh();
@@ -305,7 +306,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
         toast(t('flatmates.groupAlreadyFull', { title: g.title }), 'error');
         return;
       }
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     rememberAsk(user.mobile, key);

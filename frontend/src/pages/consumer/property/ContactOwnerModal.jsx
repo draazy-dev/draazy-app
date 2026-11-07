@@ -19,6 +19,7 @@ import useModalDialog from '../../../hooks/useModalDialog.js';
 import { dialableMobile, telHref } from './contactPhone.js';
 import { ownerVerificationMeta, OwnerRoleLine, OwnerVerifiedMark } from './ownerVerification.jsx';
 import { propertyKey } from '../../../lib/listingSeo.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export function ContactOwnerModal({ p, isIn, onClose, toast }) {
   const { t } = useTranslation();
@@ -74,7 +75,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
         return;
       }
       if (err?.code === 'recently_withdrawn') {
-        toast(err.message || t('property.recentlyWithdrawn'), 'info');
+        toast(userMessage(err, t('property.recentlyWithdrawn')), 'info');
         return;
       }
       if (err?.code === 'own_listing') {
@@ -112,7 +113,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
       return true;
     }
     if (err?.code === 'recently_withdrawn') {
-      toast(err.message || t('property.recentlyWithdrawn'), 'info');
+      toast(userMessage(err, t('property.recentlyWithdrawn')), 'info');
       return true;
     }
     if (err?.code === 'listing_not_live') {

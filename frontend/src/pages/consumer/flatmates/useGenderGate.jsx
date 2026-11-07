@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import GenderSheet from './GenderSheet.jsx';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const ROOM_ONLY = { male: 'male', female: 'female' };
 const GROUP_ONLY = { men: 'male', women: 'female' };
@@ -27,7 +28,7 @@ export function useGenderGate() {
       } catch (err) {
         const fresh = err.status === 409 ? await refreshUser() : null;
         if (!fresh?.gender) {
-          toast(err.message, 'error');
+          toast(userMessage(err, t('common.somethingWentWrong')), 'error');
           return null;
         }
         own = fresh.gender;

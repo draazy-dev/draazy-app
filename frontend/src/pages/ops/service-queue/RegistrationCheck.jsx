@@ -4,6 +4,7 @@ import { openRequestDoc } from './helpers.js';
 import { hasPermission } from '../../../lib/adminModules.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { listServiceRequestRentAgreements, verifyRentAgreement } from '../../../services/serviceRequestService.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const STATUS_LABEL = {
   draft: 'Awaiting check',
@@ -40,7 +41,7 @@ export default function RegistrationCheck({ request, onError, onUnavailable }) {
     let current = true;
     listServiceRequestRentAgreements(request.id)
       .then((list) => { if (current) setRows(list); })
-      .catch((err) => { if (current) setFailure(err?.message || 'The tenancy rows could not be read.'); });
+      .catch((err) => { if (current) setFailure(userMessage(err, 'The tenancy rows could not be read.')); });
     return () => { current = false; };
   }, [request.id]);
 
@@ -53,7 +54,7 @@ export default function RegistrationCheck({ request, onError, onUnavailable }) {
       setAnnouncement(`${row.tenantName || 'Tenant'}: ${STATUS_LABEL[updated.status] || updated.status}.`);
       requestAnimationFrame(() => document.getElementById(`${titleId}-${row.id}`)?.focus());
     } catch (err) {
-      onError(err?.message || 'That could not be recorded.');
+      onError(userMessage(err, 'That could not be recorded.'));
     } finally {
       setBusy('');
     }

@@ -22,6 +22,7 @@ import { monthLabel, monthOptions } from '../../lib/toolCalc.js';
 import { toRentalCards } from '../../lib/data/tenancy.js';
 import { openDocFrom } from '../../lib/openDoc.js';
 import { DOCUMENT_ACCEPT, DOCUMENT_GUIDANCE_KEY, PDF_GUIDANCE_KEY } from '../../lib/uploads/policy.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const OWNER_GROUPS = [
   { id: 'title', titleKey: 'dash.grpTitle', subKey: 'dash.grpTitleSub', icon: 'scroll-text', tone: 'teal', cats: DOC_CATEGORIES['Title & Ownership'] },
@@ -344,7 +345,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
         }
         toast(t('dash.uploadedToast', { file: file.name, category }), 'success');
       } catch (error) {
-        toast(error.message || t('dash.uploadFailedToast'), 'error');
+        toast(userMessage(error, t('dash.uploadFailedToast')), 'error');
       }
     };
     inp.click();

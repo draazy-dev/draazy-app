@@ -124,8 +124,8 @@ class CoFillParties {
                 request.getId().toString(), "role", side, "party", invitee.getId().toString());
         notifyInvitee(request, saved, invitee.getId(), side);
         String inviterName = displayName(caller.userId());
-        whatsApp.send(request, saved, normalised, inviterName);
-        return toDto(saved, request.getType(), invitee.getName(), inviterName);
+        boolean queued = whatsApp.send(request, saved, normalised, inviterName);
+        return toDto(saved, request.getType(), invitee.getName(), inviterName, queued);
     }
 
     private void notifyInvitee(ServiceRequest request, ServiceRequestParty saved, UUID inviteeId,
@@ -153,8 +153,8 @@ class CoFillParties {
         audit.record(caller, "service-request.party-invited", "service_request",
                 request.getId().toString(), "role", side, "party", MobileMask.mask(normalised));
         String inviterName = displayName(caller.userId());
-        whatsApp.send(request, saved, normalised, inviterName);
-        return toDto(saved, request.getType(), null, inviterName);
+        boolean queued = whatsApp.send(request, saved, normalised, inviterName);
+        return toDto(saved, request.getType(), null, inviterName, queued);
     }
 
     private void purgeSlotIdentityScans(UUID requestId, String side, int partyIndex) {
@@ -279,6 +279,11 @@ class CoFillParties {
 
     static ServiceRequestPartyDto toDto(ServiceRequestParty party, String requestType,
             String partyName, String invitedByName) {
+        return toDto(party, requestType, partyName, invitedByName, null);
+    }
+
+    private static ServiceRequestPartyDto toDto(ServiceRequestParty party, String requestType,
+            String partyName, String invitedByName, Boolean whatsappQueued) {
         return new ServiceRequestPartyDto(
                 party.getId().toString(),
                 party.getRequestId().toString(),
@@ -290,7 +295,8 @@ class CoFillParties {
                 MobileMask.mask(party.getMobile()),
                 party.isPending(),
                 invitedByName,
-                party.getCreatedAt());
+                party.getCreatedAt(),
+                whatsappQueued);
     }
 
     private Map<UUID, String> names(List<ServiceRequestParty> rows) {

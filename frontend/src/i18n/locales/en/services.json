@@ -191,6 +191,8 @@
       "invite": {
         "sendTitle": "Invite sent to your tenant",
         "sendDesc": "Request saved. We've sent the secure link to {{mobile}} on WhatsApp so they can add their details & documents. Not there? Send it yourself below.",
+        "readyTitle": "Now send your tenant the invite",
+        "readyDesc": "Request saved. We haven't messaged {{mobile}}, so send them the secure link below to add their details & documents.",
         "sendWhatsapp": "Send it yourself on WhatsApp",
         "copyLink": "Copy invite link",
         "copied": "Link copied",
@@ -207,6 +209,7 @@
         "editableTitle": "Your details — please complete this step",
         "editableDesc": "Add your tenant information and documents. This is the only section you need to fill in.",
         "sendTitle_owner": "Invite sent to the owner",
+        "readyTitle_owner": "Now send the owner the invite",
         "sendNote_owner": "The owner opens the link, signs in and checks the whole agreement. Once it's complete, either of you can pay. You'll be notified as it moves.",
         "readonlyTitle_owner": "Set up by the tenant — view only",
         "readonlyDesc_owner": "You can review every part of this agreement, but only your Owner details can be edited here.",

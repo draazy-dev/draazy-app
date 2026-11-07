@@ -30,6 +30,7 @@ import { useSupportChat } from '../../context/SupportChatContext.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { targetSlug } from './requests/requestMeta.js';
 import { useRequestActions } from './requests/useRequestActions.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const INBOX_POLL_MS = 300000;
 const THREAD_FALLBACK_POLL_MS = 4000;
@@ -340,7 +341,7 @@ function Conversations() {
 
   const flushQueue = useCallback(() => {
     const pending = queue.current.splice(0);
-    pending.forEach((item) => sendNow(item).catch((err) => markFailed(item.conversationId, item.id, err?.message || 'Not sent')));
+    pending.forEach((item) => sendNow(item).catch((err) => markFailed(item.conversationId, item.id, userMessage(err, 'Not sent'))));
   }, [markFailed, sendNow]);
   flushQueueRef.current = flushQueue;
 
@@ -398,10 +399,10 @@ function Conversations() {
           setOffline(true);
           return;
         }
-        markFailed(active.id, id, err.message || t('misc.msgSendFailed'));
+        markFailed(active.id, id, userMessage(err, t('misc.msgSendFailed')));
         return;
       }
-      const message = err?.message || t('misc.msgSendFailed');
+      const message = userMessage(err, t('misc.msgSendFailed'));
       if (err?.code === 'conversation_closed') {
         setSendError('');
         patchConv(active.id, (c) => ({ ...c, listingDeleted: true, messages: c.messages.filter((m) => m.clientId !== id) }));
@@ -450,7 +451,7 @@ function Conversations() {
       }));
     }
     sendPhotoNow({ conversationId: active.id, file, caption: caption || retry?.text || '', id, previewUrl: url }).catch((err) => {
-      const message = err?.message || 'Photo not sent — try again.';
+      const message = userMessage(err, 'Photo not sent — try again.');
       setSendError(err?.status === 403 || err?.status === 429 ? message : '');
       markFailed(active.id, id, message);
     });

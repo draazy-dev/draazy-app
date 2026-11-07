@@ -60,12 +60,12 @@ public class CoFillServiceRequests {
     public ServiceRequestDto createCoFill(AuthPrincipal caller, ServiceRequestCreate body,
             String role, String mobile) {
         UUID requestId = serviceRequests.fileDeferred(caller, body);
-        parties.invite(caller, requestId.toString(), role, 0, mobile);
+        ServiceRequestPartyDto invited = parties.invite(caller, requestId.toString(), role, 0, mobile);
 
         ServiceRequest request = requests.findById(requestId).orElseThrow(() -> new IllegalStateException("Service request " + requestId
                         + " disappeared before its co-fill invitation was recorded"));
         serviceRequests.recordBy(request, "party.invited", caller.userId());
-        return mapper.toDto(request, caller);
+        return mapper.toDto(request, caller).withWhatsappQueued(invited.id(), invited.whatsappQueued());
     }
 
     @Transactional

@@ -13,6 +13,7 @@ import { GENERAL, contextKey, contextMeta, parseContextKey } from '../../../lib/
 import { classNames } from '../../../lib/format.js';
 import { fmtAgo } from '../../../pages/ops/service-queue/helpers.js';
 import { BTN, CHIP, CHIP_TONE } from '../WorkQueue.jsx';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const POLL_MS = 15000;
 const STATUS = {
@@ -134,7 +135,7 @@ export default function StaffChatPanel({ userId, initialAbout = null, compact = 
       await load();
       refreshCounts();
     } catch (err) {
-      toast(err?.message || 'That did not go through. Try again.', 'error');
+      toast(userMessage(err, 'That did not go through. Try again.'), 'error');
     } finally {
       setBusy(false);
     }

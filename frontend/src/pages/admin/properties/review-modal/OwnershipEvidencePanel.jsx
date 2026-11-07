@@ -16,6 +16,7 @@ import UploadedDocuments from './ownership/UploadedDocuments.jsx';
 import VerdictBanner from './ownership/VerdictBanner.jsx';
 import { DOC_TYPES } from './ownership/vocabulary.js';
 import { isMadeBy } from '../constants.js';
+import { userMessage } from '../../../../lib/userMessage.js';
 
 const EMPTY_FORM = { documentId: '', docType: '', issueDate: '', subjectName: '' };
 const maskLast4 = (value) => {
@@ -65,7 +66,7 @@ function OwnershipCase({ propertyId, listing, actorId, onRefresh, onVerification
         if (!cancelled) onVerificationRef.current?.(verification);
       })
       .catch((cause) => {
-        if (!cancelled) setLoadError(cause?.message || 'Could not load ownership evidence.');
+        if (!cancelled) setLoadError(userMessage(cause, 'Could not load ownership evidence.'));
       });
     return () => { cancelled = true; };
   }, [propertyId, reload]);
@@ -107,7 +108,7 @@ function OwnershipCase({ propertyId, listing, actorId, onRefresh, onVerification
         if (mounted.current) setError('Decision saved, but the listing queue could not refresh. Reload the queue before reviewing another listing.');
       }
     } catch (cause) {
-      if (mounted.current) setError(cause?.message || 'Could not save the ownership decision. Retry the action or refresh the case.');
+      if (mounted.current) setError(userMessage(cause, 'Could not save the ownership decision. Retry the action or refresh the case.'));
     } finally {
       inFlight.current = false;
       if (mounted.current) setPending('');

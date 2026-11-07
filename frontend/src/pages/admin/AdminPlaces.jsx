@@ -19,6 +19,7 @@ import { titleCase, DUPES_FAILED } from './societies/helpers.jsx';
 import CandidatesTab from './societies/CandidatesTab.jsx';
 import DirectoryTab from './societies/DirectoryTab.jsx';
 import AdminLocalities from './AdminLocalities.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const DIR_PAGE_SIZE = 20;
 const CAND_PAGE_SIZE = 10;
@@ -149,7 +150,7 @@ export default function AdminPlaces() {
 
   const candidateRows = candidates.items.map((c) => ({ ...c, dupes: dupes[c.slug] }));
 
-  const failed = (err, fallback) => toast(err?.message || fallback, 'error');
+  const failed = (err, fallback) => toast(userMessage(err, fallback), 'error');
 
   const [deciding, setDeciding] = useState(() => new Set());
   const decidingRef = useRef(new Set());

@@ -1,6 +1,7 @@
 import { CHIP_TONE } from '../../../components/admin/WorkQueue.jsx';
 import { fmtDateTime, fmtINR } from '../../../lib/format.js';
 import { PROPERTY_TYPES } from '../../consumer/list-property/constants.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export const STAGES = [
   { value: 'new', label: 'New', tone: CHIP_TONE.sky },
@@ -202,8 +203,8 @@ const FRIENDLY = {
 };
 
 export function leadError(e) {
-  if (e?.code === 'lead-owned') return e.message || 'Another staff member owns this lead.';
+  if (e?.code === 'lead-owned') return userMessage(e, 'Another staff member owns this lead.');
   if (FRIENDLY[e?.code]) return FRIENDLY[e.code];
   if (e?.status === 403) return 'Only the lead’s owner can do that.';
-  return e?.message || 'That did not go through. Try again.';
+  return userMessage(e, 'That did not go through. Try again.');
 }

@@ -5,6 +5,7 @@ import { useToast } from '../../../context/ToastContext.jsx';
 import { leaveGroup, myFlatmateGroups, myFlatmateInterests, withdrawInterest } from '../../../services/flatmateService.js';
 import { detailPath } from '../flatmates/helpers.js';
 import { Card, RequestEmpty, RequestList, RequestRow, SectionHead } from './components.jsx';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const STATUS = {
   hosting: { key: 'flatmates.statusHosting', tint: 'teal', rank: -1 },
@@ -38,7 +39,7 @@ export default function MyFlatmateGroupsPanel() {
       else await withdrawInterest('group', r.targetId);
       toast(leaving ? t('flatmates.leftToast', { title: r.targetTitle }) : t('flatmates.requestCancelled'));
     } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
     }
     load();
   };

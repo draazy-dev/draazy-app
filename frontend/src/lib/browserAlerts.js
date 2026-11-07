@@ -1,4 +1,5 @@
 import { registerPushSubscription, unregisterPushSubscription } from '../services/notificationService.js';
+import { UserError } from './userMessage.js';
 
 const VAPID_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 const SNOOZE_KEY = 'dz_browser_alerts_ask_v1';
@@ -42,9 +43,9 @@ export async function currentPushSubscription() {
 }
 
 export async function enableBrowserAlerts() {
-  if (!alertsSupported()) throw new Error('This browser does not support notifications.');
+  if (!alertsSupported()) throw new UserError('This browser does not support notifications.');
   const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
-  if (permission !== 'granted') throw new Error('Notifications are blocked for this site. Allow them in your browser\'s site settings.');
+  if (permission !== 'granted') throw new UserError('Notifications are blocked for this site. Allow them in your browser\'s site settings.');
   writeStore(OFF_KEY, null);
   if (!pushSupported()) return;
   const reg = await navigator.serviceWorker.register(import.meta.env.DEV ? '/push-sw.js' : '/sw.js');

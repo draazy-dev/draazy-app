@@ -15,6 +15,7 @@ import LeaseFacts from '../../../components/LeaseFacts.jsx';
 import LeaseEndActions from './LeaseEndActions.jsx';
 import AmountInput from '../flatmates/AmountInput.jsx';
 import { FIELD_CLS } from './constants.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const LEDGER_MONTHS = 6;
 const MAX_RENT = 10_000_000;
@@ -112,7 +113,7 @@ export default function RentPanel({ prop, onChange }) {
       onChange?.();
       toast(wasTracking ? t('ownerHub.rentDetailsSaved') : t('ownerHub.trackingOn'), 'success');
     } catch (e) {
-      toast((e?.status === 422 && e.message) || t('ownerHub.saveFailed'), 'error');
+      toast((e?.status === 422 && userMessage(e, '')) || t('ownerHub.saveFailed'), 'error');
     } finally {
       setSaving(false);
     }
@@ -159,7 +160,7 @@ export default function RentPanel({ prop, onChange }) {
         await load();
         toast(t('ownerHub.rentAlreadyRecorded'), 'info');
       } else if (e?.status === 422) {
-        toast(e.message || t('ownerHub.setRentFirst'), 'error');
+        toast(userMessage(e, t('ownerHub.setRentFirst')), 'error');
       } else {
         toast(t('ownerHub.rentRecordFailed'), 'error');
       }

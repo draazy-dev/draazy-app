@@ -25,6 +25,10 @@ public interface DecisionMessenger {
         return false;
     }
 
+    default boolean agreementInviteDeliverable(String mobile) {
+        return false;
+    }
+
     default boolean sendAgreementInvite(String mobile, String inviter, String side, String place, String link) {
         return false;
     }

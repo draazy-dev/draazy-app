@@ -97,6 +97,25 @@ class CoFillInviteWhatsAppTest {
     }
 
     @Test
+    @DisplayName("reports the invite queued only when it sends and the template is configured")
+    void reportsQueued() {
+        UUID optedOut = UUID.randomUUID();
+        when(notifier.allowsWhatsapp(optedOut)).thenReturn(false);
+        when(messenger.agreementInviteDeliverable(MOBILE)).thenReturn(true);
+
+        assertThat(whatsApp.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of()), party("tenant", null),
+                MOBILE, "Asha")).isTrue();
+        assertThat(whatsApp.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of()), party("owner", optedOut),
+                MOBILE, "Asha")).isFalse();
+        assertThat(whatsApp.send(request(ServiceRequestTypes.LEGAL, Map.of()), party("tenant", null),
+                MOBILE, "Asha")).isFalse();
+
+        when(messenger.agreementInviteDeliverable(MOBILE)).thenReturn(false);
+        assertThat(whatsApp.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of()), party("tenant", null),
+                MOBILE, "Asha")).isFalse();
+    }
+
+    @Test
     @DisplayName("a provider failure never fails the already-saved invite")
     void bestEffort() {
         when(messenger.sendAgreementInvite(anyString(), anyString(), anyString(), anyString(), anyString()))
@@ -154,12 +173,15 @@ class CoFillInviteWhatsAppTest {
     @DisplayName("the platform's hourly invite budget caps everyone together")
     void platformCap() {
         CoFillInviteWhatsApp capped = budgeted(2);
+        when(messenger.agreementInviteDeliverable(anyString())).thenReturn(true);
+        boolean[] queued = new boolean[3];
         for (int i = 0; i < 3; i++) {
-            capped.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of(), UUID.randomUUID()),
+            queued[i] = capped.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of(), UUID.randomUUID()),
                     party("tenant", null), "98111222" + (10 + i), "Asha");
         }
 
         verify(messenger, times(2)).sendAgreementInvite(anyString(), anyString(), anyString(), anyString(), anyString());
+        assertThat(queued).containsExactly(true, true, false);
     }
 
     @Test

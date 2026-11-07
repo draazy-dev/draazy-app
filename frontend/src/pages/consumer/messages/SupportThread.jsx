@@ -14,6 +14,7 @@ import PropChip from './PropChip.jsx';
 import { useTargetCard } from './useTargetCard.js';
 import { GENERAL, contextKey, contextMeta, parseContextKey } from '../../../lib/supportLink.js';
 import { loadSupportChoices, servicePath } from './supportChat.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const noop = () => {};
 
@@ -188,7 +189,7 @@ export default function SupportThread({ t, user, contextKey: wanted, opened, onB
       setDraft('');
     } catch (err) {
       const gone = err?.status === 409;
-      setSendError(gone ? 'That request is closed. Pick another subject or ask a general question.' : (err?.message || 'Message not sent. Please try again.'));
+      setSendError(gone ? 'That request is closed. Pick another subject or ask a general question.' : (userMessage(err, 'Message not sent. Please try again.')));
       if (gone) reload();
     } finally {
       setSending(false);

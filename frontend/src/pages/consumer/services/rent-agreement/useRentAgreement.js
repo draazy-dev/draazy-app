@@ -39,6 +39,7 @@ import {
   updateServiceRequestDetails,
   withdrawServiceRequestParty,
 } from '../../../../services/serviceRequestService.js';
+import { userMessage } from '../../../../lib/userMessage.js';
 
 const DRAFT_KEY = 'dzDraft:rentAgreement';
 
@@ -258,7 +259,8 @@ export function useRentAgreement() {
       else if (mountedRef.current && status && status !== 'awaiting_payment') toast(tr('services.ra.pay.paid'), 'success');
     } catch (err) {
       console.error('Rent Agreement checkout refused', err?.status);
-      if (mountedRef.current) toast(err?.status === 409 && err?.message ? tr('services.ra.checkoutIncomplete', { detail: err.message }) : tr('services.ra.checkoutFailed'), 'error');
+      const detail = err?.status === 409 ? userMessage(err, '') : '';
+      if (mountedRef.current) toast(detail ? tr('services.ra.checkoutIncomplete', { detail }) : tr('services.ra.checkoutFailed'), 'error');
     } finally {
       payingRef.current = false;
       refreshEntitlements();
@@ -646,7 +648,7 @@ export function useRentAgreement() {
             await decideServiceRequestInvite(row.id, 'accept');
           } catch (err) {
             if (err?.status === 409) {
-              if (alive) setInviteError({ kind: 'blocked', detail: err.message || '' });
+              if (alive) setInviteError({ kind: 'blocked', detail: userMessage(err, '') });
               return;
             }
           }
@@ -922,7 +924,8 @@ export function useRentAgreement() {
       checkout = await openServiceRequestCheckout(requestId, DECLARATION_VERSION);
     } catch (err) {
       console.error('Rent Agreement checkout refused', err?.status);
-      return err?.status === 409 && err?.message ? tr('services.ra.checkoutIncomplete', { detail: err.message }) : tr('services.ra.checkoutFailed');
+      const detail = err?.status === 409 ? userMessage(err, '') : '';
+      return detail ? tr('services.ra.checkoutIncomplete', { detail }) : tr('services.ra.checkoutFailed');
     }
     await payAndConfirm(checkout, cost.total);
     refreshEntitlements();
@@ -934,7 +937,7 @@ export function useRentAgreement() {
     return handOffFailure || checkoutFiled(requestId);
   };
 
-  const shareInvite = (request, role, inviteMobile) => {
+  const shareInvite = (request, role, inviteMobile, queued) => {
     const party = (request?.parties || []).find((p) => p?.role === role && p?.status === 'invited')
       || (request?.parties || [])[0]
       || null;
@@ -953,6 +956,7 @@ export function useRentAgreement() {
       partyId: party?.id || null,
       pending: !!party?.pending,
       maskedMobile: party?.mobile || null,
+      queued: !!queued,
     });
   };
 
@@ -1043,7 +1047,8 @@ export function useRentAgreement() {
         return false;
       }
       settleFiled();
-      shareInvite(invitedRequest, invitingRole, inviteMobile);
+      shareInvite(invitedRequest, invitingRole, inviteMobile,
+        (request.parties || []).some((p) => p?.whatsappQueued));
       if (invitingRole === 'tenant') {
         const payFailure = await checkoutFiled(request.id);
         if (payFailure && mountedRef.current) toast(payFailure, 'error');
@@ -1107,7 +1112,8 @@ export function useRentAgreement() {
       if (finished && mode === 'owner') clearDraft();
     } catch (err) {
       console.error('Rent Agreement submit failed', err?.status || err?.message);
-      if (mountedRef.current) toast(err?.status === 409 && err?.message ? err.message : err?.status === 422 && err?.message ? tr('services.ra.detailsRejected', { detail: err.message }) : tr('services.ra.saveError'), 'error');
+      const refusal = userMessage(err, '');
+      if (mountedRef.current) toast(err?.status === 409 && refusal ? refusal : err?.status === 422 && refusal ? tr('services.ra.detailsRejected', { detail: refusal }) : tr('services.ra.saveError'), 'error');
       return;
     } finally {
       if (mountedRef.current) setSubmitting(false);

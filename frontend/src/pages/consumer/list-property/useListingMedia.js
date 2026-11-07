@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { uploadPhoto } from '../../../services/photoService.js';
 import usePhotoLimit from '../../../lib/uploads/usePhotoLimit.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const MAX_PARALLEL_PHOTO_UPLOADS = 3;
 const moveItem = (items, from, to) => {
@@ -54,7 +55,7 @@ export default function useListingMedia({ setErrors }) {
     } catch (error) {
       if (controller.signal.aborted) return;
       setPhotos((prev) => prev.map((photo) => (photo.id === slot.id
-        ? { ...photo, uploading: false, error: error.message || 'Upload failed. Please try again.', retryable: error.retryable !== false }
+        ? { ...photo, uploading: false, error: userMessage(error, 'Upload failed. Please try again.'), retryable: error.retryable !== false }
         : photo)));
     }
   };

@@ -5,6 +5,7 @@ import {
 import { useToast } from '../../../context/ToastContext.jsx';
 import { fmtINR } from '../../../lib/format.js';
 import { AMENDABLE_TERMS, amendmentRows, currentTerm } from '../../../lib/amendmentTerms.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const AMENDABLE = new Set(['docs_review', 'changes_requested', 'action_required']);
 const REASON_MAX = 300;
@@ -44,7 +45,7 @@ export default function AmendTerms({ request, onUpdated }) {
       setEditing(false);
       toast(success, 'success');
     } catch (err) {
-      toast(err?.message || 'The terms were not changed.', 'error');
+      toast(userMessage(err, 'The terms were not changed.'), 'error');
     } finally {
       setBusy(false);
     }

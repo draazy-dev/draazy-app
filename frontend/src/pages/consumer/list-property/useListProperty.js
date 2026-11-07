@@ -34,6 +34,7 @@ import useRoomEdit, { useHomePrefill } from './useRoomEdit';
 import { LISTING_STEPS } from './StepNav.jsx';
 import { track } from '../../../lib/pmf.js';
 import { DRAFT_OWNER_KEY, adoptSharedDraft, draftKeyFor } from './draftSlots.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const LIST_PROPERTY_DRAFT_PREFIX = 'dzDraft:list-property';
 const LEGACY_LIST_PROPERTY_DRAFT_KEY = `${LIST_PROPERTY_DRAFT_PREFIX}:v2`;
@@ -704,7 +705,7 @@ export default function useListProperty() {
       try {
         await confirmOwnerListing(editId);
       } catch (error) {
-        toast(error?.body?.message || error?.message || t('listProperty.claim.confirmFailed'), 'error');
+        toast(userMessage(error, t('listProperty.claim.confirmFailed')), 'error');
         return;
       }
       skipLeaveGuard.current = true;
@@ -835,7 +836,7 @@ export default function useListProperty() {
       triggerConfetti();
       setShowSuccess(true);
     } catch (err) {
-      const refused = err?.status === 400 && err?.message;
+      const refused = err?.status === 400 && userMessage(err, '');
       toast(refused || (editRoomId ? t('listProperty.edit.roomSaveFailed') : 'Could not post your flatmate listing. Please try again.'), 'error');
       if (refused) window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {

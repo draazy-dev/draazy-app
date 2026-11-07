@@ -3,6 +3,7 @@ import Icon from '../../../components/Icon.jsx';
 import { digits } from '../../../lib/contact.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { applyGroupToListing, myFlatmateGroups } from '../../../services/flatmateService.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export function GroupApplyCard({ p, isIn, toast }) {
   const isRent = p?.deal === 'rent';
@@ -34,7 +35,7 @@ export function GroupApplyCard({ p, isIn, toast }) {
       setDone(true);
       toast('Your group has applied.', 'success');
     } catch (e) {
-      toast(e?.message || 'That did not go through. Please try again.', 'error');
+      toast(userMessage(e, 'That did not go through. Please try again.'), 'error');
     } finally {
       setBusy(false);
     }

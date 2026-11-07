@@ -9,6 +9,7 @@ import {
   fetchPlaceDetails,
 } from '../../lib/places.js';
 import { resolveLocality, searchLocalities } from '../../services/localityService.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const dbOption = (l) => ({ value: l.name, label: l.name, meta: { locality: l } });
 
@@ -131,7 +132,7 @@ export default function LocalitySelect({
       if (token !== reqRef.current || !mountedRef.current) return;
       commit(loc.name, { slug: loc.slug, lat: loc.lat ?? details.lat, lng: loc.lng ?? details.lng, details });
     } catch (e) {
-      if (token === reqRef.current && mountedRef.current) setError(e?.status === 422 ? (e.message && !/^HTTP \d+$/.test(e.message) ? e.message : t('ui.localityPick')) : t('ui.localityFailed'));
+      if (token === reqRef.current && mountedRef.current) setError(e?.status === 422 ? userMessage(e, t('ui.localityPick')) : t('ui.localityFailed'));
     } finally {
       if (token === reqRef.current && mountedRef.current) setBusy(false);
     }

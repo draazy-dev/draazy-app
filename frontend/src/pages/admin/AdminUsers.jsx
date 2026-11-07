@@ -23,6 +23,7 @@ import Modal from '../../components/ui/Modal.jsx';
 import {
   BTN, CHIP, CHIP_TONE, Cell, Chips, DATE_CHIPS, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const ROLE_CHIPS = [
   { value: '', label: 'All' },
@@ -146,7 +147,7 @@ export default function AdminUsers() {
       const rows = await listNotes('user', timelineUser.id);
       if (alive.current) { setUserNotes(rows); setUserNoteDraft(''); }
     } catch (err) {
-      toast(err?.message || 'Could not save that note', 'error');
+      toast(userMessage(err, 'Could not save that note'), 'error');
     } finally {
       if (alive.current) setSavingNote(false);
     }
@@ -194,7 +195,7 @@ export default function AdminUsers() {
       closeAction();
       await load(true);
     } catch (err) {
-      const message = err?.message || 'That could not be done';
+      const message = userMessage(err, 'That could not be done');
       setActionError(message);
       toast(message, 'error');
     } finally {
@@ -213,7 +214,7 @@ export default function AdminUsers() {
         all.items.map((u) => [u.id, u.name, u.mobile, u.role, u.city, u.listings || 0, u.joinedAt, u.verified ? 'Yes' : 'No', u.status]),
       );
     } catch (err) {
-      toast(err?.message || 'Could not export the users', 'error');
+      toast(userMessage(err, 'Could not export the users'), 'error');
     }
   };
 

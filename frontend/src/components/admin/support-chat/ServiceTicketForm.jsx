@@ -4,6 +4,7 @@ import { useToast } from '../../../context/ToastContext.jsx';
 import { createServiceTicketFromChat } from '../../../services/supportService.js';
 import { TEAM_LABEL } from '../../../lib/data/tickets.js';
 import { BTN } from '../WorkQueue.jsx';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const TEAMS = Object.entries(TEAM_LABEL).map(([value, label]) => ({ value, label }));
 
@@ -24,7 +25,7 @@ export default function ServiceTicketForm({ userId, name, propertyId, onDone }) 
       toast(`Service ticket raised for ${TEAM_LABEL[team]}`, 'success');
       onDone();
     } catch (err) {
-      toast(err?.message || 'The ticket was not created. Try again.', 'error');
+      toast(userMessage(err, 'The ticket was not created. Try again.'), 'error');
     } finally {
       setBusy(false);
     }

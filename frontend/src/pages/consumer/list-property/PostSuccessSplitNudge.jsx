@@ -4,6 +4,7 @@ import { LayoutGrid } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { splitProperty } from '../../../services/flatmateService.js';
 import SplitFlatModal from '../flatmates/SplitFlatModal.jsx';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export default function PostSuccessSplitNudge({ listing }) {
   const { t } = useTranslation();
@@ -16,7 +17,7 @@ export default function PostSuccessSplitNudge({ listing }) {
     try {
       created = await splitProperty(listing?.uuid || listing?.id, { maxOccupants, rooms });
     } catch (err) {
-      toast(err?.body?.error || err?.message || t('listProperty.split.failed'), 'error');
+      toast(userMessage(err, t('listProperty.split.failed')), 'error');
       return;
     }
     setOpen(false);

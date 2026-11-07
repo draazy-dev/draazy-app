@@ -23,6 +23,7 @@ import InsightsPanel from './finances/InsightsPanel.jsx';
 import ReportsPanel from './finances/ReportsPanel.jsx';
 import AddTransactionModal from './finances/AddTransactionModal.jsx';
 import BasisModal from './finances/BasisModal.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 export default function FinancesTab({ user, listings, toast, isOwner = true, showRental = false }) {
   const { t } = useTranslation();
@@ -192,7 +193,7 @@ function OwnerFinances({ listings, toast }) {
         recurring: txForm.recurring ? 'monthly' : 'none',
       });
     } catch (err) {
-      toast(err?.body?.error || err?.message || t('fin.fillCatAmount'), 'error');
+      toast(userMessage(err, t('fin.fillCatAmount')), 'error');
       return;
     }
     setTxForm({ type: 'income', category: '', amount: '', date: istToday(), notes: '', recurring: false });
@@ -205,7 +206,7 @@ function OwnerFinances({ listings, toast }) {
     try {
       await deleteTransaction(finProp, id);
     } catch (err) {
-      toast(err?.body?.error || err?.message || t('fin.txRemoved'), 'error');
+      toast(userMessage(err, t('fin.txRemoved')), 'error');
       return;
     }
     if (gone) applyConfirmed(gone, -1, (rows) => rows.filter((row) => row.id !== id));
@@ -235,7 +236,7 @@ function OwnerFinances({ listings, toast }) {
         currentValue: parseFloat(basisForm.currentValue) || 0,
       });
     } catch (err) {
-      toast(err?.body?.error || err?.message || t('fin.basisSaved'), 'error');
+      toast(userMessage(err, t('fin.basisSaved')), 'error');
       return;
     }
     setFin((f) => ({ ...f, basis: saved }));

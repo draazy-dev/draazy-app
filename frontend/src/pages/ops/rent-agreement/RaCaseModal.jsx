@@ -23,6 +23,7 @@ import StaffWorkflowActions from '../service-queue/StaffWorkflowActions.jsx';
 import { fmtAgo } from '../service-queue/helpers.js';
 import CaseParticulars from './CaseParticulars.jsx';
 import { STAGES, caseSummary, nextStep, stagesDone } from './stages.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const card = 'rounded-xl border border-white/10 bg-black/10 p-4';
 const CLOSED = new Set(['completed', 'cancelled']);
@@ -122,7 +123,7 @@ function CaseView({ initial, checklistRead, onChanged }) {
       if (note) await fileNote(note);
       if (success) toast(typeof success === 'function' ? success(args) : success, 'success');
     } catch (err) {
-      toastError(err?.message || 'That did not go through.');
+      toastError(userMessage(err, 'That did not go through.'));
       throw err;
     }
   };

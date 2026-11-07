@@ -69,7 +69,6 @@ function ErrorFallback({ error, reference, scope, onRetry }) {
         </div>
         <p className="text-[11px] text-gray-500 mt-2 break-all">
           {t('common.errorBoundary.reference', { ref: reference })}
-          {error?.message ? <> · <code className="text-gray-400">{String(error.message).slice(0, 160)}</code></> : null}
         </p>
       </div>
     </div>

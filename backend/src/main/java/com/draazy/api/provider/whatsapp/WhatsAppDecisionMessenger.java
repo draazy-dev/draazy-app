@@ -60,6 +60,12 @@ class WhatsAppDecisionMessenger implements DecisionMessenger {
     }
 
     @Override
+    public boolean agreementInviteDeliverable(String mobile) {
+        return !isBlank(props.agreementInviteTemplateName()) && !isBlank(props.agreementInviteTemplateLang())
+                && !optOuts.isOptedOut(mobile);
+    }
+
+    @Override
     public boolean sendAgreementInvite(String mobile, String inviter, String side, String place, String link) {
         return send(DecisionMessenger.AGREEMENT_INVITE, "Agreement invite", "agreement-invite-template-name",
                 props.agreementInviteTemplateName(), props.agreementInviteTemplateLang(), props.phoneNumberId(),

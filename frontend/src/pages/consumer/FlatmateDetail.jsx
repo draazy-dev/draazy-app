@@ -22,6 +22,7 @@ import { readAccessToken, readUser } from '../../lib/auth.js';
 import { inr, perHead, roomTitle, FLATMATE_IMG, FLATMATE_GROUP_IMG } from './flatmates/helpers.js';
 import { SHARE_OPENER, SEEKER_OPENER, GROUP_OPENER } from './flatmates/openers.js';
 import { useGenderGate } from './flatmates/useGenderGate.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const KINDS = ['group', 'room', 'post'];
 const interestKey = (kind, id) => (kind === 'post' ? id : `${kind}-${id}`);
@@ -124,7 +125,7 @@ export default function FlatmateDetail() {
       }
       setMyAsk(null);
       if (err?.code === flatmateService.CONFLICT_GROUP_FULL) { await load(); toast(t('flatmates.groupAlreadyFull', { title: target.title }), 'error'); return; }
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     if (sent?.status) setMyAsk({ status: sent.status });
@@ -138,7 +139,7 @@ export default function FlatmateDetail() {
     try {
       await flatmateService.leaveGroup(id);
     } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     setMyAsk(null);
@@ -151,7 +152,7 @@ export default function FlatmateDetail() {
       await flatmateService.withdrawInterest(kind, id);
     } catch (err) {
       loadMine().then(setMyAsk).catch(() => {});
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     setMyAsk(null);
@@ -164,7 +165,7 @@ export default function FlatmateDetail() {
     try {
       await flatmateService.removeGroupMember(id, m.id);
     } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     toast(t('flatmates.memberRemoved', { name }));

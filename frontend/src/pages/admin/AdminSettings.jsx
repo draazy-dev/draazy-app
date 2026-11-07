@@ -14,6 +14,7 @@ import Modal from '../../components/ui/Modal.jsx';
 import AdminFlagsPanel from './settings/AdminFlagsPanel.jsx';
 import AppFlagsPanel, { appFlagOn } from './settings/AppFlagsPanel.jsx';
 import MapsGeoPanel from './settings/MapsGeoPanel.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 function ConfirmDialog({ open, title, message, onConfirm, onCancel, confirmLabel = 'Confirm', danger }) {
   return (
@@ -82,8 +83,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const saveError = (err) => {
   if (err?.status === 412) return 'Someone else changed these settings — reload to see their changes.';
-  if (err?.isValidation || err?.name === 'NetworkError') return err.message;
-  return 'That change was not saved. Please try again.';
+  return userMessage(err, 'That change was not saved. Please try again.');
 };
 
 const SITE_FIELDS = [

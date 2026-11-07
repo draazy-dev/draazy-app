@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { claimIdentityReview, getIdentityReview, releaseIdentityReview } from '../../../services/identityReviewService.js';
 import { errorCode, errorMessage, sameId } from './vocabulary.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const claimedMessage = (next) => `Being reviewed by ${next?.claimedByName || 'another reviewer'}`;
 const isClaimTaken = (error) => errorCode(error) === 'identity_case_claimed';
@@ -102,7 +103,7 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
         if (canTryClaim(initial)) await claimOrShowHolder(openId, gen, initial, isCurrent);
         else applyDetail(initial);
       } catch (nextError) {
-        if (isCurrent()) setError(nextError?.message || 'Could not load this review.');
+        if (isCurrent()) setError(userMessage(nextError, 'Could not load this review.'));
       } finally {
         if (isCurrent()) setLoading(false);
       }
@@ -127,7 +128,7 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
       if (canTryClaim(fresh) && await claimOrShowHolder(id, runRef.current, fresh, stillOpen(id))) return;
       if (stillOpen(id)() && !canTryClaim(fresh)) applyDetail(fresh);
     } catch (nextError) {
-      if (stillOpen(id)()) setError(nextError?.message || 'Could not refresh image links.');
+      if (stillOpen(id)()) setError(userMessage(nextError, 'Could not refresh image links.'));
     } finally {
       if (stillOpen(id)()) setLoading(false);
     }

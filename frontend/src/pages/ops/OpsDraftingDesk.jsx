@@ -28,6 +28,7 @@ import StaffWorkflowActions from './service-queue/StaffWorkflowActions.jsx';
 import PartyIdentities from './service-queue/PartyIdentities.jsx';
 import { OverdueToggle, stageTabs, useLinkedCase, useQueue } from './service-queue/deskQueue.jsx';
 import { fmtAgo } from './service-queue/helpers.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const PAGE_SIZE = 20;
 const TABS = stageTabs('request');
@@ -173,7 +174,7 @@ export default function OpsDraftingDesk({ desk }) {
       applyUpdate(updated);
       toast('This request is now yours. The customer can see the change.', 'success');
     } catch (err) {
-      toast(err?.message || 'That request could not be taken.', 'error');
+      toast(userMessage(err, 'That request could not be taken.'), 'error');
     } finally {
       busy.current = false;
     }
@@ -187,7 +188,7 @@ export default function OpsDraftingDesk({ desk }) {
       toast('The draft was shared with the customer.', 'success');
 
     } catch (err) {
-      toast(err?.message || 'The draft could not be shared.', 'error');
+      toast(userMessage(err, 'The draft could not be shared.'), 'error');
       throw err;
     }
   };
@@ -199,7 +200,7 @@ export default function OpsDraftingDesk({ desk }) {
       await fileInternalNote('Registered copy uploaded');
       toast('The registered copy was uploaded.', 'success');
     } catch (err) {
-      toast(err?.message || 'The registered copy could not be uploaded.', 'error');
+      toast(userMessage(err, 'The registered copy could not be uploaded.'), 'error');
       throw err;
     }
   };
@@ -213,7 +214,7 @@ export default function OpsDraftingDesk({ desk }) {
       await fileInternalNote('Cancelled');
       toast('The request was cancelled and the customer was notified.', 'success');
     } catch (err) {
-      toast(err?.message || 'The request could not be cancelled.', 'error');
+      toast(userMessage(err, 'The request could not be cancelled.'), 'error');
       throw err;
     }
   };

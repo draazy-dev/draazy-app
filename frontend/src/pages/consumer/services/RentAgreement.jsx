@@ -130,8 +130,8 @@ function RentAgreement() {
                   {payable && !paymentPending && <ReadyToPayPanel request={payable} onPay={() => payFiled()} busy={paying} unconfirmed={false} />}
                   {inviting && inviteResult ? (
                     <div className="p-5 rounded-xl bg-white/[0.03]">
-                      <p className="text-white font-semibold text-sm flex items-center gap-2"><Icon name="message-circle" className="w-4 h-4 text-emerald-400" /> {tr('services.ra.invite.sendTitle', invitedSide)}</p>
-                      <p className="text-gray-400 text-xs mt-1">{tr('services.ra.invite.sendDesc', { mobile: inviteResult.toMobile ? '••••' + inviteResult.toMobile.slice(-4) : '' })}</p>
+                      <p className="text-white font-semibold text-sm flex items-center gap-2"><Icon name="message-circle" className="w-4 h-4 text-emerald-400" /> {tr(inviteResult.queued ? 'services.ra.invite.sendTitle' : 'services.ra.invite.readyTitle', invitedSide)}</p>
+                      <p className="text-gray-400 text-xs mt-1">{tr(inviteResult.queued ? 'services.ra.invite.sendDesc' : 'services.ra.invite.readyDesc', { mobile: inviteResult.toMobile ? '••••' + inviteResult.toMobile.slice(-4) : '' })}</p>
                       {inviteResult.pending ? (
                         <p className="text-amber-200/90 text-[11px] mt-2 flex items-start gap-1.5"><Icon name="clock" className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> {tr('services.ra.invite.pendingSignup')}</p>
                       ) : (

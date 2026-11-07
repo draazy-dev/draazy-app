@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import PoweredByGoogle from '../ui/PoweredByGoogle.jsx';
 import { fetchPlaceDetails, fetchSuggestions, newAutocompleteSession } from '../../lib/places.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const DEBOUNCE_MS = 220;
 
@@ -70,7 +71,7 @@ export default function PlaceSearchInput({ label = '', onPick, onClear, bias = n
     setBusy(true);
     let value = null;
     let failure = '';
-    try { value = await resolve(s); } catch (e) { failure = e?.message || ''; }
+    try { value = await resolve(s); } catch (e) { failure = userMessage(e, ''); }
     if (id !== pickRef.current) return;
     setBusy(false);
     sessionRef.current = null;

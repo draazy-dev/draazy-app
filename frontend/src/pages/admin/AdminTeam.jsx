@@ -22,6 +22,7 @@ import Loading from '../../components/ui/Loading.jsx';
 import {
   BTN, CHIP, CHIP_TONE, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox, useClientPaging,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const STAFF_ROLE_OPTS = [
   { value: 'staff', label: 'Ops staff — service portal' },
@@ -127,7 +128,7 @@ export default function AdminTeam() {
   const functionLabels = useMemo(() => new Map(catalogue.map((fn) => [fn.name, fn.label])), [catalogue]);
 
   const failed = useCallback((err) => toast(
-    err?.code === 'role_change_unsupported' ? t('team.errors.roleChangeUnsupported') : (err?.message || t('team.errors.generic')),
+    err?.code === 'role_change_unsupported' ? t('team.errors.roleChangeUnsupported') : (userMessage(err, t('team.errors.generic'))),
     'error',
   ), [t, toast]);
 
@@ -177,7 +178,7 @@ export default function AdminTeam() {
         }
         : prev)))
       .catch((err) => setMemberModal((prev) => (prev && prev.id === m.id
-        ? { ...prev, functionsError: err?.message || t('team.errors.generic') }
+        ? { ...prev, functionsError: userMessage(err, t('team.errors.generic')) }
         : prev)));
   };
 

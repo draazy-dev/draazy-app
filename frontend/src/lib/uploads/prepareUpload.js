@@ -1,4 +1,5 @@
 import { MAX_UPLOAD_BYTES, uploadType } from './policy.js';
+import { UserError } from '../userError.js';
 
 const PROCESSING_TIMEOUT_MS = 30_000;
 const TOO_SLOW = 'This file took too long to process. Try a smaller original.';
@@ -18,12 +19,12 @@ async function processImageOnMainThread(file, type, document, maxBytes, signal) 
   try {
     result = await Promise.race([processImage(file, type, document, maxBytes), timedOut]);
   } catch (error) {
-    throw new Error(error?.message === TOO_SLOW ? TOO_SLOW : imageErrorMessage(error));
+    throw new UserError(error?.message === TOO_SLOW ? TOO_SLOW : imageErrorMessage(error));
   } finally {
     clearTimeout(timer);
   }
   signal?.throwIfAborted();
-  if (!result.blob.size || result.blob.size >= maxBytes) throw new Error(tooBig(maxBytes));
+  if (!result.blob.size || result.blob.size >= maxBytes) throw new UserError(tooBig(maxBytes));
   return { file: fileFromBlob(file, type, result.blob), look: result.look };
 }
 function processInWorker(file, type, document, maxBytes, signal) {
@@ -38,14 +39,14 @@ function processInWorker(file, type, document, maxBytes, signal) {
       if (error) reject(error); else resolve({ file: result, look });
     };
     const abort = () => finish(new DOMException('Upload preparation cancelled.', 'AbortError'));
-    const timer = setTimeout(() => finish(new Error(TOO_SLOW)), PROCESSING_TIMEOUT_MS);
+    const timer = setTimeout(() => finish(new UserError(TOO_SLOW)), PROCESSING_TIMEOUT_MS);
     signal?.addEventListener('abort', abort, { once: true });
-    worker.onerror = () => finish(new Error('Could not process this file. Try another supported original.'));
+    worker.onerror = () => finish(new UserError('Could not process this file. Try another supported original.'));
     worker.onmessage = ({ data }) => {
-      if (data.error) finish(new Error(data.error));
+      if (data.error) finish(new UserError(data.error));
       else if (data.unchanged) finish(null, file.type === type ? file : new File([file], file.name, { type, lastModified: file.lastModified }));
       else if (!(data.blob instanceof Blob) || !data.blob.size || data.blob.size >= maxBytes) {
-        finish(new Error(tooBig(maxBytes)));
+        finish(new UserError(tooBig(maxBytes)));
       } else {
         finish(null, fileFromBlob(file, type, data.blob), data.look);
       }
@@ -59,10 +60,10 @@ export async function prepareUpload(file, { document = false, originalPdf = fals
   const type = await uploadType(file, document);
   signal?.throwIfAborted();
   if (originalPdf && type !== 'application/pdf') {
-    throw new Error('Upload the original MSEDCL PDF, not a photo or scan.');
+    throw new UserError('Upload the original MSEDCL PDF, not a photo or scan.');
   }
   if (originalPdf && file.size >= MAX_UPLOAD_BYTES) {
-    throw new Error('The original PDF must be under 1 MB. Keep it unchanged; use a current property-tax receipt instead if it is too large.');
+    throw new UserError('The original PDF must be under 1 MB. Keep it unchanged; use a current property-tax receipt instead if it is too large.');
   }
   const prepared = type !== 'application/pdf' && typeof OffscreenCanvas === 'undefined'
     ? await processImageOnMainThread(file, type, document, maxBytes, signal)

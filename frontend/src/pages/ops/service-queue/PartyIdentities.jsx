@@ -5,6 +5,7 @@ import { useToast } from '../../../context/ToastContext.jsx';
 import { classNames } from '../../../lib/format.js';
 import IdInput from '../../../components/IdInput.jsx';
 import { isAadhaar, isPan } from '../../consumer/services/rent-agreement/helpers.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const PARTY_LABEL = { owner: 'Owner', tenant: 'Tenant' };
 const field = 'mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 font-mono text-sm text-white';
@@ -62,7 +63,7 @@ function CorrectNumbers({ requestId, party, onSaved, onCancel }) {
       toast('Saved. The customer has been told their ID was corrected.', 'success');
       if (mounted.current) onSaved();
     } catch (err) {
-      toast(err?.message || 'The numbers were not saved.', 'error');
+      toast(userMessage(err, 'The numbers were not saved.'), 'error');
       if (mounted.current) setBusy(false);
     }
   };
@@ -106,7 +107,7 @@ export default function PartyIdentities({ requestId, state, editable = false, cl
     } catch (err) {
       setIdentities(null);
       setStatus('refused');
-      setRefusal(err?.message || 'These numbers are visible only to the person working the matter.');
+      setRefusal(userMessage(err, 'These numbers are visible only to the person working the matter.'));
     }
   };
 

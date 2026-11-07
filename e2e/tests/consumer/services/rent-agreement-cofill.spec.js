@@ -106,13 +106,15 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
       return (await res.json()).content.filter((c) => c.operation === 'agreement-invite').length;
     };
 
-    const { requestId } = await coFillOverHttp(ownerToken, registered);
+    const { requestId, party } = await coFillOverHttp(ownerToken, registered);
+    expect(party.whatsappQueued, 'the log-only sender has no template, so the invite is not reported queued').toBe(false);
     const second = await fetch(`${API}/service-requests/${requestId}/parties`, {
       method: 'POST',
       headers: authed(ownerToken),
       body: JSON.stringify({ role: 'tenant', partyIndex: 1, mobile: unregistered }),
     });
     expect(second.status, 'a number with no account can be invited too').toBe(201);
+    expect((await second.json()).whatsappQueued).toBe(false);
 
     await expect.poll(() => invitesLogged(registered), { message: 'the registered tenant was sent the invite' }).toBe(1);
     await expect.poll(() => invitesLogged(unregistered), { message: 'the new number was sent the invite' }).toBe(1);
@@ -168,6 +170,12 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
       page.getByText('Waiting for them to open the invite'),
       'the owner is told they are waiting on a reply, not on a signup',
     ).toBeVisible();
+    expect(party.whatsappQueued, 'the e2e server runs the log-only sender, so nothing is queued').toBe(false);
+    await expect(
+      page.getByText('Now send your tenant the invite'),
+      'with nothing queued, the panel asks the owner to send it rather than claiming it was sent',
+    ).toBeVisible();
+    await expect(page.getByText('Invite sent to your tenant')).toHaveCount(0);
 
     const href = await page.getByRole('link', { name: /Send it yourself on WhatsApp/ }).getAttribute('href');
     const decoded = decodeURIComponent(href || '');

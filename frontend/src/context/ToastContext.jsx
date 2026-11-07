@@ -54,10 +54,10 @@ function Toast({ toast: t, onDismiss, onPause, onResume }) {
 
   return (
     <div
-      onPointerEnter={() => onPause(t.id)}
-      onPointerLeave={() => onResume(t.id)}
-      onFocus={() => onPause(t.id)}
-      onBlur={() => onResume(t.id)}
+      onPointerEnter={() => onPause(t.id, 'pointer')}
+      onPointerLeave={() => onResume(t.id, 'pointer')}
+      onFocus={() => onPause(t.id, 'focus')}
+      onBlur={() => onResume(t.id, 'focus')}
       className={`
         flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-2xl shadow-black/30
         backdrop-blur-xl bg-ink-2/90 min-w-[280px] max-w-[420px]
@@ -89,7 +89,7 @@ export function ToastProvider({ children }) {
   const shown = useRef(new Map());
   const durations = useRef(new Map());
   const order = useRef([]);
-  const held = useRef(new Set());
+  const held = useRef(new Map());
 
   const dismiss = useCallback((id) => {
     clearTimeout(timers.current.get(id));
@@ -100,8 +100,8 @@ export function ToastProvider({ children }) {
     shown.current.forEach((v, k) => { if (v === id) shown.current.delete(k); });
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
-  const pause = useCallback((id) => {
-    held.current.add(id);
+  const pause = useCallback((id, by) => {
+    held.current.set(id, new Set(held.current.get(id)).add(by));
     clearTimeout(timers.current.get(id));
     timers.current.delete(id);
   }, []);
@@ -111,8 +111,11 @@ export function ToastProvider({ children }) {
     clearTimeout(timers.current.get(id));
     timers.current.set(id, setTimeout(() => dismiss(id), ms));
   }, [dismiss]);
-  const release = useCallback((id) => {
-    held.current.delete(id);
+  const release = useCallback((id, by) => {
+    const rest = new Set(held.current.get(id));
+    rest.delete(by);
+    if (rest.size) held.current.set(id, rest);
+    else held.current.delete(id);
     resume(id);
   }, [resume]);
   const toast = useCallback(

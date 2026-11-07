@@ -15,6 +15,7 @@ import { istWindowStart } from '../../lib/availability.js';
 import { Chips, QueueTabs } from '../../components/admin/WorkQueue.jsx';
 import PerformanceTab from './staff-activity/PerformanceTab.jsx';
 import AuditTrail, { describe } from './staff-activity/AuditTrail.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const TABS = [['performance', 'Performance'], ['log', 'Activity log']];
 
@@ -74,7 +75,7 @@ export default function AdminStaffActivity() {
     } catch (err) {
       if (!alive.current) return;
       setRows([]);
-      setError(err?.message || 'Could not load staff activity.');
+      setError(userMessage(err, 'Could not load staff activity.'));
     }
   }, [actor, entity, action, from, q, page]);
 
@@ -89,7 +90,7 @@ export default function AdminStaffActivity() {
       setFacets({ actions: wide.actions, byEntity: wide.byEntity, leaderboard: wide.leaderboard });
     } catch (err) {
       if (!alive.current) return;
-      setError(err?.message || 'Could not load staff activity.');
+      setError(userMessage(err, 'Could not load staff activity.'));
     }
   }, [actor, entity, action, from, q]);
 

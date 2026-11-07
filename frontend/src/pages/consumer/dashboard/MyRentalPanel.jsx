@@ -18,6 +18,7 @@ import { inviteRouteFor } from '../../../lib/serviceRequestStatus.js';
 import { listMyServiceRequestInvites } from '../../../services/serviceRequestService.js';
 import { listTrackedRent } from '../../../services/managedService.js';
 import TrackedRent from './TrackedRent.jsx';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export default function MyRentalPanel({ user }) {
   const { t: tr } = useTranslation();
@@ -49,7 +50,7 @@ export default function MyRentalPanel({ user }) {
     } catch (err) {
       const settled = err?.status === 404 || err?.status === 409;
       refresh = settled;
-      toast(settled && err.message ? err.message : tr('dash.tenancy.failedToast'), 'error');
+      toast(settled ? userMessage(err, tr('dash.tenancy.failedToast')) : tr('dash.tenancy.failedToast'), 'error');
     } finally {
       sending.current = false;
       setBusy(false);

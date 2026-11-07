@@ -11,6 +11,7 @@ import Modal from '../../components/ui/Modal.jsx';
 import {
   BTN, Chips, ClearFilters, PageNav, QueuePanel, SearchBox, useClientPaging,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const coordStr = (l) => (l.lat != null && l.lng != null ? `${(+l.lat).toFixed(4)}, ${(+l.lng).toFixed(4)}` : '—');
 
@@ -38,7 +39,7 @@ export default function AdminLocalities() {
     try {
       setDirectory(await listAdminLocalities());
     } catch (e) {
-      toast(e?.message || 'Could not load localities', 'error');
+      toast(userMessage(e, 'Could not load localities'), 'error');
     } finally {
       setLoading(false);
     }
@@ -55,7 +56,7 @@ export default function AdminLocalities() {
       setTarget(null);
       await reload();
     } catch (e) {
-      toast(e?.message || 'Could not update that area', 'error');
+      toast(userMessage(e, 'Could not update that area'), 'error');
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listLeads } from '../../../services/leadService.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export const PAGE_SIZE = 20;
 
@@ -22,7 +23,7 @@ export function useLeadList({ view, q, stage, type, page, enabled }) {
       })
       .catch((e) => {
         if (!live) return;
-        setState({ status: 'error', items: [], total: 0, counts: null, error: e.message || 'Could not read the leads.' });
+        setState({ status: 'error', items: [], total: 0, counts: null, error: userMessage(e, 'Could not read the leads.') });
         setReloading(false);
       });
     return () => { live = false; };

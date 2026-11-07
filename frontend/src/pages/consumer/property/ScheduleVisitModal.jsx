@@ -11,6 +11,7 @@ import useScrollLock from '../../../hooks/useScrollLock.js';
 import useModalDialog from '../../../hooks/useModalDialog.js';
 import { scheduleVisit } from '../../../services/visitService.js';
 import { track } from '../../../lib/pmf.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const nextDayIso = () => {
   const d = new Date();
@@ -80,7 +81,7 @@ export function ScheduleVisitModal({ p, isIn, onClose }) {
         return;
       }
       const message = e?.code === 'contact_pending_limit' ? t('property.contactPendingLimit')
-        : e?.code === 'recently_withdrawn' ? (e.message || t('property.recentlyWithdrawn'))
+        : e?.code === 'recently_withdrawn' ? (userMessage(e, t('property.recentlyWithdrawn')))
         : e?.status === 409 ? t('property.visitAlreadyBooked') : t('property.visitRequestFailed');
       setError(message);
     } finally {

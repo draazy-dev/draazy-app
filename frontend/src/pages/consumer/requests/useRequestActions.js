@@ -11,6 +11,7 @@ import { decidePhotoRequest } from '../../../services/photoRequestService.js';
 import { remindRequest, removeRequest } from '../../../services/requestInboxService.js';
 import { updateVisitStatus } from '../../../services/visitService.js';
 import { isGroupJoin, isPending, requestKey, targetSlug } from './requestMeta.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const DECIDERS = {
   contact: (id, yes) => respondToContactRequest(id, yes ? 'approved' : 'declined'),
@@ -89,7 +90,7 @@ export function useRequestActions({ inbox, toast, onChanged }) {
       await DECIDERS[item.kind](item.id, yes);
     } catch (e) {
       const notLive = item.kind === 'contact' && e?.code === 'listing_not_live';
-      toast(notLive ? 'Make the listing live to share your number.' : e?.message || FAILED, 'error');
+      toast(notLive ? 'Make the listing live to share your number.' : userMessage(e, FAILED), 'error');
       load('received', { quiet: true });
       return;
     }
@@ -112,10 +113,10 @@ export function useRequestActions({ inbox, toast, onChanged }) {
     } catch (e) {
       if (e?.code === 'reminder_too_soon' && e.nextReminderAt) {
         applyNext({ nextAt: e.nextReminderAt });
-        toast(e.message || 'You reminded them recently. Try again later.', 'info');
+        toast(userMessage(e, 'You reminded them recently. Try again later.'), 'info');
         return;
       }
-      toast(e?.message || FAILED, 'error');
+      toast(userMessage(e, FAILED), 'error');
       if (e?.status === 404) load('sent', { quiet: true });
     }
   }), [guarded, load, patchItem, toast]);
@@ -125,7 +126,7 @@ export function useRequestActions({ inbox, toast, onChanged }) {
     try {
       await removeRequest(item.kind, item.id, box);
     } catch (e) {
-      toast(e?.message || FAILED, 'error');
+      toast(userMessage(e, FAILED), 'error');
       load(box, { quiet: true });
       return;
     }
@@ -153,12 +154,12 @@ export function useRequestActions({ inbox, toast, onChanged }) {
         });
       navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
     } catch (e) {
-      toast(e?.message || NO_CHAT, 'error');
+      toast(userMessage(e, NO_CHAT), 'error');
     }
   }), [guarded, navigate, toast]);
 
   const openReceived = useCallback((item) => guarded(item, () => chatWith(item)
-    .catch((e) => toast(e?.message || NO_CHAT, 'error'))), [chatWith, guarded, toast]);
+    .catch((e) => toast(userMessage(e, NO_CHAT), 'error'))), [chatWith, guarded, toast]);
 
   return { busy, decide, remind, remove, openAccepted, openReceived };
 }

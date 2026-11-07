@@ -1,4 +1,5 @@
 import { prepareUpload } from '../uploads/prepareUpload.js';
+import { UserError } from '../userMessage.js';
 
 const DOC_MIME = 'image/jpeg';
 const DOC_QUALITY = 0.92;
@@ -7,7 +8,7 @@ const PROBE_EDGE = 240;
 
 export async function startCameraStream({ facingMode, width = 1280, height = 720 }) {
   if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error('This device does not expose a browser camera. Open this page on your phone.');
+    throw new UserError('This device does not expose a browser camera. Open this page on your phone.');
   }
   return navigator.mediaDevices.getUserMedia({
     audio: false,

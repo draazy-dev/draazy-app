@@ -4,13 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../../context/ToastContext.jsx';
 import * as flatmateService from '../../../../services/flatmateService.js';
 import { inr, perHead, seatCeiling, seatsLeft } from '../helpers.js';
+import { userMessage } from '../../../../lib/userMessage.js';
 
 export function useOwnerControls(kind, item, patch) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
   const pending = useRef({});
-  const fail = (err) => toast(err?.message || t('common.somethingWentWrong'), 'error');
+  const fail = (err) => toast(userMessage(err, t('common.somethingWentWrong')), 'error');
 
   const step = async (field, want, send) => {
     pending.current[field] = want;

@@ -12,9 +12,10 @@ const DEVICE_ID_PATH = /^\/(auth\/|referrals\/|me\/referrals|me\/payments)/;
 const REFRESH_LOCK = 'draazy:auth-refresh';
 
 export class ApiError extends Error {
-  constructor({ code, message, status, traceId, fields, attemptsRemaining,   retryAfterSeconds, reason, existingId, nextReminderAt }) {
+  constructor({ code, message, status, traceId, fields, attemptsRemaining,   retryAfterSeconds, reason, existingId, nextReminderAt, unparsed }) {
     super(message || code || `HTTP ${status}`);
     this.name = 'ApiError';
+    this.serverMessage = Boolean(message) && !unparsed;
     this.code = code || null;
     this.status = status;
     this.traceId = traceId || null;
@@ -373,6 +374,7 @@ async function toResult(res, withStatus = false) {
     reason: payload?.reason,
     existingId: payload?.existingId,
     nextReminderAt: payload?.nextReminderAt,
+    unparsed: payload?.unparsed,
   });
 }
 
@@ -387,7 +389,8 @@ async function parseBody(res) {
   try {
     return JSON.parse(text);
   } catch {
-    return { message: text.slice(0, 200) };
+    // A proxy's HTML or plain-text error page: kept for logs, never shown as a server refusal.
+    return { message: text.slice(0, 200), unparsed: true };
   }
 }
 

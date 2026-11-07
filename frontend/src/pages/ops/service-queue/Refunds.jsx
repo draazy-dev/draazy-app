@@ -4,6 +4,7 @@ import {
 } from '../../../services/serviceRequestService.js';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { fmtINR } from '../../../lib/format.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const TEXT_MAX = 300;
 const GRN = /^MH[0-9A-Z]{8,23}$/;
@@ -102,7 +103,7 @@ export default function Refunds({ request }) {
     let current = true;
     getServiceRequestRefunds(request.id)
       .then((next) => { if (current) setSummary(next); })
-      .catch((err) => { if (current) setFailure(err?.message || 'The refunds on this request could not be read.'); });
+      .catch((err) => { if (current) setFailure(userMessage(err, 'The refunds on this request could not be read.')); });
     return () => { current = false; };
   }, [request.id, request.status]);
 
@@ -114,7 +115,7 @@ export default function Refunds({ request }) {
       setAsking(false);
       toast(success, 'success');
     } catch (err) {
-      toast(err?.message || 'The refund was not changed.', 'error');
+      toast(userMessage(err, 'The refund was not changed.'), 'error');
     } finally {
       setBusy(false);
     }

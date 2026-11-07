@@ -4,6 +4,7 @@ import IdInput from './IdInput.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { recordServiceRequestIdentities } from '../services/serviceRequestService.js';
 import { digits, isPan } from '../pages/consumer/services/rent-agreement/helpers.js';
+import { userMessage } from '../lib/userMessage.js';
 
 const IDENTITY_EVENTS = new Set(['identities.purged', 'identities.recorded']);
 const slotKey = (slot) => `${slot.role}-${slot.index}`;
@@ -63,7 +64,7 @@ export default function IdentityRefill({ request, viewerMobile, onSaved }) {
       onSaved?.();
     } catch (e) {
       console.warn('[identity-refill] save failed', e?.status || e?.message);
-      setError(e?.message || 'Could not save the numbers. Please try again.');
+      setError(userMessage(e, 'Could not save the numbers. Please try again.'));
     } finally {
       setBusy(false);
     }

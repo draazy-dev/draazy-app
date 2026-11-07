@@ -5,6 +5,7 @@ import '../../../../styles/routes/flatmates.css';
 import { getMyFlatmatePost } from '../../../../services/flatmateService.js';
 import { useFlatmateSupply } from '../../flatmates/useFlatmateSupply.jsx';
 import SupplyModals from '../../flatmates/SupplyModals.jsx';
+import { userMessage } from '../../../../lib/userMessage.js';
 
 const noop = () => {};
 const ownsNothing = () => false;
@@ -32,7 +33,7 @@ export function useFlatmateEditing({ user, toast, refresh }) {
       setMyPost(post);
       setPendingPostId(post.id);
     } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
     }
   };
 

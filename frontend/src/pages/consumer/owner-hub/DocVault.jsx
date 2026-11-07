@@ -12,6 +12,7 @@ import {
 import { openDocFrom } from '../../../lib/openDoc.js';
 import { DOC_CAT_KEYS } from './constants.js';
 import { DOCUMENT_ACCEPT, DOCUMENT_GUIDANCE_KEY, PDF_GUIDANCE_KEY } from '../../../lib/uploads/policy.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const CATEGORY_NAMES = Object.keys(DOC_CATEGORIES);
 
@@ -59,7 +60,7 @@ export default function DocVault({ mobile, propId, onChange }) {
     try {
       await uploadManagedDocument(mobile, propId, { category, file });
     } catch (err) {
-      if (mounted.current) toast(err?.message || t('ownerHub.cantOpen'), 'error');
+      if (mounted.current) toast(userMessage(err, t('ownerHub.cantOpen')), 'error');
       return;
     }
     await sync();
@@ -70,7 +71,7 @@ export default function DocVault({ mobile, propId, onChange }) {
     try {
       await deleteManagedDocument(mobile, propId, id);
     } catch (err) {
-      if (mounted.current) toast(err?.message || t('ownerHub.cantOpen'), 'error');
+      if (mounted.current) toast(userMessage(err, t('ownerHub.cantOpen')), 'error');
       return;
     }
     await sync();

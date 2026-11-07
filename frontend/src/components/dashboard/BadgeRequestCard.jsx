@@ -5,6 +5,7 @@ import IdGateStep, { useIdGate } from './IdGateStep.jsx';
 import { badgeDocsFor } from '../../pages/consumer/list-property/constants.js';
 import { canonicalTypeKey, matchTypeKey } from '../../data/propertyTypes.js';
 import { requestOwnershipVerification } from '../../services/propertyReviewService.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const badgeTypeOf = (type) => {
   const raw = String(type || '').toLowerCase();
@@ -41,7 +42,7 @@ export default function BadgeRequestCard({ listing, docs, onUpload, toast }) {
       setRequested(listing.uuid);
       toast(t('dash.badge.requestedToast'), 'success');
     } catch (err) {
-      toast(err?.message || t('dash.badge.requestFailed'), 'error');
+      toast(userMessage(err, t('dash.badge.requestFailed')), 'error');
     } finally {
       setBusy(false);
     }

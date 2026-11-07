@@ -18,6 +18,7 @@ import { useFlatmateSupply } from './useFlatmateSupply.jsx';
 import { useGenderGate } from './useGenderGate.jsx';
 import { MAX_PAGE_SIZE } from '../../../services/apiLimits.js';
 import { REVISIT_MAX_AGE } from '../../../services/http.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export { emptyFilters };
 export const MAP_MAX_AREAS = 3;
@@ -173,7 +174,7 @@ export function useFlatmates() {
         return;
       }
       setInterests((m) => { const n = { ...m }; delete n[r.id]; return n; });
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     rememberAsk(user.mobile, r.id);
@@ -203,7 +204,7 @@ export function useFlatmates() {
         return;
       }
       setInterests((m) => { const n = { ...m }; delete n[key]; return n; });
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     rememberAsk(user.mobile, key);

@@ -5,6 +5,7 @@ import { acceptServiceRequestAmendment } from '../services/serviceRequestService
 import { openCashfreeCheckout } from '../lib/cashfree.js';
 import { fmtINR } from '../lib/format.js';
 import { amendmentRows } from '../lib/amendmentTerms.js';
+import { userMessage } from '../lib/userMessage.js';
 
 export default function RevisedTerms({ request, onChanged }) {
   const { toast } = useToast();
@@ -25,7 +26,7 @@ export default function RevisedTerms({ request, onChanged }) {
       }
       onChanged();
     } catch (error) {
-      toast(error?.message || 'The revised terms could not be accepted. Please try again.', 'error');
+      toast(userMessage(error, 'The revised terms could not be accepted. Please try again.'), 'error');
     } finally {
       setBusy(false);
     }

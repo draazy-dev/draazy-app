@@ -24,6 +24,7 @@ import {
 } from '../../lib/browserAlerts.js';
 import { exportMyData, requestErasure, myErasureRequests } from '../../services/authService.js';
 import { myTenantProfile } from '../../services/rentService.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const Card = ({ children, className = '' }) => <div className={'glass-card rounded-2xl ' + className}>{children}</div>;
 const SectionHead = ({ icon, iconCls = 'text-teal-400', title, sub }) => (
@@ -160,7 +161,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       setForm((f) => ({ ...f, gender: '' }));
       toast('Profile saved', 'success');
     } catch (err) {
-      toast(err?.code === 'NAME_LOCKED_WHILE_VERIFIED' ? 'Name is locked while verified.' : err?.message || 'Could not save your profile. Please try again.', 'error');
+      toast(err?.code === 'NAME_LOCKED_WHILE_VERIFIED' ? 'Name is locked while verified.' : userMessage(err, 'Could not save your profile. Please try again.'), 'error');
     }
   };
 
@@ -179,7 +180,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       if (announce) toast('Preferences updated', 'success');
     } catch (err) {
       setPrefs(before);
-      toast(err?.message || 'Could not save that preference. Please try again.', 'error');
+      toast(userMessage(err, 'Could not save that preference. Please try again.'), 'error');
     }
   };
   const changeQuiet = (patch, announce = true) => changePrefs({ quietHours: { ...prefs.quietHours, ...patch } }, announce);
@@ -191,7 +192,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       await update(patch);
       toast('Privacy preference updated', 'success');
     } catch (err) {
-      toast(err?.message || 'Could not save that preference. Please try again.', 'error');
+      toast(userMessage(err, 'Could not save that preference. Please try again.'), 'error');
     }
   };
 
@@ -207,7 +208,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
         toast('Browser notifications disabled on this device', 'success');
       }
     } catch (err) {
-      toast(err?.message || 'Could not update browser notifications on this device.', 'error');
+      toast(userMessage(err, 'Could not update browser notifications on this device.'), 'error');
     } finally {
       setPermission(alertPermission());
       setAlertsOn(browserAlertsOn());
@@ -232,7 +233,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast('Your data has been downloaded', 'success');
     } catch (err) {
-      toast(err?.message || 'Could not prepare your data right now. Please try again.', 'error');
+      toast(userMessage(err, 'Could not prepare your data right now. Please try again.'), 'error');
     } finally {
       setExporting(false);
     }
@@ -248,7 +249,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       setDelOpen(false);
       toast('Your erasure request has been submitted for review', 'success');
     } catch (err) {
-      toast(err?.body?.error || err?.message || 'Could not submit your request right now. Please try again.', 'error');
+      toast(userMessage(err, 'Could not submit your request right now. Please try again.'), 'error');
     } finally {
       setErasing(false);
     }

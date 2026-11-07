@@ -242,6 +242,20 @@ class WhatsAppSendersTest {
     }
 
     @Test
+    @DisplayName("an agreement invite is deliverable only with a template and language, to a number that never replied STOP")
+    void agreementInviteDeliverable() {
+        assertThat(new WhatsAppDecisionMessenger(client, inviteProps("agreement_invite", "en_US"), calls, optOuts)
+                .agreementInviteDeliverable(MOBILE)).isTrue();
+        assertThat(new WhatsAppDecisionMessenger(client, inviteProps(" ", "en_US"), calls, optOuts)
+                .agreementInviteDeliverable(MOBILE)).isFalse();
+        assertThat(new WhatsAppDecisionMessenger(client, inviteProps("agreement_invite", ""), calls, optOuts)
+                .agreementInviteDeliverable(MOBILE)).isFalse();
+        when(optOuts.isOptedOut(MOBILE)).thenReturn(true);
+        assertThat(new WhatsAppDecisionMessenger(client, inviteProps("agreement_invite", "en_US"), calls, optOuts)
+                .agreementInviteDeliverable(MOBILE)).isFalse();
+    }
+
+    @Test
     @DisplayName("the agreement invite is skipped while its template is unset, or for a number that replied STOP")
     void agreementInviteSkipped() {
         assertThat(new WhatsAppDecisionMessenger(client, inviteProps(" ", "en_US"), calls, optOuts)

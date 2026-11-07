@@ -25,6 +25,7 @@ import BadgeRequestBanner from './review-modal/BadgeRequestBanner.jsx';
 import DecisionSection from './review-modal/DecisionSection.jsx';
 import ChecklistSection from './review-modal/ChecklistSection.jsx';
 import OpenSupportChat from '../../../components/admin/support-chat/OpenSupportChat.jsx';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const KIND_LABEL = { post: 'Seeker post', room: 'Room', group: 'Group' };
 const PUBLIC = ['approved', 'live'];
@@ -147,7 +148,7 @@ export default function FlatmateReviewModal({ entry, onClose, onChanged }) {
     let alive = true;
     getFlatmateModerationDetail(entry.key)
       .then((data) => { if (alive) setDetail({ status: 'ready', data, error: '' }); })
-      .catch((e) => { if (alive) setDetail({ status: 'error', data: null, error: e.message || 'Could not load this post.' }); });
+      .catch((e) => { if (alive) setDetail({ status: 'error', data: null, error: userMessage(e, 'Could not load this post.') }); });
     return () => { alive = false; };
   }, [entry.key, isApp, nonce]);
 
@@ -159,7 +160,7 @@ export default function FlatmateReviewModal({ entry, onClose, onChanged }) {
       onChanged();
       if (close) onClose(); else setNonce((n) => n + 1);
     } catch (e) {
-      toast(e.message || 'That decision was refused.', 'error');
+      toast(userMessage(e, 'That decision was refused.'), 'error');
     } finally {
       setBusy(false);
     }
@@ -179,7 +180,7 @@ export default function FlatmateReviewModal({ entry, onClose, onChanged }) {
     try {
       setDetail({ status: 'ready', data: await tickFlatmateChecklist(entry.key, item, pass), error: '' });
     } catch (e) {
-      toast(e.message || 'Could not save that check.', 'error');
+      toast(userMessage(e, 'Could not save that check.'), 'error');
     } finally {
       setBusy(false);
     }
@@ -209,7 +210,7 @@ export default function FlatmateReviewModal({ entry, onClose, onChanged }) {
       toast('Details updated', 'success');
       onChanged();
     } catch (e) {
-      toast(e.message || 'Could not save these changes.', 'error');
+      toast(userMessage(e, 'Could not save these changes.'), 'error');
     } finally {
       setBusy(false);
     }

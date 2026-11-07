@@ -8,6 +8,7 @@ import Modal from '../../components/ui/Modal.jsx';
 import {
   BTN, CHIP, CHIP_TONE, Chips, DATE_CHIPS, FactRow, PageNav, QueuePanel, RowCard, RowList,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const PAGE_SIZE = 20;
 const NOTE_MAX = 2000;
@@ -72,7 +73,7 @@ export default function AdminErasureRequests() {
     setData((prev) => (prev ? { ...prev, stale: true } : prev));
     load().catch((err) => {
       if (!alive) return;
-      setLoadError(err?.message || 'Could not load erasure requests');
+      setLoadError(userMessage(err, 'Could not load erasure requests'));
       setData({ items: [], total: 0, totalPages: 0 });
     });
     return () => { alive = false; };
@@ -89,7 +90,7 @@ export default function AdminErasureRequests() {
     try {
       await decideErasureRequest(decision.request.id, decision.action, note);
     } catch (err) {
-      setError(err?.message || 'That request could not be decided');
+      setError(userMessage(err, 'That request could not be decided'));
       load().catch(() => {});
       setBusy(false);
       return;
@@ -98,7 +99,7 @@ export default function AdminErasureRequests() {
     toast(reject ? 'Erasure request rejected' : 'Data erased', 'success');
     setDecision(null);
     setNote('');
-    load().catch((err) => setLoadError(err?.message || 'Could not load erasure requests'));
+    load().catch((err) => setLoadError(userMessage(err, 'Could not load erasure requests')));
   };
 
   if (!data) return <Loading />;

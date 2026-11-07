@@ -7,6 +7,7 @@ import { useAdminFlags } from '../../context/AdminFlagsContext.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Loading from '../../components/ui/Loading.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const TYPE = 'faqs';
 
@@ -30,7 +31,7 @@ export default function AdminContent() {
       setLoaded((l) => ({ ...l, [archived ? 'archived' : 'live']: true }));
     }).catch((err) => {
       asked.current.delete(archived);
-      toast(err?.message || `Could not load ${archived ? 'archived ' : ''}FAQs.`, 'error');
+      toast(userMessage(err, `Could not load ${archived ? 'archived ' : ''}FAQs.`), 'error');
     });
   };
 
@@ -70,7 +71,7 @@ export default function AdminContent() {
       toast('Saved');
       closeMod();
     } catch (err) {
-      toast(err?.message || 'Could not save. Please try again.', 'error');
+      toast(userMessage(err, 'Could not save. Please try again.'), 'error');
     } finally {
       setSaving(false);
     }

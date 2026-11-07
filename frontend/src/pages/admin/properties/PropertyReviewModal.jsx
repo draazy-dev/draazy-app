@@ -34,6 +34,7 @@ import { OWNERSHIP_REVIEW_ITEM, seeksOwnershipBadge } from '../../../lib/recheck
 import { SubmittedPhotos, SubmittedDescription, SubmittedLocation } from './review-modal/SubmittedContent.jsx';
 import ReraCheckRow, { RERA_REVIEW_ITEM } from './review-modal/ReraCheckRow.jsx';
 import { hasPermission } from '../../../lib/adminModules.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const pid = (listing) => listing?.uuid || listing?.id;
 
@@ -116,7 +117,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
         setThread(caseFile);
       } catch (err) {
         if (cancelled) return;
-        toast(err?.message || 'Could not open the verification case file', 'error');
+        toast(userMessage(err, 'Could not open the verification case file'), 'error');
         setThread(null);
         setThreadError(err);
       }
@@ -214,7 +215,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     try {
       setThread(await setPropertyReviewChecklistItem(pid(review), item, pass));
     } catch (err) {
-      toast(err?.message || 'Could not update the checklist', 'error');
+      toast(userMessage(err, 'Could not update the checklist'), 'error');
     }
   };
 
@@ -226,7 +227,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     try {
       setThread(await recordPropertyReraCheck(pid(review), result));
     } catch (err) {
-      toast(err?.message || 'Could not save the RERA check', 'error');
+      toast(userMessage(err, 'Could not save the RERA check'), 'error');
     }
   };
 
@@ -251,7 +252,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       try { await reloadCase(); } catch { onRefresh?.(); }
       return;
     }
-    toast(err?.message || fallback, 'error');
+    toast(userMessage(err, fallback), 'error');
   };
 
   const reviewApprove = async () => {
@@ -332,7 +333,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       toast('Owner edits approved \u2014 re-review cleared', 'success');
       onRefresh();
     } catch (err) {
-      toast(err?.message || 'Could not clear the re-review', 'error');
+      toast(userMessage(err, 'Could not clear the re-review'), 'error');
     } finally {
       setBusy(false);
     }
@@ -370,7 +371,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       onRefresh();
     } catch (err) {
       if (handoff) handoff.close();
-      toast(err?.message || 'Could not write this chaser', 'error');
+      toast(userMessage(err, 'Could not write this chaser'), 'error');
     } finally {
       setBusy(false);
     }
@@ -382,7 +383,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       setOutreach((rows) => rows.map((row) => (row.id === entry.id ? entry : row)));
       onRefresh();
     } catch (err) {
-      toast(err?.message || 'Could not mark this chaser as sent', 'error');
+      toast(userMessage(err, 'Could not mark this chaser as sent'), 'error');
     }
   };
 

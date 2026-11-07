@@ -1,4 +1,5 @@
 import { ADDRESS_PARTS, canStateBuyerEligibility, pickListingFormDetails } from '../../../lib/listingFormDetails.js';
+import { UserError } from '../../../lib/userMessage.js';
 
 const FIELD_INPUTS = {
   title: ['title', 'bhk', 'propertyType', 'commercialType', 'locality'],
@@ -25,7 +26,7 @@ const same = (a, b) => (Array.isArray(a) && Array.isArray(b)
 export function editPayload(payload, form, original) {
   const before = original.form;
   if (before.builtUp && !form.builtUp) {
-    throw new Error('Enter a built-up area. A previously saved measurement cannot be cleared here.');
+    throw new UserError('Enter a built-up area. A previously saved measurement cannot be cleared here.');
   }
   const fields = Object.fromEntries(Object.entries(FIELD_INPUTS)
     .filter(([, inputs]) => inputs.some((key) => !same(form[key], before[key])))

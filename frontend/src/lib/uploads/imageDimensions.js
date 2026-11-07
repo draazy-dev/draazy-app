@@ -1,3 +1,4 @@
+import { UserError } from '../userError.js';
 export const MAX_IMAGE_PIXELS = 48_000_000;
 
 function heifSizes(view, start, end, depth = 0) {
@@ -70,5 +71,5 @@ export async function checkImageDimensions(file, type) {
       : type === 'image/webp' ? webpSize(view)
         : heifSizes(view, 0, buffer.byteLength);
   if (!sizes.length || sizes.some(([width, height]) => !width || !height)) throw new Error('Invalid image dimensions.');
-  if (sizes.some(([width, height]) => width * height > MAX_IMAGE_PIXELS)) throw new Error('Choose an image no larger than 48 megapixels.');
+  if (sizes.some(([width, height]) => width * height > MAX_IMAGE_PIXELS)) throw new UserError('Choose an image no larger than 48 megapixels.');
 }

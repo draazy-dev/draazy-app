@@ -1,3 +1,4 @@
+import { userMessage } from '../../../lib/userMessage.js';
 export const DOC_LABELS = {
   aadhaar: 'Aadhaar',
   pan: 'PAN',
@@ -59,7 +60,7 @@ export const reasonLabel = (value) => REJECTION_LABELS[value] || String(value ||
 export const dateLabel = (value) => (value ? new Date(value).toLocaleString() : '—');
 export const sameId = (a, b) => Boolean(a && b && String(a) === String(b));
 export const errorCode = (error) => String(error?.code || '').toLowerCase();
-export const errorMessage = (error, fallback) => ERROR_MESSAGES[errorCode(error)] || error?.message || fallback;
+export const errorMessage = (error, fallback) => ERROR_MESSAGES[errorCode(error)] || userMessage(error, fallback);
 
 export function normalizedName(value) {
   return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();

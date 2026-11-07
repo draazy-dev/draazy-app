@@ -5,6 +5,7 @@ import { useAppFlags } from '../../../context/AppFlagsContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { useTapPop } from '../../../lib/useTapPop.js';
 import { openFlatmateRequestConversation } from '../../../services/conversationService.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const ASK_TOAST = { declined: 'flatmates.askDeclinedToast', accepted: 'flatmates.askAcceptedToast' };
 
@@ -22,7 +23,7 @@ export default function RoomAskButton({ ask, onAsk, className }) {
         const conv = await openFlatmateRequestConversation(ask.id);
         navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
       } catch (err) {
-        toast(err?.message || t('common.somethingWentWrong'), 'error');
+        toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       }
     };
     return <button type="button" onClick={openChat} data-testid="room-chat-owner" className={'room-exp-btn btn-teal text-white ' + base}><Icon name="message-circle" className="w-4 h-4 shrink-0" /> <span className="truncate">{t('flatmates.messageOwner')}</span></button>;

@@ -12,6 +12,7 @@ import {
   STEPS, LAST_STEP, INITIAL_FORM, NONRES_TYPES, LAND_TYPES, DRAFT_KEY, commercialLabelOf, landUseFor,
 } from './post-on-behalf/constants.js';
 import { OwnerStep, PropertyStep, LocationStep, PricingStep, PhotosStep, ReviewStep } from './post-on-behalf/WizardSteps.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 function loadDraft() {
   try {
@@ -191,7 +192,7 @@ export default function AdminPostOnBehalf() {
       setClaimMessage({ id: prepared.id, sent: false });
     } catch (err) {
       if (handoff) handoff.close();
-      toast(err?.message || 'Could not prepare the claim link', 'error');
+      toast(userMessage(err, 'Could not prepare the claim link'), 'error');
     }
   };
 
@@ -200,7 +201,7 @@ export default function AdminPostOnBehalf() {
       await markOutreachSent(createdListing.uuid || createdListing.id, claimMessage.id);
       setClaimMessage({ ...claimMessage, sent: true });
     } catch (err) {
-      toast(err?.message || 'Could not mark the claim link as sent', 'error');
+      toast(userMessage(err, 'Could not mark the claim link as sent'), 'error');
     }
   };
 

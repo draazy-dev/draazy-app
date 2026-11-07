@@ -1,4 +1,5 @@
 import { AREA_UNITS } from './constants.js';
+import { UserError, userMessage } from '../../../../lib/userMessage.js';
 
 export const readFileAsDataURL = async (file) => {
   if (!file) return null;
@@ -8,12 +9,12 @@ export const readFileAsDataURL = async (file) => {
     const dataUrl = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error('Could not read the file. Please try again.'));
+      reader.onerror = () => reject(new UserError('Could not read the file. Please try again.'));
       reader.readAsDataURL(prepared);
     });
     return { fileName: prepared.name, dataUrl, mime: prepared.type, size: prepared.size };
   } catch (e) {
-    return { fileName: file.name, error: e?.message || 'Could not prepare this file.' };
+    return { fileName: file.name, error: userMessage(e, 'Could not prepare this file.') };
   }
 };
 

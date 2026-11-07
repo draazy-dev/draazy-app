@@ -125,6 +125,7 @@ export function toViewModel(dto) {
       mobile: p?.mobile || null,
       pending: !!p?.pending,
       invitedBy: p?.invitedBy || '',
+      whatsappQueued: p?.whatsappQueued === true,
       createdAt: epoch(p?.createdAt),
     })),
     assignedTo: dto.assignee || null,

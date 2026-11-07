@@ -14,6 +14,7 @@ import Loading from '../../components/ui/Loading.jsx';
 import {
   BTN, CHIP, CHIP_TONE, Cell, Chips, DATE_CHIPS, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const PAGE_SIZE = 20;
 const TABS = [
@@ -157,7 +158,7 @@ export default function OpsRefunds() {
       })
       .catch((e) => {
         if (!live) return;
-        setState({ status: 'error', items: [], total: 0, error: e.message || 'Could not read the queue.' });
+        setState({ status: 'error', items: [], total: 0, error: userMessage(e, 'Could not read the queue.') });
         setReloading(false);
       });
     return () => { live = false; };
@@ -191,7 +192,7 @@ export default function OpsRefunds() {
     } catch (e) {
       if (e.status === 409) toast('Already decided or under dispute', 'error');
       else if (e.code === 'refund_not_eligible') toast('The facts changed since the request, so it can no longer be refunded.', 'error');
-      else toast(e.message || 'That decision was refused.', 'error');
+      else toast(userMessage(e, 'That decision was refused.'), 'error');
       if (e.status === 409 || e.code === 'refund_not_eligible') {
         setRejecting(null);
         setApproving(null);

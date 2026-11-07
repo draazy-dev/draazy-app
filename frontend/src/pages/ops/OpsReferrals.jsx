@@ -11,6 +11,7 @@ import Loading from '../../components/ui/Loading.jsx';
 import {
   BTN, CHIP, CHIP_TONE, Chips, DATE_CHIPS, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const RISK_TONE = { high: CHIP_TONE.red, medium: CHIP_TONE.amber, low: CHIP_TONE.green };
 const fmtDate = (ms) => (ms ? new Date(ms).toLocaleDateString('en-IN') : '—');
@@ -103,7 +104,7 @@ export default function OpsReferrals() {
       })
       .catch((e) => {
         if (!live) return;
-        setState({ status: 'error', items: [], total: 0, error: e.message || 'Could not read the queue.' });
+        setState({ status: 'error', items: [], total: 0, error: userMessage(e, 'Could not read the queue.') });
         setReloading(false);
       });
     return () => { live = false; };
@@ -145,7 +146,7 @@ export default function OpsReferrals() {
       }));
       setCounts((c) => shiftCounts(c, r, decided));
     } catch (e) {
-      toast(e.message || 'That decision was refused.', 'error');
+      toast(userMessage(e, 'That decision was refused.'), 'error');
     } finally {
       busy.current = false;
       setBusyId(null);

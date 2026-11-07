@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from './Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -92,6 +92,14 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
   const [showCancelled, setShowCancelled] = useState(false);
   const [armed, setArmed] = useState(null);
   const [busy, setBusy] = useState(null);
+  // A ref, not `busy`: a second tap can land before the re-render that disables the button.
+  const inFlight = useRef(false);
+  const once = async (id, fn) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(id);
+    try { await fn(); } finally { inFlight.current = false; setBusy(null); }
+  };
   const refresh = () => setTick((t) => t + 1);
 
   useScrollLock(Boolean(changeReq));
@@ -127,7 +135,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
     } catch (e) { console.warn('[service-tracker] draft-opened failed', e); }
   };
   const openFinal = (r) => openRequestFile(r.id, r.finalDoc?.id);
-  const approve = async (r) => {
+  const approve = (r) => once(r.id, async () => {
     try {
       const after = await decideServiceRequestDraft(r.id, 'accepted');
       refresh();
@@ -135,67 +143,71 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
         ? 'You approved the draft — waiting for the other party.'
         : 'Draft approved — we\'ll proceed with registration.', 'success');
     } catch (e) { console.warn('[service-tracker] approve failed', e); toast('Could not approve the draft. Please try again.', 'error'); }
-  };
-  const sendPartyOtp = async (r, party) => {
+  });
+  const sendPartyOtp = (r, party) => once(r.id, async () => {
     try {
       await approveServiceRequestDraftParty(r.id, party.key);
       toast(`Code sent to ${party.mobile || party.label}.`, 'success');
     } catch (e) { console.warn('[service-tracker] draft party otp send failed', e); toast('Could not send the code. Please try again.', 'error'); }
-  };
-  const verifyPartyOtp = async (r, party) => {
+  });
+  const verifyPartyOtp = (r, party) => {
     const key = `${r.id}:${party.key}`;
     const otp = (otpDraft[key] || '').trim();
-    if (otp.length !== 6) return;
-    try {
-      await approveServiceRequestDraftParty(r.id, party.key, otp);
-      setOtpDraft((prev) => ({ ...prev, [key]: '' }));
-      refresh();
-      toast(`${party.label} approved this draft.`, 'success');
-    } catch (e) { console.warn('[service-tracker] draft party otp verify failed', e); toast('The code was not accepted. Please try again.', 'error'); }
+    if (otp.length !== 6) return undefined;
+    return once(r.id, async () => {
+      try {
+        await approveServiceRequestDraftParty(r.id, party.key, otp);
+        setOtpDraft((prev) => ({ ...prev, [key]: '' }));
+        refresh();
+        toast(`${party.label} approved this draft.`, 'success');
+      } catch (e) { console.warn('[service-tracker] draft party otp verify failed', e); toast('The code was not accepted. Please try again.', 'error'); }
+    });
   };
   const requestChanges = (r) => { setChangeNote(''); setChangeReq(r); };
-  const submitChanges = async () => {
+  const submitChanges = () => {
     const note = changeNote.trim();
-    if (!note || !changeReq) return;
-    try {
-      await decideServiceRequestDraft(changeReq.id, 'changes', note);
-      setChangeReq(null);
-      refresh();
-      toast('Change request sent to our team.', 'success');
-    } catch (e) { console.warn('[service-tracker] request-changes failed', e); toast('Could not send the change request. Please try again.', 'error'); }
+    if (!note || !changeReq) return undefined;
+    return once(changeReq.id, async () => {
+      try {
+        await decideServiceRequestDraft(changeReq.id, 'changes', note);
+        setChangeReq(null);
+        refresh();
+        toast('Change request sent to our team.', 'success');
+      } catch (e) { console.warn('[service-tracker] request-changes failed', e); toast('Could not send the change request. Please try again.', 'error'); }
+    });
   };
-  const cancelUnpaid = async (r) => {
-    if (busy) return;
-    if (armed !== r.id) { setArmed(r.id); return; }
-    setBusy(r.id);
-    try {
-      await cancelServiceRequest(r.id);
-      toast('Request cancelled.', 'success');
-      onCancelled?.(r.id);
-    } catch (e) {
-      console.warn('[service-tracker] cancel failed', e);
-      toast('Could not cancel this request. Please try again.', 'error');
-    } finally {
-      setBusy(null);
-      setArmed(null);
-      refresh();
-    }
+  const cancelUnpaid = (r) => {
+    if (inFlight.current) return undefined;
+    if (armed !== r.id) { setArmed(r.id); return undefined; }
+    return once(r.id, async () => {
+      try {
+        await cancelServiceRequest(r.id);
+        toast('Request cancelled.', 'success');
+        onCancelled?.(r.id);
+      } catch (e) {
+        console.warn('[service-tracker] cancel failed', e);
+        toast('Could not cancel this request. Please try again.', 'error');
+      } finally {
+        setArmed(null);
+        refresh();
+      }
+    });
   };
-  const deleteCancelled = async (r) => {
-    if (busy) return;
-    if (armed !== r.id) { setArmed(r.id); return; }
-    setBusy(r.id);
-    try {
-      await deleteServiceRequest(r.id);
-      setRequests((prev) => prev.filter((x) => x.id !== r.id));
-      toast('Request deleted.', 'success');
-    } catch (e) {
-      console.warn('[service-tracker] delete failed', e);
-      toast('Could not delete this request. Please try again.', 'error');
-    } finally {
-      setBusy(null);
-      setArmed(null);
-    }
+  const deleteCancelled = (r) => {
+    if (inFlight.current) return undefined;
+    if (armed !== r.id) { setArmed(r.id); return undefined; }
+    return once(r.id, async () => {
+      try {
+        await deleteServiceRequest(r.id);
+        setRequests((prev) => prev.filter((x) => x.id !== r.id));
+        toast('Request deleted.', 'success');
+      } catch (e) {
+        console.warn('[service-tracker] delete failed', e);
+        toast('Could not delete this request. Please try again.', 'error');
+      } finally {
+        setArmed(null);
+      }
+    });
   };
 
   if (!isIn) return null;
@@ -253,9 +265,9 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
                               <span>{party.label}{party.mobile ? ` · ${party.mobile}` : ''} — {party.approved ? 'approved' : party.opened ? 'opened' : 'pending'}</span>
                               {!party.approved && party.method === 'otp' && !r.myPartyId ? (
                                 <span className="flex gap-2">
-                                  <button type="button" onClick={() => sendPartyOtp(r, party)} className="btn-outline px-2 py-1 text-[11px]">Send code</button>
+                                  <button type="button" onClick={() => sendPartyOtp(r, party)} disabled={busy != null} className="btn-outline px-2 py-1 text-[11px] disabled:opacity-50">Send code</button>
                                   <input value={otpDraft[key] || ''} onChange={(e) => setOtpDraft((prev) => ({ ...prev, [key]: e.target.value.replace(/\D/g, '').slice(0, 6) }))} inputMode="numeric" maxLength={6} aria-label={`OTP for ${party.label}`} className="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-white" placeholder="OTP" />
-                                  <button type="button" onClick={() => verifyPartyOtp(r, party)} disabled={(otpDraft[key] || '').length !== 6} className="btn-teal px-2 py-1 text-[11px] disabled:opacity-50">Verify</button>
+                                  <button type="button" onClick={() => verifyPartyOtp(r, party)} disabled={busy != null || (otpDraft[key] || '').length !== 6} className="btn-teal px-2 py-1 text-[11px] disabled:opacity-50">Verify</button>
                                 </span>
                               ) : null}
                             </li>
@@ -280,7 +292,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
                         {draft.approved ? (
                           <button type="button" disabled data-testid="tracker-approved" className="btn-teal"><Icon name="check-circle-2" className="w-3.5 h-3.5" /> Approved</button>
                         ) : (
-                          <button type="button" onClick={() => approve(r)} disabled={!draft.opened} title={draft.opened ? undefined : 'Open the draft first'} className="btn-teal"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>
+                          <button type="button" onClick={() => approve(r)} disabled={!draft.opened || busy != null} title={draft.opened ? undefined : 'Open the draft first'} className="btn-teal"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>
                         )}
                         {draft.approved ? null : (
                           <button type="button" onClick={() => requestChanges(r)} className="btn-outline"><Icon name="rotate-ccw" className="w-3.5 h-3.5" /> Request changes</button>
@@ -291,12 +303,12 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
                       <button type="button" onClick={() => openFinal(r)} className="btn-teal btn-row-full"><Icon name="download" className="w-3.5 h-3.5" /> Download registered copy</button>
                     ) : null}
                     {r.cancellable ? (
-                      <button type="button" onClick={() => cancelUnpaid(r)} disabled={busy === r.id} data-testid="tracker-cancel-unpaid" className="btn-outline text-rose-300">
+                      <button type="button" onClick={() => cancelUnpaid(r)} disabled={busy != null} data-testid="tracker-cancel-unpaid" className="btn-outline text-rose-300">
                         <Icon name="x" className="w-3.5 h-3.5" /> {armed === r.id ? 'Tap again to cancel' : 'Cancel request'}
                       </button>
                     ) : null}
                     {r.status === 'cancelled' ? (
-                      <button type="button" onClick={() => deleteCancelled(r)} disabled={busy === r.id} data-testid="tracker-delete" className="btn-outline text-rose-300">
+                      <button type="button" onClick={() => deleteCancelled(r)} disabled={busy != null} data-testid="tracker-delete" className="btn-outline text-rose-300">
                         <Icon name="trash-2" className="w-3.5 h-3.5" /> {armed === r.id ? 'Tap again to delete' : 'Delete'}
                       </button>
                     ) : null}
@@ -340,7 +352,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
             <textarea autoFocus value={changeNote} onChange={(e) => setChangeNote(e.target.value)} rows={4} className="w-full px-4 py-3 rounded-xl text-white text-sm resize-none border border-white/10 bg-white/[0.03] focus:border-brand-teal-2 outline-none mb-4" placeholder="e.g. Please correct the monthly rent to ₹32,000 and set the lock-in to 6 months." />
             <div className="flex gap-2">
               <button type="button" onClick={() => setChangeReq(null)} className="btn-outline flex-1 py-2.5 rounded-xl text-gray-200 text-sm font-semibold">Cancel</button>
-              <button type="button" onClick={submitChanges} disabled={!changeNote.trim()} className="btn-teal flex-1 py-2.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="rotate-ccw" className="w-4 h-4" /> Send request</button>
+              <button type="button" onClick={submitChanges} disabled={!changeNote.trim() || busy != null} className="btn-teal flex-1 py-2.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="rotate-ccw" className="w-4 h-4" /> Send request</button>
             </div>
           </div>
         </div>

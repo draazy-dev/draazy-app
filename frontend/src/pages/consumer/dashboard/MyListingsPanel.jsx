@@ -31,6 +31,7 @@ import ConfirmModal from '../../../components/ui/ConfirmModal.jsx';
 import VerifyListingsBanner from './myListings/VerifyListingsBanner.jsx';
 import SplitFlatModal from '../flatmates/SplitFlatModal.jsx';
 import { useFlatmateEditing } from './myListings/useFlatmateEditing.jsx';
+import { UserError, userMessage } from '../../../lib/userMessage.js';
 
 const rowKey = (l) => `${l.flatmateGroup ? 'group' : l.flatmatePost ? 'post' : l.flatmate ? 'room' : 'property'}:${l.uuid || l.id}`;
 
@@ -165,7 +166,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       toast(`${l.title} marked as Under Offer`, 'success');
       await reloadRow(l);
     } catch (err) {
-      toast(err?.body?.error || err?.message || 'Could not mark under offer', 'error');
+      toast(userMessage(err, 'Could not mark under offer'), 'error');
     }
   };
 
@@ -180,7 +181,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
         note: `Closed with ${dealForm.buyerName} on ${dealForm.date}`,
       });
     } catch (err) {
-      toast(err?.body?.error || err?.message || 'Could not finalize the deal', 'error');
+      toast(userMessage(err, 'Could not finalize the deal'), 'error');
       return;
     }
     toast(isSale ? `${l.title} finalized as Sold!` : t('dash.tenancy.ownerClosedToast', { title: l.title }), 'success');
@@ -193,7 +194,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     try {
       await reopenDeal(dealIdOf(l), availableOn);
     } catch (err) {
-      toast(err?.body?.error || err?.message || 'Could not reopen the listing', 'error');
+      toast(userMessage(err, 'Could not reopen the listing'), 'error');
       return false;
     }
     toast(`${l.title} reopened for listing`, 'success');
@@ -235,7 +236,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     try {
       created = await splitProperty(splitTarget?.uuid || splitTarget?.id, { maxOccupants, rooms });
     } catch (err) {
-      toast(err?.body?.error || err?.message || 'Could not list the rooms — please check the details.', 'error');
+      toast(userMessage(err, 'Could not list the rooms — please check the details.'), 'error');
       return;
     }
     setSplitTarget(null);
@@ -257,7 +258,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       toast(
         err?.status === 409
           ? 'Someone has already moved in, so these rooms can\'t be withdrawn.'
-          : err?.body?.error || err?.message || 'Could not withdraw these rooms',
+          : userMessage(err, 'Could not withdraw these rooms'),
         'error',
       );
       return;
@@ -283,7 +284,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       setQuotaTick((n) => n + 1);
       toast(t('listingLifecycle.pauseToast', { title: l.title }), 'info');
     } catch (err) {
-      toast(err?.body?.message || err?.message || t('listingLifecycle.pauseError'), 'error');
+      toast(userMessage(err, t('listingLifecycle.pauseError')), 'error');
     }
   };
 
@@ -293,7 +294,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       toast(`"${l.title}" is back on the board for 30 days`, 'success');
       await onChanged?.();
     } catch (err) {
-      toast(err?.body?.message || err?.message || 'Could not renew this post', 'error');
+      toast(userMessage(err, 'Could not renew this post'), 'error');
     }
   };
 
@@ -305,10 +306,10 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       setQuotaTick((n) => n + 1);
     } catch (err) {
       if (err?.code === 'listing_quota_exhausted') {
-        setResumeBlock({ id: l.uuid || l.id, deal: l.deal, message: err.message });
+        setResumeBlock({ id: l.uuid || l.id, deal: l.deal, message: userMessage(err, t('listingLifecycle.resumeError')) });
         return;
       }
-      toast(err?.body?.message || err?.message || t('listingLifecycle.resumeError'), 'error');
+      toast(userMessage(err, t('listingLifecycle.resumeError')), 'error');
     }
   };
 
@@ -333,11 +334,11 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     }
     try {
       const created = await ensureManagedForListing(l);
-      if (!created?.id) throw new Error('Could not open property tools for this listing.');
+      if (!created?.id) throw new UserError('Could not open property tools for this listing.');
       await onManagedChanged?.();
       navigate(`/owner-hub/property/${created.id}`);
     } catch (err) {
-      toast(err?.message || 'Could not open property tools. Please try again.', 'error');
+      toast(userMessage(err, 'Could not open property tools. Please try again.'), 'error');
     }
   };
 
@@ -373,7 +374,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       else if (l.flatmate) await deleteRoom(l.id);
       else await takeListingDown(l.uuid || l.id, user);
     } catch (e) {
-      toast(e?.message || `Could not take ${l.title} down. Please try again.`, 'error');
+      toast(userMessage(e, `Could not take ${l.title} down. Please try again.`), 'error');
       return;
     }
 

@@ -69,4 +69,13 @@ public record ServiceRequestDto(
                 sla, amendment, draftApproval, charges, attention, cancellable, editableByMe,
                 mySideSubmitted, myPartyId, payableByMe, paidBy);
     }
+
+    ServiceRequestDto withWhatsappQueued(String partyId, Boolean queued) {
+        List<ServiceRequestPartyDto> marked = parties == null ? null : parties.stream()
+                .map(p -> p.id().equals(partyId) ? p.withWhatsappQueued(queued) : p).toList();
+        return new ServiceRequestDto(id, type, team, status, propertyId, ticketId, details, assignee,
+                assignedToMe, timeline, documents, messages, marked, createdAt, amount, paymentSessionId,
+                registration, sla, amendment, draftApproval, charges, attention, cancellable, editableByMe,
+                mySideSubmitted, myPartyId, payableByMe, paidBy);
+    }
 }

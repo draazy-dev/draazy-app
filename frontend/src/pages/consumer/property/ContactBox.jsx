@@ -13,6 +13,7 @@ import { useEntitlements, contactsLeft, freeContactsTill } from './useEntitlemen
 import { track, captureLead } from '../../../lib/pmf.js';
 import { dialableMobile, telHref } from './contactPhone.js';
 import { propertyKey } from '../../../lib/listingSeo.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export function ContactBox({ p, isIn, toast }) {
   const { t } = useTranslation();
@@ -53,7 +54,7 @@ export function ContactBox({ p, isIn, toast }) {
       if (err?.code === 'verification_required') setVerifyOpen(true);
       else if (err?.code === 'contact_quota_exhausted') setQuotaOpen(true);
       else if (err?.code === 'contact_pending_limit') toast(t('property.contactPendingLimit'), 'info');
-      else if (err?.code === 'recently_withdrawn') toast(err.message || t('property.recentlyWithdrawn'), 'info');
+      else if (err?.code === 'recently_withdrawn') toast(userMessage(err, t('property.recentlyWithdrawn')), 'info');
       else if (err?.code === 'listing_not_live') toast(t('property.listingNotLive'), 'info');
       else if (err?.code === 'own_listing') toast(t('property.ownListing'), 'info');
       else if (err?.status === 401) sendToSignIn('contact', back, () => latestRequest.current());

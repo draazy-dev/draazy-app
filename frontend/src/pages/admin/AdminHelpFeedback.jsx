@@ -6,6 +6,7 @@ import Loading from '../../components/ui/Loading.jsx';
 import {
   BTN, CHIP, CHIP_TONE, Chips, ClearFilters, DATE_CHIPS, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const PAGE_SIZE = 20;
 const TABS = [{ key: 'articles', label: 'Articles' }, { key: 'comments', label: 'Comments' }];
@@ -71,7 +72,7 @@ export default function AdminHelpFeedback() {
     const read = tab === 'articles' ? listHelpFeedbackArticles(query) : listHelpFeedbackComments({ ...query, slug });
     read
       .then((res) => { if (alive) { setFailed(''); setData({ ...res, tab }); } })
-      .catch((err) => { if (alive) { setFailed(err?.message || 'Could not load help feedback'); setData({ ...EMPTY, tab }); } });
+      .catch((err) => { if (alive) { setFailed(userMessage(err, 'Could not load help feedback')); setData({ ...EMPTY, tab }); } });
     return () => { alive = false; };
   }, [tab, slug, days, page]);
 

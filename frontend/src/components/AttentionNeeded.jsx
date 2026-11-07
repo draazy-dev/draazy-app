@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Icon from './Icon.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { addServiceRequestDoc, resolveServiceRequestAttention } from '../services/serviceRequestService.js';
+import { userMessage } from '../lib/userMessage.js';
 
 const NOTE_MAX = 500;
 
@@ -30,7 +31,7 @@ export default function AttentionNeeded({ request, onChanged }) {
       setSent((prev) => [...prev, paper.id]);
       toast(`${paper.name} uploaded.`, 'success');
     } catch (error) {
-      toast(error?.message || 'The upload failed. Please try again.', 'error');
+      toast(userMessage(error, 'The upload failed. Please try again.'), 'error');
     } finally {
       setUploading('');
     }
@@ -45,7 +46,7 @@ export default function AttentionNeeded({ request, onChanged }) {
       setNote('');
       onChanged();
     } catch (error) {
-      toast(error?.message || 'That did not go through. Please try again.', 'error');
+      toast(userMessage(error, 'That did not go through. Please try again.'), 'error');
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,5 @@
 import { createProvider } from './config.js';
+import { userMessage } from '../lib/userMessage.js';
 
 const provider = createProvider('review');
 
@@ -26,7 +27,7 @@ export const deleteReview = async (id) => (await provider()).deleteReview(id);
 
 export const reviewRefusal = (err, t) => {
   if (err?.code === 'already_reviewed') return t('common.alreadyReviewed');
-  if (err?.code === 'review_not_eligible' && err.message) return err.message;
+  if (err?.code === 'review_not_eligible') return userMessage(err, '') || null;
   return null;
 };
 

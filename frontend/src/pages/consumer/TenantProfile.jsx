@@ -11,6 +11,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 
 import { myTenantProfile, saveTenantProfile } from '../../services/rentService.js';
 import { useVerification } from '../../context/VerificationContext.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const ABOUT_MAX = 2000;
@@ -93,7 +94,7 @@ export default function TenantProfile() {
       toast(
         first === 'about' ? t('misc.tpAboutTooLong', { max: ABOUT_MAX })
           : labelKey ? t('misc.tpFieldInvalid', { field: t(labelKey) })
-            : err?.message || t('misc.tpProfileSaveFailed'),
+            : userMessage(err, t('misc.tpProfileSaveFailed')),
         'error',
       );
       return false;

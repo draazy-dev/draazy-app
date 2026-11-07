@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { readAgreementDoc } from './helpers.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export default function AgreementUpload({ doc, onChange, ariaLabel, category, cta }) {
   const { t } = useTranslation();
@@ -13,7 +14,7 @@ export default function AgreementUpload({ doc, onChange, ariaLabel, category, ct
     onChange({ name: file.name, uploading: true });
     readAgreementDoc(file, category).then(onChange).catch((error) => {
       onChange(null);
-      toast(error?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(error, t('common.somethingWentWrong')), 'error');
     });
   };
   return (

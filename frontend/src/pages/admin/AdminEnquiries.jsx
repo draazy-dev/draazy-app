@@ -17,6 +17,7 @@ import {
 } from '../../components/admin/WorkQueue.jsx';
 import FunnelView from './enquiries/FunnelView.jsx';
 import { ENQUIRY_STATUS_OPTS, VISIT_STATUS_OPTS, DEAL_STATUS_OPTS, DEAL_TYPE_OPTS, AWAITING_STATUSES } from './enquiries/constants.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const fmtWhen = (v) => {
   if (!v) return '\u2014';
@@ -66,7 +67,7 @@ export default function AdminEnquiries() {
     setStale(true);
     LISTERS[tab]({ status: statusF, deal: tab === 'deals' ? typeF : '', q: qLive, days: dateRange, page: page - 1, size: PAGE_SIZE })
       .then((res) => { if (ticket === latest.current) { setList(res); setStale(false); } })
-      .catch((e) => { if (ticket === latest.current) { setStale(false); setList((cur) => cur || { items: [], total: 0 }); toast(e?.message || 'Could not load the board', 'error'); } });
+      .catch((e) => { if (ticket === latest.current) { setStale(false); setList((cur) => cur || { items: [], total: 0 }); toast(userMessage(e, 'Could not load the board'), 'error'); } });
     return () => { latest.current += 1; };
   }, [tab, statusF, typeF, qLive, dateRange, page, toast]);
 
@@ -74,7 +75,7 @@ export default function AdminEnquiries() {
     let live = true;
     getEnquirySummary({ days: funnelTime })
       .then((s) => { if (live) setSummary(s); })
-      .catch((e) => toast(e?.message || 'Could not load the board totals', 'error'));
+      .catch((e) => toast(userMessage(e, 'Could not load the board totals'), 'error'));
     return () => { live = false; };
   }, [funnelTime, toast]);
 
@@ -83,7 +84,7 @@ export default function AdminEnquiries() {
       await addNote('listing', r.propertyId, `Responded to enquiry from ${r.customer}.`, 'responded');
       toast('Note added to the listing');
     } catch (e) {
-      toast(e?.message || 'Could not add the note', 'error');
+      toast(userMessage(e, 'Could not add the note'), 'error');
     }
   };
 
@@ -94,7 +95,7 @@ export default function AdminEnquiries() {
       const full = await fetcher(r.id);
       setDetail((d) => (d && d.id === full.id ? { ...d, ...full } : d));
     } catch (e) {
-      toast(e?.message || 'Could not load the latest details', 'error');
+      toast(userMessage(e, 'Could not load the latest details'), 'error');
     }
   };
 
@@ -127,7 +128,7 @@ export default function AdminEnquiries() {
       else if (tab === 'visits') exportCsv('draazy-visits.csv', ['ID', 'Listing', 'Customer', 'Mobile', 'When', 'Status'], all.map((r) => [r.id, r.listing, r.customer, r.mobile, r.when || fmtWhen(r.slot), r.status]));
       else exportCsv('draazy-enquiries.csv', ['ID', 'Listing', 'Customer', 'Mobile', 'Locality', 'Date', 'Status'], all.map((r) => [r.id, r.listing, r.customer, r.mobile, r.locality, fmtWhen(r.at), r.status]));
     } catch (e) {
-      toast(e?.message || 'Could not export the board', 'error');
+      toast(userMessage(e, 'Could not export the board'), 'error');
     }
   };
 

@@ -12,6 +12,7 @@ import {
 } from './editForm.js';
 import { SubmittedPhotos } from './review-modal/SubmittedContent.jsx';
 import { getModerationProperty } from '../../../services/propertyService.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const TABS = [['basics', 'Basics'], ['details', 'Details'], ['location', 'Location'], ['pricing', 'Pricing'], ['about', 'Description'], ['photos', 'Photos']];
 const labelCls = 'mb-1 block text-gray-300';
@@ -174,7 +175,7 @@ export default function PropertyEditModal({ edit, setEdit, onClose, onSubmit, sa
     setLoadError('');
     getModerationProperty(id)
       .then((full) => { if (live) setEdit((prev) => (prev?.id === id ? { ...prev, ...detailsOf(full), _full: full } : prev)); })
-      .catch((err) => { if (live) setLoadError(err?.message || 'Could not load the listing'); });
+      .catch((err) => { if (live) setLoadError(userMessage(err, 'Could not load the listing')); });
     return () => { live = false; };
   }, [id, setEdit]);
 

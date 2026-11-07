@@ -802,6 +802,7 @@ class ServiceRequestFlowTest extends ServiceFixtures {
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.status").value("awaiting-payment"))
                     .andExpect(jsonPath("$.paymentSessionId").doesNotExist())
+                    .andExpect(jsonPath("$.parties[0].whatsappQueued").value(false))
                     .andReturn().getResponse().getContentAsString();
                 String requestId = field(created, "id");
 
@@ -814,6 +815,7 @@ class ServiceRequestFlowTest extends ServiceFixtures {
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].whatsappQueued").doesNotExist())
                     .andReturn().getResponse().getContentAsString();
                 String partyId = field(invites, "id");
 

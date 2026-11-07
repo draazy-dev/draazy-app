@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router';
 import { digits } from './contact.js';
 import { getConversation, listConversations, startConversation } from '../services/conversationService.js';
+import { userMessage } from './userMessage.js';
 
 async function findThread(them, pid) {
   if (!pid) return null;
@@ -27,7 +28,7 @@ export function useOpenChat(toast) {
       });
       navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
     } catch (e) {
-      toast?.(e?.message || 'Could not open the chat. Please try again.', 'error');
+      toast?.(userMessage(e, 'Could not open the chat. Please try again.'), 'error');
     }
   };
 }

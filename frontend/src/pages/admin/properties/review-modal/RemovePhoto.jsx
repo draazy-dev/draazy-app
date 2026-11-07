@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { removeListingPhoto } from '../../../../services/propertyService.js';
 import { useToast } from '../../../../context/ToastContext.jsx';
+import { userMessage } from '../../../../lib/userMessage.js';
 
 export const PHOTO_REMOVAL_REASONS = [
   { code: 'not_the_property', label: 'Not this property' },
@@ -26,7 +27,7 @@ export default function RemovePhoto({ listing, photo, onRemoved }) {
       setReason('');
       onRemoved(updated);
     } catch (err) {
-      toast(err?.message || 'Could not remove the photo', 'error');
+      toast(userMessage(err, 'Could not remove the photo'), 'error');
     } finally {
       setBusy(false);
     }

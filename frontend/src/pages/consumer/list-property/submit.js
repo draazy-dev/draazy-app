@@ -18,6 +18,7 @@ import { canStateBuyerEligibility, pickListingFormDetails } from '../../../lib/l
 import { editPayload } from './editPayload.js';
 import { headlineOf } from '../../../lib/headline.js';
 import { mapServerFieldErrors } from './serverFieldErrors.js';
+import { userMessage } from '../../../lib/userMessage.js';
 export { mapServerFieldErrors } from './serverFieldErrors.js';
 
 const STAYS_LIVE_FORM_TO_WIRE = Object.fromEntries(
@@ -253,7 +254,7 @@ export const persistListing = async ({ form, user, editId, editListing, photos, 
         console.error(err);
         return { ok: false, error: 'Could not save your listing.' };
       }
-      return { ok: false, unauthenticated: err?.status === 401, error: (err && err.message) || 'Could not save your listing.' };
+      return { ok: false, unauthenticated: err?.status === 401, error: userMessage(err, 'Could not save your listing.') };
     }
     if (!editId) {
       if (!saved || !saved.id) {

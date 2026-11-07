@@ -21,6 +21,7 @@ import {
 } from '../../../services/dealService.js';
 import { tenantsVerified } from '../../../services/rentService.js';
 import { REVISIT_MAX_AGE } from '../../../services/http.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const fmtOffer = (n) => '₹' + (Number(n) || 0).toLocaleString('en-IN');
 
@@ -115,7 +116,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
       await reload();
       if (okMsg) toast(okMsg, tone);
     } catch (err) {
-      toast(err?.body?.error || err?.message || t('property.actionFailed'), 'error');
+      toast(userMessage(err, t('property.actionFailed')), 'error');
     }
   });
 
@@ -153,7 +154,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
       try {
         await call();
       } catch (err) {
-        setOfferErr(err?.message || t('property.actionFailed'));
+        setOfferErr(userMessage(err, t('property.actionFailed')));
         return;
       }
       setOfferOpen(false); setOfferAmt(''); setOfferMoveIn('');

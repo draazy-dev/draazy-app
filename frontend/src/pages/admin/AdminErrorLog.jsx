@@ -9,6 +9,7 @@ import Modal from '../../components/ui/Modal.jsx';
 import {
   BTN, CHIP, CHIP_TONE, Chips, ClearFilters, DATE_CHIPS, IconAction, PageNav, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const PAGE_SIZE = 20;
 const SOURCES = [{ value: '', label: 'All' }, { value: 'api', label: 'API' }, { value: 'job', label: 'Jobs' }, { value: 'web', label: 'Web' }];
@@ -32,7 +33,7 @@ function ErrorDetail({ id, onClose, onResolved }) {
     let alive = true;
     getErrorLogEntry(id)
       .then((r) => { if (alive) setRow(r); })
-      .catch((err) => { if (alive) setFailed(err?.message || 'Could not load this error'); });
+      .catch((err) => { if (alive) setFailed(userMessage(err, 'Could not load this error')); });
     return () => { alive = false; };
   }, [id]);
 
@@ -43,7 +44,7 @@ function ErrorDetail({ id, onClose, onResolved }) {
       toast('Marked resolved', 'success');
       onResolved();
     } catch (err) {
-      toast(err?.message || 'Could not resolve', 'error');
+      toast(userMessage(err, 'Could not resolve'), 'error');
       setBusy(false);
     }
   };
@@ -143,7 +144,7 @@ export default function AdminErrorLog() {
     setData((prev) => (prev ? { ...prev, stale: true } : prev));
     listErrorLog({ source, status, days, q: term, page: page - 1, size: PAGE_SIZE })
       .then((res) => { if (alive) { setFailed(''); setData(res); } })
-      .catch((err) => { if (alive) { setFailed(err?.message || 'Could not load the error log'); setData(EMPTY); } });
+      .catch((err) => { if (alive) { setFailed(userMessage(err, 'Could not load the error log')); setData(EMPTY); } });
     return () => { alive = false; };
   }, [source, status, days, term, page, reload]);
 

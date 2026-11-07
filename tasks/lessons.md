@@ -131,7 +131,7 @@
 - **`isIn` (`!!user`) is false for "signed out" AND "not asked yet"** (`loading` seeds from `sessionHinted()`). Derive `gated` once, three-state, or the saved step is rewritten to 0.
 - **Debounce the serialised string, not an object rebuilt each render** (`captureShareableState()`), or the 400 ms measures renders.
 - **A debounced save cancels on unmount**: `flush()` before deliberate navigation (sign-in gates).
-- **Never render `err.message`** (a stale PWA shell leaked `[services] could not load the "auth" provider.`): map refusals to an eager-namespace i18n key; assert the translated text and no server English.
+- **Never render `err.message`** (a stale PWA shell leaked `[services] could not load the "auth" provider.`): render `userMessage(err, fallback)` (`lib/userMessage.js`). Only a server refusal (`ApiError.serverMessage`), `NetworkError` or `UserError` shows its text. Friendly local throws must be `UserError`.
 - **Freshness is not publication status**: gate Active/Availability badges and reactivation on approval.
 - **Don't change a sticky bar's position on input focus** — the blurring tap lands under the finger and is lost (`seam-write` caught it by asserting the stored value).
 

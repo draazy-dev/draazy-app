@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Check, ExternalLink, Minus, ShieldAlert, X } from 'lucide-react';
 import { reviewServiceRequestDocument } from '../../../services/serviceRequestService.js';
 import { classNames, fmtNum } from '../../../lib/format.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const REVIEWABLE = new Set(['docs_review', 'draft_shared', 'changes_requested', 'action_required', 'approved']);
 const REASON_MAX = 300;
@@ -25,7 +26,7 @@ export function usePaperReview(request, onChange, onError) {
       onChange(await reviewServiceRequestDocument(request.id, item.id, { documentId: item.documentId, verdict, reason: why }));
       return true;
     } catch (err) {
-      onError(err?.message || 'The review was not saved.');
+      onError(userMessage(err, 'The review was not saved.'));
       return false;
     } finally {
       setBusy('');

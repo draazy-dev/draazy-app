@@ -1,5 +1,6 @@
 import { PAGE_LOAD_TTL, del, get, patch, post, postMultipart, put } from '../../http.js';
 import { MAX_UPLOAD_BYTES, REGISTERED_COPY_MAX_BYTES } from '../../../lib/uploads/policy.js';
+import { UserError } from '../../../lib/userMessage.js';
 import {
   toChecklist, toIdentityList, toViewModel, toViewModelList, toQueueRowPage, toCreate, toWireType,
 } from './serviceRequestMapper.js';
@@ -33,7 +34,7 @@ export async function takeServiceRequest(id) {
 }
 
 const uploadStaffDocument = async (id, path, file, fields = {}, maxBytes = MAX_UPLOAD_BYTES) => {
-  if (!file) throw new Error('Choose a document to upload.');
+  if (!file) throw new UserError('Choose a document to upload.');
   const { prepareUpload } = await import('../../../lib/uploads/prepareUpload.js');
   const prepared = await prepareUpload(file, { document: true, maxBytes });
   const form = new FormData();

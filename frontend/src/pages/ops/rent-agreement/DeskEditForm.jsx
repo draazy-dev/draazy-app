@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { editServiceRequestDetails } from '../../../services/serviceRequestService.js';
 import { useToast } from '../../../context/ToastContext.jsx';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const SKIP = /(^o?pan$|aadhaar|^societyId$|^societyNotOnMaps$|^gramPanchayat$|^custom$)/i;
 const PRICED = new Set(['rent', 'deposit', 'nrDeposit', 'months', 'increment', 'incrementEvery']);
@@ -116,7 +117,7 @@ export default function DeskEditForm({ request, title, roots, onSaved, onCancel,
       toast('Saved. The customer was told what changed.', 'success');
       onCancel();
     } catch (err) {
-      onError(err?.message || 'The details were not saved.');
+      onError(userMessage(err, 'The details were not saved.'));
     } finally {
       setBusy(false);
     }
