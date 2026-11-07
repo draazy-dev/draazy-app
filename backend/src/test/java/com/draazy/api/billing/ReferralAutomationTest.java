@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.draazy.api.billing.referral.Referral;
@@ -541,6 +542,75 @@ class ReferralAutomationTest extends AbstractApiTest {
     }
 
     @Test
+    void closingTheRefereesAccountClawsTheRewardBackLikeASuspension() throws Exception {
+        Property[] listing = new Property[1];
+        Referral granted = grantedWithListing("9866620132", "9866620133", listing);
+        jdbc.update("update users set status = 'archived' where id = ?", idOf(granted));
+        entityManager.clear();
+
+        triggers.refereeSuspended(idOf(granted));
+
+        assertThat(reload(granted).getAutoReason()).isEqualTo("referee_suspended");
+        assertThat(reload(granted).getStatus()).isEqualTo(ReferralStatuses.CLAWED_BACK);
+    }
+
+    @Test
+    void theOwnerTrackWaitsForTheListingToGoLive() throws Exception {
+        Referral referral = pending(agedReferrer("9866620240"), "9866620241");
+        User referee = users.findByMobile("9866620241").orElseThrow();
+        Property listing = verifiedListing(referee);
+        jdbc.update("update properties set status = 'pending' where id = ?", listing.getId());
+        entityManager.clear();
+
+        qualification.announceOwnershipVerified(referee.getId(), listing.getId(), Instant.now());
+        assertThat(reload(referral).getStatus()).isEqualTo(ReferralStatuses.PENDING);
+
+        qualification.announceListingLive(listing.getId());
+        assertThat(reload(referral).getStatus()).isEqualTo(ReferralStatuses.PENDING);
+
+        jdbc.update("update properties set status = 'approved' where id = ?", listing.getId());
+        entityManager.clear();
+        qualification.announceListingLive(listing.getId());
+
+        Referral after = reload(referral);
+        assertThat(after.getStatus()).isEqualTo(ReferralStatuses.QUALIFIED);
+        assertThat(after.getTrack()).isEqualTo(ReferralStatuses.TRACK_OWNER);
+        assertThat(after.getQualifiedPropertyId()).isEqualTo(listing.getId());
+    }
+
+    @Test
+    void aListingThatIsLiveButNotOwnershipVerifiedDoesNotQualifyWhenItGoesLive() throws Exception {
+        Referral referral = pending(agedReferrer("9866620250"), "9866620251");
+        User referee = users.findByMobile("9866620251").orElseThrow();
+        Property listing = verifiedListing(referee);
+        jdbc.update("update properties set ownership_verified = false, ownership_verified_at = null where id = ?",
+                listing.getId());
+        entityManager.clear();
+
+        qualification.announceListingLive(listing.getId());
+
+        assertThat(reload(referral).getStatus()).isEqualTo(ReferralStatuses.PENDING);
+    }
+
+    @Test
+    void aRefereeWhoKeepsGuessingCodesIsLockedOutWithTheSameRefusal() throws Exception {
+        User referrer = agedReferrer("9866620260");
+        User referee = user("9866620261", "owner");
+        String code = mint(referrer, REFERRER_IP, REFERRER_UA, null);
+        for (int i = 0; i < 5; i++) {
+            jdbc.update("insert into referral_redeem_failures (id, user_id, ip_hash) "
+                    + "values (gen_random_uuid(), ?, null)", referee.getId());
+        }
+
+        assertThat(redeem(referee, code, IP, UA, "device-9866620261")).isEqualTo(409);
+        assertThat(referrals.findByReferrerId(referrer.getId())).isEmpty();
+
+        jdbc.update("update referral_redeem_failures set created_at = now() - interval '25 hours' "
+                + "where user_id = ?", referee.getId());
+        assertThat(redeem(referee, code, IP, UA, "device-9866620261")).isEqualTo(200);
+    }
+
+    @Test
     void aTriggerAfterTheClawbackWindowLeavesTheRewardAlone() throws Exception {
         Property[] listing = new Property[1];
         Referral granted = grantedWithListing("9866620140", "9866620141", listing);
@@ -670,18 +740,20 @@ class ReferralAutomationTest extends AbstractApiTest {
     }
 
     @Test
-    void theReferrersSummaryCountsHeldAndEarnedByTrack() throws Exception {
+    void theReferrersSummaryCountsQualifiedFriendsAndTheirCredits() throws Exception {
         User referrer = agedReferrer("9866620230");
         Referral owner = pending(referrer, "9866620231");
         Referral seeker = pending(referrer, "9866620232");
         qualifyByListing(owner);
         acceptContact(seeker);
 
-        String body = mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
-                .andReturn().getResponse().getContentAsString();
-
-        assertThat(body).contains("\"invited\":2").contains("\"converted\":2")
-                .contains("\"owner\":{\"referrals\":1,\"agreements\":1}")
-                .contains("\"seeker\":{\"referrals\":1,\"contacts\":15}");
+        mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
+                .andExpect(jsonPath("$.invited").value(0))
+                .andExpect(jsonPath("$.joined").value(2))
+                .andExpect(jsonPath("$.qualified").value(2))
+                .andExpect(jsonPath("$.checking").value(0))
+                .andExpect(jsonPath("$.rewards.earned").value(2))
+                .andExpect(jsonPath("$.rewards.remaining").value(2))
+                .andExpect(jsonPath("$.rewards.discountPercent").value(50));
     }
 }

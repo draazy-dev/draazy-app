@@ -6,6 +6,7 @@ import com.draazy.api.common.error.RateLimitedException;
 import com.draazy.api.common.error.UnauthorizedException;
 import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.trust.MobileMask;
+import com.draazy.api.common.trust.NewAccountAnnouncer;
 import com.draazy.api.security.JwtService;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.SelfProfile;
@@ -16,12 +17,16 @@ import com.draazy.api.provider.OtpSender;
 import com.draazy.api.security.Roles;
 import java.time.Instant;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
     private final UserRepository users;
     private final UserService userService;
     private final SelfProfile selfProfile;
@@ -30,10 +35,13 @@ public class AuthService {
     private final RefreshTokenService refreshTokens;
     private final StaffInviteRepository invites;
     private final PlatformSettings platformSettings;
+    private final NewAccountAnnouncer newAccounts;
 
     public AuthService(UserRepository users, UserService userService, SelfProfile selfProfile,
             OtpService otpService, JwtService jwtService, RefreshTokenService refreshTokens,
-            StaffInviteRepository invites, PlatformSettings platformSettings) {
+            StaffInviteRepository invites, PlatformSettings platformSettings,
+            NewAccountAnnouncer newAccounts) {
+        this.newAccounts = newAccounts;
         this.users = users;
         this.userService = userService;
         this.selfProfile = selfProfile;
@@ -96,7 +104,9 @@ public class AuthService {
                                 + "with the number you registered; otherwise contact support.");
             }
             try {
-                return userService.provisionBuyer(mobile);
+                User created = userService.provisionBuyer(mobile);
+                announceCreated(created);
+                return created;
             } catch (DataIntegrityViolationException race) {
                 // A concurrent first sign-in inserted this mobile first; adopt the winner's row.
                 // Its REQUIRES_NEW tx rolled back in isolation, so ours is clean.
@@ -106,6 +116,15 @@ public class AuthService {
             }
         });
         return user;
+    }
+
+    // Best-effort: a failed referral attribution must never block a sign-up that already committed.
+    private void announceCreated(User created) {
+        try {
+            newAccounts.accountCreated(created.getId(), created.getMobile());
+        } catch (RuntimeException e) {
+            log.warn("New-account referral attribution failed for user {}", created.getId(), e);
+        }
     }
 
     AuthResponse issueFor(User user) {

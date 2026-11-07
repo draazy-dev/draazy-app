@@ -11,6 +11,7 @@ import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.trust.MobileMask;
+import com.draazy.api.common.trust.ReferralTriggers;
 import com.draazy.api.identity.auth.RefreshTokenService;
 import com.draazy.api.identity.auth.StaffInviteService;
 import com.draazy.api.identity.auth.StaffSignInService;
@@ -55,6 +56,7 @@ public class UserAdminService {
     private final ObjectMapper objectMapper;
     private final IdentityVerificationService identity;
     private final PersonNames personNames;
+    private final ReferralTriggers referralTriggers;
     private final String baseUrl;
 
     private final BackOfficeUserView view;
@@ -66,7 +68,8 @@ public class UserAdminService {
             BackOfficeUserView view, AdminActionNotifier adminNotifications, StaffInviteMailer inviteMailer,
             BackOfficeGrantRepository grants, AccountPermissions accountPermissions,
             ObjectMapper objectMapper, IdentityVerificationService identity, PersonNames personNames,
-            @Value("${draazy.app.base-url}") String baseUrl) {
+            ReferralTriggers referralTriggers, @Value("${draazy.app.base-url}") String baseUrl) {
+        this.referralTriggers = referralTriggers;
         this.users = users;
         this.mapper = mapper;
         this.audit = audit;
@@ -188,6 +191,7 @@ public class UserAdminService {
         administrators.refuseIfLastAdministrator(user);
         refreshTokens.revokeAllForUser(user.getId());
         user.archive(reason);
+        referralTriggers.refereeSuspended(user.getId());
         audit.record(actor, "user.archive", "user", id, "reason", reason, "role", user.getRole());
         adminNotifications.managerAction(actor, "Archived staff account", user);
     }

@@ -7,14 +7,12 @@ import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.settings.PlatformSettings;
-import com.draazy.api.common.trust.ContactUsageLookup;
+import com.draazy.api.common.trust.AgreementCreditUsageLookup;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.AuthPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
-import java.security.SecureRandom;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -22,7 +20,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -31,17 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ReferralService {
-    private static final String CODE_PREFIX = "PUNE-";
-
-    private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-    private static final int CODE_LENGTH = 4;
-
-    private static final int CODE_ATTEMPTS = 5;
-
-    private static final Duration VELOCITY_WINDOW = Duration.ofDays(1);
-
-    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Logger log = LoggerFactory.getLogger(ReferralService.class);
 
     private final ReferralRepository referrals;
     private final ReferralCodeRepository codes;
@@ -50,13 +40,18 @@ public class ReferralService {
     private final PlatformSettings settings;
     private final ReferralSignals signals;
     private final AuditService audit;
-    private final ContactUsageLookup contactUsage;
+    private final AgreementCreditUsageLookup agreementCredits;
     private final ReferralOutcomes outcomes;
+    private final ReferralCodeMinter minter;
+    private final ReferralRedemption redemption;
+    private final ReferralRedeemFailures redeemFailures;
+    private final ReferralInviteRepository invites;
 
     public ReferralService(ReferralRepository referrals, ReferralCodeRepository codes,
             ReferralMapper mapper, UserRepository users, PlatformSettings settings,
-            ReferralSignals signals, AuditService audit, ContactUsageLookup contactUsage,
-            ReferralOutcomes outcomes) {
+            ReferralSignals signals, AuditService audit, AgreementCreditUsageLookup agreementCredits,
+            ReferralOutcomes outcomes, ReferralCodeMinter minter, ReferralRedemption redemption,
+            ReferralRedeemFailures redeemFailures, ReferralInviteRepository invites) {
         this.referrals = referrals;
         this.codes = codes;
         this.mapper = mapper;
@@ -64,26 +59,25 @@ public class ReferralService {
         this.settings = settings;
         this.signals = signals;
         this.audit = audit;
-        this.contactUsage = contactUsage;
+        this.agreementCredits = agreementCredits;
         this.outcomes = outcomes;
+        this.minter = minter;
+        this.redemption = redemption;
+        this.redeemFailures = redeemFailures;
+        this.invites = invites;
     }
 
     @Transactional
     public ReferralSummaryDto summary(AuthPrincipal caller, HttpServletRequest request) {
-        String code = codeFor(caller.userId(), request);
+        String code = minter.codeFor(caller.userId(), request);
         List<Referral> mine = referrals.findByReferrerId(caller.userId());
-        int held = (int) mine.stream().filter(r -> ReferralStatuses.HELD.equals(r.getStatus())).count();
-        int converted = (int) mine.stream().filter(r -> ReferralStatuses.isGranting(r.getStatus())).count();
-
-        Object[] granted = referrals.grantedByTrack(caller.userId()).getFirst();
-        int ownerReferrals = ((Number) granted[0]).intValue();
-        int seekerReferrals = ((Number) granted[1]).intValue();
-        var earned = new ReferralSummaryDto.Earned(
-                new ReferralSummaryDto.OwnerTrack(ownerReferrals,
-                        Math.toIntExact(ownerReferrals * settings.referralOwnerRewardAgreements())),
-                new ReferralSummaryDto.SeekerTrack(seekerReferrals,
-                        Math.toIntExact(seekerReferrals * settings.referralContactBonus())));
-        return new ReferralSummaryDto(code, mine.size(), converted, held, earned, friendReward(caller.userId()));
+        int checking = (int) mine.stream().filter(r -> ReferralStatuses.HELD.equals(r.getStatus())).count();
+        int qualified = (int) mine.stream().filter(r -> ReferralStatuses.isGranting(r.getStatus())).count();
+        int used = Math.toIntExact(agreementCredits.agreementCreditsHeld(caller.userId()));
+        var rewards = new ReferralSummaryDto.Rewards(qualified, used, Math.max(0, qualified - used),
+                Math.toIntExact(settings.referralAgreementDiscountPercent()));
+        return new ReferralSummaryDto(code, Math.toIntExact(invites.countByReferrerId(caller.userId())),
+                mine.size(), qualified, checking, rewards, friendReward(caller.userId()));
     }
 
     private ReferralSummaryDto.FriendReward friendReward(UUID userId) {
@@ -105,65 +99,31 @@ public class ReferralService {
             HttpServletRequest request) {
         User referred = users.findById(caller.userId())
                 .orElseThrow(() -> NotFoundException.of("User"));
-
-        String code = normalise(rawCode);
-        Optional<ReferralCode> owner = code == null ? Optional.empty() : codes.findByCode(code);
-        if (!settings.referralRewardsEnabled()
-                || owner.isEmpty()
-                || owner.get().getUserId().equals(caller.userId())
-                || referrals.existsByReferredMobile(referred.getMobile())
-                || !withinSignupWindow(referred)
-                || referred.getListingsCount() > 0
-                || !contactUsage.contactTimes(caller.userId()).isEmpty()) {
-            throw refuse();
-        }
-
-        User referrer = users.findById(owner.get().getUserId()).orElseThrow(this::refuse);
         ReferralSignals.Signals observed = signals.of(request);
-        if (ReferralSignals.matches(owner.get().getReferrerDeviceIdHash(), observed.deviceIdHash())) {
-            throw refuse();
+        if (redeemFailures.lockedOut(referred.getId())) {
+            throw ReferralRedemption.refuse();
         }
-
-        boolean velocityHigh = referrals.countByReferrerIdAndAtAfter(
-                referrer.getId(), Instant.now().minus(VELOCITY_WINDOW)) >= settings.referralVelocityPerDay();
-        boolean sameIp = ReferralSignals.matches(owner.get().getReferrerIpHash(), observed.ipHash());
-        boolean sameUa = ReferralSignals.matches(owner.get().getReferrerDeviceHash(), observed.deviceHash());
-        boolean noDeviceId = observed.deviceIdHash() == null;
-        boolean newReferrer = referrer.getCreatedAt() != null && referrer.getCreatedAt()
-                .isAfter(Instant.now().minus(Duration.ofDays(settings.referralNewReferrerDays())));
-
-        Referral referral = new Referral(
-                referrer.getId(),
-                referrer.getMobile(),
-                referred.getName(),
-                referred.getMobile(),
-                "seeker",
-                ShareChannels.normalise(shareChannel),
-                risk(velocityHigh, sameIp, sameUa, newReferrer, noDeviceId),
-                referred.isVerified(),
-                velocityHigh,
-                sameUa,
-                sameIp,
-                observed);
+        String code = normalise(rawCode);
+        // Read before attribute(): a lost insert race aborts the transaction, so no query can run after it.
+        boolean alreadyReferred = referrals.existsByReferredMobile(referred.getMobile());
         try {
-            referrals.saveAndFlush(referral);
-        } catch (DataIntegrityViolationException raced) {
-            throw refuse();
+            ReferralCode owner = (code == null ? Optional.<ReferralCode>empty() : codes.findByCode(code))
+                    .orElseThrow(ReferralRedemption::refuse);
+            redemption.attribute(referred, owner, shareChannel, observed);
+        } catch (ConflictException refused) {
+            if (settings.referralRewardsEnabled() && !alreadyReferred) {
+                countFailure(referred.getId(), observed.ipHash());
+            }
+            throw refused;
         }
     }
 
-    private boolean withinSignupWindow(User referred) {
-        return referred.getCreatedAt() != null && referred.getCreatedAt()
-                .plus(Duration.ofHours(settings.referralSignupWindowHours())).isAfter(Instant.now());
-    }
-
-    private static String risk(boolean velocityHigh, boolean sameIp, boolean sameUa, boolean newReferrer,
-            boolean noDeviceId) {
-        int correlated = (sameIp ? 1 : 0) + (sameUa ? 1 : 0) + (newReferrer ? 1 : 0) + (noDeviceId ? 1 : 0);
-        if (velocityHigh || correlated >= 2) {
-            return ReferralStatuses.RISK_HIGH;
+    private void countFailure(UUID userId, String ipHash) {
+        try {
+            redeemFailures.record(userId, ipHash);
+        } catch (DataAccessException e) {
+            log.warn("Could not count a refused referral redeem for {}", userId, e);
         }
-        return correlated == 1 ? ReferralStatuses.RISK_MEDIUM : ReferralStatuses.RISK_LOW;
     }
 
     @Transactional(readOnly = true)
@@ -229,34 +189,10 @@ public class ReferralService {
         }
         referral.decide(nextStatus, actor.userId().toString(), blankToNull(reason));
         referrals.saveAndFlush(referral);
-        outcomes.syncFeatured(referral);
+        outcomes.decidedByStaff(referral);
         audit.record(actor, action, "referral", referral.getId().toString(),
                 "contacts", String.valueOf(referral.getRewardAmount()), "reason", blankToNull(reason));
         return mapper.toDto(referral);
-    }
-
-    private String codeFor(UUID userId, HttpServletRequest request) {
-        ReferralSignals.Signals observed = signals.of(request);
-        Optional<ReferralCode> existing = codes.findById(userId);
-        if (existing.isPresent()) {
-            existing.get().refresh(observed);
-            return existing.get().getCode();
-        }
-        for (int attempt = 0; attempt < CODE_ATTEMPTS; attempt++) {
-            String candidate = generateCode();
-            if (!codes.existsByCode(candidate)) {
-                return codes.saveAndFlush(new ReferralCode(userId, candidate, observed)).getCode();
-            }
-        }
-        throw new IllegalStateException("Could not mint a unique referral code for " + userId);
-    }
-
-    private static String generateCode() {
-        StringBuilder code = new StringBuilder(CODE_PREFIX);
-        for (int i = 0; i < CODE_LENGTH; i++) {
-            code.append(CODE_ALPHABET.charAt(RANDOM.nextInt(CODE_ALPHABET.length())));
-        }
-        return code.toString();
     }
 
     private static String normalise(String code) {
@@ -265,10 +201,6 @@ public class ReferralService {
         }
         String trimmed = code.trim().toUpperCase(java.util.Locale.ROOT);
         return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private ConflictException refuse() {
-        return new ConflictException("That referral code cannot be redeemed");
     }
 
     private static String blankToNull(String value) {

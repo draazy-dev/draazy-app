@@ -75,9 +75,9 @@ class ReferralEndpointsTest extends AbstractApiTest {
         User u = user("9866600001", "owner");
 
         String first = codeOf(u);
-        assertThat(first).startsWith("PUNE-").hasSize(9);
+        assertThat(first).startsWith("PUNE-").hasSize(11);
         assertThat(first.substring(5)).doesNotContainAnyWhitespaces()
-                .matches("[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}");
+                .matches("[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}");
         assertThat(codeOf(u)).isEqualTo(first);
     }
 
@@ -87,19 +87,22 @@ class ReferralEndpointsTest extends AbstractApiTest {
         mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(u)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.invited").value(0))
-                .andExpect(jsonPath("$.converted").value(0))
-                .andExpect(jsonPath("$.held").value(0))
-                .andExpect(jsonPath("$.earned.owner.referrals").value(0))
-                .andExpect(jsonPath("$.earned.owner.agreements").value(0))
-                .andExpect(jsonPath("$.earned.seeker.referrals").value(0))
-                .andExpect(jsonPath("$.earned.seeker.contacts").value(0))
+                .andExpect(jsonPath("$.joined").value(0))
+                .andExpect(jsonPath("$.qualified").value(0))
+                .andExpect(jsonPath("$.checking").value(0))
+                .andExpect(jsonPath("$.rewards.earned").value(0))
+                .andExpect(jsonPath("$.rewards.used").value(0))
+                .andExpect(jsonPath("$.rewards.remaining").value(0))
+                .andExpect(jsonPath("$.rewards.discountPercent").value(50))
                 .andExpect(jsonPath("$.friendReward.redeemed").value(false))
+                .andExpect(jsonPath("$.converted").doesNotExist())
+                .andExpect(jsonPath("$.earned").doesNotExist())
                 .andExpect(jsonPath("$.contactsEarned").doesNotExist())
                 .andExpect(jsonPath("$.contactsPending").doesNotExist());
     }
 
     @Test
-    void redeemingCountsAsInvitedAndPendingButNotYetEarned() throws Exception {
+    void redeemingCountsAsJoinedButNotYetQualified() throws Exception {
         User referrer = user("9866600010", "owner");
         User referred = user("9866600011", "buyer");
 
@@ -107,23 +110,31 @@ class ReferralEndpointsTest extends AbstractApiTest {
 
         mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.invited").value(1))
-                .andExpect(jsonPath("$.converted").value(0));
+                .andExpect(jsonPath("$.joined").value(1))
+                .andExpect(jsonPath("$.qualified").value(0))
+                .andExpect(jsonPath("$.rewards.earned").value(0));
     }
 
     @Test
-    void theRedeemerSeesTheirFriendRewardPromise() throws Exception {
+    void theRedeemerSeesTheirFriendGiftOnlyOnceTheReferralQualifies() throws Exception {
         User referrer = user("9866600012", "owner");
         User referred = user("9866600013", "buyer");
-
-        redeem(referred, codeOf(referrer), 200);
+        User staff = user("9866600014", "staff");
+        String id = referralFrom(referrer, referred);
 
         mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referred)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.friendReward.redeemed").value(true))
                 .andExpect(jsonPath("$.friendReward.status").value(ReferralStatuses.PENDING))
-                .andExpect(jsonPath("$.friendReward.contacts").value(5))
-                .andExpect(jsonPath("$.friendReward.featuredDays").value(14));
+                .andExpect(jsonPath("$.friendReward.contacts").value(0))
+                .andExpect(jsonPath("$.friendReward.featuredDays").value(0));
+
+        mvc.perform(post("/referrals/" + id + "/approve").header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk());
+
+        mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referred)))
+                .andExpect(jsonPath("$.friendReward.status").value(ReferralStatuses.REWARDED))
+                .andExpect(jsonPath("$.friendReward.contacts").value(5));
     }
 
     @Test
@@ -281,7 +292,9 @@ class ReferralEndpointsTest extends AbstractApiTest {
 
         mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.converted").value(1));
+                .andExpect(jsonPath("$.qualified").value(1))
+                .andExpect(jsonPath("$.rewards.earned").value(1))
+                .andExpect(jsonPath("$.rewards.remaining").value(1));
 
         mvc.perform(post("/referrals/" + id + "/approve")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
@@ -337,7 +350,7 @@ class ReferralEndpointsTest extends AbstractApiTest {
 
         mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.converted").value(0));
+                .andExpect(jsonPath("$.qualified").value(0));
     }
 
     @Test
@@ -366,7 +379,7 @@ class ReferralEndpointsTest extends AbstractApiTest {
 
         mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.converted").value(0));
+                .andExpect(jsonPath("$.qualified").value(0));
     }
 
     @Test

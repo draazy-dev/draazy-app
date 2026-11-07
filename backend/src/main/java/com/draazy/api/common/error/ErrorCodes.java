@@ -102,6 +102,12 @@ public final class ErrorCodes {
 
     public static final String RATE_LIMITED = "rate_limited";
 
+    public static final String INVALID_MOBILE = "invalid_mobile";
+
+    public static final String OWN_NUMBER = "own_number";
+
+    public static final String INVITE_LIMIT = "invite_limit";
+
     public static final String OTP_ATTEMPTS_EXHAUSTED = "otp_attempts_exhausted";
 
     public static final String MAINTENANCE_MODE = "maintenance_mode";

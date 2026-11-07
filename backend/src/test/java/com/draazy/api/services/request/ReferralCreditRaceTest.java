@@ -51,7 +51,7 @@ class ReferralCreditRaceTest extends AbstractCommittedApiTest {
 
         List<Throwable> outcomes = Races.run(2, i -> tx.executeWithoutResult(s -> {
             ServiceRequest request = requests.findByIdForUpdate(ids[i]).orElseThrow();
-            if (referralCredit.spend(request)) {
+            if (referralCredit.spend(request).isPresent()) {
                 spent.incrementAndGet();
                 requests.saveAndFlush(request);
             }

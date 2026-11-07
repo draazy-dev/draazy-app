@@ -63,6 +63,7 @@ class PricingEndpointTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pricing.referralQualifyPerMonth").doesNotExist())
                 .andExpect(jsonPath("$.pricing.referralContactBonus").doesNotExist())
+                .andExpect(jsonPath("$.pricing.referralInvitesPerDay").doesNotExist())
                 .andExpect(jsonPath("$.pricing.freeContactLimit").doesNotExist())
                 .andExpect(jsonPath("$.pricing.referral.velocityPerDay").doesNotExist())
                 .andExpect(jsonPath("$.pricing.referral.signalRetentionDays").doesNotExist());
@@ -79,10 +80,11 @@ class PricingEndpointTest extends AbstractApiTest {
 
         mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.pricing.referral.contactBonus").value(15))
+                .andExpect(jsonPath("$.pricing.referral.contactBonus").doesNotExist())
                 .andExpect(jsonPath("$.pricing.referral.seekerBonusContacts").value(8))
                 .andExpect(jsonPath("$.pricing.referral.ownerFeaturedDays").value(21))
-                .andExpect(jsonPath("$.pricing.referral.ownerRewardAgreements").value(1))
+                .andExpect(jsonPath("$.pricing.referral.ownerRewardAgreements").doesNotExist())
+                .andExpect(jsonPath("$.pricing.referral.agreementDiscountPercent").value(50))
                 .andExpect(jsonPath("$.pricing.referral.featuredDays").value(10))
                 .andExpect(jsonPath("$.pricing.referral.qualifyPerMonth").value(10))
                 .andExpect(jsonPath("$.pricing.referral.qualifyPerYear").value(50))

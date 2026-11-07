@@ -23,7 +23,7 @@ public class ReferralClawbacks {
     static final String SELF_DEALING = "self_dealing";
 
     private static final Map<String, String> REASONS = Map.of(
-            REFEREE_SUSPENDED, "the referred account was suspended",
+            REFEREE_SUSPENDED, "the referred account was suspended or closed",
             LISTING_TAKEN_DOWN, "the qualifying listing was taken down",
             VERIFICATION_REVOKED, "the listing's ownership verification was withdrawn",
             LISTING_NOT_LIVE, "the qualifying listing is no longer live",
@@ -83,7 +83,8 @@ public class ReferralClawbacks {
 
     String problem(Referral referral, boolean needLive) {
         var referee = users.findByMobile(referral.getReferredMobile());
-        if (referee.isPresent() && UserStatuses.SUSPENDED.equals(referee.get().getStatus())) {
+        if (referee.isPresent() && (UserStatuses.SUSPENDED.equals(referee.get().getStatus())
+                || UserStatuses.ARCHIVED.equals(referee.get().getStatus()))) {
             return REFEREE_SUSPENDED;
         }
         if (referral.getTrack() == null || referral.getQualifiedPropertyId() == null) {

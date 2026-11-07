@@ -60,9 +60,9 @@ final class ContactAllocator {
     }
 
     static Standing allocate(List<ContactUse> contacts, int freeCapacity, List<ContactPackTerm> packs,
-            int referralCapacity, Instant now) {
+            Instant now) {
         Instant freeEnds = freeEnds(contacts);
-        List<Bucket> buckets = replay(contacts, freeEnds, freeCapacity, packs, referralCapacity);
+        List<Bucket> buckets = replay(contacts, freeEnds, freeCapacity, packs);
 
         Predicate<Bucket> usable = b -> b.frozenAt == null && b.validAt(now);
         Instant packExpires = buckets.stream()
@@ -75,8 +75,8 @@ final class ContactAllocator {
     }
 
     static Map<UUID, Integer> spentFromPacks(List<ContactUse> contacts, int freeCapacity,
-            List<ContactPackTerm> packs, int referralCapacity) {
-        List<Bucket> buckets = replay(contacts, freeEnds(contacts), freeCapacity, packs, referralCapacity);
+            List<ContactPackTerm> packs) {
+        List<Bucket> buckets = replay(contacts, freeEnds(contacts), freeCapacity, packs);
         Map<UUID, Integer> spent = new HashMap<>();
         for (int i = 0; i < packs.size(); i++) {
             int used = packs.get(i).capacity() - buckets.get(i + 1).left;
@@ -96,11 +96,10 @@ final class ContactAllocator {
     }
 
     private static List<Bucket> replay(List<ContactUse> contacts, Instant freeEnds, int freeCapacity,
-            List<ContactPackTerm> packs, int referralCapacity) {
+            List<ContactPackTerm> packs) {
         List<Bucket> buckets = new ArrayList<>();
         buckets.add(new Bucket(null, freeEnds, freeCapacity, false, null, null));
         packs.forEach(p -> buckets.add(new Bucket(p.from(), p.until(), p.capacity(), true, p.frozenAt(), p.deal())));
-        buckets.add(new Bucket(null, null, referralCapacity, false, null, null));
         for (ContactUse use : contacts) {
             buckets.stream()
                     .filter(b -> b.left > 0 && b.validAt(use.at()) && b.serves(use.deal()))

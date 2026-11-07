@@ -17,10 +17,9 @@ public record PricingResponse(
     }
 
     public record Referral(
-            long contactBonus,
             long seekerBonusContacts,
             long ownerFeaturedDays,
-            long ownerRewardAgreements,
+            long agreementDiscountPercent,
             long featuredDays,
             long qualifyPerMonth,
             long qualifyPerYear,

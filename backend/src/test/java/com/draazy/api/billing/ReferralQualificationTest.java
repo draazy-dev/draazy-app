@@ -12,11 +12,14 @@ import com.draazy.api.billing.referral.ReferralRepository;
 import com.draazy.api.billing.referral.ReferralSignalRetention;
 import com.draazy.api.billing.referral.ReferralStatuses;
 import com.draazy.api.billing.referral.ShareChannels;
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import jakarta.persistence.EntityManager;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -36,6 +39,7 @@ class ReferralQualificationTest extends AbstractApiTest {
     private static final String IP = "203.0.113.7";
 
     @Autowired UserRepository users;
+    @Autowired PropertyRepository properties;
     @Autowired ReferralRepository referrals;
     @Autowired ReferralQualification qualification;
     @Autowired ReferralSignalRetention retention;
@@ -108,6 +112,16 @@ class ReferralQualificationTest extends AbstractApiTest {
         return referrals.findById(id).orElseThrow();
     }
 
+    private UUID live(UUID ownerId) {
+        User owner = users.findById(ownerId).orElseThrow();
+        Property p = new Property(owner, "Qualifying flat", "rent", "apartment", 25000L, "Kothrud", "Pune");
+        p.setBhk(new BigDecimal("2"));
+        p.setStatus("approved");
+        p.setPriceUnit("per-month");
+        p.setArea(new BigDecimal("1000"));
+        return properties.saveAndFlush(p).getId();
+    }
+
     @Test
     void aVerifiedFirstListingQualifiesTheReferral() throws Exception {
         Referral referral = referral("9866610010", "9866610011");
@@ -116,7 +130,7 @@ class ReferralQualificationTest extends AbstractApiTest {
         assertThat(referral.isActivated()).isFalse();
 
         UUID owner = users.findByMobile(referral.getReferredMobile()).orElseThrow().getId();
-        UUID property = UUID.randomUUID();
+        UUID property = live(owner);
         Instant verifiedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
 
         qualification.announceOwnershipVerified(owner, property, verifiedAt);
@@ -129,7 +143,7 @@ class ReferralQualificationTest extends AbstractApiTest {
         assertThat(after.getTrack()).isEqualTo(ReferralStatuses.TRACK_OWNER);
         assertThat(after.getGrantedAt()).isNotNull();
         assertThat(after.getHandledBy()).isEqualTo(ReferralStatuses.SYSTEM);
-        assertThat(after.getRewardAmount()).isEqualTo(1L);
+        assertThat(after.getRewardAmount()).isEqualTo(50L);
     }
 
     @ParameterizedTest(name = "{0} mints nothing further")
@@ -140,14 +154,14 @@ class ReferralQualificationTest extends AbstractApiTest {
             throws Exception {
         Referral referral = referral("9866610030", "9866610031");
         UUID owner = users.findByMobile(referral.getReferredMobile()).orElseThrow().getId();
-        UUID property = UUID.randomUUID();
+        UUID property = live(owner);
 
         qualification.announceOwnershipVerified(owner, property, Instant.now());
         Instant firstQualifiedAt = reload(referral.getId()).getQualifiedAt();
         UUID firstProperty = reload(referral.getId()).getQualifiedPropertyId();
 
         qualification.announceOwnershipVerified(
-                owner, sameProperty ? property : UUID.randomUUID(), Instant.now().plusSeconds(60));
+                owner, sameProperty ? property : live(owner), Instant.now().plusSeconds(60));
 
         List<Referral> all = referrals.findByReferrerId(referral.getReferrerId());
         assertThat(all).hasSize(1);
@@ -177,7 +191,7 @@ class ReferralQualificationTest extends AbstractApiTest {
                 .andExpect(status().isOk());
 
         UUID owner = users.findByMobile(referral.getReferredMobile()).orElseThrow().getId();
-        qualification.announceOwnershipVerified(owner, UUID.randomUUID(), Instant.now());
+        qualification.announceOwnershipVerified(owner, live(owner), Instant.now());
 
         Referral after = reload(referral.getId());
         assertThat(after.getStatus()).isEqualTo(ReferralStatuses.REJECTED);
@@ -204,9 +218,9 @@ class ReferralQualificationTest extends AbstractApiTest {
         redeem(flatmateOne, code, null, IP, UA);
         redeem(flatmateTwo, code, null, IP, UA);
 
-        qualification.announceOwnershipVerified(flatmateOne.getId(), UUID.randomUUID(),
+        qualification.announceOwnershipVerified(flatmateOne.getId(), live(flatmateOne.getId()),
                 Instant.now());
-        qualification.announceOwnershipVerified(flatmateTwo.getId(), UUID.randomUUID(),
+        qualification.announceOwnershipVerified(flatmateTwo.getId(), live(flatmateTwo.getId()),
                 Instant.now());
 
         List<Referral> all = referrals.findByReferrerId(referrer.getId());
@@ -231,11 +245,11 @@ class ReferralQualificationTest extends AbstractApiTest {
         redeem(longAgo, code, null, IP, UA);
         redeem(thisMonth, code, null, IP, UA);
 
-        qualification.announceOwnershipVerified(longAgo.getId(), UUID.randomUUID(), Instant.now());
+        qualification.announceOwnershipVerified(longAgo.getId(), live(longAgo.getId()), Instant.now());
         jdbc.update("update referrals set qualified_at = now() - interval '100 days' "
                 + "where referred_mobile = ?", longAgo.getMobile());
 
-        qualification.announceOwnershipVerified(thisMonth.getId(), UUID.randomUUID(),
+        qualification.announceOwnershipVerified(thisMonth.getId(), live(thisMonth.getId()),
                 Instant.now());
 
         assertThat(referrals.findByReferrerId(referrer.getId()))

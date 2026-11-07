@@ -27,10 +27,11 @@ public class PlatformSettings {
 
     public static final Map<String, Bound> FEE_BOUNDS = Map.ofEntries(
             Map.entry("featuredDays", new Bound(7, 1, 90)),
-            Map.entry("referralContactBonus", new Bound(15, 0, MAX_CONTACT_GRANT)),
             Map.entry("referralSeekerBonusContacts", new Bound(5, 0, MAX_CONTACT_GRANT)),
             Map.entry("referralOwnerFeaturedDays", new Bound(14, 1, 90)),
-            Map.entry("referralOwnerRewardAgreements", new Bound(1, 0, 10)),
+            Map.entry("referralAgreementDiscountPercent", new Bound(50, 1, 100)),
+            Map.entry("referralInvitesPerDay", new Bound(10, 1, 100)),
+            Map.entry("referralRedeemFailuresPerDay", new Bound(5, 1, 50)),
             Map.entry("referralQualifyPerMonth", new Bound(10, 1, 1_000)),
             Map.entry("referralQualifyPerYear", new Bound(50, 1, 10_000)),
             Map.entry("referralHoldDays", new Bound(7, 1, 60)),
@@ -127,10 +128,6 @@ public class PlatformSettings {
         return fee("featuredDays");
     }
 
-    public long referralContactBonus() {
-        return fee("referralContactBonus");
-    }
-
     public long referralSeekerBonusContacts() {
         return fee("referralSeekerBonusContacts");
     }
@@ -139,8 +136,16 @@ public class PlatformSettings {
         return fee("referralOwnerFeaturedDays");
     }
 
-    public long referralOwnerRewardAgreements() {
-        return fee("referralOwnerRewardAgreements");
+    public long referralAgreementDiscountPercent() {
+        return fee("referralAgreementDiscountPercent");
+    }
+
+    public long referralInvitesPerDay() {
+        return fee("referralInvitesPerDay");
+    }
+
+    public long referralRedeemFailuresPerDay() {
+        return fee("referralRedeemFailuresPerDay");
     }
 
     public long referralQualifyPerMonth() {

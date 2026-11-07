@@ -18,10 +18,9 @@ public class PricingController {
                 settings.contactPackBuy(),
                 settings.rentAgreementPlatform(),
                 new PricingResponse.Referral(
-                        settings.referralContactBonus(),
                         settings.referralSeekerBonusContacts(),
                         settings.referralOwnerFeaturedDays(),
-                        settings.referralOwnerRewardAgreements(),
+                        settings.referralAgreementDiscountPercent(),
                         settings.featuredDays(),
                         settings.referralQualifyPerMonth(),
                         settings.referralQualifyPerYear(),

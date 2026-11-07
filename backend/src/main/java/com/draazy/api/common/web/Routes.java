@@ -770,6 +770,8 @@ public final class Routes {
 
         public static final String MINE = "/me/referrals";
 
+        public static final String INVITES = MINE + "/invites";
+
         public static final String REDEEM = BASE + "/redeem";
 
         public static final String APPROVE = BASE + "/{id}/approve";

@@ -27,15 +27,23 @@ public class ReferralsController {
     private static final String WRITE = STAFF_OR_ADMIN + BackOfficePermissions.REQUIRE_REFERRALS_WRITE;
 
     private final ReferralService service;
+    private final ReferralInvites invites;
 
-    public ReferralsController(ReferralService service) {
+    public ReferralsController(ReferralService service, ReferralInvites invites) {
         this.service = service;
+        this.invites = invites;
     }
 
     @GetMapping(Routes.Referrals.MINE)
     public ReferralSummaryDto mine(@CurrentUser AuthPrincipal principal,
             HttpServletRequest request) {
         return service.summary(principal, request);
+    }
+
+    @PostMapping(Routes.Referrals.INVITES)
+    public ReferralInviteResponse invite(@CurrentUser AuthPrincipal principal,
+            @Valid @RequestBody InviteRequest body, HttpServletRequest request) {
+        return invites.invite(principal, body.mobile(), request);
     }
 
     @PostMapping(Routes.Referrals.REDEEM)
@@ -79,6 +87,9 @@ public class ReferralsController {
     }
 
     public record RedeemRequest(@NotBlank String code, String shareChannel) {
+    }
+
+    public record InviteRequest(String mobile) {
     }
 
     public record ReasonRequest(String reason) {

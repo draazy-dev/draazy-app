@@ -69,16 +69,14 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
             @Param("to") Instant to);
 
     @Query("""
-            select coalesce(sum(case when r.track = 'owner' then 1 else 0 end), 0),
-                   coalesce(sum(case when r.track is null or r.track = 'seeker' then 1 else 0 end), 0)
-            from Referral r
+            select count(r) from Referral r
             where r.referrerId = :referrerId and r.status in ('qualified', 'rewarded')
             """)
-    List<Object[]> grantedByTrack(@Param("referrerId") UUID referrerId);
+    long countGranted(@Param("referrerId") UUID referrerId);
 
     @Query("""
             select count(r) > 0 from Referral r
-            where r.status in ('pending', 'qualified', 'held', 'rewarded')
+            where r.status in ('qualified', 'rewarded')
               and (r.track is null or r.track = 'seeker')
               and r.referredMobile = (select u.mobile from User u where u.id = :userId)
             """)

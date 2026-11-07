@@ -1,6 +1,7 @@
 package com.draazy.api.services.request;
 
 import com.draazy.api.billing.entitlement.EntitlementService;
+import java.util.OptionalLong;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,17 +17,19 @@ class ServiceRequestReferralCredit {
         this.pricing = pricing;
     }
 
-    boolean spend(ServiceRequest request) {
+    OptionalLong spend(ServiceRequest request) {
         if (request.isReferralCredit() || request.getPaymentRef() != null
                 || !ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())
                 || request.getAmount() == null) {
-            return false;
+            return OptionalLong.empty();
         }
         requests.lockUser(request.getRequesterId());
-        if (entitlements.freeAgreementsRemaining(request.getRequesterId()) < 1) {
-            return false;
+        if (entitlements.referralCreditsRemaining(request.getRequesterId()) < 1) {
+            return OptionalLong.empty();
         }
-        request.spendReferralCredit(Math.min(request.getAmount(), pricing.statutory(request.getDetails())));
-        return true;
+        long serviceFee = Math.max(0, request.getAmount() - pricing.statutory(request.getDetails()));
+        long discount = serviceFee * entitlements.referralDiscountPercent() / 100;
+        request.spendReferralCredit(request.getAmount() - discount);
+        return OptionalLong.of(discount);
     }
 }

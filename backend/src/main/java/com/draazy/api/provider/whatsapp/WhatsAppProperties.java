@@ -21,10 +21,18 @@ public record WhatsAppProperties(
         String serviceTemplateName,
         String serviceTemplateLang,
         String agreementInviteTemplateName,
-        String agreementInviteTemplateLang) {
+        String agreementInviteTemplateLang,
+        String referralInviteTemplateName,
+        String referralInviteTemplateLang,
+        String referralInvitePhoneNumberId) {
     public String ownerNoticeSender() {
         return ownerNoticePhoneNumberId == null || ownerNoticePhoneNumberId.isBlank()
                 ? phoneNumberId : ownerNoticePhoneNumberId;
+    }
+
+    public String referralInviteSender() {
+        return referralInvitePhoneNumberId == null || referralInvitePhoneNumberId.isBlank()
+                ? phoneNumberId : referralInvitePhoneNumberId;
     }
 
     @Override
@@ -47,6 +55,9 @@ public record WhatsAppProperties(
                 + ", serviceTemplateName=" + serviceTemplateName
                 + ", serviceTemplateLang=" + serviceTemplateLang
                 + ", agreementInviteTemplateName=" + agreementInviteTemplateName
-                + ", agreementInviteTemplateLang=" + agreementInviteTemplateLang + "]";
+                + ", agreementInviteTemplateLang=" + agreementInviteTemplateLang
+                + ", referralInviteTemplateName=" + referralInviteTemplateName
+                + ", referralInviteTemplateLang=" + referralInviteTemplateLang
+                + ", referralInvitePhoneNumberId=" + referralInvitePhoneNumberId + "]";
     }
 }

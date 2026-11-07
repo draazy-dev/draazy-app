@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.draazy.api.common.settings.PlatformSettings;
+import com.draazy.api.common.trust.NewAccountAnnouncer;
 import com.draazy.api.identity.user.SelfProfile;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserMapperImpl;
@@ -51,7 +52,7 @@ class AuthServiceRaceTest {
         when(platformSettings.signupsEnabled()).thenReturn(true);
         AuthService service = new AuthService(
                 users, userService, selfProfile, otpService, jwtService, refreshTokens,
-                mock(StaffInviteRepository.class), platformSettings);
+                mock(StaffInviteRepository.class), platformSettings, mock(NewAccountAnnouncer.class));
 
         AuthResponse response = service.login(new LoginRequest(mobile, "123456", null, null));
 

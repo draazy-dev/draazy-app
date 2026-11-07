@@ -66,6 +66,18 @@ class WhatsAppDecisionMessenger implements DecisionMessenger {
                 mobile, List.of(inviter, side, place, link));
     }
 
+    @Override
+    public boolean referralInviteEnabled() {
+        return !isBlank(props.referralInviteTemplateName());
+    }
+
+    @Override
+    public boolean sendReferralInvite(String mobile, String inviter, String link) {
+        return send(DecisionMessenger.REFERRAL_INVITE, "Referral invite", "referral-invite-template-name",
+                props.referralInviteTemplateName(), props.referralInviteTemplateLang(),
+                props.referralInviteSender(), mobile, List.of(inviter, link));
+    }
+
     private boolean send(String operation, String what, String property, String template, String lang,
             String fromNumberId, String mobile, List<String> parameters) {
         if (isBlank(template) || isBlank(lang)) {

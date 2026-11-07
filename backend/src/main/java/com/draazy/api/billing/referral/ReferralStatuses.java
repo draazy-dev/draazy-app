@@ -24,8 +24,6 @@ public final class ReferralStatuses {
 
     private static final Set<String> REJECTABLE = Set.of(PENDING, QUALIFIED, HELD);
 
-    private static final Set<String> FRIEND_ELIGIBLE = Set.of(PENDING, QUALIFIED, HELD, REWARDED);
-
     public static boolean isGranting(String status) {
         return GRANTING.contains(status);
     }
@@ -43,7 +41,7 @@ public final class ReferralStatuses {
     }
 
     public static boolean keepsFriendReward(String status) {
-        return FRIEND_ELIGIBLE.contains(status);
+        return GRANTING.contains(status);
     }
 
     public static final String TRACK_OWNER = "owner";

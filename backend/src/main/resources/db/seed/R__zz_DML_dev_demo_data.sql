@@ -437,7 +437,11 @@ INSERT INTO public.faqs (id, question, answer, category) VALUES
   ('fa900001-0000-4000-8000-00000000f009',
    'How do I report a suspicious listing or user?',
    'Tap ''Report'' on any listing, owner profile or flatmate post (you''ll need to be signed in). You can also message Draazy support from Messages. Our trust team investigates and removes anything that breaks our policies.',
-   'Trust')
+   'Trust'),
+  ('fa900001-0000-4000-8000-00000000f010',
+   'How does refer and earn work?',
+   'Open Refer a friend and type your friend''s mobile number. Draazy sends them your invite on WhatsApp, or opens your own WhatsApp if we can''t send it. When your friend gets going, you get 50% off the Draazy service fee of your next rent agreement. Stamp duty and registration charges are not discounted. Your friend gets a welcome gift too.',
+   'Payments')
     ON CONFLICT DO NOTHING;
 
 UPDATE public.faqs SET translations = '{"mr": {"question": "Draazy खरंच शून्य दलाली आहे का?", "answer": "होय — नेहमीच. तुम्ही थेट मालकांशी संपर्क साधता आणि कोणत्याही भाडे किंवा पुनर्विक्री व्यवहारावर शून्य दलाली भरता.", "category": "सर्वसाधारण"}}'::jsonb

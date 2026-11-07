@@ -51,6 +51,8 @@ const WAIVED = new Map([
   ['flatmate_requests', 'written by the flatmate request flow'],
   ['flatmate_saves', 'consumer/flatmates/flatmate-saves.spec.js creates every row it reads'],
   ['referrals', 'written on redemption - but referral_codes IS required, see below'],
+  ['referral_invites', 'written by the Refer screen invite flow; a seeded row would suppress a real invite'],
+  ['referral_redeem_failures', 'written by refused redemptions; a seeded row would lock the user out'],
   ['service_orders', 'written when a service is ordered'],
   ['property_ownership_evidence', 'written by the evidence upload'],
   // Rollup outputs may remain empty during a short suite; seeding them would fake the job's result.

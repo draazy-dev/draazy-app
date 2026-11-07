@@ -36,7 +36,11 @@ public class RateLimitLock {
 
         OWNER_NOTICE(14),
 
-        LEAD_CLAIM(15);
+        LEAD_CLAIM(15),
+
+        REFERRAL_INVITER(16),
+
+        REFERRAL_INVITE_MOBILE(17);
 
         private final int namespace;
 

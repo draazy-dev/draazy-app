@@ -3,10 +3,13 @@ package com.draazy.api.billing;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.draazy.api.billing.referral.ReferralQualification;
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.settings.SettingsCache;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.support.AbstractCommittedApiTest;
 import com.draazy.api.support.Races;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +24,7 @@ class ReferralQualificationRaceTest extends AbstractCommittedApiTest {
     @Autowired ReferralQualification qualification;
     @Autowired TransactionTemplate tx;
     @Autowired SettingsCache settingsCache;
+    @Autowired PropertyRepository propertyRepository;
 
     private String originalCap;
 
@@ -33,6 +37,8 @@ class ReferralQualificationRaceTest extends AbstractCommittedApiTest {
     void restore() {
         tx.executeWithoutResult(s -> {
             jdbc.update("delete from referrals where referrer_mobile like ?", mobilePrefix() + "%");
+            jdbc.update("delete from properties where owner_id in (select id from users where mobile like ?)",
+                    mobilePrefix() + "%");
             if (originalCap != null) {
                 jdbc.update("update settings set value = jsonb_set(value, '{referralQualifyPerMonth}', ?::jsonb) "
                         + "where key = 'fees'", originalCap);
@@ -58,8 +64,21 @@ class ReferralQualificationRaceTest extends AbstractCommittedApiTest {
                     """, referrer.getId(), referrer.getMobile(), referee.getMobile());
         }
 
+        UUID[] properties = new UUID[2];
+        for (int i = 0; i < 2; i++) {
+            User owner = referees[i];
+            properties[i] = tx.execute(s -> {
+                Property p = new Property(owner, "Race flat", "rent", "apartment", 25000L, "Kothrud", "Pune");
+                p.setBhk(new BigDecimal("2"));
+                p.setStatus("approved");
+                p.setPriceUnit("per-month");
+                p.setArea(new BigDecimal("1000"));
+                return propertyRepository.saveAndFlush(p).getId();
+            });
+        }
+
         List<Throwable> outcomes = Races.run(2, i -> tx.executeWithoutResult(s -> {
-            qualification.announceOwnershipVerified(referees[i].getId(), UUID.randomUUID(), Instant.now());
+            qualification.announceOwnershipVerified(referees[i].getId(), properties[i], Instant.now());
             pause();
         }));
 

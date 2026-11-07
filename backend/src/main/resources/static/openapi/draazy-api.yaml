@@ -2172,7 +2172,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ValidationProblem' }
-              example: { error: contact_quota_exhausted, message: You have used all your owner contacts. Buy a contact pack, or refer a friend to earn more., status: 422 }
+              example: { error: contact_quota_exhausted, message: You have used all your owner contacts. Buy a contact pack to keep contacting owners., status: 422 }
   /me/visit-requests:
     get:
       tags: [Listings]
@@ -5275,7 +5275,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-              example: { error: contact_quota_exhausted, message: You have used all your owner contacts. Buy a contact pack, or refer a friend to earn more., status: 422 }
+              example: { error: contact_quota_exhausted, message: You have used all your owner contacts. Buy a contact pack to keep contacting owners., status: 422 }
   /me/contact-requests:
     get:
       tags: [Leads & Contact]
@@ -9009,6 +9009,31 @@ paths:
         - { $ref: '#/components/parameters/DeviceId' }
       responses:
         '200': { description: Referrals, content: { application/json: { schema: { $ref: '#/components/schemas/ReferralSummary' } } } }
+  /me/referrals/invites:
+    post:
+      tags: [Billing & Growth]
+      summary: Invite a friend by WhatsApp
+      operationId: inviteReferral
+      description: >-
+        Sends the caller's referral link to a friend's mobile. A number that already has an account,
+        or was invited by anyone in the last 30 days, is skipped silently with the same response.
+        The answer never says whether a number is already a member. When Draazy cannot send WhatsApp
+        itself the response is `open_whatsapp` with a `wa.me` link for the app to open. Capped at
+        `referralInvitesPerDay` invites per caller per 24 hours.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mobile]
+              properties:
+                mobile: { type: string, description: The friend's 10-digit Indian mobile number. }
+      responses:
+        '200': { description: Invite accepted, content: { application/json: { schema: { $ref: '#/components/schemas/ReferralInviteResponse' } } } }
+        '409': { description: Referrals are switched off (`referralRewards` flag). }
+        '422': { description: 'Not a valid mobile (`invalid_mobile`) or the caller''s own number (`own_number`).' }
+        '429': { description: 'Daily invite cap reached (`invite_limit`); `Retry-After` is set.' }
   /referrals/redeem:
     post:
       tags: [Billing & Growth]
@@ -9017,7 +9042,8 @@ paths:
       description: >-
         Allowed only within `referralSignupWindowHours` of account creation, before the account has
         any listing or contact request, while the `referralRewards` flag is on, and not from the
-        referrer's own device. Every refusal is the same 409.
+        referrer's own device, and not after repeated failed attempts (`referralRedeemFailuresPerDay`
+        in 24 hours, per user). Every refusal is the same 409.
       parameters:
         - { $ref: '#/components/parameters/DeviceId' }
       requestBody:
@@ -17770,8 +17796,7 @@ components:
         remaining: { type: [integer, 'null'] }
         remainingRent: { type: [integer, 'null'], description: Contacts left for rent listings; null when unlimited. }
         remainingBuy: { type: [integer, 'null'], description: Contacts left for sale listings; null when unlimited. }
-        referralBonus: { type: integer, description: Part of allowance earned by the caller's seeker-track referrals }
-        friendBonus: { type: integer, description: Extra free contacts the caller got for joining through a code; 0 once rejected or clawed back. }
+        friendBonus: { type: integer, description: Extra free contacts the caller got for joining through a code; 0 unless the referral is granted (qualified or rewarded). }
         freeWindowEndsAt:
           type: [string, 'null']
           format: date-time
@@ -17798,10 +17823,10 @@ components:
     AgreementEntitlement:
       type: object
       properties:
-        free:
+        credits:
           type: integer
           minimum: 0
-          description: Free rent agreements earned by owner-track referrals.
+          description: Rent-agreement discount credits earned, one per qualified referral.
         used:
           type: integer
           minimum: 0
@@ -17810,40 +17835,45 @@ components:
           type: integer
           minimum: 0
           description: >-
-            Credits spendable at `POST /service-requests/{id}/checkout`, which waives only Draazy's
-            service fee. Never negative, even after a referral clawback.
+            Credits spendable at `POST /service-requests/{id}/checkout`, which takes `discountPercent`
+            off Draazy's service fee (never the statutory part). Never negative, even after a referral clawback.
+        discountPercent: { type: integer, description: Percent off the service fee one credit takes off. }
     ReferralSummary:
       type: object
       description: >-
-        The caller's own view of the scheme. The contacts and agreements earned are spendable through
+        The caller's own view of the scheme. Credits earned are spendable through
         `GET /me/entitlements`, derived from the same referrals.
       properties:
-        code: { type: string, example: PUNE-AB12 }
-        invited: { type: integer, description: People who redeemed the caller's code. }
-        converted: { type: integer, description: Referrals that qualified (granted, including rewarded). }
-        held: { type: integer, description: Referrals held for the hold period before a decision. }
-        earned:
+        code: { type: string, example: PUNE-AB12CD }
+        invited: { type: integer, description: Friends the caller invited by WhatsApp from the Refer page (link and code sign-ups count only in joined). }
+        joined: { type: integer, description: Friends who joined through the caller's code. }
+        qualified: { type: integer, description: Referrals that qualified (granted, including rewarded). }
+        checking: { type: integer, description: Referrals still pending or held for review. }
+        rewards:
           type: object
           properties:
-            owner:
-              type: object
-              properties:
-                referrals: { type: integer }
-                agreements: { type: integer, description: Free rent agreements earned. }
-            seeker:
-              type: object
-              properties:
-                referrals: { type: integer }
-                contacts: { type: integer, description: Owner contacts earned. }
+            earned: { type: integer, description: Credits earned. }
+            used: { type: integer, description: Credits spent on a rent agreement. }
+            remaining: { type: integer }
+            discountPercent: { type: integer, description: Percent off the next rent agreement service fee per credit. }
         friendReward:
           type: object
-          description: What the caller gets for having joined through a code.
+          description: What the caller gets for having joined through a code; contacts and featuredDays are 0 unless the referral is granted.
           properties:
             redeemed: { type: boolean }
             status: { type: [string, 'null'], description: The caller's own referral status; null when none. }
             track: { type: [string, 'null'], enum: [owner, seeker, null] }
             contacts: { type: integer, description: Extra free contacts standing now. }
             featuredDays: { type: integer, description: Featured days promised on their first verified listing. }
+    ReferralInviteResponse:
+      type: object
+      required: [delivery]
+      properties:
+        delivery:
+          type: string
+          enum: [sent, open_whatsapp]
+          description: '`sent` when Draazy sent the WhatsApp message; `open_whatsapp` when the app should open `whatsappUrl`.'
+        whatsappUrl: { type: string, description: A wa.me link prefilled with the invite text. Present only for `open_whatsapp`. }
     Referral:
       type: object
       description: A single referral record with anti-fraud signals (admin/ops view).
@@ -17855,7 +17885,7 @@ components:
         referredMobile: { $ref: '#/components/schemas/Mobile' }
         channel: { type: string, enum: [seeker, owner] }
         reward: { type: string, description: "Human label, e.g. '+15 owner contacts'" }
-        rewardAmount: { type: integer, description: Owner contacts or free agreements granted; 0 until it qualifies. }
+        rewardAmount: { type: integer, description: Referral credits granted (each is a % off one rent agreement service fee); 0 until it qualifies. }
         status: { type: string, enum: [pending, qualified, held, rewarded, rejected, clawed-back] }
         track: { type: [string, 'null'], enum: [owner, seeker, null], description: Decided by whichever qualifying event came first. }
         risk: { type: string, enum: [low, medium, high] }
@@ -19540,16 +19570,15 @@ components:
           type: object
           description: >-
             The referral numbers the Refer screen quotes. Each is an admin setting under `fees`
-            (`referralContactBonus`, `referralSeekerBonusContacts`, `referralOwnerFeaturedDays`,
-            `referralOwnerRewardAgreements`, `featuredDays`, `referralQualifyPerMonth`,
+            (`referralSeekerBonusContacts`, `referralOwnerFeaturedDays`,
+            `referralAgreementDiscountPercent`, `featuredDays`, `referralQualifyPerMonth`,
             `referralQualifyPerYear`, `referralHoldDays`, `referralClawbackDays`,
-            `referralSignupWindowHours`). Velocity, retention and new-referrer thresholds are not published.
-          required: [contactBonus, seekerBonusContacts, ownerFeaturedDays, ownerRewardAgreements, featuredDays, qualifyPerMonth, qualifyPerYear, holdDays, clawbackDays, signupWindowHours]
+            `referralSignupWindowHours`). Velocity, retention, invite-cap and redeem-lockout thresholds are not published.
+          required: [seekerBonusContacts, ownerFeaturedDays, agreementDiscountPercent, featuredDays, qualifyPerMonth, qualifyPerYear, holdDays, clawbackDays, signupWindowHours]
           properties:
-            contactBonus: { type: integer, description: Owner contacts the referrer earns per seeker-track referral. }
             seekerBonusContacts: { type: integer, description: Extra free contacts the friend gets on joining through a code. }
             ownerFeaturedDays: { type: integer, description: Days the friend's qualifying listing stays Featured. }
-            ownerRewardAgreements: { type: integer, description: Free rent agreements the referrer earns per owner-track referral. }
+            agreementDiscountPercent: { type: integer, minimum: 1, maximum: 100, description: Percent off the service fee of the referrer's next rent agreement, per qualified friend. }
             featuredDays: { type: integer, description: Days any listing stays Featured after its ownership is verified. }
             qualifyPerMonth: { type: integer, description: Referrals that can pay out per calendar month (IST). }
             qualifyPerYear: { type: integer, description: Referrals that can pay out per calendar year (IST). }

@@ -46,19 +46,17 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
     @Transactional(readOnly = true)
     public EntitlementsDto forUser(UUID userId) {
         Optional<Plan> plan = subscriptions.entitlingPlan(userId);
-        int contactBonus = referralContacts(userId);
         int friendBonus = friendBonus(userId);
         List<ContactUse> contacted = usage.contactUses(userId);
         long used = contacted.size();
 
         ContactEntitlementDto contacts;
         if (plan.map(Plan::isUnlimitedContacts).orElse(false)) {
-            contacts = new ContactEntitlementDto(true, used, null, null, null, null, contactBonus, friendBonus, null,
-                    null);
+            contacts = new ContactEntitlementDto(true, used, null, null, null, null, friendBonus, null, null);
         } else {
-            ContactAllocator.Standing standing = standingOf(userId, contacted, contactBonus, friendBonus);
+            ContactAllocator.Standing standing = standingOf(userId, contacted, friendBonus);
             contacts = new ContactEntitlementDto(false, used, Math.toIntExact(used) + standing.remaining(),
-                    standing.remaining(), standing.remainingRent(), standing.remainingBuy(), contactBonus,
+                    standing.remaining(), standing.remainingRent(), standing.remainingBuy(),
                     friendBonus, iso(standing.freeWindowEndsAt()), iso(standing.packExpiresAt()));
         }
 
@@ -79,14 +77,13 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         }
         List<ContactUse> before = usage.contactUses(userId).stream().filter(u -> u.at().isBefore(asOf)).toList();
         return ContactAllocator.spentFromPacks(before,
-                Math.toIntExact(settings.freeContactLimit()) + friendBonus(userId), terms,
-                referralContacts(userId)).getOrDefault(pack.subscriptionId(), 0);
+                Math.toIntExact(settings.freeContactLimit()) + friendBonus(userId), terms)
+                .getOrDefault(pack.subscriptionId(), 0);
     }
 
-    private ContactAllocator.Standing standingOf(UUID userId, List<ContactUse> contacted, int contactBonus,
-            int friendBonus) {
+    private ContactAllocator.Standing standingOf(UUID userId, List<ContactUse> contacted, int friendBonus) {
         return ContactAllocator.allocate(contacted, Math.toIntExact(settings.freeContactLimit()) + friendBonus,
-                subscriptions.contactPacks(userId), contactBonus, Instant.now());
+                subscriptions.contactPacks(userId), Instant.now());
     }
 
     private static int freeListingSlots(Optional<Plan> plan) {
@@ -97,25 +94,24 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         return Objects.toString(at, null);
     }
 
-    private int referralContacts(UUID userId) {
-        return Math.toIntExact(((Number) referrals.grantedByTrack(userId).getFirst()[1]).longValue()
-                * settings.referralContactBonus());
-    }
-
     private int friendBonus(UUID userId) {
         return referrals.friendContactBonusStands(userId) ? Math.toIntExact(settings.referralSeekerBonusContacts()) : 0;
     }
 
     @Transactional(readOnly = true)
-    public int freeAgreementsRemaining(UUID userId) {
+    public int referralCreditsRemaining(UUID userId) {
         return agreementsOf(userId).remaining();
     }
 
+    public int referralDiscountPercent() {
+        return Math.toIntExact(settings.referralAgreementDiscountPercent());
+    }
+
     private AgreementEntitlementDto agreementsOf(UUID userId) {
-        int earned = Math.toIntExact(((Number) referrals.grantedByTrack(userId).getFirst()[0]).longValue()
-                * settings.referralOwnerRewardAgreements());
+        int earned = Math.toIntExact(referrals.countGranted(userId));
         int used = Math.toIntExact(agreementCredits.agreementCreditsHeld(userId));
-        return new AgreementEntitlementDto(earned, used, Math.max(0, earned - used));
+        return new AgreementEntitlementDto(earned, used, Math.max(0, earned - used),
+                Math.toIntExact(settings.referralAgreementDiscountPercent()));
     }
 
     @Override
@@ -136,7 +132,6 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         if (subscriptions.entitlingPlan(userId).map(Plan::isUnlimitedContacts).orElse(false)) {
             return OptionalInt.empty();
         }
-        return OptionalInt.of(standingOf(userId, usage.contactUses(userId), referralContacts(userId),
-                friendBonus(userId)).remainingFor(deal));
+        return OptionalInt.of(standingOf(userId, usage.contactUses(userId), friendBonus(userId)).remainingFor(deal));
     }
 }

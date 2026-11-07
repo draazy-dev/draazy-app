@@ -95,6 +95,7 @@ public class ServiceRequest extends VersionedEntity {
     void awaitPayment(long amount) {
         this.status = ServiceRequestStatus.AWAITING_PAYMENT;
         this.amount = amount;
+        this.referralCredit = false;
     }
 
     void spendReferralCredit(long amountAfterWaiver) {

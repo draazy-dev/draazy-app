@@ -35,11 +35,11 @@ class ContactAllocatorTest {
     @Test
     @DisplayName("the free window opens at the first contact and is open-ended before it")
     void freeWindowStartsAtTheFirstContact() {
-        var none = ContactAllocator.allocate(List.of(), 15, List.of(), 0, day(100));
+        var none = ContactAllocator.allocate(List.of(), 15, List.of(), day(100));
         assertThat(none.remaining()).isEqualTo(15);
         assertThat(none.freeWindowEndsAt()).isNull();
 
-        var first = ContactAllocator.allocate(contactsOn(3, 0), 15, List.of(), 0, day(10));
+        var first = ContactAllocator.allocate(contactsOn(3, 0), 15, List.of(), day(10));
         assertThat(first.remaining()).isEqualTo(12);
         assertThat(first.freeWindowEndsAt()).isEqualTo(day(30));
     }
@@ -47,7 +47,7 @@ class ContactAllocatorTest {
     @Test
     @DisplayName("unspent free contacts lapse thirty days after the first one")
     void freeContactsExpire() {
-        var standing = ContactAllocator.allocate(contactsOn(3, 0), 15, List.of(), 0, day(31));
+        var standing = ContactAllocator.allocate(contactsOn(3, 0), 15, List.of(), day(31));
 
         assertThat(standing.remaining()).isZero();
     }
@@ -58,7 +58,7 @@ class ContactAllocatorTest {
         var early = new ContactPackTerm(day(0), day(30), 15);
         var late = new ContactPackTerm(day(0), day(60), 15);
 
-        var standing = ContactAllocator.allocate(contactsOn(10, 1), 0, List.of(early, late), 0, day(5));
+        var standing = ContactAllocator.allocate(contactsOn(10, 1), 0, List.of(early, late), day(5));
 
         assertThat(standing.remaining()).isEqualTo(20);
         assertThat(standing.packExpiresAt()).isEqualTo(day(30));
@@ -70,12 +70,12 @@ class ContactAllocatorTest {
         var frozen = new ContactPackTerm(null, day(0), day(30), 15, day(5), null);
         var live = new ContactPackTerm(day(0), day(60), 15);
 
-        var beforeFreeze = ContactAllocator.allocate(contactsOn(3, 1), 0, List.of(frozen, live), 0, day(6));
+        var beforeFreeze = ContactAllocator.allocate(contactsOn(3, 1), 0, List.of(frozen, live), day(6));
         assertThat(beforeFreeze.remaining()).isEqualTo(15);
 
         var afterFreeze = ContactAllocator.allocate(
                 java.util.stream.Stream.concat(contactsOn(3, 1).stream(), contactsOn(2, 7).stream()).toList(),
-                0, List.of(frozen, live), 0, day(8));
+                0, List.of(frozen, live), day(8));
         assertThat(afterFreeze.remaining()).isEqualTo(13);
         assertThat(afterFreeze.packExpiresAt()).isEqualTo(day(60));
     }
@@ -86,23 +86,10 @@ class ContactAllocatorTest {
         var old = new ContactPackTerm(day(0), day(30), 15);
         var fresh = new ContactPackTerm(day(40), day(70), 15);
 
-        var standing = ContactAllocator.allocate(contactsOn(5, 1), 0, List.of(old, fresh), 0, day(45));
+        var standing = ContactAllocator.allocate(contactsOn(5, 1), 0, List.of(old, fresh), day(45));
 
         assertThat(standing.remaining()).isEqualTo(15);
         assertThat(standing.packExpiresAt()).isEqualTo(day(70));
-    }
-
-    @Test
-    @DisplayName("referral contacts never expire and are spent last")
-    void referralContactsAreSpentLast() {
-        var pack = new ContactPackTerm(day(0), day(30), 15);
-
-        var spendingPackFirst = ContactAllocator.allocate(contactsOn(10, 1), 0, List.of(pack), 30, day(5));
-        assertThat(spendingPackFirst.remaining()).isEqualTo(35);
-
-        var afterPackLapses = ContactAllocator.allocate(contactsOn(10, 1), 0, List.of(pack), 30, day(90));
-        assertThat(afterPackLapses.remaining()).isEqualTo(30);
-        assertThat(afterPackLapses.packExpiresAt()).isNull();
     }
 
     @Test
@@ -110,7 +97,7 @@ class ContactAllocatorTest {
     void unassignableContactsAreIgnored() {
         var pack = new ContactPackTerm(day(50), day(80), 15);
 
-        var standing = ContactAllocator.allocate(contactsOn(20, 0), 15, List.of(pack), 0, day(60));
+        var standing = ContactAllocator.allocate(contactsOn(20, 0), 15, List.of(pack), day(60));
 
         assertThat(standing.remaining()).isEqualTo(15);
     }
@@ -119,7 +106,7 @@ class ContactAllocatorTest {
     @DisplayName("a rent pack serves rent listings only, a buy pack sale listings only")
     void typedPacksServeTheirOwnDealOnly() {
         var standing = ContactAllocator.allocate(contactsOn(3, 1, "buy"), 0,
-                List.of(pack(0, 30, "rent"), pack(0, 60, "buy")), 0, day(5));
+                List.of(pack(0, 30, "rent"), pack(0, 60, "buy")), day(5));
 
         assertThat(standing.remainingRent()).isEqualTo(15);
         assertThat(standing.remainingBuy()).isEqualTo(12);
@@ -129,7 +116,7 @@ class ContactAllocatorTest {
     @Test
     @DisplayName("a sale contact with only a rent pack left has nothing to draw on")
     void aRentPackNeverPaysForASaleContact() {
-        var standing = ContactAllocator.allocate(contactsOn(2, 1, "buy"), 0, List.of(pack(0, 30, "rent")), 0,
+        var standing = ContactAllocator.allocate(contactsOn(2, 1, "buy"), 0, List.of(pack(0, 30, "rent")),
                 day(5));
 
         assertThat(standing.remainingFor("buy")).isZero();
@@ -137,13 +124,13 @@ class ContactAllocatorTest {
     }
 
     @Test
-    @DisplayName("free, referral and pre-split packs serve both deals, and a typed pack is spent first on a tie")
+    @DisplayName("free and pre-split packs serve both deals, and a typed pack is spent first on a tie")
     void sharedBucketsServeBothDealsAndTypedWinsTies() {
         var standing = ContactAllocator.allocate(contactsOn(4, 1, "rent"), 0,
-                List.of(pack(0, 30, null), pack(0, 30, "rent")), 5, day(5));
+                List.of(pack(0, 30, null), pack(0, 30, "rent")), day(5));
 
-        assertThat(standing.remainingRent()).isEqualTo(15 + 11 + 5);
-        assertThat(standing.remainingBuy()).isEqualTo(15 + 5);
+        assertThat(standing.remainingRent()).isEqualTo(15 + 11);
+        assertThat(standing.remainingBuy()).isEqualTo(15);
     }
 
     @Test
@@ -154,7 +141,7 @@ class ContactAllocatorTest {
         var contacts = java.util.stream.Stream.concat(contactsOn(2, 1, "rent").stream(),
                 contactsOn(3, 2, "buy").stream()).toList();
 
-        var spent = ContactAllocator.spentFromPacks(contacts, 0, List.of(rent, buy), 0);
+        var spent = ContactAllocator.spentFromPacks(contacts, 0, List.of(rent, buy));
 
         assertThat(spent).containsEntry(rent.subscriptionId(), 2).containsEntry(buy.subscriptionId(), 3);
     }

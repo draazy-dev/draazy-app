@@ -14,18 +14,24 @@ public class ReferralSignalRetention {
 
     private final ReferralRepository referrals;
     private final ReferralCodeRepository codes;
+    private final ReferralRedeemFailureRepository redeemFailures;
+    private final ReferralInviteRepository invites;
     private final PlatformSettings settings;
 
     public ReferralSignalRetention(ReferralRepository referrals, ReferralCodeRepository codes,
+            ReferralRedeemFailureRepository redeemFailures, ReferralInviteRepository invites,
             PlatformSettings settings) {
         this.referrals = referrals;
         this.codes = codes;
+        this.redeemFailures = redeemFailures;
+        this.invites = invites;
         this.settings = settings;
     }
 
     @Transactional
     public int expireSignalsOlderThan(Instant cutoff) {
-        int cleared = referrals.clearSignalsOlderThan(cutoff) + codes.clearSignalsOlderThan(cutoff);
+        int cleared = referrals.clearSignalsOlderThan(cutoff) + codes.clearSignalsOlderThan(cutoff)
+                + redeemFailures.deleteOlderThan(cutoff) + invites.deleteOlderThan(cutoff);
         if (cleared > 0) {
             log.info("Referral signal retention cleared digests on {} row(s)", cleared);
         }

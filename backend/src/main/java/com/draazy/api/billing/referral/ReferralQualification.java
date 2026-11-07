@@ -37,7 +37,18 @@ public class ReferralQualification implements VerificationAnnouncer {
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
     public void announceOwnershipVerified(UUID ownerId, UUID propertyId, Instant verifiedAt) {
+        if (properties.findById(propertyId).filter(Property::isPubliclyVisible).isEmpty()) {
+            return;
+        }
         qualify(ownerId, ReferralStatuses.TRACK_OWNER, propertyId, null, verifiedAt);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void announceListingLive(UUID propertyId) {
+        properties.findById(propertyId)
+                .filter(p -> p.getOwnershipVerifiedAt() != null && p.isPubliclyVisible())
+                .ifPresent(p -> qualify(p.getOwner().getId(), ReferralStatuses.TRACK_OWNER, propertyId, null,
+                        Instant.now()));
     }
 
     @Transactional(propagation = Propagation.REQUIRED)
@@ -59,10 +70,8 @@ public class ReferralQualification implements VerificationAnnouncer {
         Referral referral = pending.get();
         locks.holdUntilCommit(RateLimitLock.Limit.REFERRER_QUALIFY, referral.getReferrerId().toString());
         boolean owner = ReferralStatuses.TRACK_OWNER.equals(track);
-        long amount = owner ? settings.referralOwnerRewardAgreements() : settings.referralContactBonus();
-        referral.qualifyOn(track, propertyId, at,
-                "+" + amount + (owner ? " free rent agreement" + (amount == 1 ? "" : "s") : " owner contacts"),
-                amount);
+        long percent = settings.referralAgreementDiscountPercent();
+        referral.qualifyOn(track, propertyId, at, percent + "% off next rent agreement fee", percent);
 
         if (!owner && referral.getReferrerId().equals(approvingOwnerId)) {
             outcomes.rejected(referral, ReferralClawbacks.SELF_DEALING, "Automatic: the referrer approved the contact",

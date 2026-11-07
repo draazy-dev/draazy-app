@@ -42,22 +42,32 @@ class WhatsAppSendersTest {
 
     private static WhatsAppProperties props(String otpName, String otpLang, String idName, String idLang) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                otpName, otpLang, idName, idLang, null, null, null, null, null, null, null, null, null);
+                otpName, otpLang, idName, idLang, null, null, null, null, null, null, null, null, null,
+                null, null, null);
     }
 
     private static WhatsAppProperties digestProps(String name, String lang) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                "login", "en_US", null, null, name, lang, null, null, null, null, null, null, null);
+                "login", "en_US", null, null, name, lang, null, null, null, null, null, null, null,
+                null, null, null);
     }
 
     private static WhatsAppProperties noticeProps(String noticeNumberId) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                "login", "en_US", null, null, null, null, "notice", "en", noticeNumberId, null, null, null, null);
+                "login", "en_US", null, null, null, null, "notice", "en", noticeNumberId, null, null, null, null,
+                null, null, null);
     }
 
     private static WhatsAppProperties inviteProps(String name, String lang) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                "login", "en_US", null, null, null, null, null, null, null, null, null, name, lang);
+                "login", "en_US", null, null, null, null, null, null, null, null, null, name, lang,
+                null, null, null);
+    }
+
+    private static WhatsAppProperties referralProps(String name, String senderId) {
+        return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
+                "login", "en_US", null, null, null, null, null, null, null, null, null, null, null,
+                name, "en_US", senderId);
     }
 
     @SuppressWarnings("unchecked")
@@ -189,7 +199,7 @@ class WhatsAppSendersTest {
         WhatsAppDecisionMessenger messenger = new WhatsAppDecisionMessenger(client,
                 new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
                         "login", "en_US", "decision", "en", "waiting", "en_US", "notice", "en", null, null, null,
-                        null, null), calls, optOuts);
+                        null, null, null, null, null), calls, optOuts);
 
         assertThat(messenger.sendWaitingDigest(MOBILE, "3 requests")).isFalse();
         assertThat(messenger.sendOwnerNotice(MOBILE, "Asha", "Baner", "https://draazy.test/owner-confirm#t")).isFalse();
@@ -245,5 +255,35 @@ class WhatsAppSendersTest {
                 eq(ProviderCalls.Outcome.SKIPPED), eq(MOBILE), any(), eq("template unset"), any());
         verify(calls).record(eq(ProviderCalls.WHATSAPP), eq("agreement-invite"),
                 eq(ProviderCalls.Outcome.SKIPPED), eq(MOBILE), any(), eq("opted out"), any());
+    }
+
+    @Test
+    @DisplayName("the referral invite sends inviter and link from its own number, else the main one")
+    void referralInvitePayload() {
+        String link = "https://draazy.test/signup?ref=PUNE-ABC234";
+        var own = new WhatsAppDecisionMessenger(client, referralProps("referral_invite", "REFER"), calls, optOuts);
+        assertThat(own.referralInviteEnabled()).isTrue();
+        assertThat(own.sendReferralInvite(MOBILE, "Asha", link)).isTrue();
+        ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);
+        verify(client).post(eq("/REFER/messages"), body.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> template = (Map<String, Object>) ((Map<String, Object>) body.getValue()).get("template");
+        assertThat(template).containsEntry("name", "referral_invite");
+        assertThat(template.get("components")).isEqualTo(List.of(Map.of("type", "body",
+                "parameters", List.of(Map.of("type", "text", "text", "Asha"),
+                        Map.of("type", "text", "text", link)))));
+
+        new WhatsAppDecisionMessenger(client, referralProps("referral_invite", " "), calls, optOuts)
+                .sendReferralInvite(MOBILE, "Asha", link);
+        verify(client).post(eq("/PNID/messages"), any());
+    }
+
+    @Test
+    @DisplayName("the referral invite is off while its template is unset")
+    void referralInviteDisabledWithoutTemplate() {
+        var messenger = new WhatsAppDecisionMessenger(client, referralProps(" ", null), calls, optOuts);
+        assertThat(messenger.referralInviteEnabled()).isFalse();
+        assertThat(messenger.sendReferralInvite(MOBILE, "Asha", "https://draazy.test/x")).isFalse();
+        verify(client, never()).post(anyString(), any());
     }
 }

@@ -12,6 +12,7 @@ public interface DecisionMessenger {
     String OWNER_NOTICE = "owner-notice";
     String SERVICE_ATTENTION = "service-attention";
     String AGREEMENT_INVITE = "agreement-invite";
+    String REFERRAL_INVITE = "referral-invite";
 
     void sendIdentityDecision(String mobile, String line);
 
@@ -25,6 +26,15 @@ public interface DecisionMessenger {
     }
 
     default boolean sendAgreementInvite(String mobile, String inviter, String side, String place, String link) {
+        return false;
+    }
+
+    default boolean referralInviteEnabled() {
+        return false;
+    }
+
+    // link carries the referrer's code: implementations must never log it.
+    default boolean sendReferralInvite(String mobile, String inviter, String link) {
         return false;
     }
 }
@@ -77,6 +87,14 @@ class LoggingDecisionMessenger implements DecisionMessenger {
         log.info("[MOCK WHATSAPP] agreement invite to {} as {} from {}: {}", MobileMask.mask(mobile), side,
                 inviter, link);
         calls.record(ProviderCalls.WHATSAPP, AGREEMENT_INVITE, ProviderCalls.Outcome.SKIPPED, mobile, null,
+                "mock", null);
+        return false;
+    }
+
+    @Override
+    public boolean sendReferralInvite(String mobile, String inviter, String link) {
+        log.info("[MOCK WHATSAPP] referral invite to {} from {}", MobileMask.mask(mobile), inviter);
+        calls.record(ProviderCalls.WHATSAPP, REFERRAL_INVITE, ProviderCalls.Outcome.SKIPPED, mobile, null,
                 "mock", null);
         return false;
     }

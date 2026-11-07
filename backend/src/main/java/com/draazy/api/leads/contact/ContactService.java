@@ -154,7 +154,7 @@ public class ContactService {
             throw new ContactQuotaExhaustedException(
                     "You have used all your owner contacts for " + (DealIntent.BUY.equals(deal) ? "sale" : "rent")
                             + " listings. Buy a " + (DealIntent.BUY.equals(deal) ? "Buy" : "Rent")
-                            + " Contact Pack, or refer a friend to earn more.");
+                            + " Contact Pack to keep contacting owners.");
         }
     }
 

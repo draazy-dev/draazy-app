@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -204,8 +205,12 @@ public class CoFillServiceRequests {
 
     private ServiceRequest spendReferralCredit(AuthPrincipal caller, String id) {
         ServiceRequest request = checkoutable(caller, id);
-        if (caller.userId().equals(request.getRequesterId()) && referralCredit.spend(request)) {
+        OptionalLong discount = caller.userId().equals(request.getRequesterId())
+                ? referralCredit.spend(request) : OptionalLong.empty();
+        if (discount.isPresent()) {
             serviceRequests.recordBy(request, "referral-credit.applied", caller.userId());
+            audit.record(caller, "service-request.referral-credit", "service_request",
+                    request.getId().toString(), "discount", String.valueOf(discount.getAsLong()));
             if (request.getAmount() == 0) {
                 serviceRequests.transition(request, ServiceRequestStatus.NEW);
                 serviceRequests.record(request, "payment.waived", null);
