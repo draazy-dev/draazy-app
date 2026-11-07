@@ -3,13 +3,17 @@ package com.draazy.api.services.request;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.provider.DecisionMessenger;
+import com.draazy.api.security.InMemoryWriteRateLimitStore;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -23,10 +27,20 @@ class CoFillInviteWhatsAppTest {
 
     private final DecisionMessenger messenger = mock(DecisionMessenger.class);
     private final Notifier notifier = mock(Notifier.class);
-    private final CoFillInviteWhatsApp whatsApp = new CoFillInviteWhatsApp(messenger, notifier, "https://draazy.test/");
+    private final CoFillInviteWhatsApp whatsApp = budgeted(60);
+
+    private CoFillInviteWhatsApp budgeted(int perHour) {
+        return new CoFillInviteWhatsApp(messenger, notifier, InMemoryWriteRateLimitStore::new,
+                "https://draazy.test/", perHour);
+    }
 
     private static ServiceRequest request(String type, Map<String, Object> details) {
+        return request(type, details, UUID.fromString("00000000-0000-0000-0000-00000000000c"));
+    }
+
+    private static ServiceRequest request(String type, Map<String, Object> details, UUID requester) {
         ServiceRequest request = mock(ServiceRequest.class);
+        when(request.getRequesterId()).thenReturn(requester);
         when(request.getId()).thenReturn(REQUEST_ID);
         when(request.getType()).thenReturn(type);
         when(request.getDetails()).thenReturn(details);
@@ -90,6 +104,62 @@ class CoFillInviteWhatsAppTest {
 
         assertThatCode(() -> whatsApp.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of()),
                 party("tenant", null), MOBILE, "Asha")).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("one number gets at most three invites a day, whoever types it")
+    void perNumberCap() {
+        for (int i = 0; i < 4; i++) {
+            whatsApp.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of(), UUID.randomUUID()),
+                    party("tenant", null), MOBILE, "Asha");
+        }
+
+        verify(messenger, times(CoFillInviteWhatsApp.MAX_PER_NUMBER))
+                .sendAgreementInvite(anyString(), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("one inviter sends at most ten invites a day, however many numbers they type")
+    void perInviterCap() {
+        for (int i = 0; i < 11; i++) {
+            whatsApp.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of()), party("tenant", null),
+                    "98111222" + (10 + i), "Asha");
+        }
+
+        verify(messenger, times(CoFillInviteWhatsApp.MAX_PER_INVITER))
+                .sendAgreementInvite(anyString(), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("an inviter over their own cap cannot use up someone else's number")
+    void cappedInviterSparesNumber() {
+        UUID griefer = UUID.randomUUID();
+        for (int i = 0; i < CoFillInviteWhatsApp.MAX_PER_INVITER; i++) {
+            whatsApp.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of(), griefer), party("tenant", null),
+                    "98111222" + (10 + i), "Asha");
+        }
+        for (int i = 0; i < 5; i++) {
+            whatsApp.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of(), griefer), party("tenant", null),
+                    MOBILE, "Asha");
+        }
+        clearInvocations(messenger);
+
+        whatsApp.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of(), UUID.randomUUID()),
+                party("tenant", null), MOBILE, "Ravi");
+
+        verify(messenger).sendAgreementInvite(eq(MOBILE), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("the platform's hourly invite budget caps everyone together")
+    void platformCap() {
+        CoFillInviteWhatsApp capped = budgeted(2);
+        for (int i = 0; i < 3; i++) {
+            capped.send(request(ServiceRequestTypes.RENT_AGREEMENT, Map.of(), UUID.randomUUID()),
+                    party("tenant", null), "98111222" + (10 + i), "Asha");
+        }
+
+        verify(messenger, times(2)).sendAgreementInvite(anyString(), anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
