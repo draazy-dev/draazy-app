@@ -109,6 +109,13 @@ class TrackedRentTest extends AbstractApiTest {
                         .content("{\"tenantName\":\"Neha Joshi\",\"tenantMobile\":\"9861005013\"}"))
                 .andExpect(status().isOk());
         User later = user("9861005013", "Neha Joshi");
+        // Named on the 1st, the successor owes this month: the one the predecessor already paid.
+        em.flush();
+        jdbc.update("update managed_properties set tenant_since = ?::timestamptz where id = ?::uuid",
+                THIS_MONTH + "-01 00:00+05:30", id);
+        jdbc.update("update managed_property_rent_receipts set created_at = created_at - interval '40 days'"
+                + " where managed_property_id = ?::uuid", id);
+        em.clear();
 
         mvc.perform(get(Routes.MeManagedProperties.TRACKED_RENT).header(HttpHeaders.AUTHORIZATION, bearer(first)))
                 .andExpect(jsonPath("$.length()").value(0));

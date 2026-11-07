@@ -127,6 +127,9 @@ public class ManagedProperty extends AuditedEntity {
     @Column(name = "agreement_request_id", insertable = false)
     private UUID agreementRequestId;
 
+    @Column(name = "agreement_flat_key", insertable = false, updatable = false)
+    private String agreementFlatKey;
+
     @Column(name = "landlord_pan")
     @Setter
     private String landlordPan;

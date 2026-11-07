@@ -717,7 +717,8 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"2 BHK in Kothrud\",\"deal\":\"rent\",\"propertyType\":\"apartment\","
-                                + "\"price\":25000,\"locality\":\"Kothrud\",\"city\":\"Pune\","
+                                + "\"price\":25000,\"locality\":\"Kothrud\",\"city\":\"Pune\",\"pincode\":\"411038\","
+                                + "\"societyId\":\"" + societyNamed("Green Meadows") + "\","
                                 + listingImages(owner) + "}"))
                 .andExpect(status().isCreated());
 
@@ -726,6 +727,30 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
                   join managed_properties m on m.published_listing_id = p.id
                  where m.id = ?::uuid
                 """, Boolean.class, homeId)).isTrue();
+    }
+
+    @Test
+    @DisplayName("a listing published from an agreement home at another address does not get the badge")
+    void publishingAnotherAddressLeavesTheListingUnverified() throws Exception {
+        User owner = customer("9820004543");
+        User desk = staff("9820004544", Teams.RENTAL);
+        complete(raise(owner, null, ownedBy(owner, TENANTS)), owner, desk);
+        String homeId = homesOf(owner).get(0).path("id").asText();
+
+        mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + homeId + "/listing")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"3 BHK in Baner\",\"deal\":\"rent\",\"propertyType\":\"apartment\","
+                                + "\"price\":45000,\"locality\":\"Baner\",\"city\":\"Pune\",\"pincode\":\"411045\","
+                                + "\"societyId\":\"" + societyNamed("Vista Heights") + "\","
+                                + listingImages(owner) + "}"))
+                .andExpect(status().isCreated());
+
+        assertThat(jdbc.queryForObject("""
+                select p.ownership_verified from properties p
+                  join managed_properties m on m.published_listing_id = p.id
+                 where m.id = ?::uuid
+                """, Boolean.class, homeId)).isFalse();
     }
 
     @Test

@@ -104,13 +104,14 @@ public class TrackedRentService {
 
     private TrackedRentDto toTenantView(ManagedProperty m, LocalDate today) {
         YearMonth month = YearMonth.from(today);
-        LocalDate due = month.atDay(dueDay(m));
+        YearMonth first = firstRentMonth(m);
+        YearMonth owed = first != null && month.isBefore(first) && !paid(m, month) ? first : month;
+        LocalDate due = owed.atDay(dueDay(m));
         String status;
-        if (paid(m, month)) {
+        if (paid(m, owed)) {
             status = "paid";
-        } else if (due.isBefore(namedOn(m))) {
+        } else if (!owed.equals(month)) {
             status = "due";
-            due = month.plusMonths(1).atDay(dueDay(m));
         } else {
             status = today.isAfter(due) ? "overdue" : "due";
         }
@@ -176,6 +177,16 @@ public class TrackedRentService {
 
     private boolean paid(ManagedProperty m, YearMonth month) {
         return receipts.existsByManagedPropertyIdAndRentMonth(m.getId(), month.toString());
+    }
+
+    // A tenant named after this month's due day owes nothing until next month's.
+    static YearMonth firstRentMonth(ManagedProperty m) {
+        if (m.getTenantSince() == null) {
+            return null;
+        }
+        LocalDate named = namedOn(m);
+        YearMonth month = YearMonth.from(named);
+        return month.atDay(dueDay(m)).isBefore(named) ? month.plusMonths(1) : month;
     }
 
     private static LocalDate namedOn(ManagedProperty m) {

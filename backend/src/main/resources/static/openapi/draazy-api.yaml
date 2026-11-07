@@ -16874,11 +16874,13 @@ components:
           readOnly: true
           description: Months (YYYY-MM) the current tenant says are paid that have no receipt yet, newest first.
           items: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        firstRentMonth: { type: [string, 'null'], readOnly: true, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$', description: 'First month (YYYY-MM) the current tenant owes rent; next month when they were named after the due day. Null without a tenant.' }
         valuation: { type: [object, 'null'], additionalProperties: true, description: Opaque Rent-o-meter snapshot. }
         publishedListingId: { type: [string, 'null'], description: Id of the spawned listing once published. }
         sourceRoomId: { type: [string, 'null'], readOnly: true, description: The flatmate room whose owner confirmation created this private home; null for a record the owner made themselves, or once that room is deleted. }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        agreementVerified: { type: boolean, readOnly: true, description: True when a registered Draazy rent agreement for this home names the owner as landlord. }
     ManagedPropertyCreate:
       type: object
       required: [deal, propertyType, price, locality]
@@ -16989,7 +16991,7 @@ components:
         owned property; accepting them here would let a caller issue themselves a receipt for a rent
         that was never agreed.
       properties:
-        rentMonth: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$', example: '2026-08' }
+        rentMonth: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$', example: '2026-08', description: 'No later than this month, or the tenant''s `firstRentMonth` when that is next month; no earlier than five years back. Otherwise 422.' }
     Document:
       type: object
       properties:

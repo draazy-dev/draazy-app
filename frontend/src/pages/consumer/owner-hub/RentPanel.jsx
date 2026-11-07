@@ -275,7 +275,7 @@ export default function RentPanel({ prop, onChange }) {
   const claims = new Set(prop.rentClaims || []);
   const claimed = !paid && !pending && claims.has(s.ym);
   const tenant = prop.tenantName || t('ownerHub.tenant');
-  const months = recentMonths(LEDGER_MONTHS, i18n.language);
+  const months = recentMonths(LEDGER_MONTHS, i18n.language, s.ym);
   return (
     <div className="glass-card rounded-2xl p-6">
       <div className="flex items-center justify-between mb-4">

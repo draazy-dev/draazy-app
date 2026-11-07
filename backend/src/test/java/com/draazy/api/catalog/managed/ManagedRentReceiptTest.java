@@ -12,6 +12,7 @@ import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
+import jakarta.persistence.EntityManager;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @DisplayName("Managed property — manual rent receipts")
 class ManagedRentReceiptTest extends AbstractApiTest {
@@ -27,6 +29,10 @@ class ManagedRentReceiptTest extends AbstractApiTest {
     UserRepository users;
     @Autowired
     ManagedPropertyRepository managed;
+    @Autowired
+    JdbcTemplate jdbc;
+    @Autowired
+    EntityManager em;
 
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
     private static final String MONTH_1 = YearMonth.now(IST).minusMonths(1).toString();
@@ -248,6 +254,11 @@ class ManagedRentReceiptTest extends AbstractApiTest {
         User o = owner("9861004022", "Asha Patil");
         String id = rentedFlat(o);
         YearMonth now = YearMonth.now(IST);
+        // Named on the 1st, the tenant owes this month, so next month has not happened yet.
+        em.flush();
+        jdbc.update("update managed_properties set tenant_since = ?::timestamptz where id = ?::uuid",
+                now.atDay(1) + " 00:00+05:30", id);
+        em.clear();
 
         String[] outOfRange = {
             now.plusMonths(1).toString(),

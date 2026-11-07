@@ -14,6 +14,8 @@ import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -187,5 +189,60 @@ class RentLoopTest extends AbstractApiTest {
 
         assertThat(noteTypes(owner)).isEmpty();
         assertThat(noteTypes(tenant)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a tenant named after the due day owes from next month, and the owner is told the same month")
+    void ownerSeesTheTenantsFirstRentMonth() throws Exception {
+        User owner = user("9861006051", "Asha Patil");
+        User tenant = user("9861006052", "Tenant Fresh");
+        String id = rentedFlat(owner, tenant.getMobile(), 5);
+        em.flush();
+
+        jdbc.update("update managed_properties set tenant_since = timestamptz '2025-03-10 09:00+05:30' where id = ?::uuid",
+                id);
+        em.clear();
+        mvc.perform(get(Routes.MeManagedProperties.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.firstRentMonth").value("2025-04"));
+
+        jdbc.update("update managed_properties set tenant_since = timestamptz '2025-03-05 09:00+05:30' where id = ?::uuid",
+                id);
+        em.clear();
+        mvc.perform(get(Routes.MeManagedProperties.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.firstRentMonth").value("2025-03"));
+    }
+
+    @Test
+    @DisplayName("the owner can confirm an early first rent the tenant claimed, but no month beyond it")
+    void ownerConfirmsAnEarlyFirstRent() throws Exception {
+        User owner = user("9861006061", "Asha Patil");
+        User tenant = user("9861006062", "Tenant Early");
+        String id = rentedFlat(owner, tenant.getMobile(), 5);
+        em.flush();
+        YearMonth now = YearMonth.now(ZoneId.of("Asia/Kolkata"));
+        String first = now.plusMonths(1).toString();
+        jdbc.update("update managed_properties set tenant_since = ?::timestamptz where id = ?::uuid",
+                now.atDay(20) + " 09:00+05:30", id);
+        em.clear();
+
+        mvc.perform(post(Routes.MeManagedProperties.TRACKED_RENT_PAID, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dueOn").value(org.hamcrest.Matchers.startsWith(first)));
+
+        mvc.perform(post(Routes.MeManagedProperties.RENT_RECEIPTS, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rentMonth\":\"" + now.plusMonths(2) + "\"}"))
+                .andExpect(status().isUnprocessableEntity());
+        mvc.perform(post(Routes.MeManagedProperties.RENT_RECEIPTS, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rentMonth\":\"" + first + "\"}"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(get(Routes.MeManagedProperties.TRACKED_RENT).header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(jsonPath("$[0].status").value("paid"))
+                .andExpect(jsonPath("$[0].dueOn").value(org.hamcrest.Matchers.startsWith(first)));
     }
 }

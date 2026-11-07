@@ -59,6 +59,7 @@ export function toManaged(dto) {
     landlordPan: dto.landlordPan || '',
     policeIntimation: dto.policeIntimation || '',
     rentClaims: Array.isArray(dto.rentClaims) ? dto.rentClaims : [],
+    firstRentMonth: dto.firstRentMonth || null,
     valuation: dto.valuation || null,
     publishedListingId: dto.publishedListingId || '',
     sourceRoomId: dto.sourceRoomId || '',

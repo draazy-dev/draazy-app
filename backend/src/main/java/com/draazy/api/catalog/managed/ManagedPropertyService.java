@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
@@ -237,12 +238,25 @@ public class ManagedPropertyService {
             throw new ConflictException("This home is already listed.");
         }
         Property created = listingService.create(ownerId, body);
-        if (m.getAgreementRequestId() != null && agreementOwnership.verify(created, m.getAgreementRequestId())) {
+        if (m.getAgreementRequestId() != null && sameBuilding(m.getAgreementFlatKey(), created)
+                && agreementOwnership.verify(created, m.getAgreementRequestId())) {
             properties.saveAndFlush(created);
         }
         m.markPublished(created.getId());
         records.saveAndFlush(m);
         return created;
+    }
+
+    // The agreement vouches for one flat; a listing published from its record may describe any address.
+    // The key's format (flatNo|society|pincode, each squashed) is RentAgreementOverlaps.flatKey's.
+    static boolean sameBuilding(String flatKey, Property listing) {
+        String[] parts = flatKey == null ? new String[0] : flatKey.split("\\|", -1);
+        return parts.length == 3 && parts[1].equals(squash(listing.getSocietyName()))
+                && parts[2].equals(squash(listing.getPincode()));
+    }
+
+    private static String squash(String value) {
+        return value == null ? "" : value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 
     // Row lock so two concurrent publishes of one record cannot both see it unpublished.
@@ -277,7 +291,7 @@ public class ManagedPropertyService {
     @Transactional
     public ManagedRentReceiptDto recordRentReceipt(UUID ownerId, String id, String rentMonth) {
         ManagedProperty m = ownedRecord(ownerId, id);
-        requireReceiptableMonth(rentMonth);
+        requireReceiptableMonth(rentMonth, TrackedRentService.firstRentMonth(m));
         if (!m.isRented()) {
             throw new ValidationException("Turn on rent tracking for this property first");
         }
@@ -300,9 +314,11 @@ public class ManagedPropertyService {
         return mapper.toDto(receipt);
     }
 
-    private static void requireReceiptableMonth(String rentMonth) {
+    // A tenant's first rent, owed next month, may be paid before that month starts.
+    private static void requireReceiptableMonth(String rentMonth, YearMonth firstRentMonth) {
         YearMonth now = YearMonth.now(ZoneId.of("Asia/Kolkata"));
-        if (rentMonth.compareTo(now.toString()) > 0) {
+        YearMonth latest = firstRentMonth != null && firstRentMonth.isAfter(now) ? firstRentMonth : now;
+        if (rentMonth.compareTo(latest.toString()) > 0) {
             throw new ValidationException("You can't record rent for a month that hasn't happened yet");
         }
         if (rentMonth.compareTo(now.minusYears(RECEIPT_BACKDATE_YEARS).toString()) < 0) {

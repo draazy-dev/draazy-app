@@ -31,6 +31,7 @@ public record ManagedPropertyDto(
         String landlordPan,
         String policeIntimation,
         List<String> rentClaims,
+        String firstRentMonth,
         Map<String, Object> valuation,
         String publishedListingId,
         String sourceRoomId,

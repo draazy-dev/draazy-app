@@ -44,6 +44,7 @@ public class ManagedPropertyMapper {
                 m.getLandlordPan(),
                 policeIntimation(m),
                 pendingClaims,
+                Objects.toString(TrackedRentService.firstRentMonth(m), null),
                 m.getValuation(),
                 Objects.toString(m.getPublishedListingId(), null),
                 Objects.toString(m.getSourceRoomId(), null),

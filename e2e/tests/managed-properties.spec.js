@@ -302,7 +302,10 @@ test.describe('LIVE: managed properties against the real API', () => {
         await ownerCard.getByTestId('rent-landlord-pan').blur();
         await expect(ownerCard.getByText('Enter a valid PAN, like ABCDE1234F')).toBeVisible();
         await ownerCard.getByTestId('rent-landlord-pan').fill('abcpe1234f');
+        const saved = page.waitForResponse((r) => r.request().method() === 'PATCH'
+          && new URL(r.url()).pathname === `/api/me/managed-properties/${id}`);
         await ownerCard.getByRole('button', { name: 'Save changes' }).click();
+        expect((await saved).ok()).toBe(true);
         await expect(ownerCard.getByTestId('rent-pan-hint')).toHaveCount(0);
         expect((await read()).landlordPan).toBe('ABCPE1234F');
       });
