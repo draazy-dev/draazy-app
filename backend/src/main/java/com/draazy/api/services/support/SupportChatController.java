@@ -27,6 +27,11 @@ public class SupportChatController {
         return service.view(principal);
     }
 
+    @GetMapping(Routes.SupportChat.UNREAD_COUNT)
+    public SupportChatService.UnreadCount unreadCount(@CurrentUser AuthPrincipal principal) {
+        return service.unreadCount(principal);
+    }
+
     @PostMapping(Routes.SupportChat.MESSAGES)
     @ResponseStatus(HttpStatus.CREATED)
     public Msg send(@CurrentUser AuthPrincipal principal, @Valid @RequestBody Post body) {

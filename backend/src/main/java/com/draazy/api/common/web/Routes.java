@@ -323,6 +323,8 @@ public final class Routes {
         public static final String MESSAGES = BASE + "/messages";
 
         public static final String READ = BASE + "/read";
+
+        public static final String UNREAD_COUNT = BASE + "/unread-count";
     }
 
     public static final class SupportTickets {

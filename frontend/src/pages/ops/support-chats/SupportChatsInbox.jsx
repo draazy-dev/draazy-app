@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ArrowLeft, MessageSquare, RefreshCw } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader.jsx';
@@ -75,6 +75,7 @@ export default function SupportChatsInbox() {
   const contexts = full ? CONTEXTS : CONTEXTS.filter((c) => !c.value || counts.scope?.contexts.includes(c.value));
   const [page, setPage] = useState(1);
   const [state, setState] = useState({ status: 'loading', items: [], total: 0 });
+  const seq = useRef(0);
 
   const setParam = (key, value) => setParams((p) => {
     const next = new URLSearchParams(p);
@@ -84,12 +85,13 @@ export default function SupportChatsInbox() {
   }, { replace: key !== 'chat' });
 
   const load = useCallback(async () => {
+    const mine = ++seq.current;
     try {
       const res = await listSupportChats({ view, context: context || undefined, page: page - 1, size: SIZE });
-      setState({ status: 'ready', items: res.items, total: res.total });
+      if (mine === seq.current) setState({ status: 'ready', items: res.items, total: res.total });
     } catch (err) {
       console.warn('[support-chats] could not load the inbox', err);
-      setState((s) => (s.status === 'ready' ? s : { status: 'error', items: [], total: 0 }));
+      if (mine === seq.current) setState((s) => (s.status === 'ready' ? s : { status: 'error', items: [], total: 0 }));
     }
   }, [view, context, page]);
 

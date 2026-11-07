@@ -84,6 +84,16 @@ class SupportConversationIndex {
                 .addValue("from", from)
                 .addValue("type", activity.aboutType())
                 .addValue("id", activity.aboutId()));
+        // A fresh statement, so it sees topics committed by a concurrent writer the upsert above waited on.
+        jdbc.update("""
+                update support_conversations set
+                    status = case when exists (select 1 from support_conversation_topics
+                                                where user_id = :user and status = 'awaiting')
+                                  then 'awaiting' else 'answered' end,
+                    staff_unread = exists (select 1 from support_conversation_topics
+                                            where user_id = :user and staff_unread)
+                 where user_id = :user
+                """, Map.of("user", activity.userId()));
         AfterCommit.run(() -> {
             hub.publish(activity.userId(), "support", Map.of("at", activity.at()));
             staffStream.publish(activity.userId());

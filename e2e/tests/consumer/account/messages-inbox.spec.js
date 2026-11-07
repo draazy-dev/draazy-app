@@ -364,7 +364,7 @@ test.describe('Messages inbox — request threads (live API)', () => {
   test('an accepted request shows Open chat from Sent, and ?openProp opens the request thread', async ({ page, request }) => {
     const requestId = await acceptedRequestThread(page, request, 'Accepted Thread Buyer');
     await expect(page.locator(`.pc-conv[data-conversation-id="request:contact:${requestId}"]`)).toHaveCount(0);
-    await expect(page.locator('.pc-conv:not([data-request-kind])')).toHaveCount(1);
+    await expect(page.locator('.pc-conv[data-conversation-id]:not([data-request-kind])')).toHaveCount(1);
   });
 
   test('Open chat on an accepted request selects the real chat with its composer', async ({ page, request }) => {

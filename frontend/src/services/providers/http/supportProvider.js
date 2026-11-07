@@ -14,6 +14,11 @@ export async function markSupportChatRead() {
   await post('/support/chat/read');
 }
 
+export async function supportChatUnreadCount() {
+  const res = await get('/support/chat/unread-count');
+  return Number(res?.count) || 0;
+}
+
 export async function listSupportChats({ view = 'awaiting', context, page = 0, size = 30 } = {}) {
   const query = { view, page, size };
   if (context) query.context = context;

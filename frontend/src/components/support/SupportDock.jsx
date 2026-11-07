@@ -46,7 +46,7 @@ export default function SupportDock({ hidden }) {
     return () => document.removeEventListener('click', onClick, true);
   }, [active, openDock]);
 
-  useEffect(() => { if (hidden) closeDock(); }, [hidden, closeDock]);
+  useEffect(() => { if (hidden && dock) closeDock(); }, [hidden, dock, closeDock]);
 
   if (!active || !dock) return null;
   if (dock.minimized) {
@@ -64,7 +64,7 @@ export default function SupportDock({ hidden }) {
   return (
     <div className="dz-support-dock" data-testid="support-dock" role="dialog" aria-label="Draazy support chat">
       <Suspense fallback={<div className="dz-support-dock__loading">Loading…</div>}>
-        <SupportDockWindow contextKey={dock.key} onMinimize={() => minimizeDock(true)} onClose={closeDock} />
+        <SupportDockWindow contextKey={dock.key} opened={dock.opened} onMinimize={() => minimizeDock(true)} onClose={closeDock} />
       </Suspense>
     </div>
   );

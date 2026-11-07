@@ -105,6 +105,30 @@ test.describe('Draazy support chat in Messages — live API', () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test('the navbar Messages badge counts unread support replies, live and on load, until the chat is read', async ({ page, consoleErrors }) => {
+    await page.setViewportSize({ width: 1366, height: 860 });
+    await seedConsent(page);
+    const mobile = await signedInAsNew(page);
+    await api('POST', '/support/chat/messages', mobile, { text: 'When is my visit?', about: null });
+    const [ticket] = await ticketsOf(mobile);
+    const badge = page.getByTestId('messages-unread-badge');
+
+    await page.goto('/help');
+    await expect(page.getByRole('link', { name: 'Messages', exact: true }).first()).toBeVisible();
+    await expect(badge).toHaveCount(0);
+    await api('POST', `/support/tickets/${ticket.id}/messages`, ACTORS.admin, { body: 'Saturday at 11.' });
+    await expect(badge).toHaveText('1');
+
+    await api('POST', `/support/tickets/${ticket.id}/messages`, ACTORS.admin, { body: 'Bring your ID.' });
+    await page.reload();
+    await expect(badge).toHaveText('2');
+
+    await page.goto('/messages?support=general');
+    await expect(thread(page).getByText('Bring your ID.')).toBeVisible();
+    await expect(badge).toHaveCount(0);
+    expect(consoleErrors).toEqual([]);
+  });
+
   test('a finished service request is read-only, and the closed bar hands over to a general question', async ({ page, consoleErrors }) => {
     const mobile = await signedInAsNew(page);
     const request = await api('POST', '/service-requests/co-fill', mobile, {

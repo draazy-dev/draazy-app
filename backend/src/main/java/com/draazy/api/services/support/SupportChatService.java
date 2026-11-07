@@ -50,6 +50,14 @@ public class SupportChatService {
                 timeline.cases(user));
     }
 
+    @Transactional(readOnly = true)
+    public UnreadCount unreadCount(AuthPrincipal caller) {
+        return new UnreadCount(timeline.unread(caller.userId()));
+    }
+
+    public record UnreadCount(int count) {
+    }
+
     @Transactional
     public Msg send(AuthPrincipal caller, Post body) {
         router.send(caller, caller.userId(), false, body.text().strip(), body.about());

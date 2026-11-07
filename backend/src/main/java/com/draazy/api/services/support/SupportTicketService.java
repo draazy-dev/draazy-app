@@ -35,11 +35,12 @@ public class SupportTicketService {
     private final Notifier notifier;
     private final SupportTicketAbouts abouts;
     private final ApplicationEventPublisher events;
+    private final SupportChatReads userLock;
 
     public SupportTicketService(SupportTicketRepository tickets,
             SupportTicketMessageRepository messages, SupportTicketMapper mapper,
             UserRepository users, AccountPermissions permissions, Notifier notifier,
-            SupportTicketAbouts abouts, ApplicationEventPublisher events) {
+            SupportTicketAbouts abouts, ApplicationEventPublisher events, SupportChatReads userLock) {
         this.tickets = tickets;
         this.messages = messages;
         this.mapper = mapper;
@@ -48,6 +49,7 @@ public class SupportTicketService {
         this.notifier = notifier;
         this.abouts = abouts;
         this.events = events;
+        this.userLock = userLock;
     }
 
     @Transactional(readOnly = true)
@@ -79,6 +81,7 @@ public class SupportTicketService {
     @Transactional
     public SupportTicketDto create(AuthPrincipal caller, SupportTicketCreate body) {
         SupportTicketAbout about = body.about() == null ? null : abouts.check(caller.userId(), body.about());
+        userLock.lock(caller.userId());
         SupportTicket ticket = SupportTicketStatuses.isIdentity(body.category()) ? null
                 : tickets.findOpenChat(caller.userId()).orElse(null);
         if (ticket == null) {
@@ -94,6 +97,8 @@ public class SupportTicketService {
     @Transactional
     public void postToChat(AuthPrincipal author, UUID userId, String body, SupportTicketAbout about) {
         SupportTicketAbout checked = about == null ? null : abouts.check(userId, about);
+        // Two first messages at once would both find no open chat and trip uq_support_tickets_open_chat.
+        userLock.lock(userId);
         SupportTicket ticket = tickets.findOpenChat(userId).orElseGet(() -> resumeOrStart(userId));
         write(ticket, author, body, checked);
         settle(ticket, author, body);

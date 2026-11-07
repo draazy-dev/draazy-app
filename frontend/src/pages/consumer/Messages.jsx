@@ -510,7 +510,7 @@ function Conversations() {
             error={error}
           />
           {activeId === SUPPORT_ID ? (
-            <SupportThread t={t} user={user} contextKey={supportKey} onBack={closeThread} />
+            <SupportThread t={t} user={user} contextKey={supportKey} onBack={closeThread} visible={!narrow || showThread} />
           ) : active?.request ? (
             <RequestThread key={active.id} t={t} thread={active} actions={requestActions} onBack={closeThread} />
           ) : (

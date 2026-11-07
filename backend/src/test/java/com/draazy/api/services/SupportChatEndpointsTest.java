@@ -227,10 +227,14 @@ class SupportChatEndpointsTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.assignee.name").value("Rohit Desk"))
                 .andExpect(jsonPath("$.messages[1].from").value("staff"))
                 .andExpect(jsonPath("$.messages[1].staffName").value("Rohit Desk"));
+        mvc.perform(get(Routes.SupportChat.UNREAD_COUNT).header(HttpHeaders.AUTHORIZATION, bearer(user)))
+                .andExpect(jsonPath("$.count").value(1));
         mvc.perform(post(Routes.SupportChat.READ).header(HttpHeaders.AUTHORIZATION, bearer(user)))
                 .andExpect(status().isNoContent());
         mvc.perform(get(Routes.SupportChat.BASE).header(HttpHeaders.AUTHORIZATION, bearer(user)))
                 .andExpect(jsonPath("$.unread").value(0));
+        mvc.perform(get(Routes.SupportChat.UNREAD_COUNT).header(HttpHeaders.AUTHORIZATION, bearer(user)))
+                .andExpect(jsonPath("$.count").value(0));
     }
 
     @Test
@@ -431,6 +435,41 @@ class SupportChatEndpointsTest extends ServiceFixtures {
             jdbc.update("delete from support_conversations where user_id = ?::uuid", uid);
             jdbc.update("delete from support_ticket_messages where ticket_id = ?", ticket);
             jdbc.update("delete from support_tickets where id = ?", ticket);
+            jdbc.update("delete from users where id = ?::uuid", uid);
+        }
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("first messages sent together land in one chat, none refused")
+    void concurrentFirstMessagesShareOneChat() throws Exception {
+        User user = customer("9850100026");
+        String uid = user.getId().toString();
+        try {
+            ExecutorService pool = Executors.newFixedThreadPool(4);
+            try {
+                List<Future<Integer>> results = new java.util.ArrayList<>();
+                for (int i = 0; i < 4; i++) {
+                    String text = "first " + i;
+                    results.add(pool.submit(() -> say(user, "general", null, text)
+                            .andReturn().getResponse().getStatus()));
+                }
+                for (Future<Integer> result : results) {
+                    assertThat(result.get()).isEqualTo(201);
+                }
+            } finally {
+                pool.shutdownNow();
+            }
+            assertThat(jdbc.queryForObject("select count(*) from support_tickets where user_id = ?::uuid",
+                    Integer.class, uid)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("select count(*) from support_ticket_messages m join support_tickets t"
+                    + " on t.id = m.ticket_id where t.user_id = ?::uuid", Integer.class, uid)).isEqualTo(4);
+        } finally {
+            jdbc.update("delete from support_conversation_topics where user_id = ?::uuid", uid);
+            jdbc.update("delete from support_conversations where user_id = ?::uuid", uid);
+            jdbc.update("delete from support_ticket_messages where ticket_id in"
+                    + " (select id from support_tickets where user_id = ?::uuid)", uid);
+            jdbc.update("delete from support_tickets where user_id = ?::uuid", uid);
             jdbc.update("delete from users where id = ?::uuid", uid);
         }
     }

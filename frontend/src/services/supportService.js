@@ -16,6 +16,8 @@ export const sendSupportChatMessage = async (text, about) => (await provider()).
 
 export const markSupportChatRead = async () => (await provider()).markSupportChatRead();
 
+export const supportChatUnreadCount = async () => (await provider()).supportChatUnreadCount();
+
 // Staff-only from here down.
 export const listSupportChats = async (opts) => (await provider()).listSupportChats(opts);
 

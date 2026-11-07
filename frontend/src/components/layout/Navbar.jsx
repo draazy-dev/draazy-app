@@ -8,6 +8,7 @@ import { useCity } from '../../context/CityContext.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { useCompare } from '../../context/CompareContext.jsx';
 import { useConversationUnread } from '../../context/ConversationContext.jsx';
+import { useSupportChat } from '../../context/SupportChatContext.jsx';
 import { TOPBAR_SCROLL } from '../../lib/chrome.js';
 import { firstName, initial, roleLabel } from '../../lib/auth.js';
 import { setAppPrefs } from '../../lib/localPrefs.js';
@@ -25,6 +26,7 @@ export default function Navbar() {
   const { flagEnabled } = useAppFlags();
   const { count: compareCount } = useCompare();
   const { unread: chatUnread, pendingRequests } = useConversationUnread();
+  const { unread: supportUnread } = useSupportChat();
   const light = useIsLightTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -41,7 +43,7 @@ export default function Navbar() {
   const cityRef = useRef(null);
   const acctRef = useRef(null);
   const acctDrawerRef = useRef(null);
-  const chatBadge = isIn ? chatUnread : 0;
+  const chatBadge = isIn ? chatUnread + supportUnread : 0;
   const requestBadge = isIn ? pendingRequests : 0;
   const messagesLabel = requestBadge > 0 ? `Messages, ${requestBadge} pending ${requestBadge === 1 ? 'request' : 'requests'}` : 'Messages';
 
@@ -301,7 +303,7 @@ export default function Navbar() {
                     <Icon name="message-square" className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
                     {requestBadge > 0 ? (
                       <span data-testid="messages-request-badge" className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 bg-gradient-to-br from-orange-500 to-orange-400 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-orange-500/30">{requestBadge > 99 ? '99+' : requestBadge}</span>
-                    ) : chatBadge > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 bg-gradient-to-br from-teal-500 to-teal-400 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-teal-500/30">{chatBadge > 99 ? '99+' : chatBadge}</span>}
+                    ) : chatBadge > 0 && <span data-testid="messages-unread-badge" className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 bg-gradient-to-br from-teal-500 to-teal-400 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-teal-500/30">{chatBadge > 99 ? '99+' : chatBadge}</span>}
                   </Link>
                 )}
                 <div className="relative -mr-4 sm:mr-0" ref={acctRef}>

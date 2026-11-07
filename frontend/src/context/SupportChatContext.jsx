@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { getSupportChat, markSupportChatRead, sendSupportChatMessage } from '../services/supportService.js';
+import { getSupportChat, markSupportChatRead, sendSupportChatMessage, supportChatUnreadCount } from '../services/supportService.js';
 import { useAuth } from './AuthContext.jsx';
 import { useConversationUnread } from './ConversationContext.jsx';
 
@@ -17,8 +17,15 @@ export function SupportChatProvider({ children }) {
   const [status, setStatus] = useState('idle');
   const [watchers, setWatchers] = useState(0);
   const [dock, setDock] = useState(null);
+  const [unread, setUnreadState] = useState(0);
   const seq = useRef(0);
+  const unreadSeq = useRef(0);
   const marking = useRef(false);
+
+  const setUnread = useCallback((n) => {
+    unreadSeq.current += 1;
+    setUnreadState(n);
+  }, []);
 
   const reload = useCallback(async () => {
     const mine = ++seq.current;
@@ -26,6 +33,7 @@ export function SupportChatProvider({ children }) {
       const next = await getSupportChat();
       if (mine === seq.current) {
         setChat(next);
+        setUnread(next.unread);
         setStatus('ready');
       }
       return next;
@@ -34,17 +42,37 @@ export function SupportChatProvider({ children }) {
       if (mine === seq.current) setStatus((s) => (s === 'ready' ? s : 'error'));
       return null;
     }
-  }, []);
+  }, [setUnread]);
 
   useEffect(() => {
     if (enabled) return;
     seq.current += 1;
     setChat(EMPTY);
+    setUnread(0);
     setStatus('idle');
     setDock(null);
-  }, [enabled]);
+  }, [enabled, setUnread]);
 
   const watched = enabled && watchers > 0;
+  useEffect(() => {
+    if (!enabled || watched) return undefined;
+    const refreshUnread = () => {
+      if (document.hidden) return;
+      const mine = ++unreadSeq.current;
+      supportChatUnreadCount()
+        .then((n) => { if (mine === unreadSeq.current) setUnreadState(n); })
+        .catch((err) => console.warn('[support] unread count failed', err));
+    };
+    refreshUnread();
+    window.addEventListener('focus', refreshUnread);
+    document.addEventListener('visibilitychange', refreshUnread);
+    return () => {
+      unreadSeq.current += 1;
+      window.removeEventListener('focus', refreshUnread);
+      document.removeEventListener('visibilitychange', refreshUnread);
+    };
+  }, [enabled, watched]);
+
   useEffect(() => {
     if (!watched) return undefined;
     setStatus((s) => (s === 'idle' ? 'loading' : s));
@@ -83,20 +111,21 @@ export function SupportChatProvider({ children }) {
     try {
       await markSupportChatRead();
       setChat((c) => ({ ...c, unread: 0 }));
+      setUnread(0);
     } catch (err) {
       console.warn('[support] mark read failed', err);
     } finally {
       marking.current = false;
     }
-  }, []);
+  }, [setUnread]);
 
-  const openDock = useCallback((key) => setDock({ key: key || null, minimized: false }), []);
+  const openDock = useCallback((key) => setDock({ key: key || null, minimized: false, opened: Date.now() }), []);
   const closeDock = useCallback(() => setDock(null), []);
   const minimizeDock = useCallback((minimized) => setDock((d) => (d ? { ...d, minimized } : d)), []);
 
   const value = useMemo(() => ({
-    enabled, chat, status, reload, watch, send, markRead, dock, openDock, closeDock, minimizeDock,
-  }), [enabled, chat, status, reload, watch, send, markRead, dock, openDock, closeDock, minimizeDock]);
+    enabled, chat, unread, status, reload, watch, send, markRead, dock, openDock, closeDock, minimizeDock,
+  }), [enabled, chat, unread, status, reload, watch, send, markRead, dock, openDock, closeDock, minimizeDock]);
   return <SupportChatContext.Provider value={value}>{children}</SupportChatContext.Provider>;
 }
 

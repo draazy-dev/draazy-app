@@ -7016,6 +7016,22 @@ paths:
       responses:
         '204': { description: Marked }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /support/chat/unread-count:
+    get:
+      tags: [Services & Support]
+      summary: Staff messages in my support chat not yet read
+      description: The same number as `unread` on the chat, without loading the timeline.
+      operationId: supportChatUnreadCount
+      responses:
+        '200':
+          description: Count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /admin/support/chats:
     get:
       tags: [Services & Support]
@@ -17294,6 +17310,12 @@ components:
         awaiting: { type: integer }
         mine: { type: integer }
         all: { type: integer }
+        scope:
+          type: object
+          description: What the caller's desk may see; full means every topic.
+          properties:
+            full: { type: boolean }
+            contexts: { type: array, items: { type: string } }
     AdminSupportChatDetail:
       type: object
       properties:
@@ -19771,6 +19793,10 @@ components:
           properties:
             count: { type: integer }
         requestsPending:
+          type: [object, 'null']
+          properties:
+            count: { type: integer }
+        supportUnread:
           type: [object, 'null']
           properties:
             count: { type: integer }

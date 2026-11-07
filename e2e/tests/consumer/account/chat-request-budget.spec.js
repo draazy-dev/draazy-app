@@ -52,7 +52,7 @@ test.describe('Chat request budget on a phone', () => {
     await openInbox(page, login);
     const api = countApi(page);
     const thread = page.waitForResponse((r) => /\/api\/messages\/[^/?]+$/.test(new URL(r.url()).pathname));
-    await page.locator('.pc-conv:not(.pc-skel)').first().click();
+    await page.locator('.pc-conv[data-staged="false"]').first().click();
     const threadPath = new URL((await thread).url()).pathname;
     await expect(page.locator('.pc-input')).toBeVisible();
     await page.waitForTimeout(2500);

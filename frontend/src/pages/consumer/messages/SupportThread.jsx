@@ -115,7 +115,7 @@ function Timeline({ messages, labelOf }) {
 }
 
 /** The user's one support chat. Each message carries the context picked in the About bar. */
-export default function SupportThread({ t, user, contextKey: wanted, onBack, onMinimize, onClose, visible = true }) {
+export default function SupportThread({ t, user, contextKey: wanted, opened, onBack, onMinimize, onClose, visible = true }) {
   const { chat, status, reload, send, markRead } = useSupportChat(visible);
   const [choices, setChoices] = useState([]);
   const [picked, setPicked] = useState(null);
@@ -131,7 +131,7 @@ export default function SupportThread({ t, user, contextKey: wanted, onBack, onM
     return () => { live = false; };
   }, [user]);
 
-  useEffect(() => { setPicked(null); }, [wanted]);
+  useEffect(() => { setPicked(null); }, [wanted, opened]);
 
   useEffect(() => {
     if (visible && ready && chat.unread > 0) markRead();

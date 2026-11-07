@@ -9,6 +9,7 @@ import com.draazy.api.identity.user.MeController;
 import com.draazy.api.leads.conversation.ConversationsController;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.CurrentUser;
+import com.draazy.api.services.support.SupportChatController;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,16 +26,19 @@ public class MeBootstrapController {
     private final NotificationController notifications;
     private final ConversationsController conversations;
     private final RequestInboxController requests;
+    private final SupportChatController support;
 
     public MeBootstrapController(MeController me, PlansController plans,
             SavedPropertyController saved, NotificationController notifications,
-            ConversationsController conversations, RequestInboxController requests) {
+            ConversationsController conversations, RequestInboxController requests,
+            SupportChatController support) {
         this.me = me;
         this.plans = plans;
         this.saved = saved;
         this.notifications = notifications;
         this.conversations = conversations;
         this.requests = requests;
+        this.support = support;
     }
 
     @GetMapping(Routes.Bootstrap.ME)
@@ -45,7 +49,8 @@ public class MeBootstrapController {
                 section("saved", () -> saved.listKeys(principal)),
                 section("notificationsUnread", () -> notifications.unreadCount(principal)),
                 section("messagesUnread", () -> conversations.unreadCount(principal)),
-                section("requestsPending", () -> requests.pendingCount(principal)));
+                section("requestsPending", () -> requests.pendingCount(principal)),
+                section("supportUnread", () -> support.unreadCount(principal)));
     }
 
     private static <T> T section(String name, Supplier<T> read) {

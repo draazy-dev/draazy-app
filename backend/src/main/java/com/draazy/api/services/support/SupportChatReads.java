@@ -78,7 +78,7 @@ class SupportChatReads {
                 """.formatted(STAFF_ROLES, scope.requestTeam("sr.team", p)), p);
     }
 
-    private void lock(UUID user) {
+    void lock(UUID user) {
         jdbc.query("select pg_advisory_xact_lock(hashtext(:user))", Map.of("user", user.toString()), rs -> {
         });
     }
