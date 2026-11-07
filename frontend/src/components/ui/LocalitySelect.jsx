@@ -12,6 +12,10 @@ import { resolveLocality, searchLocalities } from '../../services/localityServic
 
 const dbOption = (l) => ({ value: l.name, label: l.name, meta: { locality: l } });
 
+// Google can stall without rejecting; past this the saved localities answer instead of "Searching…" forever.
+const GOOGLE_WAIT_MS = 4000;
+const giveUpOnGoogle = () => new Promise((resolve) => { setTimeout(() => resolve([]), GOOGLE_WAIT_MS); });
+
 export default function LocalitySelect({
   multi = false,
   unrestricted = false,
@@ -51,7 +55,10 @@ export default function LocalitySelect({
 
   const asyncSearch = useCallback(async (q) => {
     if (!tokenRef.current) tokenRef.current = newAutocompleteSession();
-    const preds = await fetchLocalitySuggestions(q, tokenRef.current, { crossCity: unrestricted });
+    const preds = await Promise.race([
+      fetchLocalitySuggestions(q, tokenRef.current, { crossCity: unrestricted }),
+      giveUpOnGoogle(),
+    ]);
     if (preds.length) {
       return preds.map((p) => ({
         value: p.mainText,

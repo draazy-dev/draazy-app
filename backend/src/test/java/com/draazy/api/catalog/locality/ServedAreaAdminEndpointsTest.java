@@ -82,6 +82,24 @@ class ServedAreaAdminEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("the outside total counts every outside row, not just the first 200 returned")
+    void outsideTotalIsUncapped() throws Exception {
+        for (int i = 0; i < 201; i++) {
+            locality("zz-sa-cap-" + i, "ChIJ-sa-cap-" + i, "Raigad", true);
+        }
+        Integer expected = jdbc.queryForObject("select (select count(*) from localities where archived_at is null"
+                + " and district_checked_at is not null and (district is null or lower(btrim(district)) <> 'pune'))"
+                + " + (select count(*) from societies where archived_at is null and merged_into is null"
+                + " and district_checked_at is not null and (district is null or lower(btrim(district)) <> 'pune'))",
+                Integer.class);
+
+        mvc.perform(get(Routes.ServedArea.ADMIN).header(HttpHeaders.AUTHORIZATION, token("admin")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outside.length()").value(200))
+                .andExpect(jsonPath("$.outsideTotal").value(expected));
+    }
+
+    @Test
     @DisplayName("re-check asks Google for each unchecked row, stores its district and is audited")
     void recheckStoresDistricts() throws Exception {
         locality("zz-sa-a", "ChIJ-sa-a", null, false);

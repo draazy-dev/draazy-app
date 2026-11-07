@@ -13,7 +13,7 @@ export const stubPlaceId = (label, idPrefix = 'stub-') => `${idPrefix}${label.to
 
 export async function stubGooglePlaces(page, {
   lat = 18.5975, lng = 73.7701, locality = 'Wakad', pincode = '411057', street = '',
-  types = ['premise'], idPrefix = 'stub-', empty = false,
+  types = ['premise'], idPrefix = 'stub-', empty = false, stalled = false,
 } = {}) {
   await page.waitForFunction(() => !!window.google?.maps?.importLibrary, null, { timeout: 20000 });
   await page.evaluate(async (o) => {
@@ -47,12 +47,13 @@ export async function stubGooglePlaces(page, {
         AutocompleteSuggestion: {
           fetchAutocompleteSuggestions: async ({ input }) => {
             (window.__placesQueries = window.__placesQueries || []).push(input);
+            if (o.stalled) return new Promise(() => {});
             return { suggestions: o.empty ? [] : [{ placePrediction: prediction(input) }] };
           },
         },
       }
       : realImport(name));
-  }, { lat, lng, locality, pincode, street, types, idPrefix, empty });
+  }, { lat, lng, locality, pincode, street, types, idPrefix, empty, stalled });
 }
 
 // A pin no other test uses, so the pick is never offered an "Is it one of these?" prompt.

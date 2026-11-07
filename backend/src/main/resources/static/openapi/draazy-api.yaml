@@ -15142,7 +15142,8 @@ components:
       description: Places outside the served districts, for the Maps & geo panel.
       properties:
         servedDistricts: { type: array, items: { type: string } }
-        outside: { type: array, items: { $ref: '#/components/schemas/ServedAreaRow' } }
+        outside: { type: array, items: { $ref: '#/components/schemas/ServedAreaRow' }, description: The first 200 rows by kind and name }
+        outsideTotal: { type: integer, description: Every checked live row outside the served districts, including those past the first 200 }
         unchecked: { type: integer, description: Live rows with a place ID whose district was never looked up }
     ServedAreaRow:
       type: object

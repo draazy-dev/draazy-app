@@ -216,7 +216,11 @@ export default function ServedAreaCard({ geo, onSave }) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-xs font-semibold text-gray-300">
             Listed places outside these districts
-            {report ? <span className="ml-1.5 text-gray-500">({outside.length})</span> : null}
+            {report ? (
+              <span className="ml-1.5 text-gray-500">
+                {report.outsideTotal > outside.length ? `(first ${outside.length} of ${report.outsideTotal})` : `(${outside.length})`}
+              </span>
+            ) : null}
           </h4>
           {report?.unchecked ? (
             <button type="button" onClick={recheck} disabled={busy} className="dz-btn dz-btn-ghost text-xs disabled:opacity-50">

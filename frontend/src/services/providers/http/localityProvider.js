@@ -52,6 +52,7 @@ export async function getServedAreaReport() {
   return {
     servedDistricts: Array.isArray(r?.servedDistricts) ? r.servedDistricts.map(String) : [],
     outside: (Array.isArray(r?.outside) ? r.outside : []).map(toOutsideRow),
+    outsideTotal: Number(r?.outsideTotal) || 0,
     unchecked: Number(r?.unchecked) || 0,
   };
 }

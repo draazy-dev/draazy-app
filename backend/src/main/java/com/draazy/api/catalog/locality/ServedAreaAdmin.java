@@ -32,7 +32,7 @@ public class ServedAreaAdmin {
     private static final String OUTSIDE_FILTER =
             " and district_checked_at is not null and (district is null or lower(btrim(district)) <> all (?))";
 
-    private static final String OUTSIDE = "select * from ("
+    private static final String OUTSIDE = "select *, count(*) over () as total from ("
             + "select 'locality' as kind, slug, name, district, lat, lng from localities where " + LIVE_LOCALITY
             + OUTSIDE_FILTER
             + " union all select 'society', slug, name, district, lat, lng from societies where " + LIVE_SOCIETY
@@ -70,10 +70,13 @@ public class ServedAreaAdmin {
     public ServedAreaReport report() {
         List<String> served = geo.servedDistricts();
         String[] lowered = served.stream().map(d -> d.toLowerCase(Locale.ROOT)).toArray(String[]::new);
-        List<ServedAreaReport.Row> outside = jdbc.query(OUTSIDE, (rs, n) -> new ServedAreaReport.Row(
-                rs.getString("kind"), rs.getString("slug"), rs.getString("name"), rs.getString("district"),
-                nullable(rs, "lat"), nullable(rs, "lng")), lowered, lowered);
-        return new ServedAreaReport(served, outside, unchecked());
+        int[] total = {0};
+        List<ServedAreaReport.Row> outside = jdbc.query(OUTSIDE, (rs, n) -> {
+            total[0] = rs.getInt("total");
+            return new ServedAreaReport.Row(rs.getString("kind"), rs.getString("slug"), rs.getString("name"),
+                    rs.getString("district"), nullable(rs, "lat"), nullable(rs, "lng"));
+        }, lowered, lowered);
+        return new ServedAreaReport(served, outside, total[0], unchecked());
     }
 
     public ServedAreaReport.Recheck recheck(AuthPrincipal actor) {
