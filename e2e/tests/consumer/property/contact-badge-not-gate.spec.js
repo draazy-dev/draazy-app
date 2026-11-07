@@ -84,6 +84,8 @@ test('an unverified buyer reaches an ordinary owner with no badge asked for', as
 
   await signedInAs(page, buyer.mobile);
   await openListing(page, fixture.ref);
+  await expect(page.locator('a[href^="/owner/"]').filter({ hasText: /^\s*Profile\s*$/ }).first()).toBeVisible();
+  await expect(page.locator('a[href*="support=property"]'), 'a buyer is sent to the owner, not to Draazy support').toHaveCount(0);
 
   const [res] = await Promise.all([
     page.waitForResponse((r) => /\/api\/contacts\/request$/.test(r.url()) && r.request().method() === 'POST'),

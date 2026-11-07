@@ -42,19 +42,20 @@ test.describe('LIVE: referral redesign', () => {
     expect(rowOf(friend)).toMatchObject({ status: 'pending', track: '' });
     setRisk(friend, 'low');
 
-    // The friend's five extra contacts stand from the moment the code is redeemed.
+    // The friend's five extra contacts wait until the friend qualifies.
     const before = (await entitlementsOf(friend)).contacts;
-    expect(before.friendBonus).toBe(5);
-    expect(before.allowance).toBe(plain.contacts.allowance + 5);
-    expect((await summaryOf(friend)).friendReward).toMatchObject({ redeemed: true, status: 'pending', contacts: 5 });
+    expect(before.friendBonus).toBe(0);
+    expect(before.allowance).toBe(plain.contacts.allowance);
+    expect((await summaryOf(friend)).friendReward).toMatchObject({ redeemed: true, status: 'pending', contacts: 0 });
 
     await acceptedContact(friend, owner, listing.id);
 
     expect(['qualified', 'rewarded']).toContain(rowOf(friend).status);
     expect(rowOf(friend)).toMatchObject({ track: 'seeker', propertyId: listing.id });
     const earned = await summaryOf(referrer);
-    expect(earned).toMatchObject({ invited: 1, converted: 1, held: 0, earned: { seeker: { referrals: 1, contacts: 15 } } });
-    expect((await entitlementsOf(referrer)).contacts.referralBonus).toBe(15);
+    expect(earned).toMatchObject({ invited: 0, joined: 1, checking: 0, rewards: { earned: 1, used: 0, remaining: 1, discountPercent: 50 } });
+    expect((await entitlementsOf(referrer)).agreements).toMatchObject({ credits: 1, remaining: 1, discountPercent: 50 });
+    expect((await entitlementsOf(referrer)).contacts).not.toHaveProperty('referralBonus');
     expect((await entitlementsOf(friend)).contacts.friendBonus).toBe(5);
 
     await test.step('the friend is told what they got', async () => {
@@ -65,9 +66,11 @@ test.describe('LIVE: referral redesign', () => {
     await test.step('the referrer sees what was earned', async () => {
       await signedInAs(page, referrer);
       await page.goto('/refer');
-      await expect(page.getByTestId('refer-invited')).toHaveText('1');
+      await expect(page.getByTestId('refer-invited'), 'a link sign-up is not a WhatsApp invite').toHaveText('0');
       await expect(page.getByTestId('refer-held')).toHaveText('0');
-      await expect(page.getByTestId('refer-contacts-earned')).toHaveText('15');
+      await expect(page.getByTestId('refer-joined-count')).toHaveText('1');
+      await expect(page.getByTestId('refer-rewards-earned')).toHaveText('1');
+      await expect(page.getByTestId('refer-rewards-left')).toHaveText('1');
     });
   });
 
@@ -88,20 +91,20 @@ test.describe('LIVE: referral redesign', () => {
     expect(await page.evaluate(() => localStorage.getItem('dz_ref')), 'a used or refused code is not kept').toBeNull();
   });
 
-  test('the owner track pays the referrer a free agreement and Features the friend\'s listing for 14 days', async ({ page, flags }) => {
+  test('the owner track pays the referrer a 50% agreement discount and Features the friend\'s listing for 14 days', async ({ page, flags }) => {
     await flags.enable('referralRewards');
     const { referrer, referee } = await referredPair({ referrerName: 'Owner Referrer', refereeName: 'Owner Friend' });
     setRisk(referee, 'low');
     const listing = await liveListing(referee);
     expect(rowOf(referee).status, 'a live listing alone qualifies nothing').toBe('pending');
-    expect((await entitlementsOf(referrer)).agreements.free).toBe(0);
+    expect((await entitlementsOf(referrer)).agreements.remaining).toBe(0);
 
     await verifyOwnership(referee, listing);
 
     expect(['qualified', 'rewarded']).toContain(rowOf(referee).status);
     expect(rowOf(referee)).toMatchObject({ track: 'owner', propertyId: listing.id });
-    expect((await entitlementsOf(referrer)).agreements.free).toBe(1);
-    expect(await summaryOf(referrer)).toMatchObject({ converted: 1, earned: { owner: { referrals: 1, agreements: 1 } } });
+    expect((await entitlementsOf(referrer)).agreements).toMatchObject({ credits: 1, remaining: 1, discountPercent: 50 });
+    expect(await summaryOf(referrer)).toMatchObject({ joined: 1, rewards: { earned: 1, used: 0, remaining: 1 } });
     expect((await summaryOf(referee)).friendReward).toMatchObject({ redeemed: true, track: 'owner', contacts: 0, featuredDays: 14 });
     expect(sql(`select featured_days from properties where id = '${listing.id}'`)).toBe('14');
 
@@ -113,8 +116,9 @@ test.describe('LIVE: referral redesign', () => {
 
     await signedInAs(page, referrer);
     await page.goto('/refer');
-    await expect(page.getByTestId('refer-owner-track')).toContainText('14 days');
-    await expect(page.getByTestId('refer-agreements')).toHaveText('0 / 1');
+    await expect(page.getByTestId('refer-rewards-earned')).toHaveText('1');
+    await expect(page.getByTestId('refer-rewards-used')).toHaveText('0');
+    await expect(page.getByTestId('refer-rewards-left')).toHaveText('1');
   });
 
   test('withdrawing the verification takes the owner reward back', async () => {
@@ -122,12 +126,12 @@ test.describe('LIVE: referral redesign', () => {
     setRisk(referee, 'low');
     const listing = await liveListing(referee);
     await verifyOwnership(referee, listing);
-    expect((await entitlementsOf(referrer)).agreements.free).toBe(1);
+    expect((await entitlementsOf(referrer)).agreements.remaining).toBe(1);
 
     await revokeOwnership(listing);
 
     expect(rowOf(referee)).toMatchObject({ status: 'clawed-back', autoReason: 'verification_revoked' });
-    expect((await entitlementsOf(referrer)).agreements.free).toBe(0);
+    expect((await entitlementsOf(referrer)).agreements.remaining).toBe(0);
   });
 
   test('a code is refused for an old account, one with activity, the referrer\'s own device and a switched-off programme, all alike', async ({ flags }) => {
@@ -190,8 +194,8 @@ test.describe('LIVE: referral redesign', () => {
     await acceptedContact(referee, referrer, listing.id);
 
     expect(rowOf(referee)).toMatchObject({ status: 'rejected', autoReason: 'self_dealing' });
-    expect((await entitlementsOf(referrer)).contacts.referralBonus).toBe(0);
-    expect((await summaryOf(referrer)).earned.seeker.contacts).toBe(0);
+    expect((await entitlementsOf(referrer)).agreements.remaining).toBe(0);
+    expect((await summaryOf(referrer)).rewards.earned).toBe(0);
     expect((await entitlementsOf(referee)).contacts.friendBonus, 'a refused referral withdraws the friend\'s bonus too').toBe(0);
   });
 
@@ -212,7 +216,7 @@ test.describe('LIVE: referral redesign', () => {
 
     expect(['qualified', 'rewarded']).toContain(rowOf(first).status);
     expect(rowOf(second)).toMatchObject({ status: 'rejected', autoReason: 'high_risk' });
-    expect((await entitlementsOf(referrer)).contacts.referralBonus).toBe(15);
+    expect((await entitlementsOf(referrer)).agreements.remaining).toBe(1);
   });
 
   test('a redeem with no device id is never scored low', async () => {
@@ -225,15 +229,15 @@ test.describe('LIVE: referral redesign', () => {
     const owner = await member('Accepting Owner');
     const listing = await liveListing(owner);
     await acceptedContact(referee, owner, listing.id);
-    expect((await entitlementsOf(referrer)).contacts.referralBonus).toBe(15);
+    expect((await entitlementsOf(referrer)).agreements.remaining).toBe(1);
 
     const id = userIdOf(referee);
     const suspended = await call('PATCH', `/users/${id}/suspend`, ACTORS.admin, { reason: 'Referral fixture suspension' });
     try {
       expect(suspended.status, JSON.stringify(suspended.json)).toBeLessThan(300);
       expect(rowOf(referee)).toMatchObject({ status: 'clawed-back', autoReason: 'referee_suspended' });
-      expect((await entitlementsOf(referrer)).contacts.referralBonus).toBe(0);
-      expect((await summaryOf(referrer)).earned.seeker.contacts).toBe(0);
+      expect((await entitlementsOf(referrer)).agreements.remaining).toBe(0);
+      expect((await summaryOf(referrer)).rewards.earned).toBe(0);
     } finally {
       await call('PATCH', `/users/${id}/reactivate`, ACTORS.admin);
     }
@@ -265,10 +269,9 @@ test.describe('LIVE: referral redesign', () => {
     const { pricing } = await (await fetch(`${API}/bootstrap`)).json();
     const f = doc.fees;
     expect(pricing.referral).toEqual({
-      contactBonus: f.referralContactBonus,
+      agreementDiscountPercent: f.referralAgreementDiscountPercent,
       seekerBonusContacts: f.referralSeekerBonusContacts,
       ownerFeaturedDays: f.referralOwnerFeaturedDays,
-      ownerRewardAgreements: f.referralOwnerRewardAgreements,
       featuredDays: f.featuredDays,
       qualifyPerMonth: f.referralQualifyPerMonth,
       qualifyPerYear: f.referralQualifyPerYear,
@@ -276,10 +279,13 @@ test.describe('LIVE: referral redesign', () => {
       clawbackDays: f.referralClawbackDays,
       signupWindowHours: f.referralSignupWindowHours,
     });
+    expect(f).not.toHaveProperty('referralContactBonus');
+    expect(f).not.toHaveProperty('referralOwnerRewardAgreements');
 
     const mine = await entitlementsOf(await member());
     expect(mine.listings).not.toHaveProperty('referralBonus');
+    expect(mine.contacts).not.toHaveProperty('referralBonus');
     expect(mine.contacts).toHaveProperty('friendBonus', 0);
-    expect(mine.agreements).toMatchObject({ free: 0, used: 0, remaining: 0 });
+    expect(mine.agreements).toMatchObject({ credits: 0, used: 0, remaining: 0 });
   });
 });

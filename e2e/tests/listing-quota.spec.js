@@ -17,7 +17,7 @@ test.describe('Listing quota — live', () => {
     expect(listings).not.toHaveProperty('referralBonus');
     expect(listings.passes).toEqual([]);
     // Present and zero, not absent.
-    expect(agreements.free).toBe(0);
+    expect(agreements).toMatchObject({ credits: 0, used: 0, remaining: 0 });
 
     const mine = await request.get(`${API}/me/listings`, { headers });
     expect(mine.status()).toBe(200);
@@ -45,7 +45,7 @@ test.describe('Listing quota — live', () => {
       await expect(page.locator('[data-err="propertyType"]')).toBeVisible({ timeout: 15000 });
       await expect(page.getByText(/used your free listing/i)).toHaveCount(0);
       await expect(page.getByText(/^\d+ of 1 free live listing used$/)).toBeVisible();
-      await expect(page.getByText(/Go live with a ₹999 pass or pause the other/)).toBeVisible();
+      await expect(page.getByText(/Go live with a ₹[\d,]+ pass or pause the other/)).toBeVisible();
     });
 
     // Flatmate rooms do not occupy listing slots, so this path was never tiered.

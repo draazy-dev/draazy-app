@@ -59,7 +59,8 @@ test.describe('Ops: referral audit desk (live)', () => {
     const row = rowFor(page, referee);
     await expect(statusOf(page, referee, 'pending')).toBeVisible();
     await expect(row).toContainText(new RegExp(`${referrer}\\D+${referee}`));
-    await expect(row).toContainText('Contacts-only referral');
+    await expect(row).toContainText('Referral');
+    await expect(row).not.toContainText('Contacts-only');
     await expect(row).toContainText(/(low|medium|high) risk/);
     await expect(row).toContainText('Same IP');
   });
@@ -84,9 +85,9 @@ test.describe('Ops: referral audit desk (live)', () => {
     await expect(row).toContainText('medium risk');
     await expect(row).toContainText('Needs review');
 
-    // Held pays nothing yet: the referrer sees it as "checking", not as converted.
+    // Held pays nothing yet: the friend counts as joined, and the reward shows as "checking".
     const summary = await summaryOf(referrer);
-    expect(summary).toMatchObject({ held: 1, converted: 0, earned: { seeker: { referrals: 0, contacts: 0 } } });
+    expect(summary).toMatchObject({ checking: 1, joined: 1, rewards: { earned: 0, used: 0, remaining: 0 } });
   });
 
   test('approving a held referral releases the reward the referrer can spend', async ({ page, login }) => {
@@ -101,11 +102,11 @@ test.describe('Ops: referral audit desk (live)', () => {
     await expect(statusOf(page, referee, 'rewarded')).toBeVisible();
 
     const summary = await summaryOf(referrer);
-    expect(summary).toMatchObject({ converted: 1, held: 0, earned: { seeker: { referrals: 1, contacts: 15 } } });
+    expect(summary).toMatchObject({ joined: 1, checking: 0, rewards: { earned: 1, used: 0, remaining: 1 } });
     expect(summary).not.toHaveProperty('contactsEarned');
-    const { contacts } = await entitlementsOf(referrer);
-    expect(contacts.referralBonus).toBe(15);
-    expect(contacts.allowance).toBeGreaterThan(contacts.referralBonus);
+    const { contacts, agreements } = await entitlementsOf(referrer);
+    expect(contacts).not.toHaveProperty('referralBonus');
+    expect(agreements).toMatchObject({ credits: 1, remaining: 1 });
   });
 
   test('a high-risk qualification is refused by the system, and the desk says why', async ({ page, login }) => {
@@ -159,7 +160,7 @@ test.describe('Ops: referral audit desk (live)', () => {
     await expect(rowFor(page, referee)).toHaveCount(0);
     expect(writes).toEqual([{ reason: 'Owner confirmed the contact by phone' }]);
     expect(rowOf(referee).status).toBe('rewarded');
-    expect((await summaryOf(referrer)).earned.seeker.contacts).toBe(15);
+    expect((await summaryOf(referrer)).rewards.earned).toBe(1);
   });
 
   test('approve no longer needs the referee to hold an identity badge', async () => {

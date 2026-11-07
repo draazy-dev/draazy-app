@@ -70,9 +70,9 @@ test.describe('Fees — the rent-agreement sidebar prices from the admin fee sch
     await signedInAs(page, OWNER.mobile);
     await page.goto('/refer');
 
-    const owner = page.getByTestId('refer-owner-track');
-    await expect(owner).toContainText(`Featured placement for ${referral.ownerFeaturedDays} days`, { timeout: 20_000 });
-    await expect(owner).toContainText(/free rent agreements?/);
+    const gift = page.getByTestId('refer-gift');
+    await expect(gift).toContainText(`${referral.ownerFeaturedDays} days of Featured`, { timeout: 20_000 });
+    await expect(page.getByTestId('refer-how')).toContainText(`${referral.agreementDiscountPercent}% off the service fee`);
     await expect(page.locator('body')).not.toContainText(STALE_RENT_FEE);
   });
 
@@ -83,7 +83,7 @@ test.describe('Fees — the rent-agreement sidebar prices from the admin fee sch
     try {
       await signedInAs(page, OWNER.mobile);
       await page.goto('/refer');
-      await expect(page.getByTestId('refer-owner-track')).toContainText(`${repriced} days`, { timeout: 20_000 });
+      await expect(page.getByTestId('refer-gift')).toContainText(`${repriced} days`, { timeout: 20_000 });
     } finally {
       await saveFees({ referralOwnerFeaturedDays: referral.ownerFeaturedDays });
     }

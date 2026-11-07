@@ -12,7 +12,7 @@ const TERMS = { startDate: '', months: '11', rent: '20000', deposit: '100000', n
 
 const rupees = (text) => Number(String(text).replace(/[^\d.]/g, ''));
 
-test('a free rent agreement from referrals strikes the Draazy fee but keeps government charges', async ({ page }) => {
+test('a referral reward takes the configured percent off the Draazy fee but keeps government charges', async ({ page }) => {
   let remaining = 0;
   await page.route('**/api/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(BUYER) }));
   await page.route('**/api/auth/refresh', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ accessToken: 'e2e-nobackend-token' }) }));
@@ -23,9 +23,9 @@ test('a free rent agreement from referrals strikes the Draazy fee but keeps gove
   await page.route('**/api/me/entitlements', (route) => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({
-      contacts: { unlimited: false, used: 0, allowance: 15, remaining: 15, referralBonus: 0, friendBonus: 0, freeWindowEndsAt: null, packExpiresAt: null },
+      contacts: { unlimited: false, used: 0, allowance: 15, remaining: 15, friendBonus: 0, freeWindowEndsAt: null, packExpiresAt: null },
       listings: { allowance: 1, used: 0, passes: [] },
-      agreements: { free: 1, used: 1 - remaining, remaining },
+      agreements: { credits: 1, used: 1 - remaining, remaining, discountPercent: 50 },
     }),
   }));
   await page.addInitScript(([u, draft]) => {
@@ -37,17 +37,18 @@ test('a free rent agreement from referrals strikes the Draazy fee but keeps gove
 
   const total = page.locator('div.flex.justify-between.items-center', { hasText: /Estimated Total|Total Payable/ }).first();
   const fee = page.locator('div.flex.justify-between', { hasText: 'Draazy Service Fee' }).first();
-  const waiver = page.getByText(/Free with your referral reward/).first();
+  const waiver = page.getByTestId('ra-cost-referral').first();
 
   await gotoSettled(page, `${BASE}/services/rent-agreement`);
   await expect(total).toContainText('₹');
-  await expect(waiver, 'no credit, no waiver line').toHaveCount(0);
+  await expect(waiver, 'no reward, no discount line').toHaveCount(0);
   const fullTotal = rupees(await total.locator('span').last().textContent());
 
   remaining = 1;
   await reloadSettled(page);
-  await expect(waiver).toContainText('₹499');
-  await expect(fee.locator('span').last(), 'the Draazy fee is struck through, not hidden').toHaveClass(/line-through/);
+  await expect(waiver).toContainText('Referral reward: 50% off service fee');
+  await expect(waiver).toContainText('₹249');
+  await expect(fee.locator('span').last(), 'the Draazy fee stays at its full price; the discount is its own line').not.toHaveClass(/line-through/);
   await expect.poll(async () => rupees(await total.locator('span').last().textContent()),
-    'only the Draazy fee comes off the total').toBe(fullTotal - 499);
+    'only half the Draazy fee comes off the total').toBe(fullTotal - 249);
 });

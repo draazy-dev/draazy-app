@@ -25,11 +25,12 @@ test.describe('refer page, live', () => {
     // mistaken for a change here.
     expect(summary.code).toBeTruthy();
     expect(typeof summary.invited).toBe('number');
-    expect(typeof summary.converted).toBe('number');
-    expect(typeof summary.held).toBe('number');
-    expect(summary.earned).toEqual({ owner: { referrals: expect.any(Number), agreements: expect.any(Number) }, seeker: { referrals: expect.any(Number), contacts: expect.any(Number) } });
+    expect(typeof summary.joined).toBe('number');
+    expect(typeof summary.checking).toBe('number');
+    expect(summary.rewards).toEqual({ earned: expect.any(Number), used: expect.any(Number), remaining: expect.any(Number), discountPercent: expect.any(Number) });
     expect(summary.friendReward).toMatchObject({ redeemed: false });
     expect(summary).not.toHaveProperty('contactsEarned');
+    expect(summary).not.toHaveProperty('earned');
     expect(summary.code).not.toBe(BROWSER_MINTED);
 
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -72,7 +73,7 @@ test.describe('refer page, live', () => {
       await expect(counter).toContainText('0');
     });
   });
-  test('both reward tracks are pitched with the admin numbers, and the stats are the server\'s', async ({ page, request, flags }) => {
+  test('the three simple steps are pitched with the admin numbers, and the stats are the server\'s', async ({ page, request, flags }) => {
     await flags.enable('referralRewards');
     const { accessToken } = await apiLogin(REFERRER);
     const headers = { authorization: `Bearer ${accessToken}` };
@@ -83,16 +84,26 @@ test.describe('refer page, live', () => {
     await page.goto('/refer');
     await appReady(page);
 
-    await expect(page.getByTestId('refer-owner-track')).toContainText(`Featured placement for ${referral.ownerFeaturedDays} days`);
-    await expect(page.getByTestId('refer-owner-track')).toContainText(/free rent agreements?/);
-    await expect(page.getByTestId('refer-seeker-track')).toContainText(`${referral.seekerBonusContacts} extra free contact`);
-    await expect(page.getByTestId('refer-seeker-track')).toContainText(`${referral.contactBonus} owner contacts`);
+    const how = page.getByTestId('refer-how');
+    await expect(how.getByRole('listitem')).toHaveCount(3);
+    await expect(how).toContainText(`${referral.agreementDiscountPercent}% off the service fee of your next rent agreement`);
+    await expect(page.getByTestId('refer-gift')).toContainText(`${referral.seekerBonusContacts} extra free contact`);
+    await expect(page.getByTestId('refer-gift')).toContainText(`${referral.ownerFeaturedDays} days of Featured`);
+    await expect(how).toContainText('Stamp duty and registration charges are not discounted');
 
     await expect(page.getByTestId('refer-invited')).toHaveText(String(summary.invited));
-    await expect(page.getByTestId('refer-held')).toHaveText(String(summary.held));
-    await expect(page.getByTestId('refer-contacts-earned')).toHaveText(String(summary.earned.seeker.contacts));
-    await expect(page.getByTestId('refer-agreements')).toHaveText(/^\d+ \/ \d+$/);
+    await expect(page.getByTestId('refer-joined-count')).toHaveText(String(summary.joined));
+    await expect(page.getByTestId('refer-held')).toHaveText(String(summary.checking));
+    await expect(page.getByTestId('refer-rewards-earned')).toHaveText(String(summary.rewards.earned));
+    await expect(page.getByTestId('refer-rewards-used')).toHaveText(String(summary.rewards.used));
+    await expect(page.getByTestId('refer-rewards-left')).toHaveText(String(summary.rewards.remaining));
 
+    // The old free-agreement and referrer-contacts rewards are gone from the page.
+    await expect(page.getByText(/free rent agreement/i)).toHaveCount(0);
+    await expect(page.getByTestId('refer-owner-track')).toHaveCount(0);
+    await expect(page.getByTestId('refer-seeker-track')).toHaveCount(0);
+    await expect(page.getByTestId('refer-contacts-earned')).toHaveCount(0);
+    await expect(page.getByTestId('refer-agreements')).toHaveCount(0);
     // The retired quota-balance block and the every-three-referrals promise are gone.
     await expect(page.getByTestId('refer-balance')).toHaveCount(0);
     await expect(page.getByText(/every 3 referrals/i)).toHaveCount(0);
