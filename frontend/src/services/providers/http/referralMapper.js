@@ -43,6 +43,7 @@ export function toSummary(s) {
       earned: count(rewards.earned),
       used: count(rewards.used),
       remaining: count(rewards.remaining),
+      locked: count(rewards.locked),
       discountPercent: count(rewards.discountPercent),
     },
     friendReward: {
@@ -51,6 +52,14 @@ export function toSummary(s) {
       contacts: count(friend.contacts),
       featuredDays: count(friend.featuredDays),
     },
+    friends: (Array.isArray(s.friends) ? s.friends : []).map((f) => ({
+      name: f.name || '',
+      mobile: f.mobile || '',
+      at: f.at || '',
+      track: f.track || '',
+      state: f.state || 'joined',
+      kycPending: f.kycPending || '',
+    })),
   };
 }
 

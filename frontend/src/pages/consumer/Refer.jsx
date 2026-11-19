@@ -2,9 +2,11 @@ import { useToast } from '../../context/ToastContext.jsx';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router';
 import { getMyReferralSummary, referralLink } from '../../services/referralService.js';
 import { usePricing } from '../../context/PricingContext.jsx';
 import InviteByMobile from './refer/InviteByMobile.jsx';
+import FriendList from './refer/FriendList.jsx';
 
 const Stat = ({ value, label, tone = 'text-white', testId }) => (
   <div className="glass rounded-2xl px-4 py-3 min-w-0">
@@ -156,7 +158,7 @@ export default function Refer() {
         <p className="text-teal-300 text-sm mt-4" data-testid="refer-gift">
           {t('misc1.referGift', { count: referral.seekerBonusContacts, days: referral.ownerFeaturedDays })}
         </p>
-        <p className="text-xs text-gray-500 mt-2">{t('misc1.referFinePrint', { count: referral.qualifyPerMonth })}</p>
+        <p className="text-xs text-gray-500 mt-2">{t('misc1.referFinePrint', { count: referral.qualifyPerMonth, year: referral.qualifyPerYear })}</p>
       </section>
 
       <section data-testid="refer-stats">
@@ -171,8 +173,16 @@ export default function Refer() {
           <Stat value={rewards ? rewards.used : '—'} label={t('misc1.referRewardsUsed')} tone="text-emerald-300" testId="refer-rewards-used" />
           <Stat value={rewards ? rewards.remaining : '—'} label={t('misc1.referRewardsLeft')} tone="text-teal-300" testId="refer-rewards-left" />
         </div>
+        {rewards?.locked > 0 && (
+          <p className="text-sm text-amber-300 mt-3" data-testid="refer-rewards-locked">
+            {t('misc1.referRewardsLocked', { count: rewards.locked })}{' '}
+            <Link to="/verify-identity" className="underline font-semibold">{t('misc1.referDoKyc')}</Link>
+          </p>
+        )}
         <p className="text-xs text-gray-500 mt-3">{t('misc1.referCheckingNote', { days: referral.holdDays })}</p>
       </section>
+
+      {summary && <FriendList friends={summary.friends} percent={referral.agreementDiscountPercent} />}
     </div>
   );
 }

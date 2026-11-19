@@ -2,7 +2,7 @@
 import { ACTORS, expect, test } from '../../fixtures/live.js';
 import { API, apiLogin } from '../../helpers/liveAuth.js';
 import {
-  DESK, acceptedContact, decide, deskRow, deskRows, liveListing, member, referredPair, rowOf, setRisk, summaryOf,
+  DESK, acceptedContact, decide, deskRow, deskRows, kycDone, liveListing, member, referredPair, rowOf, setRisk, summaryOf,
 } from '../../helpers/referral.js';
 import { entitlementsOf } from '../../helpers/monetisation.js';
 
@@ -102,11 +102,12 @@ test.describe('Ops: referral audit desk (live)', () => {
     await expect(statusOf(page, referee, 'rewarded')).toBeVisible();
 
     const summary = await summaryOf(referrer);
-    expect(summary).toMatchObject({ joined: 1, checking: 0, rewards: { earned: 1, used: 0, remaining: 1 } });
+    expect(summary).toMatchObject({ joined: 1, checking: 0, rewards: { earned: 1, used: 0, remaining: 0, locked: 1 } });
     expect(summary).not.toHaveProperty('contactsEarned');
+    kycDone(referrer, referee);
     const { contacts, agreements } = await entitlementsOf(referrer);
     expect(contacts).not.toHaveProperty('referralBonus');
-    expect(agreements).toMatchObject({ credits: 1, remaining: 1 });
+    expect(agreements, 'spendable once both have KYC done').toMatchObject({ credits: 1, remaining: 1, locked: 0 });
   });
 
   test('a high-risk qualification is refused by the system, and the desk says why', async ({ page, login }) => {

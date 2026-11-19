@@ -43,6 +43,10 @@ test.describe('LIVE: referral invite by mobile', () => {
     expect(decodeURIComponent(url)).toContain(`ref=${code}`);
     await expect(page.getByTestId('refer-invite-status')).toHaveText('Opening WhatsApp…');
     await expect(page.locator('#refer-friend-mobile'), 'the box is cleared for the next friend').toHaveValue('');
+    const row = page.locator(`[data-testid="refer-friend"][data-mobile="${FRIEND_MOBILE}"]`);
+    await expect(row, 'the invited number joins the friend list, unmasked').toHaveAttribute('data-state', 'invited');
+    await expect(row).toContainText(`+91 ${FRIEND_MOBILE}`);
+    await expect(row).toContainText('Invite sent');
   });
 
   test('a blocked popup leaves a tappable WhatsApp link instead of navigating away', async ({ page, flags }) => {

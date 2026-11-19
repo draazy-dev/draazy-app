@@ -220,7 +220,7 @@ export const KB = [
     id: 'refer',
     keywords: ['refer', 'referral', 'invite', 'friend', 'reward', 'earn', 'bonus'],
     q: 'Is there a referral programme?',
-    a: "Yes. Open the Refer page and type your friend's mobile number. Draazy sends them your invite on WhatsApp. If it can't, your own WhatsApp opens with the message ready. When your friend gets going, you get 50% off the Draazy service fee of your next rent agreement. Stamp duty and registration charges are not discounted. Your friend gets a welcome gift too: extra free contacts, or Featured days for an owner. Some rewards are checked for a few days first. Rewards are non-cash.",
+    a: "Yes. Open the Refer page and type your friend's mobile number. Draazy sends them your invite on WhatsApp. If it can't, your own WhatsApp opens with the message ready. When your friend gets going, you get 50% off the Draazy service fee of your next rent agreement. You can use it once you and your friend have both done KYC, and it comes off by itself at checkout. Stamp duty and registration charges are not discounted. Your friend gets a welcome gift too: extra free contacts, or Featured days for an owner. Some rewards are checked for a few days first. Up to 3 rewards a month and 10 a year. Rewards are non-cash.",
     actions: [{ label: 'Refer & earn', to: '/refer', icon: 'gift' }],
   },
   {
@@ -288,7 +288,7 @@ export const KB = [
     id: 'whats-new',
     keywords: ['whats', 'latest', 'changelog', 'release', 'version', 'changed', 'features'],
     q: "What's new on Draazy?",
-    a: "The latest release (1.9.0, October 2026) made light mode the default, simplified the locality and near-a-place search, added locality guides with a Pune map and the Pune blog, and made listing location society-first. The changelog lists every release.",
+    a: "The latest release (1.13.0, November 2026) made referrals simpler: invite a friend by mobile number on WhatsApp and get 50% off your next rent agreement fee. The changelog lists every release.",
     actions: [{ label: "See what's new", to: '/help/changelog', icon: 'sparkles' }],
   },
   {

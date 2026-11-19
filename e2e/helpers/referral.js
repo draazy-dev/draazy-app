@@ -80,6 +80,11 @@ export function ageAccount(mobile, hours) {
   sql(`update users set created_at = now() - interval '${Number(hours)} hours' where mobile = '${digits(mobile)}'`);
 }
 
+/** Stamps the KYC badge directly; the ID-and-selfie review is covered by the identity specs. */
+export function kycDone(...mobiles) {
+  sql(`update users set verified = true where mobile in (${mobiles.map((m) => `'${digits(m)}'`).join(', ')})`);
+}
+
 /** Fills the referrer's month with granted referrals, so the next qualification meets the cap. */
 export function fillCap(referrerMobile, count) {
   for (let i = 0; i < count; i += 1) {

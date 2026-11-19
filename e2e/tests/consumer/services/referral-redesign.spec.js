@@ -4,7 +4,7 @@ import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, E2E_OTP, authHeaders, seedConsent, signedInAs } from '../../../helpers/liveAuth.js';
 import { call, entitlementsOf, sql } from '../../../helpers/monetisation.js';
 import {
-  acceptedContact, ageAccount, codeOf, featuredOf, fillCap, freshMobile, liveListing, member, redeem, referredPair,
+  acceptedContact, ageAccount, codeOf, featuredOf, fillCap, freshMobile, kycDone, liveListing, member, redeem, referredPair,
   revokeOwnership, rowOf, setRisk, stampVerified, summaryOf, verifyOwnership,
 } from '../../../helpers/referral.js';
 
@@ -53,24 +53,47 @@ test.describe('LIVE: referral redesign', () => {
     expect(['qualified', 'rewarded']).toContain(rowOf(friend).status);
     expect(rowOf(friend)).toMatchObject({ track: 'seeker', propertyId: listing.id });
     const earned = await summaryOf(referrer);
-    expect(earned).toMatchObject({ invited: 0, joined: 1, checking: 0, rewards: { earned: 1, used: 0, remaining: 1, discountPercent: 50 } });
-    expect((await entitlementsOf(referrer)).agreements).toMatchObject({ credits: 1, remaining: 1, discountPercent: 50 });
+    expect(earned).toMatchObject({ invited: 0, joined: 1, checking: 0, rewards: { earned: 1, used: 0, remaining: 0, locked: 1, discountPercent: 50 } });
+    expect((await entitlementsOf(referrer)).agreements, 'earned, but waiting for both KYCs').toMatchObject({ credits: 1, remaining: 0, locked: 1, discountPercent: 50 });
     expect((await entitlementsOf(referrer)).contacts).not.toHaveProperty('referralBonus');
-    expect((await entitlementsOf(friend)).contacts.friendBonus).toBe(5);
+    expect((await entitlementsOf(friend)).contacts.friendBonus, 'the friend\'s gift does not wait for KYC').toBe(5);
 
     await test.step('the friend is told what they got', async () => {
       await page.goto('/refer');
       await expect(page.getByTestId('refer-joined')).toContainText('+5 free contacts');
     });
 
-    await test.step('the referrer sees what was earned', async () => {
+    await test.step('the referrer sees the reward waiting for KYC', async () => {
       await signedInAs(page, referrer);
       await page.goto('/refer');
       await expect(page.getByTestId('refer-invited'), 'a link sign-up is not a WhatsApp invite').toHaveText('0');
       await expect(page.getByTestId('refer-held')).toHaveText('0');
       await expect(page.getByTestId('refer-joined-count')).toHaveText('1');
       await expect(page.getByTestId('refer-rewards-earned')).toHaveText('1');
+      await expect(page.getByTestId('refer-rewards-left')).toHaveText('0');
+      const locked = page.getByTestId('refer-rewards-locked');
+      await expect(locked).toContainText('1 reward is waiting');
+      await expect(locked.getByRole('link', { name: 'Do your KYC' })).toHaveAttribute('href', '/verify-identity');
+      const row = page.locator(`[data-testid="refer-friend"][data-mobile="${friend}"]`);
+      await expect(row, 'the friend list names who still owes KYC').toHaveAttribute('data-state', 'locked');
+      await expect(row).toContainText('Friend Seeker');
+      await expect(row).toContainText('Waiting for KYC');
+      await expect(row.getByTestId('refer-friend-hint')).toHaveText('You and your friend both need to do KYC. Do your KYC');
+    });
+
+    await test.step('KYC on one side only keeps it locked; both sides unlock it', async () => {
+      kycDone(referrer);
+      expect((await entitlementsOf(referrer)).agreements).toMatchObject({ remaining: 0, locked: 1 });
+      await page.reload();
+      const row = page.locator(`[data-testid="refer-friend"][data-mobile="${friend}"]`);
+      await expect(row.getByTestId('refer-friend-hint')).toHaveText('Your friend needs to do KYC to unlock this reward.');
+      kycDone(friend);
+      expect((await entitlementsOf(referrer)).agreements).toMatchObject({ credits: 1, remaining: 1, locked: 0 });
+      await page.reload();
       await expect(page.getByTestId('refer-rewards-left')).toHaveText('1');
+      await expect(page.getByTestId('refer-rewards-locked')).toHaveCount(0);
+      await expect(row).toHaveAttribute('data-state', 'ready');
+      await expect(row).toContainText('Ready to use');
     });
   });
 
@@ -95,6 +118,7 @@ test.describe('LIVE: referral redesign', () => {
     await flags.enable('referralRewards');
     const { referrer, referee } = await referredPair({ referrerName: 'Owner Referrer', refereeName: 'Owner Friend' });
     setRisk(referee, 'low');
+    kycDone(referrer, referee);
     const listing = await liveListing(referee);
     expect(rowOf(referee).status, 'a live listing alone qualifies nothing').toBe('pending');
     expect((await entitlementsOf(referrer)).agreements.remaining).toBe(0);
@@ -124,6 +148,7 @@ test.describe('LIVE: referral redesign', () => {
   test('withdrawing the verification takes the owner reward back', async () => {
     const { referrer, referee } = await referredPair();
     setRisk(referee, 'low');
+    kycDone(referrer, referee);
     const listing = await liveListing(referee);
     await verifyOwnership(referee, listing);
     expect((await entitlementsOf(referrer)).agreements.remaining).toBe(1);
@@ -175,7 +200,7 @@ test.describe('LIVE: referral redesign', () => {
   test('a referrer at the monthly cap is refused the next reward as cap_reached', async () => {
     const { referrer, referee } = await referredPair();
     setRisk(referee, 'low');
-    fillCap(referrer, 10);
+    fillCap(referrer, 3);
     const owner = await member('Accepting Owner');
     const listing = await liveListing(owner);
 
@@ -208,6 +233,7 @@ test.describe('LIVE: referral redesign', () => {
       expect((await redeem(friend, code)).status).toBe(200);
       setRisk(friend, 'low');
     }
+    kycDone(referrer, first, second);
     const owner = await member('Ring Owner');
     const listing = await liveListing(owner);
 
@@ -226,6 +252,7 @@ test.describe('LIVE: referral redesign', () => {
   test('suspending the referee within the clawback window takes the reward back by itself', async () => {
     const { referrer, referee } = await referredPair();
     setRisk(referee, 'low');
+    kycDone(referrer, referee);
     const owner = await member('Accepting Owner');
     const listing = await liveListing(owner);
     await acceptedContact(referee, owner, listing.id);

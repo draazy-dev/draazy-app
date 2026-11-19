@@ -22,7 +22,7 @@ export const PRICING_DEFAULTS = Object.freeze({
   rentAgreementPlatform: 499,
   referral: Object.freeze({
     seekerBonusContacts: 5, ownerFeaturedDays: 14, agreementDiscountPercent: 50,
-    featuredDays: 7, qualifyPerMonth: 10, qualifyPerYear: 50, holdDays: 7, clawbackDays: 30, signupWindowHours: 24,
+    featuredDays: 7, qualifyPerMonth: 3, qualifyPerYear: 10, holdDays: 7, clawbackDays: 30, signupWindowHours: 24,
   }),
   refunds: Object.freeze({
     packRefundDays: 7, passGuaranteeDays: 7, passGuaranteeMaxEnquiries: 0, passGuaranteeEveryMonths: 12, contactReplyDays: 7,

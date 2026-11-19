@@ -27,8 +27,9 @@ test.describe('refer page, live', () => {
     expect(typeof summary.invited).toBe('number');
     expect(typeof summary.joined).toBe('number');
     expect(typeof summary.checking).toBe('number');
-    expect(summary.rewards).toEqual({ earned: expect.any(Number), used: expect.any(Number), remaining: expect.any(Number), discountPercent: expect.any(Number) });
+    expect(summary.rewards).toEqual({ earned: expect.any(Number), used: expect.any(Number), remaining: expect.any(Number), locked: expect.any(Number), discountPercent: expect.any(Number) });
     expect(summary.friendReward).toMatchObject({ redeemed: false });
+    expect(Array.isArray(summary.friends)).toBe(true);
     expect(summary).not.toHaveProperty('contactsEarned');
     expect(summary).not.toHaveProperty('earned');
     expect(summary.code).not.toBe(BROWSER_MINTED);
