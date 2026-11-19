@@ -89,7 +89,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
   const [changeReq, setChangeReq] = useState(null);
   const [changeNote, setChangeNote] = useState('');
   const [otpDraft, setOtpDraft] = useState({});
-  const [showCancelled, setShowCancelled] = useState(false);
+  const [showPast, setShowPast] = useState(false);
   const [armed, setArmed] = useState(null);
   const [busy, setBusy] = useState(null);
   // A ref, not `busy`: a second tap can land before the re-render that disables the button.
@@ -210,27 +210,17 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
     });
   };
 
-  if (!isIn) return null;
+  if (!isIn || requests.length === 0) return null;
 
-  const cancelledCount = requests.filter((r) => r.status === 'cancelled').length;
-  const shown = showCancelled ? requests : requests.filter((r) => r.status !== 'cancelled');
+  const pastCount = requests.filter((r) => !isActive(r.status)).length;
+  const shown = showPast ? requests : requests.filter((r) => isActive(r.status));
 
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8     section-pt">      <div className="glass-card rounded-2xl p-4 sm:p-6">
-        <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
-          <h2 className="text-white font-bold text-lg flex items-center gap-2"><Icon name="list-checks" className="w-5 h-5 text-teal-400" /> {title}</h2>
-        </div>
-        <p className="text-gray-400 text-sm mb-4">{typeFilter === 'rental' || typeFilter === 'legal'
-          ? 'Track progress, review the draft we prepare, and approve it so we can register it with the government.'
-          : 'Track progress, review any draft we share, and message our team from here.'}</p>
+    <section data-testid="service-tracker" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pt">
+      <div className="glass-card rounded-2xl p-4 sm:p-6">
+        <h2 className={'text-white font-bold text-lg flex items-center gap-2' + (shown.length ? ' mb-4' : '')}><Icon name="list-checks" className="w-5 h-5 text-teal-400" /> {title}</h2>
 
-        {shown.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-white/15 p-6 text-center">
-            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-3"><Icon name="file-clock" className="w-6 h-6 text-gray-500" /></div>
-            <p className="text-white text-sm font-semibold">No active request yet</p>
-            <p className="text-gray-500 text-xs mt-1 max-w-md mx-auto">Submit the form below to start one.</p>
-          </div>
-        ) : (
+        {shown.length > 0 && (
           <div className="space-y-4">
             {shown.map((r) => {
               const m = r.status === 'action_required' && r.attention && !r.attention.forYou
@@ -330,10 +320,10 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
             })}
           </div>
         )}
-        {cancelledCount ? (
-          <button type="button" onClick={() => setShowCancelled((v) => !v)} aria-expanded={showCancelled} className="mt-3 w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white cursor-pointer">
-            <Icon name="chevron-down" className={'w-4 h-4 transition-transform ' + (showCancelled ? 'rotate-180' : '')} />
-            {showCancelled ? 'Hide cancelled requests' : `Show ${cancelledCount} cancelled request${cancelledCount === 1 ? '' : 's'}`}
+        {pastCount ? (
+          <button type="button" onClick={() => setShowPast((v) => !v)} aria-expanded={showPast} className={(shown.length ? 'mt-3 ' : 'mt-1 ') + 'w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white cursor-pointer'}>
+            <Icon name="chevron-down" className={'w-4 h-4 transition-transform ' + (showPast ? 'rotate-180' : '')} />
+            {showPast ? 'Hide past requests' : `Show ${pastCount} past request${pastCount === 1 ? '' : 's'}`}
           </button>
         ) : null}
       </div>

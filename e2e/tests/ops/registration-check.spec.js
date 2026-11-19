@@ -698,6 +698,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
       const customerPage = await context.newPage();
       await signIn(customerPage, ownerMobile);
       await customerPage.goto('/services/rent-agreement');
+      await customerPage.getByTestId('service-tracker').getByRole('button', { name: 'Show 1 past request' }).click();
       const step = customerPage.getByTestId('police-intimation-step');
       await expect(step).toContainText('Police informed');
       await expect(step).toContainText('shares your tenant\'s details with the police automatically');

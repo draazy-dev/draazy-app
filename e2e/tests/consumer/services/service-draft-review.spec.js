@@ -62,11 +62,8 @@ async function readBack(token, requestId) {
   expect(res.status).toBe(200);
   return res.json();
 }
-/* The tracker panel on whichever service page is open, scoped by its standing copy: every account
-   here is minted fresh and files exactly one request, so there is nothing to disambiguate. */
-
-const tracker = (page) =>
-  page.locator('section').filter({ hasText: 'Track progress, review any draft we share' });
+/* Every account here is minted fresh and files exactly one request, so there is nothing to disambiguate. */
+const tracker = (page) => page.getByTestId('service-tracker');
 
 test.describe('Service draft review — the customer is the checker', () => {
   test('sharing a draft tells the customer, the bell links to the tracker, and the customer approves only after opening the draft', async ({ page }) => {

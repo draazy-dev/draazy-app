@@ -3,8 +3,7 @@ import { test, expect } from '@playwright/test';
 import { trackErrors } from '../../helpers/console.js';
 import { seedConsent, signedInAsNew, uniqueMobile } from '../../helpers/liveAuth.js';
 
-const tracker = (page) =>
-  page.locator('section').filter({ hasText: 'Track progress, review the draft we prepare' });
+const tracker = (page) => page.getByTestId('service-tracker');
 
 // Two unpaid co-fill requests, one of them cancelled. Paying needs a complete agreement, so the live one stays unpaid.
 async function fileRequests(page) {
@@ -42,7 +41,7 @@ test.describe('Rent agreement tracker on a phone', () => {
     const progress = live.getByRole('progressbar', { name: 'Request progress' });
     await expect(progress, 'unpaid is not submitted, so no step is under way').toHaveAttribute('aria-valuetext', 'Not started yet');
 
-    const toggle = tracker(page).getByRole('button', { name: 'Show 1 cancelled request' });
+    const toggle = tracker(page).getByRole('button', { name: 'Show 1 past request' });
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await toggle.click();
     await expect(cancelled.getByText('Cancelled', { exact: true })).toBeVisible();
@@ -53,7 +52,7 @@ test.describe('Rent agreement tracker on a phone', () => {
       expect(await card.evaluate((el) => el.scrollWidth - el.clientWidth), 'nothing in the card scrolls sideways').toBeLessThanOrEqual(0);
     }
 
-    await tracker(page).getByRole('button', { name: 'Hide cancelled requests' }).click();
+    await tracker(page).getByRole('button', { name: 'Hide past requests' }).click();
     await expect(cancelled).toHaveCount(0);
     expect(errors).toEqual([]);
   });
@@ -85,7 +84,7 @@ test.describe('Rent agreement tracker on a phone', () => {
     await cancel.click();
 
     await expect(card, 'the cancelled request folds away').toHaveCount(0);
-    await expect(tracker(page).getByRole('button', { name: 'Show 1 cancelled request' })).toBeVisible();
+    await expect(tracker(page).getByRole('button', { name: 'Show 1 past request' })).toBeVisible();
     await expect(page.getByText('Your request is already submitted'), 'the wizard is free to file again').toHaveCount(0);
     expect(errors).toEqual([]);
   });
@@ -98,7 +97,7 @@ test.describe('Rent agreement tracker on a phone', () => {
     const ids = await fileRequests(page);
     await page.reload();
 
-    await tracker(page).getByRole('button', { name: 'Show 1 cancelled request' }).click();
+    await tracker(page).getByRole('button', { name: 'Show 1 past request' }).click();
     const card = tracker(page).locator('.border-l-4').filter({ hasText: ids.cancelled.slice(0, 10) });
     const remove = card.getByTestId('tracker-delete');
     await expect(remove).toHaveText('Delete');
@@ -108,10 +107,10 @@ test.describe('Rent agreement tracker on a phone', () => {
     await remove.click();
 
     await expect(card).toHaveCount(0);
-    await expect(tracker(page).getByRole('button', { name: /cancelled request/ })).toHaveCount(0);
+    await expect(tracker(page).getByRole('button', { name: /past request/ })).toHaveCount(0);
     await page.reload();
     await expect(tracker(page).locator('.border-l-4').filter({ hasText: ids.live.slice(0, 10) })).toBeVisible({ timeout: 15000 });
-    await expect(tracker(page).getByRole('button', { name: /cancelled request/ }), 'deleted, not just hidden for this visit').toHaveCount(0);
+    await expect(tracker(page).getByRole('button', { name: /past request/ }), 'deleted, not just hidden for this visit').toHaveCount(0);
     expect(errors).toEqual([]);
   });
 
@@ -139,9 +138,11 @@ test.describe('Rent agreement tracker on a phone', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: '{"items":[]}' }));
     await page.goto('/services/rent-agreement');
 
-    await tracker(page).getByRole('button', { name: 'Show 1 cancelled request' }).click();
     const groups = tracker(page).getByTestId('tracker-actions');
-    await expect(groups).toHaveCount(rows.length, { timeout: 15000 });
+    await expect(groups, 'only the two in-progress requests show up front').toHaveCount(2, { timeout: 15000 });
+    await expect(tracker(page).getByRole('button', { name: 'Download registered copy' }), 'a completed agreement is history, folded away').toHaveCount(0);
+    await tracker(page).getByRole('button', { name: 'Show 2 past requests' }).click();
+    await expect(groups).toHaveCount(rows.length);
     await expect(tracker(page).getByRole('button', { name: 'Download registered copy' })).toBeVisible();
     await expect(tracker(page).getByTestId('tracker-view-details')).toHaveCount(3);
 
@@ -167,6 +168,36 @@ test.describe('Rent agreement tracker on a phone', () => {
       const download = layout.lines.find((line) => line.some((i) => i.label === 'Download registered copy'));
       if (download) expect(download, 'the registered copy is the lead action on its own row').toHaveLength(1);
     }
+    expect(errors).toEqual([]);
+  });
+
+  test('a past agreement stays folded away while a new one is filled in, and no requests means no tracker', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedConsent(page);
+    await signedInAsNew(page);
+    let rows = [];
+    await page.route(/\/api\/service-requests\?type=rent-agreement/, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) }));
+    await page.goto('/services/rent-agreement');
+    await expect(page.getByRole('button', { name: /^Next/ })).toBeVisible({ timeout: 15000 });
+    await expect(tracker(page), 'nothing filed, so no empty tracker card').toHaveCount(0);
+
+    const at = new Date().toISOString();
+    rows = [{
+      id: 'pastdone01', type: 'rent-agreement', status: 'completed', details: { property: 'Flat 9, Kothrud, Pune', _state: {} }, mySideSubmitted: true,
+      createdAt: at, messages: [], timeline: [], parties: [],
+      documents: [{ id: 'f1', category: 'final-document', fileName: 'registered.pdf', uploadedAt: at }],
+    }];
+    await page.reload();
+    const toggle = tracker(page).getByRole('button', { name: 'Show 1 past request' });
+    await expect(toggle).toBeVisible({ timeout: 15000 });
+    await expect(tracker(page).getByText('Flat 9, Kothrud, Pune'), 'the completed agreement does not crowd the new one').toHaveCount(0);
+    await expect(page.getByText('Your request is already submitted'), 'a completed agreement does not lock the wizard').toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Next/ })).toBeVisible();
+
+    await toggle.click();
+    await expect(tracker(page).getByText('Flat 9, Kothrud, Pune')).toBeVisible();
+    await expect(tracker(page).getByRole('button', { name: 'Download registered copy' })).toBeVisible();
     expect(errors).toEqual([]);
   });
 
