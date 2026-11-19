@@ -3,7 +3,7 @@ import { API, apiLogin, signedInAsNew, uploadedListingPhotos } from '../../../he
 import { active, fillOwner, fillProperty, fillTenant, fillTerms, payAndSubmit } from '../../../helpers/rentAgreementWizard.js';
 import { gotoSettled } from '../../../helpers/settle.js';
 
-const RA_READS = ['/api/service-requests', '/api/me/service-request-invites', '/api/me/listings', '/api/me/documents/personal', '/api/me/entitlements', '/api/fees'];
+const RA_READS = ['/api/service-requests', '/api/me/service-request-invites', '/api/me/listings', '/api/me/entitlements', '/api/fees'];
 
 function countApi(page) {
   const seen = [];

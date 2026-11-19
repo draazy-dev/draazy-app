@@ -233,7 +233,7 @@ class DocumentVaultTest extends AbstractApiTest {
     private String uploadPersonal(User owner) throws Exception {
         String json = mvc.perform(multipart(Routes.MeDocuments.PERSONAL)
                         .file(pdf("pan.pdf"))
-                        .param("category", "PAN Card")
+                        .param("category", "Rent agreement")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();

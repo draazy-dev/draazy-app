@@ -6370,10 +6370,11 @@ paths:
   /me/documents/personal:
     get:
       tags: [Documents]
-      summary: Personal KYC documents (owner)
+      summary: Personal documents (owner)
       description: >-
-        The caller's own KYC papers. `personal` is a literal segment that out-ranks the
-        `{propId}` template, so a property can never be addressed here. Self-scoped; no `x-roles`.
+        The caller's own personal papers, such as a flatmate host's rent agreement or electricity
+        bill. `personal` is a literal segment that out-ranks the `{propId}` template, so a property
+        can never be addressed here. Self-scoped; no `x-roles`.
       operationId: listPersonalDocuments
       responses:
         '200':
@@ -6385,8 +6386,12 @@ paths:
                 items: { $ref: '#/components/schemas/DocumentSummary' }
     post:
       tags: [Documents]
-      summary: Upload personal KYC document (multipart)
-      description: PDF, JPEG/JPG, PNG or HEIC/HEIF; the uploaded file must be strictly smaller than 1000000 bytes.
+      summary: Upload personal document (multipart)
+      description: >-
+        PDF, JPEG/JPG, PNG or HEIC/HEIF; the uploaded file must be strictly smaller than 1000000
+        bytes. Identity papers and ownership proof are not kept here: the categories
+        `Aadhaar Card`, `PAN Card`, `Passport Photo` and `Ownership Proof` (any case) are refused
+        with 400. Ownership proof belongs in the property's own vault.
       operationId: uploadPersonalDocument
       requestBody:
         required: true
@@ -6396,7 +6401,7 @@ paths:
               type: object
               required: [category, file]
               properties:
-                category: { type: string, example: Aadhaar }
+                category: { type: string, example: Rent agreement }
                 file: { type: string, format: binary }
       responses:
         '201':
@@ -6404,6 +6409,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DocumentSummary' }
+        '400': { description: A retired identity or ownership category }
         '413': { description: Payload too large }
         '415': { description: Unsupported media type }
   /me/documents/personal/{docId}:
@@ -7666,13 +7672,15 @@ paths:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
       tags: [Services & Support]
-      summary: File one of the caller's own personal-vault papers on the request
+      summary: File one of the request property's vault papers on the request
       operationId: addServiceRequestDocFromVault
       description: >
-        Reuses a paper the caller already keeps in `GET /me/documents/personal` without a
-        re-upload: a vault row carries a signed URL rather than bytes, so the server files a new
-        request document that shares the stored object. The same category and side rules as
-        `addServiceRequestDoc` apply. Ops are refused (403); another person's vault row is 404.
+        Reuses a paper the caller already keeps in the vault of the request's own property
+        (`GET /me/documents/{propId}`) without a re-upload: a vault row carries a signed
+        URL rather than bytes, so the server files a new request document that shares the stored
+        object. The same category and side rules as `addServiceRequestDoc` apply. Ops are refused
+        (403); a paper from another property, a property the caller does not own, or a request
+        with no property is 404.
       requestBody:
         required: true
         content:
@@ -7687,7 +7695,7 @@ paths:
         '403':
           description: Ops, or a co-fill party filing a category that belongs to the other side
         '404':
-          description: No such request for this caller, or no such paper in their personal vault
+          description: No such request for this caller, or no such paper in the request property's vault
         '409':
           description: The request is closed
         '422': { $ref: '#/components/responses/ValidationError' }
@@ -13445,7 +13453,7 @@ components:
       properties:
         documentId:
           type: string
-          description: The id of a row in the caller's own `GET /me/documents/personal`.
+          description: The id of a vault row on the request's own property, owned by the caller.
         category:
           type: string
           maxLength: 64

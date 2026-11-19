@@ -439,7 +439,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
             throw new ForbiddenException("Only a party can file papers from their own vault.");
         }
         ServiceRequest request = visible(caller, id);
-        DocumentDto dto = documents.fileFromPersonalVault(caller.userId(), documentId,
+        DocumentDto dto = documents.fileFromPropertyVault(caller.userId(), documentId,
                 request.getPropertyId(), request.getId(), filedCategory(caller, request, category));
         record(request, "document.uploaded", displayName(caller.userId()));
         return dto;

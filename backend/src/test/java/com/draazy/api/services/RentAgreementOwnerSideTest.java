@@ -37,11 +37,13 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
     void tenantRequesterCannotFileOwnerPapers() throws Exception {
         User lister = customer("9820000850");
         User tenant = customer("9820000851");
-        String id = raiseUnpaid(tenant, listing(lister));
+        Property flat = listing(lister);
+        String id = raiseUnpaid(tenant, flat);
+        String ownersPaper = propertyVaultPaper(lister, flat, "index-ii.pdf");
 
         for (String category : List.of("licensor-0-pan", "LICENSOR-0-PAN", "licensor-1-aadhaar", "ownership-proof")) {
             refused(upload403(tenant, id, category));
-            refused(fromVault(tenant, id, vaultPaper(tenant), category));
+            refused(fromVault(tenant, id, ownersPaper, category));
         }
         upload(tenant, id, "tenant-0-pan", 201);
     }
@@ -74,10 +76,11 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
     @DisplayName("the listing's owner raising the request files owner papers and identities")
     void listingOwnerRequesterMayFile() throws Exception {
         User lister = customer("9820000856");
-        String id = raiseUnpaid(lister, listing(lister));
+        Property flat = listing(lister);
+        String id = raiseUnpaid(lister, flat);
 
         upload(lister, id, "licensor-0-pan", 201);
-        upload(lister, id, "ownership-proof", 201);
+        fromVault(lister, id, propertyVaultPaper(lister, flat, "index-ii.pdf"), "ownership-proof", 201);
         identities(lister, id, rows(OWNER_ROW)).andExpect(status().isNoContent());
     }
 
@@ -89,7 +92,6 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
 
         upload(owner, id, "licensor-0-pan", 201);
         upload(owner, id, "ownership-proof", 201);
-        fromVault(owner, id, vaultPaper(owner), "licensor-0-photo", 201);
         identities(owner, id, rows(OWNER_ROW)).andExpect(status().isNoContent());
     }
 
@@ -181,16 +183,6 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
     private ResultActions fromVault(User caller, String id, String documentId, String category, int expected)
             throws Exception {
         return fromVault(caller, id, documentId, category).andExpect(status().is(expected));
-    }
-
-    private String vaultPaper(User caller) throws Exception {
-        String body = mvc.perform(multipart(Routes.MeDocuments.PERSONAL)
-                        .file(new MockMultipartFile("file", "pan.pdf", "application/pdf", "%PDF-1.4".getBytes()))
-                        .param("category", "PAN Card")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(caller)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return field(body, "id");
     }
 
     private ResultActions identities(User caller, String id, String body) throws Exception {

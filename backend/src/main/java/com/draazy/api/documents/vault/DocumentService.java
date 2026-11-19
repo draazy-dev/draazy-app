@@ -5,6 +5,7 @@ import com.draazy.api.catalog.managed.ManagedPropertyRepository;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.audit.AuditService;
+import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.PayloadTooLargeException;
@@ -17,6 +18,7 @@ import com.draazy.api.provider.DocumentScanner;
 import com.draazy.api.provider.FileStorage;
 import com.draazy.api.security.AuthPrincipal;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -26,6 +28,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class DocumentService {
+    static final Set<String> RETIRED_PERSONAL_CATEGORIES =
+            Set.of("aadhaar card", "pan card", "passport photo", "ownership proof");
+
     private final DocumentRepository documents;
     private final PersonalDocumentRepository personalDocuments;
     private final ManagedPropertyDocumentRepository managedDocuments;
@@ -117,11 +122,13 @@ public class DocumentService {
     }
 
     @Transactional
-    public DocumentDto fileFromPersonalVault(UUID ownerId, String personalDocId, UUID propertyId,
+    public DocumentDto fileFromPropertyVault(UUID ownerId, String vaultDocId, UUID propertyId,
             UUID serviceRequestId, String category) {
-        PersonalDocument source = Ids.parseUuid(personalDocId)
-                .flatMap(personalDocuments::findById)
-                .filter(d -> d.getOwnerId().equals(ownerId))
+        Document source = Ids.parseUuid(vaultDocId)
+                .flatMap(documents::findById)
+                .filter(d -> d.getServiceRequestId() == null && propertyId != null
+                        && propertyId.equals(d.getPropertyId())
+                        && properties.findByIdAndOwner_Id(propertyId, ownerId).isPresent())
                 .orElseThrow(() -> NotFoundException.of("Document"));
         return mapper.toDto(documents.saveAndFlush(new Document(propertyId, serviceRequestId,
                 category, source.getFileName(), source.getStorageKey(),
@@ -146,6 +153,7 @@ public class DocumentService {
                     doc.getId().toString(), "propertyId", propertyId.toString(),
                     "category", doc.getCategory(), "fileName", doc.getFileName());
         }
+        removeUnsubmittedCopies(doc.getStorageKey());
         documents.delete(doc);
         purgeIfUnreferenced(doc.getStorageKey());
     }
@@ -158,6 +166,10 @@ public class DocumentService {
 
     @Transactional
     public DocumentSummary uploadPersonal(UUID ownerId, String category, MultipartFile file) {
+        if (isRetiredPersonal(category)) {
+            throw new BadRequestException("Identity papers and ownership proof are not stored in"
+                    + " your personal documents. Add ownership proof to the property instead.");
+        }
         byte[] bytes = readBytes(file, DocumentUploads.MAX_BYTES);
         String type = DocumentUploads.validate(file.getContentType(), file.getSize(), bytes);
         scan(file.getOriginalFilename(), type, bytes);
@@ -176,6 +188,22 @@ public class DocumentService {
                 .flatMap(personalDocuments::findById)
                 .filter(d -> d.getOwnerId().equals(ownerId))
                 .orElseThrow(() -> NotFoundException.of("Document"));
+        removePersonal(doc);
+    }
+
+    @Transactional
+    public int purgeRetiredPersonal() {
+        List<PersonalDocument> retired = personalDocuments.findByCategories(RETIRED_PERSONAL_CATEGORIES);
+        retired.forEach(this::removePersonal);
+        return retired.size();
+    }
+
+    static boolean isRetiredPersonal(String category) {
+        return category != null
+                && RETIRED_PERSONAL_CATEGORIES.contains(category.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private void removePersonal(PersonalDocument doc) {
         removeUnsubmittedCopies(doc.getStorageKey());
         personalDocuments.delete(doc);
         purgeIfUnreferenced(doc.getStorageKey());

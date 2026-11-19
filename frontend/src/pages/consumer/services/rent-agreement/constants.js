@@ -62,5 +62,5 @@ export const TDS_RENT_THRESHOLD = 50000;
 export const COMMERCIAL_ROUTE = '/services/property-legal';
 export const RESIDENTIAL_PROPERTY_TYPES = ['Flat / Apartment', 'Independent House / Bungalow', 'Row House'];
 
-export const OWNER_VAULT_CAT = { 'o-own': 'Ownership Proof' };
+export const OWNER_VAULT_CAT = { 'o-own': 'Index II' };
 

@@ -94,6 +94,7 @@ export function useRentAgreement() {
   const [inviteError, setInviteError] = useState(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
   const [myProperties, setMyProperties] = useState([]);
+  const [listingRefused, setListingRefused] = useState(false);
   useEffect(() => {
     if (!isIn) { setMyProperties([]); return undefined; }
     let alive = true;
@@ -485,38 +486,44 @@ export function useRentAgreement() {
     } catch {}
   };
 
-  const vaultEnabled = mode === 'owner' && isIn && !!user?.mobile;
+  const urlListing = listingRefused ? null : searchParams.get('listing') || searchParams.get('flat');
+  const requestPropertyId = selectedPropertyId
+    || myProperties.find((row) => row.id === urlListing || row.slug === urlListing)?.uuid
+    || null;
+  // Index II is filed from the request's own property vault, so it must be the property submit sends.
+  const vaultPropertyId = mode === 'owner' && isIn && user?.mobile ? requestPropertyId : null;
+  const vaultEnabled = !!vaultPropertyId;
   useEffect(() => {
     if (!vaultEnabled) return;
     let cancelled = false;
     (async () => {
-      const personal = await listDocuments(user.mobile, 'personal', REVISIT_READ).catch(() => null);
-      if (cancelled || !personal) return;
-      const held = new Set(personal.map((d) => String(d.id)));
+      const vault = await listDocuments(user.mobile, vaultPropertyId, REVISIT_READ).catch(() => null);
+      if (cancelled || !vault) return;
+      const held = new Set(vault.map((d) => String(d.id)));
       setOwnerDocs((cur) => {
         const next = { ...cur };
         OWNER_DOCS.forEach(([, k]) => {
           const d = next[k];
           if (d?.vaultDocId && !d.dataUrl && !held.has(String(d.vaultDocId))) next[k] = { fileName: d.fileName, reattach: true };
           if (docReady(next[k])) return;
-          const hit = personal.find((row) => row.category === OWNER_VAULT_CAT[k] && row.id);
+          const hit = vault.find((row) => row.category === OWNER_VAULT_CAT[k] && row.id);
           if (hit) next[k] = { fileName: hit.name, mime: hit.mime, vaultDocId: hit.id, fromVault: true };
         });
         return next;
       });
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh vault only when it becomes available
-  }, [vaultEnabled]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh only when the property's vault changes
+  }, [vaultPropertyId]);
 
   const saveOwnerDocToVault = async (k, d, file) => {
     if (!vaultEnabled || !d?.dataUrl || d.fromVault || !file) return;
     const cat = OWNER_VAULT_CAT[k];
     if (!cat) return;
     try {
-      const existing = await listDocuments(user.mobile, 'personal', REVISIT_READ);
+      const existing = await listDocuments(user.mobile, vaultPropertyId, REVISIT_READ);
       const saved = existing.find((x) => x.category === cat && x.name === d.fileName)
-        || await uploadDocument(user.mobile, 'personal', { category: cat, file });
+        || await uploadDocument(user.mobile, vaultPropertyId, { category: cat, file });
       if (!saved?.id || !mountedRef.current) return;
       setOwnerDocs((s) => (s[k]?.dataUrl === d.dataUrl ? { ...s, [k]: { ...s[k], vaultDocId: saved.id } } : s));
     } catch {}
@@ -723,7 +730,6 @@ export function useRentAgreement() {
 
   const listingPickRef = useRef(0);
   const propRef = useRef(prop);
-  const listingRefusedRef = useRef(false);
   useEffect(() => { propRef.current = prop; }, [prop]);
   const applyListing = async (l, { overwrite }) => {
     const id = l.uuid || l.id;
@@ -732,7 +738,7 @@ export function useRentAgreement() {
     if (!mountedRef.current || seq !== listingPickRef.current) return false;
     const { prop: answers, terms: termAnswers } = listingAnswers(full || l);
     if (!overwrite && namesOtherFlat(propRef.current, answers)) {
-      listingRefusedRef.current = true;
+      setListingRefused(true);
       toast(tr('services.ra.listingOtherFlat'), 'info');
       return false;
     }
@@ -1099,10 +1105,7 @@ export function useRentAgreement() {
       return;
     }
     const details = buildDetails();
-    const propertyReference = listingRefusedRef.current ? null : searchParams.get('listing') || searchParams.get('flat');
-    const propertyId = selectedPropertyId
-      || myProperties.find((row) => row.id === propertyReference || row.slug === propertyReference)?.uuid
-      || undefined;
+    const propertyId = requestPropertyId || undefined;
 
     setSubmitting(true);
     let finished = false;

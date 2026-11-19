@@ -109,6 +109,17 @@ abstract class ServiceFixtures extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
+    String propertyVaultPaper(User owner, Property property, String fileName) throws Exception {
+        String body = mvc.perform(multipart(Routes.MeDocuments.FOR_PROPERTY, property.getId())
+                        .file(new MockMultipartFile("file", fileName, "application/pdf",
+                                "%PDF-1.4".getBytes(StandardCharsets.UTF_8)))
+                        .param("category", "Index II")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return field(body, "id");
+    }
+
     String raise(User caller, String type, Property property) throws Exception {
         String body = property == null
                 ? "{\"type\":\"" + type + "\"}"

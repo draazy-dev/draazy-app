@@ -5,6 +5,7 @@ import {
   PNG, active, clickNext, fillOwner, fillProperty, fillTenant, fillTerms, inviteTenant, payAndSubmit,
 } from '../../../helpers/rentAgreementWizard.js';
 import { gotoSettled, reloadSettled } from '../../../helpers/settle.js';
+import { newListing } from '../../../helpers/monetisation.js';
 /* What the platform already holds is not asked for again. Each claim needs a second account or a
    server-side filing, so all three are asserted live. */
 
@@ -314,18 +315,19 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     await other.context().close();
   });
 
-  test('a paper already in your Documents is filed by reference, not re-uploaded', async ({ page }) => {
+  test("the flat's Index II already in its Documents is filed by reference, not re-uploaded", async ({ page }) => {
     test.slow();
     const ownerMobile = await signedInAsNew(page, { api: API });
-    await gotoSettled(page, `${BASE}/services/rent-agreement`);
+    const { id: propertyId } = await newListing(ownerMobile, { title: 'Reuse flat' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement?listing=${propertyId}`);
     await fillProperty(page);
 
     const o = active(page);
     const savedToVault = page.waitForResponse(
-      (r) => r.request().method() === 'POST' && /\/me\/documents\/personal$/.test(new URL(r.url()).pathname),
+      (r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith(`/me/documents/${propertyId}`),
     );
     await o.locator('input[type="file"]').nth(0).setInputFiles({ name: 'live-own.png', mimeType: 'image/png', buffer: PNG });
-    expect((await savedToVault).ok(), 'the ownership proof was saved to the vault').toBe(true);
+    expect((await savedToVault).ok(), "the Index II was saved to the flat's vault").toBe(true);
     await expect(o.getByText('Saved to your Documents')).toBeVisible({ timeout: 15000 });
     await expect
       .poll(async () => page.evaluate(() => {
@@ -338,7 +340,7 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     await expect(o.getByText('live-own.jpg')).toBeVisible();
     await expect(o.getByText('From your Documents')).toBeVisible();
 
-    await expect(o.locator('input[type="file"]'), 'ownership proof is the only paper a licensor uploads').toHaveCount(1);
+    await expect(o.locator('input[type="file"]'), 'Index II is the only paper a licensor uploads').toHaveCount(1);
     await fillOwner(page, { docs: false });
     await inviteTenant(page, uniqueMobile());
     await fillTerms(page);
@@ -357,6 +359,6 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     const read = await fetch(`${API}/service-requests/${requestId}`, { headers: await authHeaders(ownerMobile) });
     expect(read.status).toBe(200);
     const docs = (await read.json()).documents || [];
-    expect(docs.map((d) => d.category), 'the ownership proof is on the request under its slot').toContain(category);
+    expect(docs.map((d) => d.category), 'the Index II is on the request under its slot').toContain(category);
   });
 });
