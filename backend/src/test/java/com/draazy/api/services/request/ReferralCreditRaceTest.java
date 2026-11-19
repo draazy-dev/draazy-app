@@ -40,10 +40,12 @@ class ReferralCreditRaceTest extends AbstractCommittedApiTest {
     @DisplayName("one earned credit, two requests, two racing spends: exactly one wins")
     void onlyOneSpendWins() {
         User caller = user("01", "owner");
+        User friend = user("02", "buyer");
+        jdbc.update("update users set verified = true where id in (?, ?)", caller.getId(), friend.getId());
         jdbc.update("""
                 insert into referrals (referrer_id, referrer_mobile, referred_mobile, channel, status, track)
                 values (?, ?, ?, 'owner', 'qualified', 'owner')
-                """, caller.getId(), caller.getMobile(), "9782019001");
+                """, caller.getId(), caller.getMobile(), friend.getMobile());
         UUID a = filed(caller, false);
         UUID b = filed(caller, true);
         AtomicInteger spent = new AtomicInteger();

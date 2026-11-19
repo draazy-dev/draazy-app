@@ -109,7 +109,8 @@ class ReferralOutcomes {
 
     private String earnedNotice() {
         return "Your friend joined. You've earned " + settings.referralAgreementDiscountPercent()
-                + "% off the service fee on your next rent agreement.";
+                + "% off the service fee on your next rent agreement. You can use it once you and your friend"
+                + " have both finished KYC.";
     }
 
     private void tellReferrer(Referral referral, String title, String body) {

@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 29
-updated: 2026-11-06
+updated: 2026-11-08
 summary: How admins change site settings, fees, served districts and flags safely, and how to read provider status and the call log.
 tags: [ops, internal, settings, integrations, flags, fees]
 modules: [settings, integrations]
@@ -50,7 +50,7 @@ A viewer without `settings:write` can open **Settings** but cannot save. The sys
 | **General** | **Max photos per listing** (3 to 20) | **Save photo limit** |
 | **General** | **Max flatmate groups per person** (1 to 10) | **Save group limit** |
 | **Fees** | Rent listing pass (60 days), Sale listing pass (90 days), Rent contact pack (15 contacts, 30 days), Buy contact pack (15 contacts, 60 days), Rent agreement platform fee, Free owner contacts, Featured days after verification | **Save fees** |
-| **Fees** | **Referrals**: **Agreement discount %** (`referralAgreementDiscountPercent`, default 50), **Invites per day** (`referralInvitesPerDay`, default 10), **Redeem failures per day** (`referralRedeemFailuresPerDay`, default 5), friend gifts, monthly and yearly caps, hold, clawback and redeem windows, fraud-signal retention (180 days) | **Save referrals** |
+| **Fees** | **Referrals**: **Agreement discount %** (`referralAgreementDiscountPercent`, default 50), **Invites per day** (`referralInvitesPerDay`, default 10), **Redeem failures per day** (`referralRedeemFailuresPerDay`, default 5), friend gifts, monthly and yearly caps (`referralQualifyPerMonth` default 3, `referralQualifyPerYear` default 10), hold, clawback and redeem windows, fraud-signal retention (180 days) | **Save referrals** |
 | **Fees** | **Refunds**: owner reply window, open contacts and visits per seeker, contact pack refund window, listing pass guarantee | **Save refunds** |
 | **Fees** | **Move-in Pack**: a **Live** / **Coming soon** switch and six service prices | **Save Move-in Pack** |
 | **Maps** | **Served districts**, **Keep search inside served districts**, **Blacklisted places** | Each change saves at once |

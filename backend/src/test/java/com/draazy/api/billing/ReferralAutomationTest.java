@@ -753,7 +753,16 @@ class ReferralAutomationTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.qualified").value(2))
                 .andExpect(jsonPath("$.checking").value(0))
                 .andExpect(jsonPath("$.rewards.earned").value(2))
-                .andExpect(jsonPath("$.rewards.remaining").value(2))
+                .andExpect(jsonPath("$.rewards.remaining").value(0))
+                .andExpect(jsonPath("$.rewards.locked").value(2))
                 .andExpect(jsonPath("$.rewards.discountPercent").value(50));
+
+        jdbc.update("update users set verified = true where mobile in (?, ?, ?)",
+                referrer.getMobile(), "9866620231", "9866620232");
+
+        mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
+                .andExpect(jsonPath("$.rewards.earned").value(2))
+                .andExpect(jsonPath("$.rewards.remaining").value(2))
+                .andExpect(jsonPath("$.rewards.locked").value(0));
     }
 }

@@ -17868,7 +17868,14 @@ components:
           minimum: 0
           description: >-
             Credits spendable at `POST /service-requests/{id}/checkout`, which takes `discountPercent`
-            off Draazy's service fee (never the statutory part). Never negative, even after a referral clawback.
+            off Draazy's service fee (never the statutory part). Only credits whose referrer and friend
+            both have the KYC badge count. Never negative, even after a referral clawback.
+        locked:
+          type: integer
+          minimum: 0
+          description: >-
+            Credits earned but not spendable yet, because the referrer or the friend has not finished
+            KYC. Evaluated live, so a revoked badge locks a credit again.
         discountPercent: { type: integer, description: Percent off the service fee one credit takes off. }
     ReferralSummary:
       type: object
@@ -17886,7 +17893,8 @@ components:
           properties:
             earned: { type: integer, description: Credits earned. }
             used: { type: integer, description: Credits spent on a rent agreement. }
-            remaining: { type: integer }
+            remaining: { type: integer, description: Credits usable now; same as `agreements.remaining` in `GET /me/entitlements`. }
+            locked: { type: integer, description: Credits waiting for the caller or the friend to finish KYC. }
             discountPercent: { type: integer, description: Percent off the next rent agreement service fee per credit. }
         friendReward:
           type: object
@@ -17897,6 +17905,26 @@ components:
             track: { type: [string, 'null'], enum: [owner, seeker, null] }
             contacts: { type: integer, description: Extra free contacts standing now. }
             featuredDays: { type: integer, description: Featured days promised on their first verified listing. }
+        friends:
+          type: array
+          description: >-
+            One row per friend, newest first: everyone who joined through the caller's code plus numbers
+            invited on WhatsApp that have not joined through it. Spent credits are assigned to unlocked
+            rewards oldest first, so the row states always add up to `rewards`.
+          items:
+            type: object
+            properties:
+              name: { type: [string, 'null'], description: The friend's name at sign-up; null for an invite they have not joined from. }
+              mobile: { $ref: '#/components/schemas/Mobile' }
+              at: { type: string, format: date-time, description: When they joined, or when the latest invite was sent. }
+              track: { type: [string, 'null'], enum: [owner, seeker, null] }
+              state:
+                type: string
+                enum: [invited, joined, checking, locked, ready, used, not_counted]
+                description: >-
+                  `invited` never reveals whether the number already has an account; `locked` is an earned
+                  reward waiting for KYC; `not_counted` covers rejected and clawed-back referrals.
+              kycPending: { type: [string, 'null'], enum: [you, friend, both, null], description: Who still needs KYC; set only when state is `locked`. }
     ReferralInviteResponse:
       type: object
       required: [delivery]
@@ -19612,8 +19640,8 @@ components:
             ownerFeaturedDays: { type: integer, description: Days the friend's qualifying listing stays Featured. }
             agreementDiscountPercent: { type: integer, minimum: 1, maximum: 100, description: Percent off the service fee of the referrer's next rent agreement, per qualified friend. }
             featuredDays: { type: integer, description: Days any listing stays Featured after its ownership is verified. }
-            qualifyPerMonth: { type: integer, description: Referrals that can pay out per calendar month (IST). }
-            qualifyPerYear: { type: integer, description: Referrals that can pay out per calendar year (IST). }
+            qualifyPerMonth: { type: integer, description: Referrals that can pay out per calendar month (IST). Default 3. }
+            qualifyPerYear: { type: integer, description: Referrals that can pay out per calendar year (IST). Default 10. }
             holdDays: { type: integer, description: How long a medium-risk referral is held before it is re-checked. }
             clawbackDays: { type: integer, description: Days after a grant during which a problem takes the reward back. }
             signupWindowHours: { type: integer, description: A code can be redeemed only this long after the account was created. }

@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 13
-updated: 2026-11-06
+updated: 2026-11-08
 summary: How the automatic referral checks work and when staff audit, override or claw back a reward.
 tags: [ops, referrals, fraud, rewards, internal]
 modules: [referrals]
@@ -42,7 +42,7 @@ The desk shows both mobiles in full but no raw device or IP evidence; work from 
 2. **At sign-up by invited number**: when a new account's mobile was invited in the last 30 days, the earliest invite's referrer gets a `pending` referral automatically, with the same checks as a redeem. The friend types no code. A later code redeem by that person is refused as already referred.
 3. **At qualification** the server scores risk from the shared network, shared browser, redemption velocity and the referrer's account age: low, medium or high. An owner referral qualifies only when the listing is verified and live; until then the row stays `pending`.
 4. **Low** is granted immediately. **Medium** is `held` for the hold period, then released or rejected by the sweep. **High** is rejected automatically and the referrer is told to contact support. The friend's gift applies only while the row is `qualified` or `rewarded`.
-5. Monthly and yearly caps apply; overflow is rejected with the auto reason **Cap reached** and does not queue.
+5. Monthly and yearly caps apply (default 3 a month and 10 a calendar year); overflow is rejected with the auto reason **Cap reached** and does not queue. A reward still waiting for KYC counts toward the caps.
 6. A referee found to be abusive is suspended or archived (including by report enforcement) within the clawback window, which automatically reverses the reward and takes the qualifying listing down.
 7. The referrer gets an in-app notification when a reward is earned, held, released or removed, and when staff approve, reject or claw back.
 
@@ -83,6 +83,10 @@ The **Auto reason** on a row is one of: High risk, Needs review (one risk signal
 ## Reward rules
 
 The reward label is server-composed, for example **50% off next agreement fee**. The referrer's reward is the same for owner and tenant/buyer referrals: one referral credit, worth 50% (the setting) off the Draazy service fee of one future rent agreement. Stamp duty and registration are never discounted. `rewardAmount` counts credits, not rupees.
+
+A granted credit is **locked** until both the referrer and the friend have the KYC badge (ID and selfie check). The Refer page shows it as waiting with a **Do your KYC** link, and checkout does not apply it. The check is live: revoking either person's badge locks the credit again. The friend's own gift does not wait for KYC. If the **KYC badge** app flag is off, nobody can finish KYC, so every credit stays locked.
+
+When unlocked, the credit is used automatically at rent agreement checkout when the referrer is the payer. There is no code.
 
 A clawback removes the credit and the friend's gift. A credit already spent on a delivered agreement is not recovered, and the agreement stays with the user. A credit on an agreement that is cancelled returns to the referrer.
 

@@ -283,6 +283,7 @@ class ReferralEndpointsTest extends AbstractApiTest {
         User referred = user("9866600051", "buyer");
         User staff = user("9866600052", "staff");
         String id = referralFrom(referrer, referred);
+        jdbc.update("update users set verified = true where id in (?, ?)", referrer.getId(), referred.getId());
 
         mvc.perform(post("/referrals/" + id + "/approve")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))

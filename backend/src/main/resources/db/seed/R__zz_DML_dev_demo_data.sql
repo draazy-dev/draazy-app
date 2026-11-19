@@ -440,7 +440,7 @@ INSERT INTO public.faqs (id, question, answer, category) VALUES
    'Trust'),
   ('fa900001-0000-4000-8000-00000000f010',
    'How does refer and earn work?',
-   'Open Refer a friend and type your friend''s mobile number. Draazy sends them your invite on WhatsApp, or opens your own WhatsApp if we can''t send it. When your friend gets going, you get 50% off the Draazy service fee of your next rent agreement. Stamp duty and registration charges are not discounted. Your friend gets a welcome gift too.',
+   'Open Refer a friend and type your friend''s mobile number. Draazy sends them your invite on WhatsApp, or opens your own WhatsApp if we can''t send it. When your friend gets going, you get 50% off the Draazy service fee of your next rent agreement. You can use it once you and your friend have both done KYC, and it comes off by itself at checkout. Stamp duty and registration charges are not discounted. Your friend gets a welcome gift too.',
    'Payments')
     ON CONFLICT DO NOTHING;
 

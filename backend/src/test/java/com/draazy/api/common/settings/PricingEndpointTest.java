@@ -86,8 +86,8 @@ class PricingEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.pricing.referral.ownerRewardAgreements").doesNotExist())
                 .andExpect(jsonPath("$.pricing.referral.agreementDiscountPercent").value(50))
                 .andExpect(jsonPath("$.pricing.referral.featuredDays").value(10))
-                .andExpect(jsonPath("$.pricing.referral.qualifyPerMonth").value(10))
-                .andExpect(jsonPath("$.pricing.referral.qualifyPerYear").value(50))
+                .andExpect(jsonPath("$.pricing.referral.qualifyPerMonth").value(3))
+                .andExpect(jsonPath("$.pricing.referral.qualifyPerYear").value(10))
                 .andExpect(jsonPath("$.pricing.referral.holdDays").value(7))
                 .andExpect(jsonPath("$.pricing.referral.clawbackDays").value(30))
                 .andExpect(jsonPath("$.pricing.referral.signupWindowHours").value(24));

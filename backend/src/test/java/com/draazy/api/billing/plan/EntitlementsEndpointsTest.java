@@ -303,7 +303,7 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     @Test
     @DisplayName("a qualified referral buys the referrer a discount credit, never contacts")
     void anApprovedReferralGrantsAnAgreementDiscount() throws Exception {
-        User referrer = user("9844403000", "owner");
+        User referrer = identityVerified("9844403000", "owner");
         User staff = user("9844403009", "staff");
         referralApprovedFor(referrer, "9844403001", staff);
 
@@ -318,13 +318,75 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.agreements.credits").value(1))
                 .andExpect(jsonPath("$.agreements.used").value(0))
                 .andExpect(jsonPath("$.agreements.remaining").value(1))
+                .andExpect(jsonPath("$.agreements.locked").value(0))
                 .andExpect(jsonPath("$.agreements.discountPercent").value(50));
+    }
+
+    @Test
+    @DisplayName("an earned credit stays locked until the referrer and the friend both finish KYC")
+    void theCreditUnlocksOnlyWhenBothSidesAreVerified() throws Exception {
+        User referrer = user("9844403500", "owner");
+        User staff = user("9844403509", "staff");
+        referralApprovedFor(referrer, "9844403501", staff);
+        jdbc.update("update users set verified = false where mobile = '9844403501'");
+
+        expectAgreements(referrer, 1, 0, 1);
+
+        jdbc.update("update users set verified = true where id = ?", referrer.getId());
+        expectAgreements(referrer, 1, 0, 1);
+
+        jdbc.update("update users set verified = true where mobile = '9844403501'");
+        expectAgreements(referrer, 1, 1, 0);
+
+        jdbc.update("update users set verified = false where id = ?", referrer.getId());
+        expectAgreements(referrer, 1, 0, 1);
+    }
+
+    @Test
+    @DisplayName("the Refer page lists each friend with who still owes KYC, and invites that never joined")
+    void theFriendListExplainsEachReward() throws Exception {
+        User referrer = user("9844403600", "owner");
+        User staff = user("9844403609", "staff");
+        referralApprovedFor(referrer, "9844403601", staff);
+        referralApprovedFor(referrer, "9844403602", staff);
+        jdbc.update("update users set verified = false where mobile = '9844403602'");
+        mvc.perform(post(Routes.Referrals.INVITES).header(HttpHeaders.AUTHORIZATION, bearer(referrer))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"mobile\":\"9844403603\"}"))
+                .andExpect(status().isOk());
+
+        expectFriend(referrer, "9844403601", "locked", "you");
+        expectFriend(referrer, "9844403602", "locked", "both");
+        mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
+                .andExpect(jsonPath("$.friends.length()").value(3))
+                .andExpect(jsonPath("$.friends[0].mobile").value("9844403603"))
+                .andExpect(jsonPath("$.friends[0].state").value("invited"))
+                .andExpect(jsonPath("$.friends[0].name").doesNotExist());
+
+        jdbc.update("update users set verified = true where id = ?", referrer.getId());
+        expectFriend(referrer, "9844403601", "ready", null);
+        expectFriend(referrer, "9844403602", "locked", "friend");
+    }
+
+    private void expectFriend(User referrer, String mobile, String state, String kycPending) throws Exception {
+        String row = "$.friends[?(@.mobile == '" + mobile + "')]";
+        mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(row + ".state").value(org.hamcrest.Matchers.contains(state)))
+                .andExpect(jsonPath(row + ".kycPending").value(org.hamcrest.Matchers.contains(kycPending)));
+    }
+
+    private void expectAgreements(User referrer, int credits, int remaining, int locked) throws Exception {
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.agreements.credits").value(credits))
+                .andExpect(jsonPath("$.agreements.remaining").value(remaining))
+                .andExpect(jsonPath("$.agreements.locked").value(locked));
     }
 
     @Test
     @DisplayName("each qualified friend adds one credit, whichever track they came in on")
     void everyQualifiedFriendBuysACredit() throws Exception {
-        User referrer = user("9844403100", "owner");
+        User referrer = identityVerified("9844403100", "owner");
         User staff = user("9844403109", "staff");
         String first = referralApprovedFor(referrer, "9844403101", staff);
         jdbc.update("update referrals set track = 'owner' where id = ?::uuid", first);

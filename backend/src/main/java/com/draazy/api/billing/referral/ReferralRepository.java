@@ -75,6 +75,24 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
     long countGranted(@Param("referrerId") UUID referrerId);
 
     @Query("""
+            select count(r) from Referral r
+            where r.referrerId = :referrerId and r.status in ('qualified', 'rewarded')
+              and exists (select 1 from User me where me.id = :referrerId and me.verified = true)
+              and exists (select 1 from User f where f.mobile = r.referredMobile and f.verified = true)
+            """)
+    long countUnlocked(@Param("referrerId") UUID referrerId);
+
+    @Query("""
+            select r.referredMobile from Referral r
+            where r.referrerId = :referrerId and r.status in ('qualified', 'rewarded')
+              and exists (select 1 from User f where f.mobile = r.referredMobile and f.verified = true)
+            """)
+    List<String> verifiedGrantedFriends(@Param("referrerId") UUID referrerId);
+
+    @Query("select count(u) > 0 from User u where u.id = :userId and u.verified = true")
+    boolean isVerified(@Param("userId") UUID userId);
+
+    @Query("""
             select count(r) > 0 from Referral r
             where r.status in ('qualified', 'rewarded')
               and (r.track is null or r.track = 'seeker')

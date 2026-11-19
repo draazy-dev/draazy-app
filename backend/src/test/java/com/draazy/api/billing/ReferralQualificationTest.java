@@ -33,7 +33,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
 class ReferralQualificationTest extends AbstractApiTest {
-    private static final long SEEDED_CAP = 10L;
+    private static final long SEEDED_CAP = 3L;
 
     private static final String UA = "DraazyTest/1.0 (referral qualification)";
     private static final String IP = "203.0.113.7";
@@ -199,7 +199,7 @@ class ReferralQualificationTest extends AbstractApiTest {
     }
 
     @Test
-    void theCapIsConfigurationAndDefaultsToTenAMonth() {
+    void theCapIsConfigurationAndDefaultsToThreeAMonth() {
         assertThat(settings.referralQualifyPerMonth()).isEqualTo(SEEDED_CAP);
 
         setCap(2);

@@ -107,10 +107,13 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         return Math.toIntExact(settings.referralAgreementDiscountPercent());
     }
 
-    private AgreementEntitlementDto agreementsOf(UUID userId) {
+    @Transactional(readOnly = true)
+    public AgreementEntitlementDto agreementsOf(UUID userId) {
         int earned = Math.toIntExact(referrals.countGranted(userId));
+        int unlocked = Math.toIntExact(referrals.countUnlocked(userId));
         int used = Math.toIntExact(agreementCredits.agreementCreditsHeld(userId));
-        return new AgreementEntitlementDto(earned, used, Math.max(0, earned - used),
+        int remaining = Math.max(0, unlocked - used);
+        return new AgreementEntitlementDto(earned, used, remaining, Math.max(0, earned - used - remaining),
                 Math.toIntExact(settings.referralAgreementDiscountPercent()));
     }
 

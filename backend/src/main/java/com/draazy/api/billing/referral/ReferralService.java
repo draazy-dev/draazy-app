@@ -1,5 +1,6 @@
 package com.draazy.api.billing.referral;
 
+import com.draazy.api.billing.entitlement.EntitlementService;
 import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
@@ -7,7 +8,6 @@ import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.settings.PlatformSettings;
-import com.draazy.api.common.trust.AgreementCreditUsageLookup;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -40,18 +40,19 @@ public class ReferralService {
     private final PlatformSettings settings;
     private final ReferralSignals signals;
     private final AuditService audit;
-    private final AgreementCreditUsageLookup agreementCredits;
+    private final EntitlementService entitlements;
     private final ReferralOutcomes outcomes;
     private final ReferralCodeMinter minter;
     private final ReferralRedemption redemption;
     private final ReferralRedeemFailures redeemFailures;
     private final ReferralInviteRepository invites;
+    private final ReferralFriends friends;
 
     public ReferralService(ReferralRepository referrals, ReferralCodeRepository codes,
             ReferralMapper mapper, UserRepository users, PlatformSettings settings,
-            ReferralSignals signals, AuditService audit, AgreementCreditUsageLookup agreementCredits,
+            ReferralSignals signals, AuditService audit, EntitlementService entitlements,
             ReferralOutcomes outcomes, ReferralCodeMinter minter, ReferralRedemption redemption,
-            ReferralRedeemFailures redeemFailures, ReferralInviteRepository invites) {
+            ReferralRedeemFailures redeemFailures, ReferralInviteRepository invites, ReferralFriends friends) {
         this.referrals = referrals;
         this.codes = codes;
         this.mapper = mapper;
@@ -59,12 +60,13 @@ public class ReferralService {
         this.settings = settings;
         this.signals = signals;
         this.audit = audit;
-        this.agreementCredits = agreementCredits;
+        this.entitlements = entitlements;
         this.outcomes = outcomes;
         this.minter = minter;
         this.redemption = redemption;
         this.redeemFailures = redeemFailures;
         this.invites = invites;
+        this.friends = friends;
     }
 
     @Transactional
@@ -73,11 +75,12 @@ public class ReferralService {
         List<Referral> mine = referrals.findByReferrerId(caller.userId());
         int checking = (int) mine.stream().filter(r -> ReferralStatuses.HELD.equals(r.getStatus())).count();
         int qualified = (int) mine.stream().filter(r -> ReferralStatuses.isGranting(r.getStatus())).count();
-        int used = Math.toIntExact(agreementCredits.agreementCreditsHeld(caller.userId()));
-        var rewards = new ReferralSummaryDto.Rewards(qualified, used, Math.max(0, qualified - used),
-                Math.toIntExact(settings.referralAgreementDiscountPercent()));
+        var credits = entitlements.agreementsOf(caller.userId());
+        var rewards = new ReferralSummaryDto.Rewards(credits.credits(), credits.used(), credits.remaining(),
+                credits.locked(), credits.discountPercent());
         return new ReferralSummaryDto(code, Math.toIntExact(invites.countByReferrerId(caller.userId())),
-                mine.size(), qualified, checking, rewards, friendReward(caller.userId()));
+                mine.size(), qualified, checking, rewards, friendReward(caller.userId()),
+                friends.of(caller.userId(), mine, credits.used()));
     }
 
     private ReferralSummaryDto.FriendReward friendReward(UUID userId) {

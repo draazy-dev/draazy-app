@@ -16,6 +16,8 @@ public interface ReferralInviteRepository extends JpaRepository<ReferralInvite, 
 
     long countByReferrerId(UUID referrerId);
 
+    List<ReferralInvite> findByReferrerId(UUID referrerId);
+
     @Modifying
     @Query("delete from ReferralInvite i where i.createdAt < :cutoff")
     int deleteOlderThan(@Param("cutoff") Instant cutoff);
