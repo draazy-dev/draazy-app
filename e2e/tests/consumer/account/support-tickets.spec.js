@@ -53,8 +53,8 @@ test.describe('Consumer support — live API', () => {
 
     await page.goto('/contact');
     await expect(page.getByRole('heading', { name: 'Get in touch' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Send an enquiry' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Send enquiry' })).toBeVisible();
+    await expect(page.getByTestId('contact-chat-cta')).toHaveAttribute('href', '/messages?support=general');
+    await expect(page.locator('main').locator('form, textarea')).toHaveCount(0);
     expect(consoleErrors).toEqual([]);
   });
 

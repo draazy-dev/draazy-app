@@ -154,7 +154,7 @@ export default function EmiCalculator() {
                 <div className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-gray-400"><span className="w-3 h-3 rounded-full bg-teal-500" /> {t('misc1.emiPrincipal')}</span><span className="text-white font-medium">{fmtShort(out.P)}</span></div>
                 <div className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-gray-400"><span className="w-3 h-3 rounded-full bg-amber-500" /> {t('misc1.emiInterest')}</span><span className="text-white font-medium">{fmtShort(out.interest)}</span></div>
               </div>
-              <Link to="/contact?subject=Home%20Loan%20Assistance" className="btn-teal mt-7 py-3 rounded-xl text-white text-sm font-semibold text-center flex items-center justify-center gap-2"><Icon name="badge-percent" className="w-4 h-4" /> {t('misc1.emiCheckEligibility')}</Link>
+              <Link to="/home-loans" className="btn-teal mt-7 py-3 rounded-xl text-white text-sm font-semibold text-center flex items-center justify-center gap-2"><Icon name="badge-percent" className="w-4 h-4" /> {t('misc1.emiCheckEligibility')}</Link>
             </div>
           </div>
 

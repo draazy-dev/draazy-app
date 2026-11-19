@@ -127,7 +127,7 @@ export default function Compare() {
     return liveItems.filter((m) => amenityCount(m) === max).map((m) => m.id);
   }, [liveItems]);
 
-  const contactHref = (m) => `/contact?ref=${encodeURIComponent(m.id)}&subject=${encodeURIComponent('Enquiry about ' + m.title)}`;
+  const contactHref = (m) => `/contact?ref=${encodeURIComponent(m.id)}`;
 
   const exportPdf = () => {
     try {

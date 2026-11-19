@@ -96,7 +96,7 @@ export const ROUTE_HEADS = {
   },
   '/contact': {
     title: 'Contact Draazy',
-    description: "Questions about a property, a listing or a Draazy service? Send us a message and we'll get back to you.",
+    description: 'Questions about a property, a listing or a Draazy service? Chat with us in Messages, or call, WhatsApp or email our team.',
   },
   '/about': {
     title: "About Draazy | Pune's Broker-Free Property Marketplace",
