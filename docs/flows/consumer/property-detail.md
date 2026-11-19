@@ -2,7 +2,7 @@
 
 > The single-listing page: gallery, key details, insights, trust, similar homes, and the
 > entry point into the contact-reveal gate.
-> **Status:** documented from React source · re-synced to ADR-019 (badge-not-gate) - **Primary role(s):** buyer / tenant (public view, with owner/admin preview of non-approved listings)
+> **Primary role(s):** buyer / tenant (public view, with owner/admin preview of non-approved listings)
 
 ---
 
@@ -11,8 +11,8 @@
   and admin/staff reviewing it.
 - **Job-to-be-done:** "Show me everything about this home - photos, specs, price context, location,
   trust signals - and let me contact the owner or book a visit."
-- **Why it matters:** the detail page is where intent converts to a lead. It is the launch point for
-  the contact-reveal gate, schedule-visit, save, report, and document requests.
+- **Why it matters:** where intent converts to a lead; the launch point for the contact-reveal gate,
+  schedule-visit, save, report, and document requests.
 
 ## 2. Entry points
 - **Route:** `/property/:id` (`src/pages/consumer/Property.jsx`), plus `?tab=` (overview | amenities
@@ -84,8 +84,7 @@
 - **Highlights / tags:** only surfaced when backed by data (parking, furnishing (rent),
   possession (buy), RERA, verified owner, ownership verified, zone/clear-title for land, security/
   power for residential). Sale shows possession; rent shows furnishing (possession is a buy concept).
-- **Live-activity signals** are derived from real popularity so they vary per listing and stay
-  stable: `viewingNow = 3 + (views % 15)`, `visitsScheduled = 1 + (enquiries % 5)`,
+- **Live-activity signals** are derived from real popularity, stable per listing: `viewingNow = 3 + (views % 15)`, `visitsScheduled = 1 + (enquiries % 5)`,
   `enquiriesThisWeek = enquiries ? max(1, round(enquiries/6)) : 0` (a weekly slice, not the lifetime
   total - avoids fake urgency).
 - **Read-more blurb** is kind-specific (land / commercial / residential framing).
@@ -98,11 +97,9 @@
 - Renders **only when the listing is bound to a society** (D19). `societyForListing(p)` reads
   `societySlug` (the server's `@Formula` over `societies.slug`), then `societyId`, and returns null
   when neither resolves; the component returns `null` on that branch and the Amenities tab simply
-  has no Society block. It used to fall back to `pool[fnvHash(p.id) % pool.length]` and print a real
-  building's builder, towers, units, year and occupancy over a home that was not in it.
-- A partial render was considered and rejected: a "Society Information" heading over a generic
-  "Building" name, with registration and conveyance tiles driven by `p.ownershipVerified`, still
-  asserts membership - and `ownershipVerified` is a claim about the seller's title, not about a
+  has no Society block (no fallback to a hash-picked real building).
+- A partial render was rejected: a "Society Information" heading over a generic "Building" name still
+  asserts membership, and `ownershipVerified` is a claim about the seller's title, not about a
   society's registration or conveyance deed.
 - `verified` = `soc.registration && soc.conveyance` (the same single rule the hub and the directory
   use), `claimed` = `soc.claimStatus === 'claimed'`. The rating is `getEntityReviewSummary('society',
@@ -121,9 +118,9 @@
   chat/WhatsApp action. Full rules: [contact-gate-leads.md](./contact-gate-leads.md).
 
 ### Save, share and compare (`ListingActions.jsx`)
-Save, Compare and Share are bare icons on the hero photo, styled like the heart on listing cards
+Save, Compare and Share are bare icons on the hero photo, styled like the listing-card heart
 (`heart-on-photo`): Save top-left; Compare then Share top-right. Compare fills teal once added
-(the navbar badge carries the count), and a fifth add is refused with a toast (the tray holds four).
+(the navbar badge carries the count); a fifth add is refused with a toast (the tray holds four).
 There is no Fullscreen button: tapping the photo opens the lightbox, and the photo counter is the
 keyboard way in.
 
@@ -132,9 +129,9 @@ Any **residential rent** listing with `bhkNum >= 2` and a positive price shows a
 card: three per-head price tiles (alone / 2 sharing / 3 sharing, computed as `price / n`), plus a
 **Find flatmates in <locality>** CTA that deep-links to
 `/flatmates?view=teams&loc=<locality>` - it opens the **Teams** tab (groups hunting for a flat)
-narrowed to this listing's locality, rather than dropping the user on a blank Flatmates page. The gate is
-deliberately by shape, not by a hardcoded type list (flats, apartments, row houses, penthouses and
-villas all qualify); a studio or 1 BHK is not practical to split, so 2+ BHK is the floor. See
+narrowed to this listing's locality. The gate is by shape, not a hardcoded type list (flats,
+apartments, row houses, penthouses and villas all qualify); a studio or 1 BHK is not practical to
+split, so 2+ BHK is the floor. See
 [`flatmates.md`](./flatmates.md).
 
 ### Similar / related properties (`SimilarProperties.jsx`)
@@ -147,11 +144,10 @@ villas all qualify); a studio or 1 BHK is not practical to split, so 2+ BHK is t
   `Infinity` distance. Distance via haversine.
 
 ## 6. Maker-checker / approval
-- **Not initiated here, but visible here.** The listing had to pass the listing-verification
-  maker-checker (owner submits -> admin approves) before it becomes publicly viewable; the trust tab
-  surfaces the resulting verification badges (RERA, owner/ownership verified). The **contact-reveal**
-  action started from this page is itself a maker-checker (buyer requests -> owner approves) -
-  defined once in [`../../system/cross-cutting.md`](../../system/cross-cutting.md) (sections 2 & 3)
+- **Not initiated here, but visible here.** The listing passed the listing-verification
+  maker-checker (owner submits -> admin approves) before going public; the trust tab surfaces the
+  resulting badges (RERA, owner/ownership verified). The **contact-reveal** action started from this
+  page is itself a maker-checker (buyer requests -> owner approves) - defined once in [`../../system/cross-cutting.md`](../../system/cross-cutting.md) (sections 2 & 3)
   and detailed in [contact-gate-leads.md](./contact-gate-leads.md).
 
 ## 7. State machine

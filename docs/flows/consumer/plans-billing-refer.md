@@ -1,9 +1,9 @@
 # Flow: Plans, Billing & Refer-a-Friend
 
-> The monetisation and growth surface: pay-per-use products (listing pass, contact pack), the rent
-> agreement fee, checkout, the per-user billing view, and a referral program that rewards the
-> referrer with a discount on a future rent agreement fee. Nothing auto-renews (Q16b).
-> **Status:** re-synced to Q16b (pay-per-use MVP) - **Primary role(s):** owner + seeker (buyer/tenant)
+> Monetisation and growth: pay-per-use products (listing pass, contact pack), the rent agreement fee,
+> checkout, billing view, and a referral program rewarding the referrer with a discount on a future
+> rent agreement fee. Nothing auto-renews (Q16b).
+> **Status:** Q16b (pay-per-use MVP) - **Primary role(s):** owner + seeker (buyer/tenant)
 
 ---
 
@@ -12,8 +12,8 @@
   owner contacts; any user who wants to earn rewards by inviting friends.
 - **Job-to-be-done:** "Use Draazy free, pay a small one-off amount only when I need more, see my
   billing, and get rewarded for bringing friends who list or search."
-- **Why it matters:** this is how zero-brokerage is funded at MVP (rent agreements, listing passes,
-  contact packs) and how the marketplace grows virally.
+- **Why it matters:** funds zero-brokerage at MVP (rent agreements, listing passes, contact packs) and
+  drives viral growth.
 
 ## 2. Entry points
 - **Routes:** `/plans` (public), `/checkout?plan=contact-pack|listing-pass[&property=<id>]`
@@ -33,9 +33,8 @@
   side by side; the mobile view toggles persona (defaults to the user's `role`).
 - **Checkout** requires sign-in. **Referral qualification** is role-tracked (owner track vs seeker
   track); the referrer's reward is the same for both.
-- **Fraud review** of referrals is an ops/admin responsibility (see
-  [`../ops/referrals-fraud.md`](../ops/referrals-fraud.md), planned) - the consumer app only records
-  invites/joins/listings and never self-awards across devices.
+- **Fraud review** of referrals is ops/admin (see [`../ops/referrals-fraud.md`](../ops/referrals-fraud.md),
+  planned); the consumer app only records invites/joins/listings and never self-awards across devices.
 
 ## 4. Entities touched
 Links go to [`../../system/data-model.md`](../../system/data-model.md).
@@ -52,9 +51,8 @@ Links go to [`../../system/data-model.md`](../../system/data-model.md).
 ## 5. Business rules & logic  *(the meat)*
 
 ### Price list (`Plans.jsx`)
-The page reads the active catalogue (`GET /plans`, also in `GET /bootstrap`); each row carries
-`kind` and `termDays`. Retired subscription rows (`kind = plan`, `active = false`) are honoured until
-they lapse but never sold.
+Reads the active catalogue (`GET /plans`, also in `GET /bootstrap`); rows carry `kind` and `termDays`.
+Retired subscription rows (`kind = plan`, `active = false`) are honoured until they lapse, never sold.
 - **Listing pass** (`b1…005`, `kind = listing-pass`, Rs 999, 60 days): one extra *live* rent/sell
   listing, bound to one property (`subscriptions.property_id`). It ends early when that listing is
   rented, sold or archived. Re-listing later is free if it fits the free tier.
@@ -66,17 +64,16 @@ they lapse but never sold.
   rewards, `featuredDays` (7) of Featured after ownership verification.
 
 ### Platform fees (`settings.fees`)
-- Keys: `listingPass`, `contactPack`, `rentAgreementPlatform`,
-  `freeContactLimit`, `featuredDays`, and the referral numbers `referralAgreementDiscountPercent`
-  (default 50, 1..100), `referralInvitesPerDay` (10, 1..100), `referralRedeemFailuresPerDay` (5, 1..50),
-  `referralSeekerBonusContacts`, `referralOwnerFeaturedDays`,
-  `referralQualifyPerMonth`, `referralQualifyPerYear`, `referralHoldDays`, `referralClawbackDays`,
-  `referralVelocityPerDay`, `referralSignupWindowHours`, `referralSignalRetentionDays` (180),
-  `referralNewReferrerDays`. Admin PATCH validates each against fixed bounds. `GET /pricing`
-  publishes the prices and a `referral` block `{ seekerBonusContacts, ownerFeaturedDays,
-  agreementDiscountPercent, qualifyPerMonth, qualifyPerYear, holdDays, clawbackDays,
-  signupWindowHours }` (not velocity, retention, invite or redeem-lockout limits);
-  editable in Admin → Settings → Fees. The charged amount is always the plan row's `price`.
+- Keys: `listingPass`, `contactPack`, `rentAgreementPlatform`, `freeContactLimit`, `featuredDays`, and
+  the referral numbers `referralAgreementDiscountPercent` (default 50, 1..100), `referralInvitesPerDay`
+  (10, 1..100), `referralRedeemFailuresPerDay` (5, 1..50), `referralSeekerBonusContacts`,
+  `referralOwnerFeaturedDays`, `referralQualifyPerMonth`, `referralQualifyPerYear`, `referralHoldDays`,
+  `referralClawbackDays`, `referralVelocityPerDay`, `referralSignupWindowHours`,
+  `referralSignalRetentionDays` (180), `referralNewReferrerDays`. Admin PATCH validates each against
+  fixed bounds; editable in Admin → Settings → Fees. `GET /pricing` publishes the prices and a
+  `referral` block `{ seekerBonusContacts, ownerFeaturedDays, agreementDiscountPercent, qualifyPerMonth,
+  qualifyPerYear, holdDays, clawbackDays, signupWindowHours }` (not velocity, retention, invite or
+  redeem-lockout limits). The charged amount is always the plan row's `price`.
 
 ### Entitlements / gating
 - **Listing tier (soft gate).** 1 free live listing (live = approved or flagged), plus one per
@@ -86,16 +83,18 @@ they lapse but never sold.
   tier is a **422 `listing_quota_exhausted`**; pausing or archiving another listing frees the slot.
   `GET /me/entitlements` → `listings {allowance, used, passes[{propertyId, expiresAt}]}`
   (`used` = live listings no pass covers). Flatmate posts never count; the 3-active-post cap on
-  non-owner hosts stays as an anti-broker guard.
+  non-owner hosts is an anti-broker guard.
 - **Owner-contact quota (derived, D31b + Q16b).** A "contact" is the right to open one
   `contact_requests` row. `ContactAllocator` replays the caller's contacts, oldest first, against
   buckets: **free** (`settings.fees.freeContactLimit` = 15 plus the friend gift, usable until 30 days
   after the first contact, once per account) and each paid **pack** (15, valid 30 days from payment).
-  The referrer no longer earns contacts. Each contact spends the valid bucket that expires soonest; `remaining` is
+  The referrer earns no contacts. Each contact spends the valid bucket that expires soonest; `remaining` is
   what is left in buckets valid now. Nothing is stored, so a repeat press on the same listing and a
   refused press cost nothing. A legacy unlimited plan stays unlimited until it lapses. Read from
   `GET /me/entitlements` → `contacts {unlimited, used, allowance, remaining, friendBonus,
-  freeWindowEndsAt, packExpiresAt}` and `agreements {credits, used, remaining, discountPercent}`; the refusal is a **422 `contact_quota_exhausted`** from
+  freeWindowEndsAt, packExpiresAt}` and `agreements {credits, used, remaining, locked, discountPercent}`
+  (`remaining` counts only credits whose referrer and friend both have `users.verified`; the rest are
+  `locked`, evaluated live, so a revoked badge re-locks); the refusal is a **422 `contact_quota_exhausted`** from
   `POST /contacts/request`, and `ContactsExhaustedModal` offers the pack.
 
 ### Checkout (`Checkout.jsx`)
@@ -114,51 +113,43 @@ they lapse but never sold.
 
 ### The Cashfree webhook signature (`WebhookSignature`)
 
-HMAC-SHA256 is the only thing between "this order was paid" and "anyone on the internet can grant
-themselves a paid plan".
+HMAC-SHA256 is the only thing between "this order was paid" and "anyone can grant themselves a paid plan".
 
 - **Signed material is `x-webhook-timestamp + rawBody`,** in that order, no separator. The timestamp
-  is inside the signature so a captured payload cannot be re-signed under a different time, and the
-  body must be the *raw* bytes: parsing and re-serialising JSON reorders keys and normalises
-  whitespace, which changes the digest and would make every genuine callback look forged.
+  is inside the signature so a captured payload cannot be re-signed under a different time; the body
+  must be the *raw* bytes, since re-serialising JSON reorders keys and changes the digest, making every
+  genuine callback look forged.
 - **A ±5 minute freshness window.** The signature proves authenticity, not freshness; without a
-  window a payload captured once is replayable forever.
-- **Constant-time comparison,** so a valid signature cannot be recovered byte by byte from timing.
-- **A blank secret is rejected at construction.** An empty HMAC key still produces a perfectly valid,
-  publicly-computable signature, so `CASHFREE_WEBHOOK_SECRET=""` would turn verification into a
-  formality rather than failing loudly.
-- **The committed default refuses to boot in two situations.** Either the live gateway is switched on
-  under any profile — real money on a published key is the same mistake whether or not the profile is
-  called prod — or any profile other than `local` is active, gateway flag or not. The second arm is
-  an allowlist rather than a check for `prod`, because a container named `staging`, `preview` or
-  nothing at all is the ordinary state of a first deploy. The webhook route is `permitAll` and gets
-  its own rate-limit budget rather than an exemption — 50× the write allowance, sized for a provider
-  replaying a backlog, since it can neither share a bucket with users nor be exempt while anonymous
-  (the enabled flag gates only the *outbound* client) — so anyone holding
-  this repository could sign a `PAYMENT_SUCCESS` for an order id the API had just handed them. Both
-  arms still apply under `dev`: pointing at the Cashfree sandbox means receiving callbacks from
-  outside the machine. The reason is returned as a string, not a boolean, so the boot failure names
-  which trigger fired.
-- **A failed verification answers 200 and drops the payload**, telling a prober nothing — but it no
-  longer tells *us* nothing either. The refusal is a named reason, not a boolean: `MISSING_HEADER`
-  (not a Cashfree call at all), `MALFORMED` (a non-numeric timestamp or a non-Base64 signature),
-  `MISMATCH` (well-formed, wrong key) and `STALE` (correctly signed, outside the five-minute
-  window). The undifferentiated "not verified" this replaces is what made the timestamp-unit bug
-  expensive: it named the secret as the suspect while the secret was correct.
-  Freshness is checked *after* the HMAC, so `STALE` means "we signed this" and is the one refusal
-  logged at `error` — an anonymous caller cannot manufacture it, and a genuine callback refused on
-  the clock is money that will not be reconciled. `MISMATCH` is `warn` precisely because anyone can
-  reach it. A crypto failure is no longer in this list at all: an unavailable HMAC-SHA256 is a fault
-  in this JVM, not a bad callback, so it throws rather than posing as the sender's mistake.
+  window a captured payload is replayable forever.
+- **Constant-time comparison**, so a valid signature cannot be recovered byte by byte from timing.
+- **A blank secret is rejected at construction.** An empty HMAC key still yields a valid,
+  publicly-computable signature, so `CASHFREE_WEBHOOK_SECRET=""` would make verification a formality.
+- **The committed default refuses to boot in two situations:** the live gateway is switched on under
+  any profile, or any profile other than `local` is active (gateway flag or not). The second arm is an
+  allowlist, not a check for `prod`, because a container named `staging`, `preview` or nothing at all
+  is the ordinary state of a first deploy. The webhook route is `permitAll` with its own rate-limit
+  budget rather than an exemption (50× the write allowance, sized for a provider replaying a backlog;
+  it can neither share a bucket with users nor be exempt while anonymous; the enabled flag gates only
+  the *outbound* client), so anyone holding this repository could otherwise sign a `PAYMENT_SUCCESS`
+  for an order id the API had just handed them. Both arms still apply under `dev`: pointing at the
+  Cashfree sandbox means receiving callbacks from outside the machine. The reason is returned as a
+  string, so the boot failure names which trigger fired.
+- **A failed verification answers 200 and drops the payload**, telling a prober nothing. The refusal
+  is a named reason: `MISSING_HEADER` (not a Cashfree call at all), `MALFORMED` (a non-numeric
+  timestamp or a non-Base64 signature), `MISMATCH` (well-formed, wrong key) and `STALE` (correctly
+  signed, outside the five-minute window). Freshness is checked *after* the HMAC, so `STALE` means "we
+  signed this" and is the one refusal logged at `error` (an anonymous caller cannot manufacture it, and
+  a genuine callback refused on the clock is money that will not be reconciled). `MISMATCH` is `warn`
+  because anyone can reach it. An unavailable HMAC-SHA256 is a fault in this JVM, not a bad callback,
+  so it throws rather than posing as the sender's mistake.
 - **The address Cashfree posts to is sent per order** as `order_meta.notify_url`, from
-  `CASHFREE_NOTIFY_URL`, rather than relying on the single endpoint the dashboard holds. It is
-  validated at boot as an absolute `https` URL — blank is legal and means "use the dashboard
-  endpoint" — so a cleartext or relative address is a startup failure instead of a silent
-  non-delivery.
+  `CASHFREE_NOTIFY_URL`, rather than relying on the single dashboard endpoint. It is validated at boot
+  as an absolute `https` URL (blank is legal and means "use the dashboard endpoint"), so a cleartext
+  or relative address is a startup failure instead of a silent non-delivery.
 
 `application-prod.properties` separately binds a bare `${CASHFREE_WEBHOOK_SECRET}`, so a prod boot
-with the variable unset fails in the binder first — but that only fires for a deploy naming `prod`
-and reading that file; the constructor check is what states the rule.
+with the variable unset fails in the binder first, but only for a deploy naming `prod` and reading
+that file; the constructor check is what states the rule.
 
 ### Billing view (`BillingPanel.jsx`)
 - Current product from `usePlan()`: a pass or pack shows its term; otherwise the free tier line
@@ -167,20 +158,22 @@ and reading that file; the constructor check is what states the rule.
 
 ### Refunds, contact returns and credit notes
 - **Contact returns (no money moves).** The contact quota counts only requests that revealed or may still
-  reveal the number: approved rows always, pending ones while they are younger than `fees.contactReplyDays`
+  reveal the number: approved rows always, pending ones while younger than `fees.contactReplyDays`
   (default 7), whatever happens to the listing meanwhile. Declined, expired and stale-pending requests are
-  returned. Asking about a closed listing (paused, rented, sold) is `409 listing_not_live`; an archived, unapproved or
-  suspended-owner listing is `404`. An owner approving while theirs is not live gets the same `409 listing_not_live`
-  (decline is always allowed). A daily job (`contact-returns`, 10:00 IST) marks overdue pending rows `expired` and sends
-  the seeker `contact.returned`; a decline sends the same. The rows stay, so the same listing cannot be
-  re-asked to farm returns, and renewing a lapsed request re-checks the allowance. When
-  `fees.contactPendingMax` (default 10) requests are open, `POST /contacts/request` is `422 contact_pending_limit`.
+  returned. Asking about a closed listing (paused, rented, sold) is `409 listing_not_live`; an archived,
+  unapproved or suspended-owner listing is `404`. An owner approving while theirs is not live gets the same
+  `409 listing_not_live` (decline is always allowed). A daily job (`contact-returns`, 10:00 IST) marks overdue
+  pending rows `expired` and sends the seeker `contact.returned`; a decline sends the same. The rows stay,
+  so the same listing cannot be re-asked to farm returns, and renewing a lapsed request re-checks the
+  allowance. When `fees.contactPendingMax` (default 10) requests are open, `POST /contacts/request` is
+  `422 contact_pending_limit`.
 - **`GET /me/payments`** lists the caller's paid orders, newest first: `{id, kind: listing_pass|contact_pack|
   rent_agreement|ra_amendment, label, amount, paidAt, invoiceNo, status: paid|refund_pending|refunded|
   refund_rejected|disputed, creditNoteNo?, propertyId?, serviceRequestId?, refund{eligible, reason, from, until,
   amount}}`. `refund` is computed for passes and packs only. Reasons: `pack_unused`, `pass_no_enquiries`,
   `not_eligible_used`, `window_closed`, `window_not_open`, `guarantee_used_recently`, `already_requested`,
-  `listing_paused`. `invoiceNo` is the order's invoice number, or null when none was issued. `X-Device-Id` (at most 64 chars) is salt-hashed like the referral code.
+  `listing_paused`. `invoiceNo` is the order's invoice number, or null when none was issued. `X-Device-Id`
+  (at most 64 chars) is salt-hashed like the referral code.
 - **Customer refund request.** `POST /me/payments/{id}/refund {reason?}` with an `Idempotency-Key`. Eligibility:
   - *Pack:* within `fees.packRefundDays` (default 7, 0 = off) of payment and no contact allocated from it.
   - *Pass guarantee:* its listing got at most `fees.passGuaranteeMaxEnquiries` (default 0) contact requests in the
@@ -197,30 +190,30 @@ and reading that file; the constructor check is what states the rule.
   `markRefundDue(amount)`; the existing sweep, gateway and webhook path pays it and the entitlement is revoked for
   good. Reject needs a `reason` and restores the entitlement, with the term pushed out by the time the order
   was frozen (it expires instead if it would still have ended, and a pass's listing goes live again only if the
-  listing quota allows). Both are `409` while a gateway dispute is open on the order. Both notify the customer with `refund.decided`
-  and are audited `refund.*`. The request row is locked, so concurrent decisions leave one (the other gets 409).
+  listing quota allows). Both are `409` while a gateway dispute is open on the order, notify the customer with
+  `refund.decided` and are audited `refund.*`. The request row is locked, so concurrent decisions leave one (the
+  other gets 409).
 - **Automatic system refunds stay automatic** (failed, late or mismatched payment; a pass for a closed listing).
   They also notify `refunds` holders with `refund.auto` and show on the desk as `auto`.
 - **A refund made on the Cashfree dashboard** is matched by order from the refund webhook: the whole price ends the
   pack or pass (a partial one does not), and either way the refund is recorded, credited and notified
   (`refund.completed`). See finance.md 5.12.
-- **Credit note** `CN-FY2627-000001` (FY April-March, IST, one sequence per FY) is issued when a refund is
-  confirmed successful by the gateway for an invoiced order (an automatic refund of a payment that never activated gets none): subscription refunds, rent-agreement refunds, automatic refunds. A
-  rent-agreement note records only the platform fee as Draazy's (`taxable_amount`), not the pass-through part.
-  A note never credits more fee than its invoice carried, less what earlier
-  notes on that invoice already credited, and cites the invoice number.
+- **Credit note** `CN-FY2627-000001` (FY April-March, IST, one sequence per FY) is issued when the gateway confirms
+  a refund successful for an invoiced order (an automatic refund of a payment that never activated gets none):
+  subscription refunds, rent-agreement refunds, automatic refunds. A rent-agreement note records only the platform
+  fee as Draazy's (`taxable_amount`), not the pass-through part. A note never credits more fee than its invoice
+  carried, less what earlier notes on that invoice already credited, and cites the invoice number.
 - **Invoice** `INV-FY2627-000001` (same FY and per-FY sequence pattern) is issued once when a gateway
   payment succeeds: listing passes, contact packs, rent-agreement checkouts and amendment top-ups. A replayed
-  webhook issues nothing new. Only the platform fee is Draazy's own (`taxable_amount`) on a rent agreement; stamp duty, registration
-  and DHC are pass-through, and amendment top-ups carry none.
-  A payment that is refunded automatically without ever activating the order (failed, late) gets no invoice.
-  Orders paid before invoicing were numbered in `paid_at` order by the migration. No PDF is generated.
+  webhook issues nothing new. On a rent agreement only the platform fee is Draazy's own (`taxable_amount`); stamp
+  duty, registration and DHC are pass-through, and amendment top-ups carry none. A payment refunded automatically
+  without ever activating the order (failed, late) gets no invoice. Orders paid before invoicing were numbered in
+  `paid_at` order by the migration. No PDF is generated.
 - **Disputes.** The signed Cashfree webhook also takes `DISPUTE_CREATED`, `DISPUTE_UPDATED`, `DISPUTE_CLOSED`
   (unknown types are tolerated) into `payment_disputes`. A dispute freezes only its own order and notifies `refunds`
   holders with `refund.dispute`; closing it won restores the entitlement (term extended as above), lost or accepted
   revokes it from whatever status the order was in. A pack frozen by a dispute or review keeps the contacts it
-  already served but lends no more. The account
-  is never suspended. `/me/payments` shows `disputed`.
+  already served but lends no more. The account is never suspended. `/me/payments` shows `disputed`.
 - **Settings.** `fees`: `contactReplyDays` 1..30, `contactPendingMax` 1..100, `packRefundDays` 0..30,
   `passGuaranteeDays` 0..30, `passGuaranteeMaxEnquiries` 0..50, `passGuaranteeEveryMonths` 1..36; `legal.grievanceOfficer`
   `{name <= 80, email <= 120}`. `GET /bootstrap` carries `pricing.refunds` and `legal`.
@@ -247,7 +240,16 @@ new codes; older 4-character codes still resolve). `Refer.jsx` reads everything 
 `GET /me/referrals`.
 
 - **Summary:** `GET /me/referrals` → `{ code, invited, joined, qualified, checking, rewards: { earned,
-  used, remaining, discountPercent }, friendReward: { redeemed, status, track, contacts, featuredDays } }`.
+  used, remaining, locked, discountPercent }, friendReward: { redeemed, status, track, contacts, featuredDays },
+  friends: [{ name, mobile, at, track, state, kycPending }] }`.
+  `rewards` is the same numbers as `GET /me/entitlements` → `agreements`; `Refer.jsx` shows `locked`
+  as "waiting for KYC" with a link to `/verify-identity`.
+  `friends` (`ReferralFriends`, rendered by `refer/FriendList.jsx`) is one row per referral plus each
+  invited number that has not joined through the caller, newest first, mobile unmasked (the caller
+  typed it or the friend joined through them). `state` is `invited | joined | checking | locked | ready
+  | used | not_counted`; `kycPending` (`you | friend | both`) only on `locked`. Credits are fungible, so
+  `used` is assigned to unlocked rewards oldest first, which keeps the row counts equal to `rewards`.
+  An unmatched invite is always `invited`, since `invite()` hides whether a number has an account.
   `invited` counts the caller's `referral_invites` rows (last 365 days); `joined` every referral row
   where the caller is referrer; `qualified` the granting rows; `checking` the held rows. Every number
   on the page comes from `GET /pricing` → `referral` (admin settings under `fees`); nothing is
@@ -275,7 +277,7 @@ new codes; older 4-character codes still resolve). `Refer.jsx` reads everything 
   redeem would (flag on, not self, not same device, signals from the request, `shareChannel =
   whatsapp`). A later `POST /referrals/redeem` by that user is the usual uniform `409`, which the
   client ignores.
-- **Redemption:** `POST /referrals/redeem` (with an optional `X-Device-Id` header, opaque, at most 64
+- **Redemption:** `POST /referrals/redeem` (optional `X-Device-Id` header, opaque, at most 64
   characters, stored only as a salted hash). Allowed only within `referralSignupWindowHours` of
   account creation, while the account has no listing and no contact request, while the
   `referralRewards` flag is on, and not from the referrer's own device. Every refusal is the same
@@ -351,12 +353,10 @@ Referral:       (per RF row) pending -> qualified (granting) -> rewarded
   pass or a free slot is `422 listing_quota_exhausted`.
 - **Featured** is never sold: `featuredDays` (7) from ownership verification, re-granted on
   re-verification; the friend's qualifying listing gets `referralOwnerFeaturedDays` (14).
-- **Referral vanity guard:** nothing the page does moves the counts: `invited` is the server's count
-  of recorded WhatsApp invites, `joined` and `qualified` the server's referral rows, so neither a
-  copy nor a completed share nor a cancelled OS share can inflate them.
-- **Cross-device attribution:** closed. Referrer counters and every earned balance are derived from
-  the server's referral rows, so a friend signing up on another device counts and clearing site data
-  loses nothing.
+- **Referral vanity guard:** `invited` is the server's count of recorded WhatsApp invites, `joined` and
+  `qualified` the server's referral rows, so no copy, completed share or cancelled OS share can inflate them.
+- **Cross-device attribution:** closed. Referrer counters and every earned balance derive from the server's
+  referral rows, so a friend signing up on another device counts and clearing site data loses nothing.
 - **Fee source fallback:** if `GET /pricing` is unreachable, the frontend falls back to its bundled
   defaults; the charge is always the server's plan row.
 
@@ -364,95 +364,79 @@ Referral:       (per RF row) pending -> qualified (granting) -> rewarded
 ## Appendix: entitlement and plan-model rationale (moved from source Javadoc)
 
 ### Entitlements are derived, not stored
-`EntitlementService` computes every allowance on each call from rows that already exist for other
-reasons: the caller's subscription and the `granting` referrals count. There is no allowance
-column, no balance, no grant ledger. A stored balance has to be written by every code path that
-could change it and is wrong forever the first time one of them forgets; a derived balance is
-right by construction, and a clawed-back referral withdraws its credit the moment the fraud
-desk records the decision — with no compensating write to remember.
-
-This replaced a quota that lived in `localStorage` under a key derived from the caller's own
-mobile, computed by a module whose header said in as many words that it was not real security.
-The referral bonus that topped it up was computed the same way, from counters the client
-incremented for itself, which meant the referral scheme paid out a reward the platform never
-actually granted.
+`EntitlementService` computes every allowance on each call from rows that already exist: the caller's
+subscription and the `granting` referrals count. There is no allowance column, balance or grant ledger. A
+stored balance must be written by every code path that could change it and is wrong forever the first time one
+forgets; a derived balance is right by construction, and a clawed-back referral withdraws its credit the moment
+the fraud desk records the decision, with no compensating write.
 
 `EntitlementService` implements `ContactAllowanceLookup` (consumed by `leads`) and consumes
 `ContactUsageLookup` from `leads`. Neither feature imports the other; both import the kernel.
 
 ### The reward "ledger" is the referrals table itself
-Approve and clawback are described as crediting and debiting a ledger; that ledger is
-`sum(reward_amount) group by status`. A separate double-entry table was considered and rejected:
-nothing external moves this rail, the amount is frozen on the row at redemption, and every
-mutation carries who, when and why. `finance.ledger.Transaction` is the **user's own** rent-and-
-expense book and would be actively wrong as a home for platform-side credits.
+Approve and clawback credit and debit a ledger; that ledger is `sum(reward_amount) group by status`. A separate
+double-entry table was rejected: nothing external moves this rail, the amount is frozen on the row at
+redemption, and every mutation carries who, when and why. `finance.ledger.Transaction` is the **user's own**
+rent-and-expense book and would be wrong as a home for platform-side credits.
 
 ### Free tier is a settings value, not a plan row
 A caller with no subscription has nothing in `plans` to read, so `SubscriptionService#entitlingPlan`
-returning empty is the normal case rather than an error. The defaults in `EntitlementService`
-(`DEFAULT_FREE_LISTING_LIMIT = 1`) are what "no purchase" is worth. Seeding a synthetic Owner
-Free row into every entitlement check was the alternative and was rejected: it would put the free
-tier on the public pricing list as a thing to subscribe to.
+returning empty is the normal case. The defaults in `EntitlementService`
+(`DEFAULT_FREE_LISTING_LIMIT = 1`) are what "no purchase" is worth. A synthetic Owner Free row in every
+entitlement check was rejected: it would put the free tier on the public pricing list as something to subscribe to.
 
-`DEFAULT_FREE_LISTING_LIMIT` mirrors `listing_limit` on the seeded Owner Free plan but is
-duplicated as a constant because the free tier is defined by the *absence* of a subscription.
-It is also what a plan with a `null` `listing_limit` is worth: `Optional.map` over a null column
-collapses to empty and lands on this same default, so a null limit grants the free floor rather
-than lifting the ceiling — the safe direction, and the one V24 writes down.
+`DEFAULT_FREE_LISTING_LIMIT` mirrors `listing_limit` on the seeded Owner Free plan but is a separate constant
+because the free tier is defined by the *absence* of a subscription. It is also what a plan with a `null`
+`listing_limit` is worth: `Optional.map` over a null column collapses to empty and lands on this default, so a
+null limit grants the free floor rather than lifting the ceiling (the safe direction, as V24 writes down).
 
 ### Referral bonuses
 Each granting referral, owner or seeker track, earns the referrer one referral credit worth
-`referralAgreementDiscountPercent` off the service fee of one future rent agreement. There is no
-contact reward and no listing-slot reward for the referrer. The friend's side is
-`referralSeekerBonusContacts` extra free contacts (seeker) or `referralOwnerFeaturedDays` of Featured
-(owner, instead of `featuredDays`), given only while the row is granting.
+`referralAgreementDiscountPercent` off the service fee of one future rent agreement. No contact or listing-slot
+reward for the referrer. The friend's side is `referralSeekerBonusContacts` extra free contacts (seeker) or
+`referralOwnerFeaturedDays` of Featured (owner, instead of `featuredDays`), given only while the row is granting.
 
-`forUser` computes the contact, listing and agreement sides together so they come from one plan read
-and one referral count. Splitting into two endpoints would run the same two queries twice and
-could straddle a change between them.
+`forUser` computes the contact, listing and agreement sides together so they come from one plan read and one
+referral count; two endpoints would run the same queries twice and could straddle a change between them.
 
-`listingAllowance` / `contactAllowance` are narrower than `forUser` because each gate is about to
-count the caller's own usage anyway and does not need the other halves. `contactAllowance`
-deliberately does not call `forUser` and read one field: doing so would make every contact
-request pay for a count of the caller's own contact requests that the gate does not use.
+`listingAllowance` / `contactAllowance` are narrower than `forUser` because each gate counts the caller's own
+usage anyway and needs only its half. `contactAllowance` deliberately does not call `forUser`, which would make
+every contact request pay for a count of the caller's contact requests the gate does not use.
 
 ### `qualified` counts what pays, not what a human blessed (D31b)
-The summary's `qualified` counts every granting row (`QUALIFIED` or `REWARDED`). Now that `QUALIFIED`
-grants on its own, a referrer whose friend has gone live would otherwise read "0 qualified" beside a
-reward they can already spend. The numbers on the Refer screen have to be able to explain each other.
+The summary's `qualified` counts every granting row (`QUALIFIED` or `REWARDED`). Since `QUALIFIED` grants on its
+own, a referrer whose friend has gone live would otherwise read "0 qualified" beside a reward they can already
+spend. The numbers on the Refer screen have to explain each other.
 
 ### Referral scheme: automatic decision
-The reward is a discount on a rent agreement service fee, not money. The referrer's entitlement is
-derived from the referral rows by `billing.entitlement`, counting those `ReferralStatuses#isGranting`
-accepts, so a clawback needs no compensating write.
+The reward is a discount on a rent agreement service fee, not money. The referrer's entitlement is derived from
+the referral rows by `billing.entitlement`, counting those `ReferralStatuses#isGranting` accepts, so a clawback
+needs no compensating write.
 
-A referral qualifies on its first qualifying event: an owner's ownership verification with the listing
-approved and live (owner track), or a first contact request accepted by an owner (seeker track).
-`ReferralQualification` then decides
-without a desk queue, by risk band: high rejects, over the month or year cap rejects (`cap_reached`),
-medium holds for `referralHoldDays`, low grants. `ReferralHoldSweep` releases or rejects due holds
-hourly. `ReferralClawbacks` takes a reward back inside `referralClawbackDays` when the referee is
-suspended or archived, or the qualifying listing is taken down or loses its verification. Staff `approve`,
+A referral qualifies on its first qualifying event: an owner's ownership verification with the listing approved
+and live (owner track), or a first contact request accepted by an owner (seeker track).
+`ReferralQualification` then decides without a desk queue, by risk band: high rejects, over the month or year
+cap rejects (`cap_reached`), medium holds for `referralHoldDays`, low grants. `ReferralHoldSweep` releases or
+rejects due holds hourly. `ReferralClawbacks` takes a reward back inside `referralClawbackDays` when the referee
+is suspended or archived, or the qualifying listing is taken down or loses its verification. Staff `approve`,
 `reject` and `clawback` remain overrides. A credit already spent on an agreement is not recovered.
 
 ### Plan model
-`Plan` maps `plans` (V8), seeded as reference data. Read-only from the app's point of view:
-nothing creates or edits a plan, because a price list is a business decision made in the back
-office and a migration. Plan administration belongs under `/admin/` with an audit trail. A
-`price` of zero is a real plan, not a missing one — "Owner Free" is what every owner is on until
-they upgrade, and `SubscriptionService` keys the entire payment decision off this being zero.
+`Plan` maps `plans` (V8), seeded as reference data. Read-only from the app: nothing creates or edits a plan,
+because a price list is a business decision made in the back office and a migration. Plan administration
+belongs under `/admin/` with an audit trail. A `price` of zero is a real plan, not a missing one: "Owner Free"
+is what every owner is on until they upgrade, and `SubscriptionService` keys the entire payment decision off
+this being zero.
 
-`Plan.listingLimit` is the paywall's real ceiling, kept as a number rather than parsed out of
-`features` prose (D109). `null` means the plan grants no listing allowance of its own; every
-reader resolves it to the free-tier floor of one. It is not a licence: an effectively uncapped
-plan states a large number, and V24's CHECK forbids an owner plan from leaving it unstated at all.
+`Plan.listingLimit` is the paywall's real ceiling, kept as a number rather than parsed out of `features` prose
+(D109). `null` means the plan grants no listing allowance of its own; every reader resolves it to the free-tier
+floor of one. It is not a licence: an effectively uncapped plan states a large number, and V24's CHECK forbids
+an owner plan from leaving it unstated.
 
-`Plan.unlimitedContacts` (V91, D31b) is a separate column from `contactLimit` rather than a
-convention over it, because `contactLimit` is nullable and its own comment admits `null` means
-"unlimited or not-applicable" — two different answers stored identically, which is exactly the
-question an entitlement check asks. It is `true` only on the three retired priced plans, which keep
-it until they lapse. Since V107 a contact pack's `contactLimit` *is* read: it is the pack's bucket
-size in `ContactAllocator`.
+`Plan.unlimitedContacts` (V91, D31b) is a separate column from `contactLimit` because `contactLimit` is nullable
+and `null` means "unlimited or not-applicable", two different answers stored identically, which is exactly the
+question an entitlement check asks. It is `true` only on the three retired priced plans, which keep it until they
+lapse. Since V107 a contact pack's `contactLimit` *is* read: it is the pack's bucket size in `ContactAllocator`.
 
 `Plan.kind` (V107) separates the retired subscription tiers (`plan`) from the one-off products
 (`listing-pass`, `contact-pack`); `term_days` overrides `billing_cycle` for the latter, and

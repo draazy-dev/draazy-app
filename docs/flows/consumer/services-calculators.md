@@ -4,7 +4,7 @@
 > valuation, rent agreement), plus the client-side financial calculators (EMI, affordability,
 > stamp-duty, moving-cost, valuation) that anchor each page. Every calculator's math is captured here
 > because it must move server-side verbatim.
-> **Status:** documented from React source - **Primary role(s):** buyer/tenant/owner (all consumers)
+> **Primary role(s):** buyer/tenant/owner (all consumers)
 
 > Service requests are server-owned behind `serviceRequestService.js`; the client writes no
 > workflow or ticket state to `localStorage`.
@@ -18,8 +18,9 @@
   then hand off a lead to the right Draazy ops team."
 - **Why it matters:** the "everything under one roof, zero brokerage" promise. Calculators are the
   free, high-trust "customer touch" that converts a browser into a service lead; each page ends in a
-  `createTicket` (and, for valuation/interior/rent agreement, a server service request) into the ops queue. The calculators are pure functions today so they are
-  testable - and portable to the backend unchanged.
+  `createTicket` (and, for valuation/interior/rent agreement, a server service request) into the ops
+  queue. The calculators are pure functions, so they are testable and portable to the backend
+  unchanged.
 
 ## 2. Entry points
 - **Routes (from `src/App.jsx`):**
@@ -44,8 +45,8 @@
 ## 3. Actors & roles
 - **All consumers** can open every calculator and see instant figures **without signing in** (the
   math is public). Submitting a *certified/lead* request requires sign-in: the in-page sign-in sheet
-  opens over the form and re-submits it after OTP. The Move-in Pack
-  `bookPack` and rent-agreement generate also require sign-in.
+  opens over the form and re-submits it after OTP. The Move-in Pack `bookPack` and rent-agreement
+  generate also require sign-in.
 - **Ops/staff** (team-scoped) consume the resulting tickets/requests in the back-office (out of scope
   here). No consumer route here is a `ProtectedRoute`; the sign-in gate is in-handler.
 
@@ -65,8 +66,8 @@ Link to [`../../system/data-model.md`](../../system/data-model.md).
 ## 5. Business rules & logic  *(the meat - calculator math)*
 
 All formulas below are computed **client-side today** and MUST be re-implemented on the server
-(indicative figures shown to the user, so no trust is placed in them - but the server should own the
-canonical numbers to avoid drift and to gate any that become billable).
+(indicative figures, so no trust is placed in them - but the server should own the canonical numbers
+to avoid drift and to gate any that become billable).
 
 ### 5.1 EMI calculator - full page (`EmiCalculator.jsx`) and card (`LoanEmiCalc.jsx`)
 Inputs: `P` = loan amount, `annualRate` %, `years` tenure.
@@ -121,8 +122,8 @@ conf   = clamp(72..95) of 92, minus 12 if area<400 or >3000, minus 3 if ageM<0.9
 - Multipliers: **type** Flat 1 / Villa 1.18 / Plot 0.55 (plot forces `floorM = 1`); **age** New 1.05
   / 0-5y 1 / 5-10y 0.92 / 10y+ 0.82; **floor** Ground 0.98 / Mid 1 / High 1.05 / Top 1.10.
 - `RATES` cover 13 hand-tuned localities; any other Pune locality (curated or user-minted) uses
-  `PUNE_AVG_RATE` (mean of the tuned set). No growth or YoY figure is shown. The estimate is public; the certified
-  report is a signed-in lead.
+  `PUNE_AVG_RATE` (mean of the tuned set). No growth or YoY figure is shown. The estimate is public;
+  the certified report is a signed-in lead.
 
 ### 5.5 Services hub - Move-in Pack bundle (`Services.jsx`)
 - Prices come from admin config `settings.movePack.items` (movers, clean, agreement, paint, verify,
@@ -151,9 +152,8 @@ conf   = clamp(72..95) of 92, minus 12 if area<400 or >3000, minus 3 if ageM<0.9
   still created, unlinked — a failed lead must not also cost the customer their request. The
   confirmation is optimistic because it acknowledges the enquiry the customer just made, not a round
   trip they cannot see.
-- `serviceRequestMapper.toCreate` refuses to forward a browser-minted `TR…` ref — the seam's
-  statement that such a pairing is not a server id — and the flatmate and rent-agreement flows can
-  still hand it one.
+- `serviceRequestMapper.toCreate` refuses to forward a browser-minted `TR…` ref (not a server id);
+  the flatmate and rent-agreement flows can still hand it one.
 - Contact details are not posted with the ticket: the page is sign-in gated and the server copies the
   name and number off the session, so a form-supplied pair would be a second, unverified one.
 - The richer pages (valuation, rent agreement) create the same request the customer tracker and the

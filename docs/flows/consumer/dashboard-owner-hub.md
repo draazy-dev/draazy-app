@@ -3,21 +3,20 @@
 > The signed-in user's home base at `/dashboard`: a tabbed hub that becomes an owner
 > control panel (listings, leads, visits, finances) the moment the user has real
 > inventory, and stays a seeker account hub (saved, activity, alerts) otherwise.
-> **Status:** documented from React source · re-synced to ADR-019 (badge-not-gate) - **Primary role(s):** owner (control panel) + buyer/tenant (account hub)
+> **Primary role(s):** owner (control panel) + buyer/tenant (account hub)
 
 ---
 
 ## 1. Purpose & user problem
 - **Persona:** an owner who has posted a listing / room / flatmate / managed property and
-  needs one place to run it; a seeker/tenant who wants their saved homes, alerts, visits and
+  needs one place to run it; a seeker/tenant who wants saved homes, alerts, visits and
   documents in one account hub.
 - **Job-to-be-done (owner):** "See what is waiting on me, triage leads, track views/enquiries, and
   manage my listings, money and documents." **(seeker):** "Resume my search, see my saved homes and
   alerts, and manage upcoming visits."
-- **Why it matters:** this is the post-conversion retention surface. The Action Center and attention
-  badges pull the owner back to respond before leads go stale; the retention loop (alert matches +
-  profile completion) pulls the seeker back to keep searching. Every number shown is real per-user
-  data - the code explicitly refuses to fabricate figures.
+- **Why it matters:** the post-conversion retention surface. The Action Center and attention
+  badges pull the owner back to respond before leads go stale; alert matches + profile completion pull
+  the seeker back. Every number shown is real per-user data; the code refuses to fabricate figures.
 
 ## 2. Entry points
 - **Route:** `/dashboard` (`ProtectedRoute`; see [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 1).
@@ -39,11 +38,10 @@
   have ACTUAL inventory (a property listing, a flatmate room, a flatmate request/group, or a
   private managed property from Owner Hub / Rent-o-meter). This prevents a brand-new "owner" from
   landing on empty "My Listings / Requests / Finances" dead-ends.
-- **`hasManaged` is asynchronous since D32.** The managed set now comes from `managedService.js`,
-  so `Dashboard.jsx` holds it in state and starts empty. On the first paint a returning owner is
-  briefly not an owner by this test - the same first-paint hole `listings` already had, and the
-  reason the tab registry is recomputed rather than frozen at mount. A failed read falls back to
-  an empty list rather than surfacing: the dashboard's job is to show what it can.
+- **`hasManaged` is asynchronous (D32).** The managed set comes from `managedService.js`, so
+  `Dashboard.jsx` holds it in state, starting empty. On the first paint a returning owner is briefly not
+  an owner by this test (as `listings` already was), which is why the tab registry is recomputed rather
+  than frozen at mount. A failed read falls back to an empty list rather than surfacing.
 - **`showRental`** (My Rental tab) = `hasTenancy || !isOwner || hasRentalInvite` - buyers/tenants,
   anyone with a finalised tenancy, or anyone with a pending owner co-fill invite; a pure owner who
   rents nothing does not see it.
@@ -56,15 +54,15 @@
 All read-heavy; mutations happen inside the sub-flows this hub links to. Links go to
 [`../../system/data-model.md`](../../system/data-model.md).
 - `properties` / listings - read (owner listings via `loadMyListings`, catalog via `listProperties`).
-- `enquiries` - no longer read by the hub (the 8-item seed slice and its "Enquiries" tile are gone).
+- `enquiries` - not read by the hub.
 - `visits` - read + updated (`listVisits`, `updateVisit` via `mutateVisit`).
 - `contact_requests` - read + updated (owner approve/decline via `decideContact`).
 - `document_requests` - read + updated (grouped, granted/declined via `decideDocReqs`).
 - photo requests, flatmates requests, group applications - read + updated.
 - `property_review` - read (verification status per listing) + reply (`addPropReviewReply`).
 - `saved_properties`, `saved_searches`, followed societies, recent props/searches - read (counts + nudges).
-- `managed_property` (Owner Hub / Rent-o-meter) - read (rental nudge). Since D32 this is the
-  `managed` seam domain (`/me/managed-properties`), not a browser store.
+- `managed_property` (Owner Hub / Rent-o-meter) - read (rental nudge); the `managed` seam domain
+  (`/me/managed-properties`, D32), not a browser store.
 - `users` (profile), `identity_verification` - read (profile-completion meter + the opt-in Verified
   badge state; the badge is a trust signal, never a posting/contact gate — ADR-019).
 - `dzPlan` / plan - read via Plan & Billing tab (see plans-billing-refer doc).
@@ -154,8 +152,7 @@ property only. Drives the Overview rental card; it is not an Action Center row.
 
 ### Recent vs recommended feed
 `feed = recent.length ? recent : recommended`; title "Continue Exploring" (real MRU) vs "Recommended
-for you" (neutral discovery fallback, `approved.slice(0,6)`). The code is explicit that recommended
-is never mislabeled as recently viewed.
+for you" (neutral discovery fallback, `approved.slice(0,6)`); recommended is never mislabeled as recent.
 
 ### Requests (`requests/RequestsPanel.jsx`)
 Tab id `leads`, shown to every user. One list over both `/me/requests` boxes: open requests (received,
@@ -165,28 +162,25 @@ Flatmate (visits show under All only; each tab counts received open items). Each
 Received / Sent chip, the requester's message and its actions. Received history (accepted, declined or
 expired in the last 90 days) keeps a status pill, Open chat for accepted number and flatmate requests,
 and Clear. Received cards also carry owner-private notes and follow-up dates (`LeadSheet.jsx`,
-`/me/lead-notes`), which are never part of any consumer-visible payload, so the history row is where a
-note stays reachable after the decision. The old `/messages?tab=requests` links redirect here.
+`/me/lead-notes`), never part of any consumer-visible payload; the history row keeps a note reachable
+after the decision. The old `/messages?tab=requests` links redirect here.
 
 ### My Listings: type filter and letting a flat room by room
 - **Type filter:** My Listings is a mixed inventory (properties, flatmate rooms, flatmate requests,
-  flatmate groups). A `Select` filters by `catOf(l)` and only offers buckets with a non-zero count;
-  it self-resets to `all` when its bucket empties (for example after a delete).
+  flatmate groups). A `Select` filters by `catOf(l)`, offers only non-empty buckets, and self-resets
+  to `all` when its bucket empties (e.g. after a delete).
 - **`splitEligible`** = not a flatmate post, not closed, not reserved, and `canSplitIntoRooms(l)`
   (`deal === 'rent'`). **`split`** = `isFlatSplit(l.id)`.
-- **"Let room by room"** (shown when eligible and not yet split) opens `SplitFlatModal`; confirming
-  calls `splitFlat(...)` with the signed-in owner's mobile/name. The toast is honest about the badge:
-  an unapproved parent listing reports *"they'll show as owner-verified once this property is
-  approved"*.
-- **"Stop letting room by room"** (shown only when `movedIn === 0`) calls `unsplitFlat(l.id)`; once
-  anyone has moved in it is refused, because deleting the rooms would erase a live tenancy.
+- **"Let room by room"** (eligible and not yet split) opens `SplitFlatModal`; confirming calls
+  `splitFlat(...)` with the signed-in owner's mobile/name. An unapproved parent listing toasts
+  *"they'll show as owner-verified once this property is approved"*.
+- **"Stop letting room by room"** (only when `movedIn === 0`) calls `unsplitFlat(l.id)`; once anyone
+  has moved in it is refused, because deleting the rooms would erase a live tenancy.
 - **Split status on the card:** an "*N rooms listed*" chip, plus either "*M moved in - whole-flat
-  listing hidden*" (the flat can no longer honestly be let whole) or "*Whole-flat listing still
-  live*". Saying so is the difference between a feature and a silent disappearance.
+  listing hidden*" or "*Whole-flat listing still live*".
 - **Where occupancy is edited:** the dashboard shows the split *summary* only. Adjusting how many
-  people actually live in each room - and reissuing the joint rent agreement when that changes -
-  happens on the owner's own room cards in Flatmates
-  ([`flatmates.md`](./flatmates.md) section 5).
+  people live in each room, and reissuing the joint rent agreement, happens on the owner's own room
+  cards in Flatmates ([`flatmates.md`](./flatmates.md) section 5).
 
 Source: `MyListingsPanel.jsx` (`handleSplitConfirm`, `handleUnsplit`, the `SplitFlatModal` mount) and
 `myListings/ListingCard.jsx` (`splitEligible` / `split` / `splitRooms` / `movedIn`, overflow items,
@@ -223,9 +217,8 @@ navigation: go(next) only pushes '#next' (+ scroll top); the tab follows the URL
 ```
 The tab is never copied into component state: React Router commits location inside a transition,
 so a mirrored copy desynced when Android Back landed before the pending commit
-(`mobile/dashboard-nav`).
-Panels are rendered with stable component identity so a state change in the container (e.g. a
-contact decision) does not remount and wipe the active panel; React remounts only when `tab` changes.
+(`mobile/dashboard-nav`). Panels render with stable component identity so a container state change
+(e.g. a contact decision) does not remount the active panel; React remounts only when `tab` changes.
 
 ## 8. Edge cases, validation & error states
 - **New owner with no inventory:** treated as seeker (`isOwner` false) - sees the account-hub tabs,
@@ -233,7 +226,7 @@ contact decision) does not remount and wipe the active panel; React remounts onl
 - **Deep link to a hidden tab:** if the resolved tab is not in `visibleTabs`, falls back to
   `overview`. A deep link to `#messages` redirects to `/messages` (never an inline divergent view).
 - **Empty states everywhere:** every tile has an honest empty variant ("None yet", "Start browsing",
-  "Create one", "All handled") rather than a fabricated number or a blank card.
+  "Create one", "All handled"), never a fabricated number or blank card.
 - **Retention cards suppressed** when there is nothing honest to show (`alertMatches` empty and
   profile 100%).
 - **Visit mutations:** update shared `visits` state immediately, then persist; on failure the row

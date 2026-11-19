@@ -12,12 +12,10 @@
 > **Status:** documented from React source - **Primary role(s):** owner (maker/initiator), tenant
 > (co-filler / invitee), ops "rental" team (checker/drafter)
 
-> **Runtime correction (2026-08-28).** The browser-local `serviceFlow.js` described below has been
-> deleted. The current flow is server-owned: the client creates and reads
-> requests, creates/claims/accepts co-fill invitations, records identity numbers, withdraws an
-> unanswered invite, and records read receipts through `/service-requests`. Historical sections
-> that name `draazyServiceReq:*`, `draazyRAInvite:*`, or `serviceFlow` explain the migration
-> starting point, not an active storage or security boundary.
+> **Runtime note.** The flow is server-owned through `/service-requests`: the client creates and
+> reads requests, creates/claims/accepts co-fill invitations, records identity numbers, withdraws an
+> unanswered invite, and records read receipts. The browser-local `serviceFlow.js`
+> (`draazyServiceReq:*`, `draazyRAInvite:*`) is deleted.
 
 ---
 
@@ -36,7 +34,7 @@
   - `?flat=<propertyId|roomId>&reissue=1` - the **joint-agreement reissue** entry, produced by an
     owner's occupied room card in Flatmates (`useFlatmateSupply.reissueAgreement`). One rent
     agreement covers the owner and every flatmate in the flat, so any change to who lives there is
-    the moment to reissue it. Both are live: `flat` is read as an alias of `listing` (the same
+    the moment to reissue it. `flat` is read as an alias of `listing` (the same
     prefill, and the same `propertyId` binding on the created request), and `reissue=1` adds a toast
     saying the property was prefilled for the reissue.
   Query params:
@@ -66,65 +64,68 @@
   section via `?party=&request=`. Their own name, mobile and email (and remembered KYC) are seeded
   into the blanks of their step from the signed-in account.
 - **Ops "rental" team (checker/drafter):** review docs, share the draft, submit for registration,
-  upload the final registered copy (back-office, on the same server request). The upload carries the
-  registration record from the Sub-Registrar's endorsement and the GRAS challan — document number,
-  SRO, date, GRN, stamp duty and fee paid — and is refused (422) without it or (409) when that GRN or
-  document number is already on another request. The second operator's Registration check shows the
-  record beside the duty and fee the customer was quoted, and flags a difference.
-  Before drafting, the desk's **Overlap check** lists other paid, uncancelled agreements on the same
-  listing — or, for an unlisted flat, the same flat number + society + pincode — whose months
-  overlap this one, and calls out a licensor named differently. It is advisory: an early renewal
-  overlaps too, so the drafter decides. A flat typed two ways ("Flat No. 0402" and "402") is one flat, and an agreement
-  filed outside any request on the same listing (`match: record`) is compared too.
-  The desk shows the **Deed particulars** the customer typed (property, terms, licensors with their
-  capacity and power of attorney, licensees — mobiles masked), and a rent-agreement draft
-  is shared only once the drafter ticks five checks: ID numbers match the scans, the ownership proof
-  names every licensor, any POA is checked, the flat address matches, and the terms match. The
-  server refuses the draft (422) without all five and audits them.
-  Each paper on the checklist gets a **verdict** from the operator holding the request (or an
-  admin): *Verify*, or *Reject* with a reason of up to 300 characters. The verdict attaches to that
-  exact upload, so a re-upload arrives unreviewed, and a verdict sent against an older copy is a
-  409. A rejection notifies whoever files that side: the accepted co-fill party whose side it is,
-  else the requester. Each checklist item carries `canUpload` for the viewer (the rule the upload
-  route enforces), and the desk's reason on another side's PAN, Aadhaar or photo reads `null`, as
-  private as the scan. The rent-agreement tracker lists only the rejected papers the viewer can
-  re-upload, with their reasons and an upload button.
-  A rent agreement's draft and its registered copy are both refused (409, naming the papers) until
-  every paper on the checklist is verified. Other service types keep the presence-only checklist.
-  Paid rent agreements carry a **desk SLA**, measured from when the request entered its current
-  status: pick up within 4 hours, first draft within 48 hours, a revision within 24 hours, and
-  registration within 7 days of approval. A shared draft is the customer's turn and is not timed.
-  The queue row shows "Due in…", "Overdue by…" or "Customer's turn", and *Overdue only* filters the
-  queue in SQL (`?overdue=true`). The clock is computed on read — nothing sweeps or notifies
-  (ADR-011) — and it uses wall-clock hours without pausing while a rejected paper is awaited.
-  If rent, deposits, term or the yearly increase turn out wrong after payment, the holder
-  **revises the priced terms** (*Priced terms* on the desk, `POST …/amendments`, a reason the
-  customer reads). The server re-prices them, and only the requester can accept (*Revised terms*
-  on the tracker). A higher fee is paid through its own checkout, and the terms apply when that
-  payment's webhook settles. A lower fee applies on acceptance, and the overpayment stays on record
-  until it is refunded. One revision is open at a time, only while drafting, and the
-  draft cannot be shared while it is open. The holder can withdraw it. Revisions are priced against what
-  is net paid (paid less approved refunds), and the other co-fill parties are told when one is proposed or
-  applied. If a checkout's order has expired, accepting again opens a fresh one (an order already paid is
-  refused). A payment that lands on withdrawn terms is kept as credit and flagged to the desk for a refund.
-  **Refunds** (D-b, *Refunds* on the desk, `…/refunds`). Everything paid can be refunded until the
-  stamp duty is paid on GRAS; after that, only what exceeds the quoted statutory charges comes back.
-  A registered copy proves the duty was paid; before that, the maker states it with the GRN. The
-  holder asks, and a different operator approves (the maker gets 403) or rejects with a note. Only
-  on approval does the gateway refund the order the money came in on. `refund.approved` is written
-  to the timeline and the customer is notified. A refund that returns everything paid cancels the request
-  (`refund.cancelled-request`); a partial one does not. The gateway's refund webhook (Cashfree
-  `REFUND_STATUS_WEBHOOK`) is applied too: a `CANCELLED` or `FAILED` refund is marked `failed`,
-  written to the timeline and audit, and the customer is told, so the desk can ask again. A refund
-  made by hand on the Cashfree dashboard carries Cashfree's own refund id; once it succeeds it is
-  entered as an approved refund on the order's request, with its credit note, and counts toward the
-  full-refund cancellation.
-  **Draft approvals** (MC-4/MC-8). Every executing party approves the current draft version:
-  in-app for account holders, by OTP for inline parties. Any rejection
-  sends it back to changes-requested, and a new version resets every approval. A draft the holder shares goes to the customer at once; no second operator checks it first.
-  **Police intimation** (LEG-2). Automatic: registering on the IGR portal (i-SARITA, linked to
-  police CCTNS) informs the police, so the step is done as soon as the registered copy is uploaded.
-  There is nothing for the owner, tenant or ops to file or confirm.
+  upload the final registered copy (back-office, on the same server request).
+  - **Registered copy:** the upload carries the registration record from the Sub-Registrar's
+    endorsement and the GRAS challan — document number, SRO, date, GRN, stamp duty and fee paid — and
+    is refused (422) without it or (409) when that GRN or document number is already on another
+    request. The second operator's Registration check shows the record beside the duty and fee the
+    customer was quoted, and flags a difference.
+  - **Overlap check** (before drafting): lists other paid, uncancelled agreements on the same
+    listing — or, for an unlisted flat, the same flat number + society + pincode — whose months
+    overlap this one, and calls out a licensor named differently. Advisory (an early renewal
+    overlaps too), so the drafter decides. A flat typed two ways ("Flat No. 0402" and "402") is one
+    flat, and an agreement filed outside any request on the same listing (`match: record`) is compared too.
+  - **Deed particulars:** the desk shows what the customer typed (property, terms, licensors with
+    their capacity and power of attorney, licensees — mobiles masked). A rent-agreement draft
+    is shared only once the drafter ticks five checks: ID numbers match the scans, the ownership proof
+    names every licensor, any POA is checked, the flat address matches, and the terms match. The
+    server refuses the draft (422) without all five and audits them.
+  - **Paper verdicts:** each paper on the checklist gets a verdict from the operator holding the
+    request (or an admin): *Verify*, or *Reject* with a reason of up to 300 characters. The verdict
+    attaches to that exact upload, so a re-upload arrives unreviewed, and a verdict sent against an
+    older copy is a 409. A rejection notifies whoever files that side: the accepted co-fill party
+    whose side it is, else the requester. Each checklist item carries `canUpload` for the viewer (the
+    rule the upload route enforces), and the desk's reason on another side's PAN, Aadhaar or photo
+    reads `null`, as private as the scan. The tracker lists only the rejected papers the viewer can
+    re-upload, with their reasons and an upload button. A rent agreement's draft and its registered
+    copy are both refused (409, naming the papers) until every paper is verified. Other service types
+    keep the presence-only checklist.
+  - **Desk SLA** (paid rent agreements), measured from when the request entered its current
+    status: pick up within 4 hours, first draft within 48 hours, a revision within 24 hours, and
+    registration within 7 days of approval. A shared draft is the customer's turn and is not timed.
+    The queue row shows "Due in…", "Overdue by…" or "Customer's turn", and *Overdue only* filters the
+    queue in SQL (`?overdue=true`). The clock is computed on read — nothing sweeps or notifies
+    (ADR-011) — and uses wall-clock hours without pausing while a rejected paper is awaited.
+  - **Priced-terms revision:** if rent, deposits, term or the yearly increase turn out wrong after
+    payment, the holder revises the priced terms (*Priced terms* on the desk, `POST …/amendments`, a
+    reason the customer reads). The server re-prices them, and only the requester can accept
+    (*Revised terms* on the tracker). A higher fee is paid through its own checkout, and the terms
+    apply when that payment's webhook settles. A lower fee applies on acceptance, and the overpayment
+    stays on record until it is refunded. One revision is open at a time, only while drafting, and the
+    draft cannot be shared while it is open. The holder can withdraw it. Revisions are priced against
+    what is net paid (paid less approved refunds), and the other co-fill parties are told when one is
+    proposed or applied. If a checkout's order has expired, accepting again opens a fresh one (an
+    order already paid is refused). A payment that lands on withdrawn terms is kept as credit and
+    flagged to the desk for a refund.
+  - **Refunds** (D-b, *Refunds* on the desk, `…/refunds`). Everything paid can be refunded until the
+    stamp duty is paid on GRAS; after that, only what exceeds the quoted statutory charges comes back.
+    A registered copy proves the duty was paid; before that, the maker states it with the GRN. The
+    holder asks, and a different operator approves (the maker gets 403) or rejects with a note. Only
+    on approval does the gateway refund the order the money came in on. `refund.approved` is written
+    to the timeline and the customer is notified. A refund that returns everything paid cancels the
+    request (`refund.cancelled-request`); a partial one does not. The gateway's refund webhook
+    (Cashfree `REFUND_STATUS_WEBHOOK`) is applied too: a `CANCELLED` or `FAILED` refund is marked
+    `failed`, written to the timeline and audit, and the customer is told, so the desk can ask again.
+    A refund made by hand on the Cashfree dashboard carries Cashfree's own refund id; once it succeeds
+    it is entered as an approved refund on the order's request, with its credit note, and counts
+    toward the full-refund cancellation.
+  - **Draft approvals** (MC-4/MC-8). Every executing party approves the current draft version:
+    in-app for account holders, by OTP for inline parties. Any rejection sends it back to
+    changes-requested, and a new version resets every approval. A draft the holder shares goes to the
+    customer at once; no second operator checks it first.
+  - **Police intimation** (LEG-2). Automatic: registering on the IGR portal (i-SARITA, linked to
+    police CCTNS) informs the police, so the step is done as soon as the registered copy is uploaded.
+    Nothing for the owner, tenant or ops to file or confirm.
 - **Guards:** the page is publicly fillable; **generating** requires sign-in (the in-page sign-in
   sheet, which resumes the step). Invite mode forces sign-in (`reason=invite`,
   no mobile in the URL) and then resolves the invitation against the signed-in account. Guards are
@@ -146,22 +147,16 @@ Link to [`../../system/data-model.md`](../../system/data-model.md).
   ownership proof reused across the wizard and dashboard (`OWNER_VAULT_CAT`). A
   vault row carries a signed URL, not bytes, so a reused slot is held by `vaultDocId` and filed onto
   the request server-side by `POST /service-requests/{id}/docs/from-vault`.
-- **Draft (`dzDraft:rentAgreement`)** - autosave/restore of the whole wizard *except* PAN. It is
-  stripped before the draft is written (the same redaction the co-fill payload uses), and a draft
-  written before that rule is redacted in place the next time the wizard opens. Fields the wizard
-  no longer collects are dropped on restore (`withDefaults` keeps only the factory keys). A mid-fill
-  refresh therefore brings back every answer with the PAN blank, and the restored-draft banner says so. Attached papers are kept as `docRefs` — never bytes: a vault-backed slot comes back
-  whole, any other comes back as a "Re-attach <name>" marker that does not count as uploaded.
+- **Draft (`dzDraft:rentAgreement`)** - autosave/restore of the whole wizard *except* PAN (see §5.9).
+  A draft written before that rule is redacted in place the next time the wizard opens. Fields the
+  wizard no longer collects are dropped on restore (`withDefaults` keeps only the factory keys).
+  Attached papers are kept as `docRefs` — never bytes: a vault-backed slot comes back whole, any
+  other comes back as a "Re-attach <name>" marker that does not count as uploaded.
 - **Identity numbers (D151)** - `PUT /service-requests/{id}/identities`, once, immediately after the
-  live create and before the checkout modal opens. This is the *only* place a PAN leaves the
-    tab (the wizard never collects Aadhaar; staff record it at the doorstep via the desk): not in `details` (plaintext `jsonb`, echoed to every staff read), not in the draft, not in the
-  co-fill payload, not in `draazyOwnerKYC`. Built by `identityParties(owner, tenants)` from live
-  component state (a PAN row per licensor, co-owner and tenant), sent, and not retained; the server answers 204 so there is nothing to echo back.
-  On the desk's side only the operator the request is **assigned to** can read them back — an admin
-  is refused until they take the request — every read and every refusal is written to `audit_log`,
-  and the numbers are blanked when the request completes or is cancelled. A failure here is
-  non-fatal: the request exists and is about to be paid for, so the customer is told the team will
-  ask for the numbers rather than that their submission was lost.
+  live create and before the checkout modal opens; the *only* place a PAN leaves the tab (the wizard
+  never collects Aadhaar; staff record it at the doorstep via the desk). Built by
+  `identityParties(owner, tenants)` from live component state (a PAN row per licensor, co-owner and
+  tenant), sent, and not retained. See §5.10.
 - **Notifications** - server-owned notifications and request messages; the browser has no
   cross-party notification store.
 - **Fees** - `getDealFees('rent').platformFee` (`feesService`, the published fee schedule).
@@ -197,7 +192,7 @@ saved past the review step is clamped back to it.
   title: all of them execute the deed. Autofilled from `draazyOwnerKYC:<mobile>` or the session user.
 - **Step 2 Tenant:** `tenantMode` = `fill` (one or more tenants, `addTenant`/`removeTenant`) or
   `invite` (send a co-fill link). Tenant fields mirror the owner (name, DOB, PAN, mobile) plus
-    occupation, which drives `workProofRequired` for the police record, then add the IGR police record under `tenant.police`: permanent/previous address toggles
+  occupation, which drives `workProofRequired` for the police record, then add the IGR police record under `tenant.police`: permanent/previous address toggles
   (pincode, village/city, police station, address), address proof type for permanent and for a
   different previous address, workplace address + work ID proof type, and a **Work ID proof** upload
   (`workidproof`, doc key `t{i}-7`, checklist category `tenant-{i}-workidproof`) required whenever
@@ -208,10 +203,10 @@ saved past the review step is clamped back to it.
   1..60 — a restored non-preset term reopens as *Other…*), rent, deposit, non-refundable deposit,
   increment % (default 5; labelled *Increase on Renewal* for a term of 11 months or less) and, for a
   longer term, how often it applies (every 11 or 12 months, default 11), lock-in (6); how the
-    refundable deposit was paid (`depositPayments`, see § validation); maintenance payer; stamp duty &
-    registration (`costBy`, Split | Tenant | Owner); parking (`none` | `two-wheeler` | `car` |
-    `both`) with optional parking area when parking is included; notice period, rent due day, payment
-    mode, utilities, property tax and occupant count are not asked; the registration area, shown read-only because it follows the
+  refundable deposit was paid (`depositPayments`, see § validation); maintenance payer; stamp duty &
+  registration (`costBy`, Split | Tenant | Owner); parking (`none` | `two-wheeler` | `car` |
+  `both`) with optional parking area when parking is included; notice period, rent due day, payment
+  mode, utilities, property tax and occupant count are not asked; the registration area, shown read-only because it follows the
   locality (see § 5.2); deed language (`language`,
   English | Marathi, default English); the biometric-visit preference — where (`visitAt`, property |
   licensor | licensee, default property), an optional preferred date (`visitDate`, tomorrow to 90
@@ -229,16 +224,15 @@ saved past the review step is clamped back to it.
 reach. Step 0 asks only about the building, so the Estimated Total is visible before any commitment;
 every later step collects PAN and papers, which must not be taken from a session with no
 account behind it — no consent record, no audit trail, nobody to attribute the data to (Aadhaar Act
-s.29). It is a named constant rather than a literal because three places must agree: the gate in
+s.29). It is a named constant because three places must agree: the gate in
 `useRentAgreement.next`, the clamp that restores a signed-out visitor, and the padlocks the progress
 rail draws.
 
 **The progress rail's padlocks (`RentAgreement.jsx`)** read that same `gated` flag rather than
-re-deriving `mode === 'owner' && !isIn`. The clamp waits out `loading`; a re-derived copy does not,
-so during a restored draft mid-boot the padlocks and the active dot disagreed — the panel on screen
-was padlocked and no dot was active. The padlock outranks `pending` and `done` because it is the
-stronger claim: a signed-out visitor cannot reach those steps at all, so showing step 2 as "awaiting
-the tenant" would describe a queue they are not in.
+re-deriving `mode === 'owner' && !isIn` (the clamp waits out `loading`; a re-derived copy does not,
+so mid-boot the padlocks and the active dot disagreed). The padlock outranks `pending` and `done`:
+a signed-out visitor cannot reach those steps, so showing step 2 as "awaiting the tenant" would
+describe a queue they are not in.
 
 ### 5.2 Cost computation (`cost` useMemo) - Maharashtra Article 36A
 Server-side in `LeaveAndLicenceCharges`; the wizard mirrors it so the estimate equals the charge:
@@ -257,7 +251,7 @@ dhc     = 300                                        // document handling charge
 service = feeRow.platformFee                         // getDealFees('rent').platformFee
 total   = stamp + reg + dhc + service
 ```
-- The registration area is not the customer's choice (D-h). The fee halves for a Gram Panchayat
+- The registration area is not the customer's choice (D-h); the fee halves for a Gram Panchayat
   area, so a toggle invited a false "rural". On create, `RegistrationArea` resolves
   `_state.prop.locality` and stamps `regArea` ("Rural" / "Municipal / Urban") plus `_state.regArea`
   over whatever the client sent. The locality's `registration_body` column (V46, set in the R__
@@ -394,10 +388,10 @@ regArea label (overwritten server-side from the locality), and `_state` = the fu
 - Invite mode loads the owner's `_state`, seeds the tenant's blanks from the signed-in account, and
   jumps to step 0. The tenant's PAN goes through `PUT /identities`, which accepts an accepted
   party for their own side.
-- **A declined invite is recoverable.** Declining leaves the party row `declined`, which used to hold
-  the unique `(request_id, role)` slot while checkout waited forever on an accepted party. The
-  owner's locked panel now detects a co-fill request (`_state.tenantMode` or `_state.ownerMode` is
-  `'invite'`) with no invited or accepted party on that side and offers `DeclinedInvitePanel`: invite another number (withdraw the
+- **A declined invite is recoverable.** Declining leaves the party row `declined`, which holds
+  the unique `(request_id, role)` slot. The owner's locked panel detects a co-fill request
+  (`_state.tenantMode` or `_state.ownerMode` is `'invite'`) with no invited or accepted party on that
+  side and offers `DeclinedInvitePanel`: invite another number (withdraw the
   declined row — `CoFillParties.withdraw` accepts `declined` — then `POST /{id}/parties`), or cancel
   the unpaid request.
 - **Paying once the tenant is in.** When the tenant submits their half, `CoFillServiceRequests`
@@ -470,63 +464,59 @@ regArea label (overwritten server-side from the locality), and `_state` = the fu
 
 ### 5.8 Joint agreement for a split flat
 A flat let room by room is covered by **one** agreement naming the owner and every current flatmate,
-not one agreement per room - which is why rooms carved from the same listing all share a `propertyId`
+not one per room - which is why rooms carved from the same listing all share a `propertyId`
 (the key that ties them into one flat for both the occupancy ledger and the agreement). When
 occupancy changes (`setRoomOccupants`, via the room card's +/- stepper in Flatmates), the existing
 document no longer names the people actually living there, so the owner is offered a reissue at that
-exact moment. See [`flatmates.md`](./flatmates.md) section 5 and the `?flat=&reissue=1` entry in
+moment. See [`flatmates.md`](./flatmates.md) section 5 and the `?flat=&reissue=1` entry in
 section 2.
 
 ### 5.9 Identity numbers never leave the tab (`captureShareableState`, `DRAFT_KEY` purge)
 
-`captureFormState` is also the co-fill payload: it is posted as `details._state` so an invited
-tenant can open the owner's half-filled form. But `details` is stored as plaintext jsonb and echoed
-verbatim by `ServiceRequestMapper` on **every** read — including the paged ops queue — so sending
-the raw state would hand the owner's PAN, and every tenant's, to the invited stranger
-and to any staff account that listed the queue. That is a bulk identity dump.
+`captureFormState` is also the co-fill payload, posted as `details._state` so an invited tenant can
+open the owner's half-filled form. But `details` is plaintext jsonb echoed verbatim by
+`ServiceRequestMapper` on **every** read — including the paged ops queue — so sending the raw state
+would hand every party's PAN to the invited stranger and to any staff account that listed the queue.
 
-The `dzDraft:rentAgreement` autosave is the same threat model on a shorter path: `localStorage`,
-same origin, written on every keystroke and never expired. Both callers therefore get
-`captureShareableState()`; the raw capture is used for the submission and for resolving
-`useFormDraft`'s functional updater against live state, and for nothing else. Redaction happens in
-the browser so the numbers never cross the wire at all — the server-side `details` allowlist is the
-belt to that pair of braces.
+The `dzDraft:rentAgreement` autosave is the same threat model on a shorter path (`localStorage`,
+same origin, written on every keystroke, never expired). Both callers therefore get
+`captureShareableState()`; the raw capture is used only for the submission and for resolving
+`useFormDraft`'s functional updater against live state. Redaction happens in the browser so the
+numbers never cross the wire — the server-side `details` allowlist is the belt to that pair of braces.
 
-Two purges run **on read**, not merely on write, because every owner who used the wizard before the
-numbers were kept out already has a PAN sitting in their browser, and nothing else
-ever revisits those keys:
+Two purges run **on read**, because every owner who used the wizard before the numbers were kept out
+already has a PAN in their browser and nothing else revisits those keys:
 
 - The `DRAFT_KEY` purge effect **must stay above the `useFormDraft` call**. Effects fire in the
-  order their hooks were called during render, so declaring it first is what guarantees the entry is
-  rewritten before the restore reads it back into the form. Reordering the two would put the numbers
-  back on screen for one keystroke's worth of time.
+  order their hooks were called, so declaring it first guarantees the entry is rewritten before the
+  restore reads it back into the form.
 - The `draazyOwnerKYC:<mobile>` purge rewrites the entry during the owner-KYC autofill — the only
   moment the app is guaranteed to touch that key.
 
 A mid-form refresh therefore brings back every answer except the PAN, which the owner retypes; the
-restored-draft banner says so rather than claiming everything came back.
+restored-draft banner says so.
 
 ### 5.10 Submit-time channels: identities, documents, payment confirmation
 
 **No admin lead ticket is raised here.** `ServiceRequestService` commits the request at
 `awaiting-payment` and `findForQueue` deliberately excludes that status, so an unpaid rent-agreement
-request is invisible to ops on purpose. A ticket raised at submit would put the same enquiry on the
-rental desk immediately — visible, callable, and indistinguishable from a paid one — defeating the
-rule one layer down. (`ServiceLanding` posts a ticket because there the lead *is* the point: a free
-quote enquiry. This desk is priced.) **BACKEND GAP:** the ticket should be raised server-side from
-the payment webhook, where the request has actually been paid for. Until then the request itself is
-the record, and the desk sees it when payment moves it out of `awaiting-payment`.
+request is invisible to ops on purpose; a ticket at submit would put an unpaid enquiry on the rental
+desk indistinguishable from a paid one. (`ServiceLanding` posts a ticket because there the lead *is*
+the point: a free quote enquiry. This desk is priced.) **BACKEND GAP:** the ticket should be raised
+server-side from the payment webhook. Until then the request itself is the record, and the desk sees
+it when payment moves it out of `awaiting-payment`.
 
 **Identity numbers ride their own narrow channel (D151).** `details` carries none — the wizard
-redacts them and the server refuses them at any nesting depth, because `details` is plaintext
-`jsonb` echoed verbatim to every staff read. But a Leave & License names each party by PAN, so `PUT /service-requests/{id}/identities` exists: it answers 204 (nothing to echo), stores
+redacts them and the server refuses them at any nesting depth. A Leave & License names each party by
+PAN, so `PUT /service-requests/{id}/identities` exists (not in `details`, the draft, the co-fill
+payload or `draazyOwnerKYC`): it answers 204 (nothing to echo), stores
 the rows outside `details`, refuses every reader except the operator the request is assigned to (an
-admin included, until they take it), writes an audit row for each read *and* each refusal, and
-blanks the numbers when the request completes or is cancelled. Nothing touches `localStorage` on the
-way. It is separate from and after the create (the id must exist, and a create body carrying a
-PAN would put one on the response the tracker renders and logs), and before the checkout modal
-(which can outlive the page). It is non-fatal: the request exists and is about to be paid for, so
-throwing would tell a charged customer their submission was lost.
+admin included, until they take it), writes an audit row (`audit_log`) for each read *and* each
+refusal, and blanks the numbers when the request completes or is cancelled. Nothing touches
+`localStorage`. It is separate from and after the create (the id must exist, and a create body
+carrying a PAN would put one on the response the tracker renders and logs), and before the checkout
+modal (which can outlive the page). It is non-fatal: the request exists and is about to be paid for,
+so the customer is told the team will ask for the numbers rather than that their submission was lost.
 
 **Documents are a second call per file.** `createServiceRequest` carries `docs` no further than the
 wizard — `toCreate` builds `{type, details, propertyId?, ticketId?}` and `POST /service-requests`
@@ -564,13 +554,12 @@ binding the order, so a second tap loses with a 409 rather than opening a second
 
 **The checkout modal closing is not proof of payment.** Only the signature-verified webhook moves
 the request to `new` (or cancels it), and being server-to-server it lands seconds after the customer
-is back on the page. A single re-read therefore reads `awaiting_payment` on almost every
-*successful* payment, so the reward for paying was an amber "it didn't go through" panel and an
-invitation to pay twice. The page polls instead (`PAYMENT_POLL_BACKOFF_MS`) and treats "still
-awaiting" as not-yet-known until the budget is gone. Within the loop: only a status actually
-received overwrites the last one, so a dropped request mid-poll cannot erase a verdict already read;
-the loop `break`s rather than `return`s on unmount so it still falls through to `clearDraft()` — a
-paid request that leaves its draft behind re-offers a form the owner has already been charged for.
+is back on the page, so a single re-read sees `awaiting_payment` on almost every *successful* payment.
+The page therefore polls (`PAYMENT_POLL_BACKOFF_MS`) and treats "still awaiting" as not-yet-known
+until the budget is gone. Within the loop: only a status actually received overwrites the last one, so
+a dropped request mid-poll cannot erase a verdict already read; the loop `break`s rather than
+`return`s on unmount so it still falls through to `clearDraft()` — a paid request that leaves its
+draft behind re-offers a form the owner has already been charged for.
 
 **Local mock payments.** With `CASHFREE_ENABLED=false` the gateway is `MockPaymentGateway` and no
 webhook ever arrives. In a dev build, `useRaPayment` asks "Local mock payment: mark this rent

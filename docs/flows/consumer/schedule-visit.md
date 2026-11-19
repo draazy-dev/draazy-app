@@ -2,7 +2,7 @@
 
 > How a buyer/tenant books an in-person visit to a listing (there are no video visits), and how the owner confirms,
 > completes, reschedules or cancels it.
-> **Status:** documented from React source - **Primary role(s):** buyer/tenant (maker), owner (checker)
+> **Primary role(s):** buyer/tenant (maker), owner (checker)
 
 ---
 
@@ -62,8 +62,8 @@ There are **two parallel visit stores** (a known duplication - see section 8):
 - **Date:** free date field, `min = todayIso()` (local yyyy-mm-dd) - visits are **forward-only**.
 - **Canonical `when` string:** `formatWhen(dateIso, time, mode)` -> `"19 Jul 2026, 10:30 AM
   (in-person)"`. `parseWhen` reads back both this human form and the seed's ISO form
-  (`"2026-07-07"`), so a booked slot and a rescheduled slot stay mutually parseable. This one
-  vocabulary is the single source of truth across booking, dashboard reschedule and admin.
+  (`"2026-07-07"`), so a booked and a rescheduled slot stay mutually parseable. This one vocabulary
+  is the single source of truth across booking, dashboard reschedule and admin.
 
 ### Booking submit (`ScheduleVisitModal.submit`)
 1. Refuse a missing or past slot (`property.pastSlot`); send a signed-out user to sign-in.
@@ -115,8 +115,8 @@ There are **two parallel visit stores** (a known duplication - see section 8):
   standing from authorising a **new** review from that point on.
 - This looks like a gap and is a decision. Retraction would give the owner of the reviewed listing a
   one-tap silencer for criticism: confirm the stay, wait for the review, revoke on reading it. The
-  declaration exists to evidence that the reviewer was really there - a fact about the past that
-  revoking cannot change. Abuse of confirm -> review -> revoke is answered by the audit trail
+  declaration evidences that the reviewer was really there - a fact about the past that revoking
+  cannot change. Abuse of confirm -> review -> revoke is answered by the audit trail
   `TenancyDeclarationService.decide` writes and by review moderation, both held by someone other than
   the accused.
 - Pinned by `TenancyRevocationIsForwardOnlyTest` (both halves: the old review survives byte-for-byte,
@@ -128,11 +128,10 @@ There are **two parallel visit stores** (a known duplication - see section 8):
 
 ## 6. Maker-checker / approval
 - **Yes - a lightweight maker-checker.** Maker = buyer (creates a `scheduled` / `requested` visit),
-  checker = owner (confirms / completes / cancels). The side-effect of confirmation is purely the
-  slot moving to `confirmed`; the meaningful side-effect of **completion** is unlocking the buyer's
-  "Visited" review. Reschedule returns the record to `scheduled` (re-confirmation needed). See the
-  visit row in the table in [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section
-  2.4.
+  checker = owner (confirms / completes / cancels). Confirmation only moves the slot to `confirmed`;
+  **completion** unlocks the buyer's "Visited" review. Reschedule returns the record to `scheduled`
+  (re-confirmation needed). See the visit row in the table in
+  [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2.4.
 
 ## 7. State machine
 ```

@@ -12,10 +12,10 @@
 - **Persona:** a property owner (or a sitting tenant listing a room) who wants their unit live on
   Draazy.
 - **Job-to-be-done:** "Describe my property, price it, add photos, and publish it."
-- **Why it matters:** this is the **supply side** of the marketplace. Listing quality and the
-  admin listing-verification maker-checker are what make the "zero brokerage" promise real. Every
-  listing enters as `pending` and only goes live after admin verification. Posting itself is never
-  identity-gated — an owner signs in (L1) and posts; verification is an **optional Verified badge**.
+- **Why it matters:** the **supply side** of the marketplace. Listing quality and the admin
+  listing-verification maker-checker make the "zero brokerage" promise real. Every listing enters as
+  `pending` and goes live only after admin verification. Posting is never identity-gated — an owner
+  signs in (L1) and posts; verification is an **optional Verified badge**.
 
 ## 2. Entry points
 - **Routes:** `/list-property` is public for a new draft and asks for OTP inside the wizard only when
@@ -32,14 +32,12 @@
     headline, note, vibe). Required fields carry a `*` (`RequiredMark`); no posting form uses the word "optional".
     Plain `/list-property` still offers "Find a flatmate" under Rent.
 - **Tiles / triggers:** "Post Property" nav/CTA, dashboard "Add listing", the bottom bar's raised
-  `+` on mobile, and the Flatmates tab-row `Post` CTA on desktop (the two never both render - the
-  bar is `lg:hidden` and `.sf-post-cta` is its exact complement). The last two open the same thing:
-  the app-wide
+  `+` on mobile, and the Flatmates tab-row `Post` CTA on desktop (never both render - the
+  bar is `lg:hidden` and `.sf-post-cta` is its exact complement). The last two open the app-wide
   `PostChooser`, mounted once by `ConsumerLayout`, which asks "what do you want to post?" and routes
-  **two** of its branches into this wizard - *a property* to `/list-property` and *a room to fill*
-  (under Flatmates) to `?flatmate=1`, the second being a track through this form rather than a second
-  form that would relearn the same fields. The other Flatmates choices stay on Flatmates as a seeker
-  request or a group.
+  **two** branches into this wizard - *a property* to `/list-property` and *a room to fill*
+  (under Flatmates) to `?flatmate=1`, a track through this form rather than a second form. The other
+  Flatmates choices stay on Flatmates as a seeker request or a group.
 - **Source components:** `src/pages/consumer/ListProperty.jsx` (shell) + `list-property/*`:
   `useListProperty.js` (orchestrator), `PostSuccessSplitNudge.jsx` (post-success "let it room by room" offer), `ProgressMeter.jsx`,
   `StepNav.jsx`, `ListingPaywall.jsx`, `EditPolicyBanner.jsx`,
@@ -56,8 +54,8 @@
 - **Checker = staff** reviews the resulting `pending` listing in
   `src/pages/admin/AdminProperties.jsx` (three-fact checklist; see
   [`../admin/property-verification.md`](../admin/property-verification.md)).
-- **Floor (not a gate):** posting requires only being signed in (L1, `ProtectedRoute`) — there is
-  **no** identity or document gate on the form under ADR-019. The Verified property badge is offered on
+- **Floor (not a gate):** posting requires only being signed in (L1, `ProtectedRoute`) — **no**
+  identity or document gate on the form under ADR-019. The Verified property badge is offered on
   the success status card, never as a wall. See
   [`../../system/platform-architecture.md`](../../system/platform-architecture.md) §6.4 / ADR-019.
 
@@ -79,7 +77,7 @@
 ## 5. Business rules & logic  *(the meat)*
 
 ### Optional badge + paywall (before any step)
-- **Deferred login (ADR-019):** a new `/list-property` draft is **not** hidden behind a login wall.
+- **Deferred login (ADR-019):** a new `/list-property` draft is **not** behind a login wall.
   Guests can complete details, location and pricing; the shared inline OTP sheet opens at the photos
   step because photo storage and publish calls are owner-scoped. After sign-in the browser draft is
   adopted by that account, quota/paywall is checked, and the owner continues without a redirect.
@@ -87,16 +85,14 @@
   reads "Verify & submit" and reopens the sheet, since sign-in is checked before the photo floor.
   If the session expires mid-wizard (a 401 on the duplicate check, upload or submit), the sign-in sheet
   opens and the same account signing back in keeps the form and its browser draft; a different account
-  starts clean.
-  `?edit=<id>` is still protected before the wizard loads.
+  starts clean. `?edit=<id>` is still protected before the wizard loads.
 - **No identity gate:** once signed in (L1), an owner posts immediately. The success screen is a
   `ListingStatusCard` (Pending / Needs info / Live · Verified owner) with one next action; the
   optional badge is offered there, never before posting, and is fully dismissible.
 - **Freemium quota (`src/lib/store/billing.js`):** `PLAN_LISTING_LIMITS = { free: 1, 'owner-free':
   1, owner2: 2, owner5: 5 }`. `activeListingCount()` counts non-flatmate, non-deleted/archived
   listings. `canPostListing()` = `activeListingCount() < listingLimit()`. A **new** post over the
-  limit renders `ListingPaywall`; **editing** an existing listing is never paywalled (`canPost` is
-  fixed `true` in edit mode).
+  limit renders `ListingPaywall`; **editing** is never paywalled (`canPost` is fixed `true` in edit mode).
 - **The server enforces the same ceiling.** `ListingService.create` calls `ListingQuota.require`
   and `requirePace` (§9.2), so skipping this screen does not post past the plan.
 
@@ -142,9 +138,8 @@ advance on any error (scrolling to the first error via `scrollToError`).
   the picker lists up to 5 **Google Maps** buildings (`establishment`/`premise`, biased to the pin);
   picking one mints it into the catalogue with Google's coordinates (a guest gets the name, pin and
   pincode unlinked until sign-in). The same picker serves the flatmate step and the rent agreement.
-  "Use my current
-  location" places the pin from the device's position. The map uses cooperative gestures (one
-  finger scrolls the page, two pan the map) and 44 px zoom controls.
+  "Use my current location" places the pin from the device's position. The map uses cooperative
+  gestures (one finger scrolls the page, two pan the map) and 44 px zoom controls.
 - `locality` required; must be **placed on the map** (`form.pinPlaced`, set by a locality pick,
   search or pin drag) or `err.location` is raised - a listing is never geo-pinned to the default.
   Placement is a form field rather than component state so the autosaved draft carries it: the
@@ -165,9 +160,9 @@ advance on any error (scrolling to the first error via `scrollToError`).
 - **Plots in a layout (MahaRERA).** An open-plot sale asks "Is this plot part of a layout / plotted
   project?" (`formDetails.plottedProject`). The MahaRERA ID is **optional** either way (RERA binds
   promoters and agents, not an owner reselling a plot); if typed, its format is checked on the client
-  and the server (`ListingSanityLimits`). Rentals and
-  farmland are not asked. Changing `reraId` or `plottedProject` on a live listing queues a moderator
-  re-check. A resale listing never autofills `reraId` as its own claim.
+  and the server (`ListingSanityLimits`). Rentals and farmland are not asked. Changing `reraId` or
+  `plottedProject` on a live listing queues a moderator re-check. A resale listing never autofills
+  `reraId` as its own claim.
 - Money fields round a typed decimal to the nearest rupee (the dot is never stripped into digits) and
   refuse a sale price above ₹10,000,000,000 or a monthly rent above ₹10,000,000 inline. Floor above
   total floors is an inline Details error and blocks Next.
@@ -218,8 +213,8 @@ advance on any error (scrolling to the first error via `scrollToError`).
   25,000,000 bytes; advertised image dimensions are capped at 48 megapixels before decoding. Neither
   bound is quoted in the wizard's guidance: they are decode-memory guards, and only the file that
   actually hits one is told about it. The server reads the upload's header before decoding it and
-  refuses (413) a canvas over 10,000 px on a side or 24 megapixels (`PhotoUploads`). The server itself
-  takes only JPEG or PNG, since the browser has already converted any HEIC; it keeps only an allowlist
+  refuses (413) a canvas over 10,000 px on a side or 24 megapixels (`PhotoUploads`). The server
+  takes only JPEG or PNG (the browser has already converted any HEIC); it keeps only an allowlist
   (JFIF, ICC and Adobe colour segments and the image data; PNG rendering chunks), drops everything after
   the end marker (motion-photo video, MPF images), and refuses (415) a file it cannot walk to that
   marker (`ImageMetadataStripper`).
@@ -229,7 +224,7 @@ advance on any error (scrolling to the first error via `scrollToError`).
   resampled from the full frame. **Within those two bounds no photo is refused for its size:** its
   ladder runs to quality 0.35 and a 320-pixel edge, which is tens of kilobytes. A vault *document*
   stops at quality 0.62 and 1,600 pixels and is refused below that, because a scan degraded past reading
-  is worse for the moderator who has to check it than one the owner is asked to retake. The first
+  is worse for the moderator than one the owner is asked to retake. The first
   rung is 0.92 (the single attempt it replaced used 0.95, so an oversized photo that always fit is
   now marginally lossier). HEIC uses the CSP-safe heic-to decoder and becomes JPEG even below the
   cap, because browsers cannot consistently display HEIC. Unchanged originals may retain metadata.
@@ -244,15 +239,15 @@ advance on any error (scrolling to the first error via `scrollToError`).
   malformed files and outputs still above the limit are refused with visible guidance. See
   [`../admin/property-verification.md`](../admin/property-verification.md) "Ownership gate".
 - Photos upload three at a time; submission is disabled while preparation/upload is active.
-  Workers terminate on completion, cancellation or a 30-second deadline. The server checks actual
-  uploaded bytes and MIME independently, and caps persisted property galleries at the configured limit.
+  Workers terminate on cancel/unmount, and the server independently verifies uploaded bytes and MIME
+  and caps persisted property galleries at the configured limit.
 - HEIC decoding remains a separately replaceable asset. Production builds package library notices,
   corresponding library/codec sources and integration source under `/third-party/uploads/`.
 
 ### Draft vs submit
 - **New-post draft only:** `useFormDraft` autosaves a guest's form to `dzDraft:list-property:v3` and a
   signed-in owner's to `dzDraft:list-property:v3:<owner id>` (`draftSlots.js`), each stamped with its owner
-  (`__owner`). Another account on the same device therefore neither sees nor overwrites it; work a guest
+  (`__owner`). Another account on the same device neither sees nor overwrites it; work a guest
   typed before signing in moves into their slot, and logout clears every `dzDraft:*` key. The draft
   carries the step, the room mode and durable photo URLs. The server deletes an upload that no listing,
   room or avatar shows 7 days after it was made (`photo-upload-sweep`), so restore loads each photo and
@@ -265,10 +260,9 @@ advance on any error (scrolling to the first error via `scrollToError`).
   Edits never restore, autosave or clear this draft, including after a successful save. Resetting
   an edit reloads the saved server snapshot, leaving the separate new-post draft untouched.
 - **Saved edit readiness:** `GET /me/listings/{id}` is owner-scoped. The form becomes ready only
-  when it succeeds; a failure blocks the
-  entire editor and writes until an explicit retry reloads it. There is no localStorage edit
-  source or partial prefill. The form remounts keyed by owner + listing, and stale responses are
-  ignored so state and pending work cannot cross editors.
+  when it succeeds; a failure blocks the entire editor and writes until an explicit retry reloads it.
+  There is no localStorage edit source or partial prefill. The form remounts keyed by owner + listing,
+  and stale responses are ignored so state and pending work cannot cross editors.
 - **Submit (`submitProperty` -> `finalizeListing` -> `persistListing`):**
   1. `validateStep3` must pass (no identity precondition — posting is L1-only).
     Edits also revalidate Steps 1–2 against the saved snapshot before submission.
@@ -314,15 +308,15 @@ advance on any error (scrolling to the first error via `scrollToError`).
   the record so cards/detail read them without reaching into `record.form`.
 
 ### Duplicate prevention - two questions, two places
-The wizard asks two different things, and they are deliberately not the same call.
+The two questions are deliberately not the same call.
 
 **"Have I already listed this?" is the server's** (D226). `persistListing` calls
 `propertyService.checkOwnDuplicate` -> `POST /me/listings/duplicate-check`, which derives the
 comparison key by the same `LocalityResolver` + `AddressKey` calls the create makes and matches it
-against the **caller's own** listings only. It used to be `evaluateListingDedup`'s self-arm, scanning
-this browser's localStorage - which against a live API is the seeded demo catalogue, so the guard
-could refuse a genuine owner over a fixture and then offer to open an id the server had never
-issued. Only asked on a create; an edit is by definition already the listing it would match.
+against the **caller's own** listings only (the old `evaluateListingDedup` self-arm scanned this
+browser's localStorage, which against a live API is the seeded demo catalogue, so it could refuse a
+genuine owner over a fixture and offer to open an id the server never issued). Only asked on a
+create; an edit is by definition already the listing it would match.
 - **Hard block:** `{ found: true, existingId }` -> `persistListing` returns
   `{ ok:false, blocked:true, existingId }` and the wizard shows the duplicate guard. Opening the
   existing listing uses the owner-scoped edit load above, not a browser-local listing lookup.
@@ -423,14 +417,14 @@ Editing a **live** listing classifies every changed field into two tiers (`class
 - **Seats:** the host picks **Single (1 person)** or **Double sharing (up to 2)** (`roomType`
   `Private room` / `Shared room`), so `seatsTotal` is 1 or 2 and `seatsOpen` starts equal. The rent
   field is the **room rent** (`priceBasis: 'room'`); a double room shows the host "₹X each when 2
-  share". The host no longer states how many people the flat can hold — that is the owner's or the
+  share". The host does not state how many people the flat can hold — that is the owner's or the
   society's rule, asked only in the owner split flow below.
 - Creates a `room` with `status: 'pending'`; tenant-tier or flagged posts also call
   `enqueueFlatmateReview(...)`. Pushes an "under review" notification.
 
 ### Split a rent listing into rooms (`PostSuccessSplitNudge` -> `splitFlat`)
-A **second** room-creation path that does not go through the flatmate track at all, but is offered
-from this wizard's success screen (and later from Dashboard -> My Listings).
+A **second** room-creation path, not through the flatmate track, offered from this wizard's success
+screen (and later from Dashboard -> My Listings).
 
 A brand-new **rent** listing's success screen carries a dismissible offer to let the flat room by
 room; sale listings and edits are never splittable (`postedListing` is only set when
@@ -462,7 +456,7 @@ Full model: [`flatmates.md`](./flatmates.md) section 5.
 ## 6. Maker-checker / approval
 - **Yes - the canonical listing-verification maker-checker.** Maker = owner (submits `pending`);
   checker = staff who ticks the three checks and approves, asks for info, or rejects (final), all in
-  one server transaction. This flow doc covers the **maker (submission)** side; the checker/queue
+  one server transaction. This doc covers the **maker (submission)** side; the checker/queue
   side lives in [`../admin/property-verification.md`](../admin/property-verification.md). A
   stays-live edit on a live listing is a lighter re-check that keeps the listing live.
 
@@ -496,186 +490,148 @@ approved  --owner pause-->  paused  --owner resume-->  approved (no new moderati
 
 ## 9. Backend listing writes
 
-Relocated from code comments in `catalog/listing/` so the reasoning survives without a
-multi-paragraph docblock per method.
+Relocated from code comments in `catalog/listing/`.
 
 ### 9.1 Owner scope and the server-set fields
 
-Every read and mutation in `ListingService` is keyed by the server-resolved principal id, so a
-caller can only ever see or change their own rows; cross-owner access returns `404`, because we
-never confirm another owner's listing exists.
+Every read and mutation in `ListingService` is keyed by the server-resolved principal id; cross-owner
+access returns `404`, because we never confirm another owner's listing exists.
 
-On create the trust-critical fields are server-set, not taken from the body: `status = pending`,
-`owner` = the authenticated caller (loaded, not a client id), and `price_unit` derived from the
-deal. A listing therefore cannot be born approved or assigned to someone else. What the client *may*
-say is decided by `PropertyMapper`'s allowlist, so the
-"deliberately absent" set in `ListingCreate`'s docs is enforced rather than described.
+On create the trust-critical fields are server-set: `status = pending`, `owner` = the authenticated
+caller (loaded, not a client id), and `price_unit` derived from the deal, so a listing cannot be born
+approved or assigned to someone else. What the client *may* say is decided by `PropertyMapper`'s
+allowlist, so the "deliberately absent" set in `ListingCreate`'s docs is enforced rather than described.
 
 **Ordering inside `createOnBehalf` is load-bearing.** The locality resolver runs after the mapper,
 because its geo fallback needs the lat/lng the mapper has just set (a null slug is an accepted
-outcome and simply leaves the listing out of locality facets until curated). Photo hashes are
-reindexed after the flush, because the hash rows are keyed by the listing's id and it has one only
-then, and before `flag`, because the photo arm reads back what that wrote.
+outcome and leaves the listing out of locality facets until curated). Photo hashes are reindexed
+after the flush (hash rows are keyed by the listing's id) and before `flag` (the photo arm reads back
+what that wrote).
 
 `owner_verified` is **inherited, not claimed**. It is denormalised onto the listing because buyers
-and the ranking read it there, so it has to be stamped at both ends: the reviewer's approval
-back-fills existing listings, and create stamps new ones. Without this half, an owner who verified
-last month and posts today gets a listing telling buyers they are unverified - and no later approval
-can fix it, because a second approval on an already-verified row is deliberately a no-op.
-It is read from the owner rather than accepted from the client because it is a trust signal,
-so the only safe source is the one the client cannot reach.
+and the ranking read it there, so it is stamped at both ends: the reviewer's approval back-fills
+existing listings, and create stamps new ones. Without the create half, an owner who verified last
+month gets a new listing telling buyers they are unverified, and no later approval can fix it (a
+second approval on an already-verified row is deliberately a no-op). It is read from the owner, never
+the client, because it is a trust signal.
 
-The lifetime listing tally is incremented at create rather than at approval, because the question it
-answers is "has this person ever posted", and they have - a listing the desk later rejects was still
-posted by an owner. Two things this depends on, both silent if broken: it must stay on a *managed*
-`owner` (a `@Modifying(clearAutomatically = true)` inserted above that line would detach the entity
-and drop the increment with no error at all, and that idiom appears eight times elsewhere in this
-codebase), and it dirties the user row, so `users.updated_at` moves when someone posts a listing -
-anything reading that column as "profile last edited" is reading it wrong.
+The lifetime listing tally is incremented at create rather than at approval, because it answers "has
+this person ever posted" (a later-rejected listing was still posted). Two silent dependencies: it must
+stay on a *managed* `owner` (a `@Modifying(clearAutomatically = true)` inserted above that line would
+detach the entity and drop the increment with no error; that idiom appears eight times elsewhere), and
+it dirties the user row, so `users.updated_at` moves when someone posts - anything reading that column
+as "profile last edited" is wrong.
 
 ### 9.2 The freemium ceiling (`ListingQuota`)
 
-The quota is split out of `ListingService` under package-structure.md 4.1 along a use-case seam: the
-freemium ceiling is a commercial rule with its own inputs (a plan, referral credits) and two callers
-who want opposite things from it - `create` wants a verdict, the concierge desk wants the numbers so
-a human can decide. Both answers come from the same two reads deliberately: a second count derived
-some other way would eventually disagree with the one that does the refusing, and the operator would
-be reading a number the server does not act on.
+Split out of `ListingService` under package-structure.md 4.1 along a use-case seam: a commercial rule
+with its own inputs (a plan, referral credits) and two callers - `create` wants a verdict, the
+concierge desk wants the numbers so a human can decide. Both answers come from the same two reads
+deliberately, so the operator never reads a number the server does not act on.
 
-**Until this existed the rule only lived in the browser, which meant it did not exist.** The wizard
-compared a count of the listings that browser's `localStorage` held against a ceiling the same
-browser computed, so an owner who posted from a laptop and opened the wizard on a phone was measured
-as having posted nothing. The client now reads both numbers from the server, but a number the client
-reads is a number the client can skip, and the create endpoint is reachable without the wizard at
-all. Callers must check before anything is loaded or written, so a refused post leaves no half-built
-row and no duplicate-probe entry behind.
+The client reads both numbers from the server, but the create endpoint is reachable without the
+wizard, so callers must check before anything is loaded or written; a refused post leaves no
+half-built row and no duplicate-probe entry.
 
 `createOnBehalf` is the same creation **without** the ceiling, for the back-office concierge desk
-only. The ceiling is a rule about what an owner may help themselves to; the desk is not
-self-service - it is staff-only behind its own `postOnBehalf:write` atom, doubly audited, with a
-person on a phone call deciding. Leaving the check in place made the desk inherit a stranger's plan,
-so an operator taking down three flats from one caller could record one and was refused the rest
-with copy written for the owner sitting in the wizard ("take one down, upgrade your plan, or refer
-an owner"), addressed to a member of staff about an account that is not theirs. It also made one of
-the desk's own safeguards unreachable: the owner step warns "this owner already has N pending
-listings", which is how a second operator notices the flat has already been taken down once, and a
-free-tier owner can never hold two pending listings.
+only: it is staff-only behind its own `postOnBehalf:write` atom, doubly audited, with a person on a
+phone call deciding. Keeping the check made the desk inherit a stranger's plan (refusing the 2nd flat
+from one caller with owner-facing copy) and made the desk's own safeguard unreachable: the owner step
+warns "this owner already has N pending listings", which a free-tier owner could never trigger.
 
-This is not a hole in the paywall. Nothing there is reachable by the owner, and what it produces is
-a `pending` listing in a hand-back funnel the owner has not yet accepted. What the desk loses is
-only the refusal - the overage itself is still a fact, published by
-`GET /admin/properties/owner-standing` so the operator can see the upgrade conversation they are now
-holding. It is a second method rather than a `skipQuota` boolean because a flag is a thing a future
-caller can pass by accident; a method whose name says who may call it is not.
+This is not a hole in the paywall: the owner cannot reach it, and it produces a `pending` listing in
+a hand-back funnel the owner has not yet accepted. The overage is still published by
+`GET /admin/properties/owner-standing` so the operator sees the upgrade conversation they are holding.
+It is a second method rather than a `skipQuota` boolean because a flag can be passed by accident; a
+method whose name says who may call it cannot.
 
 ### 9.3 What an edit costs, and what acts on the answer
 
-`ListingEditRules` owns the rule that decides what an edit costs; `ListingService` (owner) and `ListingModerationService` (staff) own what to *do*
-about the answer, and the two paths do opposite things with the same `EditImpact`.
-The split arrived when the file reached the 450-line ceiling `ServiceSizeGuardTest` enforces, but it
-is along a real seam: a rule that decides and a caller that acts. `check-listing-foundation.mjs`
-pins the two sets against the client's copy of the same rule.
+`ListingEditRules` decides what an edit costs; `ListingService` (owner) and `ListingModerationService`
+(staff) decide what to *do* about it, and the two paths do opposite things with the same `EditImpact`
+(split when the file hit the 450-line ceiling `ServiceSizeGuardTest` enforces, along a real seam).
+`check-listing-foundation.mjs` pins the two sets against the client's copy of the same rule.
 
 A foundation-field change earns a re-review either way: an identity change reverts to `pending` and
-leaves search, an attribute change raises a re-check and stays live. Edits outside the two
-sets (title, deposit, maintenance, availability, floor, facing, age, tenants, pets) leave both untouched. When one PATCH does both, the revert wins and no
-re-check is raised, because a full re-moderation looks at the whole listing and queueing the
-attribute change separately would put the same edit in front of a moderator twice.
+leaves search, an attribute change raises a re-check and stays live. Edits outside the two sets
+(title, deposit, maintenance, availability, floor, facing, age, tenants, pets) leave both untouched.
+When one PATCH does both, the revert wins and no re-check is raised, because a full re-moderation
+looks at the whole listing and a separate re-check would put the same edit in front of a moderator
+twice.
 
-Either outcome posts a line into the owner's verification thread saying what happened and why. That
-sentence used to be composed in the browser and written to `localStorage`, which meant the owner's
-own explanation for why their listing had gone dark lived on one machine, and the ops desk - the
-people who would have to answer for it - never saw it at all.
+Either outcome posts a line into the owner's verification thread saying what happened and why (it
+used to live in the browser's `localStorage`, so the ops desk never saw it).
 
 **The stays-live note is conditional; the re-check is not.** `requestRecheck` refuses on a listing
-that is not publicly visible, because "stays live" means nothing for a listing already off search
-and already in front of a moderator; posting the note regardless told the owner of a pending listing
-that it was live and opened a case file with no work item behind it. Reading the outcome rather than
-re-testing `isPubliclyVisible()` keeps one copy of that rule, in the entity. The note is posted only
-when the desk's work item actually moved: `requestRecheck` merges this edit's fields into the set
-already under re-check, so an unchanged set means the desk has nothing new to look at and the owner
-has already been told. Without that comparison, one owner looping `PATCH {price: 41000}` /
-`{price: 41001}` wrote a `review_messages` row per request and bumped `lastMessageAt`, which is the
-desk queue's sort key - roughly 7k messages an hour, permanently pinned at rank 1 of
-`findAllForDesk`, bounded only by the global 120/min write limiter. Comparing the merged set rather
-than suppressing repeats outright keeps the note for the case that deserves one: an owner who edited
-price yesterday and area today is told about the area.
+that is not publicly visible (already off search and in front of a moderator); posting the note
+regardless told a pending listing's owner it was live and opened a case file with no work item.
+Reading the outcome rather than re-testing `isPubliclyVisible()` keeps one copy of that rule, in the
+entity. The note is posted only when the desk's work item moved: `requestRecheck` merges this edit's
+fields into the set already under re-check, so an unchanged set means nothing new for the desk and
+the owner was already told. Otherwise one owner looping `PATCH {price: 41000}` / `{price: 41001}`
+writes a `review_messages` row per request and bumps `lastMessageAt` (the desk queue's sort key),
+pinning itself at rank 1 of `findAllForDesk` (bounded only by the global 120/min write limiter).
+Comparing the merged set rather than suppressing repeats keeps the note for an owner who edited price
+yesterday and area today.
 
 **Re-probing for duplicates is conditional on a signal actually moving.** Probing on every PATCH
-would re-post the same warning every time an owner touched their description; probing never would
-leave the obvious evasion open, since an owner can be approved at one address and then edit their
-way onto somebody else's. It runs last, after the status has settled, because the note quotes it: an
-approved listing whose PATCH both moves a signal and changes an identity field is pending by the
-time the transaction commits, and a note written before the revert would tell a moderator the
-listing is "already live" about a listing that is not. The dedupe makes the ordering matter twice
-over, since `postInternalOnce` compares message bodies and the same collision described once as
-approved and once as pending is two notes for one finding. Photographs are the other half of "moved
-a signal" and are not in `signalOf` (which holds typed column values, while photo hashes are rows in
-another table): swapping every photograph for somebody else's is precisely the edit that creates a
-duplicate while every address value stays put.
+would re-post the same warning whenever an owner touched their description; never probing leaves open
+the evasion of being approved at one address and editing onto somebody else's. It runs last, after
+the status has settled, because the note quotes it: an approved listing whose PATCH both moves a
+signal and changes an identity field is pending at commit, and a note written before the revert would
+call it "already live". The dedupe makes the ordering matter twice, since `postInternalOnce` compares
+message bodies and the same collision described as approved and as pending is two notes. Photographs
+are the other half of "moved a signal" and are not in `signalOf` (typed column values; photo hashes
+are rows in another table): swapping every photograph for somebody else's creates a duplicate while
+every address value stays put.
 
-**A moderator edit does not revert the listing to pending**, and that is the one behavioural
-difference from the owner path. Re-moderation exists so a change made by the owner is seen by a
-moderator before it goes live; here the moderator *is* the change. Reverting would push their own
-correction into their own queue, so fixing a typo in an approved listing would take it off the site
-until somebody re-approved it - and the natural response to that is to stop correcting listings. For
-the same reason the duplicate key is recomputed (so the listing stays findable by a *later* probe)
-but no probe is run: here a human is already looking, and is the one making the change. The
-moderator path is audited, unlike the owner path, because it is a write to a row belonging to
-someone else who will never be told it happened, so "who changed my price" needs an answer that is
-not "nobody knows". It lives in `catalog` rather than `moderation` because the body is
-`ListingUpdate` - every field of `ListingCreate`, made optional - and a second copy of that mapping
-would be a second place for a field to be forgotten.
+**A moderator edit does not revert the listing to pending**, the one difference from the owner path.
+Re-moderation exists so the owner's change is seen by a moderator before going live; here the
+moderator *is* the change, and reverting would take a typo fix off the site until somebody
+re-approved it. For the same reason the duplicate key is recomputed (so the listing stays findable by
+a *later* probe) but no probe is run. The moderator path is audited, unlike the owner path, because it
+writes a row belonging to someone who will never be told, so "who changed my price" needs an answer.
+It lives in `catalog` rather than `moderation` because the body is `ListingUpdate` - every field of
+`ListingCreate`, made optional - and a second copy of that mapping would be a second place for a field
+to be forgotten.
 
 ### 9.4 "Have I already listed this?"
 
-`duplicateCheck` derives its comparison key here, from the address as typed, by the same two calls
-the create path makes: `LocalityResolver.resolve` then the probe's `AddressKey`. That is the point
-of the endpoint existing at all - the client used to compute its own notion of "same property" and
-match it against whatever listings its browser happened to be holding, so it could stop a real owner
-over a demo fixture and then offer to edit an id the server had never issued. Deriving the key on
-the same code path the create will take means the pre-check and the write cannot disagree.
+`duplicateCheck` derives its comparison key from the address as typed, by the same two calls the
+create path makes: `LocalityResolver.resolve` then the probe's `AddressKey`, so the pre-check and the
+write cannot disagree (the client used to match its own notion of "same property" against whatever
+listings its browser held).
 
-The meter goes through the same `MeterKey` normaliser for the same reason, and that also subsumes
-the blank-to-null guard the line used to carry: `= ''` is a match in SQL where `= null` is not, so a
-caller sending an empty meter would otherwise collide with every listing that also had one, and `""`
-has no digits so it keys to null. The read is read-only and writes nothing - the `Property` it
-builds is a scratch value that reaches the derivation and is never persisted.
+The meter goes through the same `MeterKey` normaliser, which also subsumes the blank-to-null guard:
+`= ''` is a match in SQL where `= null` is not, so an empty meter would collide with every listing
+that also had one, and `""` has no digits so it keys to null. The read writes nothing - the `Property`
+it builds is a scratch value that is never persisted.
 
 ### 9.5 Owner lifecycle writes that deliberately do nothing else
 
-`confirmAvailable` stamps `last_confirmed_at = now` and that is the whole write; freshness is
-derived from it on every read, so a dormant owner is back to active the instant they answer with
-nothing to sweep or recompute. It does **not** touch `status` (confirming availability is not a
-moderation event and must not send a live listing back to pending), `recheck_requested_at` (an owner
-saying "still available" says nothing about the price change a moderator is queued to look at, and
-clearing it here would let any owner dismiss their own re-check with one tap), or `archived` (a
-confirmation is not a restore). It writes no audit row either, unlike archive and restore: those are
-contestable - somebody took a listing down and the platform may be asked who - whereas a
-confirmation is self-reported by the only person entitled to report it and its own timestamp is the
-record. An audit row would double the write volume of the single most-repeated owner action on the
-platform to store what the column already says. It is idempotent because the owner cannot see which
-of their listings the badge currently considers stale, and the dashboard's "confirm all" would
-otherwise need to ask.
+`confirmAvailable` stamps `last_confirmed_at = now` and that is the whole write; freshness is derived
+from it on every read. It does **not** touch `status` (not a moderation event; must not send a live
+listing back to pending), `recheck_requested_at` (clearing it would let any owner dismiss their own
+re-check with one tap), or `archived` (not a restore). It writes no audit row, unlike archive and
+restore (contestable): a confirmation is self-reported by the only person entitled to report it and
+its own timestamp is the record, and an audit row would double the write volume of the
+most-repeated owner action. It is idempotent because the owner cannot see which listings the badge
+considers stale, and the dashboard's "confirm all" would otherwise need to ask.
 
-`archive` is soft, because the row is not only the owner's: enquiries, deals and moderation history
-all point at it, and the catalogue already filters on the flag it sets. It is idempotent - archiving
-an archived listing is the state the caller asked for, and a second click on a slow connection
-should not be an error. The reason string is the server's, not the client's: there is one thing the
-route means, and a free-text field would only give a client somewhere to put a string nobody reads
-back.
+`archive` is soft, because enquiries, deals and moderation history all point at the row and the
+catalogue already filters on the flag it sets. It is idempotent (a double click on a slow connection
+is not an error). The reason string is the server's, not the client's.
 
-The owner's delete (`DELETE /me/listings/{id}`) is that archive plus a 30-day clock, and it is
-refused (`409 listing_has_open_work`) while the listing is under offer, an offer waits on the owner,
-a rental/sale confirmation is pending, or a paid service is in progress: deleting would strand
-someone else's money or answer. Pending contact requests come back to their seekers at once, and
-chats about the listing become read-only: an owner who deletes is done with it (renting it out is
-Finalize, not delete). When
-the clock runs out, the nightly `listing-content-purge` job clears the photos (from storage too),
-description, address, amenities and form details, and keeps the row with its locality, price, BHK
-and photo hashes, which is what deals, enquiries and duplicate detection still need. Until then
-only support can restore it; after it, restore is a `409 listing_content_purged`. Staff archiving
-an owner-deleted listing stops the clock, so a listing under review keeps its evidence.
+The owner's delete (`DELETE /me/listings/{id}`) is that archive plus a 30-day clock, and is refused
+(`409 listing_has_open_work`) while the listing is under offer, an offer waits on the owner, a
+rental/sale confirmation is pending, or a paid service is in progress: deleting would strand someone
+else's money or answer. Pending contact requests come back to their seekers at once, and chats about
+the listing become read-only (renting it out is Finalize, not delete). When the clock runs out, the
+nightly `listing-content-purge` job clears the photos (from storage too), description, address,
+amenities and form details, and keeps the row with its locality, price, BHK and photo hashes, which
+deals, enquiries and duplicate detection still need. Until then only support can restore it; after it,
+restore is a `409 listing_content_purged`. Staff archiving an owner-deleted listing stops the clock, so
+a listing under review keeps its evidence.
 
 ### 9.6 Owner pause and resume, and the dashboard around them
 
@@ -686,7 +642,7 @@ moderation decision. Neither writes an audit row: they are the owner's own actio
 - A paused listing is excluded from search and every public discovery surface, but its direct link
   still resolves, so a buyer holding the URL is not sent to a dead page.
 - It does **not** count toward the free-tier ceiling: only `approved` and `flagged` listings occupy a
-  slot (`PropertyStatus.OCCUPIES_LISTING_SLOT`), which is what lets pause free the slot for another
+  slot (`PropertyStatus.OCCUPIES_LISTING_SLOT`), which lets pause free the slot for another
   listing. Resuming re-checks the ceiling, so pausing is a swap rather than a way round the plan.
 - An edit made while paused queues its re-check as usual, and that re-check survives the resume.
 - Resume re-runs duplicate flagging (`ListingDuplicateProbe.flag`), and paused listings are included
@@ -698,7 +654,6 @@ pending or re-check listing a moderation SLA badge (`lib/moderationSla.js`) meas
 listing back to moderation, with `createdAt`, `recheckRequestedAt` and `lastConfirmedAt` retained as
 fallbacks for old rows and stays-live re-checks. On mobile the Post CTA carries the free-listing
 label.
-
 
 ### 9.7 Write-path guards
 
