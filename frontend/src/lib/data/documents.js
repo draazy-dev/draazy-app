@@ -1,3 +1,5 @@
+import { SEARCH_TYPES, canonicalTypeKey, matchTypeKey } from '../../data/propertyTypes.js';
+
 const DOC_CATEGORIES = {
   'Title & Ownership': ['Sale Deed', 'Agreement to Sale', 'Mother Deed / Title Chain', 'Conveyance Deed', 'Index II', '7/12 Extract', '8A Extract', 'Property Card', 'Power of Attorney', 'Encumbrance Certificate', 'Legal Title Search Report'],
   'Society': ['Society Registration Certificate', 'Society NOC', 'Share Certificate', 'Maintenance Receipt'],
@@ -7,6 +9,62 @@ const DOC_CATEGORIES = {
   'Rent Agreement': ['Rent Agreement'],
 };
 export { DOC_CATEGORIES };
+
+const BUILT = ['flat', 'house', 'villa', 'commercial'];
+const LAND = ['plot', 'farmland'];
+const ALL = [...BUILT, ...LAND];
+const SALE = 'sale';
+// Only exists once construction is finished (absent for new-launch / under-construction).
+const DONE = 'done';
+
+const OWNER_DOC_RULES = {
+  'Sale Deed': [ALL, DONE],
+  'Agreement to Sale': [ALL, SALE],
+  'Mother Deed / Title Chain': [ALL, SALE],
+  'Conveyance Deed': [BUILT, SALE, DONE],
+  'Index II': [ALL],
+  '7/12 Extract': [LAND],
+  '8A Extract': [LAND],
+  'Property Card': [['house', 'villa', 'commercial', 'plot']],
+  'Power of Attorney': [ALL],
+  'Encumbrance Certificate': [ALL, SALE],
+  'Legal Title Search Report': [ALL, SALE],
+  'Society Registration Certificate': [BUILT, SALE, DONE],
+  'Society NOC': [BUILT, DONE],
+  'Share Certificate': [BUILT, DONE],
+  'Maintenance Receipt': [BUILT, DONE],
+  'Sanctioned Building Plan': [BUILT, SALE],
+  'Floor Plan': [BUILT],
+  'Commencement Certificate': [BUILT, SALE],
+  'Occupancy Certificate': [BUILT, DONE],
+  'Completion Certificate': [BUILT, SALE, DONE],
+  'RERA Certificate': [[...BUILT, 'plot'], SALE],
+  'NA Order (Non-Agricultural)': [['house', 'villa', 'plot']],
+  'Allotment Letter': [BUILT, SALE],
+  'Possession Letter': [BUILT, SALE, DONE],
+  'Builder Payment Receipts': [BUILT, SALE],
+  'Stamp Duty & Registration Receipt': [ALL, SALE],
+  'Property Valuation Report': [ALL, SALE],
+  'Property Tax Receipt': [[...BUILT, 'plot'], DONE],
+  'Electricity Bill': [BUILT, DONE],
+};
+
+const docTypeKey = (raw) => {
+  const s = String(raw || '').toLowerCase();
+  return canonicalTypeKey(s) || SEARCH_TYPES.find((t) => matchTypeKey(t.key, s))?.key || 'flat';
+};
+
+export function ownerDocCategories(listing) {
+  const type = docTypeKey(listing?.type);
+  const sale = listing?.deal !== 'rent';
+  const done = !['under', 'new'].includes(listing?.construction);
+  return Object.keys(OWNER_DOC_RULES).filter((category) => {
+    const [types, ...flags] = OWNER_DOC_RULES[category];
+    return types.includes(type) && (sale || !flags.includes(SALE)) && (done || !flags.includes(DONE));
+  });
+}
+
+export const offersHomeLoan = (listing) => listing?.deal !== 'rent' && docTypeKey(listing?.type) !== 'farmland';
 
 export const DOC_INFO = {
   'Sale Deed': { title: 'Sale Deed', body: 'The core legal proof that ownership was transferred to you. Registered at the sub-registrar, it is the single most important document a buyer or bank will ask to see.' },
@@ -42,12 +100,6 @@ export const DOC_INFO = {
 
   'Property Tax Receipt': { title: 'Property Tax Receipt', body: 'Shows municipal property tax is paid up to date. Buyers check it to confirm no tax arrears carry over.' },
   'Electricity Bill': { title: 'Electricity Bill', body: 'A recent paid bill doubles as address proof and shows utility dues are clear. Often asked for during KYC and transfers.' },
-
-
-  'Aadhaar Card': { title: 'Aadhaar Card', body: 'Your primary government identity and address proof. Needed for rent agreements, ownership verification and most transactions.' },
-  'PAN Card': { title: 'PAN Card', body: 'Your tax identity. Mandatory for property purchases above set limits, TDS, and any transaction the tax department tracks.' },
-  'Passport Photo': { title: 'Passport Photo', body: 'A recent passport-size photograph required on agreements, registration forms and KYC.' },
-  'Ownership Proof': { title: 'Ownership Proof', body: 'Proof you own the property you are letting out \u2014 the registered Index II, sale deed, or a recent electricity/property-tax bill. Required to register a rent agreement as the licensor.' },
 };
 
 export function docInfo(category) { return DOC_INFO[category] || null; }
@@ -58,10 +110,9 @@ export const HOME_LOAN_CHECKLIST = [
   'Occupancy Certificate', 'RERA Certificate', 'Possession Letter',
 ];
 
-export function checklistFromDocs(docs) {
+export function checklistFromDocs(docs, relevant) {
   const uploadedCategories = new Set((docs || []).map((d) => d.category));
-  const ready = HOME_LOAN_CHECKLIST.filter((c) => uploadedCategories.has(c));
-  return { ready: ready.length, total: HOME_LOAN_CHECKLIST.length, items: HOME_LOAN_CHECKLIST.map((c) => ({ name: c, done: uploadedCategories.has(c) })) };
+  return { items: HOME_LOAN_CHECKLIST.filter((c) => relevant.includes(c)).map((c) => ({ name: c, done: uploadedCategories.has(c) })) };
 }
 
 export function formatSize(bytes) {

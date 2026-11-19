@@ -80,23 +80,4 @@ test.describe('Mobile date & time pickers', () => {
       expect(box.width).toBeGreaterThanOrEqual(viewport.width - 26);
     });
   });
-
-  test('the HRA receipt months pick from a floating card, not the OS month picker', async ({ page, login }) => {
-    await login.asBuyer();
-    await page.goto('/dashboard?tab=documents');
-    await page.getByRole('button', { name: 'Personal', exact: true }).click();
-    await page.getByRole('button', { name: /HRA Rent Receipts/ }).click();
-    const from = page.getByRole('button', { name: /^From month/ });
-    await expect(from).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('input[type="month"]')).toHaveCount(0);
-
-    await from.click();
-    const card = page.locator('.dz-dropdown__menu--portal.is-portal-open');
-    await expectFloatingCard(page, card);
-    const first = card.getByRole('option').first();
-    const label = (await first.innerText()).trim();
-    await first.click();
-    await expect(card).toHaveCount(0);
-    await expect(from).toContainText(label);
-  });
 });

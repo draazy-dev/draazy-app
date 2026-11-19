@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
-import IdInput from '../IdInput.jsx';
 import BadgeRequestCard from './BadgeRequestCard.jsx';
 import RoomBadgeRequestCard from './RoomBadgeRequestCard.jsx';
 import PersonIdBadgeCard from './PersonIdBadgeCard.jsx';
@@ -14,11 +13,9 @@ import Tip from '../ui/Tip.jsx';
 import useAsyncList from '../../hooks/useAsyncList.js';
 import LoadError from '../LoadError.jsx';
 import { fmtINR, timeAgo, avatarFor } from '../../lib/format.js';
-import { formatSize, checklistFromDocs, DOC_CATEGORIES, docInfo } from '../../lib/data/documents.js';
+import { formatSize, checklistFromDocs, DOC_CATEGORIES, docInfo, ownerDocCategories, offersHomeLoan } from '../../lib/data/documents.js';
 import { listDocuments, uploadDocument, deleteDocument, listDocRequests, respondDocRequest, getDocumentUrl } from '../../services/documentService.js';
-import { generateRentReceipts, fyStart, thisMonth } from '../../lib/data/rentReceiptGen.js';
 import { myTenancies, myRentAgreements } from '../../services/rentService.js';
-import { monthLabel, monthOptions } from '../../lib/toolCalc.js';
 import { toRentalCards } from '../../lib/data/tenancy.js';
 import { openDocFrom } from '../../lib/openDoc.js';
 import { DOCUMENT_ACCEPT, DOCUMENT_GUIDANCE_KEY, PDF_GUIDANCE_KEY } from '../../lib/uploads/policy.js';
@@ -31,10 +28,6 @@ const OWNER_GROUPS = [
   { id: 'purchase', titleKey: 'dash.grpPurchase', subKey: 'dash.grpPurchaseSub', icon: 'receipt-indian-rupee', tone: 'teal', cats: DOC_CATEGORIES['Purchase & Payments'] },
   { id: 'tax', titleKey: 'dash.grpTax', subKey: 'dash.grpTaxSub', icon: 'zap', tone: 'amber', cats: DOC_CATEGORIES['Tax & Utilities'] },
 ];
-
-const KYC_GROUP = { id: 'kyc', titleKey: 'dash.grpKyc', subKey: 'dash.grpKycSub', icon: 'fingerprint', tone: 'amber', cats: ['Aadhaar Card', 'PAN Card', 'Passport Photo', 'Ownership Proof'] };
-
-const OWNER_CATS = OWNER_GROUPS.flatMap((g) => g.cats);
 
 const findDoc = (list, category) =>
   (list || []).find((d) => d.category === category) ||
@@ -217,8 +210,7 @@ function VaultSkeleton() {
 }
 
 export default function DocumentsTab({ user, listings, toast, isOwner = false, onRoomBadgeChanged }) {
-  const { t, i18n } = useTranslation();
-  const hraMonths = useMemo(() => monthOptions().map((v) => ({ value: v, label: monthLabel(v, i18n.language) })), [i18n.language]);
+  const { t } = useTranslation();
   const propList = (listings || []).filter((listing) => !!listing.uuid);
   const [rental, setRental] = useState({ tenancies: [], agreements: [], loaded: false });
   useEffect(() => {
@@ -243,14 +235,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
   const agreements = rental.agreements;
   const isTenant = tenancies.length > 0 || (!isOwner && agreements.length > 0);
 
-  const [context, setContext] = useState(isOwner ? 'owner' : 'personal');
-  const contextChosen = useRef(false);
-  useEffect(() => {
-    if (isOwner && !contextChosen.current) setContext('owner');
-  }, [isOwner]);
-  useEffect(() => {
-    if (rental.loaded && !isOwner && isTenant) setContext((c) => (c === 'personal' ? 'tenancy' : c));
-  }, [rental.loaded, isOwner, isTenant]);
+  const [pickedContext, setContext] = useState(null);
   const searchParams = useSearchParams()[0];
   const linkedProp = searchParams.get('prop');
   const linkedRoom = searchParams.get('room') || searchParams.get('group') || searchParams.get('post');
@@ -267,13 +252,14 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
   if (linkedFlatmate && !flatmateOptions.some((o) => o.value === linkedFlatmate)) {
     flatmateOptions.unshift({ value: linkedFlatmate, label: t('dash.roomBadge.roomFallback') });
   }
+  const contexts = [(propList.length > 0 || flatmateOptions.length > 0) && 'owner', isTenant && 'tenancy'].filter(Boolean);
+  const context = contexts.includes(pickedContext) ? pickedContext : contexts[0] || null;
   const appliedRoom = useRef(null);
   const linkedListing = linkedProp ? propList.find((l) => l.id === linkedProp || l.uuid === linkedProp) : null;
-  const [docProp, setDocProp] = useState(linkedFlatmate || linkedListing?.id || propList[0]?.id || 'portfolio');
+  const [docProp, setDocProp] = useState(linkedFlatmate || linkedListing?.id || propList[0]?.id || '');
   useEffect(() => {
     if (linkedFlatmate && appliedRoom.current !== linkedFlatmate) {
       appliedRoom.current = linkedFlatmate;
-      contextChosen.current = true;
       setContext('owner');
       setDocProp(linkedFlatmate);
     }
@@ -290,36 +276,39 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
       return;
     }
     if (!propList.some((l) => l.id === docProp) && !flatmateOptions.some((o) => o.value === docProp)) {
-      setDocProp(propList[0]?.id || proofOptions[0]?.value || 'portfolio');
+      setDocProp(propList[0]?.id || proofOptions[0]?.value || '');
     }
   }, [listings, linkedProp]); // eslint-disable-line react-hooks/exhaustive-deps -- linkedProp derives from listings
   useEffect(() => {
     if (tenancies.length && !tenancies.some((t) => t.propId === tenProp)) setTenProp(tenancies[0].propId);
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps -- initial property follows the signed-in user
-  const [openSections, setOpenSections] = useState({ title: true, kyc: true });
+  const [openSections, setOpenSections] = useState({ title: true });
   const toggle = (key) => setOpenSections((s) => ({ ...s, [key]: !s[key] }));
-  const [hraForm, setHraForm] = useState({ landlordName: '', landlordPan: '', landlordAddr: '', tenantName: user?.name || '', tenantPan: '', fromMonth: fyStart(), toMonth: thisMonth(), rentAmt: '', propertyAddr: '' });
 
   const selectedListing = propList.find((l) => l.id === docProp);
   const [flatmateKind, flatmateId] = flatmateOptions.some((o) => o.value === docProp) ? docProp.split(':') : [];
   const personKind = flatmateId && (flatmateKind === 'post' || (flatmateKind === 'group' && flatmateListings.some((l) => l.id === flatmateId && l.hunting)));
-  const docPropertyId = selectedListing?.uuid || docProp;
-  const activeProp = context === 'owner' ? docPropertyId : 'personal';
+  const docPropertyId = selectedListing?.uuid;
   const mobile = user?.mobile;
-  const ownerVaultEnabled = !!mobile && !!docPropertyId && docPropertyId !== 'portfolio' && !flatmateId;
+  const ownerVaultEnabled = !!mobile && !!docPropertyId;
   const [ownerDocs, ownerStatus, setOwnerDocs, reloadOwner, ownerError] = useAsyncList(
     () => listDocuments(mobile, docPropertyId), [mobile, docPropertyId], ownerVaultEnabled,
   );
-  const [personalDocs, personalStatus, setPersonalDocs, reloadPersonal, personalError] = useAsyncList(
+  const [personalDocs, personalStatus, , reloadPersonal, personalError] = useAsyncList(
     () => listDocuments(mobile, 'personal'), [mobile], !!mobile,
   );
   const [docReqs, reqStatus, setDocReqs, reloadReqs, reqError] = useAsyncList(
     () => listDocRequests(mobile), [mobile], !!mobile,
   );
-  const activePropRef = useRef(activeProp);
-  activePropRef.current = activeProp;
-  const setDocsFor = (prop) => (prop === 'personal' ? setPersonalDocs : setOwnerDocs);
-  const checklist = checklistFromDocs(ownerDocs);
+  const activePropRef = useRef(docPropertyId);
+  activePropRef.current = docPropertyId;
+  const relevantCats = selectedListing ? ownerDocCategories(selectedListing) : [];
+  const uploadedCats = new Set(ownerDocs.map((d) => d.category));
+  const ownerGroups = OWNER_GROUPS
+    .map((g) => ({ ...g, cats: g.cats.filter((c) => relevantCats.includes(c) || uploadedCats.has(c)) }))
+    .filter((g) => g.cats.length > 0);
+  const ownerCats = ownerGroups.flatMap((g) => g.cats);
+  const checklist = offersHomeLoan(selectedListing) ? checklistFromDocs(ownerDocs, relevantCats) : null;
   const propAgreements = agreements.filter((ra) => agreementMatchesProp(ra, docPropertyId, selectedListing));
   const selectedTenancy = tenancies.find((t) => t.propId === tenProp) || tenancies[0];
   const tenancyAgreements = selectedTenancy
@@ -327,12 +316,10 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
     : agreements;
 
   const listingOptions = propList.map((l) => ({ value: l.id, label: l.title + (l.deal === 'rent' ? ` · ${t('dash.dealRent')}` : ` · ${t('dash.dealSale')}`) }));
-  const propOptions = listingOptions.length || flatmateOptions.length
-    ? [...listingOptions, ...flatmateOptions]
-    : [{ value: 'portfolio', label: t('dash.myPortfolio') }];
+  const propOptions = [...listingOptions, ...flatmateOptions];
 
   const uploadForCategory = (category) => {
-    const targetProp = activeProp;
+    const targetProp = docPropertyId;
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = DOCUMENT_ACCEPT;
     inp.onchange = async (e) => {
@@ -341,7 +328,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
       try {
         const created = await uploadDocument(mobile, targetProp, { category, file });
         if (created && activePropRef.current === targetProp) {
-          setDocsFor(targetProp)((prev) => [created, ...prev]);
+          setOwnerDocs((prev) => [created, ...prev]);
         }
         toast(t('dash.uploadedToast', { file: file.name, category }), 'success');
       } catch (error) {
@@ -351,10 +338,10 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
     inp.click();
   };
   const removeDoc = async (id) => {
-    const targetProp = activeProp;
+    const targetProp = docPropertyId;
     try {
       const remaining = await deleteDocument(mobile, targetProp, id);
-      if (activePropRef.current === targetProp) setDocsFor(targetProp)(remaining || []);
+      if (activePropRef.current === targetProp) setOwnerDocs(remaining || []);
       toast(t('dash.docRemovedToast'));
     } catch { toast(t('dash.docRemoveFailedToast'), 'error'); }
   };
@@ -379,21 +366,11 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
   const viewDoc = async (doc) => {
     if (!(await openDocFrom(() => getDocumentUrl(doc.id)))) toast(t('dash.noPreviewToast'));
   };
-  const genHraReceipts = async () => {
-    if (!hraForm.landlordName || !hraForm.tenantName || !hraForm.rentAmt || !hraForm.propertyAddr) { toast(t('dash.fillRequiredToast'), 'error'); return; }
-    try { await generateRentReceipts({ landlordName: hraForm.landlordName, landlordPan: hraForm.landlordPan, landlordAddress: hraForm.landlordAddr, tenantName: hraForm.tenantName, tenantPan: hraForm.tenantPan, fromMonth: hraForm.fromMonth, toMonth: hraForm.toMonth, rentAmount: parseFloat(hraForm.rentAmt), propertyAddress: hraForm.propertyAddr }); toast(t('dash.receiptsDownloaded'), 'success'); } catch { toast(t('dash.receiptsFailed'), 'error'); }
-  };
 
-  const headerDone = context === 'owner' ? countDone(OWNER_CATS, ownerDocs)
-    : context === 'tenancy' ? (tenancyAgreements.length ? 1 : 0)
-    : countDone(KYC_GROUP.cats, personalDocs);
-  const headerTotal = context === 'owner' ? OWNER_CATS.length
-    : context === 'tenancy' ? 1
-    : KYC_GROUP.cats.length;
+  const headerDone = context === 'owner' ? countDone(ownerCats, ownerDocs) : (tenancyAgreements.length ? 1 : 0);
+  const headerTotal = context === 'owner' ? ownerCats.length : 1;
   const pendingReqs = docReqs.filter((r) => r.status === 'pending').length;
-  const vaultStatus = context === 'owner' ? ownerStatus : context === 'personal' ? personalStatus : 'ready';
-  const vaultDocs = context === 'owner' ? ownerDocs : context === 'personal' ? personalDocs : [];
-  const vaultLoading = vaultStatus === 'loading' && vaultDocs.length === 0;
+  const vaultLoading = context === 'owner' && ownerStatus === 'loading' && ownerDocs.length === 0;
 
   return (
     <div className="space-y-5">
@@ -402,7 +379,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
         <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-4">
-              {!(context === 'owner' && flatmateId) && <Ring done={headerDone} total={headerTotal} loading={vaultLoading} size={60} stroke={6} />}
+              {(context === 'owner' ? !!selectedListing : context === 'tenancy') && <Ring done={headerDone} total={headerTotal} loading={vaultLoading} size={60} stroke={6} />}
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Icon name="folder-lock" className="w-5 h-5 text-teal-400" />
@@ -414,7 +391,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
                 </p>
               </div>
             </div>
-            {context !== 'tenancy' && (
+            {context === 'owner' && (
               <ul className="mt-4 space-y-2.5 text-xs leading-relaxed">
                 <li className="flex items-start gap-2 text-gray-400">
                   <Icon name="file-text" className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
@@ -426,14 +403,13 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
                 </li>
               </ul>
             )}
-            {(isOwner || isTenant || flatmateOptions.length > 0) && (
+            {contexts.length > 1 && (
               <div className="inline-flex max-w-full overflow-x-auto mt-4 p-1 rounded-full bg-white/5 border border-white/10">
                 {[
-                  (isOwner || flatmateOptions.length > 0) && ['owner', 'home', 'dash.ctxOwner'],
-                  isTenant && ['tenancy', 'key', 'dash.ctxTenancy'],
-                  ['personal', 'fingerprint', 'dash.ctxPersonal'],
-                ].filter(Boolean).map(([c, ic, labelKey]) => (
-                  <button key={c} onClick={() => { contextChosen.current = true; setContext(c); }} className={'shrink-0 px-4 min-h-11 rounded-full text-xs font-semibold transition inline-flex items-center gap-1.5 ' + (context === c ? 'bg-brand-teal text-ink' : 'text-gray-400 hover:text-white')}>
+                  ['owner', 'home', 'dash.ctxOwner'],
+                  ['tenancy', 'key', 'dash.ctxTenancy'],
+                ].map(([c, ic, labelKey]) => (
+                  <button key={c} onClick={() => setContext(c)} className={'shrink-0 px-4 min-h-11 rounded-full text-xs font-semibold transition inline-flex items-center gap-1.5 ' + (context === c ? 'bg-brand-teal text-ink' : 'text-gray-400 hover:text-white')}>
                     <Icon name={ic} className="w-3.5 h-3.5" /> {t(labelKey)}
                   </button>
                 ))}
@@ -455,6 +431,10 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
         </div>
       </div>
 
+      {rental.loaded && !context && (
+        <p className="glass-card rounded-2xl p-4 sm:p-5 text-gray-400 text-sm">{t('dash.vaultEmpty')}</p>
+      )}
+
       {context === 'owner' && (
         <>
           {flatmateId ? (
@@ -465,7 +445,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
               )}
               {personalStatus === 'error' && <LoadError message={t('dash.vaultLoadError')} error={personalError} onRetry={reloadPersonal} t={t} />}
             </>
-          ) : (
+          ) : selectedListing ? (
             <>
               {ownerStatus === 'error' ? (
               <LoadError message={t('dash.vaultLoadError')} error={ownerError} onRetry={reloadOwner} t={t} />
@@ -473,22 +453,24 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
               <VaultSkeleton />
             ) : (
               <>
-                {selectedListing && ownerStatus === 'ready' ? (
+                {ownerStatus === 'ready' ? (
                   <BadgeRequestCard key={selectedListing.uuid} listing={selectedListing} docs={ownerDocs} onUpload={uploadForCategory} toast={toast} />
                 ) : null}
-                {OWNER_GROUPS.map((g) => (
+                {ownerGroups.map((g) => (
                   <CategoryCard key={g.id} group={g} docs={ownerDocs} open={!!openSections[g.id]} onToggle={toggle} onUpload={uploadForCategory} onRemove={removeDoc} onView={viewDoc} />
                 ))}
               </>
             )}
 
-            <PanelCard id="ownerAgreements" icon="file-signature" tone="teal" title={t('dash.rentAgreement')}
-              sub={selectedListing ? t('dash.agreementForProp', { title: selectedListing.title }) : t('dash.agreementForThis')}
-              badge={propAgreements.length ? pill('bg-teal-500/15 text-teal-300', String(propAgreements.length)) : null}
-              open={!!openSections.ownerAgreements} onToggle={toggle}>
-              <AgreementList ras={propAgreements} ownerView emptyText={t('dash.noAgreementProp')} />
-            </PanelCard>
-            {ownerStatus === 'ready' && (
+            {(selectedListing.deal === 'rent' || propAgreements.length > 0) && (
+              <PanelCard id="ownerAgreements" icon="file-signature" tone="teal" title={t('dash.rentAgreement')}
+                sub={t('dash.agreementForProp', { title: selectedListing.title })}
+                badge={propAgreements.length ? pill('bg-teal-500/15 text-teal-300', String(propAgreements.length)) : null}
+                open={!!openSections.ownerAgreements} onToggle={toggle}>
+                <AgreementList ras={propAgreements} ownerView emptyText={t('dash.noAgreementProp')} />
+              </PanelCard>
+            )}
+            {ownerStatus === 'ready' && checklist?.items.length > 0 && (
               <PanelCard id="checklist" icon="clipboard-list" tone="amber" title={t('dash.loanChecklist')} sub={t('dash.loanChecklistSub')}
                 badge={pill(checklist.items.every((i) => i.done) ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300', `${checklist.items.filter((i) => i.done).length}/${checklist.items.length}`)}
                 open={!!openSections.checklist} onToggle={toggle}>
@@ -503,7 +485,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
               </PanelCard>
             )}
             </>
-          )}
+          ) : null}
 
           {(docReqs.length > 0 || reqStatus === 'error') && (
             <PanelCard id="requests" icon="user-check" tone="teal" title={t('dash.docRequests')} sub={t('dash.docRequestsSub')}
@@ -559,32 +541,6 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
             badge={tenancyAgreements.length ? pill('bg-teal-500/15 text-teal-300', String(tenancyAgreements.length)) : null}
             open={openSections.tenancyAgreement !== false} onToggle={toggle}>
             <AgreementList ras={tenancyAgreements} emptyText={t('dash.noAgreementRental')} />
-          </PanelCard>
-        </>
-      )}
-
-      {context === 'personal' && (
-        <>
-          {personalStatus === 'error' ? (
-            <LoadError message={t('dash.vaultLoadError')} error={personalError} onRetry={reloadPersonal} t={t} />
-          ) : personalStatus === 'loading' && personalDocs.length === 0 ? (
-            <VaultSkeleton />
-          ) : (
-            <CategoryCard group={KYC_GROUP} docs={personalDocs} open={!!openSections.kyc} onToggle={toggle} onUpload={uploadForCategory} onRemove={removeDoc} onView={viewDoc} />
-          )}
-          <PanelCard id="hra" icon="receipt" tone="teal" title={t('dash.hraTitle')} sub={t('dash.hraSub')} open={!!openSections.hra} onToggle={toggle}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.landlordName')} <span className="text-rose-400">*</span></span><input value={hraForm.landlordName} onChange={(e) => setHraForm({ ...hraForm, landlordName: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder={t('dash.landlordNamePh')} /></label>
-              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.landlordPan')}</span><IdInput kind="pan" value={hraForm.landlordPan} onChange={(v) => setHraForm({ ...hraForm, landlordPan: v })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder="ABCDE1234F" /></label>
-              <label className="text-sm col-span-full"><span className="mb-1.5 block text-gray-400">{t('dash.landlordAddr')}</span><input value={hraForm.landlordAddr} onChange={(e) => setHraForm({ ...hraForm, landlordAddr: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder={t('dash.landlordAddrPh')} /></label>
-              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.tenantNameLbl')} <span className="text-rose-400">*</span></span><input value={hraForm.tenantName} onChange={(e) => setHraForm({ ...hraForm, tenantName: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" /></label>
-              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.tenantPan')}</span><IdInput kind="pan" value={hraForm.tenantPan} onChange={(v) => setHraForm({ ...hraForm, tenantPan: v })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder="ABCDE1234F" /></label>
-              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.fromMonth')}</span><Select value={hraForm.fromMonth} options={hraMonths} searchable={false} ariaLabel={t('dash.fromMonth')} onChange={(v) => setHraForm({ ...hraForm, fromMonth: v })} /></label>
-              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.toMonth')}</span><Select value={hraForm.toMonth} options={hraMonths} searchable={false} ariaLabel={t('dash.toMonth')} onChange={(v) => setHraForm({ ...hraForm, toMonth: v })} /></label>
-              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.monthlyRentLbl')} <span className="text-rose-400">*</span></span><input type="number" value={hraForm.rentAmt} onChange={(e) => setHraForm({ ...hraForm, rentAmt: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder="₹" /></label>
-              <label className="text-sm col-span-full"><span className="mb-1.5 block text-gray-400">{t('dash.propertyAddr')} <span className="text-rose-400">*</span></span><input value={hraForm.propertyAddr} onChange={(e) => setHraForm({ ...hraForm, propertyAddr: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder={t('dash.propertyAddrPh')} /></label>
-            </div>
-            <button onClick={genHraReceipts} className="dz-control dz-control--action px-5 gap-2"><Icon name="download" className="w-4 h-4" /> {t('dash.generateReceipts')}</button>
           </PanelCard>
         </>
       )}
