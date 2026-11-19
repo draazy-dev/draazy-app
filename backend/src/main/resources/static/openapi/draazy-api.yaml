@@ -139,10 +139,10 @@ paths:
             while onboarding is closed. It is terminal for that mobile: requesting another code or
             retrying the same one cannot create an account. A caller that already has an account
             must instead sign in with its registered number. `account_suspended` is equally
-            terminal, after a valid OTP. The send step (no `otp`) answers `forbidden` when bot
-            defence is enforced and the `CF-Turnstile-Response` header is missing or rejected;
-            reloading the page for a fresh challenge is the remedy. The verify step is never
-            challenged.
+            terminal, after a valid OTP. The send step (no `otp`) answers `bot_check_failed` when
+            bot defence is enforced and the `CF-Turnstile-Response` header is missing, expired,
+            already spent or rejected; sending again with a fresh challenge token is the remedy. The
+            verify step is never challenged.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -150,6 +150,9 @@ paths:
                 signupsClosed:
                   summary: A verified unknown mobile cannot provision an account
                   value: { error: signups_closed, message: New accounts are closed at the moment, status: 403 }
+                botCheckFailed:
+                  summary: The send step's challenge token was missing or rejected
+                  value: { error: bot_check_failed, message: This request could not be verified as human., status: 403 }
         '422': { $ref: '#/components/responses/ValidationError' }
         '429':
           description: >

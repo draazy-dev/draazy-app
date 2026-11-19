@@ -503,11 +503,32 @@ test('a failed OTP resend supersedes a terminal verification message in the form
   await expect(page.locator('#signin-otp-status')).toHaveText('Too many tries. Wait a minute and try again.');
 });
 
-test('a suspended account is told so, and a bot-check refusal is told to reload, though both are 403s', async ({ page }) => {
+test('a suspended account is told so, a bot-check refusal is told to try again, and any other 403 to reload', async ({ page }) => {
   await test.step('bot defence refuses the send step', async () => {
+    let sends = 0;
+    await page.route('**/api/auth/login', (route) => {
+      sends += 1;
+      return route.fulfill({
+        status: 403, contentType: 'application/json',
+        body: JSON.stringify({ error: 'bot_check_failed', message: 'This request could not be verified as human.', status: 403 }),
+      });
+    });
+    await page.goto('/signin');
+    await page.locator('#signin-mobile').fill(uniqueMobile());
+    const send = page.getByRole('button', { name: /Send OTP/i });
+    await send.click();
+    await expect(page.getByText("Security check didn't finish. Please try again.")).toBeVisible();
+    await expect(page.getByText(/contact support/i)).toHaveCount(0);
+    await expect(send).toBeEnabled();
+    // No site key in e2e, so there is no token to refresh and nothing to auto-retry with.
+    expect(sends).toBe(1);
+  });
+
+  await test.step('an unexplained 403 on the send step is told to reload', async () => {
+    await page.unrouteAll();
     await page.route('**/api/auth/login', (route) => route.fulfill({
       status: 403, contentType: 'application/json',
-      body: JSON.stringify({ error: 'forbidden', message: 'This request could not be verified as human.', status: 403 }),
+      body: JSON.stringify({ error: 'forbidden', message: 'Forbidden', status: 403 }),
     }));
     await page.goto('/signin');
     await page.locator('#signin-mobile').fill(uniqueMobile());

@@ -86,7 +86,7 @@ export default function Signin() {
   const [verifying, setVerifying] = useState(false);
   const [done, setDone] = useState(false);
   const turnstile = useTurnstile();
-  const otp = useOtpFlow((m) => sendOtpSvc({ mobile: m, turnstileToken: turnstile.spend() }));
+  const otp = useOtpFlow((m) => turnstile.withToken((tok) => sendOtpSvc({ mobile: m, turnstileToken: tok })));
   const [verifyError, setVerifyError] = useState(null);
   const otpSpent = verifyError?.terminal === true;
   const otpCanBeRenewed = !otpSpent || verifyError?.resendable === true;
@@ -232,9 +232,9 @@ export default function Signin() {
           </div>
             <p role="alert" id="signin-otp-status" className={otp.otpError || otp.sendError || verifyMessage ? 'text-red-400 text-xs text-center' : 'sr-only'}>{otp.otpError ? t('auth.errOtp') : (otp.sendError ? t(otp.sendError.messageKey, { count: otp.sendError.count }) : verifyMessage)}</p>
 
+          <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
           {!otp.otpSent ? (
             <>
-              <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
               <button type="button" onClick={sendOtp} disabled={otp.sending} className="send-otp-btn w-full h-btn-lg rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2">
                 <Send className="w-4 h-4" /> {otp.sending ? t('auth.sending') : t('auth.sendOtp')}
               </button>

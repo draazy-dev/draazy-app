@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
+const SCRIPT_ID = 'cf-turnstile-script';
+
 export default function TurnstileWidget({
   siteKey = import.meta.env?.VITE_TURNSTILE_SITE_KEY,
   onToken,
@@ -22,6 +24,7 @@ export default function TurnstileWidget({
     }
 
     let active = true;
+    let script = null;
 
     const render = () => {
       if (!active || !containerRef.current || !window.turnstile) return;
@@ -32,7 +35,11 @@ export default function TurnstileWidget({
           theme: 'light',
           size: 'flexible',
           appearance: 'interaction-only',
-          callback: (token) => active && onTokenRef.current?.(token),
+          callback: (token) => {
+            if (!active) return;
+            setFailed(false);
+            onTokenRef.current?.(token);
+          },
           'expired-callback': () => active && onTokenRef.current?.(null),
           'timeout-callback': () => active && onTokenRef.current?.(null),
           'error-callback': () => {
@@ -47,29 +54,35 @@ export default function TurnstileWidget({
       }
     };
 
+    const loadFailed = () => {
+      if (!active) return;
+      setFailed(true);
+      onTokenRef.current?.(null);
+    };
+
     if (window.turnstile) {
       render();
     } else {
-      const SCRIPT_ID = 'cf-turnstile-script';
-      let script = document.getElementById(SCRIPT_ID);
+      script = document.getElementById(SCRIPT_ID);
       if (!script) {
-        script = document.createElement('script');
-        script.id = SCRIPT_ID;
-        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-        script.async = true;
-        script.defer = true;
-        document.head.appendChild(script);
+        const tag = document.createElement('script');
+        tag.id = SCRIPT_ID;
+        tag.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        tag.async = true;
+        tag.defer = true;
+        // A failed tag left in the head would make every later mount wait on a load that never comes.
+        tag.addEventListener('error', () => tag.remove(), { once: true });
+        document.head.appendChild(tag);
+        script = tag;
       }
       script.addEventListener('load', render);
-      script.addEventListener('error', () => {
-        if (!active) return;
-        setFailed(true);
-        onTokenRef.current?.(null);
-      });
+      script.addEventListener('error', loadFailed);
     }
 
     return () => {
       active = false;
+      script?.removeEventListener('load', render);
+      script?.removeEventListener('error', loadFailed);
       if (widgetIdRef.current && window.turnstile?.remove) {
         try {
           window.turnstile.remove(widgetIdRef.current);

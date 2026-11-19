@@ -40,7 +40,7 @@ public class BotDefenceFilter extends OncePerRequestFilter {
             return;
         }
         log.debug("Bot defence refused a challenged write");
-        SecurityErrors.write(response, 403, ErrorCodes.FORBIDDEN, REFUSAL);
+        SecurityErrors.write(response, 403, ErrorCodes.BOT_CHECK_FAILED, REFUSAL);
     }
 
     public static boolean verified(BotDefence defence, HttpServletRequest request) {

@@ -14,6 +14,7 @@ export function classifyOtpSendError(err) {
   if (err?.code === 'signups_closed') return { messageKey: 'auth.errSignupsClosed' };
   if (err?.code === 'account_archived') return { messageKey: 'auth.errAccountArchived' };
   if (err?.code === 'owner_consent_self') return { messageKey: 'auth.errOwnerConsentSelf' };
+  if (err?.code === 'bot_check_failed') return { messageKey: 'auth.errBotCheckFailed' };
   if (err?.status === 429) return busyMessage(err.retryAfterSeconds);
   if (err?.status === 403) return { messageKey: 'auth.errSignInBlocked' };
   if (!err?.status) return { messageKey: 'connectivity.listUnreachable' };

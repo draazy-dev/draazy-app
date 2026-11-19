@@ -130,7 +130,7 @@ class BotDefenceFilterTest {
 
             assertThat(reachedApplication()).isFalse();
             assertThat(response.getStatus()).isEqualTo(403);
-            assertThat(response.getContentAsString()).contains("\"error\":\"forbidden\"");
+            assertThat(response.getContentAsString()).contains("\"error\":\"bot_check_failed\"");
         }
 
         @Test

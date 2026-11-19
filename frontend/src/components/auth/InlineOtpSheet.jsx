@@ -24,7 +24,7 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
   const { login, update } = useAuth();
   const mobile = useMobileInput('');
   const turnstile = useTurnstile();
-  const otp = useOtpFlow((m) => sendOtpSvc({ mobile: m, turnstileToken: turnstile.spend() }));
+  const otp = useOtpFlow((m) => turnstile.withToken((tok) => sendOtpSvc({ mobile: m, turnstileToken: tok })));
   const setMobileValue = mobile.setValue;
   const resetOtp = otp.reset;
   const [mobileErr, setMobileErr] = useState(false);
@@ -202,9 +202,9 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
             {mobileErr ? <p className="text-red-400 text-xs mt-1.5 ml-1">{t('auth.errMobile')}</p> : null}
           </div>
           <p role="alert" id="inline-otp-status" className={status ? 'text-red-400 text-xs text-center' : 'sr-only'}>{status}</p>
+          <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
           {!otp.otpSent ? (
             <>
-              <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
               <p className="text-[11px] leading-relaxed text-gray-500">
                 <Trans
                   i18nKey="auth.inlineOtpTerms"

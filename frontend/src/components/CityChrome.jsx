@@ -107,10 +107,10 @@ function CityModal({ modal, user, onClose, onSubmit }) {
     setErr('');
     setBusy(true);
     try {
-      await onSubmit(
-        { city: target, mobile: mob, email, turnstileToken: turnstile.spend() },
+      await turnstile.withToken((tok) => onSubmit(
+        { city: target, mobile: mob, email, turnstileToken: tok },
         isWaitlist ? `You're on the ${target} waitlist 🎉` : `Thanks! We've noted your request for ${target}`,
-      );
+      ));
     } catch {
       setErr("We couldn't record that just now. Please try again.");
     } finally {

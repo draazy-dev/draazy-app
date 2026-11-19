@@ -3,6 +3,7 @@ package com.draazy.api.provider.turnstile;
 import com.draazy.api.security.BotDefence;
 import java.time.Duration;
 import java.util.Map;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +13,8 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 @Component
@@ -62,12 +65,10 @@ public class TurnstileBotDefence implements BotDefence {
         if (remoteIp != null && !remoteIp.isBlank()) {
             form.add("remoteip", remoteIp);
         }
+        // Without it, a retry after a first call that landed but lost its answer is refused as a reused token.
+        form.add("idempotency_key", UUID.randomUUID().toString());
         try {
-            Map<?, ?> body = http.post()
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(form)
-                    .retrieve()
-                    .body(Map.class);
+            Map<?, ?> body = siteverify(form);
             if (body == null) {
                 log.warn("Turnstile returned an empty body; refusing the request");
                 return false;
@@ -81,5 +82,22 @@ public class TurnstileBotDefence implements BotDefence {
             log.error("Turnstile verification failed; refusing the request", e);
             return false;
         }
+    }
+
+    private Map<?, ?> siteverify(MultiValueMap<String, String> form) {
+        try {
+            return post(form);
+        } catch (ResourceAccessException | HttpServerErrorException e) {
+            log.warn("Turnstile verification call failed ({}); retrying once", e.getMessage());
+            return post(form);
+        }
+    }
+
+    private Map<?, ?> post(MultiValueMap<String, String> form) {
+        return http.post()
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(form)
+                .retrieve()
+                .body(Map.class);
     }
 }

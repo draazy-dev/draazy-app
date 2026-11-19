@@ -127,6 +127,7 @@ export default function Services() {
   const [notify, setNotify] = useState({ name: '', mobile: '' });
   const [notifyErr, setNotifyErr] = useState('');
   const [notified, setNotified] = useState(false);
+  const [notifying, setNotifying] = useState(false);
   const turnstile = useTurnstile();
   useEffect(() => {
     if (isIn) setNotify((n) => ({ name: n.name || user?.name || '', mobile: n.mobile || user?.mobile || '' }));
@@ -222,19 +223,23 @@ export default function Services() {
 
   const submitNotify = async (e) => {
     e.preventDefault();
+    if (notifying) return;
     const mob = (notify.mobile || '').replace(/\D/g, '');
     if (!isValidMobile(mob)) { setNotifyErr(tr('services.hub.notifyMobileErr')); return; }
     setNotifyErr('');
+    setNotifying(true);
     try {
-      await joinServiceWaitlist({
+      await turnstile.withToken((tok) => joinServiceWaitlist({
         service: 'move-in-pack',
         name: notify.name?.trim() || user?.name || '',
         mobile: mob,
-        turnstileToken: turnstile.spend(),
-      });
+        turnstileToken: tok,
+      }));
     } catch {
       setNotifyErr(tr('services.hub.notifyFailed'));
       return;
+    } finally {
+      setNotifying(false);
     }
     setNotified(true);
     toast(tr('services.hub.notifyToast'), 'success');
@@ -434,7 +439,7 @@ export default function Services() {
                       <MobileField value={notify.mobile} onChange={(v) => { setNotify((n) => ({ ...n, mobile: v })); if (notifyErr) setNotifyErr(''); }} error={!!notifyErr} />
                       <FieldError show={!!notifyErr}>{notifyErr}</FieldError>
                       <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
-                      <button type="submit" className="btn-teal w-full py-3 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name="bell" className="w-4 h-4" /> {tr('services.hub.notifyBtn')}</button>
+                      <button type="submit" disabled={notifying} aria-busy={notifying} className="btn-teal w-full py-3 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"><Icon name="bell" className="w-4 h-4" /> {tr('services.hub.notifyBtn')}</button>
                     </form>
                     <p className="text-gray-500 text-[11px] mt-2 text-center">{tr('services.hub.notifyFinePrint')}</p>
                   </>

@@ -1,5 +1,6 @@
 package com.draazy.api.identity.auth;
 
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.UnauthorizedException;
 import com.draazy.api.common.web.Routes;
@@ -45,7 +46,7 @@ public class AuthController {
             HttpServletRequest http) {
         if (!request.hasOtp()) {
             if (!BotDefenceFilter.verified(botDefence, http)) {
-                throw new ForbiddenException(BotDefenceFilter.REFUSAL);
+                throw new ForbiddenException(ErrorCodes.BOT_CHECK_FAILED, BotDefenceFilter.REFUSAL);
             }
             otpIpBudget.enforce(http);
         }

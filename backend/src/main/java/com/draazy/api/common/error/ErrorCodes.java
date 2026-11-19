@@ -10,6 +10,8 @@ public final class ErrorCodes {
 
     public static final String FORBIDDEN = "forbidden";
 
+    public static final String BOT_CHECK_FAILED = "bot_check_failed";
+
     public static final String NOT_FOUND = "not_found";
 
     public static final String CONFLICT = "conflict";
