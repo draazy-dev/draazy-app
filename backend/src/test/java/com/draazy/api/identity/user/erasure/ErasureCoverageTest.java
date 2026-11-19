@@ -121,6 +121,9 @@ class ErasureCoverageTest extends AbstractApiTest {
         map.put("help_article_feedback.comment", Outcome.ROW_REMOVED);
         map.put("help_article_feedback.ip_hash", Outcome.ROW_REMOVED);
 
+        map.put("referral_invites.mobile", Outcome.ROW_REMOVED);
+        map.put("referral_redeem_failures.ip_hash", Outcome.ROW_REMOVED);
+
         map.put("crm_leads.mobile", Outcome.ROW_REMOVED);
         map.put("crm_leads.name", Outcome.ROW_REMOVED);
         map.put("crm_leads.last_contact_at", Outcome.ROW_REMOVED);
@@ -578,6 +581,8 @@ class ErasureCoverageTest extends AbstractApiTest {
                 values (?, '1 BHK Flat in Wakad', 'rent', 'Flat', 18000, 'Wakad', true, 'Erasable Person', ?, 18000)
                 returning id
                 """, UUID.class, admin.getId(), oldMobile);
+        jdbc.update("insert into referral_invites (referrer_id, mobile, delivery) values (?, ?, 'sent')",
+                admin.getId(), oldMobile);
         entityManager.flush();
 
         Map<String, Long> beforeCounts = new LinkedHashMap<>();
@@ -622,6 +627,8 @@ class ErasureCoverageTest extends AbstractApiTest {
                 + " where storage_key = ?", Long.class, PERSONAL_DOC_KEY)).isEqualTo(1L);
         assertThat(jdbc.queryForMap("select tenant_name, tenant_mobile from managed_properties where id = ?",
                 trackedAsTenant).values()).containsOnlyNulls();
+        assertThat(jdbc.queryForObject("select count(*) from referral_invites where mobile = ?",
+                Long.class, oldMobile)).isZero();
 
         Map<String, String> survivors = new LinkedHashMap<>();
         for (Map.Entry<String, Outcome> entry : ERASED.entrySet()) {
@@ -741,6 +748,8 @@ class ErasureCoverageTest extends AbstractApiTest {
             Map.entry("service_request_parties", "mobile = ?"),
             Map.entry("tenant_rentals", "tenant_id = ?"),
             Map.entry("help_article_feedback", "user_id = ?"),
+            Map.entry("referral_invites", "referrer_id = ?"),
+            Map.entry("referral_redeem_failures", "user_id = ?"),
             Map.entry("crm_leads", "user_id = ?"),
             Map.entry("personal_documents", "owner_id = ?"),
             Map.entry("managed_properties", "owner_id = ?"),
@@ -883,6 +892,10 @@ class ErasureCoverageTest extends AbstractApiTest {
                         'Nobody called me back on 9876543210 about the Kothrud flat.', ?),
                        ('create-account', 'mr', true, null, ?)
                 """, subjectId, subjectId);
+        jdbc.update("insert into referral_invites (referrer_id, mobile, delivery) values (?, '9123456781', 'sent')",
+                subjectId);
+        jdbc.update("insert into referral_redeem_failures (user_id, ip_hash) values (?, 'erasure-seed-ip-digest')",
+                subjectId);
         jdbc.update("""
                 insert into crm_leads (mobile, user_id, name, last_contact_at)
                 values (?, ?, 'Erasable Person', now())

@@ -229,6 +229,17 @@ public class ErasureService {
                 .setParameter("id", subjectId)
                 .executeUpdate());
 
+        erased.put("referral_invites", entityManager
+                .createNativeQuery("delete from referral_invites where referrer_id = :id or mobile = :mobile")
+                .setParameter("id", subjectId)
+                .setParameter("mobile", MobileMask.normalise(oldMobile))
+                .executeUpdate());
+
+        erased.put("referral_redeem_failures", entityManager
+                .createNativeQuery("delete from referral_redeem_failures where user_id = :id")
+                .setParameter("id", subjectId)
+                .executeUpdate());
+
         erased.put("crm_leads", entityManager
                 .createNativeQuery("delete from crm_leads where user_id = :id or mobile = :mobile")
                 .setParameter("id", subjectId)
