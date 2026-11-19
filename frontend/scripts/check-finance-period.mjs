@@ -86,7 +86,6 @@ const rel = (p) => relative(SRC, p).replace(/\\/g, '/');
 const KNOWN_FY_PIVOTS = [
   'lib/data/finances.js',
   'lib/data/tenantFinance.js',
-  'lib/data/rentReceiptGen.js',
 ];
 
 const fyPivots = [];

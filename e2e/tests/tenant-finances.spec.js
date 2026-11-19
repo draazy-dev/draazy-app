@@ -96,6 +96,7 @@ test.describe('Rent Wallet — live', () => {
         await page.locator('input[type="number"]').first().fill('600000');
         await expect(page.getByText('HRA exemption (Section 10(13A))')).toBeVisible();
         await expect(page.getByText('Estimated tax you save')).toBeVisible();
+        await expect(page.getByRole('link', { name: 'Make rent receipts' })).toHaveAttribute('href', '/tools/rent-receipt-generator');
       });
 
       await test.step('the rental can be edited from the wallet itself', async () => {

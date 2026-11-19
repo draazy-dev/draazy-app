@@ -252,6 +252,7 @@ export default function TenantFinancesTab({ user, toast }) {
           ) : (
             <p className="text-gray-500 text-sm">{t('wallet.addSalaryPrompt')}</p>
           )}
+          <Link to="/tools/rent-receipt-generator" className="dz-control dz-control--ghost px-3 text-xs gap-1.5 mt-4"><Icon name="receipt" className="w-4 h-4" /> {t('wallet.makeReceipts')}</Link>
         </Card>
 
         <Card className="p-6">
