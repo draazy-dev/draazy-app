@@ -4,7 +4,7 @@ slug: invoices-and-refunds
 category: payments
 audience: everyone
 order: 2
-updated: 2026-11-06
+updated: 2026-11-19
 summary: Where to find your invoices, what is refundable, and how long a refund takes.
 tags: [invoice, refund, billing, receipt]
 ---
@@ -30,14 +30,14 @@ The binding terms are in the [Refund Policy](/refund-policy). In summary:
 | Situation | Refundable |
 | --- | --- |
 | Contact Pack, none of its contacts used, within 7 days of buying | Full |
-| Listing Pass whose listing got no enquiries in its first 7 live days (once every 12 months) | Full |
+| Listing Pass whose listing stayed live and got no enquiries in its first 7 live days, asked for in the 7 days after (once every 12 months) | Full |
 | Pack with a contact used, or pass that got enquiries | Not refundable |
 | Pass, after the listing is rented, sold or archived | Unused days are not refunded |
 | Rent agreement, before the stamp duty is paid on GRAS | Refundable up to what you paid |
 | Rent agreement, after the stamp duty is paid | Government charges are spent; only eligible service-fee or overpayment refunds can come back |
-| Duplicate or failed-but-charged payment | Refunded automatically |
+| Duplicate, wrong-amount or failed-but-charged payment | Refunded automatically |
 
-The windows above are the current settings; the [Refund Policy](/refund-policy) always shows the live numbers. Pausing a listing during its pass's guarantee window ends the guarantee, so keep it live if you plan to ask. Every refund needs a second team member's approval before it is paid.
+The windows above are the current settings; the [Refund Policy](/refund-policy) always shows the live numbers. Pausing a listing during its pass's guarantee window ends the guarantee, so keep it live if you plan to ask.
 
 A contact that an owner declines, or that gets no reply in 7 days, is returned to your allowance automatically — that is not a refund, so you do not need to ask.
 
@@ -53,6 +53,8 @@ Open **Dashboard → Plan & Billing**. If a pass or pack qualifies, its row show
 
 If a row does not qualify, it says why. Think it should? Tap **Ask for a review** — it opens a chat with Draazy support in Messages with that invoice already picked. Mention the amount and date if the charge does not appear in your billing history.
 
+For a rent agreement, tap **Message support** on its tracker; see [The rent agreement service](/help/a/rent-agreement-service).
+
 A chargeback with your bank pauses only that purchase, never your account — but contacting us first is usually faster.
 
 ## A charge you do not recognise
@@ -61,7 +63,7 @@ Check **Dashboard → Plan & Billing** first — the descriptor on your statemen
 
 ## Rent receipts
 
-Rent does not move through Draazy yet, so Draazy does not issue rent receipts for rent you pay your landlord. If your landlord tracks your rent as a [managed home](/help/a/managed-homes), each month they confirm produces a receipt PDF on your **Rental** tab. Otherwise use **Dashboard → Documents → HRA Rent Receipts**, or record what you pay in the Rent Wallet under **Dashboard → Finances**. See [Paying rent online](/help/a/paying-rent-online).
+Rent does not move through Draazy yet, so Draazy does not issue rent receipts for rent you pay your landlord. If your landlord tracks your rent as a [managed home](/help/a/managed-homes), each month they confirm produces a receipt PDF on your **Rental** tab. Otherwise use the [rent receipt generator](/tools/rent-receipt-generator) (linked from **Dashboard → Finances**), or record what you pay in the Rent Wallet under **Dashboard → Finances**. See [Paying rent online](/help/a/paying-rent-online).
 
 ## Related
 

@@ -5,7 +5,7 @@ category: trust-safety
 audience: everyone
 order: 1
 featured: true
-updated: 2026-11-06
+updated: 2026-11-19
 summary: The two verification badges, KYC done and Verified property, what each proves and what it does not.
 tags: [verification, trust, kyc, badge, rera, ownership]
 ---
@@ -28,7 +28,7 @@ Start verification from **Verify identity** on your [Profile tab](/help/a/manage
 ### Identity
 
 - Mobile number verified by OTP
-- A government ID (Aadhaar, PAN, driving licence or passport) captured with the camera alongside a live selfie, then read by a trained reviewer on our team. No badge is ever granted by software; the only other route is a staff member granting it by hand, and every such grant is recorded in an audit trail.
+- A government ID (Aadhaar, PAN, driving licence or passport) captured with the camera alongside a live selfie, then reviewed by a person on our team. No badge is ever granted automatically.
 - An ID document that is already verified on another account is refused
 - ID images are deleted 7 days after the decision. See [Your data and privacy](/help/a/your-data-privacy)
 

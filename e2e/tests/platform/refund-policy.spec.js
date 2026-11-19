@@ -14,7 +14,7 @@ test.describe('LIVE: the Refund Policy page', () => {
 
     await page.goto('/refund-policy');
     await expect(page.getByRole('heading', { level: 1, name: 'Refund Policy' })).toBeVisible();
-    await expect(page.getByText('12 October 2026').first()).toBeVisible();
+    await expect(page.getByText('19 November 2026').first()).toBeVisible();
 
     const headings = await prose(page).getByRole('heading', { level: 2 }).allTextContents();
     expect(headings.map((h) => h.replace(/^\d+\.\s*/, ''))).toEqual([
@@ -34,6 +34,8 @@ test.describe('LIVE: the Refund Policy page', () => {
     expect(text, 'the 25% and 50% tiers are gone').not.toMatch(/\b(25|50)\s?%/);
     expect(text, 'a chargeback no longer suspends the account').not.toMatch(/suspen/i);
     expect(text).toContain('Your account, your other listings and your contacts keep working');
+    expect(text).toContain('tap Message support on its tracker');
+    expect(text, 'internal approval steps stay off the public page').not.toMatch(/\b(manager|admin|second member)\b/i);
 
     expect(consoleErrors).toEqual([]);
   });

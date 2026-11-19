@@ -5,7 +5,7 @@ category: services
 audience: everyone
 order: 1
 featured: true
-updated: 2026-11-06
+updated: 2026-11-19
 summary: Start, co-fill, pay, track, approve and register a Maharashtra rent agreement, then renew it, with costs, corrections and refunds explained.
 tags: [rent agreement, e-stamp, service, legal, co-fill, renewal, refund]
 ---
@@ -144,14 +144,14 @@ Renewing starts a new agreement with the property, parties, rent, deposit, term 
 
 ## 50% off from a referral
 
-When a friend you invited gets going, you earn 50% off the Draazy service fee of your next rent agreement. It shows at checkout when you are the one paying. Stamp duty, registration fee and other government charges are not discounted. One reward works on one agreement, and rewards do not expire. Your dashboard Billing shows how many rewards you have left. If you cancel that request, the reward comes back. See [Referrals and rewards](/help/a/referrals-and-rewards).
+When a friend you invited gets going, you earn 50% off the Draazy service fee of your next rent agreement. You can use it once you and your friend have both done KYC. It comes off by itself at checkout when you are the one paying; there is no code to enter. Stamp duty, registration fee and other government charges are not discounted. One reward works on one agreement, and rewards do not expire. Your dashboard Billing shows how many rewards you have left. If you cancel that request, the reward comes back. See [Referrals and rewards](/help/a/referrals-and-rewards).
 
 ## Cancel and refunds
 
 - While a request is unpaid, tap **Cancel request** (tap again to confirm) on the tracker. A cancelled request can be deleted.
 - Everything you paid is refundable until the stamp duty is paid on GRAS. After that, the duty and registration charges are spent, and only the service fee or any overpayment above the quoted government charges can come back.
 - Ask support for the refund with **Message support**. The money returns through the payment you used, to whoever paid. You also get a credit note.
-- If everything you paid is refunded, including when our team does it, the request is cancelled.
+- If everything you paid is refunded, the request is cancelled.
 
 See [Invoices, refunds and receipts](/help/a/invoices-and-refunds).
 

@@ -58,7 +58,7 @@ export const COMPARE_NOBROKER = {
         src: ['tenant', 'owner', 'terms'],
       },
       draazy: {
-        text: 'Only three things cost money: a Contact Pack, a Listing Pass for each extra live listing, and a rent agreement. None renews by itself. A pass or pack with no premium feature used can be refunded in full within 7 days of purchase.',
+        text: 'Only three things cost money: a Contact Pack, a Listing Pass for each extra live listing, and a rent agreement. None renews by itself. An unused Contact Pack can be refunded in full within 7 days, and a Listing Pass whose listing gets no enquiries in its first 7 live days is refunded in full.',
         link: ['Read the refund policy', '/refund-policy'],
       },
     },

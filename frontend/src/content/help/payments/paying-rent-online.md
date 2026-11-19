@@ -4,7 +4,7 @@ slug: paying-rent-online
 category: payments
 audience: tenant
 order: 3
-updated: 2026-11-06
+updated: 2026-11-19
 summary: Paying rent through Draazy is coming soon. Until then, track what you pay in your Rent Wallet, see your HRA saving, and generate rent receipts.
 tags: [rent, payment, hra, receipt, upi, rent wallet]
 ---
@@ -26,7 +26,7 @@ These figures are **your own record**. Draazy has not seen this money move and d
 
 ### If your landlord tracks rent on Draazy
 
-When your landlord tracks your home's rent as a [managed home](/help/a/managed-homes), the **Rental** tab shows your monthly rent, its status and the lease dates. Tap **I paid** after you pay, and your landlord confirms it with **Mark received** or "Confirm received". Each confirmed month produces a receipt PDF you can download, and receipts for a financial year can be downloaded together.
+When your landlord tracks your home's rent as a [managed home](/help/a/managed-homes), the **Rental** tab shows your monthly rent, its status and the lease dates. Tap **I've paid** after you pay, and your landlord confirms it with **Mark received** or "Confirm received". Each confirmed month produces a receipt PDF you can download, and receipts for a financial year can be downloaded together.
 
 ## What it is not
 
@@ -40,7 +40,7 @@ If the landlord will not share their PAN, you can still claim by filing Form 60 
 
 ## Receipts for your employer
 
-Ask your landlord for a signed receipt, or use the format your employer supplies. **Dashboard → Documents → HRA Rent Receipts** generates monthly receipt PDFs from the landlord, tenant and rent details you type in (names, PANs, address, from and to month, monthly rent), ready for your landlord to sign. The Rent Wallet's yearly total tells you what the receipts should add up to, which is the usual thing people get wrong.
+Ask your landlord for a signed receipt, or use the format your employer supplies. The free [rent receipt generator](/tools/rent-receipt-generator), also linked from **Dashboard → Finances**, prints monthly receipts from the names, address, rent and months you type in, ready for your landlord to sign. The Rent Wallet's yearly total tells you what the receipts should add up to, which is the usual thing people get wrong.
 
 ## Related
 

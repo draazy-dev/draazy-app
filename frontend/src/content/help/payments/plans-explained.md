@@ -52,7 +52,7 @@ The free account includes 15 owner contacts, usable within 30 days of your first
 
 ## Saving money by inviting friends
 
-Invite a friend on the [Refer a friend](/refer) page. When your friend gets going, you get 50% off the Draazy service fee of your next rent agreement. Stamp duty and registration charges are not discounted. Your friend gets a welcome gift too. Some rewards are checked for a few days first. See [Referrals and rewards](/help/a/referrals-and-rewards).
+Invite a friend on the [Refer a friend](/refer) page. When your friend gets going, you get 50% off the Draazy service fee of your next rent agreement. You can use it once you and your friend have both done KYC. Stamp duty and registration charges are not discounted. Your friend gets a welcome gift too. Some rewards are checked for a few days first. See [Referrals and rewards](/help/a/referrals-and-rewards).
 
 ## Billing
 

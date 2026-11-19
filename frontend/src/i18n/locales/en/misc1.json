@@ -89,7 +89,7 @@
     "plansListingPassFeat4": "No auto-renewal",
     "plansListingPassCta": "Open My Listings",
     "plansFaq1Q": "How do owner contacts work?",
-    "plansFaq1A": "Each contact is a request you send to an owner. Once they approve it, you see their phone number and reach out directly — no broker in between. You get 15 free contacts to use within 30 days of your first one, each friend you refer who qualifies adds 15 more, and packs add more: a Rent Contact Pack ({{rentFee}}, {{rentCount}} contacts, {{rentDays}} days) works on rent listings, a Buy Contact Pack ({{buyFee}}, {{buyCount}} contacts, {{buyDays}} days) on sale listings.",
+    "plansFaq1A": "Each contact is a request you send to an owner. Once they approve it, you see their phone number and reach out directly — no broker in between. You get 15 free contacts to use within 30 days of your first one, a friend who joins with your invite gets extra free contacts, and packs add more: a Rent Contact Pack ({{rentFee}}, {{rentCount}} contacts, {{rentDays}} days) works on rent listings, a Buy Contact Pack ({{buyFee}}, {{buyCount}} contacts, {{buyDays}} days) on sale listings.",
     "plansFaq2Q": "Does anything renew automatically?",
     "plansFaq2A": "No. Contact Packs, Listing Passes and rent agreements are one-time payments. Nothing auto-renews — you pay only when you choose to.",
     "plansFaq3Q": "Is there really no brokerage?",
