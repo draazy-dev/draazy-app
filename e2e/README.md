@@ -22,8 +22,8 @@ environments or CI runners.
 
 ## Fast runs: `run-fast.ps1`
 
-The serial suite takes ~45 minutes, which is the wrong price for checking a one-file fix. The
-runner has two modes, and the second one stays the gate before a commit.
+The serial suite takes ~45 minutes, too slow for a one-file fix. The runner has two modes; `-Full`
+stays the gate before a commit.
 
 | Command | What it runs |
 |---|---|
@@ -50,13 +50,13 @@ navigation and calls made by reflection or events, which is why `-Full` is the c
 (created on first use, reset by `globalSetup` each run) and storage dir. They never touch the lane
 ports or databases a concurrent session uses. Spec files are dealt to shards by the time they took
 last run (`.shards/durations.json`, updated after every run), longest first, to whichever shard has
-the least work. Playwright's own `--shard` splits by test count, and one shard of wizard specs then
-takes hours longer than the rest. The backend is built once into `backend/target-shard`
+the least work (Playwright's own `--shard` splits by test count, so one shard of wizard specs takes
+hours longer than the rest). The backend is built once into `backend/target-shard`
 and rebuilt only when anything under `backend/src/main` or `pom.xml` changes (path, size or time). JVMs stay up between runs, so later
 runs skip the boot, and a JVM on an old build is restarted automatically. Each shard runs with one
-worker, just as the serial suite does, so specs that share seeded fixtures are never run
-concurrently against the same database. With more than one shard, each test runs about 1.45x slower,
-so the default test and `expect` timeouts are doubled (`E2E_TIMEOUT_SCALE=2`). Without that, some
+worker, as the serial suite does, so specs that share seeded fixtures never run
+concurrently against the same database. With more than one shard each test runs about 1.45x slower,
+so the default test and `expect` timeouts are doubled (`E2E_TIMEOUT_SCALE=2`); otherwise some
 60-second tests that pass serially time out. Timeouts a spec sets itself are unchanged.
 
 A run passes only when no test fails, no error is raised outside a test, every Playwright process
@@ -77,15 +77,12 @@ A signed-in page opens the `/api/messages/stream` SSE stream ~1 s after load, so
 (`gotoSettled`, `reloadSettled`, `settle`), which waits for the same 500 ms quiet window but ignores
 event streams. Output goes to
 `.shards/` (git-ignored): `html/` (merged report, `npx playwright show-report .shards\html`),
-`report.json`, per-shard logs `shard-<i>.log`, and `last-failed.txt`. JVM logs are in
-`%TEMP%\draazy-shard-<i>.log`.
+`report.json`, per-shard logs `shard-<i>.log`, and `last-failed.txt`. JVM logs: `%TEMP%\draazy-shard-<i>.log`.
 
 ## Two configs
 
-Until the mock provider was deleted there were two suites, and the default was the mock one — it
-had to pass with no backend running, because that is how the UI was developed and demoed. There is
-one data provider now, so a suite that avoids the server is not a safer default, it is one that
-cannot assert anything about the product. The files swapped names.
+There is one data provider now (the mock was deleted), so a suite that avoids the server cannot
+assert anything about the product; the live suite is the default.
 
 | Config | What it is |
 |---|---|
@@ -94,8 +91,7 @@ cannot assert anything about the product. The files swapped names.
 
 > **`npm test` resets a database.** `globalSetup` drops and reseeds `E2E_DB_NAME`, which defaults
 > to the shared `draazy_e2e` lane, so a bare run wipes whichever database a concurrent session is
-> using. This was tolerable while the live config was opt-in; as the default it is a footgun worth
-> naming. Prefer the lane scripts — `run-live-flatmates.ps1`, `run-live-admin.ps1`,
+> using. Prefer the lane scripts — `run-live-flatmates.ps1`, `run-live-admin.ps1`,
 > `run-live-services.ps1` — which pin the port, the database and the app URL together. If you run
 > specs directly alongside another lane, set `E2E_DB_NAME` yourself.
 
@@ -151,9 +147,8 @@ everything else is desktop-only unless a config opts it into a second viewport.
   `home-flatmates-tile`, whose fold and wrapping checks differ at 412×915, plus an explicit
   cross-viewport `testMatch` list (`referral-rewards`, `help/centre`, `help/help-urls`, `platform/i18n`).
 - **No-backend config** — one `chromium` project. Its `CROSS_VIEWPORT` list and `mobile` project
-  are gone: every entry had been *moved* to the live config as its spec converted, exactly as the
-  rule required, and the list emptied itself. `testMatch: []` matches nothing, so that project was
-  running zero specs and reporting a clean result for them.
+  are gone: every entry was *moved* to the live config as its spec converted, and `testMatch: []`
+  matches nothing (zero specs, a falsely clean result).
 
 Adding a spec to the live config's cross-viewport list doubles its runtime, so do it only when the
 spec asserts something genuinely viewport-dependent — and when such a spec moves, **move** its
@@ -169,9 +164,8 @@ Two things that make a cross-viewport spec fail on a phone against *correct* cod
 
 ## Layout
 
-Specs are grouped **audience → feature area**, mirroring `COVERAGE.md`. A spec's
-folder is its route into a viewport project, so putting a file in the right place
-is a functional decision, not just tidiness.
+Specs are grouped **audience → feature area**, mirroring `COVERAGE.md`. A spec's folder routes it
+into a viewport project, so placement is functional.
 
 ```
 e2e/
@@ -236,7 +230,7 @@ Conventions:
 
 ## Four things that fail a spec against correct code
 
-Each of these cost a debugging round; `COVERAGE.md` records the rest.
+`COVERAGE.md` records the rest.
 
 - **Scroll-reveal sections.** `.reveal` blocks sit at `opacity: 0` until observed,
   so Playwright calls them invisible — and `scrollIntoViewIfNeeded()` deadlocks,
