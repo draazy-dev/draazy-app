@@ -180,7 +180,7 @@
 
 **Pattern Name:** Hero-Centric Design
 
-- **Conversion Strategy:** One primary CTA. Let the hero dominate the initial viewport without hiding the next content cue. Use a static hero and non-pulsing CTA when reduced motion is requested; provide video controls. Pause hero media offscreen/hidden and keep the final hero message and CTA static under reduced motion.
+- **Conversion Strategy:** One primary CTA. Let the hero dominate the initial viewport without hiding the next content cue. Under reduced motion: static hero, non-pulsing CTA, static final hero message and CTA. Provide video controls; pause hero media offscreen/hidden.
 - **CTA Placement:** Hero dominant (center/bottom) + Sticky nav CTA
 - **Section Order:** Full-bleed Hero (headline + visual) > Single value prop strip > Key benefit or proof > Primary CTA
 
@@ -206,12 +206,8 @@
 
 Before delivering any UI code, verify:
 
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
-- [ ] `cursor-pointer` on all clickable elements
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode: text contrast 4.5:1 minimum
-- [ ] Focus states visible for keyboard navigation
+- [ ] None of the Additional Forbidden Patterns above (emoji icons, missing `cursor-pointer`, layout-shifting hovers, contrast under 4.5:1, instant state changes, invisible focus)
+- [ ] All icons from one consistent set (Heroicons/Lucide)
 - [ ] `prefers-reduced-motion` respected
 - [ ] Responsive: 375px, 768px, 1024px, 1440px
 - [ ] No content hidden behind fixed navbars

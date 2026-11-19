@@ -1,7 +1,7 @@
 # Decisions
 
 Open questions and the standing rulings that stop them being asked again. One row each.
-A decision that was simply built leaves no row: git holds it. Link a number from `todo.md`; never restate it.
+A decision that was simply built leaves no row (git holds it). Link a number from `todo.md`; never restate it.
 
 ## Open
 

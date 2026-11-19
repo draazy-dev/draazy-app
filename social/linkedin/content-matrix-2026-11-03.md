@@ -38,3 +38,10 @@ That's what we're building Draazy around: you talk straight to the owner, and yo
 We're not live yet. If you've rented in Pune, which of these hit you hardest? Or did we miss one?
 
 #Pune #PuneRentals #ZeroBrokerage #RealEstate
+
+## Published log
+
+- 2026-11-02: launch teaser (text)
+- 2026-11-03: Building Draazy in public × Observation (text, above)
+- 2026-11-05: 7 questions before paying token money (document)
+- 2026-11-18: Building Draazy in public × Present vs Future, "we're in testing" holistic update: buy, sell, rent, all property types, services (text)

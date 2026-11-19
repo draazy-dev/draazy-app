@@ -10,6 +10,16 @@ Read by every `ig-*` skill. Brand account, not a person.
 - **Who we talk to:** People in Pune hunting for a flat or a flatmate, mostly 21-35, many new to the city for a job (Hinjewadi, Kharadi, Magarpatta, Baner, Wakad, Viman Nagar). Second audience: owners who want to list without brokers.
 - **What we sell:** Owner listings with zero brokerage, flatmate matching, rent agreements (drafting, stamp duty, doorstep biometrics, renewal reminder and one-tap renewal).
 
+## Positioning (use everywhere, never call us a "rentals platform")
+
+- **One line:** Draazy is a broker-free property platform for Pune. Buy, sell or rent straight from owners, find a flatmate, and get the paperwork and the move sorted in one place.
+- **Deals:** buy, sell and rent, for every property type below.
+- **Property types:** flats and apartments, independent and row houses, villas, open plots, farm land, and commercial spaces (offices, co-working, shops and showrooms, retail and mall units, warehouses and godowns, industrial and factory units).
+- **Services we're building around the deal:** rent agreements (drafting, e-registration, stamp duty, doorstep biometrics, renewal), home loans with partner banks, property legal checks (title, due diligence, registration help), property valuation, packers and movers, interiors and renovation, and locality insights (price trends, livability, connectivity).
+- **Free tools:** stamp duty, rent agreement cost, EMI, legal cost, rental yield, rent receipts.
+- **Disclosure line for Reddit:** "(Full disclosure, I'm part of a small team building Draazy, a broker-free property platform for Pune: buy, rent or sell straight from owners, plus flatmates and rent agreements. Not live yet, just here learning what people struggle with 🙂)"
+- Pre-launch: say "building", "coming" or "in testing", never "live" or "available".
+
 ## What we sound like
 
 - **Tone:** a sharp Pune friend who has been through the flat hunt. Dry about the pain, never sad or whiny, upbeat about the fix.

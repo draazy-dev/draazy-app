@@ -5,269 +5,261 @@
 
 ## Crawling external sources
 
-- **A 200 saying "No Records Found" is a failure** (MahaRERA answers overload with a short shell, not a 5xx). Detect on the body, never the status.
-- **Mark work done only when it produced rows**; stamp each row with its source page so gaps are provable (empty "done" pages were skipped forever on resume).
+- **A 200 saying "No Records Found" is a failure** (MahaRERA overload returns a short shell, not a 5xx): detect on the body.
+- **Mark work done only when it produced rows**; stamp each row with its source page so gaps are provable.
 
 ## Upload policy
 
-- **PDF compression is part of the document flow** (`pdf.worker.js`): digitally signed PDFs are unsupported, so ask for unsigned copies; never call rasterizing lossless or promise every file fits 1 MB.
+- **PDF compression is part of the document flow** (`pdf.worker.js`): signed PDFs are unsupported (ask for unsigned); never call rasterizing lossless or promise every file fits 1 MB.
 
 ## Tests: what green does not prove
 
-- **`mvnw test -Dtest=A+B` runs zero tests and reports BUILD SUCCESS** (surefire 3.5). Separate classes with commas, and check "Tests run:" is non-zero.
-- **A green build does not prove a new prop is passed.** When adding a prop, grep every `<Component` call site; Vite builds clean and crashes at runtime.
-- **A spec never executed is a claim, not coverage.** The first full run found six broken specs, none a product bug.
-- **A run longer than the token TTL is a different experiment**: a session replayed past 15 min presents a rotated refresh token and reuse detection revokes the family.
-- **A spec that mutates a seeded actor breaks the next spec's premise** (DB resets once per run, not per file). Restore shared seed data.
-- **Before enriching a shared seed row, grep who depends on it being bare**; a fixture that reads richer is often wrong. Select fixtures by the fields asserted, never `rows[0]`.
+- **`mvnw test -Dtest=A+B` runs zero tests and reports BUILD SUCCESS**: use commas, check "Tests run:" is non-zero; with `-DfailIfNoTests=false` a typo still exits 1.
+- **A green build does not prove a new prop is passed**: grep every `<Component` call site (Vite builds clean, crashes at runtime).
+- **A spec never executed is a claim, not coverage.**
+- **A run longer than the token TTL is a different experiment**: past 15 min a replayed refresh token trips reuse detection.
+- **A spec mutating a seeded actor breaks the next spec** (DB resets per run, not per file): restore shared seed data.
+- **Before enriching a shared seed row, grep who relies on it being bare**; select fixtures by the fields asserted, never `rows[0]`.
 - **A `@Transactional` test base cannot see commit-time bugs, missing transactions or fetches**: wiring needs a bare `@SpringBootTest`.
-- **A `@Transactional` MockMvc test cannot prove a REJECTED write did not persist** (follow-up read auto-flushes it); assert the status and say why the read is absent.
-- **Arrange fixtures through the product's endpoint, never raw SQL on rows the transaction already loaded** (`jdbc.update` after MockMvc gave a 409 from the gate under test).
+- **A `@Transactional` MockMvc test cannot prove a REJECTED write did not persist** (the follow-up read auto-flushes): assert the status, say why the read is absent.
+- **Arrange fixtures through the product's endpoint, not raw SQL on rows the transaction already loaded.**
 - **Grep the application log after a green run**: sweeps, schedulers and listeners fail silently.
-- **Prove a regression test fails on old code** (`git show HEAD:<path>`, or `if (false)` the guard); a test passing via a side effect of the fix is not a regression test.
-- **Before editing a red assertion, say whether the test or the product is wrong**; one in five was a real regression.
-- **A checklist row is Pass only if a check did what the row says**: a count of green mobile specs that never opened the admin drawer is not "menus work on a phone". Drive each layout shell by hand.
-- **A gate that now refuses what it allowed has callers the old looseness served** (`PATCH /status → approved` re-listing a fallen-through sale got 409); enumerate them first.
+- **Prove a regression test fails on old code** (`git show HEAD:<path>` or `if (false)` the guard).
+- **Before editing a red assertion, say whether the test or the product is wrong** (one in five was a real regression). If the product changed the rule on purpose, confirm it in the service, then fix the spec — never loosen the product.
+- **A checklist row is Pass only if a check did what the row says**; drive each layout shell by hand.
+- **A gate that now refuses what it allowed has callers the old looseness served**: enumerate them first.
 
 ## Assertions that assert nothing
 
-- **`toBeVisible()` passes on `opacity: 0`, and e2e runs reduced-motion, which forces `.reveal` to opacity 1.** Assert the `visible` class `useScrollReveal` adds; prove it by deleting the hook call.
-- **`[].every(...)` is true; `expect([]).toEqual([])` passes.** Every sweep needs a floor, returned by the helper; assert A is non-trivial before diffing A against B.
-- **A "page loaded" assertion any page satisfies is not one** (`getByRole('heading').first()`, `waitForLoadState`, URL after client 404). Name the heading.
-- **A negative assertion needs a positive anchor** ("counter still reads 0" passes for a button wired to nothing) **and a negative anchor that makes a lazy assertion fail**.
-- **Prove provenance before asserting on content**: observe the request or `totalElements` first, or a silent fallback passes everything.
-- **An absence assertion on the wrong ARIA role can never fail** (`Call`/WhatsApp render as `tel:`/`wa.me` anchors, not buttons). Read what the component emits.
-- **Prove a negative with a tool you have seen return a positive** (a recursive `Select-String` falsely said `match.saved-search` existed nowhere); re-ask with a different command.
-- **A rollback-only probe under `@Transactional` tests can be a permanent `false`**: only the bound `ConnectionHolder` is marked. Grep for a prior `isRollbackOnly()` first; red-check by deleting the exception from `noRollbackFor`.
+- **`toBeVisible()` passes on `opacity: 0`; e2e runs reduced-motion, forcing `.reveal` to opacity 1.** Assert the `visible` class `useScrollReveal` adds.
+- **`[].every(...)` is true; `expect([]).toEqual([])` passes.** Every sweep needs a floor returned by the helper.
+- **A "page loaded" assertion any page satisfies is not one** (`getByRole('heading').first()`, `waitForLoadState`): name the heading.
+- **A negative assertion needs a positive anchor and a negative anchor that makes a lazy assertion fail.**
+- **Prove provenance before asserting on content** (observe the request or `totalElements`), or a silent fallback passes.
+- **An absence assertion on the wrong ARIA role can never fail** (`Call`/WhatsApp are `tel:`/`wa.me` anchors): read what the component emits.
+- **Prove a negative with a tool you have seen return a positive**; re-ask with a different command.
+- **A rollback-only probe under `@Transactional` tests can be permanently `false`** (only the bound `ConnectionHolder` is marked); red-check by deleting the exception from `noRollbackFor`.
 
 ## Playwright
 
-- **`page.route(..., { times: 1 })` is spent by StrictMode's first, discarded load.** Route persistently and `page.unroute()` before the recovery action.
-- **`setInputFiles` skips actionability checks** and sets files on a disabled input silently. Wait for the preceding operation to be observably finished (`[data-err="photos"]` `aria-busy="false"`), then assert the filename.
-- **`getByText('X')` is a case-insensitive substring match** — use `{ exact: true }`. `title=` feeds the accessible name; scope modal footers to `getByRole('dialog', { name })`.
-- **`components/ui/Table.jsx` renders rows twice (`sm:hidden` card + table).** Scope to `getByRole('row', { name })`; its empty state is a `tbody tr`, so `toHaveCount(0)` never passes.
-- **Anchor phone regexes**: use `MOBILE` from `fixtures/live.js` (`/(?<!\d)(?:\+91[\s-]?)?[6-9]\d{9}(?!\d)/`); unanchored matches inside ids and `Date.now()`.
-- **`page.addInitScript` re-runs on every navigation**, overwriting later sign-ins. Seed with `page.evaluate` after load, then `reload()`.
+- **`page.route(..., { times: 1 })` is spent by StrictMode's discarded first load**: route persistently, `unroute()` before recovery.
+- **`setInputFiles` skips actionability** (silently sets a disabled input): wait for `[data-err="photos"]` `aria-busy="false"`, assert the filename.
+- **`getByText('X')` is a case-insensitive substring match**: use `{ exact: true }`. `title=` feeds the accessible name; scope modal footers to `getByRole('dialog', { name })`.
+- **`components/ui/Table.jsx` renders rows twice** (card + table): scope to `getByRole('row', { name })`; its empty state is a `tbody tr`, so `toHaveCount(0)` never passes.
+- **Anchor phone regexes**: use `MOBILE` from `fixtures/live.js`.
+- **`page.addInitScript` re-runs on every navigation**: seed with `page.evaluate` after load, then `reload()`.
 - **`locator.count()` does not retry**: `expect(x.first()).toBeVisible()` first.
-- **A `waitForRequest` predicate must identify the caller** (admin bell asks the same `/admin/properties?status=pending` with `size=5`); match on `size` or similar.
-- **`if (await x.count()) await x.click()` is a silently skipped test, and a diagnosis-sounding `test.skip` stops anyone looking.** Fail loudly unless the environment is genuinely unsupported.
-- **`waitForTimeout`: if the next line retries, delete the sleep; if it is a non-retrying read, replace it with an assertion on the LAST observable effect** (result count after `useDeferredValue`).
-- **`waitForLoadState('networkidle')` is a sleep with a network-shaped excuse**; replace per route. `page.goto` resolving does not mean a `lazy()` route's effect ran — wait on its side effect.
-- **Scattered failures across unrelated specs, or a much slower run, is machine contention**: check `Get-Process node` and ports; never build or run `graphify` during an e2e run.
-- **`reuseExistingServer: !CI` attaches to a Vite you do not own**; uniform `ERR_CONNECTION_REFUSED` is infra (regressions cluster by feature). Keep infra-dependent specs out of the default suite.
-- **Do not edit source while a suite runs** (hot reload; a new file matching an `import.meta.glob` such as `services/providers/http/*` is a call-site change).
-- **`page.clock.install()` does NOT pause time** — only `pauseAt()` does. Under a paused clock `resume()` before the next `page.goto`; prove timer tests by deleting the code under test.
-- **Probe a session helper once** (boot, print storage keys + one signed-in-only control): a `login()` seeding only `draazyUser` ran four tests anonymous.
-- **Do not fabricate `draazyTokens`**: `http.js` 401 → `/auth/refresh` → `logoutUser()` spends it. Answer `/auth/me` and `/auth/refresh` with `page.route`.
-- **A "nobackend" config can still reach a backend**: the Vite proxy forwards `/api` to :8080. State "no server" in code.
-- **A `has:`/`hasText:` locator is re-queried relative to each candidate**: build the inner locator from `page`, not the scope, or it surfaces later as "not found".
-- **The cookie banner intercepts bottom-anchored clicks**: seed `dz_cookie_consent_v1` for bottom-click or mobile-FAB specs.
-- **Live specs need a value only the DB holds** (seeded row's exact figure); a new `providers/http/<domain>Provider.js` is globbed by `config.js`, unknown domains only `console.warn`.
+- **A `waitForRequest` predicate must identify the caller** (admin bell shares `/admin/properties?status=pending`, `size=5`).
+- **`if (await x.count()) await x.click()` silently skips; a diagnosis-sounding `test.skip` stops anyone looking.** Fail loudly.
+- **`waitForTimeout`: delete it if the next line retries, else replace with an assertion on the LAST observable effect.**
+- **`networkidle` is a sleep**; `page.goto` resolving does not mean a `lazy()` route's effect ran — wait on its side effect.
+- **Scattered failures or a much slower run is machine contention**: check `Get-Process node` and ports; never build or run `graphify` during e2e.
+- **`reuseExistingServer: !CI` attaches to a Vite you do not own**; uniform `ERR_CONNECTION_REFUSED` is infra. Keep infra-dependent specs out of the default suite.
+- **Do not edit source while a suite runs** (hot reload; a new file matching an `import.meta.glob` is a call-site change).
+- **`page.clock.install()` does NOT pause time** — `pauseAt()` does; `resume()` before the next `goto`.
+- **Probe a session helper once** (print storage keys + one signed-in-only control).
+- **Do not fabricate `draazyTokens`** (401 → `/auth/refresh` → logout): answer `/auth/me` and `/auth/refresh` with `page.route`.
+- **A "nobackend" config can still reach a backend** via the Vite `/api` proxy to :8080.
+- **A `has:`/`hasText:` inner locator must be built from `page`, not the scope.**
+- **The cookie banner intercepts bottom-anchored clicks**: seed `dz_cookie_consent_v1`.
+- **Live specs need a value only the DB holds**; a new `providers/http/<domain>Provider.js` is globbed by `config.js`, unknown domains only `console.warn`.
+- **Run only the specs a change touches**, even for app-wide components; never start `run-fast.ps1 -Full` unprompted (user-directed).
+- **A full e2e run must be launched detached** (`mode=async, detach`); progress is the shard log. An attached run dies with its session, leaving shard JVMs on ports.
+- **Before waiting on "another session's" run, probe `e2e\.shards\lock` once**: a `run-fast` name match may be your own loop; a VS Code Playwright `test-server` is not proof of a run. Never fall back to the full suite.
 
 ## Service seam and API shape
 
-- **An endpoint existing is not evidence it answers your question** (`GET /cities` lists what the DB knows, not what a shopper may switch to). One `select count(*)` first.
-- **A list endpoint omits what detail carries** (`GET /properties` has `coverImage`, no `images`). Diff both field lists before moving a collection page.
-- **Making a function async turns "cannot fail" into "fails invisibly"** and gives a handler a double-submit window; review callers.
+- **An endpoint existing is not evidence it answers your question** (`GET /cities` ≠ switchable cities): one `select count(*)` first.
+- **A list endpoint omits what detail carries** (`GET /properties` has `coverImage`, no `images`): diff the field lists.
+- **Making a function async turns "cannot fail" into "fails invisibly"** and opens a double-submit window; review callers.
 
 ## Contracts, mappers and migrations
 
-- **An unmapped key on a write is dropped, not rejected**; a silent whitelist hides bugs. Absent is not zero (never send `0` for a flats-only floor).
-- **`Number('N/A')` is `NaN` → `null` = "cleared"**: coerce with `Number.isFinite` and omit.
-- **When a write path starts populating a column, re-read every projection of it**; when a field becomes written, every display-only place becomes a writer.
+- **An unmapped key on a write is dropped, not rejected**; absent is not zero (never send `0` for a flats-only floor).
+- **`Number('N/A')` → `NaN` → `null` = "cleared"**: coerce with `Number.isFinite` and omit.
+- **When a column starts being written, re-read every projection and display-only place of it.**
 - **If the server redacts on read, render read-only**, omit from payload, validate on create only.
-- **`id` is the routing token (`slug || id`); `uuid` addresses the row** — a route binding the wrong one is the recurring bug.
-- **An allowlist duplicated across Java and JS drifts silently** (`transactionType` dropped by `pickListingFormDetails`; `DETAIL_KEYS` vs Java `TEXT`). `npm run check:enums` compares the sets; grep BOTH tables.
-- **A field scoped on the way out must be cleared on the way back** (rental carried `possession: 'ready'` from a hidden control): enumerate what each branch hides.
-- **`400 "Request body could not be read"` is a Jackson parse failure naming no field** (e.g. comma-joined string for `List<String>`); if the plainest listing fails too, it is the shared write path.
-- **Editing an applied migration (comments too) breaks Flyway checksums**; correct with a new `<yy>.<mm>.<seq>__` one. Re-read edited migrations in full (a deleted newline can comment out the next statement).
-- **A repeatable `R__` migration re-applies only on checksum change**: force with `delete from flyway_schema_history where script = 'R__...'`. Reference data belongs in `R__` (e2e reset replays only `R__`).
-- **`DELETE` a personal-data row rather than null its identifier** (half-erased rows leak free text).
+- **`id` is the routing token (`slug || id`); `uuid` addresses the row** — binding the wrong one is the recurring bug.
+- **Allowlists duplicated across Java and JS drift** (`pickListingFormDetails`, `DETAIL_KEYS` vs Java `TEXT`): `npm run check:enums`; grep BOTH.
+- **A field scoped on the way out must be cleared on the way back** (hidden control kept `possession: 'ready'`).
+- **`400 "Request body could not be read"` is a Jackson parse failure naming no field**; if the plainest listing fails, it is the shared write path.
+- **Editing an applied migration (comments too) breaks Flyway checksums**: add a new `<yy>.<mm>.<seq>__`; re-read edited migrations in full.
+- **`R__` re-applies only on checksum change** (force: `delete from flyway_schema_history where script = 'R__...'`); reference data belongs in `R__`.
+- **`DELETE` a personal-data row rather than null its identifier.**
 
 ## Backend — Spring, JPA, Postgres
 
-- **Spring 6.2+ hands a `TaskScheduler` an OutcomeTrackingRunnable, not a `ScheduledMethodRunnable`**; test scheduler wrappers through a real `@Scheduled` bean.
-- **A session advisory lock leaks behind a transaction pooler (PgBouncer / DO connection pool)**; hold `pg_try_advisory_xact_lock` in an open transaction.
-- **`@Transactional` goes on the outermost reachable method**; self-invoked/`private` helpers never cross the proxy.
-- **`:param is null` in JPQL fails on Postgres**: use `cast(:from as LocalDate) is null`.
+- **Spring 6.2+ hands a `TaskScheduler` an OutcomeTrackingRunnable**: test scheduler wrappers via a real `@Scheduled` bean.
+- **Session advisory locks leak behind PgBouncer / DO pools**: use `pg_try_advisory_xact_lock` in an open transaction.
+- **`@Transactional` goes on the outermost reachable method**; self-invoked/`private` calls skip the proxy.
+- **`:param is null` in JPQL fails on Postgres**: `cast(:from as LocalDate) is null`.
 - **A multi-column `@Query` returning `Object[]` silently nests**: use a projection interface with `as` aliases.
-- **In a `@Transactional` `@SpringBootTest`, `JdbcTemplate` cannot see unflushed JPA writes**: `em.flush()` before raw SQL.
-- **Per-test cleanup of committed rows is impossible in a `@Transactional` test** (rolled back, or deadlocks): use static `@AfterAll` with a captured `DataSource`, or drop `@Transactional`.
-- **A non-`@Transactional` `@SpringBootTest` must erase the rows it commits** (`@AfterEach`): leftover verification rows broke other classes depending on run order.
-- **"too many clients" in the full suite is the context cache**: each cached context holds a Hikari pool, so `src/test/resources/spring.properties` caps it at 12 to stay under `max_connections=100`.
-- **A Maven run going quiet mid-suite is a lock wait**: check `pg_stat_activity` for `wait_event_type = 'Lock'`.
-- **`NoClassDefFoundError` in a process that started fine means the classpath changed underneath it**; never leave `spring-boot:run` on a dir another build writes.
-- **A durable cap is not race-safe**: `noRollbackFor` survives sequential transactions, `@Lock(PESSIMISTIC_WRITE)` serialises concurrent ones — need both.
-- **A row lock cannot protect the absence of a row** (`findBy().orElseGet(insert)` races): transaction-scoped advisory lock + double-checked read, mutation-tested.
-- **`spring.jpa.open-in-view=false` is a standing ruling (D185)**: fetch associations in the service; never re-enable OSIV.
-- **Default a policy lookup to the stricter branch**: `"buy".equals(deal) ? SALE_GATE : RENT_GATE` gave unknowns the weaker gate; compare against the named constant and test unknown values.
-- **`@Size` on a `@RequestParam` does nothing without class-level `@Validated`**; validate in the service.
-- **A `jdbc.update` on a row the test already saved via JPA is invisible to a later JPQL entity read in the same `@Transactional` test** (first-level cache wins); change the entity and `saveAndFlush`.
+- **In a `@Transactional` test, `JdbcTemplate` cannot see unflushed JPA writes** (`em.flush()`), and a `jdbc.update` is invisible to a later entity read (first-level cache): change the entity and `saveAndFlush`.
+- **Committed-row cleanup**: impossible per-test under `@Transactional` (use static `@AfterAll` with a captured `DataSource`); a non-`@Transactional` `@SpringBootTest` must erase its rows in `@AfterEach`.
+- **"too many clients" is the context cache**: `src/test/resources/spring.properties` caps it at 12 (`max_connections=100`).
+- **A Maven run going quiet is a lock wait**: check `pg_stat_activity` `wait_event_type = 'Lock'`.
+- **`NoClassDefFoundError` after a fine start means the classpath changed underneath**; never `spring-boot:run` on a dir another build writes.
+- **A durable cap needs both `noRollbackFor` (sequential) and `@Lock(PESSIMISTIC_WRITE)` (concurrent).**
+- **A row lock cannot protect a row's absence** (`orElseGet(insert)` races): transaction-scoped advisory lock + double-checked read.
+- **`spring.jpa.open-in-view=false` is a standing ruling (D185)**: fetch associations in the service.
+- **Default a policy lookup to the stricter branch** and compare against the named constant; test unknown values.
+- **`@Size` on a `@RequestParam` needs class-level `@Validated`**; validate in the service.
 
 ## Security and privacy
 
-- **A scanner stripping punctuation invents what it scans for**: space/dot/dash/bracket join digits, comma/slash/pipe/colon separate — `₹65,00,000 / 750 sq.ft` must not become a phone number.
-- **Java `\s` is ASCII-only; pastes carry U+00A0.** Use `\p{Z}`/`\p{Pd}`, `Normalizer.Form.NFKC`, and `Character.digit(cp, 10)` for Devanagari/fullwidth digits.
-- **A kill switch enforced only in the browser is not one.** For every client-published flag implying a server effect (`signupsEnabled`), the server must read it at the write site's decision point.
-- **A server-side switch is only as durable as its row**: a regenerated `R__` seed with whole-document `ON CONFLICT DO UPDATE` restores defaults; grep the seed for admin-owned keys.
-- **A flag stored as the wrong type is enforced as its opposite** (`"false"` read as on). Refuse the write, do not coerce; assert against `jsonb_typeof`.
-- **"Exactly one caller" is load-bearing**: pin the call-site list with a source-scanning guard and red-check by aiming it at a many-caller method.
-- **Participation is not authorisation**: non-participant → 404 (never confirm the row), participant who may not act → 403; two distinguishable 404s restore the existence oracle. A guard shared by read and write was written for the read.
-- **Derive the sensitive value; do not validate what the client sent**; error messages that distinguish why a lookup failed answer questions the caller may not ask.
-- **A mask that still parses is worse than one that throws**: validate a property bad input cannot satisfy (length 10), refuse rather than share a bucket, under-reveal; a normaliser's default branch must not be destructive.
+- **A scanner stripping punctuation invents matches**: space/dot/dash/bracket join digits, comma/slash/pipe/colon separate (`₹65,00,000 / 750 sq.ft` is not a phone).
+- **Java `\s` is ASCII-only; pastes carry U+00A0**: use `\p{Z}`/`\p{Pd}`, NFKC, `Character.digit(cp, 10)`.
+- **A browser-only kill switch is not one**: the server must read each client-published flag (`signupsEnabled`) at the write site.
+- **A server switch is only as durable as its row**: an `R__` seed with whole-document `ON CONFLICT DO UPDATE` resets admin-owned keys.
+- **A flag stored as the wrong type is enforced as its opposite** (`"false"`): refuse the write; assert `jsonb_typeof`.
+- **"Exactly one caller" is load-bearing**: pin it with a source-scanning guard, red-check against a many-caller method.
+- **Participation is not authorisation**: non-participant → 404, participant who may not act → 403; never two distinguishable 404s. A guard shared by read and write was written for the read.
+- **Derive the sensitive value; don't validate what the client sent**; failure messages must not answer unasked questions.
+- **A mask that still parses is worse than one that throws**: validate what bad input cannot satisfy (length 10), under-reveal; a normaliser's default must not be destructive.
+- **Never render `err.message`**: render `userMessage(err, fallback)` (`lib/userMessage.js`); only `ApiError.serverMessage`, `NetworkError` or `UserError` show text; friendly local throws are `UserError`.
 
-## UI surfaces that lie
+## UI engineering
 
-- Room/flatmate badge evidence belongs after posting in Dashboard -> Documents, like property badges; keep rent agreement upload out of create/edit forms and never grant a badge on upload alone.
-- Saved heart totals must include property and flatmate saves; the mixed saved category is "Flatmates", not "Rooms". Keep sort sizing changes measurable against the prior width.
-- Saved-page fixes: assert compact right-aligned dropdown geometry, not just its shared class; click every saved post kind through to its detail page, not just the board.
-- **A locally computed answer renders a confident false negative forever** ("no duplicate clusters"); arithmetic on a creation date shown as history is fabrication.
-- **Removing a rail leaves the documents it fed**: a Rent Passport PDF headed "Verified" from tenant-typed figures is a forgery. Seal it; grep downstream artifacts for "verified".
-- **"Remove feature X" rarely means all of X's vocabulary**; restate the boundary to the user before deleting.
-- **`aria-label` on a button with visible text overrides it** (breaks `getByRole({ name })`, WCAG 2.5.3); don't add one next to text it names (read twice). Label the state, not the thing already read.
-- **A custom `Select` renders a `<button>`, so `htmlFor` cannot reach it**: give a visible caption that is a substring of `ariaLabel`, plus `ariaDescribedBy`.
-- **A rename is not done until locale JSON moves in every language** (i18next renders the key). `npm run check:i18n` plus a runtime sweep for dotted-key text.
-- **`components/ui/` may not use page-scoped i18n namespaces**: only the eager shell (`auth`, `chrome`, `common`, `help`, `home`, `misc1`) is preloaded; put shared keys in `chrome.json`, all three languages.
-- **`isIn` (`!!user`) is false for "signed out" AND "not asked yet"** (`loading` seeds from `sessionHinted()`). Derive `gated` once, three-state, or the saved step is rewritten to 0.
-- **Debounce the serialised string, not an object rebuilt each render** (`captureShareableState()`), or the 400 ms measures renders.
-- **A debounced save cancels on unmount**: `flush()` before deliberate navigation (sign-in gates).
-- **Never render `err.message`** (a stale PWA shell leaked `[services] could not load the "auth" provider.`): render `userMessage(err, fallback)` (`lib/userMessage.js`). Only a server refusal (`ApiError.serverMessage`), `NetworkError` or `UserError` shows its text. Friendly local throws must be `UserError`.
+- **A locally computed answer renders a confident false negative forever**; arithmetic on a creation date shown as history is fabrication.
+- **Removing a rail leaves the documents it fed** (a "Verified" Rent Passport from self-typed figures): grep downstream artifacts for "verified".
+- **"Remove feature X" rarely means all of X's vocabulary**: restate the boundary to the user first.
+- **`aria-label` on a button with visible text overrides it** (breaks `getByRole({ name })`, WCAG 2.5.3); label the state, not what's already read.
+- **A custom `Select` is a `<button>`, so `htmlFor` cannot reach it**: visible caption that is a substring of `ariaLabel`, plus `ariaDescribedBy`.
+- **A rename is done only when locale JSON moves in every language**: `npm run check:i18n` + runtime sweep for dotted-key text.
+- **Eager surfaces (Home, `components/ui/`) may only use eager namespaces** (`auth, chrome, common, help, home, misc1`); shared keys go in `chrome.json`, all three languages. A lazy `property.*` key renders raw.
+- **`isIn` (`!!user`) is false for "signed out" AND "not asked yet"**: derive `gated` once, three-state.
+- **Debounce the serialised string, not an object rebuilt each render**; `flush()` a debounced save before deliberate navigation.
 - **Freshness is not publication status**: gate Active/Availability badges and reactivation on approval.
-- **Don't change a sticky bar's position on input focus** — the blurring tap lands under the finger and is lost (`seam-write` caught it by asserting the stored value).
+- **Don't move a sticky bar on input focus** (the blurring tap is lost). Phone form action rows sit in flow at the form end, never sticky (iOS keyboard; `.lp-step-actions`).
+- **A hover handler on a keyboard-scrolled list must ignore pointer-less events**: gate `onMouseEnter` on `movementX/Y` (`EntitySearchCombobox`).
+- **The router package is `react-router`**; importing `react-router-dom` breaks the whole lazy chunk.
+- **Files containing JSX must be `.jsx`.**
 
 ## Reviews, agents and surveys
 
-- **A reviewer's severity is a hypothesis**: verify the mechanism; comment where you reject a finding so no one "fixes" it.
-- **A delegated survey is a lead, not a verdict**: ~30% of citations were wrong though the shape was right; ask which directories were swept; verify each agent slice.
-- **When a workaround proves load-bearing, grep the whole tree for it** (eight files, not two); search the rarer of two co-occurring anti-patterns.
-- **A harness reporting only what it was told to find certifies its blind spots**: default to fail-until-judged, compare the union of keys, print which instance answered.
-- **Ask the database about data, grep for source** (one `psql` join beat 30 KB of INSERT matches).
-- **Do not fix a shared helper in passing**; don't reformat JSON to insert one key (anchor on a neighbouring key, `JSON.parse` only as validity check).
-- **`graphify update` leaves the report stale and drops curated community names**: follow with `.\scripts\graphify.ps1 report`; names need `graphify label`.
+- **A reviewer's severity is a hypothesis**: verify the mechanism; comment where you reject a finding.
+- **A delegated survey is a lead, not a verdict** (~30% of citations wrong): ask which directories were swept; verify each slice.
+- **When a workaround proves load-bearing, grep the whole tree for it**; search the rarer of two co-occurring anti-patterns.
+- **A harness reporting only what it was told to find certifies its blind spots**: fail-until-judged, compare the union of keys.
+- **Ask the database about data, grep for source.**
+- **Do not fix a shared helper in passing**; don't reformat JSON to insert one key.
+- **`graphify update` leaves the report stale and drops community names**: run `.\scripts\graphify.ps1 report`; names need `graphify label`.
 
-## Architecture and product judgement
+## Architecture
 
-- **Draazy is owner-only: no brokers, builders or agent RERA numbers, anywhere.** Never offer, label, filter or store a non-owner poster type; anti-broker guardrails stay.
-- **A listing's RERA number is owner-shared, never Draazy-verified.** Buyer-facing copy may say only that the owner shared it and the buyer can check it on MahaRERA (link to its search result); the staff MahaRERA check stays internal and never reaches the buyer API or UI. Wording: "shared by owner, check it on MahaRERA" — no "Draazy does not verify" line either.
-- **Draazy does not verify societies.** No society copy may say verified, confirmed or RERA-registered; say only what Draazy holds (e.g. "Limited details").
-- **Two routes to one verdict are fine; two leaving the record saying different things are not.** The quiet route must write down that it ran and what it skipped.
-- **When closing a record a shortcut never opened, don't tidy the evidence**: leave unticked checklists, and don't create the record.
-- **Hoist preconditions the actor cannot fix before the first write** (a blank-locality refusal inside `publish` rolled back the reviewer's verdict).
+- **Two routes to one verdict are fine; two records saying different things are not**: the quiet route records that it ran and what it skipped.
+- **When closing a record a shortcut never opened, don't tidy the evidence** or create the record.
+- **Hoist preconditions the actor cannot fix before the first write.**
 - **Verification is a badge that earns visibility, never a precondition to act** (ADR-019).
-- **A visibility blacklist leaks on the next state**: moderation is a whitelist; hidden-from-list but reachable by id is an unlisted page.
-- **`pending ≠ active`**: a priced plan is granted by the payment webhook, not by buying.
-- **A nullable limit means "no number stated"** — resolve to the safe floor (`plans.listing_limit` NULL → free tier); unlimited needs its own boolean (`unlimited_contacts`).
-- **Never store a raw Aadhaar number**: use the aggregator's entity-scoped UID token. Login OTP proves the SIM; OKYC OTP proves identity.
-- **Set the data-caching boundary before data exists** (`/api/* → NetworkOnly` in `vite.config.js`); a service-worker `urlPattern` must match `url.pathname`.
-- **An unassigned `manualChunks` module folds into whichever chunk references it** (3 KB module pulled 189 KB charting): verify `dist/index.html`.
-- **`docs/flows/**` describe current UI, not target**; the architecture doc is the target SoT. A rename is doc-wide: grep old vocabulary across `docs/**`.
-- **Don't bolt a second search entry onto a results page** (mobile /listings locality combobox, Near-a-Place and budget preset chips were removed); ask before duplicating an entry point.
-- **Keep real-world Indian listing options even if they break a clean taxonomy** (Power of Attorney ownership, as on MagicBricks/99acres); ask before removing one.
-- **One thing, one picker**: grep the wizard for an existing control asking about the same objects before adding a group (AC/geyser/wardrobe).
-- **An approve endpoint must apply what it approves** (flatmate request: add member, take seat, 409 on second decision); test the consequence.
-- **An approved number request reveals the owner's number to that buyer** unless `hide_number` (D5 reversed). Ask which way the rule goes before calling a reveal a leak.
-- **Staff alert emails go to `role='staff'` only, never managers or admins** (they keep the bell), and ignore quiet hours; queue alerts belong in `StaffSlaRule.CATALOGUE`, not new per-event hooks (user-directed).
+- **Moderation is a whitelist**; hidden-from-list but reachable by id is an unlisted page.
+- **`pending ≠ active`**: a priced plan is granted by the payment webhook.
+- **A nullable limit means "no number stated"**: resolve to the safe floor (`plans.listing_limit` NULL → free); unlimited needs its own boolean.
+- **Never store a raw Aadhaar number**: use the aggregator's UID token. Login OTP proves the SIM; OKYC OTP proves identity.
+- **Set the caching boundary before data exists** (`/api/* → NetworkOnly` in `vite.config.js`); SW `urlPattern` matches `url.pathname`.
+- **An unassigned `manualChunks` module folds into whichever chunk references it**: verify `dist/index.html`.
+- **`docs/flows/**` describe current UI; the architecture doc is the target SoT.** A rename is doc-wide.
+- **An approve endpoint must apply what it approves** (flatmate request: add member, take seat, 409 on second decision).
+- **An approved number request reveals the owner's number** unless `hide_number`; ask which way a rule goes before calling a reveal a leak.
 
 ## Environment and tooling
 
-- **Never round-trip a source file through `Get-Content`/`Set-Content`** (PS 5.1 mangles `—` `·` `…`, adds a BOM). Use `edit`/`create` or `[IO.File]::WriteAllText` with `UTF8Encoding $false`; scan for `U+FFFD`.
-- **PowerShell 5.1**: no `&&`/`||` (use `;` + `if ($?)`); no heredocs; `Out-File -Encoding utf8` writes a BOM; `git show HEAD:path > f` needs `cmd /c` (else UTF-16).
-- **Never put non-ASCII in a `.ps1`** (ANSI read; `—` ends in a U+201D delimiter; error line is wrong). Check `Select-String -Pattern '[^\x00-\x7F]'`.
-- **The persistent shell mangles long `?`/`&` URLs and `@(...)` blocks**: write a `.ps1`. The edit tool matches raw bytes (use ASCII); concurrent edits to one file hit `EBUSY`.
-- **Backend is Java 25 (`C:\Program Files\Zulu\zulu-25`), Spring Boot 4.1**; `mvnw.cmd` is in `backend/`; local entry is `.\run-local.ps1 -Port 8099`.
-- **Local Postgres password is `postgres`; never prompt.** `$env:PGPASSWORD='postgres'; & 'C:\Program Files\PostgreSQL\17\bin\psql.exe' -U postgres -d <db> -P pager=off -v ON_ERROR_STOP=1 -c "..."` (psql not on PATH).
-- **`max(version)` on `flyway_schema_history` is lexicographic**: use `max(version::int) where version ~ '^[0-9]+$'`.
-- **An e2e lane serves the bytecode it compiled at start**: a 422 on legal values means stale. Compare source `LastWriteTime` to `target-<lane>\classes` and the listener's `StartTime`; `Stop-Process`, rerun the lane script, poll `/api/actuator/health`.
-- **The dev DB `draazy` drifts stale versus `draazy_e2e`**: never conclude "no such column" from it; check `draazy_e2e` or the migration files.
-- **`get_errors` on `.java` shows the IDE's stale view** — compile. `mvnw.cmd compile` without `clean` is often a no-op (MapStruct not regenerated): `clean compile` after DTO/record/entity changes.
-- **CLI builds write `backend/target-cli/`; `backend/target/` is the IDE's, often stale.** Inspect generated sources in the one you built; Maven's exit code is untrustworthy — aggregate `target-cli\surefire-reports\*.txt`.
-- **A running backend must not share a build dir with CLI builds** (500s on `POST /me/photos`): `run-local.ps1` builds into `target-local`, lane scripts into `target-<lane>`.
-- **`-Dtest=A+B+C` matches nothing**: Surefire wants commas; with `-DfailIfNoTests=false` a typo still exits 1.
-- **Never pair a bulk move with a force-delete on an untracked tree** (lost 22 files); `git mv` needs tracked files; diff Local History restores. Never run an unvalidated bulk-rewrite across the tree.
-- **Comment hygiene is hand work, not a script**: regex pipelines mangled strings and a `//` holding `tests/mobile/**` read as `/*`, deleting half of `playwright.config.js`. Use the edit tool; diff comment-free code against HEAD.
-- **Never `JSON.parse` → `JSON.stringify` a hand-formatted JSON file** (strips grouping blank lines). Line-edit on `^\s*"KEY"\s*:`, assert one hit, fix trailing comma, parse to validate.
-- **An "unreferenced i18n key" list is a candidate list**: template-literal keys (`` t(`misc.${tKey}Title`) ``) are invisible to grep; open the component first.
-- **A stale exemption is silent** (a path list never matches a deleted file). **A guard ALREADY RED hides a new violation**: diff its reported entries against HEAD (`ServiceSizeGuardTest`); a service shrunk under its `BASELINE` limit needs its entry deleted.
-- **Network is a GitHub-only allowlist** (`raw.githubusercontent.com` works; modelscope.cn, huggingface.co fail TLS `SEC_E_ILLEGAL_MESSAGE`). Probe reachability before designing around a download; check CI shares it.
+- **Never round-trip a source file through `Get-Content`/`Set-Content`** (PS 5.1 mangles `—`, adds a BOM): use `edit`/`create` or `[IO.File]::WriteAllText` + `UTF8Encoding $false`; scan for `U+FFFD`.
+- **PowerShell 5.1**: no `&&`/`||`, no heredocs; `Out-File -Encoding utf8` writes a BOM; `git show HEAD:path > f` needs `cmd /c`.
+- **Never put non-ASCII in a `.ps1`**: check `Select-String -Pattern '[^\x00-\x7F]'`.
+- **The persistent shell mangles long `?`/`&` URLs and `@(...)` blocks**: write a `.ps1`. The edit tool matches raw bytes; concurrent edits hit `EBUSY`.
+- **Backend is Java 25 (`C:\Program Files\Zulu\zulu-25`), Spring Boot 4.1**; `mvnw.cmd` in `backend/`; local entry `.\run-local.ps1 -Port 8099`.
+- **Local Postgres password is `postgres`; never prompt.** `$env:PGPASSWORD='postgres'; & 'C:\Program Files\PostgreSQL\17\bin\psql.exe' -U postgres -d <db> -P pager=off -v ON_ERROR_STOP=1 -c "..."`.
+- **`max(version)` on `flyway_schema_history` is lexicographic**: `max(version::int) where version ~ '^[0-9]+$'`.
+- **An e2e lane serves the bytecode compiled at its start** (422 on legal values = stale): compare source vs `target-<lane>\classes` and listener `StartTime`; restart, poll `/api/actuator/health`.
+- **The dev DB `draazy` drifts stale**: check `draazy_e2e` or the migrations before concluding "no such column".
+- **`get_errors` on `.java` is stale — compile**; `clean compile` after DTO/record/entity changes (MapStruct).
+- **CLI builds write `backend/target-cli/`; `backend/target/` is the IDE's.** Maven's exit code is untrustworthy: aggregate `target-cli\surefire-reports\*.txt`.
+- **A running backend must not share a build dir with CLI builds**: `run-local.ps1` → `target-local`, lanes → `target-<lane>`.
+- **Never pair a bulk move with a force-delete on an untracked tree**; never run an unvalidated bulk rewrite. Local History diff restores.
+- **Comment hygiene is hand work**: regex pipelines once deleted half of `playwright.config.js`.
+- **Never `JSON.parse` → `JSON.stringify` hand-formatted JSON**: line-edit on `^\s*"KEY"\s*:`, assert one hit, parse to validate.
+- **An "unreferenced i18n key" list is a candidate list**: template-literal keys are invisible to grep.
+- **A stale exemption is silent; a guard ALREADY RED hides a new violation**: diff reported entries against HEAD (`ServiceSizeGuardTest`); delete a `BASELINE` entry once under the limit.
+- **Network is a GitHub-only allowlist** (`raw.githubusercontent.com` OK; modelscope/huggingface fail TLS): probe before designing around a download.
+- **Port 3322 is the user's `run-dev.ps1` frontend**: never kill or reuse it; agent dev servers use 3400+. e2e Maps uses `:1122` (UI) + `:1123` (backend).
 
 ## House style
 
-Match it; it is why the codebase is navigable.
+- **Specs:** deltas for append-only ledgers; never guess a UI anchor or wrap an assertion in `if (await x.isVisible())`; locate by role and name; assert the write's status; prove a write with a reload.
+- **Register items:** `## N. <claim>`, `**Where:**`, `### What happens today`, `### Options` (recommendation bolded); resolved → `> **RESOLVED — …**` under the heading.
+- **Commit messages:** long-form with reasoning, "Deliberately not done" and `Verified:`; keep a corrected wrong conclusion beside the correction (`26129a2`, `368ad4f`, `48386b2`).
+- **When a claim in a doc/comment/spec header proves false, quote and correct it in place**; when right, quote it.
+- **Name specs for the feature, not the backend** (`live-*.spec.js` is refused); when a convention outlives its reason, remove it and add a guard.
+- **The comment rule is a gate**: `check-comments --staged` misses defect/worker ids (MC-, MOD-, W3, QA-, ADR-), "now/was" narration and code-restating comments. Read every comment in touched files; run ponytail-review + code-simplifier on the diff.
+- **Commit around another session's staged index**: `$env:GIT_INDEX_FILE=<temp>; git read-tree HEAD; git add -- <our paths>`, shared hunks via `git apply --cached`, commit, drop the variable, `git reset -q -- <our paths>`. Amend the same way.
 
-- **Specs:** deltas not absolutes for append-only ledgers; never guess a UI anchor or wrap an assertion in `if (await x.isVisible())`; locate by role and name; assert the write's status, not the control; prove a write with a reload.
-- **Register items:** `## N. <claim>`, `**Where:**`, `### What happens today`, `### Options` (recommendation bolded); when resolved, a `> **RESOLVED — …**` blockquote under the heading.
-- **Commit messages:** long-form with reasoning, "Deliberately not done" and `Verified:`; keep a corrected wrong conclusion beside the correction (models: `26129a2`, `368ad4f`, `48386b2`).
-- **When a claim in a Javadoc, comment, spec header or doc proves false, quote and correct it in place** (also for docs written minutes earlier); when it proves right, quote it.
-- **Name specs for the feature, not the backend**: `playwright.config.js` refuses `live-*.spec.js`; when a convention outlives its reason, remove it and add a guard.
-- **The comment rule is a gate, not a memory**: >2-line and changelog comments reached commits three times. Run `node scripts/check-comments.mjs --staged` and ponytail-review on the staged diff before every commit; it only reports, so fix by hand.
-- **Files containing JSX must be `.jsx`** (Vite parses by extension; ESLint can miss JSX in `.js`).
+## Product rules (user-directed)
 
-**Commit around the other session's staged index, never through it.** It keeps files staged (`A`)
-in the shared index, so a plain `git commit` would sweep them in. Build the commit in a private
-index: `$env:GIT_INDEX_FILE=<temp>; git read-tree HEAD; git add -- <our paths>`, take shared files'
-hunks with `git apply --cached <partial.patch>`, commit, drop the variable, then
-`git reset -q -- <our paths>` on the real index. Amend the same way (`read-tree HEAD` first).
-- **`check-comments` passing is not the comment rule**: it misses defect/worker ids (MC-, MOD-, W3, QA-, ADR-, "RC pass"), "now/was" narration and code-restating comments. Read every comment in each touched file, and run ponytail-review + code-simplifier on the uncommitted diff before handing back.
-- **Social/Reddit copy must read human, not AI**: plain casual paragraphs, no bold headers or bullet lists, contractions, an empathetic opener/closer; never invent personal anecdotes to fake emotion.
-- **Staff work queues list newest first** (To verify, Re-checks, Badge requests, Follow-up, Flagged, KYC, Flatmates): the user wants a new listing on top; overdue rows are found by their rose tag, not by FIFO order.
-- **Back-office mobiles are never masked or hidden**: every staff/admin page shows a customer's full mobile wherever it shows the customer, with no reveal step and no list audit; masking stays on consumer surfaces only.
-- **One staff decision is final** (#330): never add a second-reviewer, QA-sample or override-request step to an approval; only refunds are two-person. Self-action guards (own listing/case/upload) stay.
-- **A submitted case is "in review", not "unverified"**: consumer cards must show what the user already sent (identity, listing) instead of re-asking.
-- "Horizontal scroll UI standard" for filters/tabs = the underline `dz-detail-tab` strip in `HScroll` (Property/Society tabs, icon + label), not the dashboard pill chips.
-- **Form action rows on phones sit in flow at the end of the form, never sticky/floating**: the iOS keyboard shrinks only the visual viewport, so a sticky Back/Next bar drifts mid-screen over the fields (listing wizard `.lp-step-actions`).
-- **A new listing (and a staff-posted claim) needs 3 photos, 2 labelled with key rooms** (`MIN_PUBLISH_PHOTOS`, mirrored by `ListingCompleteness.MIN_PHOTOS`); never treat the one-photo floor as the listing standard.
-- Don't replace a familiar layout while moving features: the user wanted dashboard request-type tabs and the chat property photo panel kept; add new cues (Received/Sent chip) on top instead.
-- **Port 3322 belongs to the user's `run-dev.ps1` frontend**: never kill-and-reuse it for agent testing; start agent dev servers on another port (e.g. 3400+). e2e Maps testing uses `:1122` (UI, admitted by the Maps key) + `:1123` (backend), never 3322.
-- **Before waiting on "another session's" e2e run, probe `e2e\.shards\lock` once and run targeted specs only**: a `run-fast` process-name match can be your own wait loop; never fall back to the full suite.
-- **A persistent VS Code Playwright `test-server` is not proof an e2e run is active**: check the command line and shard-lock timestamp before attributing a run to another session (user, 2026-10-23).
-- **Posting forms: `*` on required fields, never the word "optional"** (user, 2026-10-23; reverses the earlier "no *, (optional) only" choice). Proof the badge needs (rent agreement) is asked for after posting, never on the posting form.
-- **Deposit is required on every posting form, and 0 is a valid answer** (user, 2026-10-23). A tenant room asks for the owner's mobile and WhatsApps the owner a one-tap agree/decline link.
-- **Draazy is pre-launch (under development) until the user says otherwise**: marketing copy must never claim live listings, users or availability; frame it as "building", "coming soon", "early access".
-- **Reddit: prioritise Pune subreddits** (r/Hinjewadi, r/PCMC, r/pune once karma allows); national subs only for Pune-specific threads. Keep comments short (3-5 lines).
-- **Never label things "optional" anywhere in the UI** (user, 2026-10-23): not in titles, hints, badges or blurbs. Anything not marked `*` is optional by default; say what the user gains instead.
-- **Don't duplicate an existing filter as a board chip** (user, 2026-10-23): the Women only chip was removed because Filters already has the gender choice.
-- Dashboard flatmate cards should use the same status/action grouping as property cards; every verification CTA must read visually as a button, not a loose text link.
-- Matching the property card means the complete side-by-side Share listing + full Get Verified badge label, including pending flatmate posts; do not silently hide Share based on publication status.
-- Flatmate detail pages carry no save heart (the tile owns save); share sits on the photo like the property page, and facts under the location are an icon grid, never one dot-separated line (user, 2026-10-24).
-- **Messages keeps the mobile bottom nav** (user, 2026-10-24): never hide the tab bar on a consumer route except auth; size bottom-pinned panes off `--dz-bottom-inset` instead.
-- Flatmate detail pages have no in-page back row (the app header has back) and report sits as a text link after the content, like the property page's Report listing (user, 2026-10-24).
-- Flatmate forms never ask a name: posts and groups show the profile name only, and an unnamed profile is blocked with an Add name link to the profile (user, 2026-10-24). The router package is `react-router`; importing `react-router-dom` breaks the whole lazy chunk.
-- Badge cleanup: only labels meaning a person's ID check or a home's ownership/tenancy check are badges to unify ("ID verified", "Verified property"); leave unrelated trust signals (Trust score, RERA shared, Owner consented, Verified resident) alone (user, 2026-10-25).
-- A hover handler on a list the keyboard scrolls must ignore pointer-less events: `onMouseEnter` fires when arrow keys slide an option under a still cursor, so gate on `movementX/Y` (`EntitySearchCombobox`).
-- Home and other eager surfaces may only use eager i18n namespaces (`auth, chrome, common, help, home, misc1`); a lazy `property.*` key renders raw until a property page loads.
-- A red spec on a rule the product changed on purpose (re-ask cooldown, owner tier needs an ownership-verified listing, ID-in-review before the agreement checkbox) is fixed in the spec, after confirming the rule in the service, never by loosening the product.
-- A full e2e run must be launched detached (`mode=async, detach`) and the shard log, not the tool shell, is the progress source; an attached run dies with its session and leaves six shard JVMs holding ports.
-- Home summarises and routes; it does not duplicate an inbox. Decisions (Accept/Decline) live on the page that shows the full request, and Home's attention panel links there by type.
-- Flatmates Rooms tab lists room posts only (photos, flat info); a group never appears there, and Teams lists only teams still hunting.
-- A chip that is true of every card on a tab (e.g. "Looking for a flat" on Teams) is noise; cards show only facts that differ between items.
-- Reels: keep the whole phone in frame (zoom <= 1.274 at base 1.35), logo animation only in the outro, every voice line a complete impactful sentence, and <= 30 s (shorten the weakest line).
-- The top-nav Saved heart shows no count badge; a permanent count is noise. Counts live on the Saved page tabs.
-- An interest on a flatmate seeker post comes from someone offering a room: copy says "{name} has a room for you", never "teaming up" (that is the Teams tab).
-- Every chat composer sends on Enter (Shift+Enter = new line), on touch too; its scrollbar appears only once the text outgrows the box.
-- Home "Needs your attention": a one-line header (title + N pending) over one glass-card tile per request type (icon, label, who, count + wait, chevron); no outer card, no hint line.
-- Rent agreement desk: staff can correct every customer-provided value, PAN/Aadhaar included; send back to the customer only for a fresh paper or an answer staff cannot give.
-- Dashboard KYC nudge is a compact one-row tile ("Get your KYC badge" + one benefit line + Verify); never label it "Optional" - badge-not-gate is shown by not gating, not by a tag.
-- Rent agreement: once a party files a paper it is never asked for again; every reopen path (requester "Add what's missing" and the invitee ?party=&request= link) restores filed docs from the server, replace-only. Tenant rows carry no "Relation to Tenant 1" field (nothing consumed it).
-- Rent agreement stamp duty must match the IGR Leave & License calculator (leaveandlicense.igrmaharashtra.gov.in/Fees/calculator_sd): 0.25% rounded to the nearest rupee (min ₹100), escalated rent rounded to paise then truncated - never 'up to the next ₹100'. Charges display with paise (₹918.00) plus the exact duty line.
-- Rent agreement form collects every field the IGR L&L 2.0 portal makes staff type by hand (mother's name, gender, DOB, PAN, mobile, licensor PIN/village/address; witness gender, PIN, address); only Aadhaar, its OTP, photo and biometrics are taken at the doorstep visit. Alias, occupation and email stay optional on the portal and are not asked.
-- Rent agreement: trim only what the IGR portal fetches itself (Aadhaar OTP data, biometrics); every field it requires on any tab through police records must be collected in the wizard.
-- Rent agreement: never ask the customer for property data staff can read off the Index II (village, road, CTS/survey no., zone, construction, age, gallery area); the Index II upload is mandatory instead. Police station is plain text, no suggestion list.
-- UGC reels (Flow): copy test take 4's (3f1741fb) short prompt style; never mention the phone in the action (it shows up in frame); Ishaan is never sad-faced, keep him amused/upbeat even about pain points.
-- UGC reels (Flow): never sad but not over-laughing either; dry frustration fits pain points. Every clip is exactly 8 s: time each line and fill the 8 s with an extra line (never stretch), or the model repeats lines. The sign-off stays a separate shared clip.
-- UGC reels: dialogue is complete, connected sentences that flow as one thought (cause → effect), never clipped word-lines; don't fix takes with Flow's edit box (keeps source length, loses context).
-- Flow reels: always spell out wardrobe (closed teal pullover hoodie) in every clip prompt; an unstated outfit drifts and breaks continuity across joined clips.
-- Draazy positioning: not just a rental app. It covers the whole property portfolio (rent + buy/sell) plus services such as the rent agreement. Rent agreements are done online now (nobody visits the registration office); the pain is agents' high fees. Our edge is doorstep biometrics, rent reminders and renewal.
-- Draazy reels: no prices (no agent fee figures, no Draazy price); talk pain points and services. Renewal is "renewal reminder + one-tap renewal", never "auto-renew".
-- Draazy verification = two reviewer checks: owner KYC (govt ID + live selfie -> "KYC done") and ownership papers the owner uploads (Index II/7-12/property card; rent adds tax receipt or electricity bill -> "Verified property"). Draazy does NOT check listing photos against the real flat; never claim it, or a title guarantee.
-- Reel 3 (user decision): the set has the look of a real Hinjewadi township but a plain entrance wall with no sign; the named "BlueRidge" set and its copied render were blocked by Flow video policy twice.
-- Flow video policy: keep real brands, place names and real signage out of video prompts and set images; Flow refunds blocked takes but gives no reason.
-- Flow video policy: no money-scam steps in dialogue ("send the token advance... now his number is off" was blocked even on a blank set); reel 3 (user decision) tells the fake owner without money.
-- Reel 3: Flow voice mispronounced Hindi "band" (closed); spell it "bandhh" in dialogue (user-directed).
-- Reel 4 (user decision): Sana's clip-2 story has no money ("bina mile flatmate final kar liya tha" / "roz raat teen baje tak party"), to avoid Flow's money-scam block.
-- Flow voice stretched Hinglish 'das' (ten) into 'daaas'; write Hindi numbers that look like English words in Devanagari ('दस', 'दो') in dialogue (user-directed). Reel 4 Ishaan: keep the pain mild and wry, never extra sad (user-directed).
-- Ops/admin work-queue cards (RowCard): never make the whole card clickable with an inset overlay; only the action button opens it, like the Properties queue cards (user-directed).
-- Rent agreement: the app collects no witnesses anywhere (wizard, desk, API); staff record them on the IGR portal at the doorstep visit (user-directed).
-- Rent-agreement upload limits: registered copy 2 MB; draft and party papers stay 1 MB, even though a draft once failed at 1 MB (user-directed, confirmed twice).
-- Rent-agreement registered copy: staff record only document no., SRO, date and GRN; no stamp duty or registration fee paid (user-directed).
-- Post-a-property wizard: a NEW listing pre-selects Pune-popular answers (Sale, flat, 2 BHK, semi-furnished, Ready to Move, whole-place rent); edits never inherit them, and legal/property facts stay blank (user-directed, overrides "deal/BHK/possession unselected").
-- **Run only the specs a change touches, even for an app-wide component like `ToastContext`**; never start `run-fast.ps1 -Full` unprompted (user-directed).
+### Positioning and trust
+
+- **Owner-only: no brokers, builders or agent RERA numbers anywhere**; anti-broker guardrails stay.
+- **A listing's RERA number is owner-shared, never Draazy-verified**: say "shared by owner, check it on MahaRERA" (link the search); the staff check stays internal; no "Draazy does not verify" line.
+- **Draazy does not verify societies**: never "verified/confirmed/RERA-registered"; say what we hold ("Limited details").
+- **Verification = two reviewer checks**: owner KYC (ID + live selfie → "KYC done") and ownership papers (Index II/7-12/property card; rent adds tax receipt or electricity bill → "Verified property"). Never claim photo checks or a title guarantee.
+- **Badges to unify are only person-ID or ownership/tenancy checks** ("ID verified", "Verified property"); leave Trust score, RERA shared, Owner consented, Verified resident alone.
+- **Pre-launch until the user says otherwise**: never claim live listings/users; say "building", "coming soon", "early access".
+- **Not a "rentals platform"**: broker-free Pune property platform — buy, sell, rent across residential, plots, commercial, plus flatmates and services (rent agreements are done online now; the pain is agents' fees; our edge is doorstep biometrics, rent reminders, renewal vs agents' fees). SoT: Positioning in `social/instagram/voice.md`.
+
+### Forms and posting
+
+- **Required fields get `*`; never the word "optional" anywhere in the UI** (titles, hints, badges, tags); say what the user gains.
+- **Badge proof (e.g. rent agreement) is asked after posting in Dashboard → Documents**, never on create/edit forms; never grant a badge on upload alone.
+- **Deposit is required on every posting form; 0 is valid.** A tenant room asks the owner's mobile and WhatsApps them an agree/decline link.
+- **A new listing (and staff-posted claim) needs 3 photos, 2 labelled key rooms** (`MIN_PUBLISH_PHOTOS` = `ListingCompleteness.MIN_PHOTOS`).
+- **New listings pre-select Pune-popular answers** (Sale, flat, 2 BHK, semi-furnished, Ready to Move, whole-place rent); edits never inherit them; legal/property facts stay blank.
+- **Keep real-world Indian options even if they break the taxonomy** (Power of Attorney); ask before removing one.
+- **One thing, one picker**: grep the wizard for an existing control before adding a group.
+- **Don't add a second search entry to a results page or duplicate a filter as a chip**; ask first.
+
+### Flatmates
+
+- **Forms never ask a name**: use the profile name; an unnamed profile is blocked with an Add name link.
+- **Detail pages**: no save heart (tile owns it), share on the photo, location facts as an icon grid, no in-page back row, report as a text link after content.
+- **Rooms tab lists room posts only; Teams lists only teams still hunting.** Drop chips true of every card on a tab.
+- **An interest on a seeker post is someone offering a room**: "{name} has a room for you", never "teaming up".
+- **Dashboard flatmate cards match property cards**: same status/action grouping, side-by-side Share + full Get Verified label (pending too); verification CTAs look like buttons.
+
+### Consumer UI
+
+- **Don't replace a familiar layout while moving features** (kept request-type tabs, chat photo panel); add cues on top.
+- **Home summarises and routes**: decisions live on the full-request page. "Needs your attention" = one-line header (title + N pending) over one glass tile per type (icon, label, who, count + wait, chevron).
+- **Dashboard KYC nudge**: one-row tile ("Get your KYC badge" + one benefit + Verify).
+- **Saved**: heart totals include property + flatmate saves; category is "Flatmates"; no top-nav count badge (counts on Saved tabs). Verify dropdown geometry and click every saved kind through to detail.
+- **Messages keeps the mobile bottom nav** (hide it only on auth): size panes off `--dz-bottom-inset`. Composers send on Enter (Shift+Enter newline), touch too; scrollbar only on overflow.
+- **"Horizontal scroll UI standard" = the underline `dz-detail-tab` strip in `HScroll`**, not dashboard pill chips.
+- **Service trackers show only in-progress requests**; past ones fold behind one toggle; none when nothing is filed.
+- **Public refund pages state only what the user gets and how to ask**, never who approves internally.
+
+### Staff and back-office
+
+- **Work queues list newest first**; overdue rows are found by their rose tag.
+- **Back-office shows customers' full mobiles**, no reveal step or list audit; masking is consumer-only.
+- **One staff decision is final** (#330): no second reviewer, QA sample or override step; only refunds are two-person; self-action guards stay. Managers/admins may approve their own rent-agreement refund (e6f801344) — not a gap.
+- **Staff alert emails go to `role='staff'` only** and ignore quiet hours; queue alerts go in `StaffSlaRule.CATALOGUE`.
+- **RowCard queue cards: only the action button opens them**, never a whole-card overlay.
+- **A submitted case is "in review", not "unverified"**: show what the user sent instead of re-asking.
+
+### Rent agreement
+
+- **Stamp duty matches the IGR L&L calculator**: 0.25% rounded to nearest rupee (min ₹100), escalated rent rounded to paise then truncated; show paise (₹918.00) and the duty line.
+- **Collect every field the IGR L&L 2.0 portal needs through police records** (gender, DOB, PAN, mobile, licensor PIN/village/address); skip what it fetches (Aadhaar OTP data, photo, biometrics at the doorstep), optional fields (alias, occupation, email, mother's name) and witnesses (none anywhere in the app; staff record them on the portal). Server keeps a format-only mother's-name check for legacy requests.
+- **Never ask property data staff can read off Index II** (village, road, CTS/survey, zone, construction, age, gallery); Index II upload is mandatory. Police station is plain text.
+- **A filed paper is never asked again**: every reopen path restores filed docs, replace-only. No "Relation to Tenant 1" field.
+- **Staff may correct every customer value** (PAN/Aadhaar too); send back only for a fresh paper or an answer staff cannot give.
+- **Upload limits: registered copy 2 MB; draft and party papers 1 MB** (confirmed twice). Registered copy records only document no., SRO, date, GRN.
+
+### Social and reels
+
+- **Social copy reads human**: casual paragraphs, no bold headers or bullets, contractions, empathetic opener/closer; never invent anecdotes.
+- **Reddit**: Pune subs first (r/Hinjewadi, r/PCMC, r/pune), national only for Pune threads; 3–5 lines; feature mentions + disclosure only in broker/agreement/verification threads; links only in promo slots.
+- **Pre-launch mentions point to instagram.com/draazyapp.homes**, never draazy.com; there is no waitlist page.
+- **Reels: no prices**; renewal is "renewal reminder + one-tap renewal", never "auto-renew". Keep the whole phone in frame (zoom ≤ 1.274 at base 1.35), logo only in the outro, ≤ 30 s, every line a complete sentence.
+- **UGC/Flow clips**: short prompt style of take 4 (3f1741fb); never mention the phone; spell out wardrobe (closed teal pullover hoodie) every clip; each clip exactly 8 s — fill with an extra line, never stretch; sign-off is a separate shared clip; don't fix takes in Flow's edit box.
+- **Dialogue**: connected sentences (cause → effect), never clipped word-lines. Ishaan is amused/wry, never sad or over-laughing; keep pain mild.
+- **Flow policy**: no real brands, places or signage, and no money-scam steps (blocked with no reason). Reel 3: unsigned Hinjewadi-style entrance, fake owner without money. Reel 4: Sana's clip-2 story without money.
+- **Flow voice**: spell Hindi "band" as "bandhh"; write Hindi numbers that look English in Devanagari ('दस', 'दो').
