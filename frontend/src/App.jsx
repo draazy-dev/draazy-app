@@ -38,7 +38,7 @@ const Owner = lazyPage(() => import('./pages/consumer/Owner.jsx'), 'owner');
 const Compare = lazyPage(() => import('./pages/consumer/Compare.jsx'), 'compare-saved');
 const Dashboard = lazyPage(() => import('./pages/consumer/Dashboard.jsx'), 'dashboard', 'flatmates', 'list-property', 'listings', 'locality', 'owner', 'owner-hub', 'verify');
 const Services = lazyPage(() => import('./pages/consumer/Services.jsx'), 'services');
-const ListProperty = lazyPage(() => import('./pages/consumer/ListProperty.jsx'), 'flatmates', 'list-property', 'owner', 'verify');
+const ListProperty = lazyPage(() => import('./pages/consumer/ListProperty.jsx'), 'dashboard', 'flatmates', 'list-property', 'owner', 'verify');
 const PropertyPassport = lazyPage(() => import('./pages/consumer/PropertyPassport.jsx'), 'locality', 'owner-hub');
 const PackersMovers = lazyPage(() => import('./pages/consumer/services/PackersMovers.jsx'), 'services');
 const PropertyLegal = lazyPage(() => import('./pages/consumer/services/PropertyLegal.jsx'), 'services');
@@ -46,7 +46,7 @@ const HomeLoans = lazyPage(() => import('./pages/consumer/services/HomeLoans.jsx
 const InteriorRenovation = lazyPage(() => import('./pages/consumer/services/InteriorRenovation.jsx'), 'services');
 const PropertyValuation = lazyPage(() => import('./pages/consumer/services/PropertyValuation.jsx'), 'services');
 const RentAgreement = lazyPage(() => import('./pages/consumer/services/RentAgreement.jsx'), 'list-property', 'services');
-const Contact = lazy(() => import('./pages/consumer/Contact.jsx'));
+const Contact = lazyPage(() => import('./pages/consumer/Contact.jsx'), 'misc2');
 const TrustPage = lazy(() => import('./pages/consumer/TrustPage.jsx'));
 const CompareNobroker = lazy(() => import('./pages/consumer/CompareNobroker.jsx'));
 const StaffInvite = lazy(() => import('./pages/consumer/StaffInvite.jsx'));

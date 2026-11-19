@@ -59,7 +59,13 @@ function resolveImport(fromFile, spec) {
 
 const KEY_LITERAL = /['"`]([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)['"`]/g;
 const IMPORT_SPEC = /(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
+const NESTED_LAZY_PAGE = /lazyPage\(\(\) => import\('([^']+)'\)((?:,\s*'[^']+')*)\)/g;
 
+const parseDeclared = (argsRaw) => new Set(
+  (argsRaw || '').split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean),
+);
+
+const nestedBoundaries = [];
 const fileFacts = new Map();
 function factsFor(file) {
   let facts = fileFacts.get(file);
@@ -73,6 +79,13 @@ function factsFor(file) {
   try { source = readFileSync(file, 'utf8'); } catch { return facts; }
 
   source = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+  // A nested lazyPage loads its own namespaces, so it is checked as a boundary, not charged to this file.
+  source = source.replace(NESTED_LAZY_PAGE, (_, spec, argsRaw) => {
+    const target = resolveImport(file, spec);
+    if (target) nestedBoundaries.push({ from: file, spec, target, declared: parseDeclared(argsRaw) });
+    return '';
+  });
 
   for (const [, literal] of source.matchAll(KEY_LITERAL)) {
     const ns = nsForLiteral(literal);
@@ -110,9 +123,7 @@ let failures = 0;
 const hints = [];
 
 for (const [, name, spec, argsRaw] of app.matchAll(ROUTE)) {
-  const declared = new Set(
-    (argsRaw || '').split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean),
-  );
+  const declared = parseDeclared(argsRaw);
   const required = namespacesReachedBy(resolveImport(APP, spec));
   const missing = [...required].filter((ns) => !declared.has(ns) && !EAGER.has(ns)).sort();
   const spare = [...declared].filter((ns) => !required.has(ns)).sort();
@@ -141,6 +152,14 @@ for (const [, spec] of app.matchAll(SYNC_IMPORT)) {
     console.error(`✗ ${spec} is imported synchronously by App.jsx but reaches ${required.join(', ')},`);
     console.error('  which is not eager. It renders outside every route boundary, so those keys');
     console.error('  would paint raw. Either make the namespace eager or move the module behind a route.');
+    failures++;
+  }
+}
+
+for (const { from, spec, target, declared } of nestedBoundaries) {
+  const missing = [...namespacesReachedBy(target)].filter((ns) => !declared.has(ns) && !EAGER.has(ns)).sort();
+  if (missing.length) {
+    console.error(`✗ lazyPage(() => import('${spec}')) in ${from.replace(SRC, 'src')} reaches ${missing.join(', ')} but does not declare it.`);
     failures++;
   }
 }
