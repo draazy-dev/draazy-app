@@ -1,0 +1,11 @@
+{
+  "name": "draazy-loadtest",
+  "private": true,
+  "scripts": {
+    "sandbox": "artillery run -e sandbox smoke.yml",
+    "local": "artillery run -e local smoke.yml"
+  },
+  "devDependencies": {
+    "artillery": "2.0.34"
+  }
+}
