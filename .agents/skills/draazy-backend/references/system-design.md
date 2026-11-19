@@ -1,9 +1,9 @@
 # PuneNest backend — system design roadmap
 
 How to go from "React frontend + API contract" to a live, frontend-wired Spring Boot + PostgreSQL
-backend, without boiling the ocean. The organizing idea: **freeze the contract, build the data model
-and cross-cutting foundation once, then ship vertical slices in priority order, then flip the
-frontend to `http`.** Do the phases in order; each assumes the previous is stable.
+backend. Organizing idea: **freeze the contract, build the data model and cross-cutting foundation
+once, ship vertical slices in priority order, then flip the frontend to `http`.** Do the phases in
+order; each assumes the previous is stable.
 
 ## System context (the big picture)
 
@@ -16,11 +16,11 @@ Spring Boot ──> provider seams ──> OTP/SMS | KYC/Aadhaar | Payments | Fi
                                    (mock impls in dev; real @Primary in prod)
 ```
 
-- One deployable Spring Boot service (a modular monolith), not microservices — the domain is
-  cohesive and a monolith is the laziest-that-works choice at this stage (`ponytail`). Keep features
-  in separate packages so they *could* be split later if load demands it.
-- Stateless (JWT) so it scales horizontally behind a load balancer; all state in PostgreSQL.
-- External integrations are always behind seams so dev/demo needs zero paid keys.
+- One deployable Spring Boot service (modular monolith), not microservices: the domain is
+  cohesive and a monolith is the laziest-that-works choice now (`ponytail`). Keep features
+  in separate packages so they *could* be split later.
+- Stateless (JWT), so it scales horizontally behind a load balancer; all state in PostgreSQL.
+- External integrations always behind seams, so dev/demo needs zero paid keys.
 
 ## Phase 0 — Freeze the contract
 
@@ -28,9 +28,9 @@ Goal: no surprises later. Before modeling anything:
 
 - Read the target domains in the OpenAPI spec (`backend/src/main/resources/static/openapi/punenest-api.yaml`)
   end to end; confirm every endpoint you plan to build has request params, auth level, and response shape defined.
-- Diff against the frontend `providers/mock/` output for those domains — the mock is the concrete
-  reference for exact field names/casing. Note any drift and reconcile it in the contract.
-- Output: a short list of contract gaps to patch (if any), patched before coding.
+- Diff against the frontend `providers/mock/` output for those domains (the concrete
+  reference for exact field names/casing). Reconcile any drift in the contract.
+- Output: a short list of contract gaps, patched before coding.
 
 ## Phase 1 — Data model & V1 schema
 
@@ -66,7 +66,7 @@ issues a JWT via the mock OTP seam, and a protected ping endpoint enforces roles
 ## Phase 3 — Vertical slices (priority order)
 
 Build one domain at a time, full stack (entity -> repo -> service -> controller -> DTOs -> tests),
-each keeping shapes byte-compatible with the contract. Recommended order (value-first, dependency-aware):
+shapes byte-compatible with the contract. Recommended order (value-first, dependency-aware):
 
 1. **Auth & users** — login/OTP, `/auth/me`, user admin, Aadhaar verification.
    Everything else needs identity + the Aadhaar flag.
@@ -113,9 +113,9 @@ Goal: prove the swap. Component code must not change.
 
 ## Guardrails throughout
 
-- **Contract compatibility over cleverness** — the frontend is done; the backend conforms to it.
-- **Runnable with zero keys** — mock seams stay the default in dev.
-- **Soft-delete + audit** — no hard deletes; log state changes to `audit_log`.
-- **Enforce trust rules server-side** — Aadhaar gate, mobile masking, foundation-field status
+- **Contract compatibility over cleverness**: the frontend is done; the backend conforms to it.
+- **Runnable with zero keys**: mock seams stay the default in dev.
+- **Soft-delete + audit**: no hard deletes; log state changes to `audit_log`.
+- **Enforce trust rules server-side**: Aadhaar gate, mobile masking, foundation-field status
   reversion are domain rules, not UI decoration.
-- **Ship slices, not layers** — a working `/properties` beats a half-wired everything.
+- **Ship slices, not layers.**

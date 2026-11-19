@@ -1,8 +1,7 @@
 # PuneNest backend — architecture
 
-How a PuneNest Spring Boot service is structured. Mirror the existing **auth/identity slice**
-(`com.punenest.api.identity` + `com.punenest.api.security`); this file generalizes its patterns so
-every new feature looks the same.
+How a PuneNest Spring Boot service is structured. Mirror the **auth/identity slice**
+(`com.punenest.api.identity` + `com.punenest.api.security`); this file generalizes its patterns.
 
 ## Table of contents
 - Package-by-feature layout
@@ -19,7 +18,7 @@ every new feature looks the same.
 
 ## Package-by-feature layout
 
-Group by domain feature, not by technical layer. Each feature is a self-contained package under
+Group by domain feature, not technical layer. Each feature is a self-contained package under
 `com.punenest.api`:
 
 ```
@@ -54,22 +53,21 @@ property/
 ## Layering & responsibilities
 
 - **Controller** — HTTP only: bind path/query/body, call the service, return a DTO. No business
-  logic, no repository calls. Annotate with `@RestController`, `@RequestMapping("/api/...")`.
-- **Service** — the brain: business rules, `@Transactional` boundaries, gating checks, mapping
+  logic, no repository calls. `@RestController`, `@RequestMapping("/api/...")`.
+- **Service** — business rules, `@Transactional` boundaries, gating checks, mapping
   orchestration, calls to repositories and provider seams. Constructor injection only.
 - **Repository** — Spring Data JPA. Derived queries where possible; `@Query` for anything
   non-trivial. Public list queries filter out archived rows.
-- **Entity** — JPA `@Entity` mapping the table. Keep persistence concerns here; never leak entities
+- **Entity** — JPA `@Entity` mapping the table. Persistence concerns only; never leak entities
   out of the service layer — always map to a DTO.
 
-Use **constructor injection** (a `final` field set in a single constructor); do not use field
+Use **constructor injection** (a `final` field set in a single constructor); no field
 `@Autowired`. It keeps classes testable and dependencies explicit.
 
 ## DTOs as records
 
-Inbound and outbound payloads are Java `record`s — they are immutable, concise, and make the shape
-obvious at a glance. Match the OpenAPI spec (`backend/src/main/resources/static/openapi/punenest-api.yaml`)
-field names exactly (the frontend depends on them).
+Inbound and outbound payloads are Java `record`s (immutable, concise). Match the OpenAPI spec
+(`backend/src/main/resources/static/openapi/punenest-api.yaml`) field names exactly (the frontend depends on them).
 
 ```java
 public record PropertyResponse(
@@ -96,7 +94,7 @@ Every error returns:
 { "error": "code", "message": "human readable", "status": 400 }
 ```
 
-Represent it as a record and centralize production in a `@RestControllerAdvice`:
+Represent it as a record and centralize it in a `@RestControllerAdvice`:
 
 ```java
 public record ApiError(String error, String message, int status) {}
@@ -135,17 +133,17 @@ public record PageResponse<T>(List<T> content, int page, int size,
 - Stateless JWT. A `JwtFilter` (OncePerRequestFilter) reads `Authorization: Bearer <token>`,
   validates via `JwtService`, and populates the `SecurityContext` with the user id + role.
 - Roles: `buyer`, `owner`, `admin`, `staff`. Staff tokens also carry `team`/`teams` claims.
-- Guard endpoints with method security (`@PreAuthorize("hasRole('OWNER')")`) or in `SecurityConfig`
-  URL rules — whichever the existing `com.punenest.api.security.SecurityConfig` already uses; stay consistent.
+- Guard endpoints with method security (`@PreAuthorize("hasRole('OWNER')")`) or `SecurityConfig`
+  URL rules — whichever `com.punenest.api.security.SecurityConfig` already uses; stay consistent.
 - Login is **passwordless**: `/auth/login` verifies a mobile OTP and issues a token;
   `/auth/staff-login` is the internal staff path. OTP verification goes through the OTP provider seam.
-- Expose the current principal to services via a small `@CurrentUser` argument resolver or by reading
-  the `SecurityContext` in a helper — do not thread the token through method signatures.
+- Expose the current principal via a `@CurrentUser` argument resolver or a `SecurityContext` helper;
+  do not thread the token through method signatures.
 
 ## The contact / Aadhaar gate
 
-A buyer can only see an owner contact number after (a) they are Aadhaar-verified and (b) a contact
-request is approved. Enforce this server-side, not just in the UI:
+A buyer sees an owner contact number only after (a) Aadhaar verification and (b) an approved contact
+request. Enforce server-side, not just in the UI:
 
 1. If the caller is not Aadhaar-verified -> throw `AadhaarRequiredException` ->
    `403 { "error": "aadhaar_required", ... }`.
@@ -171,15 +169,14 @@ class MockOtpSender implements OtpSender { ... }
 class SmsOtpSender implements OtpSender { ... }
 ```
 
-The whole app must build, run, and demo with only the mock impls — no paid keys required. Copy this
-pattern (see the real `cashfree/` payment impl under `provider/`); the mock stays the dev default and
-the real impl is `@Primary` only when its profile/keys are present.
+The whole app must build, run and demo with only the mock impls (no paid keys). Copy this
+pattern (see the real `cashfree/` payment impl under `provider/`): the mock stays the dev default; the
+real impl is `@Primary` only when its profile/keys are present.
 
 ## Caching
 
-For expensive-but-stable facts, cache at write time keyed on the stable inputs. Prefer persisting the
-computed value in the DB over an in-memory cache when the result is durable, so it survives restarts
-and is queryable.
+Cache expensive-but-stable facts at write time, keyed on the stable inputs. Prefer persisting the
+computed value in the DB over an in-memory cache when the result is durable (survives restarts, queryable).
 
 ## Config & profiles
 

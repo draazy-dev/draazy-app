@@ -9,9 +9,9 @@ A lean, no-install take on the `/brag` approach (latent-spaces/brag): every vide
 with a seekable `window.render(t)`, screenshotted frame by frame with Playwright and encoded with Windows'
 built-in Media Foundation. No Remotion, HyperFrames or ffmpeg.
 
-Everything lives in `brag-output/` (git-excluded via `.git/info/exclude`). The working directory is
-`brag-output\work\`; finished videos go in `brag-output\`. `brag-output\brag-plan.md` has the exact rebuild
-commands for every existing video. Read its reel section before changing anything.
+Everything lives in `brag-output/` (git-excluded via `.git/info/exclude`). Working directory
+`brag-output\work\`; finished videos in `brag-output\`. `brag-output\brag-plan.md` has the exact rebuild
+commands for every existing video; read its reel section before changing anything.
 
 ## Hard rules
 
@@ -27,11 +27,10 @@ commands for every existing video. Read its reel section before changing anythin
 5. **Secrets:** never store a token the user pastes in chat; use it only as a process env var, and tell them to revoke it.
 6. **Show before you ship:** voice samples before re-voicing, a stills contact sheet before a full render.
 7. **Phone never cut off at the bottom.** The whole phone frame stays inside the 1080×1920 canvas in every
-   scene (camera zoom ≤ 1.274 at base scale 1.35; see Layout spec). Check the contact sheet for it.
+   scene (camera zoom ≤ 1.274 at base scale 1.35; see Layout spec). Check the contact sheet.
 8. **Script in full sentences.** Every voice line is a complete, natural, impactful sentence a presenter
    would say, never clipped words or labels read out ("Ownership papers? Checked."). Reel ≤ 30 s.
-9. **Logo animation only at the end.** No splash or logo reveal mid-reel; the logo animates only in the
-   closing outro.
+9. **Logo animation only at the end.** No splash or logo reveal mid-reel; the logo animates only in the closing outro.
 
 ## Pipeline
 
@@ -58,7 +57,7 @@ Run from `brag-output\work`, always with
 | Verify | `node verify.cjs <name>.mp4` (path relative to `brag-output`) → expect 1080×1920, stereo 48 kHz, exact duration | same |
 
 Poster = a late outro frame (e.g. `f00948.jpg` for 32 s), copied before encoding.
-If only the audio changes, re-use the existing frames folder — no re-render needed (that is how v3 was made).
+If only the audio changes, re-use the existing frames folder (that is how v3 was made).
 
 ## Layout spec (9:16, any screen of the app)
 
@@ -67,14 +66,13 @@ If only the audio changes, re-use the existing frames folder — no re-render ne
   (total scale ≤ ~1.72, phone ≈ 66% of the width).
 - **Captions** at the top: start y ≈ 170, max two lines, end ≈ 310. They must never overlap the phone screen.
 - **Phone top edge pinned at y ≈ 326**, just under the captions, for the whole reel (the camera clamps
-  `fy` with `CAPTION_FLOOR`). **The whole phone stays in frame** — the user rejected a phone cut off at the
-  bottom: `326 + 868·S·z ≤ ~1820`, so z ≤ 1.274.
+  `fy` with `CAPTION_FLOOR`). **The whole phone stays in frame** (the user rejected a phone cut off at the
+  bottom): `326 + 868·S·z ≤ ~1820`, so z ≤ 1.274.
 - **Instagram safe zones:** nothing important in the top ~150 px, bottom ~350 px (y > 1570) or the right edge.
 - **Zoom rule:** the highest zoom (≤ 1.274×) that keeps the feature in focus above y ≈ 1570; drop to ~1.2×
   for a beat whose feature sits lower (e.g. the selfie "Checks passed" title). Bottom-of-app features (sticky
   "Contact Owner", bottom nav) fall below 1570 at 1.274, so pull back to ~1.1× for that beat only.
-- **Logo:** only in the outro. No splash/logo animation mid-reel; go from the lock screen to the app with an
-  iOS swipe-up unlock (`reels\trust-v2`).
+- **Logo:** only in the outro; go from the lock screen to the app with an iOS swipe-up unlock (`reels\trust-v2`).
 - **Motion:** eased zoom between keyframes, no sideways pans. Keep attention on the feature — big and close,
   never a small phone floating in space (a rejected attempt).
 - Reference: `reel-trust-v2.mp4` / `reels\trust-v2\index.html`. Geometry: `X(x)=SX+x·S`, `Y(y)=SY+(47+y)·S`,
@@ -86,15 +84,14 @@ If only the audio changes, re-use the existing frames folder — no re-render ne
   agent narrating: short spoken lines, contractions, problem → payoff, a question then its answer, real
   pauses (0.2–0.45 s), one idea per beat, brand + city at the end.
   Example: "You search for one flat in Pune... and the broker calls just don't stop."
-  Every line is a complete, impactful sentence — no clipped fragments like "Ownership papers? Checked." that
-  sound like reading out labels. Keep each reel **≤ 30 s**; shorten the weakest line rather than run over.
+  Keep each reel **≤ 30 s**; shorten the weakest line rather than run over (full-sentence rule: Hard rule 8).
 - `cues.json`: `duration`; `script` = `[sceneStart, [phrase | pauseSeconds | ["at", t]]]` (`"at"` pins the
   next phrase to an on-screen beat); optional `rates` (per-phrase Edge rate, e.g. `"Draazy.": -8`);
   `music: { hook, outro, whoosh, clicks }` in per-reel folders. `voice.py` reports overflows — fix them by
   shortening lines or nudging rates; ≤ 0.05 s is fine.
 - **Indian English only, no Hindi.** Voice: Edge TTS `en-IN-NeerjaNeural` at speed 1.04 (user's pick from
   samples; `en-IN-NeerjaExpressiveNeural` and `en-IN-PrabhatNeural` are alternatives). It says "Pune"
-  correctly; Kokoro did not. Edge is fine for demos — recommend Azure Speech (same voices, licensed) for paid ads.
+  correctly; Kokoro did not. Edge is fine for demos; recommend Azure Speech (same voices, licensed) for paid ads.
 - Edge quirks already handled in `voice.py`: phrase-by-phrase synthesis (whole-script reads sound robotic),
   MP3-only output decoded by `mp3wav.cjs` via Chromium, `tighten()` trims Edge's long full-stop gaps to
   0.16 s, script pauses ×0.6, clips cached in `vo\edge-cache\`.

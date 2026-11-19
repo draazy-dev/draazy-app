@@ -2,7 +2,7 @@
 
 The PostgreSQL schema for PuneNest. Source of truth is the OpenAPI spec
 (`backend/src/main/resources/static/openapi/punenest-api.yaml`) plus `docs/system/data-model.md`; this
-file expands them into concrete migration and mapping guidance. When they disagree, the spec wins —
+file expands them into migration and mapping guidance. When they disagree, the spec wins:
 patch the spec, then update here.
 
 ## Table of contents
@@ -19,15 +19,14 @@ patch the spec, then update here.
 
 - **snake_case** table and column names (`owner_id`, `created_at`).
 - **UUID primary keys** in prod (`id uuid primary key default gen_random_uuid()`), exposed as
-  `String` in the API. The mock uses prefixed string ids (`PR{ts}`); prod need not reproduce the
-  prefix, only the String type.
+  `String` in the API (the mock's prefixed ids like `PR{ts}` need not be reproduced, only the String type).
 - **`created_at timestamptz not null default now()`** on every table; add `updated_at` where the row
   is mutated.
 - Foreign keys are `<entity>_id uuid references <table>(id)`.
-- Money is stored as integer minor units or `numeric` — pick one and be consistent; the contract
-  exposes plain numbers. Rupees as `bigint` (whole rupees) is fine for this domain.
-- Enum-like columns (`status`, `role`, `deal`, `type`) are stored as `text` with a `check`
-  constraint listing allowed values — cheaper to evolve than native PG enums.
+- Money: integer minor units or `numeric`, consistently; the contract exposes plain numbers. Rupees as
+  `bigint` (whole rupees) is fine here.
+- Enum-like columns (`status`, `role`, `deal`, `type`) are `text` with a `check`
+  constraint listing allowed values (cheaper to evolve than native PG enums).
 
 ## Flyway migrations
 
@@ -43,7 +42,7 @@ patch the spec, then update here.
 
 ## Tables by domain
 
-Field lists below come straight from the OpenAPI spec and `docs/system/data-model.md`; add the
+Field lists below come from the OpenAPI spec and `docs/system/data-model.md`; add the
 standard `created_at` (and `archived`/`archived_at` where the domain supports soft-delete) even if
 omitted in the summary.
 
@@ -109,8 +108,7 @@ archived_at  timestamptz
 
 Applies to `properties`, `users`, and CMS `content` collections (announcements, etc.). Public/list
 repository queries filter `where archived = false`; admin queries opt in with `?archived=true`.
-Never issue SQL `DELETE` for these — set the flag. This preserves audit history and referential
-integrity.
+Never issue SQL `DELETE` for these; set the flag (preserves audit history and referential integrity).
 
 ## Indexing
 
@@ -124,29 +122,28 @@ Index every FK and every column used in a filter or sort:
 - Any `user_id` / `property_id` FK across the schema.
 
 Add composite indexes matching the actual query predicates rather than one-column indexes on
-everything; measure with `EXPLAIN` on the real search query.
+everything; check with `EXPLAIN` on the real search query.
 
 ## JSONB usage
 
 Use `jsonb` for variable-shape or array data the API returns as arrays/objects:
 `properties.images`, `properties.amenities`, `localities.stats`, `saved_searches.filters_json`,
 `ticket_messages.images`, `settings.value_json`. GIN-index a JSONB column only if you query inside it
-(e.g. filtering saved searches); otherwise a plain column is enough.
+(e.g. filtering saved searches).
 
 ## ID strategy
 
 - DB: `uuid` PK with `gen_random_uuid()`.
-- API: expose as `String`; the frontend treats ids opaquely, so UUIDs satisfy the mock string-id
-  contract without change.
-- Do not leak sequential integer ids — they enable enumeration of listings/users.
+- API: expose as `String`; the frontend treats ids opaquely.
+- Do not leak sequential integer ids (they enable enumeration of listings/users).
 
 ## Entity mapping
 
 - One JPA `@Entity` per table, `@Table(name = "snake_case")`, `@Column(name = "snake_case")`.
 - Map JSONB with a JSON type (Hibernate 6 `@JdbcTypeCode(SqlTypes.JSON)` on a `List<String>` /
-  `Map<String,Object>` field) — do not hand-roll string concatenation.
+  `Map<String,Object>` field), not hand-rolled string concatenation.
 - Keep entities inside the service layer; map to DTO records before returning (see
-  `architecture.md`). Never annotate entities with jackson and serialize them directly — that couples
+  `architecture.md`). Never serialize entities with jackson directly: it couples
   the wire format to the schema and risks lazy-loading serialization bugs.
-- Model relationships by FK id fields plus explicit repository lookups where possible; reserve JPA
-  `@ManyToOne`/`@OneToMany` for cases where you genuinely need the object graph, to avoid N+1 traps.
+- Model relationships by FK id fields plus explicit repository lookups where possible; use JPA
+  `@ManyToOne`/`@OneToMany` only when you need the object graph, to avoid N+1 traps.

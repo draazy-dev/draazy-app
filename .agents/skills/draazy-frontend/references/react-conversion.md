@@ -1,13 +1,13 @@
 # PuneNest: HTML prototype → React conversion plan
 
-This prototype was always intended to become a real React + backend app. The current static HTML is a
-**design-phase validation** of UX and flows. Use this plan when the user is ready to convert.
+This prototype was always meant to become a real React + backend app; the static HTML was a
+**design-phase validation** of UX and flows. Use this plan when ready to convert.
 
 ## Guiding principles
 
 - **Don't rewrite everything at once.** Migrate module-by-module behind a consistent shell.
-- **The admin/ops back-office is the natural first React module** — it is self-contained, has clear data
-  needs, and benefits most from real auth + an API. The consumer site can follow.
+- **The admin/ops back-office is the natural first React module**: self-contained, clear data
+  needs, benefits most from real auth + an API. The consumer site follows.
 - **Map the existing abstractions directly:**
   - Each HTML page → a React route/page component.
   - `injectAdmin(...)` → a shared `<AdminLayout>` (sidebar/topbar) component.
@@ -20,12 +20,12 @@ This prototype was always intended to become a real React + backend app. The cur
 
 ## Recommended stack
 
-- **React + Vite + TypeScript** (fast, simple; or Next.js if SSR/SEO for the consumer site matters — it
-  likely does for listings, so consider Next.js App Router for the consumer side later).
+- **React + Vite + TypeScript** (or Next.js if SSR/SEO matters — it likely does for listings, so consider
+  Next.js App Router for the consumer side later).
 - **Tailwind CSS** (already the design language — port the theme to a real Tailwind config + design tokens
   so admin and consumer stay consistent).
-- **Component primitives**: a headless/accessible library (e.g. Radix or shadcn/ui patterns) so dropdowns,
-  modals, and selects are accessible by default — this replaces the hand-rolled `.pn-dropdown` portal logic.
+- **Component primitives**: a headless/accessible library (e.g. Radix or shadcn/ui patterns), replacing
+  the hand-rolled `.pn-dropdown` portal logic.
 - **Charts**: keep Chart.js (via `react-chartjs-2`) or switch to Recharts.
 - **Data fetching**: TanStack Query against the API client.
 - **Backend**: any REST/GraphQL service; model entities from `admin-data.js` (listings, users, staff,
@@ -47,8 +47,7 @@ This prototype was always intended to become a real React + backend app. The cur
 
 ## Things to carry over carefully
 
-- The **dropdown accessibility/portal behavior** — replace with an accessible primitive rather than
-  reimplementing the body-portal hack.
-- The **deterministic analytics seeding** is only for the mock; real analytics come from the backend.
-- Keep the **trust/verification UI** prominent — it is a core acquisition lever, not just decoration.
+- The **dropdown accessibility/portal behavior** — replace with an accessible primitive, not the body-portal hack.
+- The **deterministic analytics seeding** is mock-only; real analytics come from the backend.
+- Keep the **trust/verification UI** prominent — a core acquisition lever, not decoration.
 - Preserve **role separation** (admin vs staff teams) and enforce it on the server, not the client.

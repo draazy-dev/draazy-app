@@ -13,10 +13,11 @@
 | Mobile/touch UI: phone viewport, bottom sheet, carousel, tap/scroll, safe areas, PWA | `mobile-native` |
 | New UI surface or visual redesign | `ui-ux-pro-max`, then `frontend-design` |
 | Render/data/bundle performance | `react-performance` |
+| Browser-native HTML/CSS/client JS: dialogs, popovers, tooltips, forms, scrollbars, animations, Core Web Vitals | `modern-web-guidance` (run its `npx` with `$env:DISABLE_TELEMETRY='1'`) |
 | A skill named by the user | that skill |
 | New code beyond a one-line fix (outside the two-skill cap) | `ponytail` |
 
-Conflicts: `draazy-*` wins on implementation, `real-estate-expert` on domain, `senior-product-manager-realestate` on scope, `mobile-native` on touch/viewport (`ui-ux-pro-max` owns layout, density, colour). Skills live in `.agents/skills/`; edit them there, never in `~/.copilot` or `~/.claude`. A named skill missing there → report it.
+Conflicts: `draazy-*` wins on implementation, `real-estate-expert` on domain, `senior-product-manager-realestate` on scope, `mobile-native` on touch/viewport (`ui-ux-pro-max` owns layout, density, colour), `modern-web-guidance` on which web-platform API to use. Legacy patterns it finds in existing code go to `docs/system/tech-debt.md`, not into unrelated diffs. Skills live in `.agents/skills/`; edit them there, never in `~/.copilot` or `~/.claude`. A named skill missing there → report it.
 
 **Simplicity.** No change > existing code > stdlib/native > one-line addition > new dependency > new abstraction. YAGNI: no speculative abstractions, config or flexibility. `ponytail-review` for an over-engineering audit.
 
