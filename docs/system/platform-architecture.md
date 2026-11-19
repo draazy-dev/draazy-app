@@ -2,13 +2,11 @@
 
 > **Status:** MVP architecture pass complete — 23 ADRs ratified (ADR-001..021 incl. ADR-009a/009b)
 > covering compute, database, auth/session, identity verification, notifications/jobs, search,
-> storage, payments, cache/limits, the operational foundation, and **Cashfree as primary payments
-> provider (ADR-017/018)**. All seven architecture views are drawn (§5.1–5.7: context, high-level,
-> component, API-interaction, data-flow, sequences, deployment). This is the central place for
-> platform architecture: component decisions, scoring, ADRs, assumptions, and Mermaid diagrams.
-> **Verification follows a "badge, not gate" progressive-trust model (ADR-019; full design in
-> §6.4 below) — identity verification is opt-in, reviewed in-house, and
-> never blocks participation.**
+> storage, payments (**Cashfree primary, ADR-017/018**), cache/limits and the operational foundation.
+> All seven architecture views are drawn (§5.1–5.7). This is the central place for component
+> decisions, scoring, ADRs, assumptions, and Mermaid diagrams.
+> **Verification is a "badge, not gate" progressive-trust model (ADR-019; full design in §6.4):
+> opt-in, reviewed in-house, never blocks participation.**
 > Remaining open items are non-blocking (§8).
 >
 > **Companion docs (do not duplicate):**
@@ -144,9 +142,8 @@ diagrams are added in §5 as decisions firm up.*
 
 Founder constraint: spend only where no free tier exists, and make every component justify its cost.
 Hosting is the fixed floor: sandbox ≈ $17/mo + 18% GST (App Platform $10 + dev database $7, §4.3).
-The one other need with no free production tier is login OTP. Identity
-verification costs nothing per check — capture is in the browser,
-and the decision is made by our own reviewer (§6.4).
+The one other need with no free production tier is login OTP. Identity verification costs nothing per
+check (browser capture, our own reviewer, §6.4).
 
 | Need | Choice | Free allowance | First cost trigger |
 | --- | --- | --- | --- |
@@ -165,15 +162,14 @@ and the decision is made by our own reviewer (§6.4).
 | Identity verification | in-house: browser capture + staff review | free — no per-check vendor fee at any volume | reviewer time, and object storage for the seven-day image window |
 
 **Two corrections to the old "~1,000 free conversations/mo" assumption.** (a) Conversation-based
-pricing was **replaced by per-message pricing on 1 Jul 2025** — Meta charges per *delivered template*,
-by category and recipient country. (b) The free monthly allowance that survives (1,000/mo from
-1 Oct 2026) covers **service** messages only, and a service message can only be sent inside an open
-24-hour customer-service window. **Authentication templates are billed from the first message**, so
-WhatsApp OTP is a per-login cost, not a free tier. Order of magnitude for India is low single-digit
-paise-to-₹0.15 per delivered OTP — *treat that as a placeholder only*: the authoritative number is
-the **INR rate card CSV** on Meta's pricing page, and rates can move quarterly (1 Jan / 1 Apr /
-1 Jul / 1 Oct) with one month's notice. Volume tiers lower the rate as monthly authentication volume
-grows, aggregated across the whole business portfolio.
+pricing was **replaced by per-message pricing on 1 Jul 2025**: Meta charges per *delivered template*,
+by category and recipient country. (b) The surviving free allowance (1,000/mo from 1 Oct 2026) covers
+**service** messages only, sendable only inside an open 24-hour customer-service window.
+**Authentication templates are billed from the first message**, so WhatsApp OTP is a per-login cost,
+not a free tier. For India it is low single-digit paise-to-₹0.15 per delivered OTP — *a placeholder
+only*: the authoritative number is the **INR rate card CSV** on Meta's pricing page, and rates can
+move quarterly (1 Jan / 1 Apr / 1 Jul / 1 Oct) with one month's notice. Volume tiers lower the rate
+as monthly authentication volume grows, aggregated across the whole business portfolio.
 
 ---
 
@@ -192,18 +188,18 @@ FTS `tsvector` + amenities JSONB + b-tree indexes = **~2-4 KB**; a user row ~0.5
 
 **Binding order.** (1) **R2 storage** is the tightest hard wall (~5k photo-backed listings; reels
 fill it faster). (2) **Postgres 512 MiB** is the *last* wall for content **only if**
-audit/otp/notification retention is enforced — left unpruned it becomes the *first* wall instead.
-(3) **Compute** binds on sustained concurrent traffic and is solved by a larger instance, not a rewrite.
+audit/otp/notification retention is enforced; unpruned, it becomes the *first*. (3) **Compute** binds
+on sustained concurrent traffic and is solved by a larger instance, not a rewrite.
 
-**Bottom line.** The sandbox stack comfortably carries a **Pune neighbourhood-scale MVP**: a few thousand
-live photo-backed listings and **tens of thousands of registered users**. Scaling
-past that is a **DO Managed PostgreSQL upgrade (from ~$15/mo) + a larger instance + pennies-per-GB R2 overage** (R2
-zero-egress ⇒ storage-only overage ~USD 0.015/GB-mo), **not a re-architecture** — the "clear path to
-millions without rewrite" the ADRs target.
+**Bottom line.** The sandbox stack comfortably carries a **Pune neighbourhood-scale MVP**: a few
+thousand live photo-backed listings and **tens of thousands of registered users**. Scaling past that
+is a **DO Managed PostgreSQL upgrade (from ~$15/mo) + a larger instance + pennies-per-GB R2 overage**
+(R2 zero-egress ⇒ storage-only overage ~USD 0.015/GB-mo), **not a re-architecture** — the "clear path
+to millions without rewrite" the ADRs target.
 
-**Two caveats that bite in prod.** (a) **The first usage-driven cost is R2** — the moment photo-backed
+**Two caveats that bite in prod.** (a) **The first usage-driven cost is R2**, once photo-backed
 listings cross ~5k or reels get popular; it scales gracefully because egress is free. (b) **The dev
-database has no backups and is App Platform only** — so production data belongs on DO Managed
+database has no backups and is App Platform only**, so production data belongs on DO Managed
 PostgreSQL, the first upgrade actually *needed*, well before the 512 MiB fills (see §6.2).
 
 ---
@@ -213,10 +209,10 @@ PostgreSQL, the first upgrade actually *needed*, well before the 512 MiB fills (
 Prices read from DigitalOcean's published pricing pages; **re-check before acting**.
 
 **DigitalOcean has no free tier we can use.** App Platform's free tier is **3 apps with static
-sites**, 1 GiB transfer each — a Cloudflare Pages substitute, not a compute one, and Pages is
-already free *and* runs the `/api` proxy Function that §5.7.1's cookie topology requires. Managed
-Postgres, Spaces and container instances have no free tier at all. The $200/60-day new-account credit
-is a trial; pricing a platform against an expiring credit is how the surprise arrives in month three.
+sites**, 1 GiB transfer each — a Cloudflare Pages substitute, not a compute one, and Pages is already
+free *and* runs the `/api` proxy Function that §5.7.1's cookie topology requires. Managed Postgres,
+Spaces and container instances have none at all. The $200/60-day new-account credit is a trial; do not
+price a platform against an expiring credit.
 
 | Component | DigitalOcean | Note |
 |---|---|---|
@@ -236,9 +232,9 @@ threads). It does not OOM under load — it OOMs *during startup*, after the hea
 waiting, which reads as a failed deploy rather than an undersized plan.
 
 **What is kept regardless.** R2 (zero-egress is the property ADR-013 relies on; Spaces would cost
-$5/mo to buy storage headroom we will not need for years and to give that property up) and Cloudflare
-Pages including the `/api` Function. Moving the proxy off Cloudflare breaks the same-site cookie
-topology and kills every session fifteen minutes after login.
+$5/mo for storage headroom we will not need for years and give that property up) and Cloudflare Pages
+including the `/api` Function. Moving the proxy off Cloudflare breaks the same-site cookie topology
+and kills every session fifteen minutes after login.
 
 ---
 
@@ -578,13 +574,12 @@ graph LR
 
 #### 5.7.1 The UI and the API must share one registrable domain
 
-The session's long-lived half is an `HttpOnly`, `SameSite=Lax` cookie (`__Host-draazy_rt`), so the
-browser returns it to `POST /api/auth/refresh` only when the page making that call and this API are
-the same *site*. That makes hosting topology a load-bearing part of the auth design rather than an
-operational detail, and the failure mode is why it is written down here: a cross-site frontend gets
-its cookie withheld **silently** — no error, no CORS message — so every session dies fifteen minutes
-after login and the server log looks exactly like a stream of visitors who were never signed in. Dev
-and e2e cannot surface it, because the Vite proxy makes everything same-origin there.
+The session's long-lived half is an `HttpOnly`, `SameSite=Lax` cookie (`__Host-draazy_rt`), which the
+browser returns to `POST /api/auth/refresh` only when the calling page and this API are the same
+*site*. Hosting topology is therefore part of the auth design. A cross-site frontend gets its cookie
+withheld **silently** — no error, no CORS message — so every session dies fifteen minutes after login
+and the server log looks like visitors who were never signed in. Dev and e2e cannot surface it,
+because the Vite proxy makes everything same-origin there.
 
 Two arrangements satisfy it, and the code supports both without modification:
 
@@ -594,39 +589,36 @@ Two arrangements satisfy it, and the code supports both without modification:
 | **Sibling subdomains** | `www.draazy.com` → `api.draazy.com` | Yes, but same-*site* | `WEB_ORIGINS` listing the UI origin exactly; `CorsConfig` already sets `allowCredentials` |
 
 The two are not equivalent, and the path proxy is the one to choose. The readable
-`__Host-draazy_session` marker that drives the Safari-ITP session recovery is scoped by *host* —
-`document.cookie` always is, and the `__Host-` prefix forbids the `Domain` attribute that would widen
-it — so on sibling subdomains a page on `www.` cannot see a marker set by `api.`. Refresh still works
-for everyone else; what is lost is the recovery for the Safari visitor who returns after seven days,
-and it is lost **silently**, which is the same shape of bug this whole section exists to prevent.
-`CookieDeliveryCheck` therefore warns about that topology by name at boot. The tempting repair —
-giving the marker a `Domain` — is worse than the problem: it drops the prefix and lets any sibling
-host shadow our cookies, turning the automatic cold-boot restore into session fixation.
+`__Host-draazy_session` marker that drives the Safari-ITP session recovery is scoped by *host*
+(`document.cookie` always is, and the `__Host-` prefix forbids the `Domain` attribute that would widen
+it), so on sibling subdomains a page on `www.` cannot see a marker set by `api.`. Refresh still works
+for everyone else; what is lost, **silently**, is the recovery for the Safari visitor who returns
+after seven days. `CookieDeliveryCheck` therefore warns about that topology by name at boot. Giving
+the marker a `Domain` is worse: it drops the prefix and lets any sibling host shadow our cookies,
+turning the automatic cold-boot restore into session fixation.
 
-Subdomain hygiene follows from that: nothing under the cookie's registrable domain should point at a
-third-party SaaS, no wildcard DNS, and no dangling `CNAME` records. A host an attacker can claim is a
-host that can write cookies into our jar.
+Subdomain hygiene follows: nothing under the cookie's registrable domain should point at a
+third-party SaaS, no wildcard DNS, and no dangling `CNAME` records. A host an attacker can claim can
+write cookies into our jar.
 
-What breaks it is a frontend on its own registrable domain. Every vendor preview host is exactly
-that — `*.netlify.app`, `*.pages.dev`, `*.vercel.app` are all Public Suffix List entries, so
-`draazy.pages.dev` and any `api.*` host are different sites. This is resolved by construction rather
-than by rule: the SPA is served from a custom domain (`sandbox.draazy.com` first) and reaches the API
-through a same-origin `/api` path proxy, `frontend/functions/api/[[path]].js`, so nothing ever
-crosses a site boundary. It does mean the vendor preview URL cannot be used for anything requiring a
-session. `SameSite=None` would restore delivery on a cross-site shape but is not a free repair — it
-deletes the argument for `/auth/refresh` carrying no CSRF token, so it would have to be paid for with
-a double-submit token or an Origin allow-list.
+What breaks it is a frontend on its own registrable domain. Every vendor preview host is one —
+`*.netlify.app`, `*.pages.dev`, `*.vercel.app` are Public Suffix List entries, so `draazy.pages.dev`
+and any `api.*` host are different sites. This is resolved by construction: the SPA is served from a
+custom domain (`sandbox.draazy.com` first) and reaches the API through a same-origin `/api` path
+proxy, `frontend/functions/api/[[path]].js`, so nothing crosses a site boundary. The vendor preview
+URL therefore cannot be used for anything requiring a session. `SameSite=None` would restore delivery
+on a cross-site shape but deletes the argument for `/auth/refresh` carrying no CSRF token, so it would
+have to be paid for with a double-submit token or an Origin allow-list.
 
 Because none of this shows up at runtime, `CookieDeliveryCheck` compares `API_PUBLIC_ORIGIN` against
 every entry in `WEB_ORIGINS` at startup and refuses to boot on a topology that cannot work, naming
-both fixes in the message. A silent, total, production-only failure becomes a container that does not
-start. It additionally warns — without failing — on the same-site-but-not-same-host case above, where
-only the ITP recovery is lost.
+both fixes in the message, so a silent, total, production-only failure becomes a container that does
+not start. It only warns, without failing, on the same-site-but-not-same-host case above, where only
+the ITP recovery is lost.
 
 One-off cost of the cookie rename: every already-signed-in user is signed out once on the deploy that
-introduces `__Host-draazy_rt`, because their existing `draazy_rt` cookie is no longer looked for.
-No data is lost and the next sign-in is normal; it is worth a line in the release note rather than a
-support surprise.
+introduces `__Host-draazy_rt`, because their existing `draazy_rt` cookie is no longer looked for. No
+data is lost; put a line in the release note.
 
 ## 6. Component deep-dives (added as ratified)
 
@@ -645,10 +637,10 @@ support surprise.
   `migrate` job runs Flyway before every deploy (`docs/DEPLOY.md` §5). Portable container + standard
   Postgres keep lock-in low (escape hatch to any container host).
 - **Container contract.** App Platform routes traffic to the service's `http_port` (8080), and the app
-  binds `server.port=${PORT:8080}`, so the two agree. Getting this wrong fails the health check while
-  the process itself looks healthy, so the deploy never receives traffic and the logs show nothing
-  wrong. The `8080` default keeps local `spring-boot:run` and the Vite proxy working unchanged. Pinned
-  by `ProdProfileContractTest`.
+  binds `server.port=${PORT:8080}`, so the two agree. A mismatch fails the health check while the
+  process looks healthy, so the deploy never receives traffic and the logs show nothing wrong. The
+  `8080` default keeps local `spring-boot:run` and the Vite proxy working unchanged. Pinned by
+  `ProdProfileContractTest`.
 - **Security.** Managed TLS, no SSH surface, secrets injected as `SECRET` env vars from the GitHub
   `sandbox` environment, database reached over TLS (`sslmode=require`).
 - **Performance.** One always-on 1 vCPU / 1 GB container: no cold starts, and the in-process scheduler
@@ -703,17 +695,17 @@ support surprise.
   whole family) and server-side revocation. `/auth/refresh` rotates the cookie. **CSRF** handled by a
   double-submit token (readable `XSRF` cookie echoed in an `X-CSRF-Token` header) on all mutations.
   > **Partly superseded — see "As built" below.** Only the *refresh* token became a cookie; the access
-  > token is still a Bearer. That is what retires the double-submit CSRF token too: with every mutation
-  > authenticated by a header no foreign origin can set, there is nothing for a forged cross-site
-  > request to ride on. The paragraph is kept because it records the decision this one departs from.
+  > token is still a Bearer. That also retires the double-submit CSRF token: with every mutation
+  > authenticated by a header no foreign origin can set, a forged cross-site request has nothing to
+  > ride on. Kept because it records the decision this one departs from.
 - **Local feasibility.** A **Vite dev proxy** makes the SPA and API same-origin, so the cookie is
   first-party, `SameSite=Lax` "just works", and there is no CORS/cross-site-cookie pain. Prod serves
   the API under the same registrable domain (Cloudflare route `/api` or `api.` subdomain + cookie domain).
 - **Frontend impact.** Contained to the `http` provider: stop attaching `Authorization: Bearer`, send
   `credentials: 'include'` + the CSRF header. **Components never change** (honours "UI is done").
-  > **Superseded.** `Authorization: Bearer` stayed, and no CSRF header was added; `credentials:
-  > 'include'` did land. The prediction that held is the one that mattered: the change was contained
-  > to the `http` provider and no component was touched.
+  > **Superseded.** `Authorization: Bearer` stayed and no CSRF header was added; `credentials:
+  > 'include'` did land. The prediction that mattered held: the change was contained to the `http`
+  > provider and no component was touched.
 - **Security.** httpOnly blocks JS token theft; Secure forces HTTPS; SameSite blocks cross-site send;
   short access TTL limits blast radius; rotation + reuse-detection contain refresh replay; CSRF token
   blocks forged mutations; OTP hashed + throttled.
@@ -722,47 +714,47 @@ support surprise.
 - **Cost.** Zero (Postgres tables only). OTP send cost applies only in prod, behind the `OtpSender` seam.
 - **Operational prerequisite / risk.** **Superseded by ADR-020.** This originally read "real SMS OTP
   in India requires DLT/TRAI registration (registered entity, sender ID, approved templates) before
-  go-live" — choosing WhatsApp as the OTP channel removes DLT from the critical path entirely. The
-  prerequisite is now **Meta business verification + an approved `AUTHENTICATION` template**. Free in
-  dev via the mock seam.
+  go-live"; choosing WhatsApp as the OTP channel removes DLT from the critical path. The prerequisite
+  is now **Meta business verification + an approved `AUTHENTICATION` template**. Free in dev via the
+  mock seam.
 - **Future scale.** Move the refresh-token store to Redis for faster revocation checks; add a device/
   session list with "log out everywhere"; step-up auth for sensitive operations.
 - **Score - Performance 8 | Security 9 | Cost 9 | Ops simplicity 7.**
 - **As built (2026-08-31).** Half of C, and deliberately so: the **refresh** token is an `HttpOnly;
   Secure; SameSite=Lax; Path=/` cookie (`__Host-draazy_rt`), while the **access** token is still a
-  `localStorage` Bearer. Splitting them this way took the month-long credential out of JavaScript's
-  reach without rewriting every authenticated call. Be precise about the benefit, because the
-  obvious phrasing is wrong: `HttpOnly` stops a payload *reading* the refresh token, not *using* it —
-  same-origin script can still `POST /auth/refresh` with `credentials: 'include'` and read the new
-  access token out of the response. What it prevents is **exfiltration**: the token cannot be shipped
-  to the attacker's own server, so the capability dies with the compromised page instead of granting
-  thirty days of offline re-authentication afterwards. That makes XSS the dominant risk to this
-  credential, and dropping `'unsafe-inline'` from `script-src` (see `frontend/public/_headers`) the
-  mitigation that actually moves the number.
+  `localStorage` Bearer. This took the month-long credential out of JavaScript's reach without
+  rewriting every authenticated call. Be precise about the benefit, because the obvious phrasing is
+  wrong: `HttpOnly` stops a payload *reading* the refresh token, not *using* it — same-origin script
+  can still `POST /auth/refresh` with `credentials: 'include'` and read the new access token out of
+  the response. What it prevents is **exfiltration**: the token cannot be shipped to the attacker's
+  own server, so the capability dies with the compromised page instead of granting thirty days of
+  offline re-authentication afterwards. That makes XSS the dominant risk to this credential, and
+  dropping `'unsafe-inline'` from `script-src` (see `frontend/public/_headers`) the mitigation that
+  actually moves the number.
   Two consequences follow from moving only one token. **CSRF stays unnecessary** — the cookie is
   POST-only under an explicit `SameSite=Lax`, so a forged cross-site POST to `/auth/refresh` arrives
   with no cookie at all; every mutation still authenticates by a header no other origin can set. And
-  the client lost its ability to break a refresh race by
-  comparing the stored token, so the server forgives a replay landing within seconds of the rotation
-  it lost (`draazy.security.jwt.refresh-grace`).
+  the client lost its ability to break a refresh race by comparing the stored token, so the server
+  forgives a replay landing within seconds of the rotation it lost
+  (`draazy.security.jwt.refresh-grace`).
   Finishing C — access token in memory, CSRF double-submit — remains open, and is now a change to the
   access token alone.
-  **The `__Host-` prefix replaced the `/api/auth` path scoping, and that is a net gain.** Path
-  scoping only ever guarded against our own code forwarding or logging a request carrying the cookie,
-  and nothing here logs cookies or headers. The prefix, which browsers enforce by refusing to store
-  the cookie at all unless it is `Secure`, `Domain`-less and at `Path=/`, guards against something we
+  **The `__Host-` prefix replaced the `/api/auth` path scoping, and that is a net gain.** Path scoping
+  only ever guarded against our own code forwarding or logging a request carrying the cookie, and
+  nothing here logs cookies or headers. The prefix, which browsers enforce by refusing to store the
+  cookie at all unless it is `Secure`, `Domain`-less and at `Path=/`, guards against something we
   could not otherwise stop: any other host under the registrable domain planting a `Domain`-scoped
-  twin that neither side can clear. With the ITP restore below now resuming sessions automatically at
-  cold boot, that twin would be a fully automated session fixation — the victim's browser signing
-  itself into the attacker's account with no interaction. The cookie names are therefore derived at
-  runtime from `refresh-cookie.secure` (prefixed in production, bare over plain-HTTP dev where a
-  browser would reject the prefix), and both shapes are pinned by test rather than left to whichever
+  twin that neither side can clear. With the ITP restore below resuming sessions automatically at cold
+  boot, that twin would be a fully automated session fixation — the victim's browser signing itself
+  into the attacker's account with no interaction. The cookie names are therefore derived at runtime
+  from `refresh-cookie.secure` (prefixed in production, bare over plain-HTTP dev where a browser would
+  reject the prefix), and both shapes are pinned by test rather than left to whichever
   profile CI happens to run.
   **A second, deliberately readable cookie rides beside it.** `__Host-draazy_session` (`Path=/`, not
   `HttpOnly`, same `Max-Age`/`Secure`/`SameSite`, cleared by the same logout) exists because Safari's
   ITP evicts *script-writable* storage at seven days and spares server-set cookies. Without it a
   remembered Safari user reached day eight with an empty `localStorage` and a refresh cookie good for
-  three more weeks that nothing would ever spend — an absent access token reads as "signed out"
+  three more weeks that nothing would ever spend; an absent access token reads as "signed out"
   everywhere else in the client, correctly, so the boot path needed its own signal rather than a
   loosening that would cost every anonymous visitor a `/auth/refresh`. Its value (`1`/`0`) also
   carries whether the session was meant to persist: `remember` must be restated on each rotation, and
@@ -776,15 +768,15 @@ support surprise.
   side of a listing as a **badge**. It is a trust signal, never a precondition: browsing, posting and
   requesting contact all stay at L1 mobile (ADR-019, §6.4).
 - **Why in-house (the decision that replaced the vendor).** Every hosted e-KYC route we costed was a
-  per-check fee on a funnel that is *opt-in*, i.e. exactly the funnel you cannot afford to meter. The
-  three things a vendor was buying us — a licensed Aadhaar retrieval, a liveness check, and a document
-  read — are each available to us for free at the quality a *badge* needs: we do not need UIDAI-grade
-  authentication to say "a person on our team looked at this card and this face".
+  per-check fee on an *opt-in* funnel, exactly the funnel you cannot afford to meter. What a vendor
+  was buying us — a licensed Aadhaar retrieval, a liveness check, a document read — is each available
+  free at the quality a *badge* needs: we do not need UIDAI-grade authentication to say "a person on
+  our team looked at this card and this face".
 - **Legal constraint (still decisive, and why the shape is what it is).** Direct UIDAI Aadhaar OTP
   e-KYC is restricted to licensed **AUA/KUA** entities and we do not qualify. So we never authenticate
-  an Aadhaar number against UIDAI, and we never ask for one to be typed in. Aadhaar is accepted here
-  only as **one of three photographable documents** — the same standing as a PAN card or a driving
-  licence — and what we retain of it is a keyed hash and the last four digits.
+  an Aadhaar number against UIDAI, and we never ask for one to be typed in. Aadhaar is accepted only as
+  **one of three photographable documents** — the same standing as a PAN card or a driving licence —
+  and what we retain of it is a keyed hash and the last four digits.
 - **How the flow works.**
   1. **Capture, camera-only.** The applicant photographs a government document (**Aadhaar, PAN card,
      or driving licence**; Aadhaar and driving licence also need the back) and then records a **live
@@ -823,10 +815,9 @@ support surprise.
 - **Performance.** One-time per user and entirely off the hot path. The badge check on a render is a
   cheap boolean on `users.verified`; `identity_hash` is indexed for dedup. There is no outbound call,
   no redirect hop and no webhook.
-- **Cost.** **Zero per check.** Capture is the user's camera and the decision
-  is our reviewer. What it does cost is *reviewer minutes* and the object storage holding images for
-  their seven-day window — both of which scale with real verifications rather than with attempts,
-  because of the attempt cap above.
+- **Cost.** **Zero per check.** Capture is the user's camera and the decision is our reviewer. What it
+  costs is *reviewer minutes* and the object storage holding images for their seven-day window, both
+  of which scale with real verifications rather than with attempts, because of the attempt cap above.
 - **Dev.** No reviewer sits behind a developer machine, so `POST /me/verification/identity/simulate`
   (`@LocalOnly`) decides a case that has genuinely been filed. It **404s without one** — it is a
   decision endpoint, not a badge dispenser — which is the property that keeps it honest.
@@ -932,16 +923,16 @@ support surprise.
 - **Why required.** `plans-billing-refer.md` defines the revenue model - nothing monetizes without it.
 - **India context.** The gateway must be **UPI-first** (UPI dominates), plus cards/netbanking/wallets.
 - **Cost model - no "free tier" exists; only $0 fixed cost.** Regulated gateways have **no free
-  usage tier** (every successful payment carries a real network cost). What they do offer is **zero
-  setup / annual fee + free sandbox + pay-per-successful-transaction** - so integration, testing and
-  idle time cost nothing; you pay only when a customer actually pays. That already satisfies
-  $0-until-revenue. Fixed-cost comparison: Razorpay, Cashfree, PhonePe PG, Stripe, PayU are all ~₹0 to
-  start with full test mode; standard per-txn ~1.75-2% (confirm live rates - they change).
+  usage tier** (every successful payment carries a real network cost). They offer **zero setup /
+  annual fee + free sandbox + pay-per-successful-transaction**, so integration, testing and idle time
+  cost nothing and you pay only when a customer actually pays, which satisfies $0-until-revenue.
+  Razorpay, Cashfree, PhonePe PG, Stripe and PayU are all ~₹0 to start with full test mode; standard
+  per-txn ~1.75-2% (confirm live rates - they change).
 - **UPI: MDR vs aggregator fee (the key nuance).** Two costs stack on any payment: (1) **MDR**
   (network/interchange) - **government-mandated 0% for UPI + RuPay debit**; (2) the **aggregator's own
   service fee** for checkout/dashboard/webhooks/reconciliation. **Zero-MDR only zeroes (1); it does not
   force an aggregator to waive (2)** - so **UPI through Razorpay is typically NOT free** (their service
-  fee still applies; confirm current UPI %). Note GPay/PhonePe are payer-side UPI *apps*, not merchant
+  fee still applies; confirm current UPI %). GPay/PhonePe are payer-side UPI *apps*, not merchant
   integrations - you accept **UPI** and any app can pay; whoever bridges you to the rails may charge.
 - **Two routes (decision).**
   - **Route A - full aggregator (Razorpay), chosen for MVP.** Cards + UPI + netbanking, **server
@@ -952,8 +943,8 @@ support surprise.
     reconciliation + verification yourself (often no robust webhooks; no cards). The "free" UPI is paid
     for in ops/engineering, not in fees.
 - **Options considered.**
-  - **Cashfree** - India-first, UPI/cards/netbanking/wallets; **one vendor for payments and (later) payouts** and
-    Payouts -> one entity onboarding, one HMAC webhook pattern, one dashboard family. **Chosen (ADR-017).**
+  - **Cashfree** - India-first, UPI/cards/netbanking/wallets; **one vendor for payments and (later)
+    Payouts** -> one entity onboarding, one HMAC webhook pattern, one dashboard family. **Chosen (ADR-017).**
   - Razorpay - equally strong DX; **retained as the documented fallback** behind the same seam.
   - PhonePe PG - strong UPI reach.
   - PayU - established, heavier onboarding.
@@ -1050,14 +1041,14 @@ support surprise.
 | ADR-006 | Firebase/Firestore as core backend | Full Firebase BaaS; keep Spring Boot + Postgres and use Firebase only for FCM | Rejected Firestore core; use FCM push only | Firestore is a poor fit for filter-heavy search, transactions and audit; per-read cost cliff; highest lock-in; would discard the matured OpenAPI/data-model | Firebase limited to free push (FCM); core stays relational |
 | ADR-007 | Managed Postgres provider + data residency | DO dev database (sandbox) / DO Managed PostgreSQL (prod); Neon (Singapore); self-managed on VM | DigitalOcean PostgreSQL, BLR1 Bangalore, used as pure Postgres: dev database for the sandbox, Managed PostgreSQL for production | India data residency for Aadhaar-adjacent PII; co-located with the API for low latency; standard Postgres keeps lock-in low | Direct TLS connection with a small Hikari pool; our own JWT auth; the dev database has no backups, so production data goes on Managed PostgreSQL |
 | ADR-008 | Session / token storage model | A: both tokens in localStorage (Bearer); B: access in memory + refresh in httpOnly cookie; **C: both tokens in httpOnly cookies + CSRF** | Option C - httpOnly+Secure+SameSite=Lax cookies; short access JWT + rotating refresh (reuse-detection); double-submit CSRF | Token never in JS (XSS-safe); stays stateless (ADR-003); dev feasible via Vite proxy; only the http provider changes, components unchanged | Adds `/auth/refresh` + `otp`/`refresh_token` tables + CSRF filter; **OTP delivery channel decided separately in ADR-020 (WhatsApp, no DLT)** |
-| ADR-009 | Identity verification | A: hosted e-KYC via a licensed vendor; B: offline document XML; C: paid OKYC/OTP aggregator; D: licensed AUA e-KYC (not permitted); **E: in-house capture + on-device OCR + staff review** | **Option E, built in-house (§6.4); third-party e-KYC is permanently out of scope.** Government document (Aadhaar / PAN / driving licence / passport / voter ID) photographed in the browser, live selfie with liveness stages, Tesseract wasm OCR on the device, decided by a staff reviewer | A vendor was charging per check on an **opt-in** funnel, which is the funnel you can least afford to meter. A badge needs "a person on our team looked at this card and this face", not UIDAI-grade authentication — so the licence we could never hold stopped being on the critical path. Zero marginal cost, no redirect, no webhook, no second entity onboarding | The cost moved from a vendor invoice to **reviewer minutes** — a staffing commitment, and the real trade. Images sit in the private bucket for **7 days** after a decision. Weaker anti-forgery than a UIDAI read: mitigated by camera-only capture, a 3-per-24h attempt cap, and the fact that claims are never believed (§6.4) |
+| ADR-009 | Identity verification | A: hosted e-KYC via a licensed vendor; B: offline document XML; C: paid OKYC/OTP aggregator; D: licensed AUA e-KYC (not permitted); **E: in-house capture + on-device OCR + staff review** | **Option E, built in-house (§6.4); third-party e-KYC is permanently out of scope.** Government document (Aadhaar / PAN / driving licence / passport / voter ID) photographed in the browser, live selfie with liveness stages, Tesseract wasm OCR on the device, decided by a staff reviewer | A vendor was charging per check on an **opt-in** funnel, the funnel you can least afford to meter. A badge needs "a person on our team looked at this card and this face", not UIDAI-grade authentication, so the licence we could never hold stopped being on the critical path. Zero marginal cost, no redirect, no webhook, no second entity onboarding | The cost moved from a vendor invoice to **reviewer minutes** — a staffing commitment, and the real trade. Images sit in the private bucket for **7 days** after a decision. Weaker anti-forgery than a UIDAI read: mitigated by camera-only capture, a 3-per-24h attempt cap, and the fact that claims are never believed (§6.4) |
 | ADR-009a | Mobile-match policy (registration mobile vs document-linked mobile) | Enforce A==B for all; don't enforce; prefer+soft-flag | **Withdrawn.** The vendor webhook that carried the document-linked `mobile` is gone with ADR-009, and a photographed card does not reveal one. There is nothing left to compare Mobile A against | The policy only ever existed because a vendor e-KYC payload happened to include the number. Nothing in the in-house flow reproduces it, and inventing a proxy for it would be guessing | Login OTP (ADR-008) still proves control of Mobile A; one-document-one-badge is enforced by ADR-009b. If a document-linked mobile is ever needed, it is a **new** decision, not this one |
-| ADR-009b | Identity uniqueness / dedup anchor | Raw document-number hash; a vendor per-request id; composite identity fingerprint; **keyed HMAC of the canonical number** | **`identity_hash = HMAC-SHA256(docType \| canonical_number)` under `IDENTITY_HASH_SECRET`, stored UNIQUE, written at approval** | The reviewer reads the real number off the image, so unlike the masked-UID era there *is* a stable per-document value — it just must never be stored. HMAC not a plain digest: an Aadhaar number's input space is ~10¹¹, so an unkeyed hash is brute-forceable from a leaked dump. Namespacing by type stops a PAN colliding with a licence | `409 identity_already_registered` (fires **only in the opt-in badge flow — ADR-019 — never gates posting or browsing**). Set at **approval, not submit**, or a forged claim could permanently block the real holder. Rotating the key orphans every hash → **set-once** in the deploy guide. `person_key` (name+DOB) is a reviewer signal only and never rejects on its own |
+| ADR-009b | Identity uniqueness / dedup anchor | Raw document-number hash; a vendor per-request id; composite identity fingerprint; **keyed HMAC of the canonical number** | **`identity_hash = HMAC-SHA256(docType \| canonical_number)` under `IDENTITY_HASH_SECRET`, stored UNIQUE, written at approval** | The reviewer reads the real number off the image, so a stable per-document value exists — it just must never be stored. HMAC, not a plain digest: an Aadhaar number's input space is ~10¹¹, brute-forceable from a leaked dump. Namespacing by type stops a PAN colliding with a licence | `409 identity_already_registered` (fires **only in the opt-in badge flow — ADR-019 — never gates posting or browsing**). Set at **approval, not submit**, or a forged claim could permanently block the real holder. Rotating the key orphans every hash → **set-once** in the deploy guide. `person_key` (name+DOB) is a reviewer signal only and never rejects on its own |
 | ADR-017 | Primary provider consolidation | Split (Razorpay PG + separate KYC aggregator); **Cashfree for KYC + Payments (+ Payouts later)** | **Amended by ADR-009 — Cashfree is now the payments vendor only.** PG (fee collection) today; Payouts deferred behind a `PayoutClient` seam. Secure ID dropped when identity verification moved in-house. Supersedes Razorpay in ADR-014 (Razorpay = documented fallback) | The consolidation argument (one onboarding, one HMAC pattern, one dashboard) was half about KYC; with KYC in-house what survives is competitive PG pricing and an India-first rail | Vendor concentration is now *lower*, not higher; **pricing not in skill - get written quote** before final sign-off; 2 credential sets (PG / Payouts) in GitHub environment secrets |
 | ADR-018 | 2FA for Cashfree Payouts (prod) | IP whitelisting (needs a static egress IP); dedicated egress IP add-on; **RSA public-key signature** | **RSA public-key signature `X-Cf-Signature`** (5-min validity) for Payouts prod calls. Scope narrowed by ADR-009 — Secure ID is no longer a caller | The container's egress IP is **not static** by default; the signature avoids a dedicated-IP add-on's cost/complexity; skill provides Java RSA code. (PG API needs no IP-whitelist - uses client-id/secret + domain whitelist) | Dormant until Payouts is built. Hold the RSA private key as a `SECRET` env var; watch 5-min clock skew; can switch to a dedicated egress IP + allowlist at higher volume if preferred |
 | ADR-019 | Verification posture: gate vs badge | A: mandatory KYC to post/contact (hard gate both sides); **B: progressive trust - opt-in badge, never a wall**; C: no verification | **Option B - "verification is a badge, not a gate."** L0 browse / L1 mobile post+contact / L2 reviewed Verified badge (ranking + faster response). The badge blocks nothing, anywhere. Amends ADR-009a/009b to soft-at-MVP | Hard KYC on both sides at posting is supply-side-suicidal cold-start (empty-marketplace risk); the real market lives in free, frictionless Pune FB/Telegram groups - we must match their liquidity and win on **freshness + trust badges + ranking**, not walls (see §6.4, BUSINESS_PLAN §2) | Verification effort falls only on users who opt in at L2; ranking/badge + the freshness engine do the policing; seams (`PaymentClient`/`NotifierClient`) unchanged; **guardrail: no verification nudge may precede a value moment** |
 | ADR-010 | Notification channels + delivery | WhatsApp: Meta Cloud API direct vs BSP (Twilio/Gupshup); Email: Brevo/Resend; In-app: Postgres table; delivery: inline vs transactional outbox | Meta WhatsApp Cloud API direct + Brevo email + Postgres in-app, all behind `NotifierClient` seam, with a transactional outbox | Free tiers; low lock-in (direct APIs); outbox guarantees delivery across restarts and redeploys; seam keeps vendors swappable | Adds `notifications`/`outbox` tables + drainer job; WhatsApp needs Meta business account + template approval |
-| ADR-011 | Background jobs | A: external scheduler -> internal endpoint; B: GitHub Actions cron; C: always-on container + native @Scheduled | Option C - always-on single container with in-process `@Scheduled` | Fires on time with no external trigger, no warming ping and no cold starts; no cost beyond the compute already paid | `JobRunner` runs every job in four IST cron groups (every 15 min, hourly, 00:00 cleanup, 10:00 user-facing), each group under a Postgres advisory lock (`JobRunScheduler`) so a second instance never double-sends (no ShedLock), each job behind `draazy.jobs.<name>.enabled`. No internal jobs endpoint; see DEPLOY.md §5 |
+| ADR-011 | Background jobs | A: external scheduler -> internal endpoint; B: GitHub Actions cron; C: always-on container + native @Scheduled | Option C - always-on single container with in-process `@Scheduled` | Fires on time with no external trigger, no warming ping and no cold starts; no cost beyond the compute already paid | `JobRunner` runs all jobs in four IST cron groups under Postgres advisory locks, so a second instance never double-sends (no ShedLock); cadence and per-job `draazy.jobs.<name>.enabled` flags in §6.5. No internal jobs endpoint; see DEPLOY.md §5 |
 | ADR-012 | Search strategy | **PostgreSQL** (indexes + `tsvector` + `pg_trgm` + PostGIS); Meilisearch/Typesense; OpenSearch/Elastic; Algolia | PostgreSQL behind a search seam | Domain is structured filters + geo, not free-text relevance; Places handles autocomplete; $0, one datastore, no sync lag | Add PostGIS for map radius; keyset pagination; swap to Meilisearch/Typesense (via outbox/CDC) when relevance/volume grows |
 | ADR-013 | Media storage + upload path | Pre-signed direct-to-R2 vs proxy-through-API; single vs split buckets | **Proxy through the API** (multipart to `/me/photos` and the document endpoints) behind the `FileStorage` seam; split public (photos/CDN) + private (KYC/docs, signed GET) | The server must see the bytes before they are world-readable (magic bytes, metadata strip, hash, card copies); the browser holds no R2 write credential; zero-egress R2; PII stays private with short-lived scoped URLs | 1 MB photo cap; 100 photo uploads per account per 24 h; unattached uploads swept after 7 days; R2 CORS `GET` only; malware scan + transcoding deferred |
 | ADR-014 | Payment gateway + rent-fund scope | Razorpay; Cashfree; PhonePe PG; PayU; Stripe. Rent: fee-only vs move funds (Route/escrow). UPI: aggregator (Route A) vs direct collection (Route B) | Razorpay behind `PaymentClient` seam; **fee-only at MVP**, rent settles off-platform; **Route A (aggregator) now, Route B UPI-direct as documented cost-reduction upgrade** | No gateway has a free usage tier, but all are ₹0 fixed + pay-per-txn (fits $0-until-revenue); zero-MDR does NOT make UPI free through an aggregator (their service fee applies); Route A's webhooks/reconciliation are worth more than the tiny MVP-volume fee | **Provider superseded by ADR-017 (Cashfree primary; Razorpay = fallback)** - fee-only scope, Route A/B and seam design unchanged; server-side verify + idempotent webhooks + audit; confirm live per-txn rates before signing |
@@ -1102,9 +1093,10 @@ record that answers *who approved this* after the fact.
 - **A-Q13 -> Ops = GitHub environment secrets + GitHub Actions + App Platform logs/alerts + in-app error log; DR = managed-database backups + pg_dump->R2 (ADR-016).**
 
 **Principle locked by the founder:** free-tier-first - spend nothing until real usage forces it.
-Every component must justify any non-zero cost. Hosting is the fixed floor: sandbox ≈ $17/mo + 18% GST (§4.3). The only unavoidable early usage cost is login OTP
-(WhatsApp authentication templates, ADR-020), which stays behind a provider seam and is free in dev.
-Identity verification used to be the second, and stopped being one when it came in-house (ADR-009).
+Every component must justify any non-zero cost. Hosting is the fixed floor: sandbox ≈ $17/mo + 18% GST
+(§4.3). The only unavoidable early usage cost is login OTP (WhatsApp authentication templates,
+ADR-020), which stays behind a provider seam and is free in dev. Identity verification stopped being a
+second one when it came in-house (ADR-009).
 
 **Open (must be answered, not assumed):**
 - A-Q2 Expected MVP scale (concurrent users, listings, notifications/day) - sizes free-tier headroom.

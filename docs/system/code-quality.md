@@ -60,7 +60,7 @@ are all examples where the comment is the only record of the reasoning. Repo con
 docs or into a comment next to the code it explains."*
 
 A naive "strip the comments" pass would destroy the most valuable documentation in the repo.
-So the rule is **remove comments that are wrong or worthless — keep comments that carry reasoning.**
+So: **remove comments that are wrong or worthless — keep comments that carry reasoning.**
 
 ### Delete these
 
@@ -118,8 +118,8 @@ change.
   excluded** (D68). So there is still no active backend *formatting* gate.
 - Frontend lint is green on errors but carries **~395 warnings**.
 
-So this is no longer "nothing scans". It is "scanning is standing up; the findings have not been
-triaged yet", and the remaining work below is the triage.
+So this is no longer "nothing scans": scanning is standing up, findings are untriaged, and the work
+below is the triage.
 
 ### Ponytail-ordered plan
 
@@ -160,7 +160,7 @@ exclusion.
 ### Where these fixes land
 
 Static-analysis fixes ride **in the same commit as the change to the file**. A separate "Sonar fixes"
-mega-commit is unreviewable and conflicts with everything else in flight.
+mega-commit is unreviewable and conflicts with everything in flight.
 
 ---
 

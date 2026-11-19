@@ -1,9 +1,7 @@
 # Notifications
 
 Every message Draazy sends, by channel and audience, with the exact copy. The source of truth is the code; when
-copy changes there, update the row here in the same commit.
-
-`{curly}` marks a runtime value. Links are app routes.
+copy changes there, update the row here in the same commit. `{curly}` marks a runtime value; links are app routes.
 
 ## Channels at a glance
 
@@ -26,15 +24,14 @@ Configuration for the paid channels is in [DEPLOY.md](../DEPLOY.md) (WhatsApp id
 - **Quiet hours.** When the user has quiet hours on (default off, 22:00–07:00), a row written inside the window gets
   `deliverAfter` and stays hidden until the window closes. Turning quiet hours off releases held rows.
 - **Match-alert switch.** `matchAlerts=false` drops only the `match.*` and `price.*` families (`NotificationTypes`).
-- **Retention.** The nightly `NotificationRetention` sweep deletes read rows after 30 days (they already left the
-  list then) and every row after 90.
+- **Retention.** The nightly `NotificationRetention` sweep deletes read rows after 30 days and every row after 90.
 - **Channel toggles.** The `whatsapp` toggle (`Notifier.allowsWhatsapp`) gates the paid identity and digest sends;
   codes are never gated. The `email` toggle gates the [staff alert email](#email-zeptomail); `sms` is stored but
-  read by nothing.
+  read by nothing (wire it before adding any paid SMS send).
 - **Chat bursts.** `message.received` writes one bell row per unread run (only when the recipient's unread count in
   that conversation is 1); push is scheduled for every message.
 - **Paid sends happen after commit** and are best-effort: a failed identity-decision WhatsApp is logged and the
-  in-app row still stands. An OTP delivery failure is surfaced to the caller.
+  in-app row stands. An OTP delivery failure is surfaced to the caller.
 - **Privacy.** No notification body carries another user's mobile number. Contact details are revealed only on the
   surfaces behind the contact gate.
 - **Frontend.** `frontend/src/services/providers/http/notificationMapper.js` maps a type to a UI chip by its prefix
@@ -249,7 +246,7 @@ line. Sent after commit by `WhatsAppDecisionMessenger`; failures are logged and 
 | Rejected (reviewer, or pending too long) | Your Draazy identity verification could not be completed. Open the app to see the reason and retake your photos. |
 | Revoked | Your Draazy ID verified badge was withdrawn. Open the app to see the reason and submit again. |
 
-Approvals and the automatic check's rejects are in-app only. Both sends respect the user's `whatsapp` toggle.
+Both sends respect the user's `whatsapp` toggle.
 
 ### Waiting-on-you digest — `UTILITY` template
 
@@ -552,10 +549,8 @@ stream timeout.
   and identity *rejected* (by a reviewer or the pending-expiry sweep) / *revoked*.
 - Identity *approved* and the automatic check's rejects send no WhatsApp: the user is in the app at that moment and the
   bell row covers both.
-- Everything else stays in-app, plus web push.
-- Staff → owner messaging stays on free click-to-chat.
-- The `whatsapp` toggle gates every paid send except codes; the `email` toggle gates the staff alert email. The `sms`
-  toggle stays stored-only: wire it before adding any paid SMS send.
+- Everything else stays in-app, plus web push; staff → owner messaging stays on free click-to-chat.
+- Toggles: see [Delivery rules](#delivery-rules).
 - Consumer email (receipts, refunds) only after consumer email verification exists.
 
 ## Adding a notification

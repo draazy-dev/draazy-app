@@ -3,9 +3,8 @@
 ## Control Sizing Scale
 
 All interactive controls share **one height token, `--control-h`** — 40px on desktop and **44px
-below 640px**. The mobile value is not decoration: 40px fails the WCAG 2.5.8 / platform 44px touch
-floor, and ramping the variable fixes every dropdown trigger, dropdown option and shared field height
-at once instead of per component. Quote sizes as **tokens**, never as literals.
+below 640px** (40px fails the WCAG 2.5.8 / platform 44px touch floor; ramping the variable fixes every
+dropdown trigger, option and shared field at once). Quote sizes as **tokens**, never as literals.
 
 ### CSS Tokens (defined in `:root` of `src/styles/index.css`)
 
@@ -34,8 +33,7 @@ at once instead of per component. Quote sizes as **tokens**, never as literals.
 
 ### Element Heights
 
-Everything below derives from `--control-h` / `--btn-h`, so all of them are 40px on desktop and
-44px below 640px unless stated otherwise.
+Everything derives from `--control-h` / `--btn-h`: 40px on desktop, 44px below 640px unless stated.
 
 | Element | Height | Class/Token | Example |
 |---------|--------|-------------|---------|
@@ -50,10 +48,9 @@ Everything below derives from `--control-h` / `--btn-h`, so all of them are 40px
 
 ### Compact scale (chips, tags, toggles)
 
-Not everything is a 44px control. Like a native chat app, secondary pieces are **drawn smaller** and
-keep the 44px **target** with a transparent `::before` (built into each tappable class — no
-`.tap-extend` needed). Tokens live in `:root` of `index.css`; the classes in
-`styles/components/chips.css`. Same size on desktop and phone.
+Secondary pieces are **drawn smaller** and keep the 44px **target** with a transparent `::before`
+(built into each tappable class — no `.tap-extend` needed). Tokens live in `:root` of `index.css`;
+classes in `styles/components/chips.css`. Same size on desktop and phone.
 
 | Token | Size | Class | For |
 |---|---|---|---|
@@ -101,8 +98,8 @@ Non-button controls
 .dz-input           — single-line text input
 ```
 
-The button system in `index.css` declares itself the single source of truth for buttons; `.dz-control*`
-is now the minority pattern and should not be used in new code.
+The button system in `index.css` is the single source of truth for buttons; `.dz-control*` is the
+minority pattern and must not be used in new code.
 
 ### Usage in JSX
 
@@ -172,42 +169,34 @@ is now the minority pattern and should not be used in new code.
 
 ## Mobile-first system
 
-The app is authored mobile-first. These are the rules the phone layout depends on; breaking one of
-them usually breaks a different component than the one you edited.
+The app is authored mobile-first. Breaking one of these rules usually breaks a different component
+than the one you edited.
 
 ### Which routes are mobile-supported
 
-"Mobile-first" is a claim about the consumer app, not about every screen in the codebase. Roughly
-80% of consumer traffic is phone-only, so **every `/` consumer route is mobile-supported without
-exception** and a phone regression there is a release blocker.
+Roughly 80% of consumer traffic is phone-only, so **every `/` consumer route is mobile-supported
+without exception**; a phone regression there is a release blocker. The back office splits in two, a
+deliberate scope boundary:
 
-The back office splits in two, and the split is a deliberate scope boundary rather than an
-oversight:
-
-**Field ops — mobile-supported.** These are used standing in a lobby, on a site visit, or between
-appointments, so they get the same touch-target floor, safe-area handling and content-budget checks
-as consumer routes:
+**Field ops — mobile-supported.** Used in a lobby, on a site visit, or between appointments, so they
+get the same touch-target floor, safe-area handling and content-budget checks as consumer routes:
 
 - `/ops` and every ops queue under it — `/ops/requests`, `/ops/flatmate-review`, `/ops/interior`,
   `/ops/legal`, `/ops/packers`, `/ops/referrals`, `/ops/rent-agreement`, `/ops/valuation`
 - `/admin/properties` — listing verification, which is done with the property in front of you
 
-**Desk admin — desktop-only, and that is a decision.** `/admin/analytics`, `/admin/finance`,
+**Desk admin — desktop-only, by decision.** `/admin/analytics`, `/admin/finance`,
 `/admin/reports`, `/admin/settings`, `/admin/users`, `/admin/team`, `/admin/staff-activity`,
 `/admin/content`, `/admin/localities`, `/admin/societies`, `/admin/enquiries`, `/admin/services`,
-`/admin/support`, `/admin/post-on-behalf`, `/admin/flatmates`. These are dense multi-column tables,
-cross-filtered charts and bulk editors that a staff member uses seated at a desk. They must stay
-*usable* on a phone — nothing may be unreachable or clipped off-screen — but they are not held to
-the mobile polish bar, and time spent hand-tuning a phone layout for `/admin/analytics` is time
-spent on nobody.
-
-Practical consequences:
+`/admin/support`, `/admin/post-on-behalf`, `/admin/flatmates`. Dense multi-column tables,
+cross-filtered charts and bulk editors used seated at a desk. They must stay *usable* on a phone —
+nothing unreachable or clipped off-screen — but are not held to the mobile polish bar.
 
 - Mobile e2e projects (`mobile`, `mobile-small`) cover consumer and field-ops routes. Adding a desk
-  admin route to a mobile sweep will surface real but deliberately-accepted findings.
+  admin route to a mobile sweep surfaces real but deliberately-accepted findings.
 - The responsive dual-render pattern below is mandatory for field-ops tables and optional for desk
-  admin, where a horizontally scrollable table is an acceptable answer.
-- If a desk admin route starts being used in the field, move it into the list above *first* and then
+  admin, where a horizontally scrollable table is acceptable.
+- If a desk admin route starts being used in the field, move it into the list above *first*, then
   fix it — the list is what makes the expectation reviewable.
 
 ### Bottom chrome: `--dz-bottom-inset` and the z-index ladder
@@ -215,37 +204,33 @@ Nothing bottom-anchored may hardcode a `bottom-*` value. `--dz-bottom-inset` rep
 viewport bottom is already claimed by fixed chrome; `ConsumerLayout` sets `.has-bottom-nav` on routes
 that mount the mobile tab bar, which expands the inset to
 `--dz-bottom-nav-h + --dz-bottom-nav-offset`. Above `lg` the variable collapses back to the
-safe-area inset alone, so every `calc()` built on it resolves to the literal offset it had before the
-system existed — desktop safety is structural, not a promise.
+safe-area inset alone, so every `calc()` built on it resolves to its pre-system literal offset —
+desktop safety is structural.
 
-`--dz-bottom-nav-offset` is `max(--dz-bottom-nav-gap, --dz-safe-b)`, **not** a sum. The capsule's
-float gap and the home-indicator inset are the same thing — breathing room at the bottom edge — so
-adding them double-counts. That shipped: in an installed iOS app `--dz-safe-b` is 34px, and
-`gap + safe-b` parked the bar 46px above the screen edge (5.5% of the viewport) while an in-browser
-visit showed the intended 12px, because in a browser tab the inset is 0. It is one token because the
-bar's own `bottom` and `--dz-bottom-inset` must agree; they were two hand-synced `calc()`s, which is
-precisely how they drifted apart.
+`--dz-bottom-nav-offset` is `max(--dz-bottom-nav-gap, --dz-safe-b)`, **not** a sum: the capsule's
+float gap and the home-indicator inset are the same breathing room, so adding them double-counts
+(in an installed iOS app `--dz-safe-b` is 34px and a sum parked the bar 46px above the edge, vs 12px
+in a browser tab where the inset is 0). It is one token because the bar's own `bottom` and
+`--dz-bottom-inset` must agree.
 
 The ladder is written down once so bottom chrome never re-negotiates it:
 **content 0-49 · sticky page CTA 60 · mobile bottom nav 70 · autosave flash 90 · sheets 1000 ·
 assistant 1300 · install prompt 1350 · cookie consent 1400 · blocking modals 1500 · toasts 1600.**
 
-Toasts are the top of the *bottom-chrome* ladder on purpose, and they are the one rung there that is
-not bottom chrome. A toast is the receipt for an action the user just took — "Saved", "Request sent",
-"Couldn't copy link" — so it has to be legible above whatever surface triggered it, including a modal.
-Anything that outranked a toast would silently swallow the only confirmation the app gives. That is
-also why the container is `pointer-events: none` with the pills re-enabling it individually: sitting
-at 1600 means it covers real estate on every layer below, so it must not intercept a tap meant for
-them.
+Toasts are the one rung that is not bottom chrome: a toast is the receipt for an action the user just
+took ("Saved", "Request sent", "Couldn't copy link"), so it must be legible above whatever surface
+triggered it, including a modal. That is also why the container is `pointer-events: none` with the
+pills re-enabling it individually — at 1600 it covers every layer below and must not intercept their
+taps.
 
-The rung this replaced is worth recording. The autosave pill used to sit at an undocumented
-`z-index: 2000` — above blocking modals — so a transient "Draft saved" could paint over a dialog
-asking the user to confirm something irreversible. It is now 90, because it reports *state* rather
-than confirming an *action* and never needs to outrank a dialog. A property lightbox carried the same
-ad-hoc 2000 and has been moved onto the 1500 modal rung for the same reason.
+The autosave pill (`.dz-autosave-flash`) is at 90, not above blocking modals, because it reports
+*state* rather than confirming an *action* and never needs to outrank a dialog. It sits just above
+the tab bar and is appended to `<body>`, so it cannot read the `--dz-bottom-inset` that
+`.has-bottom-nav` sets on ConsumerLayout's wrapper — it rebuilds the offset from
+`--dz-bottom-nav-h` + `--dz-bottom-nav-offset` inside the bar's own breakpoint. Anything else
+appended to `<body>` has the same blind spot. A property lightbox sits on the 1500 modal rung.
 
-**Above the ladder there is a second, higher band that the ladder above does not describe**, and it
-is recorded here so nobody assumes 1600 is the ceiling:
+**Above the ladder there is a second, higher band** — 1600 is not the ceiling:
 
 | Layer | Value | Why it is up there |
 | --- | --- | --- |
@@ -255,53 +240,41 @@ is recorded here so nobody assumes 1600 is the ceiling:
 | Skip-to-content link | 9999 | WCAG 2.4.1 — on focus it must beat everything |
 | Maintenance overlay | 99999 | Blocks the entire consumer app by design |
 
-The skip link and the maintenance overlay genuinely belong at the ceiling. The sheet/picker cluster
-is the **known inconsistency**: `.dz-action-sheet` at 9999 outranks the toast layer at 1600, so a
-confirmation fired from inside an action sheet paints behind it. Consolidating that cluster onto the
-1000 "sheets" rung is the next change here; it is called out rather than done silently because
-restacking live surfaces changes real tap and focus behaviour and needs its own measurement pass.
+The skip link and maintenance overlay belong at the ceiling. The sheet/picker cluster is the **known
+inconsistency**: `.dz-action-sheet` at 9999 outranks the toast layer at 1600, so a confirmation fired
+from inside an action sheet paints behind it. Consolidating that cluster onto the 1000 "sheets" rung
+is the next change here; it needs its own measurement pass because restacking live surfaces changes
+tap and focus behaviour.
 
-Every `position: fixed` addition gets a rung — from this page, not invented — before it ships. A
-value picked to "just be on top" is how 2000 happened, twice.
+Every `position: fixed` addition gets a rung from this page — never a value picked to "just be on
+top" — and must be checked against the existing bottom-chrome inventory (bottom nav, assistant FAB,
+install prompt, cookie bar, CityChrome, sticky CTA), not just z-index: two floating controls on the
+same corner intercept each other's taps.
 
-The autosave flash (`.dz-autosave-flash`) sits *just above* the tab bar rather than near the top:
-it reports state and never needs to outrank a dialog. It is also the one piece of bottom chrome
-appended to `<body>` rather than rendered inside the layout, so it cannot read the
-`--dz-bottom-inset` that `.has-bottom-nav` sets on ConsumerLayout's wrapper — it rebuilds the
-offset from `--dz-bottom-nav-h` + `--dz-bottom-nav-offset` inside the bar's own breakpoint
-instead. Anything else appended to `<body>` has the same blind spot.
+The ConnectivityBanner at 1450 is the one *top* chrome rung, deliberately. The bottom edge of a phone
+viewport already carries five fixed layers; a sixth at 360px would sit on the floating tab bar or its
+raised active bubble, whereas docked to `--dz-top-inset` it cannot cover either. It outranks the
+cookie card (a consent prompt must never be why a dropped connection goes unexplained) and sits under
+blocking modals (a dialog already owns the screen).
 
-A new `position: fixed` element must be checked against the existing bottom-chrome inventory (bottom
-nav, assistant FAB, install prompt, cookie bar, CityChrome, sticky CTA), not just against z-index — two
-floating controls on the same corner intercept each other's taps.
-
-The ConnectivityBanner at 1450 is the one rung on that ladder that is *top* chrome, deliberately. The
-bottom edge of a phone viewport already carries five fixed layers, and a sixth at 360px would sit on
-the floating tab bar or its raised active bubble; docked to `--dz-top-inset` it cannot cover either,
-structurally rather than by promise. It outranks the cookie card because a first-visit consent prompt
-must never be the reason a dropped connection goes unexplained, and sits under blocking modals
-because a dialog already owns the screen while it is up.
-
-The tab bar floats 12px off the screen edges rather than running edge to edge, so the page reads as
-scrolling under a control instead of ending at a wall. It is an opaque `--bottom-nav-solid` bar with
-12px corners and a drop shadow; the active tab is marked by a notch cut into the bar's top edge with a
-teal bubble rising through it, and both slide together to the next slot. The notch is a CSS mask on
-`.dz-bottom-nav__bg::before` driven by two registered custom properties (`--dz-nav-i`, the slot index,
-and `--dz-notch-y`, the notch depth) so they animate instead of flipping; the shadow is a
-`drop-shadow()` on the unmasked parent because a filter on the masked layer is cut away with it. Post
-is a plain tab in the centre slot: tapping it slides the notch there first, then opens the chooser. On
-routes owning no slot the notch closes in place, so the next tab slides from there rather than from 0.
-In landscape phones the 44px bar has no room for a raised bubble, so the bubble sits inside the bar and
-the notch stays closed.
+The tab bar floats 12px off the screen edges so the page reads as scrolling under a control instead of
+ending at a wall. It is an opaque `--bottom-nav-solid` bar with 12px corners and a drop shadow; the
+active tab is marked by a notch cut into the bar's top edge with a teal bubble rising through it, and
+both slide together to the next slot. The notch is a CSS mask on `.dz-bottom-nav__bg::before` driven
+by two registered custom properties (`--dz-nav-i`, the slot index, and `--dz-notch-y`, the notch
+depth) so they animate instead of flipping; the shadow is a `drop-shadow()` on the unmasked parent
+because a filter on the masked layer is cut away with it. Post is a plain tab in the centre slot:
+tapping it slides the notch there first, then opens the chooser. On routes owning no slot the notch
+closes in place, so the next tab slides from there rather than from 0. In landscape phones the 44px
+bar has no room for a raised bubble, so the bubble sits inside the bar and the notch stays closed.
 
 ### Top chrome: `--dz-nav-h`, `--dz-top-inset`, hide-on-scroll
-`--dz-nav-h` is the only place the top bar's height is written down: the row, every page's top
-padding, sticky sub-headers and full-height routes all derive from it (58px on phones, 72px from
-768px up). `--dz-top-inset` is where a sticky sub-header docks; below `lg` the navbar slides away on
-scroll-down (`.dz-nav-hidden` on `<html>`) and the inset drops to 0 so the sub-header rises to the
-screen edge instead of leaving a hole. Opt a sub-header in with `.dz-docks-under-nav`. Every rule
-that reacts to the class lives inside a `max-width: 1023.98px` block, so the class is inert on
-desktop.
+`--dz-nav-h` is the only place the top bar's height is written down (58px on phones, 72px from 768px
+up): the row, every page's top padding, sticky sub-headers and full-height routes derive from it.
+`--dz-top-inset` is where a sticky sub-header docks; below `lg` the navbar slides away on scroll-down
+(`.dz-nav-hidden` on `<html>`) and the inset drops to 0 so the sub-header rises to the screen edge.
+Opt a sub-header in with `.dz-docks-under-nav`. Every rule reacting to the class lives inside a
+`max-width: 1023.98px` block, so it is inert on desktop.
 
 ### Floating cards are the mobile overlay shape
 Below 640px a centred dialog is the wrong shape: with the keyboard open the usable viewport is ~300px,
@@ -339,19 +312,19 @@ that implement it, which must not diverge:
 40px of the card, and takes pointer capture on the first qualifying *move* — capturing on
 `pointerdown` retargets the following click and breaks every button in the panel.
 
-**The shared `<Modal>` sits at `z-[1550]`, inside the floating-chrome band**, and the trap is that
-the collision only exists below 640px. On desktop the panel is centred while the passive chrome
-(CityChrome 1200, AssistantWidget 1300, InstallPrompt 1350, CookieConsent 1400, ConnectivityBanner
-1450, MobileNav 1500) is pinned to an edge; as a bottom card the two share one strip, and a *short*
-card lands its buttons under the cookie banner outright. Anything below that band also has its
-clicks swallowed by the `pointer-events-auto` panels in it. A modal is the foreground task, so it
-outranks passive chrome — but it stays **below** `ToastContext`'s 1600, because a toast is how the
-modal's own action reports back. The portalled `Select`/`Menu` popovers set `zIndex = 9999` inline
-and are unaffected, which is what keeps a dropdown usable inside a dialog.
+**The shared `<Modal>` sits at `z-[1550]`, inside the floating-chrome band**; the collision only
+exists below 640px. On desktop the panel is centred while passive chrome (CityChrome 1200,
+AssistantWidget 1300, InstallPrompt 1350, CookieConsent 1400, ConnectivityBanner 1450, MobileNav 1500)
+is pinned to an edge; as a bottom card they share one strip, and a *short* card lands its buttons
+under the cookie banner. Anything below that band also has its clicks swallowed by the
+`pointer-events-auto` panels in it. A modal is the foreground task, so it outranks passive chrome, but
+stays **below** `ToastContext`'s 1600 because a toast is how the modal's own action reports back. The
+portalled `Select`/`Menu` popovers set `zIndex = 9999` inline and are unaffected, which keeps a
+dropdown usable inside a dialog.
 
-Structurally, the card's header/body/footer become a bounded flex column so the body scrolls
-internally and the footer actions stay pinned above the keyboard. Every mobile value is a base class
-paired with an `sm:` reset, so at ≥640px the rendered class set is the plain desktop one.
+The card's header/body/footer become a bounded flex column so the body scrolls internally and the
+footer actions stay pinned above the keyboard. Every mobile value is a base class paired with an `sm:`
+reset, so at ≥640px the rendered class set is the plain desktop one.
 
 ### Touch-target floor: `.tap-target` vs `.tap-extend`
 Two classes, one rule (WCAG 2.5.8 / 44px). `.tap-target` grows the box
@@ -364,23 +337,21 @@ declared later, so pairing silently reinstates the 44px box. A 32px box plus the
 adjacent centres exactly 44px apart — do not shrink the gap without shrinking the target.
 
 ### Icon-only controls must carry a real accessible name
-`title=` is **not** a label on touch — it never surfaces on a phone, so an icon-only control named
-only by `title` is unnamed. Every icon-only button takes `aria-label`, and toggles take
-`aria-pressed`. Where a visible label is dropped for space (bottom-nav tabs in landscape), the
-`aria-label` is set unconditionally so hiding the text costs a screen reader nothing. Grep for
-`title=` on icon-only buttons during any mobile pass.
+`title=` is **not** a label on touch — it never surfaces on a phone. Every icon-only button takes
+`aria-label`, and toggles take `aria-pressed`. Where a visible label is dropped for space (bottom-nav
+tabs in landscape), the `aria-label` is set unconditionally. Grep for `title=` on icon-only buttons
+during any mobile pass.
 
 ### Hover is not an affordance
-Nothing may be reachable only via `:hover`; on a touch screen that state never fires and the content
-is simply invisible. Mark any hover-revealed layer `.reveal-on-hover` and it becomes permanently
-visible under `@media (hover: none)` — keyed on the *capability*, not the viewport, so touch laptops
-are covered and mouse desktops keep the animation. The same block removes the browser's blue tap
-flash and replaces it with an `:active` opacity dip: removing one without the other makes taps feel
-broken.
+Nothing may be reachable only via `:hover`. Mark any hover-revealed layer `.reveal-on-hover` and it
+becomes permanently visible under `@media (hover: none)` — keyed on the *capability*, not the
+viewport, so touch laptops are covered and mouse desktops keep the animation. The same block removes
+the browser's blue tap flash and replaces it with an `:active` opacity dip: removing one without the
+other makes taps feel broken.
 
 ### Sticky action rows (`position: sticky`, not `fixed`)
-In-flow action rows use `sticky`: the row keeps its place in the flow, so it reserves its own space
-and can never cover the last field — no per-step `padding-bottom` bookkeeping. Two consumers:
+In-flow action rows use `sticky`: the row keeps its place in the flow, reserves its own space and can
+never cover the last field — no per-step `padding-bottom` bookkeeping. Two consumers:
 `.dz-auth-submit` (sign-in/sign-up, where the keyboard would otherwise push the primary action below
 the fold) and `.dz-sticky-cta`, which is genuinely `fixed` and docks at `--dz-bottom-inset`.
 
@@ -389,58 +360,52 @@ the fold) and `.dz-sticky-cta`, which is genuinely `fixed` and docks at `--dz-bo
 keyboard, so a sticky row there floated mid-screen over the fields being typed into.
 
 ### Mobile bottom nav + the floating-glass material
-The primary wayfinding surface on phones is the floating notched bar described under Bottom chrome.
+The primary phone wayfinding surface is the floating notched bar described under Bottom chrome.
 The floating-glass material — one blur + one saturation boost + a light inset top edge, tinted with
-the app's own indigo/teal (`saturate()` is what stops the blur turning the brand teal into grey mud) —
-is now used by `.filter-fab` alone. Its alphas are set by the worst case (near-white gallery imagery
-behind it), not the pretty one, and it carries an opaque `@supports not (backdrop-filter)` fallback
-for Firefox Android and old WebViews. `.filter-fab` shares the bar's `left` inset so the two sit on
-one vertical edge. Bar height is owned by `--dz-bottom-nav-h` **only** — an inline `style` on the
-element would desync every widget that positions against `--dz-bottom-inset`.
+the app's own indigo/teal (`saturate()` stops the blur turning the brand teal into grey mud) — is
+used by `.filter-fab` alone. Its alphas are set by the worst case (near-white gallery imagery behind
+it), and it carries an opaque `@supports not (backdrop-filter)` fallback for Firefox Android and old
+WebViews. `.filter-fab` shares the bar's `left` inset so the two sit on one vertical edge. Bar height
+is owned by `--dz-bottom-nav-h` **only** — an inline `style` would desync every widget positioned
+against `--dz-bottom-inset`.
 
 ### Home-screen install nudge is two mechanisms, not one
-`InstallPrompt.jsx` promotes adding Draazy to the home screen, and the platform split is real
-rather than an implementation detail worth hiding:
+`InstallPrompt.jsx` promotes adding Draazy to the home screen:
 
 - **Chromium** (Android Chrome, Samsung Internet, Edge) fires `beforeinstallprompt`. We
-  `preventDefault()` it — suppressing Chrome's own mini-infobar so the user gets one ask, not two —
-  stash the event, and call `prompt()` from the click. That opens the browser's native install
-  dialog. `prompt()` throws outside a user gesture, so a silent install on page load is impossible on
-  every platform, by design.
-- **iOS/WebKit** has no install API in any browser, including Chrome on iOS. The only honest option
-  is the Share → Add to Home Screen instruction, rendered **without** a button — a CTA there would be
-  a dead control.
+  `preventDefault()` it (suppressing Chrome's own mini-infobar so the user gets one ask), stash the
+  event, and call `prompt()` from the click, opening the native install dialog. `prompt()` throws
+  outside a user gesture, so a silent install on page load is impossible by design.
+- **iOS/WebKit** has no install API in any browser, including Chrome on iOS. Show the
+  Share → Add to Home Screen instruction **without** a button — a CTA there would be a dead control.
 - Everything else (Firefox Android, desktop) never renders it. Mobile-only via `lg:hidden`, matching
   the bottom nav's breakpoint.
 
-**The gate is engagement, not time.** The nudge appears after 3 page views, not after N seconds: a
-timer measures patience, whereas three pages in is someone who came here to look at homes. The count
-persists in `localStorage` (`dz_install_prompt_v1`), so it accumulates across visits.
+**The gate is engagement, not time:** the nudge appears after 3 page views (a timer measures
+patience; three pages in is someone looking at homes). The count persists in `localStorage`
+(`dz_install_prompt_v1`), accumulating across visits.
 
 **Silence escalates and is terminal:** 1st dismissal → 1 week, 2nd → 2 weeks, 3rd → never again.
-Declining the browser's own dialog counts as a dismissal; treating it as neutral would re-ask someone
-who already said no. It is also suppressed while the cookie bar is up (that bar is legally required
-and owns the bottom of the screen), and never shown once `display-mode: standalone`,
-`navigator.standalone`, or an `appinstalled` event indicates the app is already installed.
+Declining the browser's own dialog counts as a dismissal. It is also suppressed while the cookie bar
+is up (legally required, owns the bottom of the screen), and never shown once `display-mode:
+standalone`, `navigator.standalone`, or an `appinstalled` event indicates the app is installed.
 
-> The view counter is written through a ref guard. Under `StrictMode` effects are double-invoked
-> deliberately, and a bare `views + 1` counted every page twice — the gate opened at half the intended
-> engagement in dev. Any future per-navigation counter has the same trap.
+> The view counter is written through a ref guard: under `StrictMode` effects are double-invoked, and
+> a bare `views + 1` counted every page twice. Any future per-navigation counter has the same trap.
 
 ### Landscape phones are a height budget, not a width one
-A rotated handset is ~915x412, so a `min-width: 768px` breakpoint cannot tell it from a tablet and was
-serving it desktop chrome on a 412px-tall screen. When a rule is really about available *height*, key
-it off height and orientation. The landscape block is guarded three ways — `orientation: landscape`
-**and** `max-height: 500px` **and** `max-width: 1023.98px` — so a 1440x900 desktop and a 1024x768
-landscape tablet both fail it structurally. Inside it `--dz-nav-h` drops to 47px,
-`--dz-bottom-nav-h` to 44px, and tab labels are hidden (the `aria-label` keeps the tab named).
+A rotated handset is ~915x412, so a `min-width: 768px` breakpoint cannot tell it from a tablet. When a
+rule is really about available *height*, key it off height and orientation. The landscape block is
+guarded three ways — `orientation: landscape` **and** `max-height: 500px` **and**
+`max-width: 1023.98px` — so a 1440x900 desktop and a 1024x768 landscape tablet both fail it
+structurally. Inside it `--dz-nav-h` drops to 47px, `--dz-bottom-nav-h` to 44px, and tab labels are
+hidden (the `aria-label` keeps the tab named).
 
 ### Safe areas and `dvh`
 `viewport-fit=cover` is set on the document — the only thing that makes `env(safe-area-inset-*)`
-resolve to real values. Bottom insets flow through `--dz-safe-b`, never through raw `env()` at call
-sites. Horizontal insets are handled by `.dz-safe-x` (positioning, not padding, so the element's own
-padding utilities survive); `env()` is `0px` everywhere else including desktop, so the class is inert
-off-device.
+resolve to real values. Bottom insets flow through `--dz-safe-b`, never raw `env()` at call sites.
+Horizontal insets are handled by `.dz-safe-x` (positioning, not padding, so the element's own padding
+utilities survive); `env()` is `0px` elsewhere including desktop, so the class is inert off-device.
 
 Every viewport-height constraint uses **`dvh`**, so the mobile URL bar collapsing does not resize the
 layout: floating cards cap at `100dvh` minus `--dz-float-top`/`--dz-float-bottom`, the app shell is `min-h-[100dvh]`.
@@ -449,28 +414,26 @@ Do not introduce `vh`.
 ### Responsive dual-render (mobile card / desktop table)
 Data tables render twice: a stacked card list at `sm:hidden` and the real `<table>` at
 `hidden sm:block`. `Table` takes an optional `mobileCard(row)` renderer and only splits when one is
-supplied, so a table without one is unchanged. **Both copies exist in the DOM at all times** — any
-assertion or query selector must scope to the visible copy (`getByRole('table')`, `:visible`), or it
-hits the hidden one first.
+supplied. **Both copies exist in the DOM at all times** — any assertion or query selector must scope
+to the visible copy (`getByRole('table')`, `:visible`), or it hits the hidden one first.
 
 ### Mobile vertical rhythm and type
-- The page rhythm was authored for a 1440px canvas, where 40px between sections reads as air; on a
-  412px screen it is most of a fold. Two knobs, not per-component tuning: `--section-gap` (already
-  behind every `.section-y/-pt/-pb/-mb`) drops to `1.75rem` below `sm`, and `--section-head-gap`
-  standardises the gap under a section heading.
+- The page rhythm was authored for a 1440px canvas; on a 412px screen 40px between sections is most
+  of a fold. Two knobs, not per-component tuning: `--section-gap` (behind every
+  `.section-y/-pt/-pb/-mb`) drops to `1.75rem` below `sm`, and `--section-head-gap` standardises the
+  gap under a section heading.
 - `.consumer-main` headings scale down exactly 20% below 640px, scoped to `h1/h2/h3` so numeric price
   and stat spans reusing the same `text-*` utilities keep their emphasis.
 - **Never let an editable field's font-size fall below 16px on touch.** Touch browsers zoom into any
-  field under 16px on focus, forcing the user to pinch back out; our controls use 14px by default, so every
-  `input`/`select`/`textarea` is lifted to `16px !important` under `pointer: coarse`. The
-  `!important` is required to beat class-scoped rules. Placeholders stay at 14px because zoom is
-  triggered by the field's own size, not the placeholder's.
+  field under 16px on focus; our controls use 14px by default, so every `input`/`select`/`textarea` is
+  lifted to `16px !important` under `pointer: coarse` (`!important` is required to beat class-scoped
+  rules). Placeholders stay at 14px because zoom is triggered by the field's own size.
 - A `px` font-size is not "safe" from dynamic type — it *is* the accessibility failure. Labels that
   must scale are authored in `rem` with an overflow guard, and never with `leading-none` (line-height
   1 is shorter than ascent+descent and clips glyphs).
 
 ### Reduced motion is a first-class state
-Decorative motion is cut under `prefers-reduced-motion: reduce`, and the app additionally honours a
+Decorative motion is cut under `prefers-reduced-motion: reduce`, and the app also honours a
 user-toggled "Reduce motion" setting mirroring the OS one. What survives is the half that carries
 information: the bottom-nav notch and bubble jump to the active slot without sliding; the filter FAB
 keeps its shadow drop but loses the press scale; sheets keep a short opacity transition instead of the
@@ -478,14 +441,14 @@ slide. When cutting motion, ask which half of the effect reports state.
 
 ### Devanagari typography
 The interface is English-only, but user-written text (listing descriptions, society names, a Marathi
-rent-agreement deed) can still be Devanagari. `--font-sans` lists `'Noto Sans Devanagari'` **after**
+rent-agreement deed) can be Devanagari. `--font-sans` lists `'Noto Sans Devanagari'` **after**
 `Outfit`, not instead of it: the browser falls through per character, so Latin still renders in Outfit
 and only Devanagari codepoints reach Noto, whose subsets are behind `unicode-range` so an English
 visitor never downloads them. Putting Noto first would restyle the entire site.
 
 ### Route-scoped stylesheets
-Large per-route CSS is split out of `index.css` and ships with its route chunk instead of blocking
-first paint everywhere: `styles/routes/{messages,reels,flatmates,rent-agreement,property-map,compare,services-hub}.css`.
+Large per-route CSS is split out of `index.css` and ships with its route chunk:
+`styles/routes/{messages,reels,flatmates,rent-agreement,property-map,compare,services-hub}.css`.
 `index.css` keeps a one-line pointer at each extraction site. New route-only styling belongs in a
 route file, not in `index.css`.
 
@@ -503,23 +466,19 @@ grown), `Tabs`, `Switch`, `Badge`, `Tip`, `FieldError`, `DualRange`, `Stat`, `Pa
 
 ## Control Width
 
-A control's width should reflect the content it holds, not the width of the page.
-A dropdown or text input that stretches edge-to-edge for a handful of short
-options reads as a page-wide bar and makes the form feel unfinished.
+A control's width should reflect its content, not the page width. A dropdown or text input stretching
+edge-to-edge for a handful of short options reads as a page-wide bar.
 
 **Rule:** dropdowns and short inputs must not span the full form width on desktop.
 
-- **Grid-paired controls** — keep `w-full` so they fill their grid cell. Two
-  half-width controls sharing a row (e.g. Facing + Age, Property Type + BHK) is
-  the preferred layout: it fills the row without any single control stretching.
-- **Standalone controls** — a control that is the only field in its row must be
-  capped. In the Post-a-property flow use the `ddSolo` token
-  (`sm:max-w-xs`, from `list-property/styles.js`); elsewhere apply an equivalent
-  `sm:max-w-xs`/`sm:max-w-sm` cap. It stays full-width on mobile for easy tapping
-  and caps to ~half a row on desktop.
-- **Wide-content controls** — a searchable locality list or a free-text address
-  legitimately needs more room; let those fill their cell. The cap is for short,
-  fixed option sets (zone, water source, unit, tenure).
+- **Grid-paired controls** — keep `w-full` so they fill their grid cell. Two half-width controls
+  sharing a row (e.g. Facing + Age, Property Type + BHK) is the preferred layout.
+- **Standalone controls** — a control that is the only field in its row must be capped. In the
+  Post-a-property flow use the `ddSolo` token (`sm:max-w-xs`, from `list-property/styles.js`);
+  elsewhere an equivalent `sm:max-w-xs`/`sm:max-w-sm` cap. Full-width on mobile for easy tapping,
+  ~half a row on desktop.
+- **Wide-content controls** — a searchable locality list or a free-text address legitimately needs
+  more room. The cap is for short, fixed option sets (zone, water source, unit, tenure).
 
 ```jsx
 // ✅ Standalone dropdown — capped so it doesn't span the page
