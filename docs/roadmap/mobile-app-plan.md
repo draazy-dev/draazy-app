@@ -3,12 +3,12 @@
 > Goal: ship a real, store‑listed Android/iOS app for Draazy by **reusing the existing React
 > codebase**, optimizing for **performance** and **usability**, without a native rewrite.
 >
-> Scope of this document: **everything up to (but not including) React Native.** That means two
-> phases — **PWA hardening** and **Capacitor packaging** — plus the backend prerequisite that both
-> depend on. React Native is deliberately deferred and only sketched at the end as a future Phase.
+> Scope: **everything up to (but not including) React Native** — **PWA hardening** and **Capacitor
+> packaging**, plus the backend prerequisite both depend on. React Native is deferred and only
+> sketched as a future Phase.
 
-Audience: this is written for someone **new to mobile development**, so key concepts are explained
-inline. Owner: frontend team. Status: proposed.
+Audience: someone **new to mobile development**, so key concepts are explained inline. Owner:
+frontend team. Status: proposed.
 
 ---
 
@@ -19,19 +19,19 @@ separation, so we take the fast, low‑risk path first:
 
 1. **Phase 0 — Backend prerequisite (satisfied).** Native features (push, camera upload, per‑user
    data) need a real API. The Spring Boot backend is live and `src/services/` reaches it through the
-   `http` providers, so the gating dependency for the mobile features that actually matter is met.
-2. **Phase 1 — PWA hardening.** Turn the current web app into an installable, offline‑capable,
-   fast‑loading Progressive Web App. Benefits mobile web *and* the Capacitor shell in Phase 2.
-3. **Phase 2 — Capacitor packaging.** Wrap the exact same web build in a native Android/iOS shell to
-   get App Store / Play Store apps with native push, geolocation, camera, and native storage —
-   reusing **~95–100%** of existing code.
-4. **Phase 3 (future, out of scope here) — React Native** for the consumer app *only if* native feel
+   `http` providers.
+2. **Phase 1 — PWA hardening.** Make the web app installable, offline‑capable and fast. Benefits
+   mobile web *and* the Capacitor shell in Phase 2.
+3. **Phase 2 — Capacitor packaging.** Wrap the exact same web build in a native Android/iOS shell for
+   App Store / Play Store apps with native push, geolocation, camera and storage — reusing
+   **~95–100%** of existing code.
+4. **Phase 3 (future, out of scope) — React Native** for the consumer app *only if* native feel
    becomes the competitive differentiator. Admin/ops stays web forever.
 
-**Why this order:** cheap validation now, native investment only where it pays off. We compete with
-NoBroker / MagicBricks / 99acres, who have polished native apps — but trust, freshness, and genuine
-owner‑direct leads win in Indian real estate, not raw native polish. Capacitor lets us match table
-stakes (a store app + push alerts) in weeks, not months.
+**Why this order:** cheap validation now, native investment only where it pays off. NoBroker /
+MagicBricks / 99acres have polished native apps, but trust, freshness and genuine owner‑direct leads
+win in Indian real estate, not raw native polish. Capacitor matches table stakes (a store app + push
+alerts) in weeks, not months.
 
 ---
 
@@ -44,16 +44,15 @@ stakes (a store app + push alerts) in weeks, not months.
 | **React Native (Expo)** | Rebuild the **UI** in native primitives; reuse logic only | **Best (truly native)** | Logic yes, **UI no** | High | Defer (Phase 3) |
 
 **The one concept to internalize:** Capacitor runs our existing React/HTML/CSS **unchanged** inside a
-native WebView and adds a bridge to native APIs. React Native does **not** — it replaces `<div>` /
-Tailwind with `<View>` / `<Text>` / `StyleSheet`, so every screen is rebuilt. That is the whole
-reason Capacitor comes first.
+native WebView with a bridge to native APIs. React Native replaces `<div>` / Tailwind with `<View>` /
+`<Text>` / `StyleSheet`, so every screen is rebuilt. That is why Capacitor comes first.
 
 ---
 
 ## 3. Codebase readiness — what reuses, what changes
 
-Our current stack: **React 19 + Vite 6 + React Router 7 + Tailwind 3**, Leaflet maps, Chart.js,
-jsPDF, with a **provider‑based service layer** and **platform‑agnostic logic** in `src/lib/`.
+Current stack: **React 19 + Vite 6 + React Router 7 + Tailwind 3**, Leaflet maps, Chart.js, jsPDF,
+with a **provider‑based service layer** and **platform‑agnostic logic** in `src/lib/`.
 
 ### Reuses as‑is (both PWA and Capacitor)
 - **`src/services/**`** — data layer already abstracts the API behind Promises (`config.js`,
@@ -67,10 +66,10 @@ jsPDF, with a **provider‑based service layer** and **platform‑agnostic logic
 - **Persistence (`src/lib/persist.js`)** — dev uses a Vite file‑persist middleware; production falls
   back to `localStorage`. Inside Capacitor, migrate to **`@capacitor/preferences`** (native storage)
   so data survives app updates and is not evicted like WebView localStorage can be.
-- **Router mode** — confirm hash or memory‑safe routing works from a `file://`/`capacitor://` origin
-  (BrowserRouter needs correct `base`; test deep links).
-- **Absolute asset paths** — ensure Vite `base` produces relative asset URLs for the packaged shell.
-- **Safe‑area / notch handling** — add CSS `env(safe-area-inset-*)` padding for iOS/Android.
+- **Router mode** — confirm routing works from a `file://`/`capacitor://` origin (BrowserRouter needs
+  correct `base`; test deep links).
+- **Absolute asset paths** — Vite `base` must produce relative asset URLs for the packaged shell.
+- **Safe‑area / notch handling** — CSS `env(safe-area-inset-*)` padding for iOS/Android.
 - **Leaflet tiles & external CDNs** — verify they load over the app origin and behind offline caching.
 
 ### Must be rebuilt only for React Native (Phase 3 — not now)
@@ -81,12 +80,12 @@ jsPDF, with a **provider‑based service layer** and **platform‑agnostic logic
 
 ## 4. Recommended tech stack (pre‑React‑Native)
 
-**Core (already in place):** React 19, Vite 6, React Router 7, Tailwind 3, Leaflet, Chart.js.
+**Core (in place):** React 19, Vite 6, React Router 7, Tailwind 3, Leaflet, Chart.js.
 
 **Add for Phase 1 (PWA):**
-- **`vite-plugin-pwa`** (Workbox under the hood) — service worker, offline caching, install manifest.
-- **`@tanstack/react-query`** — caching, retries, stale‑while‑revalidate for the service layer. Big
-  perf + offline UX win; drops in on top of the existing Promise‑based services.
+- **`vite-plugin-pwa`** (Workbox) — service worker, offline caching, install manifest.
+- **`@tanstack/react-query`** — caching, retries, stale‑while‑revalidate; drops in on top of the
+  Promise‑based services. Big perf + offline UX win.
 - Route‑based **code splitting** (`React.lazy` + `Suspense`) and image lazy‑loading.
 
 **Add for Phase 2 (Capacitor):**
@@ -96,24 +95,21 @@ jsPDF, with a **provider‑based service layer** and **platform‑agnostic logic
   **`@capacitor/preferences`** (native storage), **`@capacitor/app`** + **`@capacitor/browser`**
   (deep links / external links), **`@capacitor/status-bar`** + **`@capacitor/splash-screen`**.
 
-**Backend prerequisite (Phase 0) — satisfied:** the Spring Boot API serves the app (in local dev at
-`http://localhost:8080/api`), and `src/services/` reaches it through the `http` providers with no
-component‑level coupling.
+**Backend prerequisite (Phase 0) — satisfied:** the Spring Boot API serves the app (local dev:
+`http://localhost:8080/api`); see §5.
 
 ---
 
 ## 5. Phase 0 — Backend prerequisite (satisfied)
 
-Push notifications, camera upload, saved searches, and per‑user data are only meaningful with a real
-backend and real auth. **That dependency is met:** the Spring Boot API is live, auth is server‑side
-with role guards, and every domain in `src/services/` resolves to an `http` provider — there is no
-other data source in the app.
+Push notifications, camera upload, saved searches and per‑user data need a real backend and real
+auth. **That dependency is met:** auth is server‑side with role guards, and every domain in
+`src/services/` resolves to an `http` provider — there is no other data source in the app.
 
 **The rules the native shells inherit, and must not weaken:**
 - The **normalized listing model** holds (see `real-estate-expert`: `listingType` discriminator,
   lat/lng always present, gated contact, RERA validation).
-- **Contact details never leak before the auth/approval gate**, and the gate is enforced by the
-  server, not the client.
+- **Contact details never leak before the auth/approval gate**, enforced by the server, not the client.
 - **Roles are enforced server‑side** — a seeker cannot reach admin/ops endpoints whatever the shell
   renders.
 
@@ -126,15 +122,12 @@ other data source in the app.
 **Primary metric:** % of core flows working against the live API. **Guardrail:** no PII/contact leak
 before gate; auth error rate flat.
 
-> This phase can overlap with Phase 1 (PWA hardening is backend‑agnostic), but must land **before**
-> the native‑feature parts of Phase 2 (push/camera/geo) are useful.
-
 ---
 
 ## 6. Phase 1 — PWA hardening
 
-Make the mobile web experience fast, installable, and resilient. Everything here also improves the
-Capacitor shell in Phase 2 (same build).
+Make the mobile web experience fast, installable and resilient; it also improves the Capacitor shell
+(same build).
 
 > **Status:** installability is **shipped** — manifest + icons, `vite-plugin-pwa` service worker,
 > safe-area/bottom-chrome system, and the in-app install promotion (§6.1). React Query, route
@@ -153,7 +146,7 @@ Capacitor shell in Phase 2 (same build).
 4. **Performance:**
    - Route‑based code splitting (`React.lazy`) for heavy pages (map, charts, admin).
    - Lazy‑load below‑the‑fold images; use deterministic placeholders (already a domain guardrail).
-   - Audit bundle; ensure Leaflet/Chart.js/jsPDF are only loaded on pages that need them.
+   - Audit bundle; Leaflet/Chart.js/jsPDF load only on pages that need them.
 5. **Mobile UX polish:** verify all pages at 360–430px widths; tap targets ≥44px; sticky primary CTA
    (contact / schedule visit / save) above the fold on listing detail; safe‑area CSS. ✅
 6. **Offline states:** graceful offline banner; saved/shortlisted listings readable offline.
@@ -161,23 +154,23 @@ Capacitor shell in Phase 2 (same build).
 
 ### 6.1 Install promotion (shipped)
 
-Installability alone converts almost nobody: every browser buries "Add to Home Screen" two or three
-taps into a menu users never open. `InstallPrompt.jsx` surfaces it in-app — one tap plus the browser's
-native confirm on Android Chromium, and a Share-menu instruction on iOS, which exposes no install API
-in any browser. Behaviour, cooldowns and the StrictMode trap are specified in
-[`system/design-system.md`](../system/design-system.md) → *Home-screen install nudge*.
+Installability alone converts almost nobody: browsers bury "Add to Home Screen" in a menu users never
+open. `InstallPrompt.jsx` surfaces it in-app — one tap plus the browser's native confirm on Android
+Chromium, and a Share-menu instruction on iOS (no install API in any browser). Behaviour, cooldowns
+and the StrictMode trap are specified in [`system/design-system.md`](../system/design-system.md) →
+*Home-screen install nudge*.
 
-Two things worth carrying into Phase 2, both of which only reproduced in **production**:
+Two things to carry into Phase 2, both reproducible only in **production**:
 
 - **A `<meta>` CSP does not govern the service worker.** The host applies `frontend/public/_headers`
-  to `/sw.js` too, so the worker inherits the real policy. Listing photos are `img-src` when the browser
-  loads an `<img>`, but the SW's `fetch()` for the same URL has no image element behind it and is
-  checked against **`connect-src`** — so every photo failed with `ERR_FAILED` the moment the worker
-  took control. `vite preview` sends no CSP header at all, which is exactly why local verification
-  missed it. Any new origin the SW fetches needs both directives.
-- **Chrome no longer requires a service worker to be installable.** The install criteria are HTTPS +
-  a manifest with name, 192/512 icons, `start_url` and `display: standalone`. The SW buys the offline
-  shell, not installability — worth remembering if the caching risk in §12 ever outweighs the benefit.
+  to `/sw.js` too, so the worker inherits the real policy. Listing photos are `img-src` when the
+  browser loads an `<img>`, but the SW's `fetch()` for the same URL has no image element behind it and
+  is checked against **`connect-src`** — every photo failed with `ERR_FAILED` once the worker took
+  control. `vite preview` sends no CSP header, which is why local verification missed it. Any new
+  origin the SW fetches needs both directives.
+- **Chrome no longer requires a service worker to be installable.** The criteria are HTTPS + a
+  manifest with name, 192/512 icons, `start_url` and `display: standalone`. The SW buys the offline
+  shell, not installability — relevant if the caching risk in §12 ever outweighs the benefit.
 
 ### Acceptance criteria
 - Lighthouse **PWA installable = pass**; **Performance ≥ 90** on mobile emulation for the homepage
@@ -217,7 +210,7 @@ Wrap the Phase‑1 web build in a native shell to produce real store apps with n
 
 ### Native feature tasks (depend on Phase 0 backend)
 - **Push notifications** (`@capacitor/push-notifications` + FCM/APNs): new‑listing and saved‑search
-  alerts. This is a core acquisition/retention lever — treat it as a first‑class feature.
+  alerts — a core acquisition/retention lever, so a first‑class feature.
 - **Geolocation** (`@capacitor/geolocation`): "properties near me" and commute/locality search.
 - **Camera** (`@capacitor/camera`): owner photo upload in the list‑property wizard (autosave draft
   must survive — already a wizard guardrail).
@@ -244,12 +237,12 @@ Wrap the Phase‑1 web build in a native shell to produce real store apps with n
 
 ## 8. Cross‑cutting: verification & quality gates
 
-Per project conventions, after non‑trivial changes:
-1. **Review** — run `react-reviewer` (JSX), `code-reviewer` (general), and `security-reviewer` for
-   any auth / user‑data / contact‑gate changes (mobile push tokens + location + camera = user data).
+After non‑trivial changes:
+1. **Review** — `react-reviewer` (JSX), `code-reviewer` (general), and `security-reviewer` for any
+   auth / user‑data / contact‑gate changes (mobile push tokens + location + camera = user data).
 2. **Simplify** — strict no‑behavior‑change pass.
-3. **Playwright** — run relevant `e2e/tests/*.spec.js`; keep web green throughout (Capacitor uses the same
-   web build, so web tests remain the primary automated safety net pre‑RN).
+3. **Playwright** — run relevant `e2e/tests/*.spec.js`; keep web green throughout (Capacitor uses the
+   same web build, so web tests remain the primary automated safety net pre‑RN).
 4. **Manual device testing** — Capacitor‑specific behavior (push, camera, geo, safe‑area, back button)
    is verified on a real device; document steps where no automated coverage exists.
 
@@ -257,17 +250,16 @@ Per project conventions, after non‑trivial changes:
 
 ## 9. Risks & tradeoffs
 
-- **WebView performance ceiling.** Capacitor is web‑in‑a‑shell; very heavy map/image scrolling may
-  feel less fluid than native. *Mitigation:* Phase‑1 perf work; virtualize long lists; if this becomes
-  the competitive gap, that is the trigger for Phase 3 (RN) — but only then.
+- **WebView performance ceiling.** Heavy map/image scrolling may feel less fluid than native.
+  *Mitigation:* Phase‑1 perf work; virtualize long lists. If this becomes the competitive gap, that
+  is the trigger for Phase 3 (RN) — but only then.
 - **localStorage eviction in WebViews.** *Mitigation:* move to `@capacitor/preferences`.
-- **Backend is the real long pole.** Native features are hollow without it. *Mitigation:* start Phase 0
-  early; it also unblocks the whole product, not just mobile.
+- **Backend is the real long pole.** Native features are hollow without it (now satisfied, §5).
 - **Store review friction (esp. iOS).** Permissions (location, camera, push) need clear justification
   and privacy disclosures. *Mitigation:* request permissions in‑context, not upfront; ship the privacy
   policy first.
-- **Scope creep into RN too early.** *Mitigation:* this doc explicitly fences RN to Phase 3 with a
-  defined trigger (native feel = proven differentiator + backend live + validated demand).
+- **Scope creep into RN too early.** *Mitigation:* RN is fenced to Phase 3 with a defined trigger
+  (native feel = proven differentiator + backend live + validated demand).
 
 ---
 
@@ -285,8 +277,8 @@ Phase 3 (React Native)  ──▶  FUTURE / OUT OF SCOPE — only if native feel
                              Admin/ops stays web permanently. Reuses src/services + src/lib.
 ```
 
-**Recommended start:** Phase 0 is done, so **Phase 1** first, then **Phase 2**. The service
-layer's provider seam is what makes this safe and reversible.
+**Recommended start:** Phase 0 is done, so **Phase 1** first, then **Phase 2**. The service layer's
+provider seam makes this safe and reversible.
 
 ---
 
@@ -311,25 +303,23 @@ layer's provider seam is what makes this safe and reversible.
 application.** The web app *is* the mobile app; `/android` and `/ios` are generated build output.
 
 ### Why one codebase
-- **Capacitor consumes the web build, not a separate app.** The flow is literally:
-  `npm run build → dist/ → npx cap sync → Android/iOS shell`. The native projects (`/android`,
-  `/ios`) are **output folders** that wrap `dist/`, not a parallel app you maintain.
+- **Capacitor consumes the web build:** `npm run build → dist/ → npx cap sync → Android/iOS shell`.
+  The native projects (`/android`, `/ios`) are **output folders** wrapping `dist/`, not a parallel app.
 - **Phase 1 (PWA)** = config + code *inside* this repo (`vite-plugin-pwa`, React Query, code
   splitting). Pure web changes.
-- **Phase 2 (Capacitor)** = add `@capacitor/*` deps + `capacitor.config.ts` + generated
-  `/android`,`/ios` folders — all in this same repo. Same components, same `src/services`, same
-  `src/lib`, same tests. One source of truth.
+- **Phase 2 (Capacitor)** = `@capacitor/*` deps + `capacitor.config.ts` + generated
+  `/android`,`/ios` folders, all in this repo. Same components, `src/services`, `src/lib`, tests.
 
 ### Why a fork would be a mistake (anti‑pattern)
-A separate mobile React app means **two copies** of every screen, service, and business rule that
-immediately drift apart. In real estate that is fatal: the listing model, contact‑gate logic, RERA
-validation, and pricing rules would fork — and trust bugs (leaked contact, stale listings) would
-appear in one app but not the other. You'd double the review/test surface for **zero** benefit,
-because Capacitor already produces native apps from the web code.
+A separate mobile React app means **two copies** of every screen, service and business rule that
+drift apart. In real estate that is fatal: the listing model, contact‑gate logic, RERA validation and
+pricing rules would fork, and trust bugs (leaked contact, stale listings) would appear in one app but
+not the other — double the review/test surface for **zero** benefit, since Capacitor already produces
+native apps from the web code.
 
 ### How to handle real web↔native differences: platform seams (not forks)
-Don't fork the repo — fork **small seams** where behavior genuinely differs, using the **same
-dependency‑inversion pattern already in `src/services/config.js`**:
+Fork **small seams** where behavior genuinely differs, using the **same dependency‑inversion pattern
+as `src/services/config.js`**:
 - **Persistence** — `persist.js` chooses localStorage (web) vs `@capacitor/preferences` (native) at
   runtime via `Capacitor.isNativePlatform()`. One interface, two implementations.
 - **Native features** (push/camera/geo) — thin wrapper modules that **no‑op or degrade gracefully on
@@ -346,9 +336,6 @@ re‑implement the **UI** natively.
 | Separate mobile app? | **No** — not until Phase 3, and even then only the UI layer. |
 | Handle web/native differences? | **Runtime platform seams** inside shared code (like the services provider seam). |
 | Structure? | Web app *is* the mobile app; `/android` + `/ios` are generated output. |
-
-**Mental model:** you are not building a mobile app *alongside* the web app — you are **shipping the
-web app as a mobile app.** One codebase, multiple targets.
 
 ---
 
@@ -378,8 +365,8 @@ web app as a mobile app.** One codebase, multiple targets.
    }
    ```
 2. **Never modify a shared component's existing behavior — only add.** No touching flows, screens,
-   routes, or listing/contact‑gate logic. If a change isn't inside a platform seam or a new file and
-   it alters existing behavior, it doesn't belong in the mobile work.
+   routes, or listing/contact‑gate logic. A change outside a platform seam or a new file that alters
+   existing behavior doesn't belong in the mobile work.
 
 ### How we prove web didn't break
 - **Playwright (`e2e/tests/*.spec.js`)** runs against the web build and must stay green through every
@@ -387,57 +374,29 @@ web app as a mobile app.** One codebase, multiple targets.
 - **Reviewers** — `react-reviewer` (JSX), `security-reviewer` for the contact‑gate/persistence seams
   (push tokens + location + camera = user data).
 
-**Biggest actual risk:** service‑worker stale cache (Phase 1) — standard, contained, config‑level.
-Everything else is additive or native‑only.
-
 ---
 
-## 14. Timing & sequencing — when to start, tied to YOUR milestones
+## 14. Timing & sequencing — when to start
 
-Written against two anchors: **(1) mobile UI screens are still being reworked after review; (2)
-backend comes after UI freeze.** Both have since passed — the backend is live and Phase 0 and Phase 1
-are done — so the sequencing below is kept as the *reasoning*, and the gate it waits on is open.
-**Capacitor packaging is now the next move, not a premature one.**
+The original anchors were (1) mobile UI screens still being reworked and (2) backend after UI freeze.
+Both gates have passed — UI frozen, backend live, Phase 0 and Phase 1 done — so **Capacitor packaging
+is the next move, not a premature one.**
 
 ### Dependency logic
-- **Phase 2's valuable part (push/camera/geo) depends on the backend** — it can't finish before the
-  backend exists.
-- **Phase 1 (PWA) is backend‑agnostic but sits on top of your UI** — doing it before UI freeze means
-  re‑testing caching/splitting after every screen change (building on shifting sand).
-- **You're actively changing mobile UI now** — layering mobile infrastructure onto soon‑to‑change
-  screens is wasted rework.
-
-**Conclusion: finish UI work first. Mobile packaging is a follow‑on, not a parallel track** — with one
-cheap exception (mobile‑ready design during the rework you're already doing).
+- **Phase 2's valuable part (push/camera/geo) depends on the backend.**
+- **Phase 1 (PWA) is backend‑agnostic but sits on top of the UI** — doing it before UI freeze means
+  re‑testing caching/splitting after every screen change.
 
 ### Timeline against milestones
 | Milestone | Mobile action | Why |
 |---|---|---|
-| **Now → UI review & screen rework** | **No packaging.** Just design mobile‑responsive: 360–430px widths, ≥44px tap targets, sticky primary CTA, safe‑area spacing. Keep data in service/lib seams, not hardcoded in components. | This *is* the mobile prep; getting responsive UI right now means Phase 1/2 add almost nothing later. |
+| **UI review & screen rework** | **No packaging.** Design mobile‑responsive: 360–430px widths, ≥44px tap targets, sticky primary CTA, safe‑area spacing. Keep data in service/lib seams, not hardcoded in components. | This *is* the mobile prep; Phase 1/2 then add almost nothing. |
 | **UI freeze** ✅ | **Start Phase 1 (PWA hardening).** | Screens stable → caching/splitting/perf work won't be invalidated. |
-| **Backend build** ✅ | Phase 0 is complete — the `http` providers and server-side auth are in place. | Phase 1 needed no backend, so the two overlapped naturally. |
+| **Backend build** ✅ | Phase 0 complete — the `http` providers and server-side auth are in place. | Phase 1 needed no backend, so the two overlapped. |
 | **Backend live** ✅ | **Start Phase 2 (Capacitor)** + native features (push/camera/geo). | These finally have a real API to talk to. |
 
-### Visual sequence
-```
-Now ──────────────▶ UI FREEZE ──────────▶ BACKEND LIVE ──────────▶
-   │                    │                       │
-   ▼                    ▼                       ▼
-Rework mobile UI    Phase 1 (PWA)          Phase 2 (Capacitor)
-(responsive design) + start Phase 0 http    + push / camera / geo
-                      providers
-```
-
-### Do during UI rework (cheap, high‑leverage — not "starting mobile work")
-- [ ] Responsive at phone widths (360–430px); safe‑area‑friendly spacing.
-- [ ] Thumb‑reachable, sticky primary CTA (contact / schedule visit / save) above the fold.
-- [ ] Tap targets ≥44px.
-- [ ] Keep new UI inside existing service/lib seams (no hardcoded data) so later native swaps stay
-      zero‑friction.
-
-**Direct answer:** *Phase 1 waited on the UI freeze and Phase 2 waited on the backend. Both gates are
-now open*, so the responsive-design work below is no longer the only mobile work available — it is
-the checklist to confirm before packaging, not a reason to defer it.
+The responsive-design points above (360–430px, thumb‑reachable sticky CTA, ≥44px taps, no hardcoded
+data) are the checklist to confirm before packaging, not a reason to defer it.
 
 ---
 

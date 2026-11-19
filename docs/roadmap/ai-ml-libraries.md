@@ -1,8 +1,8 @@
 # AI/ML roadmap — where AI earns its place in Draazy
 
 > **Status:** proposal, grounded in the code on `feature/backend-integration` (2026-10-13). Nothing here
-> is built yet unless §1 lists it or an item is marked **Shipped**. Every library listed is open source under a permissive licence
-> (Apache 2.0 / MIT / PostgreSQL).
+> is built unless §1 lists it or an item is marked **Shipped**. Every library is open source under a
+> permissive licence (Apache 2.0 / MIT / PostgreSQL).
 >
 > **Companion docs:** [platform-architecture.md](../system/platform-architecture.md) (ADR-019
 > badge-not-gate, ADR-021 hosting), [search-listings.md](../flows/consumer/search-listings.md),
@@ -17,7 +17,7 @@
 |---|---|
 | **Hosting budget ~$17/mo + 18% GST** (DigitalOcean App Platform 1 vCPU / 1 GB + dev database — ADR-021) | No always-on GPU. Server-side inference is CPU-only, small models, and runs in a **background job**, never on the request path. |
 | **Provider-seam pattern, zero paid keys in dev** | Any model/LLM call sits behind an interface with a deterministic dev stub, like the OTP/storage/payments seams. |
-| **Mobile-first India** — mid-range Android, metered data | Nothing over ~10 MB on a consumer route. Models load lazily (dynamic `import()`, as [face.js](../../frontend/src/lib/identity-verification/face.js) already does), run in a worker, and are cached by the PWA service worker. |
+| **Mobile-first India** — mid-range Android, metered data | Nothing over ~10 MB on a consumer route. Models load lazily (dynamic `import()`, as [face.js](../../frontend/src/lib/identity-verification/face.js) does), run in a worker, and are cached by the PWA service worker. |
 | **DPDP Act 2023** — photos, ID documents, chats are personal data | They never go to a third-party AI API. Self-hosted models only. |
 | **Badge-not-gate + maker-checker** (ADR-019) | AI **flags and suggests**; a human approves, rejects, or hides. No auto-reject. |
 | **CSP** | `'wasm-unsafe-eval'` is already allowed and guarded by `check-csp.mjs` (MediaPipe needs it). Models are self-hosted under `public/models/` via [fetch-models.mjs](../../frontend/scripts/fetch-models.mjs) — no runtime model CDN. |
@@ -68,17 +68,17 @@ Ranked by value ÷ effort. **S** ≈ days, **M** ≈ 1–2 weeks, **L** ≈ 3+ w
 ## 3. Tier A — no model, or a model we already ship
 
 ### A1. Typo-tolerant, index-backed listing search
-- **Today:** `publicTextSearch` ANDs a `LIKE '%word%'` per word across four columns. "Koregoan", "Hinjwadi"
-  vs "Hinjewadi", "Magarpata" return nothing, and a leading-wildcard `LIKE` can't use a btree —
-  V02 already notes that substring search "needs pg_trgm and a GIN index".
+- **Today:** `publicTextSearch` ANDs a `LIKE '%word%'` per word across four columns. "Koregoan",
+  "Hinjwadi" vs "Hinjewadi", "Magarpata" return nothing, and a leading-wildcard `LIKE` can't use a
+  btree — V02 notes that substring search "needs pg_trgm and a GIN index".
 - **Do:** one migration — `CREATE EXTENSION pg_trgm, unaccent`; a GIN `gin_trgm_ops` index on
   `lower(title || ' ' || locality || ' ' || society)`; keep the word-by-word AND, but match each word
   with `word_similarity(word, doc) > 0.4` (`<%` operator, index-backed) instead of `LIKE`. Optionally add a
-  generated `tsvector` column for stemming ("furnished" ↔ "furnishing"). Keep the existing 120-char /
+  generated `tsvector` column for stemming ("furnished" ↔ "furnishing"). Keep the 120-char /
   6-word caps.
-- **Locality aliases:** add a small `aliases text[]` per locality (Devanagari spelling, old names) and
-  match it the same way — cheaper and more exact than a transliteration model.
-- **Performance:** turns a sequential scan per keystroke into a GIN index lookup.
+- **Locality aliases:** a small `aliases text[]` per locality (Devanagari spelling, old names), matched
+  the same way — cheaper and more exact than a transliteration model.
+- **Performance:** a sequential scan per keystroke becomes a GIN index lookup.
 - **Measure:** zero-result rate for searches with `q`; p95 latency of `GET /properties?q=`.
 - **Shipped (first step):** with `pg_trgm` enabled, a letter-only word of 5+ letters that no live
   listing matches exactly falls back to `word_similarity ≥ 0.5` (a fallback, because "balewadi" vs
@@ -97,7 +97,7 @@ Ranked by value ÷ effort. **S** ≈ days, **M** ≈ 1–2 weeks, **L** ≈ 3+ w
 - **Do:** in [image.worker.js](../../frontend/src/lib/uploads/image.worker.js), where the frame is
   already decoded, compute brightness and sharpness (the `readFrameQuality` maths). Show a one-line tile
   hint ("Looks dark — retake in daylight?"), never a block. Run MediaPipe **FaceDetector** (BlazeFace,
-  ~200 KB, same package already shipped) and offer "Blur faces" — useful for tenant privacy under DPDP.
+  ~200 KB, same shipped package) and offer "Blur faces" — useful for tenant privacy under DPDP.
 - **Measure:** first-pass approval rate; "ask for info: photos" rate on the verification desk.
 - **Shipped (first step):** dark/blurry tile hint ([photoLook.js](../../frontend/src/lib/uploads/photoLook.js)).
   Face blur remains.
@@ -107,7 +107,7 @@ Ranked by value ÷ effort. **S** ≈ days, **M** ≈ 1–2 weeks, **L** ≈ 3+ w
   (`hi-IN`, `mr-IN`, `en-IN`), with the transcript fed into `parseSmartQuery`. Hide where unsupported
   (Firefox, some iOS versions).
 - **Caveat:** Chrome sends the audio to Google's recognition service. It's user-initiated, but the
-  privacy notice should say so. A self-hosted Whisper (MIT) only if usage justifies a server.
+  privacy notice should say so. Self-hosted Whisper (MIT) only if usage justifies a server.
 
 ### A5. FAQ deflection on the support form
 - **Today:** [FaqSection.jsx](../../frontend/src/pages/consumer/support/FaqSection.jsx) is a static
@@ -125,7 +125,7 @@ Ranked by value ÷ effort. **S** ≈ days, **M** ≈ 1–2 weeks, **L** ≈ 3+ w
 
 ### B1. Contact details and competitor watermarks inside photos
 - **Why first in Tier B:** the contact gate is the business model, and `NoContactDetails` covers text
-  only. Owners routinely put a phone number or a NoBroker/MagicBricks/99acres watermark into a photo.
+  only; owners routinely put a phone number or a NoBroker/MagicBricks/99acres watermark in a photo.
 - **Step 1 (zero server cost):** when `PropertyReviewModal` opens, run **Tesseract.js** (Apache 2.0,
   `eng`+`hin`+`mar` traineddata) over the listing's photos **in the reviewer's browser** — a trusted,
   desktop client. Run the text through the same rules as `hasContactDetails` plus a competitor-brand list,
@@ -166,17 +166,15 @@ Ranked by value ÷ effort. **S** ≈ days, **M** ≈ 1–2 weeks, **L** ≈ 3+ w
 - **Rank:** hybrid — A1's trigram/FTS score and vector distance fused with Reciprocal Rank Fusion in
   SQL — inside the existing `publicSearch` floor and ahead of the existing `relevanceFirst` boosts.
   `SimilarListings` keeps its hard geo/BHK/price filters and re-ranks the pool by cosine.
-- **Prerequisite:** A1. **Startup:** the JVM loads the model only inside the job runner, not at boot, so
-  startup time doesn't grow.
+- **Prerequisite:** A1. The JVM loads the model only inside the job runner, not at boot.
 
 ### B5. Fair-price signal
 - **Step 1 (no ML):** extend `marketRate` to `percentile_cont` by locality × BHK × deal over live
   listings. Show "Asking rent is in the usual range for 2 BHKs in Baner" on the detail page and "Similar
   flats ask ₹X–Y" on the wizard's price step. Hide below a minimum sample.
-- **Step 2 (when data exists):** finalised deals already record `agreed_price`. Once there are a few
-  thousand, train **LightGBM** (MIT) offline on area, floor, age, furnishing, amenities and distance;
-  export with `onnxmltools` and serve through ONNX Runtime Java. Asking prices alone are too noisy to
-  train on.
+- **Step 2 (when data exists):** finalised deals record `agreed_price`. With a few thousand, train
+  **LightGBM** (MIT) offline on area, floor, age, furnishing, amenities and distance; export with
+  `onnxmltools`, serve through ONNX Runtime Java. Asking prices alone are too noisy to train on.
 
 ---
 
@@ -187,7 +185,7 @@ OpenAI-compatible API, so the Java side is a plain `RestClient` behind an `LlmPr
 canned dev stub — no AI framework needed for a handful of prompts. **Models:** **Qwen3** 4B–8B
 (Apache 2.0) or **Phi-4-mini** (MIT).
 **Cost reality:** a GPU box breaks the hosting envelope. A 4B model, 4-bit, on CPU gives roughly
-5–15 tokens/s — fine for queued jobs, too slow for interactive chat. That's why every item below is async.
+5–15 tokens/s — fine for queued jobs, too slow for interactive chat, hence everything below is async.
 
 ### C1. Better descriptions, in the reader's language
 - Feed only the structured fields `describe.js` already uses; the model rewrites the template draft. The
@@ -196,7 +194,7 @@ canned dev stub — no AI framework needed for a handful of prompts. **Models:**
   stronger than a general LLM at it. Store per language; i18next already handles the UI side.
 
 ### C2. Fallback for unparsed smart-search text
-- **First** log the remainders `parseSmartQuery` forwards as `?q=` (PostHog event). Most gaps will be
+- **First** log the remainders `parseSmartQuery` forwards as `?q=` (PostHog event); most gaps will be
   new rules, not AI. Only for remainders that still miss, call the LLM with a JSON-schema-constrained
   output (llama.cpp grammars / Ollama structured outputs) that can only produce known filter keys.
 
@@ -216,8 +214,8 @@ canned dev stub — no AI framework needed for a handful of prompts. **Models:**
    `runtimeCaching` rule in `vite-plugin-pwa` for `/models/*` so a model downloads once per device.
 4. **Keep models out of the consumer critical path.** No model on the home, search or detail routes'
    initial load. Back-office routes can afford more (desktop, Wi-Fi).
-5. **Keep the API container lean.** ONNX Runtime and tokenizers load only in the job runner, so
-   startup time and the 1 GB container's memory headroom are unaffected.
+5. **Keep the API container lean.** ONNX Runtime and tokenizers load only in the job runner, leaving
+   startup time and the 1 GB container's memory headroom unaffected.
 6. **Every feature ships its metric** (named per item above) through PostHog or `recordSignal`, and
    is dropped if it doesn't move it.
 

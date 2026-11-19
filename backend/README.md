@@ -1,8 +1,7 @@
 # Draazy API (Spring Boot skeleton)
 
-Empty/skeleton Spring Boot service that hosts the hand-authored **OpenAPI 3.1** contract for the
-Draazy platform. No business endpoints are implemented yet — this is the scaffold plus live API
-documentation.
+Spring Boot service hosting the hand-authored **OpenAPI 3.1** contract for the Draazy platform.
+No business endpoints are implemented yet — scaffold plus live API documentation.
 
 - **Java:** 21
 - **Spring Boot:** 4.1.0 (Spring Framework 7)
@@ -19,9 +18,9 @@ documentation.
 
 The contract lives at `src/main/resources/static/openapi/draazy-api.yaml`.
 
-> **Note:** springdoc-openapi is intentionally **not** used — its current releases target Spring
-> Boot 3.x / Spring 6 and are incompatible with Boot 4.x. Documentation is served as a static YAML
-> plus the `org.webjars:swagger-ui` webjar, which is framework-version-agnostic.
+> springdoc-openapi is intentionally **not** used — its releases target Spring Boot 3.x / Spring 6
+> and are incompatible with Boot 4.x. Docs are served as static YAML plus the
+> `org.webjars:swagger-ui` webjar, which is framework-version-agnostic.
 
 ## Build & run
 
@@ -36,11 +35,11 @@ mvn -DskipTests package        # add -s <settings.xml> if your ~/.m2 mirror is i
 java -jar target-cli\draazy-api-0.0.1-SNAPSHOT.jar
 ```
 
-> **Why `target-cli`?** Command-line Maven builds write there instead of `target`, via
-> `-DbuildDirName=target-cli` in `.mvn/maven.config` (applied automatically). `target` is left to the
-> VS Code Java language server, which compiles the project with its own bundled JDK 21 and would
-> otherwise overwrite Maven's Java 25 bytecode mid-build — producing `NoClassDefFoundError` or
-> `Unresolved compilation problems` at test runtime. See `docs/system/api-standards.md` §8.1.
+> **Why `target-cli`?** Command-line Maven builds write there (`-DbuildDirName=target-cli` in
+> `.mvn/maven.config`, applied automatically). `target` is left to the VS Code Java language server,
+> which compiles with its own bundled JDK 21 and would otherwise overwrite Maven's Java 25 bytecode
+> mid-build — producing `NoClassDefFoundError` or `Unresolved compilation problems` at test runtime.
+> See `docs/system/api-standards.md` §8.1.
 
 Then open http://localhost:8080/api/docs.
 
@@ -50,5 +49,5 @@ Implement controllers/entities per bounded context (see
 [`../docs/system/package-structure.md`](../docs/system/package-structure.md) §3 for the
 context → package → schema map, and
 [the OpenAPI spec](./src/main/resources/static/openapi/draazy-api.yaml)). Keep the spec in sync — it is
-the machine-readable source of truth, and `SpecCoverageTest` fails the build in both directions if it
+the machine-readable source of truth; `SpecCoverageTest` fails the build in both directions if it
 drifts from the served routes.

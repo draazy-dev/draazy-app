@@ -6,11 +6,11 @@ App Platform in `blr`, a dev Postgres, Cloudflare Pages and R2 — is decided in
 This file is the single deployment document: the contract (what to set and which mistakes are silent),
 the order for a fresh environment (§6) and the checks after a deploy (§9).
 
-> **Source of truth for the variable list is `ProdProfileContractTest`**, not this page. That test
-> loads the real `application-prod.properties` and fails if a `${ENV}` lookup appears without being
-> added to its checklist. If this page and that test disagree, the test is right.
+> **Source of truth for the variable list is `ProdProfileContractTest`**, not this page. It loads the
+> real `application-prod.properties` and fails if a `${ENV}` lookup is not in its checklist. If this
+> page and that test disagree, the test is right.
 
-Commands are given for macOS and Windows PowerShell where they differ; run them from the repository root
+Commands are given for macOS and Windows PowerShell where they differ; run from the repository root
 unless stated otherwise. The repository is `draazy-dev/draazy-app`.
 
 | § | Covers |
@@ -54,21 +54,20 @@ Two arrangements satisfy that:
 | Sibling subdomains — cross-origin but same-site | `https://www.draazy.com` | `https://api.draazy.com` |
 
 A UI served from its own registrable domain — `*.netlify.app`, `*.pages.dev`, `*.vercel.app`, all
-Public Suffix List entries — is **fatal**, and fatal in the worst way: the browser withholds the
-cookie *silently*, so every session dies fifteen minutes after login and the server log is
-indistinguishable from a visitor who was never signed in. `CookieDeliveryCheck` refuses to boot on
-that shape, which is the only reason it is caught at all — no test can reach it, because dev and e2e
-go through the Vite proxy where everything is same-origin by construction.
+Public Suffix List entries — is **fatal**, and silently: the browser withholds the cookie, so every
+session dies fifteen minutes after login and the server log is indistinguishable from a visitor who
+was never signed in. `CookieDeliveryCheck` refuses to boot on that shape, the only reason it is caught
+— no test can reach it, because dev and e2e go through the Vite proxy where everything is same-origin.
 
 Consequences, all easy to get wrong:
 
 - **Never test login on the `*.pages.dev` URL.** Every Pages deployment gets one and it is cross-site
-  with `/api`. Browsing works there; sessions do not. The custom domain has to be attached before
-  anyone can stay signed in.
-- **Do not create `api.draazy.com`.** Pointing a subdomain at the backend is the *other* shape and needs
-  different `WEB_ORIGINS` / `API_PUBLIC_ORIGIN` values. Mixing the two gives a service that boots and
-  cannot hold a session. The browser never learns the DigitalOcean URL: it is the Pages variable
-  `API_ORIGIN`, read server-side at request time, with no DNS record.
+  with `/api`. Browsing works there; sessions do not. Attach the custom domain before anyone can stay
+  signed in.
+- **Do not create `api.draazy.com`.** That is the *other* shape and needs different `WEB_ORIGINS` /
+  `API_PUBLIC_ORIGIN` values; mixing the two gives a service that boots and cannot hold a session. The
+  browser never learns the DigitalOcean URL: it is the Pages variable `API_ORIGIN`, read server-side at
+  request time, with no DNS record.
 - **`VITE_API_BASE` stays unset (`/api`).** Relative, by design: an absolute value is the cross-origin
   topology, and the CSP ships `connect-src 'self'`.
 
@@ -78,11 +77,11 @@ The path proxy was chosen because it is the only shape that can also deliver the
 ### How the proxy is implemented
 
 `frontend/functions/api/[[path]].js` — a Cloudflare Pages Function, not a `_redirects` rule.
-**Cloudflare Pages does not proxy `_redirects` to an external origin**; it redirects to it, which
-lands the browser on the backend's origin and loses the cookie exactly as described above.
+**Cloudflare Pages does not proxy `_redirects` to an external origin**; it redirects, landing the
+browser on the backend's origin and losing the cookie as described above.
 
-Pages resolves Functions before static assets and before `_redirects`, so the SPA rewrites cannot
-shadow `/api`. `_redirects` is generated at build time by `frontend/scripts/vite-plugin-spa-fallback.mjs`:
+Pages resolves Functions before static assets and `_redirects`, so the SPA rewrites cannot shadow
+`/api`. `_redirects` is generated at build time by `frontend/scripts/vite-plugin-spa-fallback.mjs`:
 one rewrite per `App.jsx` route to the shell (prerendered pages rewrite to themselves first), which
 ships as `dist/404.html` so unknown paths answer a real 404. A `/*` rewrite cannot be used: Pages
 ignores `/* /index.html`, and any other `/*` target would be matched before the asset lookup and serve
@@ -96,10 +95,10 @@ The Function reads two Pages settings:
 | `API_ORIGIN` | Scheme + host of the backend, no path, no trailing slash: the App Platform default ingress |
 | `ORIGIN_SHARED_SECRET` | Pages **secret**; same value as the backend's (§4) |
 
-Unset, either answers 502 rather than falling through — a fall-through would return the HTML shell with
-a 200, which `http.js` reads as success and renders as an affirmative "no results" on every catalogue.
-The Function also sets `X-Forwarded-For` from `CF-Connecting-IP`, overwriting anything the client sent,
-and refuses to forward at all when that header is absent.
+Unset, either answers 502 rather than falling through — a fall-through would return the HTML shell
+with a 200, which `http.js` reads as success and renders as "no results" on every catalogue. The
+Function also sets `X-Forwarded-For` from `CF-Connecting-IP`, overwriting anything the client sent,
+and refuses to forward when that header is absent.
 
 ---
 
@@ -111,10 +110,10 @@ moved to another region). It carries no credentials in GitHub: the spec binds `$
 `${db.PORT}`, `${db.DATABASE}`, `${db.USERNAME}` and `${db.PASSWORD}`, and DigitalOcean fills them at deploy.
 
 - **Direct connection, no pooler.** `DB_URL` and `FLYWAY_DB_URL` are the same JDBC URL
-  (`...?sslmode=require`), so Flyway's session-scoped `pg_advisory_lock` works and prepared statements
-  are not an issue. `application-sandbox.properties` still pins `prepareThreshold=0`, which is harmless
-  here. It also pins `sslmode=require` as a floor, since pgjdbc's default `prefer` falls back to plaintext
-  silently, and a small, drainable Hikari pool (`maximum-pool-size=5`, `minimum-idle=0`).
+  (`...?sslmode=require`), so Flyway's session-scoped `pg_advisory_lock` works. `application-sandbox.properties`
+  pins `prepareThreshold=0` (harmless here), `sslmode=require` as a floor (pgjdbc's default `prefer`
+  falls back to plaintext silently), and a small, drainable Hikari pool (`maximum-pool-size=5`,
+  `minimum-idle=0`).
 - **When it outgrows 512 MB, or needs a standby,** upgrade the dev database to a DigitalOcean Managed
   Database from the app's database settings. Then split the roles as in §2.1.
 
@@ -122,15 +121,14 @@ moved to another region). It carries no credentials in GitHub: the spec binds `$
 `spring.flyway.locations` is migration-only under `prod`, deliberately — `R__zz_DML_dev_demo_data.sql`
 is *repeatable*, so it would re-seed 38 fabricated listings and 78 fabricated users on every deploy whose
 checksum moved, indistinguishable from real inventory to a buyer. `application-sandbox.properties` is a
-standalone profile activated as `SPRING_PROFILES_ACTIVE=sandbox` — a self-contained copy of the prod
-configuration whose one declared difference is that it adds the seed location back. A seeded database can
-never be promoted to production: point production at its own database.
+standalone profile (`SPRING_PROFILES_ACTIVE=sandbox`) — a self-contained copy of the prod configuration
+whose one declared difference is that it adds the seed location back. A seeded database can never be
+promoted to production: point production at its own database.
 
-Sandbox and production read the same variable *names* and entirely different *values* — separate
-databases, separate GitHub environment secrets, separate Cashfree credentials.
-`SandboxProfileContractTest` asserts the two files stay identical apart from the declared divergence, so
-hardening prod without hardening sandbox fails the build. All four tiers are in
-[`system/profiles.md`](./system/profiles.md).
+Sandbox and production read the same variable *names* and entirely different *values* (separate
+databases, GitHub environment secrets and Cashfree credentials). `SandboxProfileContractTest` asserts the
+two files stay identical apart from the declared divergence, so hardening prod without sandbox fails the
+build. All four tiers are in [`system/profiles.md`](./system/profiles.md).
 
 ### 2.1 Database roles and migrations
 
@@ -180,11 +178,11 @@ Run migrations locally with `java -jar app.jar --migrate-only` and the three `FL
 
 Every variable below is declared with **no default**, so a deploy that omits one fails to start
 rather than inheriting the developer values in `application.properties` (local Postgres credentials,
-a committed JWT secret, `trusted-proxies=none`). That is the design, not an inconvenience.
+a committed JWT secret, `trusted-proxies=none`).
 
 Secrets live in the GitHub `sandbox` environment (§5.1). The deploy workflow substitutes them into
-`backend/deploy/do-app-sandbox.yaml`, and DigitalOcean stores the `type: SECRET` entries encrypted. There
-is no separate secret store.
+`backend/deploy/do-app-sandbox.yaml`, and DigitalOcean stores the `type: SECRET` entries encrypted;
+there is no separate secret store.
 
 | Variable | Notes |
 |---|---|
@@ -244,15 +242,14 @@ token from the GitHub `sandbox` environment secret **`SANDBOX_WHATSAPP_ACCESS_TO
 fast while it is empty). Every send is billed to the Meta prepaid balance and only reaches mobiles
 registered on WhatsApp, so seeded demo mobiles cannot sign in — use your own number.
 
-`draazy.otp.sandbox-code` is pinned empty, as in prod. It remains a break-glass only: setting
-`DRAAZY_OTP_SANDBOX_CODE` on the app pins every code to that value for anyone who knows a mobile, so set
-it only for a disposable database and remove it afterwards. It is a key of its own rather than a reuse of
-`DRAAZY_OTP_FIXED_CODE` on purpose: that one is refused on *every* deployment profile by
-`OtpService.rejectFixedCodeInProduction`, and sandbox counts as one, so reusing it would disarm the guard
-that also covers prod. `OtpService.rejectSandboxCodeOutsideSandbox` is the matching lock: the boot fails
-unless `sandbox` is the *only* deployment profile active, so neither a copied properties file nor a
-`prod,sandbox` activation can carry it into production. `application-prod.properties` also pins the key
-empty.
+`draazy.otp.sandbox-code` is pinned empty, as in prod. It is break-glass only: setting
+`DRAAZY_OTP_SANDBOX_CODE` pins every code to that value for anyone who knows a mobile, so set it only for
+a disposable database and remove it afterwards. It is a key of its own, not a reuse of
+`DRAAZY_OTP_FIXED_CODE`, which `OtpService.rejectFixedCodeInProduction` refuses on *every* deployment
+profile (sandbox included) — reusing it would disarm the guard that also covers prod.
+`OtpService.rejectSandboxCodeOutsideSandbox` is the matching lock: the boot fails unless `sandbox` is the
+*only* deployment profile active, so neither a copied properties file nor a `prod,sandbox` activation can
+carry it into production. `application-prod.properties` also pins the key empty.
 
 Sandbox also enforces Turnstile on the code send and both waitlists (`TURNSTILE_ENABLED=true`). Create a
 widget in Cloudflare → Turnstile for the sandbox hostname, then add its secret key as the `sandbox`
@@ -265,15 +262,14 @@ boot while `TURNSTILE_ENABLED` is false.
 
 ### 3.2 The public photo bucket must send `Access-Control-Allow-Origin`
 
-A listing photo is not only rendered. The create-listing wizard draws each one to a `<canvas>` to
-compute a perceptual hash, which the duplicate probe compares across owners, and reading pixels back
-from a canvas that has drawn a cross-origin image throws unless that image arrived with CORS headers.
+The create-listing wizard draws each photo to a `<canvas>` to compute a perceptual hash, which the
+duplicate probe compares across owners; reading pixels back from a canvas that drew a cross-origin image
+throws unless it arrived with CORS headers.
 
-The failure is silent by construction: the client degrades to no hashes, the listing posts normally,
-and the only symptom is that duplicate listings sharing photographs stop being flagged. Nothing in
-the repository can assert it — the URL is R2's, the header is bucket configuration, and the dev
-stand-in is same-origin (`DevObjectStore.publicUrl`), so no test will ever go red if the rule is
-missing. The CORS policy is in §6.2.
+The failure is silent: the client degrades to no hashes, the listing posts normally, and the only symptom
+is that duplicate listings sharing photographs stop being flagged. No test can catch it — the header is R2
+bucket configuration and the dev stand-in is same-origin (`DevObjectStore.publicUrl`). The CORS policy is
+in §6.2.
 
 The same bucket should sit behind a **proxied custom domain**, not `r2.dev`, which Cloudflare does
 not cache. On that domain the `.w480.webp`/`.w960.webp` card copies are edge-cached by default, but
@@ -379,8 +375,8 @@ mobile; the owner taps a link to agree or decline (`/owner-confirm#<token>`).
 Owners whose account has WhatsApp turned off, and any number that replied STOP, get no notice.
 
 Owner notices go to numbers a tenant typed, so they draw more blocks and spam reports than any other
-template. A second number on the same WABA keeps those off the login number's quality rating. It does not
-add capacity: since October 2025 Meta's messaging limit is shared by every number in the business portfolio.
+template. A second number on the same WABA keeps those off the login number's quality rating but adds no
+capacity: since October 2025 Meta's messaging limit is shared by every number in the business portfolio.
 
 **WhatsApp "needs your attention" template.** Sent when the desk sends a rent agreement back to the owner
 or tenant for a correction (`POST /service-requests/{id}/attention`), to each person asked whose account
@@ -508,9 +504,8 @@ their own free Worker, `fetch` the origin directly with a forged `X-Forwarded-Fo
 `RemoteIpValve` pop the Cloudflare hop and adopt the attacker's chosen address. That buys unlimited
 rotation of the anonymous write budget, satisfies `BotDefenceFilter.verify` for arbitrary addresses and —
 run the other way — lets one address be pinned to a victim's IP to 429 them off the platform. Leaving
-Cloudflare out instead collapses all anonymous traffic into the single Cloudflare-egress bucket. Neither
-is safe on its own, so the origin must be able to tell *this* proxy apart from any other Cloudflare
-tenant. A shared secret does that for free.
+Cloudflare out collapses all anonymous traffic into one bucket. Neither is safe alone, so the origin must
+tell *this* proxy apart from any other Cloudflare tenant. A shared secret does that for free.
 
 ### How the gate works
 
@@ -705,8 +700,7 @@ ShedLock is needed.
 | Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `otp-retention`, `outbound-message-retention`, `listing-content-purge`, `photo-upload-sweep`, `photo-delete-retry` (listing photos whose R2 delete failed, from `photo_storage_deletes`, 500 a night, least-tried first), `flatmate-owner-notice-purge`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
 | Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `lease-end-reminders`, `tracked-rent-reminders`, `waiting-digest` |
 
-The app is always on, so the `@Scheduled` cron runs in-process at the times above with no external
-trigger. Switches: `draazy.jobs.enabled=false` turns off all of them (the test suite does), and
+The `@Scheduled` cron runs in-process (the app is always on), with no external trigger. Switches:  `draazy.jobs.enabled=false` turns off all of them (the test suite does), and
 `draazy.jobs.<name>.enabled=false` (env `DRAAZY_JOBS_<NAME>_ENABLED`) turns off one. Daily jobs that read a
 capped page (200–500 rows) repeat until a page comes back empty, up to ten pages a run.
 
@@ -735,9 +729,9 @@ Tools (`wrangler` runs through `npx`; no install):
 
 ### 6.1 DNS: GoDaddy → Cloudflare
 
-> **This does not move the domain off GoDaddy.** GoDaddy stays the *registrar*; what moves is *DNS
-> hosting*. Cloudflare DNS is free, and registrar-at-GoDaddy / DNS-at-Cloudflare is an ordinary
-> arrangement, reversible in minutes by pasting GoDaddy's original nameservers back.
+> **This does not move the domain off GoDaddy.** GoDaddy stays the *registrar*; only *DNS hosting*
+> moves. Cloudflare DNS is free, and the split is ordinary and reversible in minutes by pasting
+> GoDaddy's original nameservers back.
 
 Do the full nameserver move even though a lone subdomain could keep GoDaddy DNS:
 
@@ -956,7 +950,7 @@ Run §9.3 against `https://sandbox.draazy.com`, then the cookie test in §9.3 an
 
 ## 8. Logs, errors and alerts on DigitalOcean — $0
 
-Nothing here costs money; non-critical logs are not worth paying to keep.
+Nothing here costs money.
 
 | Signal | Where it lives | Retention |
 |---|---|---|
@@ -1006,9 +1000,8 @@ against mocks; this section covers only what it cannot reach:
   self-grant Verified badge are `@LocalOnly` and do not exist outside `local`
   ([`system/profiles.md`](./system/profiles.md#local-only)). There is no shortcut, and adding one to
   a deployed environment would be a login bypass.
-- **Maker-checker needs two operators.** Rent-agreement refund approval refuses the same person on
-  both sides, so each environment needs a second back-office account with the relevant permission,
-  not a second administrator.
+- **Rent-agreement refunds need a manager or the admin.** Staff can ask for one but only a manager or
+  the admin approves it, their own requests included, so each environment needs one such account.
 - **Production never-do list** — these touch real people:
   - Never **approve** a test listing. It goes public, into search, sitemaps and alerts.
   - Never **unlock a real owner's contact** from a test account. That discloses a real person's
@@ -1138,7 +1131,7 @@ one Android phone (Chrome) and one iPhone (Safari) as well as desktop.
 
 ### 9.5 Production — smoke
 
-Short, mostly read-only, and restricted to test accounts. Respect the never-do list in §9.1.
+Short, mostly read-only, test accounts only. Respect the never-do list in §9.1.
 
 - [ ] §9.3 wiring, against the production origin
 - [ ] Consumer sign-in: OTP arrives on WhatsApp
