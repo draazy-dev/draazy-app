@@ -10,16 +10,16 @@
 - **Persona:** a growth / operations lead who needs to see demand, supply, pricing, funnel and SLA health at a glance.
 - **Job-to-be-done:** "Show me traffic and conversion, where demand outruns supply, whether listings are
   mispriced, how the ops team is doing against SLA, and how Pune's seasons will move the market."
-- **Why it matters:** this is the decision layer above every operational flow - it tells ops where to source
-  supply, which localities to prioritise, and whether SLAs (feeding [`services-moderation.md`](./services-moderation.md)
-  and property verification) are being met. The funnel here complements [`enquiries-funnel.md`](./enquiries-funnel.md).
+- **Why it matters:** the decision layer above every operational flow: where to source supply, which localities to
+  prioritise, whether SLAs (feeding [`services-moderation.md`](./services-moderation.md) and property verification) are met.
+  The funnel complements [`enquiries-funnel.md`](./enquiries-funnel.md).
 
 ## 2. Entry points
 - **Routes:** `/admin/analytics?tab=<key>` (default `traffic`). Tab keys: `traffic`, `engagement`, `funnel`, `supply-gap`,
   `pricing`, `sla`; any other key (including the retired `geography`, `seasonal`, `surfers`) falls back to Traffic.
   The Dashboard (`/admin`) surfaces KPI tiles + SLA panels that link into these tabs (e.g. `?tab=supply-gap`).
-- **Tiles / triggers:** a header `Report window` select (30/90/180 days, shown on every tab except Pricing),
-  per-tab KPI cards, charts, and drill tables; CSV export on the Traffic tab.
+- **Tiles / triggers:** header `Report window` select (30/90/180 days, every tab except Pricing), per-tab KPI cards,
+  charts, drill tables; CSV export on the Traffic tab.
 - **Source components:**
   - `src/pages/admin/AdminAnalytics.jsx` - tab shell, window state, header picker.
   - `src/pages/admin/analytics/*.jsx` - the tab views + `constants.jsx` (palette, axes, `Card`).
@@ -34,7 +34,7 @@
 - Guards are UX-only mock RBAC ([`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 1).
 
 ## 4. Entities touched
-- **Read only** (no writes; analytics is pure aggregation): [`listings`](../../system/data-model.md),
+- **Read only** (pure aggregation): [`listings`](../../system/data-model.md),
   [`enquiries`](../../system/data-model.md), [`visits`](../../system/data-model.md),
   [`deals`](../../system/data-model.md), [`tickets`](../../system/data-model.md),
   [`users`](../../system/data-model.md), [`localities`](../../system/data-model.md),
@@ -60,7 +60,7 @@ Charts: Visits & page views line; Traffic sources doughnut (from `analytics.sour
 
 ### 5.2 Engagement tab (all "Sample")
 Static illustrative series over `WK12`: avg session minutes `3.2..4.5`, bounce `48..37%`, top-pages index bar
-(Home 100 down to Post property 22). No DB derivation - labelled Sample.
+(Home 100 down to Post property 22). No DB derivation.
 
 ### 5.3 Anonymous surfers tab (`anonymousSurfers(days, traffic)`, seed 987654)
 - `totalVisits = sum(visits)`, `totalSignups = sum(signups)` over the (shared) traffic series.
@@ -73,13 +73,13 @@ Static illustrative series over `WK12`: avg session minutes `3.2..4.5`, bounce `
 
 ### 5.4 Geography tab — removed
 It charted ~155 localities in 360px bars (unreadable), and its demand index and ₹/sqft were curated
-seed constants. Locality demand now lives on Supply Gap, measured prices on Pricing.
+seed constants. Locality demand lives on Supply Gap, measured prices on Pricing.
 
 ### 5.4a Funnel tab (`GET /admin/analytics/funnel?days=`, `AdminFunnelService`)
 Weekly (IST, Monday-start, zero-filled) counts of five stages over the window (1–365 days, default 90):
 - **Posted** — non-archived `properties.created_at`.
 - **Approved** — the first approval audit row per non-archived listing: `property.status` → `approved`, or the console's case-file `property.verification.decision` = `approve` (re-approvals don't recount).
-- **Contacts** — `contact_requests.created_at` (requests sent; there is no reliable approval timestamp).
+- **Contacts** — `contact_requests.created_at` (requests sent; no reliable approval timestamp).
 - **Visits** — `visits.created_at`. **Deals** — `deals.closed_at` where `status = 'closed'`.
 
 Each stage counts events in the week they happened, not one cohort followed through, so the tiles'
@@ -98,23 +98,17 @@ Per-locality supply vs weighted demand over the header window:
 - A failed read shows a notice instead of zeroed KPIs; the city panel below still renders.
 - **Demand Alerts by locality** (`alertsByLocality()`): groups `demandAlerts` by locality -> `{count, lastAt, rent, buy, topType}`, sorted by count.
 - **City Expansion Requests** (`GET /admin/cities/waitlist` via `cityService.listCityWaitlist()`):
-  where people want Draazy to launch **next** — a different question from the rest of this tab,
-  which compares supply and demand *inside* a city already served. Rows are
-  `{ city, requests, lastRequestedAt }`, grouped in SQL by `lower(city)` and ordered by `requests`
-  desc then recency; displayed spelling is `min(city)`, a real one somebody typed. The panel is
-  **counts-only by design** — `city_waitlist` holds unverified public mobiles and emails, and the
-  aggregation happens in the database so no contact detail reaches the JVM, let alone this screen.
-  There is no `?days=` window: wanting a city does not decay.
-  It previously aggregated a `dzCityRequests` array in localStorage, so it showed the reading
-  operator only the asks made from *their own* browser — always none on a fresh profile, while
-  `POST /cities/waitlist` had been recording the real ones all along.
-  The waitlist is held as `null`-until-loaded rather than `[]`: a failed read renders
-  "Couldn't load city requests", never "No city requests yet", because the second sentence would
-  close the expansion queue on the strength of an outage. `cityProvider.listCityWaitlist` **throws**
-  on a non-array 200 for the same reason — coercing to `[]` there would resolve the promise and
-  defeat the distinction from below. The failed state carries a **Try again** button wired to an
-  attempt counter in the effect's deps: nothing else on this tab re-runs the read, so without it
-  the panel would warn against misreading the outage and then offer no way to resolve it.
+  where people want Draazy to launch **next**, unlike the rest of this tab (supply vs demand *inside* a served city).
+  Rows are `{ city, requests, lastRequestedAt }`, grouped in SQL by `lower(city)`, ordered by `requests`
+  desc then recency; displayed spelling is `min(city)`. **Counts-only by design** — `city_waitlist` holds
+  unverified public mobiles and emails, and aggregation happens in the database so no contact detail
+  reaches the JVM or this screen. No `?days=` window: wanting a city does not decay.
+  - The waitlist is `null`-until-loaded, not `[]`: a failed read renders "Couldn't load city requests",
+    never "No city requests yet" (which would close the expansion queue on the strength of an outage).
+    `cityProvider.listCityWaitlist` **throws** on a non-array 200 for the same reason; coercing to `[]`
+    would defeat the distinction.
+  - The failed state carries a **Try again** button wired to an attempt counter in the effect's deps
+    (nothing else on this tab re-runs the read).
 
 ### 5.6 Pricing tab (`GET /admin/analytics/pricing`)
 - **Asking ₹/sqft and rental yield are measured from approved flats only** (`property_type_key = 'flat'`,
@@ -122,7 +116,7 @@ Per-locality supply vs weighted demand over the header window:
   shops are not priced per sqft like flats, and one listing cannot speak for a locality.
 - Market rate, avg rent and demand are curated reference figures, labelled as such on the tab.
 - **Summary KPIs:** localities priced, overpriced/underpriced/fair counts (±10% of market rate), avg yield,
-  highest/lowest market rate. The chart draws only priced localities. No window: it is a live snapshot.
+  highest/lowest market rate. The chart draws only priced localities. No window: live snapshot.
 - Locality breakdown table (opportunity chip: High if `demand>=85 && totalListings<=2`, Moderate if
   `demand>=75`, else Stable).
 
@@ -145,28 +139,24 @@ Four categories, each simulating a time and a per-item `breached = time > target
 Pinned by `AdminSlaAnalyticsTest`. Targets are served in the response so no client carries its own copy:
 `listing review 24h`, `ticket pickup 4h`, `ticket delivery 72h`, `conciergeToLive 168h`.
 - **Review turnaround is the *first* `property.status` decision**, not the latest and not the mean of
-  all of them. A re-check on a live listing is a second look at a decision already taken, not a second
-  first decision. A rejection counts as a review — the queue was worked, not skipped.
+  all of them. A re-check on a live listing is not a second first decision. A rejection counts as a review.
 - **The audit join matches `entity_id` against the id *or* the slug.** `audit_log.entity_id` is free
-  text and the moderation surfaces have not always agreed which identifier goes in it. Dropping the
+  text and moderation surfaces have not always agreed which identifier goes in it. Dropping the
   `or` branch would silently stop counting older decisions and *improve* the reported average, because
   those listings stay in the pending backlog.
 - **Empty means null, not zero.** `avgHoursToReview`, `medianHoursToReview` and `slaRatePct` are null
-  when nothing was reviewed: there is no average of nothing, and a team with no decisions has not met
-  the SLA. `breachedCount` stays 0, which is a true count rather than a derived figure.
+  when nothing was reviewed (a team with no decisions has not met the SLA). `breachedCount` stays 0, a true count.
 - **`?days=` filters on when the work was *finished*** — the decision or completion instant, never
-  `created_at`. The backlog counts are present-tense and are deliberately not narrowed by the window.
+  `created_at`. Backlog counts are present-tense and deliberately not narrowed by the window.
 - **A listing waits from `coalesce(resubmitted_at, created_at)`**, matching the review queue, so an
   edited listing is not reported overdue for its whole age. Reviewed is not filtered on the current
   status: a listing since sold, paused or resubmitted was still decided.
 - **Ticket pickup is the first real assignment recorded in `audit_log`**, not `tickets.assignee_id`
   (a re-queued ticket has it back to null) and not the latest assignment row (`assigneeId: "none"` is
-  an unassignment, not a pickup). Delivery counts `closed` as well as `resolved`: a desk that closes a
-  request has finished with it, and recognising only `resolved` grows the backlog every time somebody
-  tidies up.
-- **Concierge measures the decision that put the listing *live***, not the first look at it, and is
-  filtered to `posted_by_admin` — otherwise it reports the whole catalogue's approval time under a
-  heading about staff-posted listings. A rejected concierge listing is finished with, not outstanding.
+  an unassignment). Delivery counts `closed` as well as `resolved`: recognising only `resolved` grows
+  the backlog every time somebody tidies up.
+- **Concierge measures the decision that put the listing *live***, not the first look, and is
+  filtered to `posted_by_admin` (else it reports the whole catalogue's approval time). A rejected concierge listing is finished with, not outstanding.
 
 ### 5.8 Seasonal tab (`seasonalAnalytics()`, seed 112233)
 Pune-specific monthly multipliers (12 each): `rentMultiplier` (peak Jun-Aug), `buyMultiplier` (peak Oct-Nov),
@@ -204,18 +194,18 @@ Pune-specific monthly multipliers (12 each): `rentMultiplier` (peak Jun-Aug), `b
 - Deviation/yield/opportunity thresholds and SLA targets should be server-config, and the funnel/KPIs authoritative.
 
 ## 6. Maker-checker / approval
-- **Not applicable.** Analytics is read-only reporting - no proposals, approvals, or mutations. (Dashboard tiles link
+- **Not applicable.** Read-only reporting; no proposals, approvals, or mutations. (Dashboard tiles link
   into flows that do have maker-checker, e.g. property verification and visits.)
 
 ## 7. State machine
-- No entity lifecycle is owned here. The only "states" are categorical labels the views compute for display:
+- No entity lifecycle is owned here. The only "states" are categorical labels the views compute per render:
   pricing `overpriced|underpriced|fair`, supply-gap priority `High|Medium|OK`, SLA `breached/breaching`, and
-  seasonal recommendation `opportunity|caution|strategy`. These are derived each render, not transitions.
+  seasonal recommendation `opportunity|caution|strategy`.
 
 ## 8. Edge cases, validation & error states
 - **Flag gating:** disabled tabs are filtered out (`.filter(Boolean)`); their generators are skipped via memo guards.
 - **Divide-by-zero guards:** SLA rates default to 100 when no items; pricing skips null `marketPrice`; `maxDemand/maxSupply`
   use `Math.max(..., 1)`; anonymous rates guard on `totalVisits`.
 - **Empty signals:** Supply Gap shows friendly empty states when there are no demand alerts / city requests.
-- **Sample labelling:** non-derived charts carry a "Sample" chip so illustrative data is not mistaken for real.
+- **Sample labelling:** non-derived charts carry a "Sample" chip.
 - **Determinism:** fixed RNG seeds mean values are stable per session but change with the mock DB contents / current date.

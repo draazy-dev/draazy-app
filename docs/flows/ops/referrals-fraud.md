@@ -20,7 +20,7 @@
   got one wrong."
 - **Why it matters:** rewards (rent agreement fee discounts, Featured days, free contacts) are a real
   cost and a classic fraud target. The automatic decision keeps honest referrers from waiting; the desk
-  exists for the exceptions.
+  is for the exceptions.
 
 ## 2. Entry points
 - **Route:** `/ops/referrals` (under `RoleRoute roles=['staff','admin']` + `AdminLayout variant="ops"`;
@@ -60,14 +60,16 @@
 `referralAgreementDiscountPercent` (50, bounds 1..100), `referralInvitesPerDay` (10, 1..100),
 `referralRedeemFailuresPerDay` (5, 1..50), `referralSeekerBonusContacts` (5),
 `referralOwnerFeaturedDays` (14),
-`referralQualifyPerMonth` (10, calendar month IST),
-`referralQualifyPerYear` (50), `referralHoldDays` (7), `referralClawbackDays` (30),
+`referralQualifyPerMonth` (3, calendar month IST),
+`referralQualifyPerYear` (10, calendar year IST), `referralHoldDays` (7), `referralClawbackDays` (30),
 `referralVelocityPerDay` (5), `referralSignupWindowHours` (24), `referralSignalRetentionDays` (180, bounds 30..180),
-`referralNewReferrerDays` (7), and `featuredDays` (7) for ordinary Featured. These replace the old
-`referralContactBonus` and `referralOwnerRewardAgreements`. `GET /pricing` publishes
+`referralNewReferrerDays` (7), and `featuredDays` (7) for ordinary Featured. `GET /pricing` publishes
 the reward numbers in a `referral` block; velocity, retention, new-referrer days, invite and redeem-lockout
 limits are not published.
 The `referralRewards` flag is the kill switch: off means invites and redeem are refused and nothing new is granted.
+A granted credit is spendable only while both the referrer and the referred user have `users.verified`
+(`ReferralRepository.countUnlocked`, read live by `EntitlementService.agreementsOf`); the rest are reported as
+`locked`. Caps count at qualification, so a locked credit still uses a month/year slot. The friend's gift is not gated.
 
 ### 5.1a WhatsApp invites
 `POST /me/referrals/invites { mobile }` sends a Meta MARKETING-category WhatsApp template
@@ -191,13 +193,13 @@ the referee's address, User-Agent and device id on `referrals`, and of the refer
 signals stay `false` (a missing device id is itself a risk signal, see 5.3). The digests are personal
 data kept for one purpose, never on the wire, and blanked by `ReferralSignalRetention` after
 `referralSignalRetentionDays`. The findings (`same_device`, `same_ip`, `risk`) outlive the evidence on
-purpose: they are outcomes, not identifiers. The columns have no getters, the cheapest guarantee they
-never reach a DTO. Time-based expiry is a different mechanism from a subject's erasure request; the
-overlap is disclosed in `ErasureRetention#knownGaps()`.
+purpose: they are outcomes, not identifiers. The columns have no getters, so they cannot reach a DTO.
+Time-based expiry differs from a subject's erasure request; the overlap is disclosed in
+`ErasureRetention#knownGaps()`.
 
 ### Reward amount
 `reward` is a free-text label (for example "50% off next agreement fee") and `rewardAmount` its
-magnitude (referral credits, 1 per granting referral), frozen when the referral qualifies; it is 0 and
+magnitude (referral credits, 1 per granting referral), frozen when the referral qualifies; 0 and
 neutral until then. Audit metadata names the unit (`credits`, not `amount`) so an append-only trail is
 not misread.
 

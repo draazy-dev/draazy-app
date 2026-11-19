@@ -12,8 +12,8 @@
 - **Job-to-be-done:** "Take incoming service requests, route each to the right vertical team,
   assign an owner, track age/SLA, and mark them resolved."
 - **Why it matters:** services are a direct revenue line (see [`finance.md`](./finance.md), where
-  done tickets and rent-agreement fees feed the transaction ledger). This desk is where that
-  revenue is actually fulfilled, and its pickup/delivery timings drive the SLA analytics.
+  done tickets and rent-agreement fees feed the transaction ledger); this desk fulfils it, and its
+  pickup/delivery timings drive the SLA analytics.
 
 > **Scope note (honest gap):** the repo does **not** implement a separate provider directory with
 > per-provider/per-listing approval. The "marketplace" is: (a) the consumer `/services` catalog
@@ -52,7 +52,7 @@
 ### 5.1 Teams (the service verticals)
 `TEAMS = ['rental', 'legal', 'loans', 'interior', 'packers', 'valuation']` with labels
 (`TEAM_LABEL`): Rent Agreement, Property & Legal, Home Loans, Interior & Renovation,
-Packers & Movers, Property Valuation. These are the same keys as `OPS_TEAMS` (staff team-scoping)
+Packers & Movers, Property Valuation. Same keys as `OPS_TEAMS` (staff team-scoping)
 and the `services.json` `team` field, so a ticket's `team` binds the request to a vertical and to
 the staff who may own it.
 
@@ -86,14 +86,13 @@ Audit: "Updated <id> -> <status>[, assigned <name>]". The `?open=` deep-link par
 
 ### 5.7 Catalog & pricing (adjacent, not on this page)
 - `services.json` entries carry `{ key, name, team, price, active, desc, icon }` - the consumer catalog;
-  `active:false` hides a service. There is **no admin UI to toggle `services[].active` today** - only
+  `active:false` hides a service. **No admin UI toggles `services[].active`** - only
   the module-level `services.enabled` flag and the Settings Move-in Pack pricing/launch toggle exist.
 - Move-in Pack (Settings > Fees): per-item prices + `enabled` (Live vs "Coming soon"); read by consumer `/services`.
 
 ### 5.8 Ops-workflow mirroring
-`syncServiceTicket(ref, status)` keeps a ticket truthful when its linked ops workflow (rent agreement,
-valuation, etc.) advances - it matches by the `ref` stamped at creation and mirrors the workflow state
-onto `ticket.status` so the admin desk never shows a request stuck at "new" after real progress.
+`syncServiceTicket(ref, status)` matches by the `ref` stamped at creation and mirrors the linked ops
+workflow's state (rent agreement, valuation, etc.) onto `ticket.status`, so the desk never shows a request stuck at "new" after real progress.
 
 ### 5.9 What MUST move server-side
 - Ticket lifecycle transitions and legal-transition enforcement (cannot resolve a cancelled ticket).
@@ -103,10 +102,10 @@ onto `ticket.status` so the admin desk never shows a request stuck at "new" afte
 
 ## 6. Maker-checker / approval
 - **For the request desk: no.** Start/Resolve/assign are single-actor ops transitions, not propose/approve gates.
-- **For a real provider marketplace: yes (to build).** Provider onboarding and per-listing catalog changes
-  should follow the shared maker-checker pattern - a maker (partner/ops) proposes a provider/service listing,
-  a checker (admin) approves before it goes live, with pending -> approved/rejected states and audit.
-  See [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2. This is **not** implemented today.
+- **For a real provider marketplace: yes (to build, not implemented).** Provider onboarding and per-listing catalog changes
+  should follow the shared maker-checker pattern - a maker (partner/ops) proposes, a checker (admin) approves
+  before it goes live, with pending -> approved/rejected states and audit.
+  See [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2.
 
 ## 7. State machine
 - **Ticket:** `new -> in_progress -> done`; `cancelled` is a terminal option available in the modal
@@ -120,5 +119,5 @@ onto `ticket.status` so the admin desk never shows a request stuck at "new" afte
 - **Deep-link guard:** `?open=` handled once per mount (`deepLinkHandled` ref) so it doesn't re-open after close.
 - **Unassigned display:** null `assignedTo` renders "-" / "Unassigned"; Start falls back to the first team staffer.
 - **Empty:** table shows "No requests match".
-- **Notes:** only non-empty trimmed notes are appended; empty note textareas are ignored.
+- **Notes:** only non-empty trimmed notes are appended.
 - **Concurrency:** shared store, last write wins (`updateTicket` does `Object.assign` + save).

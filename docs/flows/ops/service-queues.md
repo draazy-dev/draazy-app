@@ -20,7 +20,7 @@
   customer, and move the matter through its lifecycle - without seeing other desks' work."
 - **Why it matters:** paid/assisted services are a direct revenue line. These queues are where
   requests captured on the consumer side (see [`../consumer/services-calculators.md`](../consumer/services-calculators.md)
-  and [`../consumer/rent-agreement.md`](../consumer/rent-agreement.md)) are actually fulfilled.
+  and [`../consumer/rent-agreement.md`](../consumer/rent-agreement.md)) are fulfilled.
   The admin mirror of this desk is [`../admin/services-moderation.md`](../admin/services-moderation.md).
 
 ## 2. Entry points
@@ -49,10 +49,10 @@
 - **Sidebar.** The *Service Desks* group lists one entry per desk (`SERVICE_DESKS` in
   `lib/adminModules.js`); *Support chats* sits in the *Support* group. A staff account sees a desk
   entry only for a desk listed in its `desks`.
-- **Deep links.** A desk's `?tab=` style state is carried in the URL: `?view=tickets` opens the
-  *Customer tickets* tab, `?open=<ticketId>` opens one ticket, `?request=<id>` opens one service
-  request on its desk (a request that cannot be read raises a toast and the param is dropped).
-  `ticketPath(ticket, open)` builds these links.
+- **Deep links.** Desk state is carried in the URL: `?view=tickets` opens the *Customer tickets*
+  tab, `?open=<ticketId>` opens one ticket, `?request=<id>` opens one service request on its desk (a
+  request that cannot be read raises a toast and the param is dropped). `ticketPath(ticket, open)`
+  builds these links.
 - **Source components:**
   - `src/pages/ops/OpsDraftingDesk.jsx` - service-request desk for legal, interior, packers,
     valuation (section 5.2).
@@ -77,7 +77,7 @@
   - The client's job is only to *say so*: the desk entries a staffer sees are their own desks, so
     an empty queue and a forbidden queue do not look alike.
 - **admin / manager** - sees every desk and every ticket. Only admins and managers get the
-  *Assign to* list in the ticket modal (it is loaded only when the role is not `staff`).
+  *Assign to* list in the ticket modal (loaded only when the role is not `staff`).
 - **Permission atoms** (`lib/adminModules.js`, checked again by the server):
   - Desk modules need `services:read` (writes `services:write`); the Home Loans board needs
     `tickets:read` / `tickets:write`.
@@ -98,7 +98,7 @@ Link definitions: [`../../system/data-model.md`](../../system/data-model.md).
   hand-off row for a service team. Read (paged list, summary, one ticket), updated (status,
   priority, assignee, team), appended to (notes). Never deleted; `closed` is a status. The wire
   shape is `TicketDto`: `id`, `subject`, `team`, `priority`, `status`, `propertyId`, `assignee` (a
-    resolved display **name**, not an id), `service`, `customer`, `mobile`, `value`, `quotedValue`, `detail`,
+  resolved display **name**, not an id), `service`, `customer`, `mobile`, `value`, `quotedValue`, `detail`,
   `notes[]` (`{by, text, at}`), `createdAt`. Writes go the other way as
   `TicketUpdate(status, priority, assigneeId, team)` - an **id** in, a **name** out, so the client
   never decides whose name appears against a claim. A ticket is raised from four places:
@@ -119,7 +119,7 @@ Link definitions: [`../../system/data-model.md`](../../system/data-model.md).
   request through its consumer-scoped endpoint.
 - **Document checklist** (derived, `GET /service-requests/{id}/checklist`) - not an entity. Folded
   at read time from the request's own vault documents (D120): no checklist table, no `status`
-  column a desk can tick, and therefore no way for "verified" to disagree with "there is a file".
+  column a desk can tick, so "verified" cannot disagree with "there is a file".
 - **Support conversation** (`support_conversations`) - one per customer; messages carry an *About*
   tag. See section 5.5.
 - **Ticket and service request are separate work streams.** `TicketUpdate` has no request
@@ -188,8 +188,8 @@ The contract it works to:
 ### 5.2 Service-request desks (`OpsDraftingDesk`, `RentAgreementDesk`)
 `/admin/legal`, `/admin/interior`, `/admin/packers` and `/admin/valuation` render `OpsDraftingDesk`
 for one desk; `/admin/rent-agreement` renders `RentAgreementDesk`. Both read the server directly. A
-desk that shows an empty table when it simply cannot see the real queue is worse than one that
-fails the request visibly (D184).
+desk that shows an empty table when it cannot see the real queue is worse than one that fails the
+request visibly (D184).
 
 - **Stage tabs** (`stageTabs` in `service-queue/deskQueue.jsx`), each with a count from
   `GET /service-requests/queue-summary` and a status filter on `GET /service-requests/queue`:
@@ -243,11 +243,10 @@ fails the request visibly (D184).
   audit row.
 - **Documents:** `readServiceRequestChecklist(id)` → `GET /{id}/checklist` renders
   "*n* of *m* received" and **every** item, present or missing - the missing ones are the point.
-  There is nothing to tick: the fold is derived on read, so the only thing that moves an item is
-  an upload. A failed read says so rather than rendering as "nothing filed". *Files on this
-  request* lists every `documents[]` row (customer uploads, each draft version, the registered
-  copy) and opens it through `lib/openDoc.js`; a dev vault URL is refused with a toast rather than
-  a blank tab.
+  There is nothing to tick: the fold is derived on read, so only an upload moves an item. A failed
+  read says so rather than rendering as "nothing filed". *Files on this request* lists every
+  `documents[]` row (customer uploads, each draft version, the registered copy) and opens it
+  through `lib/openDoc.js`; a dev vault URL is refused with a toast rather than a blank tab.
 - **Drafting workflow (`StaffWorkflowActions`):** *Share draft* (`POST /{id}/draft`, multipart, an
   optional customer note) while the matter is assigned / in progress / changes requested - each
   share is a new version; *Upload registered copy* (`POST /{id}/final-doc`) once the customer has
@@ -413,8 +412,8 @@ open  --(Start)-->  in-progress --(Resolve)-->  resolved
   (`Unknown ticket status`).
 - **No transition table.** `PATCH /tickets/{id}` accepts any legal status from any other, unlike
   `ServiceRequestStatus` (7.2) which refuses illegal moves. That suits a work queue: a ticket that
-  turns out to be the wrong desk's, or that a customer replies to after it was closed, has to be
-  able to go backwards without an ops person filing a second one.
+  turns out to be the wrong desk's, or that a customer replies to after it was closed, must be able
+  to go backwards without an ops person filing a second one.
 - `UNRESOLVED` is `open`, `in-progress`, `waiting`; the waitlist signup uses it to avoid a second
   open ticket for the same mobile and service.
 - Terminal in practice: `resolved` and `closed`, neither enforced.

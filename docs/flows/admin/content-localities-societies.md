@@ -18,8 +18,7 @@
 ## 2. Entry points
 - **Routes:** `/admin/content` (FAQs only) and `/admin/places` (tabs `?tab=areas`, `?tab=duplicates`,
   `?tab=societies`). Staff reach the same pages under `/staff/content` and `/staff/places`.
-- **Legacy redirects:** `/admin/localities` redirects to `/admin/places?tab=areas`; `/admin/societies`
-  redirects to `/admin/places?tab=duplicates`.
+- **Legacy redirects:** `/admin/localities` -> `/admin/places?tab=areas`; `/admin/societies` -> `/admin/places?tab=duplicates`.
 - **Tab selection:** `useTabParam` reads `?tab=`; an unknown or missing value falls back to the first
   tab the operator is allowed to see. Changing tab replaces the history entry.
 - **Tiles / triggers:** the staff work dashboard links its Localities card to `?tab=areas` and its
@@ -59,7 +58,7 @@
 ### 5.1 Content - FAQs
 FAQs only (`TYPE = 'faqs'`; the backend rejects any other content type). Blank template:
 `{ question, answer, category:'general' }`. The page subtitle states that the first 6 FAQs also appear on the Home page.
-Active FAQs load on mount; archived ones load on demand via "Show archived".
+Active FAQs load on mount; archived ones on demand via "Show archived".
 
 ### 5.2 Content - create / edit
 - **Save (new):** `createContent('faqs', body)` -> `POST /admin/content/faqs`; the returned row is appended.
@@ -70,7 +69,7 @@ Active FAQs load on mount; archived ones load on demand via "Show archived".
 - **Archive:** `window.confirm("Archive this FAQ? It will be hidden but preserved.")` ->
   `POST /admin/content/faqs/{id}/archive`; the row moves to the dimmed "Archived" section.
 - **Restore:** confirm -> `POST /admin/content/faqs/{id}/restore`.
-- No hard delete. No note is collected; the actor and action land in the server audit log.
+- No hard delete. No note is collected; actor and action land in the server audit log.
 - Review moderation is not on this page (see [`trust-safety-reports.md`](./trust-safety-reports.md)).
 
 ### 5.4 Places - shell
@@ -80,7 +79,7 @@ Active FAQs load on mount; archived ones load on demand via "Show archived".
 - **Counts:** the Duplicates badge is `candidates` from `GET /admin/societies/summary` (fetched only with
   `societies:read`, refetched after each merge/undo/edit); the Society details badge is the directory total once loaded.
   The Areas tab has no badge.
-- **Queue errors:** a failed candidates or merges load (`ApiError` / `NetworkError`) is collected and shown as a red
+- **Queue errors:** a failed candidates or merges load (`ApiError` / `NetworkError`) shows a red
   alert with Retry, so a failed queue is never shown as an empty one.
 
 ### 5.5 Places - Areas tab (`AdminLocalities`)
@@ -128,11 +127,11 @@ Active FAQs load on mount; archived ones load on demand via "Show archived".
 - Merges are conditional updates on `merged_into`; a merge of an already-merged society, or an undo of an unmerged one, is rejected.
 
 ## 6. Maker-checker / approval
-- **Content:** single-actor publish/archive; no separate proposer and approver.
-- **Areas:** areas are minted automatically from Google Maps picks; the admin step is a reversible Retire/Restore, not an approval.
+- **Content:** single-actor publish/archive.
+- **Areas:** minted automatically from Google Maps picks; the admin step is a reversible Retire/Restore, not an approval.
 - **Duplicates:** the community mint is the proposal; the admin Merge (reversible via Undo) is the checker step.
   Merge and edit require `societies:write`, so a read-only operator can view the queue but not act.
-  See the shared pattern in [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2.
+  See [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2.
 
 ## 7. State machine
 - **FAQ:** `active <-> archived`. No hard delete.
@@ -143,7 +142,7 @@ Active FAQs load on mount; archived ones load on demand via "Show archived".
 - **Loading:** Content shows a spinner until flags and the live FAQ list load; Areas shows "Loading localities..."; the
   directory shows "Loading the directory...".
 - **Module gating:** `content.enabled` off -> "Content module is disabled." with an "Enable in Settings" link.
-- **Tab gating:** a tab without the read atom is not rendered; a `?tab=` value that is not allowed falls back to the first allowed tab.
+- **Tab gating:** a tab without the read atom is not rendered; a disallowed `?tab=` value falls back to the first allowed tab.
 - **Confirmations:** FAQ archive/restore use `window.confirm`; area retire/restore and society merge use modals.
 - **Merge errors:** a failed merge or undo surfaces the server message as an error toast
   ("Could not merge those two societies." / "Could not undo that merge." as fallbacks); picking no target shows "Pick a society to merge into."

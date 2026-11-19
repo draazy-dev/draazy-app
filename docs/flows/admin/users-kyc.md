@@ -85,14 +85,12 @@
   window reset so the user can resubmit at once.
 - **The KYC desk.** Three tabs, 10 cases a page, every filter a server query
   (`GET /moderation/identity-reviews?status=&q=&docType=&claim=&overdue=&outcome=&sort=`, counts
-  from `/moderation/identity-reviews/summary`):
+  from `/moderation/identity-reviews/summary`), newest first (no sort toggle):
   - *Needs review* (`pending`) — the work. Claim chips All / Unclaimed / Mine n/3 /
     Others replace a separate "my cases" tab, since a reviewer holds at most three.
   - *Appeals* (`appeal`) — rejections the applicant asked to have checked again; uphold or reopen.
   - *Decided* (`verified`/`rejected`/`revoked`, Outcome chips) — revoke a badge or
     read a case's history.
-
-  Every tab is newest first; the back office has no sort toggle.
 
   A row opens one case in a dialog: document images beside the applicant's entries and a per-document
   checklist (Approve stays disabled until every line is ticked — the server cannot judge a photo),
@@ -103,7 +101,7 @@
   misuse from their recent submit conflict (`POST /me/verification/identity/dispute`), which opens
   an `identity_dispute` support ticket; the staff-only link to the holder's case is in the `identity.dispute.opened` audit entry.
   If upheld, staff revoke the holder's case and the reporter resubmits.
-- **Consent** is shown in English only (the app is English-only); the client always sends
+- **Consent** is shown in English only; the client always sends
   `consent_language = en`, stored next to `consent_notice_version`. The column still accepts
   `hi`/`mr` for rows recorded before the switch.
 
@@ -144,10 +142,9 @@ user's `mobile` (and `id` for owners):
 5. Listings owned (owners only; title + status).
 Gated by the `users.timeline` flag; opened via the Eye action.
 
-Notes are **not** on this feed. `GET /users/{id}/timeline` is administrator-only and its `kind`
-union has no `note`, while notes are readable by any staffer holding `notes:read` — collapsing the
-two would have narrowed the readership of a note to the narrower of the two routes. They render in
-their own panel above the feed instead (5.6).
+Notes are **not** on this feed: `GET /users/{id}/timeline` is administrator-only and its `kind`
+union has no `note`, while notes are readable by any staffer holding `notes:read`. They render in
+their own panel above the feed (5.6).
 
 ### 5.6 Staff notes on the account
 The same `note` domain the property console uses, with `entityType: 'user'`:
@@ -223,27 +220,26 @@ Rationale relocated from `UserAdminService` Javadoc.
   pattern, so `?q=%` cannot become an unanchored scan the `text_pattern_ops` index cannot serve.
   The escape character is declared in the query, so the two must agree.
 - **Email collisions are caught in the service.** `update` and `restore` both compare
-  case-insensitively against V70's `lower(email)` partial unique index. Without the guard the
+  case-insensitively against V70's `lower(email)` partial unique index; without the guard the
   flush hits the index and the operator sees a generic conflict naming neither field nor account.
-- **Restore is the dangerous one.** Archiving is a soft delete, so an address can legitimately be
-  re-used while the first account sits archived. Restoring it then puts two live rows on one
+- **Restore is the dangerous one.** Archiving is a soft delete, so an address can be
+  re-used while the first account sits archived; restoring then puts two live rows on one
   address, and `AuthService#staffLogin` uses an `Optional`-returning lookup - two rows is an
   `IncorrectResultSizeDataAccessException`, i.e. a 500 on every later sign-in for both people,
   with no route back through the console. Answered 409 (the platform's state forbids it, not the
   caller's entitlement) with a message naming the address and the way out.
 - **Archive floors.** An admin may not archive themselves, nor the last remaining administrator:
   restore is admin-only, so either would lock the platform out of its own back office with no
-  in-product recovery. 409, for the same reason as above.
+  in-product recovery. 409.
 
 ## Account moderation
 
 Rationale relocated from `UserModerationService` Javadoc.
 
 - **Suspension is not archiving.** Archiving is the soft delete and every read path filters the
-  account out - right for someone who has gone, wrong for someone under investigation, because it
-  hides the account from the colleagues who need to look at it.
-- **A suspension is only real because `AuthService` enforces it.** Writing the column alone would
-  produce a button that changes a badge while the person kept signing in. The refusal sits on every
+  account out - wrong for someone under investigation, because it hides the account from the
+  colleagues who need to look at it.
+- **A suspension is only real because `AuthService` enforces it.** The refusal sits on every
   path that mints a session, including refresh, and existing refresh families are revoked so the
   window closes to the access-token TTL rather than at some unpredictable point in the next hour.
 - **Guarded like archiving** - not yourself, not the last administrator - and idempotent, so two
@@ -253,21 +249,20 @@ Rationale relocated from `UserModerationService` Javadoc.
   row here would leave `archived = true` with `status = active`, a row invisible to the
   directory that claims to be fine.
 - **The manual badge exists because the document-and-selfie flow cannot reach everybody** - a
-  company account, or a person an administrator has met and whose documents they have seen. Without
-  it those people are permanently unverifiable and the judgement moves off-platform. Because it
+  company account, or a person an administrator has met and whose documents they have seen. Because it
   skips the `identity_hash` dedup, every grant carries a written reason and an audit entry. There is
   one administrator, so a second-admin approval could never complete; a manager or the admin
   decides it directly. The old maker-checker table `badge_grant_requests` was dropped in V118.
 - **Withdrawing an earned badge is refused here** - doubt about the verification is an action
   against the verification record (revoke), which keeps the evidence and the reason together.
 - **Badge changes propagate in both directions** to the person's listings, flatmate seeker posts and
-  group seats (and so the "verified only" filter), because the badge is sold on being the same claim
+  group seats (and so the "verified only" filter), because the badge is the same claim
   everywhere it shows.
 - **The flag has no self-check and no last-administrator guard.** It takes nothing away, so there is
   nothing to lock yourself out of. A reason is required and validated in the service so the operator
   gets a sentence rather than a constraint violation.
 - **The timeline loads the user first** so a mistyped id answers 404; an empty timeline is a real
-  and common answer for a fresh account, and would otherwise read as "this person has done nothing".
+  and common answer for a fresh account.
 
 ## Back office user view
 
