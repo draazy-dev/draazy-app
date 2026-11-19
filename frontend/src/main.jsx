@@ -22,6 +22,8 @@ import { initProductAnalytics } from './lib/productAnalytics.js';
 import { loadGeoPolicy } from './lib/geoConfig.js';
 import { readAccessToken } from './lib/auth.js';
 import { primeMeBootstrap } from './services/meBootstrapService.js';
+import { isGatewayPopupReturn } from './lib/paymentReturn.js';
+import PaymentPopupReturn from './components/PaymentPopupReturn.jsx';
 import './i18n';
 // Ahead of index.css so @font-face lands before anything sets font-family.
 import './styles/fonts.css';
@@ -78,7 +80,13 @@ const app = (
 );
 
 document.documentElement.dataset.dzBoot = 'ready';
-loadGeoPolicy();
-window.addEventListener('draazy-settings-change', loadGeoPolicy);
-if (readAccessToken()) primeMeBootstrap();
-createRoot(document.getElementById('root')).render(app);
+const root = createRoot(document.getElementById('root'));
+if (isGatewayPopupReturn()) {
+  window.close();
+  root.render(<PaymentPopupReturn />);
+} else {
+  loadGeoPolicy();
+  window.addEventListener('draazy-settings-change', loadGeoPolicy);
+  if (readAccessToken()) primeMeBootstrap();
+  root.render(app);
+}

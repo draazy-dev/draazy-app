@@ -50,7 +50,8 @@ public class ServiceRequestService implements AbandonedCheckouts {
 
     private static final String ABANDONED_EVENT = "payment.abandoned";
 
-    static final String RETURN_PATH = "/services/rent-agreement";
+    // order_id lets the frontend tell Cashfree's bank popup apart from a top-level redirect of the paying tab.
+    static final String RETURN_PATH = "/services/rent-agreement?order_id={order_id}";
 
     static final Duration INCOMPLETE_TTL = Duration.ofDays(30);
 

@@ -18,11 +18,14 @@ export default function RevisedTerms({ request, onChanged }) {
     setBusy(true);
     try {
       const updated = await acceptServiceRequestAmendment(request.id, amendment.id);
-      if (updated.paymentSessionId) {
-        await openCashfreeCheckout(updated.paymentSessionId);
-        toast('We will apply the revised terms as soon as the payment is confirmed.', 'success');
-      } else {
+      if (!updated.paymentSessionId) {
         toast('Revised terms accepted. Our team will prepare the draft on them.', 'success');
+      } else {
+        const outcome = await openCashfreeCheckout(updated.paymentSessionId)
+          .catch(() => ({ error: true, unopened: true }));
+        if (outcome?.unopened) toast("We couldn't open payment. Nothing has been charged. Please try again.", 'error');
+        else if (outcome?.error) toast("Payment not completed. Tap Pay to try again. If you were charged, it shows here in a few minutes.", 'error');
+        else toast('We will apply the revised terms as soon as the payment is confirmed.', 'success');
       }
       onChanged();
     } catch (error) {

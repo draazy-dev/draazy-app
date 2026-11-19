@@ -10,6 +10,9 @@
     "chip_nextMonth": "1st of next month"
   },
   "common": {
+    "payReturnTitle": "Payment step finished",
+    "payReturnBody": "Close this window and go back to the Draazy tab where you started. Your payment result is shown there.",
+    "payReturnContinue": "Continue in this window",
     "myPostsAria": "Your posts",
     "myPostsViewAll": "View all ({{count}})",
     "myPostsLive": "Live",

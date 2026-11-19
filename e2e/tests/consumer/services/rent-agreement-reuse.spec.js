@@ -132,6 +132,36 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     await expect(panel.getByRole('button', { name: /^Pay/ })).toBeEnabled();
   });
 
+  test('a declined or closed payment says not completed at once, instead of a long spinner and a pending notice', async ({ page }) => {
+    const ownerMobile = uniqueMobile();
+    const { accessToken: ownerToken } = await apiLogin(ownerMobile, { api: API });
+    const tenantMobile = uniqueMobile();
+    const { accessToken: tenantToken } = await apiLogin(tenantMobile, { api: API });
+    const { requestId, partyId } = await coFillOverHttp(ownerToken, tenantMobile);
+    const accepted = await fetch(`${API}/me/service-request-invites/${partyId}`, {
+      method: 'POST', headers: authed(tenantToken), body: JSON.stringify({ decision: 'accept' }),
+    });
+    expect(accepted.ok, 'the invitee can accept').toBe(true);
+
+    /* The SDK resolves a bank decline and a closed modal alike as `{ error }`. The mock session never reaches
+       the SDK, so checkout is answered with a real-looking session and the SDK global is faked. */
+    await page.addInitScript(() => { window.Cashfree = () => ({ checkout: async () => ({ error: { message: 'declined' } }) }); });
+    await page.route('**/service-requests/*/checkout', async (route) => {
+      const res = await fetch(`${API}/service-requests/${requestId}`, { headers: authed(ownerToken) });
+      return route.fulfill({ json: { ...(await res.json()), paymentSessionId: 'session_e2e' } });
+    });
+
+    await signedInAs(page, ownerMobile);
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
+    const panel = page.getByTestId('ra-pay-panel');
+    await panel.getByRole('checkbox').check();
+    await panel.getByRole('button', { name: /^Pay/ }).click();
+
+    await expect(panel.getByText('Payment not completed')).toBeVisible({ timeout: 5000 });
+    await expect(panel.getByRole('button', { name: 'Try payment again' })).toBeVisible();
+    await expect(page.getByText("We couldn't confirm your payment yet")).toHaveCount(0);
+  });
+
   test('an owner holding two payable agreements sees a pay panel for each flat', async ({ page }) => {
     const ownerMobile = uniqueMobile();
     const { accessToken: ownerToken } = await apiLogin(ownerMobile, { api: API });

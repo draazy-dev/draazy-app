@@ -12,6 +12,7 @@ export function useRaPayment({ tr, toast }) {
   const pollWakeRef = useRef(null);
   const [paymentPending, setPaymentPending] = useState(false);
   const [paymentConfirming, setPaymentConfirming] = useState(false);
+  const [paymentNotCompleted, setPaymentNotCompleted] = useState(false);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -38,15 +39,25 @@ export function useRaPayment({ tr, toast }) {
     if (Number.isFinite(charged) && charged > 0 && expectedTotal != null && charged !== expectedTotal) {
       toast(tr('services.ra.cost.chargedDiffers', { amount: fmt(charged) }), 'info');
     }
+    setPaymentPending(false);
+    setPaymentNotCompleted(false);
     let opened = null;
     try {
       opened = await openCashfreeCheckout(checkout.paymentSessionId);
     } catch (err) {
+      opened = { error: err };
       console.error('Rent Agreement checkout could not open');
       if (import.meta.env.DEV) console.error(err);
     }
     if (opened?.mock && import.meta.env.DEV && window.confirm('Local mock payment: mark this rent agreement as paid?')) {
       await simulateServiceRequestPayment(checkout.id, 'paid').catch((err) => console.error('Mock payment failed', err?.status));
+    }
+    if (opened?.error) {
+      const settled = await getServiceRequest(checkout.id).catch(() => null);
+      clearReads();
+      const status = settled?.status || 'awaiting_payment';
+      if (mountedRef.current) setPaymentNotCompleted(status === 'awaiting_payment');
+      return status;
     }
     setPaymentConfirming(true);
     let status = 'awaiting_payment';
@@ -68,7 +79,7 @@ export function useRaPayment({ tr, toast }) {
     return status;
   };
 
-  const resetPayment = () => { setPaymentPending(false); setPaymentConfirming(false); };
+  const resetPayment = () => { setPaymentPending(false); setPaymentConfirming(false); setPaymentNotCompleted(false); };
 
-  return { mountedRef, paymentPending, paymentConfirming, payAndConfirm, resetPayment };
+  return { mountedRef, paymentPending, paymentConfirming, paymentNotCompleted, payAndConfirm, resetPayment };
 }

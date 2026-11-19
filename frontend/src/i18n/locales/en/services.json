@@ -179,6 +179,9 @@
       "donePaymentPendingTitle": "We couldn't confirm your payment yet",
       "donePaymentPendingDesc": "Your rent agreement details are saved. If you've just paid, your bank may still be confirming it — check your requests in a few minutes before paying again. Our team starts drafting once the payment is confirmed.",
       "donePaymentPendingCta": "Complete payment",
+      "donePaymentNotCompletedTitle": "Payment not completed",
+      "donePaymentNotCompletedDesc": "Your rent agreement details are saved, but the payment didn't go through. If money did leave your account, it shows here within a few minutes.",
+      "donePaymentNotCompletedCta": "Try payment again",
       "police": {
         "title": "Police informed",
         "done": "Registering on the government IGR portal shares your tenant's details with the police automatically. Nothing to file."
@@ -887,7 +890,8 @@
         "desc": "Pay to send this agreement to our drafting team. If anything is still missing, we'll say exactly what.",
         "cta": "Pay {{amount}}",
         "referralReward": "Referral reward: {{percent}}% off service fee",
-        "paid": "Payment received — our drafting team will start on your agreement."
+        "paid": "Payment received — our drafting team will start on your agreement.",
+        "returned": "Checking your payment. It can take a minute to show here, so please don't pay again in the meantime."
       },
       "docsRetry": "We saved your request but couldn't upload one or more documents. Please try again.",
       "docsReattach": "You changed the agreement, so it has to be filed again — please re-attach the papers marked below.",

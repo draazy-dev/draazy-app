@@ -14,7 +14,7 @@ function ChargeRow({ k, v }) {
   );
 }
 
-export default function ReadyToPayPanel({ request, onPay, busy, unconfirmed }) {
+export default function ReadyToPayPanel({ request, onPay, busy, outcome }) {
   const { t } = useTranslation();
   const { referral } = usePricing();
   const discount = Number(request.charges?.referralDiscount) || 0;
@@ -22,17 +22,18 @@ export default function ReadyToPayPanel({ request, onPay, busy, unconfirmed }) {
   const tenantFillsLater = state?.tenantMode === 'invite' && state?.ownerMode !== 'invite';
   const shared = !tenantFillsLater && (!!request.myPartyId || (request.parties || []).some((p) => p.status === 'accepted'));
   const coFilled = shared && !request.myPartyId;
+  const outcomeKey = outcome === 'pending' ? 'donePaymentPending' : 'donePaymentNotCompleted';
   const [declare, setDeclare] = useState(false);
   return (
     <div className="mt-5 p-4 rounded-xl bg-teal-500/8 border border-teal-500/25 max-w-md mx-auto text-left" data-testid="ra-pay-panel">
       <p className="text-white font-semibold text-sm flex items-center gap-2">
         <Icon name="credit-card" className="w-4 h-4 text-teal-300" />
-        {t(unconfirmed ? 'services.ra.donePaymentPendingTitle' : coFilled ? 'services.ra.pay.coFilledTitle' : 'services.ra.pay.title')}
+        {t(outcome ? `services.ra.${outcomeKey}Title` : coFilled ? 'services.ra.pay.coFilledTitle' : 'services.ra.pay.title')}
       </p>
       <p className="text-gray-400 text-xs mt-1 leading-relaxed">
-        {t(unconfirmed ? 'services.ra.donePaymentPendingDesc' : 'services.ra.pay.desc')}
+        {t(outcome ? `services.ra.${outcomeKey}Desc` : 'services.ra.pay.desc')}
       </p>
-      {shared && !unconfirmed && <p className="text-teal-200/80 text-[11px] mt-1.5" data-testid="ra-pay-either">{t('services.ra.pay.eitherHint')}</p>}
+      {shared && !outcome && <p className="text-teal-200/80 text-[11px] mt-1.5" data-testid="ra-pay-either">{t('services.ra.pay.eitherHint')}</p>}
       {request.details?.property && (
         <div className="mt-3" data-testid="ra-pay-summary">
           <ReviewRow k={t('services.ra.review.rowProperty')} v={request.details.property} />
@@ -65,7 +66,7 @@ export default function ReadyToPayPanel({ request, onPay, busy, unconfirmed }) {
       <button type="button" disabled={busy || !declare} onClick={onPay}
         className="btn-teal mt-3 w-full px-4 py-3 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2 min-h-[44px] disabled:opacity-50">
         <Icon name="credit-card" className="w-4 h-4" />
-        {unconfirmed ? t('services.ra.donePaymentPendingCta') : t('services.ra.pay.cta', { amount: fmtPaise(request.amount) })}
+        {outcome ? t(`services.ra.${outcomeKey}Cta`) : t('services.ra.pay.cta', { amount: fmtPaise(request.amount) })}
       </button>
     </div>
   );

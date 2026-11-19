@@ -68,7 +68,8 @@ export function useRentAgreement() {
   const { toast } = useToast();
   const { fee } = usePricing();
   const formRef = useRef(null);
-  const { mountedRef, paymentPending, paymentConfirming, payAndConfirm, resetPayment } = useRaPayment({ tr, toast });
+  const { mountedRef, paymentPending, paymentConfirming, paymentNotCompleted, payAndConfirm, resetPayment } = useRaPayment({ tr, toast });
+  const paymentOutcome = paymentPending ? 'pending' : paymentNotCompleted ? 'notCompleted' : null;
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const routeState = useLocation().state;
@@ -192,6 +193,19 @@ export function useRentAgreement() {
       .catch(() => { if (alive) setActiveRequests([]); });
     return () => { alive = false; };
   }, [isIn, user, done, requestsNonce]);
+  const returnedFromGateway = useRef(searchParams.has('order_id'));
+  useEffect(() => {
+    if (!returnedFromGateway.current) return;
+    returnedFromGateway.current = false;
+    setSearchParams((cur) => {
+      const rest = new URLSearchParams(cur);
+      rest.delete('order_id');
+      return rest;
+    }, { replace: true });
+    toast(tr('services.ra.pay.returned'), 'info');
+    for (const ms of [3000, 10000, 30000]) setTimeout(() => setRequestsNonce((n) => n + 1), ms);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- consume the gateway return once
+  }, []);
   const ownRequests = activeRequests.filter((r) => !r.myPartyId);
   const locked = mode === 'owner' && !done && !startNew && activeRequests.length > 0;
   const joinedOnly = ownRequests.length === 0;
@@ -1163,7 +1177,7 @@ export function useRentAgreement() {
     tenantMode, setTenantMode, tenants, setTenant, addTenant, removeTenant, tenantDocs, setTenantDocs, invite, setInvite,
     terms, setT, startBounds, maint, setMaint, regArea, furnItems, custom, setCustom, clauses, setClauses,
     isChecked, toggleFurn, bumpQty, removeFurn, addCustom, furnitureText,
-    declare, setDeclare, generate, submitting, pendingRequestId, paymentPending, paymentConfirming,
+    declare, setDeclare, generate, submitting, pendingRequestId, paymentOutcome, paymentConfirming,
     clearErr, fc, cost, locked, joinedOnly, gated, startNewAgreement, restored, startFresh, myInvites,
     identityReminders,
     stalledInvite, recoverInvite, recovering, payable, payables, payFiled, paying, continuable, continueFiled, coFilledRole, maskedIds: stillHeld(maskedIds, { owner, coOwners, tenants }),
