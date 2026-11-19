@@ -40,9 +40,9 @@ export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, add
         <div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <Field label={t('services.ra.owner.inviteMobile')} required error={errors.invMobile && why('invMobile', 'services.ra.owner.inviteMobileErr')}><MobileField value={invite.invMobile} onChange={(v) => { setInvite((p) => ({ ...p, invMobile: v })); clearErr('invMobile'); }} error={!!errors.invMobile} placeholder={t('services.ra.owner.mobilePlaceholder')} inputClassName="px-4 py-3" /></Field>
-            <Field label={t('services.ra.owner.inviteName')}><input value={invite.invName} onChange={(e) => setInvite((p) => ({ ...p, invName: e.target.value }))} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={t('services.ra.owner.inviteNamePlaceholder')} /></Field>
+            <Field label={t('services.ra.owner.inviteName')}><input maxLength={80} value={invite.invName} onChange={(e) => setInvite((p) => ({ ...p, invName: e.target.value }))} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={t('services.ra.owner.inviteNamePlaceholder')} /></Field>
           </div>
-          <Field className="mb-3" label={t('services.ra.tenant.message')}><textarea rows={2} value={invite.invMessage} onChange={(e) => setInvite((p) => ({ ...p, invMessage: e.target.value }))} className="field w-full px-4 py-3 rounded-xl text-white text-sm resize-none" placeholder={t('services.ra.owner.messagePlaceholder')} /></Field>
+          <Field className="mb-3" label={t('services.ra.tenant.message')}><textarea rows={2} maxLength={300} value={invite.invMessage} onChange={(e) => setInvite((p) => ({ ...p, invMessage: e.target.value }))} className="field w-full px-4 py-3 rounded-xl text-white text-sm resize-none" placeholder={t('services.ra.owner.messagePlaceholder')} /></Field>
           <div className="bg-teal-500/8 border border-teal-500/20 rounded-xl p-3.5 flex items-start gap-2.5">
             <Icon name="shield-check" className="w-4 h-4 text-teal-300 flex-shrink-0 mt-0.5" />
             <p className="text-teal-100/90 text-xs leading-relaxed">{t('services.ra.owner.inviteInfo')}</p>
@@ -75,8 +75,8 @@ export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, add
         {offline && (
           <div className="sm:col-span-2 rounded-xl border border-sky-400/20 bg-sky-500/10 p-3 text-xs text-sky-100 leading-relaxed">{t('services.ra.party.offlineNote')}</div>
         )}
-        <Field label={t('services.ra.owner.fullName')} required error={errors.oName && t('services.ra.owner.fullNameErr')}><input value={owner.oName} onChange={(e) => { setO('oName', e.target.value); clearErr('oName'); }} className={fc('oName')} placeholder={t('services.ra.owner.fullNamePlaceholder')} /></Field>
-        <PartyIdentityFields dob={owner.oDob} setDob={(v) => setO('oDob', v)} setAge={(v) => setO('oAge', v)} mother={owner.mother} setMother={(v) => setO('mother', v)} gender={owner.gender} setGender={(v) => setO('gender', v)} keys={{ dob: 'oDob', age: 'oAge', mother: 'mother', gender: 'gender' }} errors={errors} clearErr={clearErr} />
+        <Field label={t('services.ra.owner.fullName')} required error={errors.oName && t('services.ra.owner.fullNameErr')}><input maxLength={80} value={owner.oName} onChange={(e) => { setO('oName', e.target.value); clearErr('oName'); }} className={fc('oName')} placeholder={t('services.ra.owner.fullNamePlaceholder')} /></Field>
+        <PartyIdentityFields dob={owner.oDob} setDob={(v) => setO('oDob', v)} setAge={(v) => setO('oAge', v)} gender={owner.gender} setGender={(v) => setO('gender', v)} keys={{ dob: 'oDob', age: 'oAge', gender: 'gender' }} errors={errors} clearErr={clearErr} />
         <Field label={t('services.ra.owner.pan')} required error={errors.oPan && why('oPan', 'services.ra.owner.panErr')}><PartyIdInput masked={masked?.['owner-0']?.pan} held={held} kind="pan" value={owner.oPan} onChange={(v) => { setO('oPan', v); clearErr('oPan'); }} className={fc('oPan')} placeholder="ABCDE1234F" /></Field>
         {offline && (
           <>

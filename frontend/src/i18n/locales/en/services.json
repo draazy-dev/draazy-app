@@ -266,6 +266,7 @@
         "gramPanchayatNo": "No",
         "gramPanchayatErr": "Choose Yes or No.",
         "city": "City",
+        "cityErr": "Enter the city.",
         "taluka": "Taluka",
         "talukaPlaceholder": "Select taluka",
         "talukaErr": "Choose the Pune taluka.",
@@ -324,14 +325,11 @@
         "passportErr": "Enter a passport number, 6 to 20 letters or digits.",
         "visaOci": "Visa / OCI details",
         "visaOciPlaceholder": "Visa, OCI or e-FRRO reference",
-        "visaOciErr": "Enter visa or OCI details for a foreign national.",
+        "visaOciErr": "Enter the visa, OCI or e-FRRO reference (at least 4 letters or digits).",
         "frro": "FRRO registration number (optional)",
         "frroPlaceholder": "If already registered",
         "dob": "Date of birth",
         "dobErr": "Choose a valid date of birth for an adult party.",
-        "mother": "Mother's name",
-        "motherPlaceholder": "As per Aadhaar or PAN",
-        "motherErr": "Enter the mother's name (up to 80 characters).",
         "gender": "Gender",
         "genderPick": "Select gender",
         "genderOpt": { "male": "Male", "female": "Female", "other": "Other" },
@@ -344,7 +342,7 @@
         "subtitle": "The person giving the property on rent.",
         "fullName": "Full Name",
         "fullNamePlaceholder": "As per PAN/Aadhaar",
-        "fullNameErr": "Enter the owner's full name.",
+        "fullNameErr": "Enter the owner's full name as on PAN — letters only.",
         "agePlaceholder": "e.g. 42",
         "pan": "PAN Number",
         "panErr": "Enter a valid PAN (e.g. ABCDE1234F).",
@@ -380,6 +378,7 @@
           "sroPlaceholder": "e.g. Haveli No. 11, Pune",
           "date": "POA registration date",
           "required": "Required when signing under a Power of Attorney.",
+          "principalErr": "Enter the name of the owner you sign for — letters only.",
           "dateErr": "Enter the POA registration date — it can't be in the future."
         },
         "coDoc": {
@@ -392,7 +391,7 @@
           "hint": "Add everyone else on the title deed or Index II. All co-owners are licensors and must sign.",
           "add": "Add co-owner",
           "label": "Co-owner {{n}}",
-          "nameErr": "Enter the co-owner's full name as on the title deed."
+          "nameErr": "Enter the co-owner's full name as on the title deed — letters only."
         },
         "fillTitle": "I'm the owner — I'll fill this",
         "fillDesc": "Enter the owner's details & upload their ID and ownership papers.",
@@ -419,7 +418,7 @@
         "remove": "Remove",
         "fullName": "Full Name",
         "fullNamePlaceholder": "As per PAN/Aadhaar",
-        "fullNameErr": "Enter the tenant's full name.",
+        "fullNameErr": "Enter the tenant's full name as on PAN — letters only.",
         "occupation": "Occupation",
         "occupationPlaceholder": "e.g. Software Engineer",
         "pan": "PAN Number",
@@ -473,7 +472,7 @@
             "co-tenant": "Co-tenant"
           },
           "fullName": "Full name",
-          "nameErr": "Enter the person's full name.",
+          "nameErr": "Enter the person's full name — letters only.",
           "relation": "Relation",
           "selectRelation": "Select relation",
           "relationOpt": {

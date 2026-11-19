@@ -56,6 +56,13 @@ export const tenantDocSlots = (tenant, i) => {
 const blank = (v) => !String(v ?? '').trim();
 const wholeIn = (v, lo, hi) => /^\d+$/.test(String(v).trim()) && Number(v) >= lo && Number(v) <= hi;
 const passportOk = (v) => /^[A-Za-z0-9]{6,20}$/.test(String(v || '').trim());
+const visaOciOk = (v) => /^[A-Za-z0-9][A-Za-z0-9 /-]{3,39}$/.test(String(v || '').trim());
+const PERSON_NAME = /^[\p{L}\p{M}][\p{L}\p{M} .'-]{0,79}$/u;
+const checkName = (e, key, v) => {
+  if (blank(v)) e[key] = 'required';
+  else if (!PERSON_NAME.test(String(v).trim())) e[key] = 'format';
+};
+const tooLong = (v, max) => String(v ?? '').trim().length > max;
 
 const licensorIds = ({ owner, coOwners = [], ownerMode, invite }) => (ownerMode === 'invite'
   ? [{ m: ['invMobile', invite?.invMobile], pan: ['invPan', ''] }]
@@ -84,7 +91,8 @@ export const dupMessageKey = (key) => `services.ra.err.${/mobile$/i.test(key) ? 
 
 const checkPoa = (e, prefix, row, today) => {
   if (row?.capacity !== 'poa') return;
-  ['poaPrincipal', 'poaRegNo', 'poaSro'].forEach((k) => { if (blank(row[k])) e[prefix + k] = 'required'; });
+  checkName(e, prefix + 'poaPrincipal', row.poaPrincipal);
+  ['poaRegNo', 'poaSro'].forEach((k) => { if (blank(row[k])) e[prefix + k] = 'required'; });
   if (!row.poaDate) e[prefix + 'poaDate'] = 'required';
   else if (row.poaDate > today) e[prefix + 'poaDate'] = 'range';
 };
@@ -102,9 +110,7 @@ const checkDob = (e, key, dob) => {
   if (!age || !wholeIn(age, 18, 120)) e[key] = 'range';
 };
 const onFile = (held, pan) => (blank(pan) && held ? held : {});
-const checkMotherGender = (e, p, row) => {
-  if (blank(row.mother)) e[p + 'mother'] = 'required';
-  else if (String(row.mother).trim().length > 80) e[p + 'mother'] = 'range';
+const checkGender = (e, p, row) => {
   if (!GENDERS.includes(row.gender || '')) e[p + 'gender'] = 'required';
 };
 const PARTY_PIN = /^[1-9]\d{5}$/;
@@ -118,13 +124,13 @@ const checkPerson = (e, p, row, held) => {
   if (!PARTY_TYPES.includes(row.type || 'individual')) e[p + 'type'] = 'format';
   if (row.type === 'entity') e[p + 'type'] = 'entity';
   if (!RESIDENCIES.includes(row.residency || 'resident')) e[p + 'residency'] = 'format';
-  if (blank(row.name)) e[p + 'name'] = 'required';
-  checkMotherGender(e, p, row);
+  checkName(e, p + 'name', row.name);
+  checkGender(e, p, row);
   checkDob(e, p + 'dob', row.dob);
   if (!kept.pan && !isPan(row.pan)) e[p + 'pan'] = 'format';
   if (isOfflineParty(row)) {
     if (!passportOk(row.passport)) e[p + 'passport'] = 'format';
-    if (isForeignParty(row) && blank(row.visaOci)) e[p + 'visaOci'] = 'required';
+    if (isForeignParty(row) && !visaOciOk(row.visaOci)) e[p + 'visaOci'] = 'required';
   }
   if (!isMobile(row.mobile)) e[p + 'mobile'] = 'format';
 };
@@ -132,7 +138,7 @@ const checkPerson = (e, p, row, held) => {
 const checkPoliceAddress = (e, p, group, row) => {
   const key = group[0].toUpperCase() + group.slice(1);
   if (blank(row?.address)) e[p + `police${key}Address`] = 'required';
-  if (!/^\d{6}$/.test(digits(row?.pincode))) e[p + `police${key}Pincode`] = 'format';
+  if (!PARTY_PIN.test(digits(row?.pincode))) e[p + `police${key}Pincode`] = 'format';
   if (blank(row?.village)) e[p + `police${key}Village`] = 'required';
   if (blank(row?.policeStation)) e[p + `police${key}PoliceStation`] = 'required';
 };
@@ -153,8 +159,7 @@ const checkPoliceRecord = (e, p, tenant) => {
   occupants.forEach((row, i) => {
     if (!FAMILY_MEMBER_TYPES.includes(row.type || '')) e[`${p}policeOcc${i}type`] = 'required';
     if (!FAMILY_RELATIONS.includes(row.relation || '')) e[`${p}policeOcc${i}relation`] = 'required';
-    if (blank(row.fullName)) e[`${p}policeOcc${i}fullName`] = 'required';
-    else if (String(row.fullName).trim().length > 80) e[`${p}policeOcc${i}fullName`] = 'range';
+    checkName(e, `${p}policeOcc${i}fullName`, row.fullName);
     if (blank(row.age) || !wholeIn(row.age, 0, 120)) e[`${p}policeOcc${i}age`] = 'range';
     if (!isMobile(row.mobile)) e[`${p}policeOcc${i}mobile`] = 'format';
   });
@@ -166,17 +171,17 @@ function licensorErrors(e, f, today) {
     if (!isMobile(f.invite?.invMobile)) e.invMobile = 'format';
     return;
   }
-  if (blank(owner.oName)) e.oName = 'required';
+  checkName(e, 'oName', owner.oName);
   if (!PARTY_TYPES.includes(owner.type || 'individual')) e.type = 'format';
   if (owner.type === 'entity') e.type = 'entity';
   if (!RESIDENCIES.includes(owner.residency || 'resident')) e.residency = 'format';
-  checkMotherGender(e, '', owner);
+  checkGender(e, '', owner);
   checkDob(e, 'oDob', owner.oDob);
   const kept = onFile(f.held?.['owner-0'], owner.oPan);
   if (!kept.pan && !isPan(owner.oPan)) e.oPan = 'format';
   if (isOfflineParty(owner)) {
     if (!passportOk(owner.passport)) e.passport = 'format';
-    if (isForeignParty(owner) && blank(owner.visaOci)) e.visaOci = 'required';
+    if (isForeignParty(owner) && !visaOciOk(owner.visaOci)) e.visaOci = 'required';
   }
   if (!isMobile(owner.oMobile)) e.oMobile = 'format';
   else if (!f.listed && f.selfMobile && ![owner.oMobile, ...coOwners.map((c) => c.mobile)].some((m) => digits(m).slice(-10) === digits(f.selfMobile).slice(-10))) e.oMobile = 'notOwner';
@@ -259,7 +264,8 @@ export function stepErrors(step, form, now = new Date()) {
   const bounds = startDateBounds(now);
   if (step === 0) {
     const { prop } = form;
-    ['flatNo', 'locality', 'taluka'].forEach((k) => { if (blank(prop[k])) e[k] = 'required'; });
+    ['flatNo', 'locality', 'taluka', 'city'].forEach((k) => { if (blank(prop[k])) e[k] = 'required'; });
+    if (tooLong(prop.flatNo, 40)) e.flatNo = 'range';
     if (blank(prop.society)) e.society = 'required';
     if (typeof prop.gramPanchayat !== 'boolean') e.gramPanchayat = 'required';
     if (!blank(prop.taluka) && !PUNE_TALUKAS.includes(prop.taluka)) e.taluka = 'format';

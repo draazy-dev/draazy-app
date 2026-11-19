@@ -105,8 +105,7 @@ export async function pickGender(page, scope, name = 'Female') {
   await page.getByRole('option', { name, exact: true }).click();
 }
 
-export async function fillPartyIgr(page, scope, { mother = 'Shaila Verma', gender = 'Female', address = true } = {}) {
-  await scope.getByPlaceholder('As per Aadhaar or PAN').first().fill(mother);
+export async function fillPartyIgr(page, scope, { gender = 'Female', address = true } = {}) {
   await pickGender(page, scope, gender);
   if (!address) return;
   await scope.getByPlaceholder('411004').first().fill('411045');
@@ -132,7 +131,7 @@ export async function fillCoOwner(page, scope = active(page), { docs = true } = 
   await pickDate(page, '[data-err="c0dob"]', '1977-05-15');
   await scope.getByPlaceholder('ABCDE1234F').fill('VWXYZ9876L');
   await scope.getByPlaceholder('10-digit mobile').fill(MOBILE.coOwner);
-  await fillPartyIgr(page, scope, { mother: 'Meera Verma', gender: 'Male' });
+  await fillPartyIgr(page, scope, { gender: 'Male' });
   if (docs) await uploadAll(scope, 'co-doc');
 }
 
@@ -142,7 +141,7 @@ export async function fillTenant(page, { docs = true, next = true } = {}) {
   await pickDate(page, '[data-err="t0dob"]', '1995-01-01');
   await p.getByPlaceholder('ABCDE1234F').first().fill('PQRSX6789K');
   await p.getByPlaceholder('10-digit mobile').first().fill(MOBILE.tenant);
-  await fillPartyIgr(page, p, { mother: 'Latha Nair', gender: 'Male', address: false });
+  await fillPartyIgr(page, p, { gender: 'Male', address: false });
   await fillTenantPolice(page);
   if (docs) await uploadAll(p, 'tenant-doc');
   if (next) await clickNext(page, 3);
@@ -150,7 +149,7 @@ export async function fillTenant(page, { docs = true, next = true } = {}) {
 
 // The removed fields must not come back: Aadhaar OTP happens at the doorstep visit.
 export async function expectNoRemovedPartyInputs(scope) {
-  for (const placeholder of ['12-digit Aadhaar', 'Full permanent address', 'As per identity proof', 'If used in older papers']) {
+  for (const placeholder of ['12-digit Aadhaar', 'Full permanent address', 'As per identity proof', 'If used in older papers', 'As per Aadhaar or PAN']) {
     await expect(scope.getByPlaceholder(placeholder), `"${placeholder}" input was removed`).toHaveCount(0);
   }
 }

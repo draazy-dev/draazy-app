@@ -10,6 +10,7 @@ import AmountInput from '../../flatmates/AmountInput.jsx';
 import { DEED_LANGUAGES, FURN_PRESETS, PARKING, PERIODS, TDS_RENT_THRESHOLD, VISIT_PLACES, VISIT_SLOTS } from './constants.js';
 import { visitDateBounds } from './validation.js';
 import { digits, num } from './helpers.js';
+import { isImeComposing } from '../../../../lib/isImeComposing.js';
 import '../../../../styles/components/furniture-tiles.css';
 
 const CLAUSES_SOFT_LIMIT = 1500;
@@ -23,7 +24,7 @@ export default function StepTerms({ step, terms, setT, startBounds, errors = {},
     setCustomChosen(v === 'custom');
     if (v !== 'custom') setMonths(v);
   };
-  const numberField = (k, errKey, labelKey = k) => (<Field label={t(`services.ra.terms.${labelKey}`)} error={errors[k] && t(errKey, { months: terms.months })}><input inputMode="numeric" value={terms[k]} onChange={(e) => { setT(k, e.target.value); clearErr(k); }} className={fc(k)} /></Field>);
+  const numberField = (k, errKey, labelKey = k) => (<Field label={t(`services.ra.terms.${labelKey}`)} error={errors[k] && t(errKey, { months: terms.months })}><input inputMode="numeric" maxLength={3} value={terms[k]} onChange={(e) => { setT(k, digits(e.target.value)); clearErr(k); }} className={fc(k)} /></Field>);
   const payerField = (k, values) => (
     <Field label={t(`services.ra.terms.${k}`)}>
       <NativeSelect value={terms[k]} title={t(`services.ra.terms.${k}`)} onChange={(e) => setT(k, e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm">
@@ -140,9 +141,9 @@ export default function StepTerms({ step, terms, setT, startBounds, errors = {},
       <div className="flex items-center gap-2 mb-5 max-w-[640px]">
         <div className="relative flex-1">
           <Icon name="plus-circle" className="w-4 h-4 text-teal-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input value={custom.name} onChange={(e) => setCustom((p) => ({ ...p, name: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }} type="text" placeholder={t('services.ra.terms.customPlaceholder')}           className="field w-full pl-9 pr-3 rounded-xl text-white text-sm" />
+          <input maxLength={40} value={custom.name} onChange={(e) => setCustom((p) => ({ ...p, name: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter' && !isImeComposing(e)) { e.preventDefault(); addCustom(); } }} type="text" placeholder={t('services.ra.terms.customPlaceholder')}           className="field w-full pl-9 pr-3 rounded-xl text-white text-sm" />
         </div>
-                  <input type="number" min="1" value={custom.qty} onChange={(e) => setCustom((p) => ({ ...p, qty: e.target.value }))} aria-label={t('services.ra.terms.customQtyAria')} className="field w-16 px-2 rounded-xl text-white text-sm text-center" />
+                  <input type="number" min="1" max="99" value={custom.qty} onChange={(e) => setCustom((p) => ({ ...p, qty: e.target.value }))} aria-label={t('services.ra.terms.customQtyAria')} className="field w-16 px-2 rounded-xl text-white text-sm text-center" />
                   <button type="button" onClick={addCustom} className="btn-outline h-btn px-4 rounded-xl text-teal-400 text-sm font-semibold whitespace-nowrap">{t('services.ra.terms.add')}</button>
       </div>
 

@@ -49,8 +49,8 @@ export default function CoOwnerBlock({ index, row, set, remove, errors, fc, clea
           </div>
         )}
         {offline && <div className="sm:col-span-2 rounded-xl border border-sky-400/20 bg-sky-500/10 p-3 text-xs text-sky-100 leading-relaxed">{t('services.ra.party.offlineNote')}</div>}
-        <Field label={t('services.ra.owner.fullName')} required error={errors[p + 'name'] && t('services.ra.owner.coOwners.nameErr')}><input {...input('name')} placeholder={t('services.ra.owner.fullNamePlaceholder')} /></Field>
-        <PartyIdentityFields dob={row.dob} setDob={(v) => set('dob', v)} setAge={(v) => set('age', v)} mother={row.mother} setMother={(v) => set('mother', v)} gender={row.gender} setGender={(v) => set('gender', v)} keys={{ dob: p + 'dob', age: p + 'age', mother: p + 'mother', gender: p + 'gender' }} errors={errors} clearErr={clearErr} />
+        <Field label={t('services.ra.owner.fullName')} required error={errors[p + 'name'] && t('services.ra.owner.coOwners.nameErr')}><input maxLength={80} {...input('name')} placeholder={t('services.ra.owner.fullNamePlaceholder')} /></Field>
+        <PartyIdentityFields dob={row.dob} setDob={(v) => set('dob', v)} setAge={(v) => set('age', v)} gender={row.gender} setGender={(v) => set('gender', v)} keys={{ dob: p + 'dob', age: p + 'age', gender: p + 'gender' }} errors={errors} clearErr={clearErr} />
         <Field label={t('services.ra.owner.pan')} required error={errors[p + 'pan'] && why('pan', 'services.ra.owner.panErr')}><PartyIdInput masked={masked?.pan} held={held} kind="pan" value={row.pan || ''} onChange={(v) => { set('pan', v); clearErr(p + 'pan'); }} className={fc(p + 'pan')} placeholder="ABCDE1234F" /></Field>
         {offline && (
           <>

@@ -15,7 +15,7 @@ export function useRaFurniture() {
   const addCustom = () => {
     const name = custom.name.trim();
     if (!name) return;
-    const qty = Math.max(1, parseInt(custom.qty, 10) || 1);
+    const qty = Math.min(99, Math.max(1, parseInt(custom.qty, 10) || 1));
     setFurnItems((arr) => {
       const ex = arr.find((f) => f.name.toLowerCase() === name.toLowerCase());
       if (ex) return arr.map((f) => (f === ex ? { ...f, qty: f.qty + qty } : f));

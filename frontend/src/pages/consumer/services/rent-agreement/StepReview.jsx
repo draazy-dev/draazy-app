@@ -13,7 +13,6 @@ export default function StepReview({ step, readOnly, prop, owner, coOwners = [],
   const partyIdentity = (dob, row) => [
     dob && `${tr('services.ra.party.dob')}: ${dob}`,
     row?.gender && tr(`services.ra.party.genderOpt.${row.gender}`),
-    row?.mother && `${tr('services.ra.party.mother')}: ${row.mother}`,
     addrLine(row?.addr),
   ].filter(Boolean).join(' · ') || '—';
   const offlineParties = [

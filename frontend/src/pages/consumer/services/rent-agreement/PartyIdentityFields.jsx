@@ -20,7 +20,7 @@ function GenderField({ value, onChange, errKey, errors, clearErr }) {
   );
 }
 
-export default function PartyIdentityFields({ dob, setDob, setAge, mother, setMother, gender, setGender, keys, errors, clearErr }) {
+export default function PartyIdentityFields({ dob, setDob, setAge, gender, setGender, keys, errors, clearErr }) {
   const { t } = useTranslation();
   const today = todayIst();
   const err = (key) => errors[key];
@@ -35,9 +35,6 @@ export default function PartyIdentityFields({ dob, setDob, setAge, mother, setMo
 
   return (
     <>
-      <Field label={t('services.ra.party.mother')} required error={err(keys.mother) && t('services.ra.party.motherErr')}>
-        <input maxLength={80} value={mother || ''} onChange={(e) => { setMother(e.target.value); clear(keys.mother); }} className={cls(keys.mother)} placeholder={t('services.ra.party.motherPlaceholder')} />
-      </Field>
       <GenderField value={gender} onChange={setGender} errKey={keys.gender} errors={errors} clearErr={clearErr} />
       <Field label={t('services.ra.party.dob')} required error={err(keys.dob) && t('services.ra.party.dobErr')}>
         <DateField value={dob || ''} min={dobMin} max={today} onChange={onDob} className={cls(keys.dob)} invalid={!!err(keys.dob)} dataErr={keys.dob} ariaLabel={t('services.ra.party.dob')} />

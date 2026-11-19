@@ -63,12 +63,12 @@ export const largestFreeTextField = (state) => {
 };
 
 const POA_BLANK = { poaPrincipal: '', poaRegNo: '', poaDate: '', poaSro: '' };
-const PARTY_BLANK = { type: 'individual', residency: 'resident', dob: '', mother: '', gender: '', passport: '', visaOci: '', frro: '' };
+const PARTY_BLANK = { type: 'individual', residency: 'resident', dob: '', gender: '', passport: '', visaOci: '', frro: '' };
 const emptyAddr = () => ({ pincode: '', village: '', address: '' });
 export const emptyTenantPolice = () => ({ permanentSameAsCurrent: true, permanent: { address: '', pincode: '', village: '', policeStation: '' }, addressProofType: 'uid', previousSameAsPermanent: true, previous: { address: '', pincode: '', village: '', policeStation: '' }, previousAddressProofType: 'uid', workplaceAddress: '', workIdProofType: '', occupants: [] });
 export const emptyTenant = () => ({ name: '', age: '', occupation: '', pan: '', mobile: '', police: emptyTenantPolice(), ...PARTY_BLANK });
 export const emptyProp = () => ({ propType: 'Flat / Apartment', flatNo: '', society: '', societyId: '', societyNotOnMaps: false, locality: '', gramPanchayat: null, city: 'Pune', taluka: '', landmark: '', policeStation: '', roadVicinity: '', roadType: '', pincode: '', area: '', areaUnit: 'sqft', floor: '' });
-export const emptyOwner = (isIn, user) => ({ oName: isIn ? user?.name || '' : '', oDob: '', oAge: '', oPan: '', oMobile: isIn ? user?.mobile || '' : '', mother: '', gender: '', addr: emptyAddr(), capacity: 'owner', type: 'individual', residency: 'resident', passport: '', visaOci: '', frro: '', ...POA_BLANK });
+export const emptyOwner = (isIn, user) => ({ oName: isIn ? user?.name || '' : '', oDob: '', oAge: '', oPan: '', oMobile: isIn ? user?.mobile || '' : '', gender: '', addr: emptyAddr(), capacity: 'owner', type: 'individual', residency: 'resident', passport: '', visaOci: '', frro: '', ...POA_BLANK });
 export const emptyCoOwner = () => ({ name: '', age: '', pan: '', mobile: '', capacity: 'co-owner', addr: emptyAddr(), ...PARTY_BLANK, ...POA_BLANK });
 export const emptyInvite = () => ({ invMobile: '', invName: '', invMessage: '' });
 export const emptyTerms = () => ({ startDate: '', months: '11', rent: '', deposit: '', nrDeposit: '', increment: '5', incrementEvery: '11', lockin: '6', costBy: 'Split', parking: 'none', parkingArea: '', parkingAreaUnit: 'sqft', language: 'English', visitAt: 'property', visitDate: '', visitSlot: 'any', depositPayments: [] });

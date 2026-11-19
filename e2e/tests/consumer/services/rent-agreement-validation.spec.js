@@ -425,27 +425,65 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
     await expect(p.getByRole('img', { name: 'Preview' })).toBeVisible();
   });
 
-  test('the owner gives mother\'s name, gender and residential address, as the IGR party tab requires', async ({ page }) => {
+  test('the owner gives gender and residential address, as the IGR party tab requires, but never a mother\'s name (optional there)', async ({ page }) => {
     test.slow();
     await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await fillProperty(page);
     await fillOwner(page, { next: false });
     const p = active(page);
-    await p.getByPlaceholder('As per Aadhaar or PAN').first().fill('');
+    await expect(p.getByText("Mother's name")).toHaveCount(0);
     await p.getByPlaceholder('411004').first().fill('0110');
     await p.getByPlaceholder('Flat, building, street, locality').first().fill('');
 
     await clickNext(page);
     await stillOn(page, 1);
-    await expect(p.getByText("Enter the mother's name (up to 80 characters).")).toBeVisible();
     await expect(p.getByText('Enter a 6-digit pincode.')).toBeVisible();
     await expect(p.getByText('Enter the address.')).toBeVisible();
 
-    await p.getByPlaceholder('As per Aadhaar or PAN').first().fill('Shaila Verma');
     await p.getByPlaceholder('411004').first().fill('560001');
     await p.getByPlaceholder('Flat, building, street, locality').first().fill('7 Residency Road, Bengaluru');
     await clickNext(page, 2);
     await expect.poll(async () => page.evaluate((k) => localStorage.getItem(k) || '', DRAFT), 'a licensor may live outside Maharashtra').toContain('560001');
+  });
+
+  test('every field takes only what it is for: a blank city, a name with digits, a pincode starting 0, and letters in a number are all stopped', async ({ page }) => {
+    test.slow();
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
+    await fillProperty(page, { next: false });
+    const p = active(page);
+    await p.getByLabel('City', { exact: true }).fill('');
+    await clickNext(page);
+    await stillOn(page, 0);
+    await expect(p.getByText('Enter the city.')).toBeVisible();
+    await p.getByLabel('City', { exact: true }).fill('Pune');
+    await clickNext(page, 1);
+
+    await fillOwner(page, { next: false });
+    const owner = active(page);
+    await owner.getByPlaceholder('As per PAN/Aadhaar').first().fill('Anita 2 Verma');
+    await clickNext(page);
+    await stillOn(page, 1);
+    await expect(owner.getByText("Enter the owner's full name as on PAN — letters only.")).toBeVisible();
+    await owner.getByPlaceholder('As per PAN/Aadhaar').first().fill('Anita Verma');
+    await clickNext(page, 2);
+
+    await fillTenant(page, { docs: false, next: false });
+    await fillTenantPolice(page, { previous: true });
+    const tenant = active(page);
+    const police = tenant.getByTestId('tenant-police-record-0');
+    await police.getByPlaceholder('411004').fill('011030');
+    await clickNext(page);
+    await stillOn(page, 2);
+    await expect(police.getByText('Enter a 6-digit pincode.')).toBeVisible();
+    await police.getByPlaceholder('411004').fill('411030');
+    await uploadAll(tenant, 'tenant-doc');
+    await clickNext(page, 3);
+
+    const terms = active(page);
+    await terms.getByLabel('Lock-in Period (months)').fill('a6b');
+    await expect(terms.getByLabel('Lock-in Period (months)')).toHaveValue('6');
+    await terms.getByLabel('Increase on Renewal (%)').fill('5%');
+    await expect(terms.getByLabel('Increase on Renewal (%)')).toHaveValue('5');
   });
 
   test('the page never says 11 months avoids registration, and the wizard is residential-only: commercial premises, or a draft saved for a shop, go to the legal desk', async ({ page }) => {
@@ -506,8 +544,9 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
     await clickNext(page);
     await stillOn(page, 1);
     await expect(p.getByText('Required when signing under a Power of Attorney.').first()).toBeVisible();
+    await expect(p.getByText('Enter the name of the owner you sign for — letters only.')).toBeVisible();
     await expect(p.getByText(/Enter the POA registration date/).first()).toBeVisible();
-    await expect(co.getByText("Enter the co-owner's full name as on the title deed.")).toBeVisible();
+    await expect(co.getByText("Enter the co-owner's full name as on the title deed — letters only.")).toBeVisible();
     await expect(co.getByText(DOC_REQUIRED), 'a co-owner uploads nothing: PAN is typed, Aadhaar is taken at the visit').toHaveCount(0);
     await expectNoRemovedPartyInputs(co);
     /* The POA itself is one more required paper for the owner who signs under it. */

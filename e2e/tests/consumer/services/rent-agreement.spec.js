@@ -138,7 +138,7 @@ test.describe('Rent Agreement — revenue flow', () => {
     await expect(review.getByText(/Date of birth: 1980-01-01/)).toBeVisible();
     await expect(review.getByText('Tenant identity')).toBeVisible();
     await expect(review.getByText(/Date of birth: 1995-01-01/)).toBeVisible();
-    await expect(review.getByText(/Mother's name: Shaila Verma/)).toBeVisible();
+    await expect(review.getByText(/Mother's name/), "optional on the IGR portal, so the wizard doesn't ask").toHaveCount(0);
     await expect(review.getByText(/12 MG Road, Baner, Pune, Baner, 411045/)).toBeVisible();
     await expect(review.getByText(/Aadhaar:/)).toHaveCount(0);
   });
