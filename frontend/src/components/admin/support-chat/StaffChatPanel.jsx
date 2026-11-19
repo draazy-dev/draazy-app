@@ -14,6 +14,7 @@ import { classNames } from '../../../lib/format.js';
 import { fmtAgo } from '../../../pages/ops/service-queue/helpers.js';
 import { BTN, CHIP, CHIP_TONE } from '../WorkQueue.jsx';
 import { userMessage } from '../../../lib/userMessage.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 
 const POLL_MS = 15000;
 const STATUS = {
@@ -227,7 +228,7 @@ export default function StaffChatPanel({ userId, initialAbout = null, compact = 
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isImeComposing(e)) { e.preventDefault(); send(); } }}
             rows={compact ? 1 : 2}
             maxLength={4000}
             placeholder={`Reply to ${chat.user.name}…`}

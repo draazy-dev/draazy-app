@@ -6,6 +6,7 @@ import Icon from '../Icon.jsx';
 import useSheetViewport from '../../lib/useSheetViewport.js';
 import useVisualViewportInsets from '../../lib/useVisualViewportInsets.js';
 import useSwipeDismiss from '../../lib/useSwipeDismiss.js';
+import { isImeComposing } from '../../lib/isImeComposing.js';
 import useScrollLock from '../../hooks/useScrollLock.js';
 import PoweredByGoogle from './PoweredByGoogle.jsx';
 import { isSearchableList } from './dropdownSearch.js';
@@ -215,7 +216,7 @@ const MultiSelect = forwardRef(function MultiSelect({
   const swipe = useSwipeDismiss(close);
 
   const onKeyDown = (e) => {
-    if (disabled) return;
+    if (disabled || (e.key === 'Enter' && isImeComposing(e))) return;
     if (!open && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
       setOpen(true);

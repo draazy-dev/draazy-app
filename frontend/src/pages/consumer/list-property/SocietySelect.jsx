@@ -6,6 +6,7 @@ import { useAuth } from '../../../context/AuthContext.jsx';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { fetchSuggestions, fetchPlaceDetails, newAutocompleteSession } from '../../../lib/places.js';
 import { haversineKm } from '../../../lib/listings/coords.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 import { cleanText } from './sanitize.js';
 import { fld } from './styles.js';
 
@@ -208,6 +209,7 @@ export default function SocietySelect({
   };
 
   const onKeyDown = (e) => {
+    if (e.key === 'Enter' && isImeComposing(e)) return;
     if (!open && (e.key === 'ArrowDown' || e.key === 'Enter')) { e.preventDefault(); setOpen(true); return; }
     if (!open) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(items.length - 1, i + 1)); }

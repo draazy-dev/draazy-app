@@ -12,6 +12,7 @@ import { listNotifications, markAllRead, markRead } from '../../services/notific
 import { safeNotificationLink, TYPE_META } from '../notifications/notificationModel.js';
 import Icon from '../Icon.jsx';
 import { SERVICE_DESKS, canOpenPath, hasPermission, portalPath, runbooksFor, ticketPath } from '../../lib/adminModules.js';
+import { isImeComposing } from '../../lib/isImeComposing.js';
 
 const RESULT_CAP = 6;
 
@@ -273,7 +274,7 @@ export default function AdminTopbarTools() {
   const rowCls = (key) => 'flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5' + (active?.key === key ? ' bg-white/10' : '');
   const onSearchKey = (e) => {
     if (!searchOpen || !rows.length) return;
-    if (e.key === 'Enter') { e.preventDefault(); go(active.path); return; }
+    if (e.key === 'Enter') { if (!isImeComposing(e)) { e.preventDefault(); go(active.path); } return; }
     const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
     if (!step) return;
     e.preventDefault();

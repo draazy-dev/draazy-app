@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Modal from '../../../components/ui/Modal.jsx';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 
 export default function CancelDialog({ request, onClose, onConfirm }) {
   const [reason, setReason] = useState('');
@@ -36,7 +37,7 @@ export default function CancelDialog({ request, onClose, onConfirm }) {
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+              if (event.key === 'Enter' && !event.shiftKey && !isImeComposing(event)) {
                 event.preventDefault();
                 event.currentTarget.form.requestSubmit();
               }

@@ -5,6 +5,7 @@ import { classNames } from '../../lib/format.js';
 import useSheetViewport from '../../lib/useSheetViewport.js';
 import useVisualViewportInsets from '../../lib/useVisualViewportInsets.js';
 import useSwipeDismiss from '../../lib/useSwipeDismiss.js';
+import { isImeComposing } from '../../lib/isImeComposing.js';
 import useScrollLock from '../../hooks/useScrollLock.js';
 import Icon from '../Icon.jsx';
 import PoweredByGoogle from './PoweredByGoogle.jsx';
@@ -175,7 +176,7 @@ const Select = forwardRef(function Select({
   const swipe = useSwipeDismiss(close);
 
   const onKeyDown = (e) => {
-    if (disabled) return;
+    if (disabled || (e.key === 'Enter' && isImeComposing(e))) return;
     if (!open && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
       setOpen(true);

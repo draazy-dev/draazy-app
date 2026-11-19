@@ -3,6 +3,7 @@ import { Landmark, RefreshCw, Loader2, CheckCircle2, Search, X, Plus } from 'luc
 import { getServedAreaReport, recheckServedArea } from '../../../services/localityService.js';
 import { servedDistrictAreasOf, validBounds } from '../../../lib/geoConfig.js';
 import { fetchSuggestions, fetchPlaceViewport, newAutocompleteSession } from '../../../lib/places.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 import PoweredByGoogle from '../../../components/ui/PoweredByGoogle.jsx';
 import DistrictMap from './DistrictMap.jsx';
 
@@ -57,7 +58,7 @@ function DistrictSearch({ onPick, disabled }) {
     if (!list.length) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((i) => (i + 1) % list.length); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setOpen(true); setActive((i) => (i <= 0 ? list.length - 1 : i - 1)); }
-    else if (e.key === 'Enter' && showList && active >= 0) { e.preventDefault(); void choose(list[active]); }
+    else if (e.key === 'Enter' && showList && active >= 0 && !isImeComposing(e)) { e.preventDefault(); void choose(list[active]); }
     else if (e.key === 'Escape') setOpen(false);
   };
 

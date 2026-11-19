@@ -15,6 +15,7 @@ import { useTargetCard } from './useTargetCard.js';
 import { GENERAL, contextKey, contextMeta, parseContextKey } from '../../../lib/supportLink.js';
 import { loadSupportChoices, servicePath } from './supportChat.js';
 import { userMessage } from '../../../lib/userMessage.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 
 const noop = () => {};
 
@@ -244,7 +245,7 @@ export default function SupportThread({ t, user, contextKey: wanted, opened, onB
                 className="pc-input"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isImeComposing(e)) { e.preventDefault(); submit(); } }}
                 rows={1}
                 maxLength={4000}
                 enterKeyHint="send"

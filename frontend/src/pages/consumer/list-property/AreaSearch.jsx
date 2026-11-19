@@ -3,6 +3,7 @@ import { Search, MapPin, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { fld } from './styles.js';
 import { newAutocompleteSession, fetchSuggestions, fetchPlaceDetails } from './geocode.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 
 const DEBOUNCE_MS = 220;
 
@@ -72,6 +73,7 @@ export default function AreaSearch({
   }, [onChange, onSelectPlace]);
 
   const onKeyDown = (e) => {
+    if (e.key === 'Enter' && isImeComposing(e)) return;
     if (open && suggestions.length) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => (i + 1) % suggestions.length); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => (i <= 0 ? suggestions.length - 1 : i - 1)); return; }

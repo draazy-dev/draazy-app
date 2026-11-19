@@ -8,6 +8,7 @@ import DateField from '../../../components/ui/DateField.jsx';
 import DualRange from '../../../components/ui/DualRange.jsx';
 import { FilterGroup } from '../../../components/ui/FilterGroup.jsx';
 import useSwipeDismiss from '../../../lib/useSwipeDismiss.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 import LocalitySearchInput from '../../../components/search/LocalitySearchInput.jsx';
 import NearPlaceField from './NearPlaceField.jsx';
 import VibeFilter from './VibeFilter.jsx';
@@ -255,7 +256,7 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
           <div className="flex items-center gap-2 flex-1 min-w-0 lg:min-w-[180px] lg:max-w-[600px]">
             <div className="relative flex-1 min-w-0">
               <Icon name="sparkles" className="w-4 h-4 text-teal-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input ref={qInputRef} value={qDraft} onChange={(e) => { sawSmartLoadingRef.current = false; setSmartClearPending(false); setQDraft(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) submitSmartSearch(); }} type="text" enterKeyHint="search" aria-label={t('flatmates.smartSearch')} className="sf-search-field field w-full rounded-full pl-9 pr-12 lg:pr-4 h-11 lg:h-10 text-sm" placeholder={t('flatmates.searchPlaceholder')} />
+              <input ref={qInputRef} value={qDraft} onChange={(e) => { sawSmartLoadingRef.current = false; setSmartClearPending(false); setQDraft(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter' && !isImeComposing(e)) submitSmartSearch(); }} type="text" enterKeyHint="search" aria-label={t('flatmates.smartSearch')} className="sf-search-field field w-full rounded-full pl-9 pr-12 lg:pr-4 h-11 lg:h-10 text-sm" placeholder={t('flatmates.searchPlaceholder')} />
 
               <button type="button" onClick={submitSmartSearch} aria-label={t('flatmates.smartSearch')} className="sf-search-go tap-extend lg:hidden absolute top-1 bottom-1 right-1 w-9 rounded-full btn-primary flex items-center justify-center"><Icon name="search" className="w-4 h-4" /></button>
             </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Sparkles, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { classNames } from '../../lib/format.js';
+import { isImeComposing } from '../../lib/isImeComposing.js';
 import '../../styles/components/furniture-tiles.css';
 
 export default function FeatureSelector({
@@ -47,7 +48,7 @@ export default function FeatureSelector({
   };
 
   const onKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isImeComposing(e)) {
       e.preventDefault();
       commit();
     }

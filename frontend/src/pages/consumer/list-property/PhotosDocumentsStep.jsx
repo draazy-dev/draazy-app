@@ -11,6 +11,7 @@ import { describeListing } from './describe.js';
 import { listingLabels } from './submit.js';
 import HeadlineField from '../../../components/ui/HeadlineField.jsx';
 import VideoLinkField from './VideoLinkField.jsx';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 
 const BEST_TIMES = ['anytime', 'morning', 'afternoon', 'evening'];
 
@@ -147,7 +148,7 @@ const PhotosDocumentsStep = ({
             </div>
           ) : null}
           <div className="mt-3 flex items-center gap-2 max-w-md">
-            <input value={draftAmenity} onChange={(e) => setDraftAmenity(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAmenity(); } }} placeholder={t('listProperty.ph.addOtherAmenity')} aria-label={t('ui.addCustom', { noun: t('listProperty.aria.amenity') })} maxLength={40} className="form-input flex-1 px-4 py-3 rounded-xl text-white text-sm" />
+            <input value={draftAmenity} onChange={(e) => setDraftAmenity(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !isImeComposing(e)) { e.preventDefault(); addAmenity(); } }} placeholder={t('listProperty.ph.addOtherAmenity')} aria-label={t('ui.addCustom', { noun: t('listProperty.aria.amenity') })} maxLength={40} className="form-input flex-1 px-4 py-3 rounded-xl text-white text-sm" />
             <button type="button" onClick={addAmenity} disabled={!draftAmenity.trim()} className="h-btn shrink-0 inline-flex items-center gap-1.5 px-4 rounded-xl text-sm font-semibold text-teal-300 border border-teal-500/40 hover:bg-teal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><Plus className="w-4 h-4" /> Add</button>
           </div>
           {amenityStatus ? <p aria-live="polite" className="mt-2 text-xs font-medium text-teal-300">{amenityStatus}</p> : null}

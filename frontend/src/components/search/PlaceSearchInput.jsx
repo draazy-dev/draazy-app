@@ -4,6 +4,7 @@ import Icon from '../Icon.jsx';
 import PoweredByGoogle from '../ui/PoweredByGoogle.jsx';
 import { fetchPlaceDetails, fetchSuggestions, newAutocompleteSession } from '../../lib/places.js';
 import { userMessage } from '../../lib/userMessage.js';
+import { isImeComposing } from '../../lib/isImeComposing.js';
 
 const DEBOUNCE_MS = 220;
 
@@ -104,7 +105,7 @@ export default function PlaceSearchInput({ label = '', onPick, onClear, bias = n
     if (!open || !suggestions.length) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => (i + 1) % suggestions.length); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => (i <= 0 ? suggestions.length - 1 : i - 1)); }
-    else if (e.key === 'Enter') { e.preventDefault(); choose(suggestions[Math.max(active, 0)]); }
+    else if (e.key === 'Enter') { if (!isImeComposing(e)) { e.preventDefault(); choose(suggestions[Math.max(active, 0)]); } }
     else if (e.key === 'Escape') setOpen(false);
   };
 

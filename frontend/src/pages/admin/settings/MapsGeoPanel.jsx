@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useId } from 'react';
 import { Globe, MapPin, Ban, Trash2, Search, Loader2, Type } from 'lucide-react';
 import { classNames } from '../../../lib/format.js';
 import { fetchAdminSuggestions, newAutocompleteSession } from '../../../lib/places.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 import Switch from '../../../components/ui/Switch.jsx';
 import PoweredByGoogle from '../../../components/ui/PoweredByGoogle.jsx';
 import ServedAreaCard from './ServedAreaCard.jsx';
@@ -55,7 +56,7 @@ function BlacklistSearch({ onPickPlace, onAddTerm }) {
     if (!options.length) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((i) => (i + 1) % options.length); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setOpen(true); setActive((i) => (i <= 0 ? options.length - 1 : i - 1)); }
-    else if (e.key === 'Enter' && showList && active >= 0) { e.preventDefault(); choose(options[active]); }
+    else if (e.key === 'Enter' && showList && active >= 0 && !isImeComposing(e)) { e.preventDefault(); choose(options[active]); }
     else if (e.key === 'Escape') setOpen(false);
   };
 

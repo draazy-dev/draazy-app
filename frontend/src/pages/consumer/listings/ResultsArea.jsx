@@ -14,6 +14,7 @@ import ActiveFilterChips from '../../../components/ui/ActiveFilterChips.jsx';
 import useBackToClose from '../../../hooks/useBackToClose.js';
 import { flatmatesUrl } from './matchers.js';
 import { RANGE, rangeChanged } from '../../../lib/listings/filterState.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 
 const PropertyMap = lazy(() => import('../../../components/property/PropertyMap.jsx'));
 const MapDetailPanel = lazy(() => import('../../../components/property/MapDetailPanel.jsx'));
@@ -80,7 +81,7 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                 <div className="flex gap-2" role="search">
                   <div className="flex-1 relative">
                     <Icon name="sparkles" className="w-4 h-4 text-teal-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input type="text" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) smartSearch(); }} enterKeyHint="search" aria-label={t('listings.smartSearch')} placeholder={f.deal === 'rent' ? t('listings.smartPlaceholderRent') : t('listings.smartPlaceholderBuy')} className="lst-search-field w-full pl-9 pr-[88px] sm:pr-3 h-11 sm:h-10 rounded-full glass border border-white/10 text-sm text-white placeholder-gray-500 focus:border-teal-400/50 outline-none bg-white/5" />
+                    <input type="text" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !isImeComposing(e)) smartSearch(); }} enterKeyHint="search" aria-label={t('listings.smartSearch')} placeholder={f.deal === 'rent' ? t('listings.smartPlaceholderRent') : t('listings.smartPlaceholderBuy')} className="lst-search-field w-full pl-9 pr-[88px] sm:pr-3 h-11 sm:h-10 rounded-full glass border border-white/10 text-sm text-white placeholder-gray-500 focus:border-teal-400/50 outline-none bg-white/5" />
 
                     <div className="sm:hidden absolute inset-y-0 right-1 flex items-center gap-1">
                       <button type="button" onClick={saveSearch} disabled={savingSearch} aria-busy={savingSearch || undefined} aria-label={t('listings.alertMe')} className="lst-search-bell w-11 self-stretch flex items-center justify-center text-gray-400 hover:text-teal-300 disabled:opacity-50 disabled:pointer-events-none t-all"><Icon name={savingSearch ? 'loader' : 'bell-plus'} className={'w-4 h-4' + (savingSearch ? ' animate-spin' : '')} /></button>

@@ -11,6 +11,7 @@ import { resolveLocality } from '../../services/localityService.js';
 import { newAutocompleteSession, fetchSuggestions, fetchPlaceDetails, LOCALITY_TYPES } from '../../lib/places.js';
 import { useCity } from '../../context/CityContext.jsx';
 import { cityHasData } from '../../lib/geoConfig.js';
+import { isImeComposing } from '../../lib/isImeComposing.js';
 
 const EMPTY = [];
 
@@ -245,6 +246,7 @@ export default function EntitySearchCombobox({
       if (!open) { setOpen(true); return; }
       if (rows.length) setActiveIdx((i) => (i <= 0 ? rows.length - 1 : i - 1));
     } else if (e.key === 'Enter') {
+      if (isImeComposing(e)) return;
       e.preventDefault();
       if (resolving) return;
       if (listOpen && activeIdx >= 0) pickRow(rows[activeIdx]);

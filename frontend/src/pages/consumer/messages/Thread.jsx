@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 import { digits, fmtPhone, isFullMobile } from '../../../lib/contact.js';
 import { formatTime } from '../../../lib/chatFormat.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 import { detailPath } from '../flatmates/helpers.js';
 import { ThreadAvatar } from './Inbox.jsx';
 import MessageList from './MessageList.jsx';
@@ -223,7 +224,7 @@ export default function Thread({
               {replyTo ? <div className="pc-reply-bar"><span>{replyTo.text}</span><button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><Icon name="x" className="w-4 h-4" /></button></div> : null}
               <input ref={fileRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={pickPhoto} />
               <button type="button" className="pc-icon-btn pc-attach" onClick={() => fileRef.current?.click()} aria-label={t('misc.msgAttachPhoto')}><Icon name="paperclip" className="w-5 h-5" /></button>
-              <textarea ref={inputRef} className="pc-input" value={draft} onChange={(e) => changeDraft(e.target.value)} onInput={resize} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }} rows={1} enterKeyHint="send" placeholder={t('misc.msgTypeMessage')} aria-label={t('misc.msgTypeMessage')} />
+              <textarea ref={inputRef} className="pc-input" value={draft} onChange={(e) => changeDraft(e.target.value)} onInput={resize} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isImeComposing(e)) { e.preventDefault(); send(); } }} rows={1} enterKeyHint="send" placeholder={t('misc.msgTypeMessage')} aria-label={t('misc.msgTypeMessage')} />
               <button className="pc-send" disabled={!draft.trim()} onClick={() => send()} aria-label={t('misc.msgSendMessage')}><Icon name="send" className="w-5 h-5" /></button>
             </div>
             {preview ? (
