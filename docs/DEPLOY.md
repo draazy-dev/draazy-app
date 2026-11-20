@@ -238,7 +238,7 @@ creator, who shares it privately; manager-created staff invites also notify the 
 Sandbox sends real, random OTPs through WhatsApp exactly like prod: `do-app-sandbox.yaml` sets
 `WHATSAPP_ENABLED=true`, the business number's `WHATSAPP_PHONE_NUMBER_ID` and the approved
 `draazy_login_otp` / `draazy_identity_decision` templates, and the deploy workflow passes the System User
-token from the GitHub repository secret **`SANDBOX_WHATSAPP_ACCESS_TOKEN`** (the deploy fails
+token from the GitHub repository secret **`WHATSAPP_ACCESS_TOKEN`** (shared with prod: one Meta app) (the deploy fails
 fast while it is empty). Every send is billed to the Meta prepaid balance and only reaches mobiles
 registered on WhatsApp, so seeded demo mobiles cannot sign in — use your own number.
 
@@ -415,8 +415,8 @@ every non-OTP template; START opts it back in. A `failed` delivery lands in the 
 | Setting | Value |
 |---|---|
 | Callback URL (Meta App ▸ WhatsApp ▸ Configuration) | `https://<host>/api/webhooks/whatsapp`, subscribed to the `messages` field |
-| `WHATSAPP_APP_SECRET` | Meta App ▸ Settings ▸ Basic ▸ App secret (`SANDBOX_WHATSAPP_APP_SECRET`); signs every callback |
-| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | 16+ random characters you choose, typed into Meta too (`SANDBOX_WHATSAPP_WEBHOOK_VERIFY_TOKEN`) |
+| `WHATSAPP_APP_SECRET` | Meta App ▸ Settings ▸ Basic ▸ App secret (`WHATSAPP_APP_SECRET`, shared); signs every callback |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | 16+ random characters you choose, typed into Meta too (`WHATSAPP_WEBHOOK_VERIFY_TOKEN`, shared) |
 
 Set both or neither: one without the other, or a token under 16 characters, fails the boot. Unset, the
 route answers 404. Meta delivers real callbacks only to a published app (Draazy's is, since 2026-10-27).
@@ -655,7 +655,7 @@ tell those apart.
 
 | Scope | Secrets | Variables |
 |---|---|---|
-| repository (backend) | `DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_ZEPTOMAIL_WEBHOOK_KEY`, `SANDBOX_WHATSAPP_ACCESS_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
+| repository (backend) | `DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_ZEPTOMAIL_WEBHOOK_KEY`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
 | repository (frontend publish) | `CLOUDFLARE_API_TOKEN` (Account → Cloudflare Pages → Edit, nothing else) | `CLOUDFLARE_ACCOUNT_ID` |
 | repository (frontend build) | `VITE_GOOGLE_MAPS_API_KEY`, `VITE_GA_ID` | `VITE_GOOGLE_MAPS_MAP_ID`, `VITE_CASHFREE_MODE`, `VITE_PMF_MODE`, `VITE_VAPID_PUBLIC_KEY`, `VITE_TURNSTILE_SITE_KEY`, `VITE_POSTHOG_KEY` (US-cloud project key; blank = off), `VITE_POSTHOG_APP_URL` |
 

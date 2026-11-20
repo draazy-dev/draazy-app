@@ -176,8 +176,9 @@ The agent prepares the lists; the owner does the clicks.
   - `PROD_ORIGIN_SHARED_SECRET` (>= 32 chars; the same value goes into the prod Pages `ORIGIN_SHARED_SECRET`)
   - `PROD_CASHFREE_APP_ID`, `PROD_CASHFREE_SECRET_KEY` (**live** keys); `CASHFREE_WEBHOOK_SECRET`
     gets the same value as the secret key
-  - `PROD_WHATSAPP_PHONE_NUMBER_ID`, `PROD_WHATSAPP_ACCESS_TOKEN` (**System User** token; the
-    dashboard token expires in 24 h), `PROD_WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `PROD_WHATSAPP_APP_SECRET`
+  - WhatsApp: none. One Meta app, number and template set serve both envs, so the shared
+    `WHATSAPP_ACCESS_TOKEN` (**System User** token), `WHATSAPP_APP_SECRET` and
+    `WHATSAPP_WEBHOOK_VERIFY_TOKEN` are reused; copy the phone number ID and template names from the sandbox spec
   - `PROD_ZEPTOMAIL_*`, including the webhook key
   - `PROD_BOOTSTRAP_ADMIN_EMAIL`, `PROD_BOOTSTRAP_ADMIN_MOBILE`
   - `PROD_GOOGLE_PLACES_SERVER_KEY`, R2 credentials
@@ -201,7 +202,9 @@ The agent prepares the lists; the owner does the clicks.
 - [ ] **3.5 [OWNER] Meta / WhatsApp:**
   - Add a **spend cap** on the billing account **before** enabling WhatsApp on prod (`DEPLOY.md` §7).
   - Make sure the OTP, agreement-invite and referral-invite templates are Active.
-  - Set the prod webhook callback `https://draazy.com/api/webhooks/whatsapp` and subscribe `messages`.
+  - Move the webhook callback from sandbox to `https://draazy.com/api/webhooks/whatsapp` (same verify
+    token), subscribe `messages`. Meta allows one callback per number, so sandbox stops receiving
+    opt-outs and failed-delivery statuses from then on.
 - [ ] **3.6 [OWNER] Cashfree:**
   - Activate the live account and rename the merchant from "testMerchantName".
   - Set the live webhook to the prod URL with failed and user-dropped events.
@@ -211,7 +214,10 @@ The agent prepares the lists; the owner does the clicks.
   - Set quotas and budget alerts. Rotate the key whose old copy is in git history (`frontend/dist-perf`).
 - [ ] **3.8 [OWNER] GitHub repo settings:** Dependabot alerts, secret scanning, push protection; rotate
   `backend/.env.local` secrets.
-- [ ] **3.9 [OWNER] ZeptoMail:** prod domain verified (SPF, DKIM, DMARC), webhook key, staff alert emails
+- [ ] **3.9 [OWNER] ZeptoMail:** prod domain verified (SPF, DKIM, DMARC), staff alert emails. Mail agent
+  `draazy-prod` exists (API key in `PROD_ZEPTOMAIL_API_KEY`). Once `draazy.com/api` answers (the 302 rule is
+  gone), add its webhook `https://draazy.com/api/webhooks/zeptomail` (bounces + feedback loop) and copy its
+  authentication key into `PROD_ZEPTOMAIL_WEBHOOK_KEY`: Verify fails while the URL redirects to sandbox.
   (`ZEPTOMAIL_ENABLED=true` and an email on each staff account).
 
 ## Phase 4: Legal, content and ops (owner, agent assists)
