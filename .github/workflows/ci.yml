@@ -150,8 +150,6 @@ jobs:
     name: Backend tests (Maven)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # A real gate, and red until three pre-existing architecture-guard failures
-    # (ServiceSizeGuardTest, SpecCoverageTest, ErasureCoverageTest) are resolved.
     services:
       # Matches backend/src/test/resources/application.properties exactly — same database
       # name, user and password — so no TEST_DB_* override is needed.
@@ -185,25 +183,37 @@ jobs:
       # applies -DbuildDirName=target-cli, which sonar-project.properties also reads.
       - name: Run backend test suite
         working-directory: backend
-        run: ./mvnw --batch-mode --no-transfer-progress test
+        run: ./mvnw --batch-mode --no-transfer-progress org.jacoco:jacoco-maven-plugin:0.8.16:prepare-agent test
+
+      # A separate step so a red suite still produces coverage for Sonar.
+      - name: Coverage report
+        if: always()
+        working-directory: backend
+        run: ./mvnw --batch-mode --no-transfer-progress org.jacoco:jacoco-maven-plugin:0.8.16:report
 
       # Surefire XML is the only place a failure's assertion message survives; the console log
       # truncates. `always()` because this artifact matters most on the red runs.
-      - name: Upload surefire reports
+      - name: Upload surefire reports and coverage
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: surefire-reports
-          path: backend/target-cli/surefire-reports/
+          name: backend-test-reports
+          path: |
+            backend/target-cli/surefire-reports/
+            backend/target-cli/site/jacoco/jacoco.xml
           retention-days: 7
 
   sonar:
     name: SonarQube Cloud
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # `pull_request`, never `pull_request_target`: the latter exposes SONAR_TOKEN to fork code.
-    # The condition drops fork PRs, which cannot read the secret and would fail on auth anyway.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: backend
+    # Never `pull_request_target` (exposes SONAR_TOKEN to forks). Skipped on fork PRs and while
+    # private (not on the free plan); `always()` so a red backend suite is still analysed.
+    if: >-
+      always() && !cancelled() &&
+      !github.event.repository.private &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     steps:
       - uses: actions/checkout@v7
         with:
@@ -238,6 +248,14 @@ jobs:
             echo "::error::backend/target-cli/classes contains no .class files - Sonar would silently skip Java analysis and report it as clean." >&2
             exit 1
           fi
+
+      # The paths match sonar.coverage.jacoco.xmlReportPaths and sonar.junit.reportPaths.
+      - name: Download backend coverage and test results
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: backend-test-reports
+          path: backend/target-cli/
 
       # Configuration lives in sonar-project.properties at the repo root; this action reads it.
       # SONAR_TOKEN is a repository secret - rotate it in the SonarQube Cloud UI if ever leaked.
