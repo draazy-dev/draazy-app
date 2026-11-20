@@ -40,6 +40,7 @@ import com.draazy.api.identity.verification.IdentityVerificationService;
 import com.draazy.api.leads.contact.ContactReturns;
 import com.draazy.api.moderation.verification.NeedsInfoSweepService;
 import com.draazy.api.provider.ProviderCalls;
+import com.draazy.api.security.RateLimitCounterRetention;
 import com.draazy.api.services.request.CoFillInviteRetention;
 import com.draazy.api.services.request.ServiceRequestIdentityRetention;
 import java.time.Duration;
@@ -111,6 +112,11 @@ class JobCatalog {
     @Bean
     ScheduledJob pageViewRollupJob(PageViewRollup rollup) {
         return new ScheduledJob("page-view-rollup", HOURLY, rollup::rollUpNow);
+    }
+
+    @Bean
+    ScheduledJob rateLimitCounterRetentionJob(RateLimitCounterRetention retention) {
+        return new ScheduledJob("rate-limit-counter-retention", HOURLY, retention::purgeExpired);
     }
 
     @Bean

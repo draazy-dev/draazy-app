@@ -263,6 +263,16 @@ class ProdProfileContractTest {
         }
     }
 
+    @Test
+    @DisplayName("deployed rate-limit budgets survive a redeploy")
+    void deployedProfilesCountRateLimitsInPostgres() throws IOException {
+        for (String profile : List.of("application-prod.properties", "application-sandbox.properties")) {
+            assertThat(mainResource(profile).getProperty("draazy.ratelimit.store"))
+                    .as("%s: in-memory counters reset on every deploy and multiply with instances", profile)
+                    .isEqualTo("postgres");
+        }
+    }
+
     private static MockEnvironment environmentSupplying(Set<String> variables) {
         MockEnvironment environment = new MockEnvironment();
         variables.forEach(name -> environment.setProperty(name, name));

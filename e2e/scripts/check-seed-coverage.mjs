@@ -10,6 +10,7 @@ const USER = process.env.E2E_DB_USER || 'postgres';
 const WAIVED = new Map([
   ['otp_codes', 'every login writes one; a seeded code is a seeded credential'],
   ['refresh_tokens', 'issued at login, by the same flow every spec starts with'],
+  ['rate_limit_counters', 'written by the postgres rate-limit store on each limited request; a seeded row is a pre-spent budget'],
   ['push_subscriptions', 'written by the push opt-in flow; a seeded endpoint would fake browser registration'],
   ['flatmate_owner_notices', 'written when a tenant posts a room; the link token exists only in the WhatsApp message'],
   ['provider_call', 'written by every OTP, email and payment call the specs make'],
