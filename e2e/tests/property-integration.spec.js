@@ -436,7 +436,7 @@ test.describe('LIVE: identity verification against the real API', () => {
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 15000 });
 
     const { code, after } = await page.evaluate(async (b64) => {
-      const tokens = JSON.parse(localStorage.getItem('draazyTokens') || sessionStorage.getItem('draazyTokens') || 'null');
+      const tokens = { accessToken: (await import('/src/lib/auth.js')).readAccessToken() };
       const binary = atob(b64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
@@ -471,7 +471,7 @@ test.describe('LIVE: identity verification against the real API', () => {
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 15000 });
 
     const { simulate, after } = await page.evaluate(async (b64) => {
-      const tokens = JSON.parse(localStorage.getItem('draazyTokens') || sessionStorage.getItem('draazyTokens') || 'null');
+      const tokens = { accessToken: (await import('/src/lib/auth.js')).readAccessToken() };
       const auth = { Authorization: `Bearer ${tokens.accessToken}` };
       const binary = atob(b64);
       const bytes = new Uint8Array(binary.length);

@@ -38,14 +38,10 @@ const PROPERTY_REVIEW = {
 
 async function tokenFor(page, mobile) {
   await signedInAs(page, mobile);
-  // "Remember me" determines the storage area, so both stores supply the token fixture.
   // Polled: switching users on one page can trigger a second boot navigation that destroys the evaluate context.
   let token;
   await expect.poll(async () => {
-    token = await page.evaluate(() => {
-      const raw = localStorage.getItem('draazyTokens') || sessionStorage.getItem('draazyTokens');
-      return JSON.parse(raw || 'null')?.accessToken;
-    }).catch(() => null);
+    token = await page.evaluate(async () => (await import('/src/lib/auth.js')).readAccessToken()).catch(() => null);
     return token;
   }, { message: `no access token cached for ${mobile}` }).toBeTruthy();
   return token;

@@ -5,6 +5,7 @@ import { clearConversationDeviceState } from '../services/conversationService.js
 import { unregisterPushSubscription } from '../services/notificationService.js';
 import { ApiError, NetworkError, restoreSession, SESSION_ENDED_EVENT } from '../services/http.js';
 import { primeMeBootstrap } from '../services/meBootstrapService.js';
+import { resetAnalyticsIdentity } from '../lib/productAnalytics.js';
 
 const AuthContext = createContext(null);
 
@@ -101,6 +102,7 @@ export function AuthProvider({ children }) {
       Object.keys(localStorage)
         .filter((key) => key.startsWith('dzDraft:') || key.startsWith('draazyOwnerKYC:'))
         .forEach((key) => localStorage.removeItem(key));
+      resetAnalyticsIdentity();
     } catch {
     }
     await authService.logout();

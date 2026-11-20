@@ -174,18 +174,21 @@ test.describe('polish that is really about safety', () => {
     expect(await completeProfileIfAsked(page)).toBe(true);
     await page.waitForURL('**/listings');
 
-    const tiers = await page.evaluate(() => ({
+    const tiers = await page.evaluate(async () => ({
       userLocal: localStorage.getItem('draazyUser'),
       userSession: sessionStorage.getItem('draazyUser'),
-      tokensLocal: localStorage.getItem('draazyTokens'),
-      tokensSession: sessionStorage.getItem('draazyTokens'),
+      tokensStored: localStorage.getItem('draazyTokens') ?? sessionStorage.getItem('draazyTokens'),
+      tokenHeld: (await import('/src/lib/auth.js')).readAccessToken(),
     }));
+    const hint = (await page.context().cookies()).find((c) => c.name === 'draazy_session');
 
     expect(tiers.userLocal).toBeNull();
     expect(tiers.userSession).toContain(mobile);
-    // One remember flag scopes both stores; a session must not be half-scoped.
-    expect(tiers.tokensLocal).toBeNull();
-    expect(tiers.tokensSession).toBeTruthy();
+    // The access token is memory-only; the remember flag scopes the user record and the refresh pair.
+    expect(tiers.tokensStored).toBeNull();
+    expect(tiers.tokenHeld).toBeTruthy();
+    expect(hint?.value).toBe('0');
+    expect(hint.expires).toBe(-1);
   });
 
   test('the OTP step does NOT offer the demo-mode hint', async ({ page }) => {

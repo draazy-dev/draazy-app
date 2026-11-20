@@ -17,23 +17,48 @@ export function writeUser(user, remember = true) {
 
 const TOKENS_KEY = 'draazyTokens';
 
-export function readTokens() {
-  return readKeyed(TOKENS_KEY);
+// Memory only, so an XSS payload cannot lift the bearer token from storage;
+// a reload re-mints it from the HttpOnly refresh cookie.
+let tokens;
+let remembered = false;
+
+// Adopts, then deletes, a token stored by builds that persisted it (the e2e harness still seeds one this way).
+function adoptStoredTokens() {
+  tokens = null;
+  for (const s of stores()) {
+    try {
+      const v = s.getItem(TOKENS_KEY);
+      if (v && !tokens) {
+        tokens = JSON.parse(v);
+        remembered = s === localStorage;
+      }
+      s.removeItem(TOKENS_KEY);
+    } catch { }
+  }
 }
 
-export function writeTokens(tokens, remember = true) {
-  writeKeyed(TOKENS_KEY, tokens, remember);
+export function readTokens() {
+  if (tokens === undefined) adoptStoredTokens();
+  return tokens;
+}
+
+export function writeTokens(next, remember = true) {
+  readTokens();
+  tokens = next || null;
+  remembered = Boolean(next) && remember;
 }
 
 export const readAccessToken = () => readTokens()?.accessToken || null;
 
 function tokensRemembered() {
-  try {
-    return localStorage.getItem(TOKENS_KEY) != null;
-  } catch {
-    return false;
-  }
+  readTokens();
+  return remembered;
 }
+
+// Sign-out in another tab clears the shared stored user; drop this tab's in-memory token with it.
+globalThis.addEventListener?.('storage', (e) => {
+  if (e.key === KEY && e.newValue == null && !readUser()) tokens = null;
+});
 
 const HINT_COOKIE = '__Host-draazy_session';
 const HINT_COOKIE_INSECURE = 'draazy_session';

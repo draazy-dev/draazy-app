@@ -70,3 +70,7 @@ export function initProductAnalytics() {
 export function capture(event, props) {
   client?.then((ph) => ph?.capture(event, props)).catch(() => {});
 }
+
+export function resetAnalyticsIdentity() {
+  client?.then((ph) => ph?.reset()).catch(() => {});
+}

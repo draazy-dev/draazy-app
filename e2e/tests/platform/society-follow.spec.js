@@ -70,7 +70,7 @@ test.describe('LIVE — society follows', () => {
     /* Paged because one user's taps are a rate, not a bound. Asserted on the wire: the envelope names the
        current page `page`, not Spring's `number`, which a provider fallback can hide. */
     const body = await page.evaluate(async () => {
-      const tokens = JSON.parse(localStorage.getItem('draazyTokens') || sessionStorage.getItem('draazyTokens') || 'null');
+      const tokens = { accessToken: (await import('/src/lib/auth.js')).readAccessToken() };
       const res = await fetch('/api/me/societies/following?size=5', {
         headers: { Authorization: `Bearer ${tokens.accessToken}` },
       });

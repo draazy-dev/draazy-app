@@ -20,7 +20,8 @@ import { installGlobalErrorHandlers } from './lib/errorReporter.js';
 import { initPmf } from './lib/pmf.js';
 import { initProductAnalytics } from './lib/productAnalytics.js';
 import { loadGeoPolicy } from './lib/geoConfig.js';
-import { readAccessToken } from './lib/auth.js';
+import { readAccessToken, sessionHinted } from './lib/auth.js';
+import { restoreSession } from './services/http.js';
 import { primeMeBootstrap } from './services/meBootstrapService.js';
 import { isGatewayPopupReturn } from './lib/paymentReturn.js';
 import PaymentPopupReturn from './components/PaymentPopupReturn.jsx';
@@ -87,6 +88,12 @@ if (isGatewayPopupReturn()) {
 } else {
   loadGeoPolicy();
   window.addEventListener('draazy-settings-change', loadGeoPolicy);
-  if (readAccessToken()) primeMeBootstrap();
-  root.render(app);
+  // Sync readAccessToken() checks across the app assume a live session already holds its token at first render.
+  const restored = !readAccessToken() && sessionHinted()
+    ? Promise.race([restoreSession().catch(() => null), new Promise((r) => setTimeout(r, 5000))])
+    : Promise.resolve();
+  restored.then(() => {
+    if (readAccessToken()) primeMeBootstrap();
+    root.render(app);
+  });
 }

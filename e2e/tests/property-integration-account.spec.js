@@ -341,7 +341,7 @@ test.describe('LIVE: saved, alerts, visits and the contact gate against the real
       .toEqual(expect.arrayContaining([expect.stringMatching(/^200 PATCH \/api\/visits\/[^/]+\/slot$/)]));
 
     const saved = await page.evaluate(async () => {
-      const tokens = JSON.parse(localStorage.getItem('draazyTokens') || sessionStorage.getItem('draazyTokens') || 'null');
+      const tokens = { accessToken: (await import('/src/lib/auth.js')).readAccessToken() };
       const res = await fetch('/api/me/saved?size=5', { headers: { Authorization: `Bearer ${tokens.accessToken}` } });
       return res.json();
     });

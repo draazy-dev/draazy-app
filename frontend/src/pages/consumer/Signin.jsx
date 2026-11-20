@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { ArrowRight, BadgeCheck, CheckCircle2, IndianRupee, Loader2, Mail, Send, ShieldCheck, Smartphone, User, UserCircle, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { sendOtp as sendOtpSvc } from '../../services/authService.js';
@@ -272,6 +272,16 @@ export default function Signin() {
             </button>
           ) : null}
         </form>
+
+        <p className="text-[11px] leading-relaxed text-gray-500 text-center mt-5">
+          <Trans
+            i18nKey="auth.inlineOtpTerms"
+            components={{
+              1: <Link to="/terms" className="text-teal-400 hover:text-teal-300" />,
+              3: <Link to="/privacy" className="text-teal-400 hover:text-teal-300" />,
+            }}
+          />
+        </p>
 
         {signupsOn ? (
           <p className="text-center text-sm text-gray-500 mt-7">

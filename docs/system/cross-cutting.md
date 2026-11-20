@@ -34,15 +34,19 @@ The session user carries a `role`. The **canonical auth roles are the `Role` sch
 
 ### Session storage and the two login doors
 
-Session state lives in `localStorage`/`sessionStorage` under `draazyUser` (the cached profile) and
-`draazyTokens` (the 15-minute access token), managed by `src/lib/auth.js`:
+Session state is `draazyUser` (the cached profile) in `localStorage`/`sessionStorage` and the
+15-minute access token, held only in module memory so an XSS payload cannot read it from storage. Both
+are managed by `src/lib/auth.js`; a hard reload or new tab with the session hint awaits one
+`/auth/refresh` in `main.jsx` before first render, so synchronous `readAccessToken()` callers still see
+a live token. A legacy `draazyTokens` entry in either store is adopted once and deleted (the e2e
+harness seeds sessions this way):
 
 - `writeUser(user, remember)` - persists to `localStorage` when "remember this device" is on,
   otherwise `sessionStorage` (tab-scoped). Exactly one tier holds the session at a time.
-- `writeTokens(tokens, remember)` / `readAccessToken()` - the same two-tier plumbing for the access
-  token. `sessionRemembered()` reports whether the session should outlive the browser, so a refresh
+- `writeTokens(tokens, remember)` / `readAccessToken()` - the in-memory access token; `remember`
+  records which tier the session was meant for. `sessionRemembered()` reports whether the session should outlive the browser, so a refresh
   can restate `remember` and the cookie stays scoped to match. It reads the server's session-hint
-  cookie when readable and falls back to the tokens' storage tier only when not (sibling-subdomain
+  cookie when readable and falls back to that recorded tier only when not (sibling-subdomain
   topology, §5.7.1). The order is deliberate: the tier records where the last write *landed*, not
   what the user *asked for* (`persistTokens` demotes to the tab tier when `localStorage` is
   unwritable while keeping the 30-day cookie), so reading it as the choice would make one transient

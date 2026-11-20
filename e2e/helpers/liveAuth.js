@@ -111,13 +111,8 @@ export async function signIn(page, mobile, { screen = 'consumer', next, search, 
   await completeProfileIfAsked(page, { away: form.away });
 
   if (settleAtHome && form.away.test(page.url())) {
-    const signedIn = await page.evaluate(() => {
-      try {
-        return Boolean(JSON.parse(localStorage.getItem('draazyTokens') || '{}').accessToken);
-      } catch {
-        return false;
-      }
-    });
+    // The readable session hint, not the token: the token is memory-only and `/src` is absent from the preview build.
+    const signedIn = await page.evaluate(() => /(^|; )(__Host-)?draazy_session=/.test(document.cookie));
     if (signedIn) {
       await page.goto('/');
       return;
