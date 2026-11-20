@@ -704,8 +704,8 @@ It differs from sandbox in five ways:
 
 Inputs beyond the `PROD_*` twins of the sandbox list: secret `PROD_DB_APP_PASSWORD` (the `draazy_app`
 role's password, §2.1), variables `PROD_DB_CLUSTER_NAME`, `PROD_INTERNAL_PROXIES` (§4) and
-`PROD_CASHFREE_ENABLED`. `DIGITALOCEAN_ACCESS_TOKEN` additionally needs **database: read, update** for the
-dump. `DeploymentManifestTest` checks both specs and that every required `${...}` in
+`PROD_CASHFREE_ENABLED`. `DIGITALOCEAN_ACCESS_TOKEN` additionally needs **database: read, update,
+view_credentials** for the dump. `DeploymentManifestTest` checks both specs and that every required `${...}` in
 `application-prod.properties` reaches the prod service.
 
 ### Scheduled jobs

@@ -218,7 +218,8 @@ jobs:
           echo "ip=$ip" >> "$GITHUB_OUTPUT"
           doctl databases firewalls append "$cluster" --rule "ip_addr:$ip" > /dev/null
           conn=$(doctl databases connection "$cluster" --output json)
-          export PGPASSWORD=$(jq -r '.password' <<<"$conn")
+          export PGPASSWORD=$(jq -r '.password // empty' <<<"$conn")
+          [ -n "$PGPASSWORD" ] || { echo "::error::DIGITALOCEAN_ACCESS_TOKEN lacks database:view_credentials." >&2; exit 1; }
           echo "::add-mask::${PGPASSWORD}"
           dump="$RUNNER_TEMP/predeploy.dump"
           for attempt in $(seq 1 6); do
