@@ -220,8 +220,8 @@ class DaytimeTrustJobsQaTest extends AbstractJobQaTest {
         int seekerBefore = remaining(releasedSeeker);
         int friendBefore = remaining(releasedFriend);
         int suspendedFriendBefore = remaining(suspendedFriend);
-        assertThat(friendBefore).isEqualTo(FREE_CONTACTS + 5);
-        assertThat(suspendedFriendBefore).isEqualTo(FREE_CONTACTS + 5);
+        assertThat(friendBefore).isEqualTo(FREE_CONTACTS);
+        assertThat(suspendedFriendBefore).isEqualTo(FREE_CONTACTS);
 
         runGroup(Group.DAYTIME);
 
@@ -230,7 +230,7 @@ class DaytimeTrustJobsQaTest extends AbstractJobQaTest {
                 .containsEntry("hold_until", null).containsEntry("auto_reason", null);
         assertThat(referralRow(released).get("granted_at")).isNotNull();
         assertThat(remaining(releasedSeeker)).isEqualTo(seekerBefore + 15);
-        assertThat(remaining(releasedFriend)).isEqualTo(friendBefore);
+        assertThat(remaining(releasedFriend)).isEqualTo(friendBefore + 5);
         assertThat(notes(releasedSeeker, "referral.outcome")).isZero();
         assertThat(audits("referral.auto.released", released)).isEqualTo(1);
 
