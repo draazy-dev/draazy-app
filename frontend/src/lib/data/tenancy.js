@@ -7,7 +7,6 @@ function thisMonth() {
   return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
 }
 
-/** Days past the 28th are clamped so a lease starting on the 31st does not silently skip February. */
 function dueDayFromLease(startDate) {
   if (!startDate) return 1;
   const day = Number(String(startDate).slice(8, 10));
@@ -15,7 +14,6 @@ function dueDayFromLease(startDate) {
   return Math.min(day, 28);
 }
 
-/** Tenancy rows lack title/address, so callers with the listing pass it in. */
 export function toRentalCard(row, listing) {
   const startDate = row?.startDate || '';
   return {
@@ -39,7 +37,6 @@ export function toRentalCard(row, listing) {
   };
 }
 
-/** One batched call for the whole set rather than one per row, and a failure is swallowed. */
 export async function toRentalCards(rows) {
   const list = rows || [];
   const ids = [...new Set(list.map((r) => r?.propId || r?.propertyId).filter(Boolean))];
@@ -52,7 +49,6 @@ export async function toRentalCards(rows) {
   return list.map((row) => toRentalCard(row, byId.get(row?.propId || row?.propertyId)));
 }
 
-/* Payment status can be unknown; do not derive a false "rent is due" from missing data. */
 export function tenancyStatus(t) {
   const month = thisMonth();
   const now = new Date();

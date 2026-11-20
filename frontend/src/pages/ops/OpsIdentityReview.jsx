@@ -7,35 +7,31 @@ import Loading from '../../components/ui/Loading.jsx';
 import Select from '../../components/ui/Select.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { hasPermission } from '../../lib/adminModules.js';
-import { classNames, fmtNum } from '../../lib/format.js';
+import { classNames, fmtNum, lastActivity } from '../../lib/format.js';
 import { useTabParam } from '../../lib/useTabParam.js';
-import { Chips, ClearFilters, PageNav, QueueTabs, SearchBox } from '../../components/admin/WorkQueue.jsx';
+import { Chips, ClearFilters, DATE_CHIPS, PageNav, QueueTabs, SearchBox } from '../../components/admin/WorkQueue.jsx';
 import KycReviewModal from './kyc/KycReviewModal.jsx';
-import { CLAIM_HOLD_LIMIT, DOC_OPTIONS, STATUS_LABELS, dateLabel, docLabel, elapsed } from './kyc/vocabulary.js';
+import { CLAIM_HOLD_LIMIT, DOC_OPTIONS, STATUS_LABELS, docLabel, elapsed } from './kyc/vocabulary.js';
 
 const PAGE_SIZE = 10;
 const TABS = [
-  { key: 'needs', label: 'Needs review', status: 'pending', count: (s) => s.pending, empty: 'All caught up — no KYC cases waiting.', note: 'Pending cases, oldest first. Opening one claims it for 30 minutes, so nobody else can decide it.' },
-  { key: 'qa', label: 'QA sample', status: 'qa', count: (s) => s.qa, empty: 'No approvals waiting for a QA check.', note: 'Approvals picked at random for a second check by a different reviewer. Your own approvals are not listed.' },
+  { key: 'needs', label: 'Needs review', status: 'pending', count: (s) => s.pending, empty: 'All caught up — no KYC cases waiting.', note: 'Pending cases, newest first. Opening one claims it for 30 minutes, so nobody else can decide it.' },
   { key: 'decided', label: 'Decided', status: 'decided', count: (s) => s.decided, empty: 'Nothing decided yet.', note: 'Verified, rejected and revoked cases — open one to revoke a badge or read its history.' },
+  { key: 'appeal', label: 'Appeals', status: 'appeal', count: (s) => s.appeals, empty: 'No identity appeals waiting.', note: 'Rejected cases the applicant asked to have checked again. Uphold the rejection or reopen it for a fresh review.' },
 ];
 const TAB_KEYS = TABS.map((t) => t.key);
-const EMPTY_FILTERS = { q: '', docType: '', claim: '', overdue: false, outcome: '', sort: 'oldest' };
-const defaultsFor = (tab) => (tab === 'decided' ? { ...EMPTY_FILTERS, sort: 'newest' } : EMPTY_FILTERS);
+const EMPTY_FILTERS = { q: '', docType: '', claim: '', overdue: false, outcome: '', days: '' };
 const OUTCOME_CHIPS = [{ value: '', label: 'Any outcome' }, { value: 'verified', label: 'Verified' }, { value: 'rejected', label: 'Rejected' }, { value: 'revoked', label: 'Revoked' }];
-const SORT_CHIPS = [{ value: 'oldest', label: 'Oldest' }, { value: 'newest', label: 'Newest' }];
 const GRID = 'grid grid-cols-[minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.2fr)_4.5rem] items-center gap-3';
 const AGE_TONE = { ok: 'text-gray-400', warn: 'font-semibold text-amber-300', breach: 'font-semibold text-rose-300' };
 
-/* Only the filters the tab's server query understands go on the wire. */
 function queryFor(tab, f, page) {
-  const base = { status: TABS.find((t) => t.key === tab).status, q: f.q.trim() || undefined, docType: f.docType || undefined, sort: f.sort, page: page - 1, size: PAGE_SIZE };
+  const base = { status: TABS.find((t) => t.key === tab).status, q: f.q.trim() || undefined, docType: f.docType || undefined, days: f.days || undefined, sort: 'newest', page: page - 1, size: PAGE_SIZE };
   if (tab === 'needs') return { ...base, claim: f.claim || undefined, overdue: f.overdue || undefined };
   if (tab === 'decided') return { ...base, outcome: f.outcome || undefined };
   return base;
 }
 
-// `stale` keeps the last page on screen but inert until the newer query answers.
 function useKycQueue(query, reloadToken) {
   const key = JSON.stringify(query);
   const [state, setState] = useState({ page: null, failed: false, key: null });
@@ -58,20 +54,17 @@ export default function OpsIdentityReview() {
   const { user } = useAuth();
   const canWrite = hasPermission(user, 'identity:write');
   const [tab, setTab] = useTabParam(TAB_KEYS, 'needs');
-  const [filters, setFilters] = useState(() => defaultsFor(tab));
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
-  // Reset during render, not in an effect: the tab also changes from outside (back button).
   const [filtersTab, setFiltersTab] = useState(tab);
   if (filtersTab !== tab) {
     setFiltersTab(tab);
-    setFilters(defaultsFor(tab));
+    setFilters(EMPTY_FILTERS);
     setPage(1);
   }
-  const defaults = defaultsFor(tab);
-  const filtered = Object.keys(defaults).some((k) => filters[k] !== defaults[k]);
+  const filtered = Object.keys(EMPTY_FILTERS).some((k) => filters[k] !== EMPTY_FILTERS[k]);
   const changeFilters = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
 
-  // `null` on failure, so a tab count is omitted rather than reading "0" — an all-clear nobody issued.
   const [summary, setSummary] = useState(null);
   const loadSummary = useCallback(() => identityReviewSummary().then(setSummary).catch((err) => {
     console.error('[OpsIdentityReview] summary unavailable', err);
@@ -86,12 +79,10 @@ export default function OpsIdentityReview() {
   const total = queue.page?.total ?? 0;
   const pageCount = queue.page?.totalPages ?? 0;
 
-  // A decision can empty the last page; step back rather than showing "nothing here" over a backlog.
   useEffect(() => {
     if (queue.page && !queue.stale && rows.length === 0 && page > 1 && pageCount > 0) setPage(pageCount);
   }, [queue.page, queue.stale, rows.length, page, pageCount]);
 
-  // Without a tick a desk left open never escalates a row to overdue.
   const [, setAgeTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setAgeTick((n) => n + 1), 60_000);
@@ -152,8 +143,8 @@ export default function OpsIdentityReview() {
             </>
           ) : null}
           {tab === 'decided' ? <Chips label="Outcome" options={OUTCOME_CHIPS} value={filters.outcome} onChange={(outcome) => changeFilters({ outcome })} /> : null}
-          <Chips label="Sort" options={SORT_CHIPS} value={filters.sort} onChange={(sort) => changeFilters({ sort })} />
-          {filtered ? <ClearFilters onClick={() => changeFilters(defaults)} /> : null}
+          <Chips label="Date" options={DATE_CHIPS} value={filters.days} onChange={(days) => changeFilters({ days })} />
+          {filtered ? <ClearFilters onClick={() => changeFilters(EMPTY_FILTERS)} /> : null}
           <div className="ml-auto"><PageNav {...paging} /></div>
         </div>
 
@@ -169,8 +160,8 @@ export default function OpsIdentityReview() {
               <div aria-hidden="true" className={classNames(GRID, 'border-b border-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500')}>
                 <div>Applicant</div>
                 <div>Document</div>
-                <div>{tab === 'needs' ? 'Waiting' : tab === 'qa' ? 'Sampled' : 'Decided'}</div>
-                <div>{tab === 'needs' ? 'Claim' : tab === 'qa' ? 'Approved by' : 'Outcome'}</div>
+                <div>{tab === 'needs' ? 'Waiting' : 'Decided'}</div>
+                <div>{tab === 'needs' ? 'Claim' : 'Outcome'}</div>
                 <div />
               </div>
               <ul>
@@ -197,25 +188,34 @@ export default function OpsIdentityReview() {
 
 function QueueRow({ row, tab, onOpen }) {
   const lockedByOther = row.claimedByName && !row.claimedByMe;
-  const age = tab === 'needs' ? elapsed(row.submittedAt) : tab === 'qa' ? elapsed(row.qaSampledAt) : null;
+  const age = tab === 'needs' ? elapsed(row.submittedAt) : null;
+  const stamp = lastActivity(row.submittedAt, row.decidedAt, row.revokedAt);
   return (
     <li className="border-b border-white/[0.06] last:border-b-0">
       <button type="button" onClick={onOpen} data-testid="kyc-row" className={classNames(GRID, 'w-full cursor-pointer px-4 py-3 text-left transition-colors hover:bg-white/[0.03]', lockedByOther && 'opacity-60')}>
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-white">{row.userName || 'Unknown user'}</div>
+          <div className="truncate text-sm font-semibold text-white">
+            {row.userName || 'Unknown user'}
+            {row.appeal ? <span data-testid="kyc-appeal-tag" className="dz-tag ml-2 border border-sky-400/30 bg-sky-500/15 font-medium text-sky-200">Appeal</span> : null}
+          </div>
           <div className="truncate text-xs tabular-nums text-gray-500">{row.userMobile || '—'}</div>
         </div>
         <div className="truncate text-sm text-gray-300">{docLabel(row.docType)}</div>
-        <div className={classNames('flex items-center gap-1.5 text-xs tabular-nums', age ? AGE_TONE[age.tone] : 'text-gray-400')}>
-          {age ? <><Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />{age.text}{age.tone === 'breach' ? ' · overdue' : age.tone === 'warn' ? ' · due soon' : ''}</> : dateLabel(row.revokedAt || row.decidedAt)}
+        <div className="min-w-0 text-xs tabular-nums">
+          {age ? (
+            <div className={classNames('flex items-center gap-1.5', AGE_TONE[age.tone])}>
+              <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />{age.text}{age.tone === 'breach' ? ' · overdue' : age.tone === 'warn' ? ' · due soon' : ''}
+            </div>
+          ) : null}
+          <div data-testid="activity-stamp" title={stamp ? `${stamp.verb} ${stamp.text}` : undefined} className={classNames('truncate', age ? 'text-[11px] text-gray-500' : 'text-gray-400')}>
+            {stamp ? `${stamp.verb} ${stamp.text}` : '—'}
+          </div>
         </div>
         <div className="min-w-0 truncate text-xs">
           {tab === 'needs' ? (
             row.claimedByMe ? <span className="text-teal-200">Claimed by you</span>
-              : lockedByOther ? <span className="rounded-full border border-amber-400/30 bg-amber-500/15 px-2 py-0.5 text-amber-200">In review · {row.claimedByName}</span>
+              : lockedByOther ? <span className="dz-tag border border-amber-400/30 bg-amber-500/15 text-amber-200">In review · {row.claimedByName}</span>
                 : <span className="text-gray-500">Unclaimed</span>
-          ) : tab === 'qa' ? (
-            <span className="text-gray-300">{row.approvedByName || '—'}</span>
           ) : (
             <Badge status={row.status}>{STATUS_LABELS[row.status] || row.status}</Badge>
           )}

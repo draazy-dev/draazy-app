@@ -12,16 +12,12 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 
-/** The only thing between "this order was paid" and a self-granted plan. */
 @Component
 public class WebhookSignature {
-
     private static final String HMAC_SHA256 = "HmacSHA256";
 
-    /** The value in {@code application.properties}, and therefore public. Never usable live. */
     private static final String COMMITTED_DEFAULT = "dev-webhook-secret";
 
-    /** The signature proves authenticity, not freshness: unbounded, one capture replays forever. */
     private static final long MAX_SKEW_MILLIS = 5 * 60 * 1000L;
 
     private final byte[] secret;
@@ -47,7 +43,6 @@ public class WebhookSignature {
         this.secret = secret.getBytes(StandardCharsets.UTF_8);
     }
 
-    /** A reason rather than a boolean, so the boot failure names which trigger fired. */
     private static String liveDeploymentReason(boolean gatewayEnabled, Environment environment) {
         if (gatewayEnabled) {
             return "draazy.providers.cashfree.enabled=true";
@@ -58,24 +53,16 @@ public class WebhookSignature {
         return null;
     }
 
-    /** Four distinct refusals, because one generic "did not verify" line blames the secret
-     * even when the secret is correct. */
     public enum Verification {
-        /** Well-formed, matching, recent. The only outcome that settles anything. */
         VERIFIED,
-        /** A header or the body was absent — not a Cashfree callback at all. */
         MISSING_HEADER,
-        /** Checked after the HMAC, so this genuinely means we signed it: a replay, or clock drift. */
         STALE,
-        /** Timestamp not an integer, or signature not Base64 — nothing to compare either way. */
         MALFORMED,
-        /** Parsed but the HMAC differs. Any anonymous caller can cause this,
-         * so one occurrence is not evidence the key is wrong. */
         MISMATCH
     }
 
-    /** Authenticity before freshness, so {@link Verification#STALE} cannot be produced by someone without the
-     * secret. Anything but {@code VERIFIED} is dropped and still answers 200. */
+    // Authenticity before freshness, so STALE cannot be produced without the secret.
+    // Anything but VERIFIED is dropped and still answers 200.
     public Verification verify(String signature, String timestamp, byte[] rawBody) {
         if (signature == null || timestamp == null || rawBody == null) {
             return Verification.MISSING_HEADER;
@@ -92,15 +79,13 @@ public class WebhookSignature {
         } catch (IllegalArgumentException notBase64) {
             return Verification.MALFORMED;
         }
-        // Computed-first, so the loop length never depends on the attacker's array.
+        // Computed first, so the loop length never depends on the attacker's array.
         if (!MessageDigest.isEqual(hmac(timestamp, rawBody), presented)) {
             return Verification.MISMATCH;
         }
         return isFresh(sentAt) ? Verification.VERIFIED : Verification.STALE;
     }
 
-    /** Shared by {@link #verify} and {@link #sign} so they cannot drift. Thrown, not refused:
-     * a missing HMAC-SHA256 is this JVM's fault and would blame the sender in the log. */
     private byte[] hmac(String timestamp, byte[] rawBody) {
         try {
             Mac mac = Mac.getInstance(HMAC_SHA256);
@@ -112,10 +97,7 @@ public class WebhookSignature {
         }
     }
 
-    /** Both units accepted because Cashfree posts seconds and {@link #sign} signs millis; neither
-     * widens the window, since a misread value lands in 1970 or the year 57000. */
     private boolean isFresh(long sentAt) {
-        // Math.abs(Long.MIN_VALUE) is itself negative, so now - 2^63 would compare as fresh.
         if (sentAt < 0) {
             return false;
         }
@@ -124,7 +106,6 @@ public class WebhookSignature {
                 || Math.abs(now / 1000L - sentAt) <= MAX_SKEW_MILLIS / 1000L;
     }
 
-    /** Exists so tests run the real path: a check that is only ever mocked is a check nobody ran. */
     public String sign(String timestamp, String rawBody) {
         return Base64.getEncoder().encodeToString(hmac(timestamp, rawBody.getBytes(StandardCharsets.UTF_8)));
     }

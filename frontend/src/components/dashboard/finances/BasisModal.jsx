@@ -5,7 +5,6 @@ import DateField from '../../ui/DateField.jsx';
 import Modal from '../../ui/Modal.jsx';
 import { onlyDigits, grpINR } from './helpers.jsx';
 
-// Ownership basis — edit in a modal (opened by ROI CTA or Reports tab)
 export default function BasisModal({ open, onClose, basisForm, setBasisForm, onSave }) {
   const { t } = useTranslation();
   return (

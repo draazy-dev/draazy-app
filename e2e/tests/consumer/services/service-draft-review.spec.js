@@ -1,6 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 /* The customer half of the maker→checker, read back from the server rather than the browser. A
    valuation because the one priced desk can never reach `draft-shared` without the signed webhook. */
 
@@ -61,11 +62,8 @@ async function readBack(token, requestId) {
   expect(res.status).toBe(200);
   return res.json();
 }
-/* The tracker panel on whichever service page is open, scoped by its standing copy: every account
-   here is minted fresh and files exactly one request, so there is nothing to disambiguate. */
-
-const tracker = (page) =>
-  page.locator('section').filter({ hasText: 'Track progress, review the draft we prepare' });
+/* Every account here is minted fresh and files exactly one request, so there is nothing to disambiguate. */
+const tracker = (page) => page.getByTestId('service-tracker');
 
 test.describe('Service draft review — the customer is the checker', () => {
   test('sharing a draft tells the customer, the bell links to the tracker, and the customer approves only after opening the draft', async ({ page }) => {
@@ -91,13 +89,13 @@ test.describe('Service draft review — the customer is the checker', () => {
     // …and that it survives the wire→UI translation: `service.draft-shared` is dotted, so it reaches
     // the page only because `notificationMapper.js` maps it.
     await signedInAs(page, mobile);
-    await page.goto(`${BASE}/notifications`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/notifications`);
     const row = page.locator('.notif').filter({ hasText: 'Your draft is ready to review' });
     await expect(row).toBeVisible({ timeout: 15000 });
     await expect(row.locator('a').first()).toHaveAttribute('href', '/services/property-valuation');
     await expect(row.locator('a .h-10.w-10').first()).toHaveClass(/bg-teal-400\/15/);
 
-    await page.goto(`${BASE}/services/property-valuation`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/property-valuation`);
 
     const mine = tracker(page);
     await expect(mine.getByText(requestId.slice(0, 10))).toBeVisible({ timeout: 15000 });
@@ -131,7 +129,7 @@ test.describe('Service draft review — the customer is the checker', () => {
     await shareDraft(staff, requestId);
 
     await signedInAs(page, mobile);
-    await page.goto(`${BASE}/services/property-valuation`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/property-valuation`);
 
     const mine = tracker(page);
     await expect(mine.getByText(requestId.slice(0, 10))).toBeVisible({ timeout: 15000 });

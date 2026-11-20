@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.deals.deal.Deal;
 import com.draazy.api.deals.deal.DealRepository;
@@ -23,6 +24,7 @@ import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,13 +36,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/** Rows are seeded via repositories to skip the contact gate. */
 @DisplayName("D25 — the demand board")
 class EnquiryBoardEndpointsTest extends AbstractApiTest {
-
     private static final String RAW = "9855100011";
 
-    /** What the audit row stores in place of {@link #RAW}. */
     private static final String MASKED = "98XXXXX011";
 
     @Autowired
@@ -57,9 +56,8 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("enquiries — contact requests")
     class Enquiries {
-
         @Test
-        @DisplayName("an admin sees the row with the requester's masked number")
+        @DisplayName("an admin sees the row with the requester's full number")
         void adminReadsFullMobile() throws Exception {
             User owner = user("9855100001", Roles.Wire.OWNER, "Owner One");
             User buyer = user(RAW, Roles.Wire.BUYER, "Curious Buyer");
@@ -71,7 +69,7 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                             .param("status", ContactRequestStatuses.PENDING))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].requesterName").value("Curious Buyer"))
-                    .andExpect(jsonPath("$.content[0].requesterMobile").value(MASKED))
+                    .andExpect(jsonPath("$.content[0].requesterMobile").value(RAW))
                     .andExpect(jsonPath("$.content[0].propertyTitle")
                             .value("Enquiry board fixture"));
         }
@@ -95,9 +93,8 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("visits")
     class Visits {
-
         @Test
-        @DisplayName("the visitor's masked number, and the slot survives the projection")
+        @DisplayName("the visitor's full number, and the slot survives the projection")
         void visitorMobileInFull() throws Exception {
             User owner = user("9855100007", Roles.Wire.OWNER, "Owner Four");
             User visitor = user(RAW, Roles.Wire.BUYER, "Site Visitor");
@@ -109,7 +106,7 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(admin("9855100008"))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].visitorName").value("Site Visitor"))
-                    .andExpect(jsonPath("$.content[0].visitorMobile").value(MASKED))
+                    .andExpect(jsonPath("$.content[0].visitorMobile").value(RAW))
                     .andExpect(jsonPath("$.content[0].mode").value(VisitModes.IN_PERSON))
                     .andExpect(jsonPath("$.content[0].slot").exists());
         }
@@ -118,7 +115,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("deals — two sources for one number")
     class Deals {
-
         @Test
         @DisplayName("a registered counterparty's own mobile")
         void registeredCounterparty() throws Exception {
@@ -135,7 +131,7 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(admin("9855100010"))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].counterpartyName").value("Registered Party"))
-                    .andExpect(jsonPath("$.content[0].counterpartyMobile").value(MASKED))
+                    .andExpect(jsonPath("$.content[0].counterpartyMobile").value(RAW))
                     .andExpect(jsonPath("$.content[0].agreedPrice").value(24000));
         }
 
@@ -155,14 +151,13 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                             .param("status", DealStatuses.CLOSED))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].counterpartyName").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].counterpartyMobile").value(MASKED));
+                    .andExpect(jsonPath("$.content[0].counterpartyMobile").value(RAW));
         }
     }
 
     @Nested
     @DisplayName("server paging, search and summary")
     class Narrowing {
-
         @Test
         @DisplayName("q matches the person's name, case-insensitively, and a mobile only as the whole number")
         void searchByNameAndMobile() throws Exception {
@@ -214,6 +209,27 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
         }
 
         @Test
+        @DisplayName("days=1 is the IST calendar day: a deal closed just before midnight IST is not today's")
+        void todayStartsAtIstMidnight() throws Exception {
+            User owner = user("9855100041", Roles.Wire.OWNER, "Owner Today");
+            Instant midnight = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant();
+            Deal yesterday = new Deal(listing(owner, "Today fixture late").getId(), "rent");
+            yesterday.setStatus(DealStatuses.CLOSED);
+            yesterday.setClosedAt(midnight.minus(1, ChronoUnit.MINUTES));
+            deals.saveAndFlush(yesterday);
+            Deal today = new Deal(listing(owner, "Today fixture now").getId(), "rent");
+            today.setStatus(DealStatuses.CLOSED);
+            today.setClosedAt(Instant.now());
+            deals.saveAndFlush(today);
+            String token = bearer(admin("9855100040"));
+
+            mvc.perform(get(Routes.Moderation.ADMIN_DEALS).header(HttpHeaders.AUTHORIZATION, token)
+                            .param("days", "1").param("q", "Today fixture"))
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].propertyTitle").value("Today fixture now"));
+        }
+
+        @Test
         @DisplayName("the summary counts every tab and scopes the funnel by days and deal type")
         void summary() throws Exception {
             User owner = user("9855100036", Roles.Wire.OWNER, "Owner Summary");
@@ -257,14 +273,10 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isUnauthorized());
         }
     }
-    // --- who may open the board ---------------------------------------------------------------
 
     @Nested
     @DisplayName("who may open the board")
     class Authorisation {
-
-        /** enquiries:read is an ops atom staff hold from the baseline with no permissions document; asserted so
-         * the route cannot silently become admin-only. */
         @Test
         @DisplayName("a staffer reads it too — this is a floor tool, not an admin-only one")
         void staffMayRead() throws Exception {
@@ -298,13 +310,9 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
         }
     }
 
-
-    /** The number and the audit row are asserted in one request, so a refactor cannot keep one
-     * and drop the other. */
     @Nested
     @DisplayName("opening one row is audited")
     class Detail {
-
         @Test
         @DisplayName("an admin opening an enquiry gets the number, and the log says they did")
         void enquiryDetailIsAudited() throws Exception {
@@ -344,7 +352,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
             assertThat(auditRows(actor, "visit.contact.reveal", v.getId().toString())).isEqualTo(1);
         }
 
-        /** A typed number may belong to someone with no account, so the log names the source. */
         @Test
         @DisplayName("an off-platform deal's log names the number's source")
         void dealDetailNamesItsSource() throws Exception {
@@ -398,7 +405,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
             assertThat(auditRows(actor, "enquiry.contact.reveal", ghost)).isZero();
         }
 
-        /** A path that is not a UUID is the same answer as one that is but names nothing. */
         @Test
         @DisplayName("a non-UUID id is a 404, not a 500")
         void malformedIdIsNotFound() throws Exception {
@@ -407,8 +413,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isNotFound());
         }
     }
-
-    // --- fixtures -----------------------------------------------------------------------------
 
     private User admin(String mobile) {
         return user(mobile, Roles.Wire.ADMIN, "Board Reader");
@@ -438,9 +442,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
         return contactRequests.saveAndFlush(cr);
     }
 
-    // --- audit helpers ------------------------------------------------------------------------
-
-    /** Audit writes use {@code REQUIRES_NEW} and outlive the class rollback in a shared DB; cleaned by actor. */
     private final List<String> revealActors = new ArrayList<>();
 
     @AfterEach
@@ -449,7 +450,6 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
         revealActors.clear();
     }
 
-    /** Scoped by actor <em>and</em> entity id — other suites write to this table too. */
     private int auditRows(User actor, String action, String entityId) {
         return jdbc.queryForObject("""
                 select count(*) from audit_log

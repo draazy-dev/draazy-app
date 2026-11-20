@@ -10,13 +10,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-/** The Java suite and e2e run with the cache off, so this is where its behaviour is proved. */
 class PublicReadCacheFilterTest {
-
     private final AtomicInteger calls = new AtomicInteger();
     private int status = 200;
 
-    /** Answers a body that changes on every call, so a replay is distinguishable from a recompute. */
     private final FilterChain controller = (req, res) -> {
         int n = calls.incrementAndGet();
         var http = (HttpServletResponse) res;
@@ -41,13 +38,13 @@ class PublicReadCacheFilterTest {
 
     @Test
     void aSignedInReadBypassesTheEntryAndRefreshesItForEveryoneElse() throws Exception {
-        send(get("/localities"));
+        send(get("/fees"));
 
-        var fresh = get("/localities");
+        var fresh = get("/fees");
         fresh.addHeader("Cache-Control", "max-age=0");
         assertThat(send(fresh).getContentAsString()).isEqualTo("{\"n\":2}");
 
-        assertThat(send(get("/localities")).getContentAsString()).isEqualTo("{\"n\":2}");
+        assertThat(send(get("/fees")).getContentAsString()).isEqualTo("{\"n\":2}");
         assertThat(calls).hasValue(2);
     }
 
@@ -117,6 +114,43 @@ class PublicReadCacheFilterTest {
         send(new MockHttpServletRequest("PUT", "/admin/settings"));
 
         assertThat(send(get("/bootstrap")).getContentAsString()).isEqualTo("{\"n\":3}");
+    }
+
+    @Test
+    void aReadThatOverlapsAnAdminWriteIsServedButNotRemembered() throws Exception {
+        FilterChain readSpanningAWrite = (req, res) -> {
+            filter.doFilter(new MockHttpServletRequest("PUT", "/admin/settings"), new MockHttpServletResponse(), controller);
+            controller.doFilter(req, res);
+        };
+        var overlapped = new MockHttpServletResponse();
+        filter.doFilter(get("/bootstrap"), overlapped, readSpanningAWrite);
+
+        assertThat(overlapped.getContentAsString()).isEqualTo("{\"n\":2}");
+        assertThat(send(get("/bootstrap")).getContentAsString()).isEqualTo("{\"n\":3}");
+    }
+
+    @Test
+    void aSuccessfulModerationWriteEvictsTheListingEverywhere() throws Exception {
+        int n = 1;
+        for (String[] write : new String[][] {{"PATCH", "/properties/p1/status"},
+                {"POST", "/properties/p1/flag"}, {"DELETE", "/properties/p1/flag"},
+                {"POST", "/properties/p1/photos/takedown"}, {"PATCH", "/properties/p1/archive"},
+                {"PATCH", "/properties/p1/restore"}}) {
+            send(get("/properties/p1"));
+            send(new MockHttpServletRequest(write[0], write[1]));
+            n += 2;
+            assertThat(send(get("/properties/p1")).getContentAsString()).as(write[1]).isEqualTo("{\"n\":" + n + "}");
+        }
+    }
+
+    @Test
+    void aMemberWriteUnderAListingEvictsNothing() throws Exception {
+        send(get("/properties/p1"));
+        for (String[] write : new String[][] {{"POST", "/properties/p1/reviews"},
+                {"POST", "/properties/p1/photo-requests"}, {"POST", "/properties/p1/split"}}) {
+            send(new MockHttpServletRequest(write[0], write[1]));
+            assertThat(send(get("/properties/p1")).getContentAsString()).as(write[1]).isEqualTo("{\"n\":1}");
+        }
     }
 
     @Test

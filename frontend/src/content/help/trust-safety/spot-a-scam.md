@@ -5,7 +5,7 @@ category: trust-safety
 audience: everyone
 order: 2
 featured: true
-updated: 2026-10-04
+updated: 2026-11-06
 summary: The five patterns behind almost every rental fraud in Pune, and the one rule that defeats all of them.
 tags: [scam, fraud, safety, deposit]
 ---
@@ -29,7 +29,7 @@ They cannot meet you, but they will courier the keys once you send a token amoun
 
 ### 3. The fake Draazy fee
 
-Someone asks you to pay a "Draazy verification charge", "listing unlock fee" or "refundable platform deposit". **We never collect rent, deposits or token amounts**, and we never ask for payment over WhatsApp or UPI. Draazy charges appear on an invoice; see [Invoices, refunds and receipts](/help/a/invoices-and-refunds).
+Someone asks you to pay a "Draazy verification charge", "listing unlock fee" or "refundable platform deposit". **We never collect rent, deposits or token amounts**, and we never ask for payment over WhatsApp or UPI. Draazy charges appear on an invoice and in **Plan & Billing** on your [dashboard](/help/a/your-dashboard); see [Invoices, refunds and receipts](/help/a/invoices-and-refunds). A chat message is never a payment request from us.
 
 ### 4. The photo mismatch
 
@@ -49,7 +49,7 @@ You are pushed to sign a rent agreement without reading it, often with a blank d
 
 ## If something feels wrong
 
-Stop, do not pay, and [report the listing](/help/a/report-a-listing). If you have already paid, file a complaint on the [National Cybercrime Portal](https://cybercrime.gov.in) and tell us - we will preserve the account records for the investigation.
+Stop, do not pay, and [report the listing](/help/a/report-a-listing). If the message came in a chat, use **Report this user** in the thread's three-dot menu. See [Messages and chat](/help/a/messages-and-chat). If you have already paid, file a complaint on the [National Cybercrime Portal](https://cybercrime.gov.in) and tell us. We will preserve the account records for the investigation.
 
 ## Related
 

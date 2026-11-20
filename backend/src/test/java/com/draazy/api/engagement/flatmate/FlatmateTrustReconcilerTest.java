@@ -2,9 +2,12 @@ package com.draazy.api.engagement.flatmate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.draazy.api.catalog.property.Property;
@@ -13,6 +16,7 @@ import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.trust.RegisteredTenancyLookup;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +29,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class FlatmateTrustReconcilerTest {
-
     @Mock
     private FlatmateReviewRepository reviews;
 
@@ -50,7 +53,6 @@ class FlatmateTrustReconcilerTest {
     @Mock
     private Notifier notifier;
 
-
     private FlatmateTrustReconciler reconciler;
 
     @BeforeEach
@@ -65,6 +67,7 @@ class FlatmateTrustReconcilerTest {
         UUID roomId = UUID.randomUUID();
         FlatmateReview review = tenantReview(hostId, roomId,
                 LocalDate.now().minusDays(1));
+        review.decide(FlatmateVocabulary.STATUS_APPROVED, null, UUID.randomUUID());
         when(reviews.findLapsedApprovals(any())).thenReturn(List.of(review));
 
         int expired = reconciler.reconcileAgreementExpiry();
@@ -79,12 +82,24 @@ class FlatmateTrustReconcilerTest {
     }
 
     @Test
+    void skipsALapsedClaimNoLongerApprovedOnceLocked() {
+        FlatmateReview review = tenantReview(UUID.randomUUID(), UUID.randomUUID(),
+                LocalDate.now().minusDays(1));
+        when(reviews.findLapsedApprovals(any())).thenReturn(List.of(review));
+
+        assertThat(reconciler.reconcileAgreementExpiry()).isZero();
+        verify(badges).lockWithPost(review);
+        verifyNoMoreInteractions(badges);
+        verifyNoInteractions(notifier);
+    }
+
+    @Test
     void approvesAConsentedClaimMatchedToADraazyRegisteredAgreement() {
         UUID hostId = UUID.randomUUID();
         UUID roomId = UUID.randomUUID();
         UUID propertyId = UUID.randomUUID();
         FlatmateReview review = tenantReview(hostId, roomId, LocalDate.now().plusDays(300), propertyId);
-        User host = new User("9820000100", "buyer");
+        User host = verifiedHost("9820000100");
         when(reviews.findConsentedTenantBacklog()).thenReturn(List.of(review));
         when(rooms.findById(roomId)).thenReturn(Optional.of(roomIn("Baner")));
         when(properties.findById(propertyId)).thenReturn(Optional.of(propertyIn("Baner")));
@@ -102,6 +117,24 @@ class FlatmateTrustReconcilerTest {
     }
 
     @Test
+    void doesNotAutoApproveForAHostWhoseIdIsNotVerified() {
+        UUID hostId = UUID.randomUUID();
+        UUID roomId = UUID.randomUUID();
+        UUID propertyId = UUID.randomUUID();
+        FlatmateReview review = tenantReview(hostId, roomId, LocalDate.now().plusDays(300), propertyId);
+        User host = new User("9820000104", "buyer");
+        when(reviews.findConsentedTenantBacklog()).thenReturn(List.of(review));
+        when(rooms.findById(roomId)).thenReturn(Optional.of(roomIn("Baner")));
+        when(properties.findById(propertyId)).thenReturn(Optional.of(propertyIn("Baner")));
+        when(users.findById(hostId)).thenReturn(Optional.of(host));
+
+        assertThat(reconciler.reconcileDraazyAgreements()).isZero();
+        assertThat(review.getStatus()).isNotEqualTo(FlatmateVocabulary.STATUS_APPROVED);
+        verifyNoInteractions(agreements, notifier);
+        verify(badges, never()).apply(any(), anyBoolean());
+    }
+
+    @Test
     void doesNotAutoApproveAnAgreementForAFlatInAnotherLocality() {
         UUID hostId = UUID.randomUUID();
         UUID roomId = UUID.randomUUID();
@@ -116,11 +149,10 @@ class FlatmateTrustReconcilerTest {
 
         assertThat(approved).isZero();
         assertThat(review.getStatus()).isNotEqualTo(FlatmateVocabulary.STATUS_APPROVED);
-        verifyNoInteractions(agreements, badges, notifier);
+        verifyNoInteractions(agreements, notifier);
+        verify(badges, never()).apply(any(), anyBoolean());
     }
 
-    // Both halves name the same building, which is strictly stronger than the locality fallback:
-    // the sweep may fire without a person having looked.
     @Test
     void approvesWhenThePostAndTheAgreementNameTheSameSociety() {
         UUID hostId = UUID.randomUUID();
@@ -128,7 +160,7 @@ class FlatmateTrustReconcilerTest {
         UUID propertyId = UUID.randomUUID();
         UUID societyId = UUID.randomUUID();
         FlatmateReview review = tenantReview(hostId, roomId, LocalDate.now().plusDays(300), propertyId);
-        User host = new User("9820000101", "buyer");
+        User host = verifiedHost("9820000101");
         when(reviews.findConsentedTenantBacklog()).thenReturn(List.of(review));
         when(rooms.findById(roomId)).thenReturn(Optional.of(roomIn("Baner", societyId)));
         when(properties.findById(propertyId)).thenReturn(Optional.of(propertyIn("Baner", societyId)));
@@ -139,8 +171,6 @@ class FlatmateTrustReconcilerTest {
         assertThat(review.getStatus()).isEqualTo(FlatmateVocabulary.STATUS_APPROVED);
     }
 
-    // The case the locality rung cannot see: two towers in one neighbourhood, with every fact the
-    // coarse check compares agreeing. Falls to the desk rather than being refused.
     @Test
     void doesNotAutoApproveAnAgreementForAnotherSocietyInTheSameLocality() {
         UUID hostId = UUID.randomUUID();
@@ -154,7 +184,8 @@ class FlatmateTrustReconcilerTest {
 
         assertThat(reconciler.reconcileDraazyAgreements()).isZero();
         assertThat(review.getStatus()).isNotEqualTo(FlatmateVocabulary.STATUS_APPROVED);
-        verifyNoInteractions(agreements, badges, notifier);
+        verifyNoInteractions(agreements, notifier);
+        verify(badges, never()).apply(any(), anyBoolean());
     }
 
     @Test
@@ -163,7 +194,7 @@ class FlatmateTrustReconcilerTest {
         UUID roomId = UUID.randomUUID();
         UUID propertyId = UUID.randomUUID();
         FlatmateReview review = tenantReview(hostId, roomId, LocalDate.now().plusDays(300), propertyId);
-        User host = new User("9820000102", "buyer");
+        User host = verifiedHost("9820000102");
         when(reviews.findConsentedTenantBacklog()).thenReturn(List.of(review));
         when(rooms.findById(roomId)).thenReturn(Optional.of(roomIn("Baner")));
         when(properties.findById(propertyId))
@@ -189,7 +220,8 @@ class FlatmateTrustReconcilerTest {
         when(properties.findById(claimedId)).thenReturn(Optional.of(propertyIn("Baner", UUID.randomUUID())));
 
         assertThat(reconciler.reconcileDraazyAgreements()).isZero();
-        verifyNoInteractions(agreements, badges, notifier);
+        verifyNoInteractions(agreements, notifier);
+        verify(badges, never()).apply(any(), anyBoolean());
     }
 
     @Test
@@ -202,7 +234,7 @@ class FlatmateTrustReconcilerTest {
         FlatmateReview review = groupReview(hostId, groupId, claimedId);
         FlatmateGroup group = new FlatmateGroup(hostId, "Two seats", "Baner", 12_000L);
         group.setPropertyId(parentId);
-        User host = new User("9820000103", "buyer");
+        User host = verifiedHost("9820000103");
         when(reviews.findConsentedTenantBacklog()).thenReturn(List.of(review));
         when(groups.findById(groupId)).thenReturn(Optional.of(group));
         when(properties.findById(parentId)).thenReturn(Optional.of(propertyIn("Baner", societyId)));
@@ -227,6 +259,43 @@ class FlatmateTrustReconcilerTest {
     }
 
     @Test
+    void aRoomOnAnApprovedListingWithoutTheOwnerBadgeLosesOwnerTier() {
+        FlatmateRoom room = ownerTierRoom(UUID.randomUUID(), FlatmateVocabulary.MOD_APPROVED);
+        Property listing = propertyIn("Baner");
+        listing.setStatus("approved");
+        when(rooms.findOwnerTierClaims()).thenReturn(List.of(room));
+        when(properties.findById(any())).thenReturn(Optional.of(listing));
+
+        assertThat(reconciler.reconcileOwnerTier()).isEqualTo(1);
+        assertThat(room.getVerificationTier()).isEqualTo(FlatmateVocabulary.TIER_IDENTITY);
+    }
+
+    @Test
+    void aRoomOnAnApprovedListingWithTheOwnerBadgeKeepsOwnerTier() {
+        FlatmateRoom room = ownerTierRoom(UUID.randomUUID(), FlatmateVocabulary.MOD_APPROVED);
+        Property listing = propertyIn("Baner");
+        listing.setStatus("approved");
+        listing.verifyOwnership(Instant.now(), null);
+        when(rooms.findOwnerTierClaims()).thenReturn(List.of(room));
+        when(properties.findById(any())).thenReturn(Optional.of(listing));
+
+        assertThat(reconciler.reconcileOwnerTier()).isZero();
+        assertThat(room.getVerificationTier()).isEqualTo(FlatmateVocabulary.TIER_OWNER);
+    }
+
+    @Test
+    void aLapsedOwnerBadgeDemotesLikeAnUnapprovedListing() {
+        FlatmateRoom room = ownerTierRoom(UUID.randomUUID(), FlatmateVocabulary.MOD_APPROVED);
+        Property listing = propertyIn("Baner");
+        listing.setStatus("approved");
+        listing.verifyOwnership(Instant.now().minusSeconds(7200), Instant.now().minusSeconds(3600));
+        when(rooms.findOwnerTierClaims()).thenReturn(List.of(room));
+        when(properties.findById(any())).thenReturn(Optional.of(listing));
+
+        assertThat(reconciler.reconcileOwnerTier()).isEqualTo(1);
+    }
+
+    @Test
     void aModeratorApprovedRoomStaysPublishedWhenItLosesOwnerTier() {
         FlatmateRoom room = ownerTierRoom(UUID.randomUUID(), FlatmateVocabulary.MOD_APPROVED);
         when(rooms.findOwnerTierClaims()).thenReturn(List.of(room));
@@ -235,6 +304,12 @@ class FlatmateTrustReconcilerTest {
 
         assertThat(room.getModStatus()).isEqualTo(FlatmateVocabulary.MOD_APPROVED);
         verifyNoInteractions(notifier);
+    }
+
+    private static User verifiedHost(String mobile) {
+        User host = new User(mobile, "buyer");
+        host.setVerified(true);
+        return host;
     }
 
     private static FlatmateRoom ownerTierRoom(UUID hostId, String modStatus) {

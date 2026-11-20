@@ -6,7 +6,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ContentService {
-
     private final FaqRepository faqs;
     private final ContentMapper mapper;
 
@@ -15,7 +14,6 @@ public class ContentService {
         this.mapper = mapper;
     }
 
-    /** Non-archived FAQs, by category. */
     @Transactional(readOnly = true)
     public List<FaqResponse> listFaqs() {
         return faqs.findByArchivedFalseOrderByCategoryAscCreatedAtAscIdAsc().stream()

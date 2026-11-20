@@ -22,11 +22,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
-/** At most one live account per email, enforced in the service and by the partial unique index on
- *  {@code lower(email)}. Two live rows on one address is a permanent 500 on staff sign-in. */
 @DisplayName("users.email — at most one live account per address")
 class LiveEmailUniquenessTest extends AbstractApiTest {
-
     private static final String ADDRESS = "collision.probe@draazy.test";
 
     @Autowired
@@ -35,8 +32,6 @@ class LiveEmailUniquenessTest extends AbstractApiTest {
     @PersistenceContext
     EntityManager em;
 
-    /** {@code users.mobile} is UNIQUE in a persistent database, so a fixed literal would collide
-     *  with anything a previous class left behind. */
     private static String freshMobile() {
         long n = Math.abs(UUID.randomUUID().getMostSignificantBits() % 1_000_000_000L);
         return "9" + String.format("%09d", n);
@@ -61,7 +56,6 @@ class LiveEmailUniquenessTest extends AbstractApiTest {
                 .header(HttpHeaders.AUTHORIZATION, bearer(actor)));
     }
 
-    /** Read liveness from the database rather than the entity, which may hold an unflushed edit. */
     private boolean archivedInDatabase(User user) {
         em.flush();
         return Boolean.TRUE.equals(jdbc.queryForObject(
@@ -73,20 +67,13 @@ class LiveEmailUniquenessTest extends AbstractApiTest {
     void restoringOntoAnAddressAlreadyHeldIsRefused() throws Exception {
         User admin = live("collision.admin@draazy.test", Roles.Wire.ADMIN);
         User suspended = archived(ADDRESS);
-        // Legitimate today, and the reason the exists-check in addStaff cannot catch this: while the
-        // first account is archived the address genuinely has no live claimant.
         live(ADDRESS, Roles.Wire.STAFF);
 
         restore(admin, suspended)
                 .andExpect(status().isConflict())
-                // The envelope field is `error`, not `code`.
                 .andExpect(jsonPath("$.error").value("conflict"))
-                // Naming the address is the actionable half: otherwise the operator is told a
-                // restore failed and not which field caused it.
                 .andExpect(jsonPath("$.message").value(containsString(ADDRESS)));
 
-        // The refusal has to leave the account where it was. A guard that answers 409 *and* restores
-        // is the original defect wearing an error message.
         assertThat(archivedInDatabase(suspended))
                 .as("the refused account must still be archived")
                 .isTrue();
@@ -123,8 +110,6 @@ class LiveEmailUniquenessTest extends AbstractApiTest {
         User suspended = archived("Mixed.Case@Draazy.test");
         live("mixed.case@draazy.test", Roles.Wire.STAFF);
 
-        // A case-sensitive guard would restore happily and then hit the lower(email) index, which
-        // yields the generic conflict rather than a message naming the address.
         restore(admin, suspended)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value(containsString("Mixed.Case@Draazy.test")));
@@ -132,8 +117,6 @@ class LiveEmailUniquenessTest extends AbstractApiTest {
         assertThat(archivedInDatabase(suspended)).isTrue();
     }
 
-    /** Asserting the exact message is the point: a bare 409 would still pass with the guard removed,
-     *  because the {@code lower(email)} index produces one too. */
     @Test
     @DisplayName("creating staff on a case-variant of a live address gets the named conflict")
     void creatingStaffOnACaseVariantIsNamed() throws Exception {
@@ -152,8 +135,6 @@ class LiveEmailUniquenessTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.message").value("A user with that email already exists"));
     }
 
-    /** Excluding the row being edited matters as much as the case-insensitive comparison: re-saving
-     *  an account with its own address, in any case, must stay a no-op. */
     @Test
     @DisplayName("patching a user onto a case-variant of a live address gets the named conflict")
     void patchingOntoACaseVariantIsNamed() throws Exception {
@@ -168,8 +149,6 @@ class LiveEmailUniquenessTest extends AbstractApiTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("A user with that email already exists"));
 
-        // The guard excludes the row under edit, so re-stating an account's own address — here in a
-        // different case — is still accepted rather than refused against itself.
         mvc.perform(patch(Routes.Users.BY_ID, target.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -177,8 +156,6 @@ class LiveEmailUniquenessTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    /** Goes round the service on purpose: the index is the floor under every write path, including
-     *  a future one that forgets to ask. Nothing may follow the violation — PostgreSQL aborts. */
     @Test
     @DisplayName("the database refuses a second live row on the same address in a different case")
     void theIndexRefusesACaseVariantOfALiveAddress() {
@@ -188,8 +165,6 @@ class LiveEmailUniquenessTest extends AbstractApiTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
-    /** Why the index is partial: a total constraint would make every archived address permanently
-     *  burnt. Separate from the test above because nothing may follow a constraint violation. */
     @Test
     @DisplayName("two archived accounts may share an address")
     void archivedRowsMayRepeatAnAddress() {

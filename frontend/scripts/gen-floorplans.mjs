@@ -1,11 +1,3 @@
-/*
- * Floor-plan asset generator.
- *
- * Produces clean schematic SVG floor plans that genuinely reflect a property's
- * type + bedroom count, then writes them to public/floorplans/*.svg.
- *
- * Run:  node scripts/gen-floorplans.mjs
- */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -17,7 +9,6 @@ const OUT_DIR = join(ROOT, 'public', 'floorplans');
 const W = 960;
 const H = 640;
 
-/* ---- palette ---- */
 const C = {
   paper: '#f8fafc',
   grid: '#e6ebf2',
@@ -34,7 +25,6 @@ const C = {
   outdoorLine: '#bcd8c8',
 };
 
-/* ---- primitives ---- */
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
 function label(x, y, w, text, sub) {
@@ -44,7 +34,6 @@ function label(x, y, w, text, sub) {
   return out;
 }
 
-/* generic room: rect + centred label + optional furniture glyph */
 function room(x, y, w, h, name, furnish, sub, alt) {
   const fill = alt ? C.roomAlt : C.room;
   let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${C.wall}" stroke-width="3"/>`;
@@ -55,7 +44,6 @@ function room(x, y, w, h, name, furnish, sub, alt) {
 
 function outdoor(x, y, w, h, name) {
   let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${C.outdoor}" stroke="${C.outdoorLine}" stroke-width="2" stroke-dasharray="6 5"/>`;
-  // hatch lines to read as open/outdoor space
   for (let lx = x + 16; lx < x + w; lx += 26) {
     s += `<line x1="${lx}" y1="${y + 6}" x2="${lx - 16}" y2="${y + h - 6}" stroke="${C.outdoorLine}" stroke-width="1.2"/>`;
   }
@@ -63,7 +51,6 @@ function outdoor(x, y, w, h, name) {
   return s;
 }
 
-/* ---- furniture glyphs (light gray, schematic) ---- */
 function fx(inner) { return `<g stroke="${C.fixture}" stroke-width="1.8" fill="${C.fixtureFill}" stroke-linejoin="round">${inner}</g>`; }
 
 function furniture(x, y, w, h, kind) {
@@ -193,7 +180,6 @@ function outerShell(x, y, w, h) {
   return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${C.outer}" stroke-width="6"/>`;
 }
 
-/* ---- residential generator ---- */
 function residential(beds, variant) {
   const TITLES = {
     flat: `${beds} BHK Apartment`,
@@ -204,11 +190,10 @@ function residential(beds, variant) {
   const SUBS = { flat: 'TYPICAL FLOOR', villa: 'GROUND FLOOR', penthouse: 'UPPER LEVEL', rowhouse: 'GROUND FLOOR' };
   const topName = variant === 'penthouse' ? 'TERRACE' : (variant === 'villa' || variant === 'rowhouse') ? 'GARDEN / DECK' : 'BALCONY';
 
-  const X = 40, Y = 72, WI = W - 80, HI = H - Y - 40; // plan area
+  const X = 40, Y = 72, WI = W - 80, HI = H - Y - 40;
   let s = titleBand(TITLES[variant], SUBS[variant]);
   s += outerShell(X, Y, WI, HI);
 
-  // top outdoor strip (balcony/terrace/garden)
   const topH = 70;
   if (variant === 'villa' || variant === 'rowhouse' || variant === 'penthouse') {
     s += outdoor(X, Y, WI, topH, topName);
@@ -222,15 +207,12 @@ function residential(beds, variant) {
   const rightX = X + leftW;
   const rightW = WI - leftW;
 
-  // left: living (top) + kitchen (bottom)
   const livH = Math.round(bodyH * 0.6);
   s += room(X, bodyY, leftW, livH, 'LIVING / DINING', 'living');
   s += room(X, bodyY + livH, leftW, bodyH - livH, 'KITCHEN', 'kitchen', null, true);
 
-  // right: bedrooms stacked + bathroom row
   const bathH = 118;
   const bedsArea = bodyH - bathH;
-  // master gets extra weight
   const weights = Array.from({ length: beds }, (_, i) => (i === 0 ? 1.35 : 1));
   const wSum = weights.reduce((a, b) => a + b, 0);
   let cy = bodyY;
@@ -242,7 +224,6 @@ function residential(beds, variant) {
     s += room(rightX, cy, rightW, h, name, i === 0 ? 'bed-master' : 'bed', null, i % 2 === 1);
     cy += h;
   }
-  // bath row
   const bathCount = beds >= 4 ? 3 : beds >= 2 ? 2 : 1;
   const bw = Math.round(rightW / bathCount);
   for (let b = 0; b < bathCount; b++) {
@@ -270,7 +251,6 @@ function studio() {
   return scaffold(s);
 }
 
-/* ---- commercial generator ---- */
 function commercial(title, sub, zones) {
   const X = 40, Y = 72, WI = W - 80, HI = H - Y - 40;
   let s = titleBand(title, sub);
@@ -338,7 +318,6 @@ const COMMERCIAL = {
   ]),
 };
 
-/* ---- build ---- */
 mkdirSync(OUT_DIR, { recursive: true });
 const written = [];
 function emit(key, svg) { writeFileSync(join(OUT_DIR, `${key}.svg`), svg); written.push(key); }

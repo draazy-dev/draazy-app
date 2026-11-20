@@ -2,6 +2,7 @@ package com.draazy.api.support;
 
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.identity.verification.IdentityHasher;
 import com.draazy.api.security.JwtService;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,12 +18,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Every request really commits, unlike AbstractApiTest's single transaction where an entity detached in
- * production stays managed and a dependent write is dropped; each test owns and purges its fixtures. */
 @SpringBootTest
 @AutoConfigureMockMvc
 public abstract class AbstractCommittedApiTest {
-
     private static final String LOCALITY_PREFIX = "committed-smoke-";
 
     @Autowired
@@ -39,6 +37,13 @@ public abstract class AbstractCommittedApiTest {
 
     @Autowired
     private TransactionTemplate tx;
+
+    @Autowired
+    private IdentityHasher identityHasher;
+
+    protected String otpHash(String code) {
+        return identityHasher.otpHash(code);
+    }
 
     private final List<UUID> userIds = new ArrayList<>();
 
@@ -59,7 +64,6 @@ public abstract class AbstractCommittedApiTest {
         userIds.clear();
     }
 
-    /** Every account a test creates starts with this, so a crashed run is swept by the next. */
     protected abstract String mobilePrefix();
 
     protected User user(String suffix, String role) {
@@ -75,7 +79,6 @@ public abstract class AbstractCommittedApiTest {
         return "Bearer " + jwtService.issueAccessToken(u);
     }
 
-    /** A live, picked locality of this name for the test; removed with the rest of its fixtures. */
     protected String liveLocality(String name) {
         String slug = LOCALITY_PREFIX + name.toLowerCase().replaceAll("[^a-z0-9]+", "-");
         jdbc.update("""
@@ -103,7 +106,6 @@ public abstract class AbstractCommittedApiTest {
         jdbc.update("delete from " + table + " where id in (" + in + ")");
     }
 
-    // Ids come from our own rows, so inlining them is safe and avoids a typed array parameter.
     private static String literals(List<UUID> ids) {
         return ids.stream().map(id -> "'" + id + "'::uuid").collect(Collectors.joining(","));
     }

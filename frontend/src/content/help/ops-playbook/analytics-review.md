@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 26
-updated: 2026-10-10
+updated: 2026-10-25
 summary: What each Analytics tab measures, what to check daily and weekly, and which changes to report.
 tags: [ops, internal, analytics, sla, demand]
 modules: [analytics]
@@ -21,13 +21,14 @@ modules: [analytics]
 - **SLA** tab: **Overdue right now** should be 0. **Longest Waiting Listings** shows the 10 oldest pending listings.
 - **SLA** tab: **Unassigned** under **Ticket Pickup** and **In flight** under **Service Delivery**. Read the line under each box for how many are past target.
 - **Funnel** tab: the rose "of previous" figure and the **Biggest drop** line. Note which stage it is.
+- **Flatmates** tab: **Unanswered over 48h** and **Replied within 48h**. A falling reply rate means hosts are ignoring requests.
 - **Traffic** tab: the **Sessions & page views** line. Look for a sudden fall or spike, not small day-to-day changes.
 - Any red **This report could not be loaded** notice. That is a failed read, not a quiet week. Reload before you report numbers.
 
 **Work on**
 
 - Open overdue listings from **Longest Waiting Listings** (each title opens it in Properties). Verification work follows [Verification SLAs](/help/a/verification-sla).
-- Tell the right desk about unassigned tickets that are past target: see [Ticket handling and escalation](/help/a/ticket-escalation).
+- Tell the right desk about unassigned tickets that are past target: see [Chats, tickets and escalation](/help/a/ticket-escalation).
 - Weekly: read **Supply Gap**, **Funnel** and **Pricing** and send your manager a short note with what changed and which locality or stage it concerns.
 - Weekly: check **City Expansion Requests** and **Demand Alerts by Locality** and pass the top names to your manager.
 
@@ -45,9 +46,10 @@ An admin can switch the whole module off in **Settings → Feature flags → Adm
 | **Traffic** (lower half) | **Anonymous share**, **Session → Signup rate**, **Anonymous sessions**, **Signups in period**; **Where visitors leave**; **Pages visited by anonymous users** | A dash means the base figure was missing, not zero. Exit percentages are a share of the exits shown, not of all exits |
 | **Engagement** | **Avg. session duration** (minutes) and **Bounce rate** (single-view sessions) per week; **Top pages by views** | A week with no sessions has a gap in the line, not a zero |
 | **Funnel** | **Listings posted**, **Approved**, **Contact requests**, **Visits booked**, **Deals closed** | Each stage counts what happened that week. It does not follow one group of people through |
+| **Flatmates** | New rooms, groups and seeker posts per week; **Requests sent** and **Matches** (accepted requests and group joins); **Replied within 48h**, accept rate and **Median reply time**; **Supply vs demand by locality** | Reply figures judge a request once it is 48 hours old. A dash means nothing could be measured yet. The locality table is live posts now, not the window. Hidden when the Flatmates module is off |
 | **Supply Gap** | Demand against listings by locality | See the table below |
 | **Pricing** | Asking ₹/sqft, rent and rental yield by locality | A live snapshot of approved flats. A locality needs 3 or more to show a figure |
-| **SLA** | Listing review turnaround, ticket pickup and delivery, concierge listings | See the table below |
+| **SLA** | Listing review turnaround, ticket pickup and delivery, concierge listings, flatmate post review | See the table below |
 
 ## Supply Gap
 
@@ -68,13 +70,14 @@ An admin can switch the whole module off in **Settings → Feature flags → Adm
 | Ticket pickup (first assignment) | 4 hours |
 | Service delivery (raised to finished) | 3 days |
 | Concierge to live (staff-posted listing) | 7 days |
+| Flatmate review (post to first decision) | 24 hours |
 
 The **Within target** figure is green at 90% or higher and amber below. Grey means nothing was measured. If turnaround is "not recorded", decisions exist without timestamps and only the backlog numbers are real.
 
 ## Weekly review
 
 1. Set **Report window** to Last 30 days. Open **Funnel** and write down the **Biggest drop** stage.
-2. Open **Supply Gap**. Note every **High** locality and the top locality in **Demand Alerts by Locality**.
+2. Open **Supply Gap**. Note every **High** locality and the top locality in **Demand Alerts by Locality**. On **Flatmates**, note the localities with the biggest positive gap.
 3. Open **Pricing**. Look for a locality whose asking rate or yield looks out of line with its neighbours, then check the listings behind it in Properties.
 4. Open **SLA**. Note any track that is amber, and the count past target.
 5. Send your manager one message: what changed, where, and what you checked.
@@ -99,6 +102,6 @@ Tell your manager. For a stuck page or numbers that look wrong, include the tab,
 ## Related
 
 - [Verification SLAs](/help/a/verification-sla)
-- [Ticket handling and escalation](/help/a/ticket-escalation)
+- [Chats, tickets and escalation](/help/a/ticket-escalation)
 - [Team activity review](/help/a/team-activity)
 - [Staff desks](/help/a/staff-desks)

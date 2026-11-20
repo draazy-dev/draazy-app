@@ -1,8 +1,5 @@
-/* FAQs are public, but feedback still goes through `post` for the shared API envelope. */
 import { PUBLIC_READ_TTL, get, post, unwrapPage } from '../../http.js';
 
-/** `String(... || '')` rather than a trusting spread because these strings are rendered directly into the help page
- * and fed to the assistant's tokenizer. */
 const toFaq = (row) => ({
   id: String(row?.id || ''),
   question: String(row?.question || ''),
@@ -11,7 +8,6 @@ const toFaq = (row) => ({
   translations: row?.translations && typeof row.translations === 'object' ? row.translations : {},
 });
 
-/** Every published FAQ. Public — no token, no session short-circuit. */
 export async function listFaqs() {
   const rows = await get('/faqs', undefined, { ttl: PUBLIC_READ_TTL });
   return (Array.isArray(rows) ? rows : []).map(toFaq);
@@ -42,18 +38,28 @@ export async function submitHelpFeedback({ slug, helpful, comment }) {
   });
 }
 
-export async function listHelpFeedbackArticles({ page = 0, size = 20 } = {}) {
-  return unwrapPage(await get('/admin/help-feedback', { page, size }), { page, size });
+export async function listHelpFeedbackArticles({ days, page = 0, size = 20 } = {}) {
+  const query = { page, size };
+  if (days) query.days = days;
+  return unwrapPage(await get('/admin/help-feedback', query), { page, size });
 }
 
-export async function listHelpFeedbackComments({ slug, page = 0, size = 20 } = {}) {
+export async function listHelpFeedbackComments({ slug, days, page = 0, size = 20 } = {}) {
   const query = { page, size };
   if (slug) query.slug = slug;
+  if (days) query.days = days;
   return unwrapPage(await get('/admin/help-feedback/comments', query), { page, size });
 }
 
-export async function staffHelpContent() {
-  const body = await get('/admin/help/staff');
+const staffTree = (body) => {
   const list = (v) => (Array.isArray(v) ? v : []);
   return { sections: list(body?.sections), categories: list(body?.categories), articles: list(body?.articles) };
+};
+
+export async function staffHelpContent() {
+  return staffTree(await get('/admin/help/staff'));
+}
+
+export async function staffHelpIndex() {
+  return staffTree(await get('/admin/help/staff/index'));
 }

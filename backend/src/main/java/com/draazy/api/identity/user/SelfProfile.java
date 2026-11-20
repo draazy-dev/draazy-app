@@ -5,10 +5,8 @@ import com.draazy.api.security.Roles;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
-// Four routes return the caller to themselves, so each must resolve permissions uniformly.
 @Component
 public class SelfProfile {
-
     private final UserMapper userMapper;
     private final AccountPermissions accountPermissions;
 
@@ -17,7 +15,6 @@ public class SelfProfile {
         this.accountPermissions = accountPermissions;
     }
 
-    // Consumer accounts get permissions null; back-office accounts get the resolved atom list.
     public SelfResponse of(User user) {
         UserResponse base = userMapper.toResponse(user);
         boolean backOffice = Roles.isBackOffice(user.getRole());
@@ -28,13 +25,12 @@ public class SelfProfile {
                 ? List.copyOf(accountPermissions.effectiveFor(user.getRole(), user.getId()))
                 : null;
         return new SelfResponse(base.id(), base.name(), base.mobile(), base.email(), base.role(),
-                base.verified(), base.city(), base.verifiedContactOnly(), base.hideNumber(),
+                base.verified(), base.city(), user.getGender(), user.genderChangesLeft(),
+                base.verifiedContactOnly(), base.hideNumber(),
                 base.shareActivityStatus(), base.shareReadReceipts(), base.listingsCount(), atoms,
                 desks);
     }
 
-    // A token-bearing sign-in caches this as the session identity: back-office accounts get the
-    // slim staff shape, everyone else the consumer profile.
     public SessionUser forSession(User user) {
         if (!Roles.isBackOffice(user.getRole())) {
             return of(user);

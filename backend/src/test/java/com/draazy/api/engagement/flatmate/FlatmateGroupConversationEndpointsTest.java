@@ -3,6 +3,7 @@ package com.draazy.api.engagement.flatmate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -56,10 +57,7 @@ class FlatmateGroupConversationEndpointsTest extends AbstractApiTest {
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Chat in Baner","locality":"Baner","policy":"any",
-                                 "rent":30000,"seats":3,"seatsOpen":2,"name":"Host"}
-                                """))
+                        .content(FlatmateGroupFixture.hunting("Chat in Baner", "Baner", "any")))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = idIn(json);
@@ -72,12 +70,20 @@ class FlatmateGroupConversationEndpointsTest extends AbstractApiTest {
         return json.replaceAll("(?s).*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
-    private void join(String groupId, User who) throws Exception {
+    private void join(String groupId, User host, User who) throws Exception {
         mvc.perform(post(Routes.Flatmates.GROUP_JOIN, groupId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(who))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isCreated());
+        String requestId = jdbc.queryForObject("select id::text from flatmate_requests "
+                + "where target_id = ?::uuid and requester_id = ?::uuid", String.class, groupId,
+                who.getId().toString());
+        mvc.perform(patch(Routes.Flatmates.MY_REQUEST_BY_ID, requestId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"accepted\"}"))
+                .andExpect(status().isOk());
     }
 
     private ResultActions open(String groupId, User who) throws Exception {
@@ -138,7 +144,7 @@ class FlatmateGroupConversationEndpointsTest extends AbstractApiTest {
         User host = user("Host");
         User member = user("Asha Rao");
         String id = group(host);
-        join(id, member);
+        join(id, host, member);
 
         String conversation = threadOf(id, host);
         open(id, member).andExpect(status().isOk())
@@ -187,12 +193,12 @@ class FlatmateGroupConversationEndpointsTest extends AbstractApiTest {
         User early = user("Early");
         User late = user("Late");
         String id = group(host);
-        join(id, early);
+        join(id, host, early);
         String conversation = threadOf(id, host);
         send(conversation, early, "Before you came").andExpect(status().isCreated());
         send(conversation, host, "Still before").andExpect(status().isCreated());
 
-        join(id, late);
+        join(id, host, late);
         inbox(late).andExpect(jsonPath("$.content[0].id").value(conversation))
                 .andExpect(jsonPath("$.content[0].unread").value(0));
 
@@ -226,7 +232,7 @@ class FlatmateGroupConversationEndpointsTest extends AbstractApiTest {
         User host = user("Host");
         User member = user("Removed");
         String id = group(host);
-        join(id, member);
+        join(id, host, member);
         String conversation = threadOf(id, member);
         send(conversation, member, "bye soon").andExpect(status().isCreated());
 
@@ -261,7 +267,7 @@ class FlatmateGroupConversationEndpointsTest extends AbstractApiTest {
         User host = user("Host");
         User member = user("Member");
         String id = group(host);
-        join(id, member);
+        join(id, host, member);
 
         remove(id, memberId(id, host), member).andExpect(status().isNotFound());
         remove(id, memberId(id, host), host).andExpect(status().isConflict());

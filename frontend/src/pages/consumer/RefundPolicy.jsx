@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import LegalPage from '../../components/LegalPage.jsx';
+import { supportLink } from '../../lib/supportLink.js';
 import { usePricing } from '../../context/PricingContext.jsx';
 import { GRIEVANCE_OFFICER_DEFAULT, getGrievanceOfficer } from '../../services/settingsService.js';
 
@@ -20,7 +21,7 @@ export default function RefundPolicy() {
     : 'no enquiries';
 
   return (
-    <LegalPage title="Refund Policy" lastUpdated="12 October 2026" current="refund-policy">
+    <LegalPage title="Refund Policy" lastUpdated="19 November 2026" current="refund-policy">
       <p>
         This Refund Policy applies to all paid services purchased through draazy.com
         ("<strong>Platform</strong>") operated by Draazy Technologies ("<strong>Draazy</strong>"). Every purchase is
@@ -30,8 +31,8 @@ export default function RefundPolicy() {
       <h2>1. Scope</h2>
       <p>This policy covers:</p>
       <ul>
-        <li>Listing Passes ({fee('listingPass')}, one per extra live listing).</li>
-        <li>Contact Packs ({fee('contactPack')}).</li>
+        <li>Listing Passes (rent {fee('listingPass')}, sale {fee('listingPassBuy')}; one per extra live listing).</li>
+        <li>Contact Packs (rent {fee('contactPack')}, buy {fee('contactPackBuy')}).</li>
         <li>Rent agreements.</li>
       </ul>
       <p>
@@ -59,9 +60,9 @@ export default function RefundPolicy() {
       {!loaded ? null : passGuaranteeDays > 0 ? (
         <>
           <p>
-            If your listing gets {enquiryLimit} in its first <strong>{passGuaranteeDays} live days</strong> on a
-            pass, you can ask for a full refund. The guarantee can be used once every{' '}
-            <strong>{passGuaranteeEveryMonths} months</strong>.
+            If your listing stays live and gets {enquiryLimit} in its first{' '}
+            <strong>{passGuaranteeDays} live days</strong> on a pass, you can ask for a full refund in the 7 days
+            that follow. The guarantee can be used once every <strong>{passGuaranteeEveryMonths} months</strong>.
           </p>
           <p>
             Pausing the listing during that window ends the guarantee. Otherwise a pass is not refundable. It ends
@@ -84,19 +85,23 @@ export default function RefundPolicy() {
         For a Leave and License agreement, everything you paid is refunded until the
         stamp duty is paid to the Government of Maharashtra on GRAS. After that, the stamp duty and registration
         charges are spent, and only the service fee (and anything you overpaid after a change of terms) is
-        refunded. Every refund is approved by a second member of our team.
+        refunded. If everything you paid is refunded, the request is closed.
       </p>
 
       <h2>6. How to request a refund</h2>
       <ol>
         <li>Open <strong>Dashboard → Plan &amp; Billing</strong>. If the purchase qualifies, you will see a <strong>Refund</strong> button.</li>
+        <li>For a rent agreement, tap <strong>Message support</strong> on its tracker.</li>
         <li>
-          If it does not qualify but you think it should, choose <strong>Ask for a review</strong>, or raise a ticket
-          from the <Link to="/support">Support</Link> page with the invoice number.
+          If it does not qualify but you think it should, choose <strong>Ask for a review</strong>. It opens a chat
+          with <Link to={supportLink('general')}>Draazy support</Link> about that invoice.
         </li>
         <li>Our team reviews every request within 2 business days and keeps you updated.</li>
       </ol>
-      <p>Payments taken in error, such as a double charge, are refunded automatically.</p>
+      <p>
+        Payments we cannot use, such as a double charge, a wrong amount, or an order cancelled before the payment
+        arrived, are refunded automatically.
+      </p>
 
       <h2>7. Refund processing</h2>
       <ul>

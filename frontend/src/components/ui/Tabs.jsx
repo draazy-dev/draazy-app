@@ -3,7 +3,6 @@ import { classNames } from '../../lib/format.js';
 import HScroll from './HScroll.jsx';
 import Icon from '../Icon.jsx';
 
-/* Controlled via `active` + `onChange`, or uncontrolled via `initial`. */
 export default function Tabs({ items, initial, active: controlledActive, onChange, variant = 'pill' }) {
   const [internalActive, setInternalActive] = useState(initial ?? items[0]?.key);
   const active = controlledActive ?? internalActive;
@@ -39,8 +38,6 @@ export default function Tabs({ items, initial, active: controlledActive, onChang
     );
   }
 
-  /* A segmented control is a "pick one of these" decision, so every option must be visible to be weighed.
-     Past three pills on a 360px phone the rest sit off-screen, so below `sm` the strip wraps 2-up. */
   const wrapOnMobile = items.length > 3;
 
   return (
@@ -48,8 +45,6 @@ export default function Tabs({ items, initial, active: controlledActive, onChang
       <HScroll
         role="tablist"
         fadeColor="var(--brand-card)"
-        // The phone axis lock in index.css would turn this back into a scroll container, because
-        // `overflow-x: visible` beside `overflow-y: hidden` computes to `auto`.
         data-axis-free={wrapOnMobile ? '' : undefined}
         className={classNames(
           'flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1',
@@ -64,7 +59,6 @@ export default function Tabs({ items, initial, active: controlledActive, onChang
             onClick={() => select(i.key)}
             className={classNames(
               'flex-1 shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition',
-              // 44px touch floor on mobile; desktop keeps the original density.
               'min-h-[44px] sm:min-h-0',
               wrapOnMobile ? 'whitespace-normal sm:whitespace-nowrap' : 'whitespace-nowrap',
               active === i.key ? 'bg-brand-teal text-ink' : 'text-gray-300 hover:text-white',

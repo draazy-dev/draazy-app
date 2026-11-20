@@ -8,10 +8,9 @@ import Icon from './Icon.jsx';
 import { ServiceBreadcrumbs } from './Breadcrumbs.jsx';
 import MobileField from './MobileField.jsx';
 import { useScrollReveal } from '../lib/useScrollReveal.js';
-import { useSignInGate } from '../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../lib/useSignInGate.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { SUPPORT_PHONE, SUPPORT_TEL } from '../lib/supportContact.js';
-/* Two distinct writes: the ops lead ticket a desk calls back from, and the flow request the customer then tracks. */
 import { useToast } from '../context/ToastContext.jsx';
 import { createTicket } from '../services/ticketService.js';
 import { createServiceRequest as createFlowRequest } from '../services/serviceRequestService.js';
@@ -19,12 +18,9 @@ import ServiceTracker from './ServiceTracker.jsx';
 import AutosaveBanner from './AutosaveBanner.jsx';
 import { useFormDraft, useFieldErrors } from '../lib/hooks.js';
 import { srcSetFor } from '../lib/imgSrcSet.js';
-/* Full-bleed hero needs a wider ladder than imgSrcSet's 960w card default, so a phone fetches ~640w rather than the
-   full 1.26 MB asset while desktop keeps the 1600w source. */
 
 const HERO_WIDTHS = [640, 960, 1280, 1600];
 const CRUMB_KEY = { packers: 'packersMovers', legal: 'propertyLegal', loans: 'homeLoans' };
-/* Shared shell for every service landing page (packers, legal, home-loans, interior, valuation). */
 
 export default function ServiceLanding({
   desk, heroGradient = 'linear-gradient(140deg,rgb(var(--dz-c-slate-950)) 0%,rgb(var(--dz-c-teal-950)) 52%,rgb(var(--dz-c-teal-900)) 100%)',
@@ -52,8 +48,6 @@ export default function ServiceLanding({
   const err = useFieldErrors(formRef);
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
-  // Apply field default/prefill values (e.g. from ?type=/?scope=/?service= query params that
-  // resolve after mount) without clobbering anything the user has already entered.
 
   const fieldDefaults = (quote?.fields || []).map((f) => f.value || '').join('|');
   useEffect(() => {
@@ -70,37 +64,33 @@ export default function ServiceLanding({
   const submit = async (e) => {
     e.preventDefault();
     if (status === 'sending') return;
-    // Public page, so gate on use rather than on arrival; the draft carries input across the hop.
-    if (!isIn) { sendToSignIn('services'); return; }
+    if (!isIn) { sendToSignIn('services', undefined, replay(e)); return; }
     const reqd = (quote?.fields || []).find((f) => f.required && !form[f.name]);
+    const name = form.name.trim() || user?.name || '';
+    const mobile = form.mobile || user?.mobile || '';
+    if (name !== form.name || mobile !== form.mobile) setForm((p) => ({ ...p, name, mobile }));
     const ok = err.check([
-      { name: 'name', ok: !!form.name.trim(), msg: 'Please enter your name.' },
-      { name: 'mobile', ok: /^[6-9]\d{9}$/.test((form.mobile || '').replace(/\D/g, '')), msg: 'Enter a valid 10-digit mobile number.' },
+      { name: 'name', ok: !!name, msg: 'Please enter your name.' },
+      { name: 'mobile', ok: /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '')), msg: 'Enter a valid 10-digit mobile number.' },
       ...(reqd ? [{ name: reqd.name, ok: false, msg: `Please fill: ${reqd.label}` }] : []),
     ], toast);
     if (!ok) return;
     const detail = (quote?.fields || []).filter((f) => form[f.name]).map((f) => `${f.label}: ${form[f.name]}`).join(' · ');
     const service = form[quote?.serviceField] || quote?.title || 'Service request';
     const details = (quote?.fields || []).filter((f) => form[f.name]).reduce((o, f) => { o[f.name] = form[f.name]; return o; }, {});
-    /* One submit, two records that must name each other: `POST /tickets` returns the server id carried onto the
-       request as `ticketId`. */
 
     const raiseLead = async () => {
-      // Contact details are not sent: the page is sign-in gated above and the server copies the
-      // name and number off the session, so a form-supplied pair would be a second, unverified one.
       const ticket = await createTicket({ desk, subject: service, body: detail });
       return ticket?.id || null;
     };
 
-    /* Chained, not gated: a rejected ticket yields a null ref and the flow request is still created, unlinked — a
-       failed lead must not also cost the customer their request. */
     setStatus('sending');
     if (leadRef.current === undefined) leadRef.current = await raiseLead().catch(() => null);
     const ref = leadRef.current;
     let filed = true;
     if (flowType) {
       try {
-        await createFlowRequest({ type: flowType, service, customer: { name: form.name }, ticketRef: ref, details });
+        await createFlowRequest({ type: flowType, service, customer: { name }, ticketRef: ref, details });
       } catch {
         filed = false;
       }
@@ -117,7 +107,6 @@ export default function ServiceLanding({
   return (
     <div ref={rootRef}>
       <div>
-          {/* A real <img>, not a CSS background — a srcset has no effect on one. */}
         <section className="theme-dark relative overflow-hidden" style={{ background: heroGradient }}>
           {heroImage && (
             <img
@@ -131,7 +120,7 @@ export default function ServiceLanding({
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="reveal">
               <ServiceBreadcrumbs k={CRUMB_KEY[desk]} />
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs text-teal-200 font-medium mb-5"><Icon name={badgeIcon} className="w-3.5 h-3.5" /> {badge}</span>
+              <span className="dz-tag bg-white/10 border border-white/15 text-teal-200 font-medium mb-5"><Icon name={badgeIcon} className="w-3.5 h-3.5" /> {badge}</span>
               <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight">{titleTop}<br /><span className="gradient-text">{titleAccent}</span></h1>
               <p className="text-gray-200 text-base sm:text-lg mt-5 max-w-xl">{subtitle}</p>
               <div className="flex flex-wrap gap-x-6 gap-y-3 mt-7">
@@ -161,28 +150,31 @@ export default function ServiceLanding({
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {(quote?.fields || []).map((f) => (
-                        <div key={f.name} className={f.full ? 'sm:col-span-2' : ''} data-err={f.name}>
-                          <label className="block text-xs font-medium text-gray-300 mb-1.5">{f.label}{f.required ? <span className="text-rose-400"> *</span> : null}</label>
-                          {f.type === 'select' ? (
-                            <NativeSelect value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} className="field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm" invalid={err.has(f.name)}>
-                              <option value="">{f.placeholder || 'Select'}</option>
-                              {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                            </NativeSelect>
-                          ) : f.type === 'locality' ? (
-                            <LocalitySelect value={form[f.name]} onChange={(v) => { set(f.name, v); err.clear(f.name); }} nameOnly unrestricted={f.unrestricted} placeholder={f.placeholder || 'Select locality'} ariaLabel={f.label} dataErr={f.name} invalid={err.has(f.name)} className="w-full" />
-                          ) : f.type === 'date' ? (
-                            <DateField value={form[f.name]} onChange={(v) => { set(f.name, v); err.clear(f.name); }} ariaLabel={f.label} dataErr={f.name} invalid={err.has(f.name)} className="field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm" />
-                          ) : f.type === 'textarea' ? (
-                            <textarea rows={2} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 resize-none' + err.cx(f.name)} />
-                          ) : f.type === 'money' ? (
-                            <input type="text" inputMode="numeric" value={form[f.name]} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); const formatted = raw ? raw.replace(/\B(?=(\d{2})+(\d)(?!\d))/g, ',') : ''; set(f.name, formatted); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx(f.name)} />
-                          ) : (
-                            <input type={f.type || 'text'} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx(f.name)} />
-                          )}
-                          <FieldError show={err.has(f.name)}>{err.msg(f.name)}</FieldError>
-                        </div>
-                      ))}
+                      {(quote?.fields || []).map((f) => {
+                        const fieldId = `svc-${desk}-${f.name}`;
+                        return (
+                          <div key={f.name} className={f.full ? 'sm:col-span-2' : ''} data-err={f.name}>
+                            <label htmlFor={fieldId} className="block text-xs font-medium text-gray-300 mb-1.5">{f.label}{f.required ? <span className="text-rose-400"> *</span> : null}</label>
+                            {f.type === 'select' ? (
+                              <NativeSelect id={fieldId} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} className="field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm" invalid={err.has(f.name)}>
+                                <option value="">{f.placeholder || 'Select'}</option>
+                                {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                              </NativeSelect>
+                            ) : f.type === 'locality' ? (
+                              <LocalitySelect id={fieldId} value={form[f.name]} onChange={(v) => { set(f.name, v); err.clear(f.name); }} nameOnly unrestricted={f.unrestricted} placeholder={f.placeholder || 'Select locality'} ariaLabel={f.label} dataErr={f.name} invalid={err.has(f.name)} className="w-full" />
+                            ) : f.type === 'date' ? (
+                              <DateField id={fieldId} value={form[f.name]} onChange={(v) => { set(f.name, v); err.clear(f.name); }} ariaLabel={f.label} dataErr={f.name} invalid={err.has(f.name)} className="field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm" />
+                            ) : f.type === 'textarea' ? (
+                              <textarea id={fieldId} rows={2} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 resize-none' + err.cx(f.name)} />
+                            ) : f.type === 'money' ? (
+                              <input id={fieldId} type="text" inputMode="numeric" value={form[f.name]} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); const formatted = raw ? raw.replace(/\B(?=(\d{2})+(\d)(?!\d))/g, ',') : ''; set(f.name, formatted); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx(f.name)} />
+                            ) : (
+                              <input id={fieldId} type={f.type || 'text'} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx(f.name)} />
+                            )}
+                            <FieldError show={err.has(f.name)}>{err.msg(f.name)}</FieldError>
+                          </div>
+                        );
+                      })}
                     </div>
                     {status === 'failed' ? (
                       <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
@@ -292,8 +284,8 @@ export default function ServiceLanding({
                 <p className="text-gray-400 mt-3 mb-7">{cta.sub}</p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <button onClick={scrollToForm} className="btn-teal px-6 py-3.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name={cta.icon || 'send'} className="w-4 h-4" /> {cta.primary}</button>
-                  {cta.phone ? <a href={`tel:${cta.phone.replace(/[^\d+]/g, '')}`} className="px-6 py-3.5 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> Call {cta.phone}</a> : null}
-                  {cta.link ? <Link to={cta.link} className="px-6 py-3.5 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2">{cta.linkLabel}</Link> : null}
+                  {cta.phone ? <a href={`tel:${cta.phone.replace(/[^\d+]/g, '')}`} className="h-btn-lg px-6 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> Call {cta.phone}</a> : null}
+                  {cta.link ? <Link to={cta.link} className="h-btn-lg px-6 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2">{cta.linkLabel}</Link> : null}
                 </div>
               </div>
             </div>

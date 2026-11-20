@@ -13,18 +13,15 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicUpdate;
 
-// The identity root other tables hang off; erasure contract: docs/system/data-model.md.
 @Entity
 @Table(name = "users")
 @DynamicUpdate
 @Getter
 public class User extends SoftDeleteEntity implements TokenSubject {
-
     @Column(name = "name")
     @Setter
     private String name;
 
-    // The natural key erasure cannot blank. No setter keeps identity from moving under user_id.
     @Column(name = "mobile", nullable = false, unique = true)
     private String mobile;
 
@@ -32,7 +29,6 @@ public class User extends SoftDeleteEntity implements TokenSubject {
     @Setter
     private String email;
 
-    /** BCrypt hash — staff/admin only; buyers/owners are passwordless (mobile-OTP). */
     @Column(name = "password_hash")
     @Setter
     private String passwordHash;
@@ -57,17 +53,14 @@ public class User extends SoftDeleteEntity implements TokenSubject {
     @Setter
     private boolean mobileVerified = false;
 
-    /** L2 opt-in identity badge — granted by staff review, a trust signal, never a hard gate. */
     @Column(name = "verified", nullable = false)
     @Setter
     private boolean verified = false;
 
-    /** Owner preference: only accept contact requests from -verified users. */
     @Column(name = "verified_contact_only", nullable = false)
     @Setter
     private boolean verifiedContactOnly = false;
 
-    // Not a second contact gate: the request is approved, only the digits are withheld.
     @Column(name = "hide_number", nullable = false)
     @Setter
     private boolean hideNumber = false;
@@ -80,7 +73,6 @@ public class User extends SoftDeleteEntity implements TokenSubject {
     @Setter
     private boolean shareReadReceipts = true;
 
-    // Persona predicate, never a quota input: includes rejected and archived listings.
     @Column(name = "listings_count", nullable = false)
     private int listingsCount = 0;
 
@@ -88,7 +80,14 @@ public class User extends SoftDeleteEntity implements TokenSubject {
     @Setter
     private String avatar;
 
-    // Hibernate-populated because DEFAULT now only covers raw-SQL inserts.
+    public static final int SELF_GENDER_CHANGES = 2;
+
+    @Column(name = "gender")
+    private String gender;
+
+    @Column(name = "gender_changes", nullable = false, insertable = false, updatable = false)
+    private int genderChanges;
+
     @CreationTimestamp
     @Column(name = "joined_at", nullable = false, updatable = false)
     private Instant joinedAt;
@@ -101,7 +100,6 @@ public class User extends SoftDeleteEntity implements TokenSubject {
     @Column(name = "sessions_revoked_at", insertable = false, updatable = false)
     private Instant sessionsRevokedAt;
 
-    // Internal review marker, deliberately not a status. No setter: the columns move together.
     @Column(name = "flagged", nullable = false)
     private boolean flagged = false;
 
@@ -115,7 +113,6 @@ public class User extends SoftDeleteEntity implements TokenSubject {
     private UUID flaggedBy;
 
     protected User() {
-
     }
 
     public User(String mobile, String role) {
@@ -123,7 +120,6 @@ public class User extends SoftDeleteEntity implements TokenSubject {
         this.role = role;
     }
 
-    // Overwrites rather than appends: the column says what the next person should inspect.
     public void flag(String reason, UUID by) {
         this.flagged = true;
         this.flagReason = reason;
@@ -138,18 +134,25 @@ public class User extends SoftDeleteEntity implements TokenSubject {
         this.flaggedBy = null;
     }
 
-    // Monotonic on purpose; lost-update race is accepted for this persona predicate.
+    public void correctGender(String value) {
+        gender = value;
+    }
+
+    public int genderChangesLeft() {
+        return verified ? 0 : Math.max(0, SELF_GENDER_CHANGES - genderChanges);
+    }
+
     public void recordListingPosted() {
         this.listingsCount++;
     }
 
-    // One method because these user PII fields must stop being true together.
     public void erasePersonalData(String pseudonymMobile) {
         this.mobile = pseudonymMobile;
         this.name = null;
         this.email = null;
         this.avatar = null;
         this.city = null;
+        this.gender = null;
 
         this.passwordHash = null;
         this.mobileVerified = false;

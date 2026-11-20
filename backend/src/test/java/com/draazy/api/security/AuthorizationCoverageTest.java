@@ -39,10 +39,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Every served route is pinned public or refused anonymously; no paged list breaks on crafted paging. */
 @DisplayName("Security — no route ships unclassified, and no admin route is a consumer's")
 class AuthorizationCoverageTest extends AbstractApiTest {
-
     private static final List<String> NOT_OURS = List.of("/error", "/actuator");
 
     private static final String PLACEHOLDER_ID = "00000000-0000-4000-8000-000000000000";
@@ -52,14 +50,12 @@ class AuthorizationCoverageTest extends AbstractApiTest {
     private static final Pattern BACK_OFFICE_GUARD = Pattern.compile(
             "'(" + Roles.ADMIN + "|" + Roles.STAFF + ")'|@" + BackOfficePermissions.BEAN + "\\.");
 
-    // A customer's own list on the same route; its guard only narrows what staff may see.
     private static final Set<String> SHARED_WITH_CUSTOMERS = Set.of("GET /service-requests");
 
     private static final String[][] HOSTILE_PAGING = {
             {"sort", "nosuchfield,desc"}, {"sort", "password,asc"}, {"page", "2147483647"}, {"page", "-1"},
             {"page", "+21474837"}, {"page", "\u0662\u0661\u0664\u0667\u0664\u0668\u0663\u0667"}};
 
-    // Mirrors SecurityConfig's permitAll list; a route answering anonymous callers is added here deliberately.
     private static final Set<String> PUBLIC = Set.of(
             "POST /auth/login", "POST /auth/staff-login", "POST /auth/staff-login/verify",
             "POST /auth/staff-login/enrol", "POST /auth/staff-login/enrol/confirm", "POST /auth/staff-invite/redeem",
@@ -67,16 +63,18 @@ class AuthorizationCoverageTest extends AbstractApiTest {
             "GET /properties", "GET /properties/{id}", "GET /properties/featured", "GET /properties/cards",
             "GET /properties/compare", "GET /properties/reels", "GET /properties/search-index",
             "GET /properties/similar", "GET /properties/{propId}/reviews", "GET /owners/{id}",
-            "GET /localities", "GET /localities/{slug}", "GET /localities/search", "POST /localities/resolve",
+            "GET /localities/{slug}", "GET /localities/search", "POST /localities/resolve",
             "GET /societies", "GET /societies/{slug}", "GET /societies/{slug}/brief", "GET /societies/resolve",
             "GET /societies/top", "GET /reviews/{entityType}/{entityId}",
             "GET /flatmates/feed", "GET /flatmates/groups/{id}", "GET /flatmates/posts/{id}", "GET /flatmates/rooms/{id}",
+            "GET /flatmates/owner-notice", "POST /flatmates/owner-notice/answer",
             "GET /documents/shared/url",
             "POST /cities/waitlist", "POST /service-waitlist", "POST /demand-signals", "POST /page-views",
             "POST /client-errors",
             "POST /help/feedback",
-            // Signature-verified in the handler, and always 200 so Cashfree does not retry a refusal.
-            "POST /webhooks/cashfree/payment");
+            "POST /webhooks/cashfree/payment",
+            "GET /webhooks/whatsapp", "POST /webhooks/whatsapp",
+            "POST /webhooks/zeptomail");
 
     @Autowired
     @Qualifier("requestMappingHandlerMapping")
@@ -205,7 +203,6 @@ class AuthorizationCoverageTest extends AbstractApiTest {
         assertThat(broke).as("paged lists that a crafted page or sort broke").isEmpty();
     }
 
-    /** A failed statement aborts the shared test transaction; a savepoint per probe keeps the next one honest. */
     private int isolated(Callable<Integer> probe) throws Exception {
         jdbc.execute("savepoint paging_probe");
         try {

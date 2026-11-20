@@ -17,7 +17,6 @@ import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
 final class ImageMetadataStripper {
-
     private static final byte[] PNG_SIGNATURE =
             {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
     private static final Set<String> PNG_KEPT = Set.of(
@@ -117,8 +116,6 @@ final class ImageMetadataStripper {
         throw damaged();
     }
 
-    // Kept APP segments are cut to their fixed layout, so nothing can ride along after it, and a JFIF
-    // thumbnail is dropped. Null drops the segment.
     private static byte[] keptPayload(int marker, byte[] c, int payload, int end) {
         if (JPEG_STRUCTURE.contains(marker)) {
             return Arrays.copyOfRange(c, payload, end);
@@ -156,7 +153,6 @@ final class ImageMetadataStripper {
         }
     }
 
-    // A profile split across segments is rejoined, scrubbed and written as one clean sequence.
     private static void writeIcc(ByteArrayOutputStream out, SortedMap<Integer, byte[]> icc, int count) {
         if (icc.isEmpty() || count < 1 || icc.size() != count || icc.firstKey() != 1 || icc.lastKey() != count) {
             return;
@@ -206,7 +202,6 @@ final class ImageMetadataStripper {
         throw damaged();
     }
 
-    // iCCP is keyword, method byte, then a zlib stream; the keyword may name the device, so it is replaced.
     private static void writeIccChunk(ByteArrayOutputStream out, byte[] c, int from, int end) {
         int nul = from;
         while (nul < end && c[nul] != 0) {

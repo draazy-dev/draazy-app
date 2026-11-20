@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { claimIdentityReview, getIdentityReview, releaseIdentityReview } from '../../../services/identityReviewService.js';
 import { errorCode, errorMessage, sameId } from './vocabulary.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const claimedMessage = (next) => `Being reviewed by ${next?.claimedByName || 'another reviewer'}`;
 const isClaimTaken = (error) => errorCode(error) === 'identity_case_claimed';
@@ -44,8 +45,6 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
     return claimed;
   }, []);
 
-  /* A case someone else holds is not claimed on open: the server would refuse it, and the detail
-     already names the holder. `claimedByName` is only set while their hold is fresh. */
   const canTryClaim = useCallback(
     (row) => canWrite && row?.status === 'pending' && !sameId(row?.userId, userId) && !row?.claimedByMe && !row?.claimedByName,
     [canWrite, userId],
@@ -56,8 +55,6 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
     setClaimNotice(next?.status === 'pending' && next?.claimedByName && !next?.claimedByMe ? claimedMessage(next) : '');
   }, []);
 
-  /* Shared by open, refresh and decide: claim if allowed, and on a lost race show who holds it. The claim
-     answers only who holds the case, so it is laid over the record already read. */
   const claimOrShowHolder = useCallback(async (id, gen, fallback, isCurrent) => {
     try {
       const claimed = await claimForRun(id, gen);
@@ -106,7 +103,7 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
         if (canTryClaim(initial)) await claimOrShowHolder(openId, gen, initial, isCurrent);
         else applyDetail(initial);
       } catch (nextError) {
-        if (isCurrent()) setError(nextError?.message || 'Could not load this review.');
+        if (isCurrent()) setError(userMessage(nextError, 'Could not load this review.'));
       } finally {
         if (isCurrent()) setLoading(false);
       }
@@ -120,7 +117,6 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
 
   const stillOpen = (id) => () => openIdRef.current === id;
 
-  /* Signed image links are short-lived; this re-reads the case and, if the hold lapsed, re-claims it. */
   async function refresh() {
     const id = openIdRef.current;
     if (!id) return;
@@ -132,13 +128,12 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
       if (canTryClaim(fresh) && await claimOrShowHolder(id, runRef.current, fresh, stillOpen(id))) return;
       if (stillOpen(id)() && !canTryClaim(fresh)) applyDetail(fresh);
     } catch (nextError) {
-      if (stillOpen(id)()) setError(nextError?.message || 'Could not refresh image links.');
+      if (stillOpen(id)()) setError(userMessage(nextError, 'Could not refresh image links.'));
     } finally {
       if (stillOpen(id)()) setLoading(false);
     }
   }
 
-  /* Returns `identity_number_mismatch` instead of showing it, so the approve form can offer the override. */
   async function decide(submit, failureMessage, { requireClaim = false } = {}) {
     if (!detail || deciding) return null;
     const id = detail.id;

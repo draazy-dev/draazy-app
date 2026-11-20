@@ -5,7 +5,6 @@ import PropertyMap from '../../../components/property/PropertyMap.jsx';
 import { useNearViewport } from '../../../lib/useNearViewport.js';
 import { listProperties } from '../../../services/propertyService.js';
 
-/** Keyed by locality slug: the viewport observer only attaches to the element of the first render. */
 export default function MapCard({ slug, activeName, activeCoords }) {
   const { t } = useTranslation();
   const ref = useRef(null);

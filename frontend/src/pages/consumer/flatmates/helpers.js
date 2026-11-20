@@ -1,5 +1,5 @@
 import { uploadPersonalDocument } from '../../../services/documentService.js';
-import { MOVE_LBL } from './constants.js';
+import { MOVE_LBL, FURN_KEY } from './constants.js';
 import { headlineOf } from '../../../lib/headline.js';
 import { slugOfName } from '../../../lib/searchEntities.js';
 
@@ -36,9 +36,28 @@ const groupListingsUrl = (p) => {
   if (p.depositMax) q.set('deposit', `${p.depositMin || 0}-${p.depositMax}`);
   if (p.furnishing) q.set('furn', p.furnishing);
   if (p.bachelors) q.set('tenants', 'bachelors');
-  if (p.gatedOnly) q.set('amen', 'security');
+  const amen = [p.gatedOnly && 'security', p.parking && 'parking'].filter(Boolean);
+  if (amen.length) q.set('amen', amen.join(','));
   return `/listings?${q}`;
 };
+const matchingRoomsUrl = (p) => {
+  const q = new URLSearchParams({ view: 'move-in' });
+  const names = p.localities?.length ? p.localities : [p.locality].filter(Boolean);
+  if (names.length === 1) q.set('loc', names[0]);
+  const budgetMax = +p.budgetMax || +p.budget;
+  if (budgetMax) q.set('budget', `0-${budgetMax}`);
+  if (p.furnishing === 'furnished' || p.furnishing === 'semi') q.set('furn', p.furnishing);
+  if (p.gatedOnly) q.set('gated', '1');
+  if (p.attachedBath) q.set('bath', '1');
+  return `/flatmates?${q}`;
+};
+const mustHaves = (p, t) => [
+  ['sofa', FURN_KEY[p.furnishing] && t('flatmates.' + FURN_KEY[p.furnishing])],
+  ['building-2', p.gatedOnly && t('flatmates.gatedOnly')],
+  ['bath', p.attachedBath && t('flatmates.mustAttachedBath')],
+  ['parking-circle', p.parking && t('flatmates.parking_' + p.parking)],
+  ['users', p.bachelors && t('flatmates.detailBachelorsOk')],
+].filter(([, label]) => label);
 const groupLocalities = (g) => (g.localities?.length ? g.localities : [g.locality].filter(Boolean));
 const maxOpenSeats = (g) => Math.max(0, g.seatsTotal - (g.members?.length || 0));
 const MAX_GROUP_SEATS = 12;
@@ -50,29 +69,17 @@ const seatCeiling = (kind, item) => (kind === 'group' ? seatsLeft(item) + MAX_GR
 const allVerified = (g) => g.members.length > 0 && g.members.every((m) => m.verified);
 const policyAvatar = (p) => (p === 'women' ? 'from-pink-500 to-rose-400' : p === 'men' ? 'from-blue-500 to-indigo-400' : 'from-teal-500 to-indigo-500');
 
-// Default title for a replacement-flatmate group, so the host starts from something real.
-const replacementTitle = ({ bhk, locality } = {}) => {
-  const where = locality ? ' in ' + locality : '';
-  return bhk ? `1 more flatmate for a ${bhk}${where}` : `1 more flatmate${where}`;
-};
-
-// Identity is the floor (the Aadhaar gate) and earns no badge; only these two tiers carry
-// extra proof — an Ops-verified property, or a sitting tenant's registered agreement.
 const HOST_TIERS = {
-  owner: { label: 'Owner-verified', icon: 'badge-check', cls: 'text-emerald-300' },
-  tenant: { label: 'Tenant-verified', icon: 'file-check', cls: 'text-teal-300' },
+  owner: { label: 'Verified property', icon: 'badge-check', cls: 'text-emerald-300' },
+  tenant: { label: 'Verified property', icon: 'badge-check', cls: 'text-emerald-300' },
 };
 const hostTierMeta = (item) => (item && HOST_TIERS[item.verificationTier]) || null;
-// Tenant tier is a self-claim, so its badge waits for Ops approval; owner tier rides on
-// proof the card already holds (group: attached verified property; room: its `verified`).
 const showHostBadge = (item, reviewStatus, ownerEarned = true) => {
   if (!hostTierMeta(item)) return false;
   if (item.verificationTier === 'tenant') return reviewStatus === 'approved';
   if (item.verificationTier === 'owner') return ownerEarned;
   return false;
 };
-// A post counts as "verified" for the Verified-only filter: owner tier is trusted
-// on its property proof; tenant tier only once Ops has approved it.
 const hostVerifiedFor = (item, reviewStatus) => {
   if (!item) return false;
   if (item.verificationTier === 'owner') return true;
@@ -80,10 +87,6 @@ const hostVerifiedFor = (item, reviewStatus) => {
   return false;
 };
 
-/* Free text is the server's `q`; what it deliberately does not match (names, display-only
- * labels) is in docs/flows/consumer/flatmates.md § Server-side board search. */
-// Approximate age of a post in minutes. Uses an exact createdAt when available,
-// otherwise parses the human "time" label ("Just now", "2 hours ago", "1 day ago").
 const recencyMins = (item) => {
   if (item && item.createdAt) return (Date.now() - item.createdAt) / 60000;
   const t = ((item && item.time) || '').toLowerCase();
@@ -112,10 +115,6 @@ const matchFor = (item, me) => {
   return null;
 };
 
-/* No client-side verified predicate and no client-side sort: re-ordering one server-ordered
- * page makes the top of page 2 outrank the bottom of page 1. */
-// Whether a post is fresh enough to flag as new. Tied to real post age (< 24h)
-// so the signal stays honest — no fabricated "active now" states.
 const isFresh = (item) => recencyMins(item) < 1440;
 
 const isDateVal = (v) => typeof v === 'string' && v.includes('-');
@@ -141,8 +140,6 @@ const moveInByWire = (v, stored) => {
   return stored && stored <= todayIso() ? stored : todayIso();
 };
 
-// Images and PDFs only, matching the input's `accept`, so nothing else can become "evidence".
-// An oversized file is recorded present-but-not-inlined, unread, so it can't freeze the tab.
 const AGREEMENT_MAX_BYTES = 3 * 1024 * 1024;
 const AGREEMENT_MIME_RE = /^(image\/|application\/pdf)/;
 const readLocalAgreement = (file) => new Promise((resolve) => {
@@ -153,11 +150,11 @@ const readLocalAgreement = (file) => new Promise((resolve) => {
   reader.onerror = () => resolve({ ...meta, dataUrl: null });
   reader.readAsDataURL(file);
 });
-const readAgreementDoc = async (file) => {
+const readAgreementDoc = async (file, category = 'Rent agreement') => {
   if (!file || !AGREEMENT_MIME_RE.test(file.type || '')) return null;
   const [local, stored] = await Promise.all([
     readLocalAgreement(file),
-    uploadPersonalDocument({ category: 'Rent agreement', file }),
+    uploadPersonalDocument({ category, file }),
   ]);
   return { ...local, id: stored.id };
 };
@@ -167,8 +164,6 @@ const hasAgreementEvidence = (doc) => !!doc?.id;
 const FLATMATE_IMG = 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&q=80';
 const FLATMATE_GROUP_IMG = 'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&q=80';
 
-// Built on read, never at the moment of the tap: the shortlist stores the key alone, so a
-// card cannot go on advertising a rent or a photo the host has since changed.
 const toSavedCard = (item) => {
   if (!item?.id) return null;
   if (item.kind === 'room') {
@@ -220,8 +215,7 @@ const toSavedCard = (item) => {
   };
 };
 
-// Geo: a post keeps real coords; the rest get their locality centroid plus a deterministic
-// per-id jitter so they can be drawn. NEVER filter on these — the server uses real lat/lng.
+// Display-only jittered coords: never filter on them, the server uses real lat/lng.
 const hashStr = (s) => {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -247,7 +241,6 @@ export const BUDGET_MAX = 40000;
 
 export const budgetIsAny = (b) => b[0] <= BUDGET_MIN && b[1] >= BUDGET_MAX;
 
-/* Omitting the key keeps the two apart all the way to the column, where null carries the same distinction. */
 const numeric = (name, raw) => (raw === '' || raw == null ? {} : { [name]: Number(raw) });
 const terms = (f) => ({
   ...numeric('noticePeriodDays', f.noticePeriodDays),
@@ -256,4 +249,4 @@ const terms = (f) => ({
   ...(f.electricityBilling ? { electricityBilling: f.electricityBilling } : {}),
 });
 
-export { inr, avatarGrad, initials, genderLabel, genderPref, foodLabel, perHead, shareFloor, moneyRange, seekerBudget, bhkText, groupLocalities, groupListingsUrl, maxOpenSeats, MAX_GROUP_SEATS, seatCeiling, seatsLeft, allVerified, policyAvatar, replacementTitle, hostTierMeta, showHostBadge, hostVerifiedFor, matchFor, isFresh, moveInLabel, isDateVal, todayIso, moveInByForm, moveInByWire, readAgreementDoc, hasAgreementEvidence, toSavedCard, numeric, terms, FLATMATE_IMG, FLATMATE_GROUP_IMG, withCoords };
+export { inr, avatarGrad, initials, genderLabel, genderPref, foodLabel, perHead, shareFloor, moneyRange, seekerBudget, bhkText, mustHaves, groupLocalities, groupListingsUrl, matchingRoomsUrl, maxOpenSeats, MAX_GROUP_SEATS, seatCeiling, seatsLeft, allVerified, policyAvatar, hostTierMeta, showHostBadge, hostVerifiedFor, matchFor, isFresh, moveInLabel, isDateVal, todayIso, moveInByForm, moveInByWire, readAgreementDoc, hasAgreementEvidence, toSavedCard, numeric, terms, FLATMATE_IMG, FLATMATE_GROUP_IMG, withCoords };

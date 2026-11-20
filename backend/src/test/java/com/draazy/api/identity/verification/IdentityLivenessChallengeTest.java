@@ -13,6 +13,7 @@ import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
 import com.jayway.jsonpath.JsonPath;
+import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -20,11 +21,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
-@TestPropertySource(properties = "draazy.identity.qa-sample-rate=0.0")
 class IdentityLivenessChallengeTest extends AbstractApiTest {
 
     private static final String PAN = "ABCDE1234F";
@@ -37,6 +36,9 @@ class IdentityLivenessChallengeTest extends AbstractApiTest {
 
     @Autowired
     LivenessCheck liveness;
+
+    @Autowired
+    EntityManager entityManager;
 
     @AfterEach
     void cleanAuditRows() {
@@ -88,11 +90,10 @@ class IdentityLivenessChallengeTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.livenessSource").value("challenge"))
                 .andExpect(jsonPath("$.numberOverridden").value(false));
-        assertThat(caseOf(subject).getQaSampledAt()).isNull();
     }
 
     @Test
-    void numberMismatchIsASoftStopAndTheOverrideAlwaysGoesToQa() throws Exception {
+    void numberMismatchIsASoftStopUntilTheReviewerOverrides() throws Exception {
         User subject = user("9830012006", "buyer");
         User reviewer = user("9830012007", Roles.Wire.ADMIN);
         mvc.perform(submission(subject, PAN).param("challenge", liveness.issue(subject.getId()).token()))
@@ -109,7 +110,6 @@ class IdentityLivenessChallengeTest extends AbstractApiTest {
 
         IdentityVerification v = caseOf(subject);
         assertThat(v.isNumberOverridden()).isTrue();
-        assertThat(v.getQaSampledAt()).as("an overridden number always gets a second look").isNotNull();
         assertThat(jdbc.queryForObject("""
                 select metadata ->> 'numberOverridden' from audit_log
                  where action = 'identity.verification.approved' and entity_id = ?
@@ -117,7 +117,7 @@ class IdentityLivenessChallengeTest extends AbstractApiTest {
     }
 
     @Test
-    void submissionWithoutAChallengeIsAlwaysSampledForQa() throws Exception {
+    void submissionWithoutAChallengeIsApprovedWithClientLiveness() throws Exception {
         User subject = user("9830012008", "buyer");
         User reviewer = user("9830012009", Roles.Wire.ADMIN);
         mvc.perform(submission(subject, PAN)).andExpect(status().isAccepted());
@@ -125,7 +125,42 @@ class IdentityLivenessChallengeTest extends AbstractApiTest {
         approve(reviewer, caseOf(subject).getId(), PAN, "")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.livenessSource").value("client"));
-        assertThat(caseOf(subject).getQaSampledAt()).isNotNull();
+    }
+
+    @Test
+    void approvalWithAGenderCorrectsTheLockedProfileGenderAndAuditsIt() throws Exception {
+        User subject = user("9830012010", "buyer");
+        User reviewer = user("9830012011", Roles.Wire.ADMIN);
+        jdbc.update("update users set gender = 'male' where id = ?", subject.getId());
+        entityManager.clear();
+        mvc.perform(submission(subject, PAN)).andExpect(status().isAccepted());
+        UUID id = caseOf(subject).getId();
+
+        approve(reviewer, id, PAN, ",\"gender\":\"female\"").andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountGender").value("female"));
+
+        entityManager.flush();
+        assertThat(jdbc.queryForObject("select gender from users where id = ?", String.class, subject.getId()))
+                .isEqualTo("female");
+        assertThat(jdbc.queryForObject("""
+                select metadata ->> 'genderBefore' || '>' || (metadata ->> 'genderAfter') from audit_log
+                 where action = 'identity.verification.approved' and entity_id = ?
+                """, String.class, id.toString())).isEqualTo("male>female");
+    }
+
+    @Test
+    void approvalWithoutAGenderLeavesTheProfileGenderAlone() throws Exception {
+        User subject = user("9830012012", "buyer");
+        User reviewer = user("9830012013", Roles.Wire.ADMIN);
+        jdbc.update("update users set gender = 'male' where id = ?", subject.getId());
+        entityManager.clear();
+        mvc.perform(submission(subject, PAN)).andExpect(status().isAccepted());
+
+        approve(reviewer, caseOf(subject).getId(), PAN, "").andExpect(status().isOk());
+
+        entityManager.flush();
+        assertThat(jdbc.queryForObject("select gender from users where id = ?", String.class, subject.getId()))
+                .isEqualTo("male");
     }
 
     private User user(String mobile, String role) {

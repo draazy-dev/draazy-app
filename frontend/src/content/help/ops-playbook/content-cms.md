@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 22
-updated: 2026-10-10
+updated: 2026-11-06
 summary: How to add, edit, archive and restore the public FAQs in the Content module, and where they show on the site.
 tags: [ops, internal, content, faq, cms]
 modules: [content]
@@ -69,7 +69,8 @@ Archived FAQs do not show. The list is ordered by category, then by when each FA
 
 - The public site keeps a short-lived copy. An edit can take about half a minute to appear. Refresh before you decide it did not work.
 - The Home page shows only the first 6, so the order (category, then creation date) decides which ones. If the FAQs cannot load, Home shows a built-in set of five instead.
-- Translations exist in the server, but this page has no way to edit them.
+- The site is English only. Write every FAQ in English.
+- Help centre articles are not edited here. They ship with the site.
 
 ## Add or fix an FAQ
 

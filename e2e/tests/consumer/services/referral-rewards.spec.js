@@ -3,6 +3,7 @@
 import { expect, test, ACTORS } from '../../../fixtures/live.js';
 import { API, apiLogin, signedInAs, signIn, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ownersApproveAll } from '../../../helpers/monetisation.js';
+import { gotoSettled, reloadSettled } from '../../../helpers/settle.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
@@ -15,11 +16,11 @@ const entitlements = (token) =>
 /* Borrowed from the seeded catalogue rather than minted: this file has no opinion about the
  * listings beyond existing and belonging to somebody else. */
 async function someListings(count) {
-  const res = await fetch(`${API}/properties?size=${count}`);
+  const res = await fetch(`${API}/properties?size=100`);
   expect(res.status).toBe(200);
   const rows = (await res.json()).content;
   expect(rows.length, 'the seeded catalogue has listings to contact').toBeGreaterThanOrEqual(count);
-  return rows.map((r) => ({ id: r.id, ref: r.slug || r.id }));
+  return rows.map((r) => ({ id: r.id, ref: r.slug || r.id, deal: r.deal }));
 }
 
 const askFor = (token, propertyId) =>
@@ -37,7 +38,9 @@ async function exhaustedBuyer(page) {
     ownersApproveAll(mobile);
   }
   await signedInAs(page, mobile);
-  return { mobile, accessToken, untouched: listings[FREE_LIMIT] };
+  const untouched = listings.slice(FREE_LIMIT).find((l) => l.deal === 'rent');
+  expect(untouched, 'a rent listing is left to press on, so the upsell is the rent pack').toBeTruthy();
+  return { mobile, accessToken, untouched };
 }
 
 /* The button renders in both the desktop sidebar card and the contact sheet and this file has no
@@ -71,7 +74,7 @@ async function pressAndCatch(page) {
 }
 
 test.describe('the free-contact wall, on screen', () => {
-  test('an exhausted press is refused by the server and opens the upsell with the free route beside the paid one, which the flag can drop', async ({ page, viewport, flags }) => {
+  test('an exhausted press is refused by the server and opens the upsell with the paid route only, with or without the flag', async ({ page, viewport, flags }) => {
     const { untouched } = await exhaustedBuyer(page);
     await openListing(page, untouched.ref, flags);
 
@@ -83,8 +86,8 @@ test.describe('the free-contact wall, on screen', () => {
 
     await expect(exhaustedModal(page)).toBeVisible();
     await expect(exhaustedModal(page).getByTestId('contacts-exhausted-plan')).toHaveAttribute('href', /^\/checkout\?plan=contact-pack&next=/);
+    await expect(exhaustedModal(page).getByTestId('contacts-exhausted-refer')).toHaveCount(0);
     await expect(exhaustedModal(page).getByTestId('contacts-exhausted-plan')).toContainText('₹199');
-    await expect(exhaustedModal(page).getByTestId('contacts-exhausted-refer')).toHaveAttribute('href', '/refer');
 
     /* The two sheets only stack below `lg`. On desktop the press comes from the sidebar card, which
        is not a dialog, so there is no pair for one keypress to collapse. */
@@ -101,14 +104,13 @@ test.describe('the free-contact wall, on screen', () => {
       await expect(contactForm).toHaveCount(0);
     }
 
+    // Referrers do not earn contacts, so the flag must not add a refer route to this modal.
     await flags.disable('referralRewards');
     await openListing(page, untouched.ref, flags);
     await pressAndCatch(page);
 
     await expect(exhaustedModal(page)).toBeVisible();
     await expect(exhaustedModal(page).getByTestId('contacts-exhausted-refer')).toHaveCount(0);
-    /* The paid route surviving is half the claim. A flag that took the whole modal away would also
-       satisfy the line above, and would be a different — much worse — behaviour. */
     await expect(exhaustedModal(page).getByTestId('contacts-exhausted-plan')).toBeVisible();
   });
 
@@ -135,33 +137,32 @@ test.describe('the free-contact wall, on screen', () => {
 });
 
 test.describe('referralRewards is a server document', () => {
-  test('/refer shows the contact track and its earnings with the flag on, and keeps only the owner track with it off', async ({ page, flags }) => {
+  test('/refer shows the 50% pitch and the server\'s stats with the flag on, and a send is refused as "paused" with it off', async ({ page, flags }) => {
     const mobile = uniqueMobile();
     const { accessToken } = await apiLogin(mobile);
-    const [only] = await someListings(1);
-    expect((await askFor(accessToken, only.id)).status).toBe(200);
 
     await flags.enable('referralRewards');
     const summary = await fetch(`${API}/me/referrals`, { headers: auth(accessToken) }).then((r) => r.json());
 
     await signedInAs(page, mobile);
-    await page.goto('/refer', { waitUntil: 'networkidle' });
+    await gotoSettled(page, '/refer');
 
-    await expect(page.getByTestId('refer-seeker-track')).toBeVisible();
+    await expect(page.getByTestId('refer-invite-form')).toBeVisible();
+    await expect(page.getByTestId('refer-how')).toContainText(/% off the service fee of your next rent agreement/);
     /* The number on screen is the server's, read from the same endpoint rather than pinned to a literal. */
-    await expect(page.getByTestId('refer-contacts-earned')).toHaveText(String(summary.earned.seeker.contacts));
-    await expect(page.getByTestId('refer-owner-track')).toBeVisible();
+    await expect(page.getByTestId('refer-rewards-earned')).toHaveText(String(summary.rewards.earned));
+    await expect(page.getByTestId('refer-rewards-left')).toHaveText(String(summary.rewards.remaining));
 
     await flags.disable('referralRewards');
-    await page.reload({ waitUntil: 'networkidle' });
+    await reloadSettled(page);
 
-    /* Asserted **first**: `toHaveCount(0)` is satisfied the instant it is asked on a page that has
-       not finished rendering, so the negatives below need something real to wait behind. */
-    await expect(page.getByTestId('refer-owner-track')).toContainText(/free rent agreement/i);
-    await expect(page.getByTestId('refer-agreements')).toBeVisible();
-
-    await expect(page.getByTestId('refer-seeker-track')).toHaveCount(0);
-    await expect(page.getByTestId('refer-contacts-earned')).toHaveCount(0);
+    await page.locator('#refer-friend-mobile').fill('9876543210');
+    const [res] = await Promise.all([
+      page.waitForResponse((r) => /\/api\/me\/referrals\/invites$/.test(r.url()) && r.request().method() === 'POST'),
+      page.getByTestId('refer-invite-send').click(),
+    ]);
+    expect(res.status()).toBe(409);
+    await expect(page.getByTestId('refer-invite-status')).toHaveText('Referrals are paused right now. Please try again later.');
   });
 
   test('the switch is the server\'s too: a switched-off programme refuses a redeem', async ({ flags }) => {
@@ -177,7 +178,7 @@ test.describe('referralRewards is a server document', () => {
   test('Ops switching it off is a confirmed write that lands on the server', async ({ page, flags }) => {
     await flags.enable('referralRewards');
     await signIn(page, ACTORS.admin, { screen: 'staff' });
-    await page.goto('/admin/settings?tab=flags', { waitUntil: 'networkidle' });
+    await gotoSettled(page, '/admin/settings?tab=flags');
 
     await page.getByRole('button', { name: /Monetization & Payments/i }).click();
     const row = page.getByRole('switch', { name: 'Toggle Referral rewards' });

@@ -1,4 +1,6 @@
 import { fmtINR } from '../../../lib/format.js';
+import { deserializeF, filtersToParams } from '../../../lib/listings/filterState.js';
+import { sectionVisible } from '../../../lib/listings/filterRelevance.js';
 import { fmtRent } from './format.js';
 import { BUY_TYPES, RENT_TYPES, COMMERCIAL_TYPES } from '../../../data/propertyTypes.js';
 import { BHK_BUY, BHK_RENT, FURN_LBL, AMEN_LBL } from './constants.js';
@@ -6,8 +8,6 @@ import { BHK_BUY, BHK_RENT, FURN_LBL, AMEN_LBL } from './constants.js';
 const TYPE_LBL = Object.fromEntries([...BUY_TYPES, ...RENT_TYPES]);
 const COMM_LBL = Object.fromEntries(COMMERCIAL_TYPES);
 
-// Default range bounds (mirroring INITIAL() in Listings.jsx), so an "any price" range can be told
-// apart from a real one and not shown as a noise chip.
 const BUY_MAX = 50000000;
 const RENT_MAX = 100000;
 
@@ -44,8 +44,16 @@ export function alertLabel(rec, locNameBySlug = {}) {
   return parts.filter(Boolean).join(' · ') || `All ${rec.deal === 'rent' ? 'rentals' : 'homes'}`;
 }
 
+export function dropHiddenFacets(rec) {
+  const types = new Set(asArr(rec.types));
+  const out = { ...rec };
+  for (const key of ['bhk', 'furnishing', 'amenities']) if (out[key] && !sectionVisible(key, types)) out[key] = [];
+  if (out.pets && !sectionVisible('amenities', types)) out.pets = false;
+  return out;
+}
+
 export function buildAlertRecord(f, locNameBySlug = {}) {
-  const rec = {
+  const rec = dropHiddenFacets({
     deal: f.deal,
     types: asArr(f.types),
     commercialTypes: asArr(f.commercialTypes),
@@ -56,7 +64,7 @@ export function buildAlertRecord(f, locNameBySlug = {}) {
     budget: Array.isArray(f.budget) ? f.budget : undefined,
     rent: Array.isArray(f.rent) ? f.rent : undefined,
     pets: !!f.pets,
-  };
+  });
   rec.label = alertLabel(rec, locNameBySlug);
   return rec;
 }
@@ -80,40 +88,7 @@ export function criteriaChips(rec, locNameBySlug = {}) {
   return chips;
 }
 
-export function countMatches(rec, props = []) {
-  const locs = asArr(rec.localities).map((s) => String(s).toLowerCase());
-  const bhks = asArr(rec.bhk).map(String);
-  const types = asArr(rec.types).map((s) => String(s).toLowerCase());
-  const furnishings = asArr(rec.furnishing).map((s) => String(s).toLowerCase());
-  const amenities = asArr(rec.amenities).map((s) => String(s).toLowerCase());
-  const [lo, hi] = rec.deal === 'rent'
-    ? (Array.isArray(rec.rent) ? rec.rent : [0, RENT_MAX])
-    : (Array.isArray(rec.budget) ? rec.budget : [0, BUY_MAX]);
-  const wantsRent = rec.deal === 'rent';
-  return props.filter((p) => {
-    if (wantsRent ? p.deal !== 'rent' : p.deal === 'rent') return false;
-    if (p.price < lo || p.price > hi) return false;
-    if (locs.length) {
-      const slug = String(p.localitySlug || '').toLowerCase();
-      const name = String(p.locality || '').toLowerCase();
-      if (!locs.includes(slug) && !locs.includes(name)) return false;
-    }
-    if (types.length && !types.includes(String(p.type || '').toLowerCase())) return false;
-    if (bhks.length && !bhks.some((b) => b.endsWith('plus') ? Number(p.bhkNum) >= Number(b.replace('plus', '')) : b === String(p.bhkNum))) return false;
-    if (furnishings.length && !furnishings.includes(String(p.furnishing || '').toLowerCase())) return false;
-    if (amenities.length) {
-      const listingAmenities = asArr(p.amenities).map((s) => String(s).toLowerCase());
-      if (!amenities.every((a) => listingAmenities.includes(a))) return false;
-    }
-    if (rec.pets && p.pets !== true) return false;
-    return true;
-  }).length;
-}
-
 export function searchHref(rec) {
-  const params = new URLSearchParams();
-  params.set('deal', rec.deal === 'rent' ? 'rent' : 'buy');
-  const loc = asArr(rec.localities)[0];
-  if (loc) params.set('q', String(loc).toLowerCase());
+  const params = new URLSearchParams({ deal: rec.deal === 'rent' ? 'rent' : 'buy', ...filtersToParams(deserializeF(rec)) });
   return '/listings?' + params.toString();
 }

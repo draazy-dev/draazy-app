@@ -13,7 +13,7 @@ test.beforeAll(async () => {
 // A static control proves the lazy board mounted even when its feed is empty.
 const openBoard = async (page) => {
   await page.goto(`${BASE}/flatmates`);
-  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 20000 });
 };
 
 const verifiedOnServer = async (mobile) => (await apiLogin(mobile)).user.verified;

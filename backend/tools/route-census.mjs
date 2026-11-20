@@ -9,19 +9,14 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ROUTES_JAVA = join(REPO, 'backend/src/main/java/com/draazy/api/common/web/Routes.java');
 const FRONTEND_SRC = join(REPO, 'frontend/src');
 
-/** Sources that quote a path without calling it — indexing them would make dead routes look live. */
 const EXCLUDE = /i18n|db\.json/;
 
-/** Paths shorter than this are too generic to search for — `/me`, `/api` would match everything. */
 const MIN_PREFIX = 4;
 
-// The only directory from which the app issues an HTTP request, so a path mentioned elsewhere is a
-// browser route wearing the same spelling (`/admin/analytics`). Re-check when a new importer appears.
 const API_CALLERS = /[\\/]frontend[\\/]src[\\/]services[\\/]/;
 
-/** Visibility is deliberately not matched: a `private` BASE is still a BASE that others resolve through. */
 function parseRoutes(text) {
-  const defs = new Map(); // "Class.NAME" -> raw expression, insertion-ordered
+  const defs = new Map();
   let cls = '';
   for (const line of text.split(/\r?\n/)) {
     const openClass = line.match(/static final class (\w+)/);
@@ -38,8 +33,6 @@ function parseRoutes(text) {
   return defs;
 }
 
-// Expand `A + B + "literal"` to a fixed point; a bare `NAME` resolves in the declaring class first,
-// as Java scopes it. Anything unresolved is reported loudly — a skipped route is a claimless route.
 function resolveAll(defs) {
   const out = new Map();
   let progress = true;
@@ -92,14 +85,11 @@ function stripProse(text) {
     .join('\n');
 }
 
-/** Everything before the first path variable — the part a caller must write out literally. */
 function literalPrefix(path) {
   const brace = path.indexOf('{');
   return (brace >= 0 ? path.slice(0, brace) : path).replace(/\/+$/, '');
 }
 
-// A plain `includes` would credit `/documents/requests` to the different `/me/documents/requests`,
-// so the hit must start at a path boundary — a quote, backtick or paren, never a word char or `/`.
 function mentions(index, prefix) {
   let at = index.indexOf(prefix);
   while (at !== -1) {
@@ -110,18 +100,14 @@ function mentions(index, prefix) {
   return false;
 }
 
-/** A Spring Security path matcher rather than a controller mapping — nobody requests these. */
 function isMatcher(path) {
   return path.includes('*');
 }
 
-/** Derived from the path, not a hand-kept key list, so a webhook added later classifies itself. */
 function isInbound(path) {
   return path.startsWith('/webhooks/');
 }
 
-// Same segment count, each segment identical or a `{template}` on the other side — two differently
-// named templates are one wildcard. Caller must exclude `path`, which shadows itself trivially.
 function shadowingSibling(path, matchedPaths) {
   const mine = path.split('/');
   const isVar = (seg) => seg.startsWith('{');
@@ -161,8 +147,6 @@ for (const [key, path] of resolved) {
   });
 }
 
-// `wired` means something under services/ writes this path, the only place a fetch can originate.
-// A path mentioned in code but never there is a browser route, and gets its own bucket below.
 const matchedPaths = considered.filter((r) => r.inServices).map((r) => r.path);
 const missed = considered.filter((r) => !r.inServices);
 

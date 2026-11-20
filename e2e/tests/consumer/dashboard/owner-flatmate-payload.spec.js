@@ -2,15 +2,18 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 const track = flatmateCleanup(test);
 
-const CARD_HIDDEN = ['members', 'ownerMobile', 'ownerName', 'ownerConsentMobile', 'addressFingerprint', 'flagForReview', 'verificationTier', 'reviewStatus', 'preferences'];
+// `verificationTier` and `reviewStatus` stay on the card: its Get verified button reads them.
+const CARD_HIDDEN = ['members', 'ownerMobile', 'ownerName', 'ownerConsentMobile', 'addressFingerprint', 'flagForReview', 'preferences'];
 
 async function newUser() {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Payload Member' });
   return { mobile, accessToken };
 }
 
@@ -18,15 +21,16 @@ async function createGroup(host, policy) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(host.accessToken),
-    body: JSON.stringify({
-      title: `Owner payload ${Date.now().toString(36)}`, name: 'Host', locality: 'Baner', rent: 30000,
-      seats: 2, seatsOpen: 1, policy, role: 'tenant',
-    }),
+    body: JSON.stringify(huntingGroup({
+      title: `Owner payload ${Date.now().toString(36)}`, locality: 'Baner', rent: 30000, deposit: 50000,
+      seats: 2, seatsOpen: 1, policy,
+    })),
   });
   expect(res.status, await res.clone().text()).toBe(201);
   const group = await res.json();
   track('groups', group.id, host.accessToken);
   const admin = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, group.id, auth(admin.accessToken));
   const live = await fetch(`${API}/admin/flatmates/${group.id}/moderation`, {
     method: 'PATCH', headers: auth(admin.accessToken), body: JSON.stringify({ modStatus: 'live', note: 'e2e' }),
   });
@@ -55,8 +59,8 @@ test.describe('Owner flatmate lists and inbox (live API)', () => {
       method: 'POST',
       headers: auth(author.accessToken),
       body: JSON.stringify({
-        name: 'Poster', gender: 'female', age: 26, occupation: 'Designer', budget: 18000,
-        localities: ['Baner'], moveIn, flatPref: 'women', roomPref: 'private', tags: ['Vegetarian'],
+        gender: 'female', age: 26, occupation: 'Designer', budget: 18000,
+        localities: ['Baner'], moveIn, flatPref: 'women', roomPref: 'private',
       }),
     });
     expect(created.status, await created.clone().text()).toBe(201);
@@ -77,7 +81,7 @@ test.describe('Owner flatmate lists and inbox (live API)', () => {
     const masked = `${seeker.mobile.slice(0, 2)}XXXXX${seeker.mobile.slice(-3)}`;
 
     const join = await fetch(`${API}/flatmates/groups/${group.id}/join`, {
-      method: 'POST', headers: auth(seeker.accessToken), body: JSON.stringify({}),
+      method: 'POST', headers: auth(seeker.accessToken), body: JSON.stringify({ gender: 'female' }),
     });
     expect(join.status, await join.clone().text()).toBe(201);
 

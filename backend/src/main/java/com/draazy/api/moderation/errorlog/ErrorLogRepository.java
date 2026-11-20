@@ -5,6 +5,7 @@ import com.draazy.api.common.persistence.LikePatterns;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -18,7 +19,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class ErrorLogRepository {
-
     public enum Status { OPEN, RESOLVED, ALL }
 
     private static final RowMapper<ErrorEventSummary> SUMMARY = (rs, i) -> new ErrorEventSummary(
@@ -42,7 +42,7 @@ public class ErrorLogRepository {
         this.jdbc = jdbc;
     }
 
-    public Page<ErrorEventSummary> search(String source, Status status, String q, Pageable pageable) {
+    public Page<ErrorEventSummary> search(String source, Status status, String q, Instant since, Pageable pageable) {
         StringBuilder where = new StringBuilder(" WHERE 1 = 1");
         List<Object> args = new ArrayList<>();
         if (source != null) {
@@ -54,6 +54,10 @@ public class ErrorLogRepository {
         } else if (status == Status.RESOLVED) {
             where.append(" AND resolved_at IS NOT NULL");
         }
+        if (since != null) {
+            where.append(" AND last_seen >= ?");
+            args.add(Timestamp.from(since));
+        }
         String pattern = LikePatterns.contains(q);
         if (pattern != null) {
             where.append(" AND (message ILIKE ? OR error_type ILIKE ? OR path ILIKE ?"
@@ -61,7 +65,6 @@ public class ErrorLogRepository {
             for (int i = 0; i < 5; i++) {
                 args.add(pattern);
             }
-            // The user-quoted crash reference is matched from its start, not anywhere inside it.
             args.add(pattern.substring(1));
         }
 

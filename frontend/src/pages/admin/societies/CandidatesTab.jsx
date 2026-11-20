@@ -5,22 +5,17 @@ import {
 } from '../../../components/admin/WorkQueue.jsx';
 import { titleCase, fmtDate, Chip, PLAIN, DUPES_FAILED } from './helpers.jsx';
 
-/** One server page of candidates; the search runs on the server so the page and the count stay true. */
 export default function CandidatesTab({ candidates, total, query, onQuery, page: pageIndex, pageSize, onPage, merges, setMerge, openMerge, undoMerge, deciding, note }) {
   const busy = (key) => !!deciding?.has(key);
   const rows = candidates;
   const paging = { page: pageIndex + 1, pageCount: Math.max(1, Math.ceil(total / pageSize)), total, size: pageSize, onPage: (p) => onPage(p - 1) };
 
-  /* Three branches, not two: rows minted before V108 have no provenance, and a confident "From a
-     listing" on those would be the component guessing. A row with no recorded provenance says nothing. */
   const sourceChip = (s) => {
     if (s.mintOrigin === 'demand') return <span className={classNames(CHIP, CHIP_TONE.amber, 'gap-0.5')}><Home className="h-2.5 w-2.5" aria-hidden="true" />Searcher demand</span>;
     if (s.mintOrigin === 'listing') return <span className={classNames(CHIP, CHIP_TONE.sky, 'gap-0.5')}><Building2 className="h-2.5 w-2.5" aria-hidden="true" />From a listing</span>;
     return null;
   };
 
-  /* Hints, not verdicts: `undefined` is "still checking" and `[]` is "nothing resembles it",
-     so a failed check must not read as "No obvious match". */
   const dupeCell = (s) => {
     if (s.dupes === DUPES_FAILED) return <span className="text-amber-300">Could not check</span>;
     if (!s.dupes) return <span className="text-gray-500">Checking…</span>;
@@ -66,7 +61,6 @@ export default function CandidatesTab({ candidates, total, query, onQuery, page:
           />
         ))}
       </RowList>
-      {/* Merges in force: a merged-away society is invisible elsewhere, so a merge could not be undone. */}
       {merges && merges.length ? (
         <div className="m-3 mt-0 rounded-xl border border-white/10 bg-white/5 p-3">
           <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-gray-300"><GitMerge className="h-3.5 w-3.5" /> <h4 className="inline">Merged duplicates</h4></div>

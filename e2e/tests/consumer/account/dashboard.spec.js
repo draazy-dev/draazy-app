@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile, letterTag } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, fileIdentityCase, uploadedListingPhotos, signedInAs, uniqueMobile, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListing, rejectListing } from '../../../helpers/moderation.js';
 import { openBadgeVault, uploadBadgeProof } from '../../../helpers/badgeVault.js';
 import { PHOTO_PNG } from '../../../helpers/listingPhotos.helper.js';
@@ -60,7 +60,7 @@ test.afterEach(async ({ request }) => {
   createdListingIds.clear();
 });
 
-test('the overview shows the optional Verified badge nudge before profile completion', async ({ page }) => {
+test('the overview shows the Verified badge nudge before profile completion', async ({ page }) => {
   const seeker = await newActor(`Zztest Dashboard Seeker ${letterTag()}`, {
     email: `dashboard-${Date.now()}@example.test`,
     city: 'Pune',
@@ -71,7 +71,6 @@ test('the overview shows the optional Verified badge nudge before profile comple
 
   await expect(page.getByTestId('action-center-clear')).toBeVisible();
   await expect(page.getByTestId('verify-badge-cta')).toBeVisible();
-  await expect(page.getByTestId('verify-badge-cta')).toContainText(/optional/i);
   await expect(page.getByTestId('profile-meter')).toHaveCount(0);
 });
 
@@ -101,16 +100,19 @@ test('an owner with an approved listing gets Requests navigation and a Verified 
   const card = page.getByTestId('badge-request-card');
   await expect(card).toBeVisible();
   await expect(card.getByTestId('badge-state')).toHaveText('Not requested');
+  await expect(card.getByTestId('badge-id-step'), 'property verification starts with the ID check').toHaveAttribute('data-state', 'needed');
   await expect(card.getByTestId('request-badge')).toBeDisabled();
 });
 
 test('the vault badge request goes under review, and a staff decline comes back with its reason', async ({ page, request }) => {
   const owner = await newActor(`Zztest Dashboard Badge ${letterTag()}`);
   const listingId = await createApprovedListing(request, owner);
+  await fileIdentityCase(owner.mobile);
 
   await signedInAs(page, owner.mobile);
   const card = await openBadgeVault(page, listingId);
   await expect(card).toHaveAttribute('data-state', 'none');
+  await expect(card.getByTestId('badge-id-step'), 'an ID still in review does not hold the request back').toHaveAttribute('data-state', 'in-review');
   await uploadBadgeProof(page, card, 'Electricity Bill', { name: 'bill.png', mimeType: 'image/png', buffer: PHOTO_PNG });
   await card.getByTestId('request-badge').click();
   await expect(card.getByTestId('badge-state')).toHaveText('Under review');
@@ -157,10 +159,46 @@ test('on a phone the identity banner and listing status card leave no dead rows'
   await expect(banner).toHaveCount(0);
 
   const status = page.getByTestId('listing-status-card').first();
-  const pill = await status.getByText('Live', { exact: true }).boundingBox();
+  const title = await status.getByText('Live', { exact: true }).boundingBox();
   const line = await status.getByText('Buyers can now find and contact you.').boundingBox();
   const card = await status.boundingBox();
   const badge = await status.getByRole('link', { name: 'Get Verified property badge' }).boundingBox();
-  expect(line.y, 'the status line shares the pill row').toBeLessThan(pill.y + pill.height);
-  expect(badge.width, 'the badge CTA fills the row').toBeGreaterThan(card.width * 0.8);
+  const share = await status.getByRole('button', { name: 'Share listing' }).boundingBox();
+  expect(line.y, 'the explanation sits under the status title').toBeGreaterThanOrEqual(title.y + title.height - 1);
+  expect(Math.abs(line.x - title.x), 'title and explanation share one left edge').toBeLessThan(2);
+  expect(share.width + badge.width, 'Share and the badge link fill the action row').toBeGreaterThan(card.width * 0.8);
+
+  const tiles = await page.getByTestId('listing-facts').first().getByRole('listitem').evaluateAll((els) => els.map((el) => {
+    const r = el.getBoundingClientRect();
+    return { y: r.y, h: r.height, w: r.width, clipped: el.scrollWidth > el.clientWidth };
+  }));
+  expect(tiles.length, 'the listing facts show as tiles').toBeGreaterThanOrEqual(1);
+  for (const tile of tiles) {
+    expect(tile.clipped).toBe(false);
+    expect(Math.abs(tile.y - tiles[0].y), 'the fact tiles share one row').toBeLessThan(1);
+    expect(Math.abs(tile.w - tiles[0].w), 'the fact tiles split the row evenly').toBeLessThan(2);
+  }
+});
+
+test('on a phone each owned listing reads as its own card', async ({ page, request }) => {
+  const owner = await newActor(`Zztest Dashboard Cards ${letterTag()}`);
+  await createApprovedListing(request, owner);
+  await createApprovedListing(request, owner);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await signedInAs(page, owner.mobile);
+  await page.goto('/dashboard#properties');
+  const cards = page.getByTestId('owner-listing-card');
+  await expect(cards).toHaveCount(2);
+
+  const looks = await cards.evaluateAll((els) => els.map((el) => {
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, border: parseFloat(s.borderTopWidth), bg: s.backgroundColor };
+  }));
+  for (const card of looks) {
+    expect(card.border, 'each card has its own outline').toBeGreaterThanOrEqual(1);
+    expect(card.bg, 'each card sits on a solid surface, not a faint tint').not.toMatch(/rgba\(.*, 0\.0\d+\)/);
+  }
+  expect(looks[1].top - looks[0].bottom, 'a clear gap separates one listing from the next').toBeGreaterThanOrEqual(16);
 });

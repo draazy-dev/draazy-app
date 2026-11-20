@@ -12,9 +12,15 @@ const ref = (p) => p.slug || p.id;
 
 const cards = (page) => page.locator('a[href^="/property/"]');
 
+// A slug-less listing links as `/property/<bhk-type-deal-locality>-<uuid>`; its key is the trailing UUID.
+const TRAILING_UUID = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
 const slugs = async (page) => {
   const hrefs = await cards(page).evaluateAll((els) => els.map((e) => e.getAttribute('href')));
-  return hrefs.map((h) => h.split('/').pop());
+  return hrefs.map((h) => {
+    const seg = h.split('/').pop();
+    return seg.match(TRAILING_UUID)?.[1] ?? seg;
+  });
 };
 
 /* The count line is rendered twice (a mobile `sm:hidden` copy and a desktop one), and it holds the
@@ -31,6 +37,18 @@ const get = async (query) => {
   expect(res.ok, `${query} answered ${res.status}`).toBe(true);
   return res.json();
 };
+
+test('old demo stock remains searchable even though its freshness is dormant', async ({ page }) => {
+  const detail = await fetch(`${API}/properties/p5140`);
+  expect(detail.ok).toBe(true);
+  const demo = await detail.json();
+  expect(demo.freshness).toBe('dormant');
+
+  const results = await get('deal=buy&localities=wagholi&size=100');
+  expect(results.content.map(ref)).toContain('p5140');
+  await page.goto('/listings?deal=buy&loc=Wagholi');
+  await expect(page.locator('a[href="/property/p5140"]')).toBeVisible();
+});
 
 test('a filter narrows the catalogue, not the page you are holding', async ({ page }) => {
   /* Wagholi's buy listings are the oldest rows, so default order splits them across pages 1 and 2:
@@ -174,6 +192,11 @@ test('a misspelt place name still finds its listings, and the grid shows the ser
   expect((await get('q=wagholy&size=1')).totalElements).toBeGreaterThanOrEqual(exact);
 
   await page.goto('/listings?q=wagholy');
-  await expect.poll(async () => settledCount(page), { timeout: 15000 })
-    .toBe((await get('q=wagholy&size=1')).totalElements);
+  // Other shards add and retire Wagholi stock mid-run, so a mismatch reloads rather than failing on a moved target.
+  await expect.poll(async () => {
+    const shown = await settledCount(page);
+    const served = (await get('q=wagholy&size=1')).totalElements;
+    if (shown !== served) await page.reload();
+    return shown === served;
+  }, { timeout: 30000 }).toBe(true);
 });

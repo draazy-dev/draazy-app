@@ -1,4 +1,4 @@
-/* localStorage keys match the HTML prototype's, for data interop. */
+import { SEARCH_TYPES, canonicalTypeKey, matchTypeKey } from '../../data/propertyTypes.js';
 
 const DOC_CATEGORIES = {
   'Title & Ownership': ['Sale Deed', 'Agreement to Sale', 'Mother Deed / Title Chain', 'Conveyance Deed', 'Index II', '7/12 Extract', '8A Extract', 'Property Card', 'Power of Attorney', 'Encumbrance Certificate', 'Legal Title Search Report'],
@@ -6,12 +6,66 @@ const DOC_CATEGORIES = {
   'Approvals & Plans': ['Sanctioned Building Plan', 'Floor Plan', 'Commencement Certificate', 'Occupancy Certificate', 'Completion Certificate', 'RERA Certificate', 'NA Order (Non-Agricultural)'],
   'Purchase & Payments': ['Allotment Letter', 'Possession Letter', 'Builder Payment Receipts', 'Stamp Duty & Registration Receipt', 'Property Valuation Report'],
   'Tax & Utilities': ['Property Tax Receipt', 'Electricity Bill'],
+  'Rent Agreement': ['Rent Agreement'],
 };
 export { DOC_CATEGORIES };
 
-export const ALL_DOC_TYPES = Object.values(DOC_CATEGORIES).flat().concat(['Other']);
+const BUILT = ['flat', 'house', 'villa', 'commercial'];
+const LAND = ['plot', 'farmland'];
+const ALL = [...BUILT, ...LAND];
+const SALE = 'sale';
+// Only exists once construction is finished (absent for new-launch / under-construction).
+const DONE = 'done';
 
-/* Keyed by the exact slot name used on the Documents tab. */
+const OWNER_DOC_RULES = {
+  'Sale Deed': [ALL, DONE],
+  'Agreement to Sale': [ALL, SALE],
+  'Mother Deed / Title Chain': [ALL, SALE],
+  'Conveyance Deed': [BUILT, SALE, DONE],
+  'Index II': [ALL],
+  '7/12 Extract': [LAND],
+  '8A Extract': [LAND],
+  'Property Card': [['house', 'villa', 'commercial', 'plot']],
+  'Power of Attorney': [ALL],
+  'Encumbrance Certificate': [ALL, SALE],
+  'Legal Title Search Report': [ALL, SALE],
+  'Society Registration Certificate': [BUILT, SALE, DONE],
+  'Society NOC': [BUILT, DONE],
+  'Share Certificate': [BUILT, DONE],
+  'Maintenance Receipt': [BUILT, DONE],
+  'Sanctioned Building Plan': [BUILT, SALE],
+  'Floor Plan': [BUILT],
+  'Commencement Certificate': [BUILT, SALE],
+  'Occupancy Certificate': [BUILT, DONE],
+  'Completion Certificate': [BUILT, SALE, DONE],
+  'RERA Certificate': [[...BUILT, 'plot'], SALE],
+  'NA Order (Non-Agricultural)': [['house', 'villa', 'plot']],
+  'Allotment Letter': [BUILT, SALE],
+  'Possession Letter': [BUILT, SALE, DONE],
+  'Builder Payment Receipts': [BUILT, SALE],
+  'Stamp Duty & Registration Receipt': [ALL, SALE],
+  'Property Valuation Report': [ALL, SALE],
+  'Property Tax Receipt': [[...BUILT, 'plot'], DONE],
+  'Electricity Bill': [BUILT, DONE],
+};
+
+const docTypeKey = (raw) => {
+  const s = String(raw || '').toLowerCase();
+  return canonicalTypeKey(s) || SEARCH_TYPES.find((t) => matchTypeKey(t.key, s))?.key || 'flat';
+};
+
+export function ownerDocCategories(listing) {
+  const type = docTypeKey(listing?.type);
+  const sale = listing?.deal !== 'rent';
+  const done = !['under', 'new'].includes(listing?.construction);
+  return Object.keys(OWNER_DOC_RULES).filter((category) => {
+    const [types, ...flags] = OWNER_DOC_RULES[category];
+    return types.includes(type) && (sale || !flags.includes(SALE)) && (done || !flags.includes(DONE));
+  });
+}
+
+export const offersHomeLoan = (listing) => listing?.deal !== 'rent' && docTypeKey(listing?.type) !== 'farmland';
+
 export const DOC_INFO = {
   'Sale Deed': { title: 'Sale Deed', body: 'The core legal proof that ownership was transferred to you. Registered at the sub-registrar, it is the single most important document a buyer or bank will ask to see.' },
   'Agreement to Sale': { title: 'Agreement to Sale', body: 'The contract recording the agreed price and terms before the final sale. It shows the transaction history and any conditions between buyer and seller.' },
@@ -46,11 +100,6 @@ export const DOC_INFO = {
 
   'Property Tax Receipt': { title: 'Property Tax Receipt', body: 'Shows municipal property tax is paid up to date. Buyers check it to confirm no tax arrears carry over.' },
   'Electricity Bill': { title: 'Electricity Bill', body: 'A recent paid bill doubles as address proof and shows utility dues are clear. Often asked for during KYC and transfers.' },
-
-  'Aadhaar Card': { title: 'Aadhaar Card', body: 'Your primary government identity and address proof. Needed for rent agreements, ownership verification and most transactions.' },
-  'PAN Card': { title: 'PAN Card', body: 'Your tax identity. Mandatory for property purchases above set limits, TDS, and any transaction the tax department tracks.' },
-  'Passport Photo': { title: 'Passport Photo', body: 'A recent passport-size photograph required on agreements, registration forms and KYC.' },
-  'Ownership Proof': { title: 'Ownership Proof', body: 'Proof you own the property you are letting out \u2014 the registered Index II, sale deed, or a recent electricity/property-tax bill. Required to register a rent agreement as the licensor.' },
 };
 
 export function docInfo(category) { return DOC_INFO[category] || null; }
@@ -61,103 +110,9 @@ export const HOME_LOAN_CHECKLIST = [
   'Occupancy Certificate', 'RERA Certificate', 'Possession Letter',
 ];
 
-const docsKey = (mobile) => `draazyDocs:${mobile || 'anon'}`;
-const docReqKey = (mobile) => `draazyDocReq:${mobile || 'anon'}`;
-
-function get(k, def) {
-  try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch { return def; }
-}
-function set(k, v) {
-  try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* quota */ }
-  return v;
-}
-
-export function getAllDocs(mobile) { return get(docsKey(mobile), {}); }
-export function getDocsForProp(mobile, propId) { return getAllDocs(mobile)[propId] || []; }
-
-export function addDocument(mobile, propId, { category, name, size, mime, dataUrl }) {
-  const all = getAllDocs(mobile);
-  if (!all[propId]) all[propId] = [];
-  const doc = {
-    id: 'd' + Date.now(),
-    category: category || 'Other',
-    name: name || 'Document',
-    size: size || 0,
-    mime: mime || 'application/pdf',
-    dataUrl: dataUrl || null,
-    uploadedAt: Date.now(),
-  };
-  all[propId].unshift(doc);
-  set(docsKey(mobile), all);
-  return doc;
-}
-
-export function deleteDocument(mobile, propId, docId) {
-  const all = getAllDocs(mobile);
-  if (all[propId]) {
-    all[propId] = all[propId].filter((d) => d.id !== docId);
-    set(docsKey(mobile), all);
-  }
-  return all[propId] || [];
-}
-
-export function getDocRequests(mobile) { return get(docReqKey(mobile), []); }
-export function setDocRequests(mobile, reqs) { return set(docReqKey(mobile), reqs); }
-
-export function addDocRequest(mobile, {
-  propId, buyerName, buyerMobile, docType, categories, acknowledgedDisclaimer,
-}) {
-  const reqs = getDocRequests(mobile);
-  const requestedCategories = Array.isArray(categories) && categories.length
-    ? [...new Set(categories.filter(Boolean))]
-    : [docType || 'Sale Deed'];
-  const existing = reqs.find((r) =>
-    r.propId === propId && r.buyerMobile === buyerMobile && r.status === 'pending');
-  if (existing) return existing;
-  const req = {
-    id: `req-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`,
-    propId: propId || '',
-    buyerName: buyerName || 'Buyer',
-    buyerMobile: buyerMobile || '',
-    docType: requestedCategories[0],
-    categories: requestedCategories,
-    status: 'pending',
-    requestedAt: Date.now(),
-    acknowledgedDisclaimer: !!acknowledgedDisclaimer,
-    ackAt: acknowledgedDisclaimer ? Date.now() : null,
-  };
-  reqs.unshift(req);
-  setDocRequests(mobile, reqs);
-  return req;
-}
-
-export function respondDocRequest(mobile, reqId, decision) {
-  const reqs = getDocRequests(mobile);
-  const req = reqs.find((r) => r.id === reqId);
-  if (req) {
-    req.status = decision === 'granted' ? 'granted' : 'declined';
-    req.respondedAt = Date.now();
-    // Buyer requests by category and owner uploads by category, so the category match is
-    // exact scope — no separate "pick which docs" step is needed.
-    if (req.status === 'granted') {
-      const categories = new Set(req.categories || [req.docType]);
-      req.sharedDocIds = getDocsForProp(mobile, req.propId)
-        .filter((d) => categories.has(d.category))
-        .map((d) => d.id);
-    } else {
-      req.sharedDocIds = [];
-    }
-    setDocRequests(mobile, reqs);
-  }
-  return req;
-}
-
-/* Takes the docs rather than re-reading localStorage, which holds nothing the seam fetched
-   and would report a false 0/N. */
-export function checklistFromDocs(docs) {
+export function checklistFromDocs(docs, relevant) {
   const uploadedCategories = new Set((docs || []).map((d) => d.category));
-  const ready = HOME_LOAN_CHECKLIST.filter((c) => uploadedCategories.has(c));
-  return { ready: ready.length, total: HOME_LOAN_CHECKLIST.length, items: HOME_LOAN_CHECKLIST.map((c) => ({ name: c, done: uploadedCategories.has(c) })) };
+  return { items: HOME_LOAN_CHECKLIST.filter((c) => relevant.includes(c)).map((c) => ({ name: c, done: uploadedCategories.has(c) })) };
 }
 
 export function formatSize(bytes) {

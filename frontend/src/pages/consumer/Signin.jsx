@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { ArrowRight, BadgeCheck, CheckCircle2, IndianRupee, Loader2, Mail, Send, ShieldCheck, Smartphone, User, UserCircle, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { sendOtp as sendOtpSvc } from '../../services/authService.js';
@@ -20,10 +20,9 @@ import { resolveAuthIntent, postAuthDest } from '../../lib/authIntent.js';
 import { isValidName } from '../../lib/auth.js';
 import { classifyOtpVerifyError } from '../../lib/otpVerifyError.js';
 import { healStaleShell } from '../../lib/seamErrors.js';
+import { redeemOnNewAccount } from '../../lib/referralAttribution.js';
 import { cityHasData } from '../../lib/geoConfig.js';
 import { STATS } from '../../data/homeData.js';
-// City-aware marketing panel: a city with no inventory yet gets "launching soon" copy and
-// generic-but-true claims, never Pune's numbers.
 
 const MOAT = [
   [IndianRupee, 'auth.moatZeroBrokerage'],
@@ -40,7 +39,7 @@ function LeftPanel() {
 
   return (
     <>
-      <div className="inline-flex items-center gap-2 rounded-full border border-teal-400/25 bg-teal-400/[.08] px-3.5 py-1.5 mt-6 mb-6">
+      <div className="dz-tag border border-teal-400/25 bg-teal-400/[.08] mt-6 mb-6">
         <span className="auth-live-dot inline-block w-1.5 h-1.5 rounded-full bg-teal-300" />
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-200">
           {hasData ? t('auth.marketplaceEyebrow', { city }) : t('auth.launchingSoon', { city })}
@@ -56,7 +55,7 @@ function LeftPanel() {
       </p>
       <div className="flex flex-wrap gap-2 mb-8">
         {MOAT.map(([Ic, key]) => (
-          <span key={key} className="inline-flex items-center gap-1.5 rounded-full border border-white/[.08] bg-white/[.04] px-3 py-1.5 text-[13px] font-medium text-gray-200">
+          <span key={key} className="dz-tag border border-white/[.08] bg-white/[.04] font-medium text-gray-200">
             <Ic className="w-4 h-4 text-teal-300" /> {t(key)}
           </span>
         ))}
@@ -87,15 +86,12 @@ export default function Signin() {
   const [verifying, setVerifying] = useState(false);
   const [done, setDone] = useState(false);
   const turnstile = useTurnstile();
-  /* Only a refusal a fresh code cannot fix blocks the form — a busy limiter or a dropped connection leaves the guess
-     intact and must stay retryable. */
-  const otp = useOtpFlow((m) => sendOtpSvc({ mobile: m, turnstileToken: turnstile.spend() }));
+  const otp = useOtpFlow((m) => turnstile.withToken((tok) => sendOtpSvc({ mobile: m, turnstileToken: tok })));
   const [verifyError, setVerifyError] = useState(null);
   const otpSpent = verifyError?.terminal === true;
   const otpCanBeRenewed = !otpSpent || verifyError?.resendable === true;
   const verifyMessage = verifyError
     ? t(verifyError.messageKey, { count: verifyError.count })
-  /* Step 3 is collected only from an account the server provisioned without a name. */
     : null;
   const [needsProfile, setNeedsProfile] = useState(false);
   const [name, setName] = useState('');
@@ -103,8 +99,6 @@ export default function Signin() {
   const [profileErrs, setProfileErrs] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
-  /* The confirmation is held on screen for a second, during which the live navbar is still clickable — so the timer
-     has to be cancellable. */
 
   const redirectTimer = useRef(null);
   useEffect(() => () => clearTimeout(redirectTimer.current), []);
@@ -114,8 +108,6 @@ export default function Signin() {
 
   const sendOtp = () => {
     if (!mobile.valid) { setMobileErr(true); return; }
-    /* No `userExists(mobile)` check: a public "does this mobile have an account?" answer is a user-enumeration
-       oracle, and the server provisions on first verified login anyway. */
     setMobileErr(false);
     otp.send(mobile.value);
   };
@@ -124,24 +116,19 @@ export default function Signin() {
     e.preventDefault();
     if (!mobile.valid) { setMobileErr(true); return; }
     if (!otp.otpSent) { sendOtp(); return; }
-    // The disabled button is presentation, not enforcement — Enter still submits a form whose
-    // button is disabled in some browsers, and this code can only be refused.
     if (otpSpent) return;
     if (otp.otp.length < 6) { otp.setOtpError(true); return; }
     setVerifying(true);
     setVerifyError(null);
     try {
       const who = await login({ mobile: mobile.value, otp: otp.otp, remember });
-      /* A blank name is how a nameless provisioned account announces itself, asked for only after the code proved the
-         number. */
       const claim = params.get('claim');
       if (claim) recordClaimLinkOpened(claim).catch(() => {});
-      if (who && !who.name?.trim()) { setNeedsProfile(true); return; }
+      if (who && !who.name?.trim()) { redeemOnNewAccount(); setNeedsProfile(true); return; }
       setDone(true);
       redirectTo(postAuthDest(params, claim ? '/dashboard#listings' : undefined));
     } catch (err) {
       setVerifyError(classifyOtpVerifyError(err));
-      // Set the message FIRST: if a reload starts, it is never read; if the heal is refused, it is.
       healStaleShell(err);
     } finally {
       setVerifying(false);
@@ -170,15 +157,11 @@ export default function Signin() {
     setSaving(true);
     setSaveError(null);
     try {
-      // Email is omitted rather than sent blank: PATCH treats a present field as an overwrite,
-      // so `email: ''` would erase an address on the retry path.
       const patch = { name: nameVal };
       if (emailVal) patch.email = emailVal;
       await update(patch);
       setDone(true);
-      /* Only this branch knows the account is seconds old, so only it can say the dashboard is a wall of zeros. */
       redirectTo(postAuthDest(params, params.get('claim') ? '/dashboard#listings' : '/listings'));
-      /* Read the STATUS, never `err.message`: the server speaks English and this form is trilingual. */
     } catch (err) {
       setSaveError(err?.status === 409 ? t('auth.errEmailTaken') : t('common.somethingWentWrong'));
     } finally {
@@ -247,32 +230,24 @@ export default function Signin() {
             <MobileField id="signin-mobile" autoFocus enterKeyHint="send" value={mobile.value} onChange={(v) => { if (v !== mobile.value && otp.otpSent) otp.reset(); mobile.setValue(v); setMobileErr(false); setVerifyError(null); }} error={mobileErr} disabled={otp.sending || verifying} placeholder={t('auth.mobilePlaceholder')} />
             {mobileErr ? <p className="text-red-400 text-xs mt-1.5 ml-1">{t('auth.errMobile')}</p> : null}
           </div>
-          {/* This alert remains mounted from the first OTP request through verification, so all delivery and
-             verification failures reach the same assistive-technology channel. */}
-
             <p role="alert" id="signin-otp-status" className={otp.otpError || otp.sendError || verifyMessage ? 'text-red-400 text-xs text-center' : 'sr-only'}>{otp.otpError ? t('auth.errOtp') : (otp.sendError ? t(otp.sendError.messageKey, { count: otp.sendError.count }) : verifyMessage)}</p>
 
+          <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
           {!otp.otpSent ? (
-              /* Renders nothing unless VITE_TURNSTILE_SITE_KEY is set, and the send button is not gated on a token —
-                 the server alone decides whether the challenge is required. */
             <>
-              <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
-              <button type="button" onClick={sendOtp} disabled={otp.sending} className="send-otp-btn w-full py-3 rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2">
+              <button type="button" onClick={sendOtp} disabled={otp.sending} className="send-otp-btn w-full h-btn-lg rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2">
                 <Send className="w-4 h-4" /> {otp.sending ? t('auth.sending') : t('auth.sendOtp')}
               </button>
+              <p className="text-[11px] text-gray-500 text-center">{t('auth.whatsappNotice')}</p>
             </>
           ) : (
             <div className="space-y-4">
               <div className="text-center">
                 <label className="block text-sm font-medium text-gray-300 mb-1">{t('auth.enterOtp')}</label>
                 <p className="text-xs text-gray-500 mb-4">{t('auth.otpSentTo')} <span className="text-teal-400 font-medium">+91 {mobile.value}</span></p>
-              {/* Typing clears an ordinary error but not the spent-code blocker: only a fresh code can help, so
-                 hiding the message would walk the user back into a refusal. */}
               </div>
               <OtpBoxes value={otp.otp} onChange={(v) => { otp.setOtp(v); otp.setOtpError(false); if (!otpSpent) setVerifyError(null); }} error={otp.otpError || !!verifyError} />
               <div className="flex items-center justify-center gap-2 text-sm">
-                {/* Cleared only once a code has really been sent: clearing on click would re-enable the form against
-                   the dead code whenever the resend itself is refused. */}
                 <span className="text-gray-500">{t('auth.didntReceive')}</span>
                 <button type="button" onClick={async () => { if (await otp.resend(mobile.value)) setVerifyError(null); }} disabled={!otp.canResend || otp.sending || !otpCanBeRenewed} className="text-teal-400 hover:text-teal-300 font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                   {otp.canResend ? t('auth.resendOtp') : t('auth.resendIn', { seconds: otp.seconds })}
@@ -298,10 +273,18 @@ export default function Signin() {
           ) : null}
         </form>
 
+        <p className="text-[11px] leading-relaxed text-gray-500 text-center mt-5">
+          <Trans
+            i18nKey="auth.inlineOtpTerms"
+            components={{
+              1: <Link to="/terms" className="text-teal-400 hover:text-teal-300" />,
+              3: <Link to="/privacy" className="text-teal-400 hover:text-teal-300" />,
+            }}
+          />
+        </p>
+
         {signupsOn ? (
           <p className="text-center text-sm text-gray-500 mt-7">
-            {/* Carries the whole query string: Signup calls the same `postAuthDest(params)`, so a bare `/signup` link
-               would drop the destination the sender chose. */}
             {t('auth.noAccount')}
             <Link to={params.toString() ? `/signup?${params}` : '/signup'} className="text-teal-400 hover:text-teal-300 font-semibold transition-colors ml-1">{t('auth.signUp')}</Link>
           </p>

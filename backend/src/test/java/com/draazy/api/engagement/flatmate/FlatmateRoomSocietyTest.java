@@ -10,7 +10,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,11 +18,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
-// The society FK is nullable because rooms may be offered in uncatalogued buildings.
-// The FK cannot catch this: `null` is a legal value for the column.
 @DisplayName("Flatmates — a room's society id has to name a society")
 class FlatmateRoomSocietyTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -34,16 +30,16 @@ class FlatmateRoomSocietyTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    // This helper sends `societyId`; the shared supply helper deliberately never does.
     private static String roomBody(User host, String societyId) {
         return """
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                 "furnishing":"semi","locality":"Baner","societyId":%s,"rentShare":15000,
+                 "locality":"Baner","societyId":%s,"rentShare":15000,
                  "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
-                 "foodPref":"any","photos":["%s"],
-                 "hostRole":"owner","note":"Sunny room, quiet building."}
+                 "foodPref":"any",%s,
+                 "hostRole":"owner","note":"Sunny room, quiet building.",%s,%s}
                 """.formatted(societyId == null ? "null" : "\"" + societyId + "\"",
-                UploadedPhotos.of(host.getId()));
+                FlatmateRoomFixture.photos(host.getId()), FlatmateRoomFixture.BASICS,
+                FlatmateRoomFixture.DETAILS);
     }
 
     private ResultActions offerRoom(User host, String societyId) throws Exception {
@@ -78,7 +74,6 @@ class FlatmateRoomSocietyTest extends AbstractApiTest {
     @Test
     @DisplayName("omitting the society id is still allowed — the room just names no building")
     void absentSocietyIdStillWorks() throws Exception {
-        // The guard must not turn an optional field into a required one.
         offerRoom(host("9811100003"), null)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.societyId").doesNotExist());

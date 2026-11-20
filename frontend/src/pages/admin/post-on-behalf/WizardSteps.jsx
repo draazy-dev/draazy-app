@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ImagePlus } from 'lucide-react';
 import { classNames, parseAmount } from '../../../lib/format.js';
 import Select from '../../../components/ui/Select.jsx';
 import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import SocietySelect from '../../consumer/list-property/SocietySelect.jsx';
+import { activeLocality, societyLocalityName } from '../../consumer/list-property/useListingLocation.js';
 import FieldError from '../../../components/ui/FieldError.jsx';
+import IdInput from '../../../components/IdInput.jsx';
 import AvailabilityField from '../../../components/ui/AvailabilityField.jsx';
 import DateField from '../../../components/ui/DateField.jsx';
 import i18n from '../../../i18n/index.js';
@@ -38,8 +40,6 @@ const moneyWords = (v) => {
 
 const WIDE = 'grid-cols-1 sm:grid-cols-2';
 
-/* Short option sets as one-tap boxes instead of a dropdown, so the desk can file a call quickly.
-   Re-tapping the chosen box is a no-op: a repeat `propertyType` would cascade-reset its answers. */
 function ChoiceBoxes({ value, onChange, options, ariaLabel, invalid = false, cols = 'grid-cols-2 sm:grid-cols-3' }) {
   return (
     <div role="group" aria-label={ariaLabel} className={classNames('grid gap-2', cols)}>
@@ -61,11 +61,7 @@ function ChoiceBoxes({ value, onChange, options, ariaLabel, invalid = false, col
 
 export function OwnerStep({ form, set, errors, standing }) {
   const mobileValid = /^[6-9]\d{9}$/.test(form.ownerMobile);
-  /* The tally arrives as a prop from one read of the pending queue when the wizard opens. Defaulted
-     so the step still renders if it is mounted without one. */
   const dupCount = mobileValid ? (standing?.pending || 0) : 0;
-  /* Shown, never enforced: the desk is exempt from the owner's plan ceiling, so this is information
-     for the call and reads as a sales prompt rather than a warning. */
   const overage = standing?.known && standing.overAllowance ? standing : null;
   return (
     <div className="space-y-5">
@@ -73,11 +69,11 @@ export function OwnerStep({ form, set, errors, standing }) {
         <strong>Concierge Mode:</strong> Take only the key facts on the call. The owner signs in with this mobile number, confirms the listing is theirs, and adds the rest and photos.
       </div>
       <div><label htmlFor="pob-ownerName" className={label}>Owner Name *</label><input id="pob-ownerName" value={form.ownerName} onChange={(e) => set('ownerName', e.target.value)} placeholder="Full name of the property owner" className={classNames(fld, errors.ownerName && errCls)} /><FieldError show={!!errors.ownerName}>Owner name is required.</FieldError></div>
-      <div><label htmlFor="pob-ownerMobile" className={label}>Owner Mobile *</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">+91</span><input id="pob-ownerMobile" inputMode="numeric" value={form.ownerMobile} onChange={(e) => set('ownerMobile', e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="9876543210" className={classNames(fld, 'pl-12', errors.ownerMobile && errCls)} /></div><FieldError show={!!errors.ownerMobile}>Valid 10-digit mobile required.</FieldError>
+      <div><label htmlFor="pob-ownerMobile" className={label}>Owner Mobile *</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">+91</span><IdInput kind="mobile" id="pob-ownerMobile" value={form.ownerMobile} onChange={(v) => set('ownerMobile', v)} placeholder="9876543210" className={classNames(fld, 'pl-12', errors.ownerMobile && errCls)} /></div><FieldError show={!!errors.ownerMobile}>Valid 10-digit mobile required.</FieldError>
         {dupCount > 0 && <p className="mt-1.5 text-xs text-amber-300/90">⚠ This owner already has {dupCount} pending listing{dupCount > 1 ? 's' : ''}. You can still continue if this is a different property.</p>}
         {overage && <p data-testid="pob-plan-overage" className="mt-1.5 text-xs text-sky-300/90">This owner is over their plan — {overage.held} live listing{overage.held > 1 ? 's' : ''} on a plan that includes {overage.allowance}. You can still post; worth mentioning an upgrade on the call.</p>}
       </div>
-      <div><label htmlFor="pob-ownerNotes" className={label}>Internal Notes (optional)</label><textarea id="pob-ownerNotes" value={form.ownerNotes} maxLength={4000} onChange={(e) => set('ownerNotes', e.target.value)} placeholder="e.g. Owner contacted via WhatsApp, photos sent on chat..." rows={3} className={fld} /></div>
+      <div><label htmlFor="pob-ownerNotes" className={label}>Internal Notes</label><textarea id="pob-ownerNotes" value={form.ownerNotes} maxLength={4000} onChange={(e) => set('ownerNotes', e.target.value)} placeholder="e.g. Owner contacted via WhatsApp, photos sent on chat..." rows={3} className={fld} /></div>
     </div>
   );
 }
@@ -114,19 +110,31 @@ export function PropertyStep({ form, set, errors }) {
 }
 
 export function LocationStep({ form, set, errors, onLocalityBusy }) {
-  // A pick binds the listing to the society record and its Google pin; typing unbinds both.
-  const onSocietyChange = (s) => {
+  const pickSeq = useRef(0);
+  const handPickedAt = useRef(-1);
+  const pickLocality = (name, slug) => { handPickedAt.current = pickSeq.current; set('locality', name); set('localitySlug', slug); };
+  const onSocietyChange = async (s) => {
     set('society', s?.name || '');
     set('societyId', s?.id || '');
     set('lat', s?.lat ?? null);
     set('lng', s?.lng ?? null);
     set('pincode', s?.pincode || '');
+    const seq = ++pickSeq.current;
+    if (!s?.id) return;
+    onLocalityBusy(true);
+    try {
+      const { name, slug } = await societyLocalityName(s, Number(s.lat ?? NaN), Number(s.lng ?? NaN));
+      const hit = await activeLocality(name, slug);
+      if (hit && seq === pickSeq.current && handPickedAt.current !== seq) { set('locality', hit.name); set('localitySlug', hit.slug); }
+    } finally {
+      if (seq === pickSeq.current) onLocalityBusy(false);
+    }
   };
   return (
     <div className="space-y-5">
-      <div><label className={label}>Locality *</label><LocalitySelect value={form.locality} onChange={(v) => { set('locality', v); set('localitySlug', ''); }} onSelect={(sel) => { set('locality', sel.name); set('localitySlug', sel.slug || ''); }} onBusyChange={onLocalityBusy} placeholder="Select locality" ariaLabel="Locality" invalid={!!errors.locality} /><FieldError show={!!errors.locality}>Select a locality.</FieldError></div>
       <div><label htmlFor="pob-society" className={label}>Society / Building Name</label>
         <SocietySelect id="pob-society" value={form.societyId} name={form.society} allowNotOnMaps={false} localityLabel={form.locality} lat={form.lat} lng={form.lng} placeholder="Search society or building on Google Maps" inputClassName={fld} onChange={onSocietyChange} /></div>
+      <div><label className={label}>Locality *</label><LocalitySelect value={form.locality} onChange={(v) => pickLocality(v, '')} onSelect={(sel) => pickLocality(sel.name, sel.slug || '')} onBusyChange={onLocalityBusy} placeholder="Select locality" ariaLabel="Locality" invalid={!!errors.locality} /><FieldError show={!!errors.locality}>Select a locality.</FieldError></div>
       <div><label htmlFor="pob-address" className={label}>Full Address</label><textarea id="pob-address" value={form.address} maxLength={300} onChange={(e) => set('address', e.target.value)} placeholder="Flat no, wing, street..." rows={2} className={fld} /></div>
     </div>
   );
@@ -147,7 +155,7 @@ export function PricingStep({ form, set, errors }) {
       <div><label htmlFor="pob-price" className={label}>{rent ? 'Monthly Rent' : 'Expected Price'} *</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</span><input id="pob-price" inputMode="numeric" {...money('price')} placeholder={rent ? 'e.g. 25,000' : 'e.g. 85,00,000'} className={classNames(fld, 'pl-10', errors.price && errCls)} /></div>{errors.price ? <FieldError show>Enter the {rent ? 'monthly rent' : 'expected price'}.</FieldError> : moneyWords(form.price) && <p className="text-xs text-gray-400 mt-1.5 ml-1">{moneyWords(form.price)}</p>}</div>
       {rent && (
         <>
-          <div><label htmlFor="pob-deposit" className={label}>Security Deposit</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</span><input id="pob-deposit" inputMode="numeric" {...money('deposit')} placeholder="e.g. 50,000" className={classNames(fld, 'pl-10')} /></div>{moneyWords(form.deposit) && <p className="text-xs text-gray-400 mt-1.5 ml-1">{moneyWords(form.deposit)}</p>}<div className="flex flex-wrap gap-2 mt-2">{DEPOSIT_MONTHS[land ? 'land' : commercial ? 'commercial' : 'residential'].map((m) => <button key={m} type="button" onClick={() => setDepositMonths(m)} className="text-[11px] px-2.5 py-1 rounded-full border border-white/10 text-gray-400 hover:border-teal-400/40 hover:text-teal-300 transition-all">{m} month{m > 1 ? 's' : ''} rent</button>)}</div></div>
+          <div><label htmlFor="pob-deposit" className={label}>Security Deposit *</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</span><input id="pob-deposit" inputMode="numeric" {...money('deposit')} placeholder="e.g. 50,000" className={classNames(fld, 'pl-10', errors.deposit && errCls)} /></div>{errors.deposit ? <FieldError show>Enter the security deposit (0 if none).</FieldError> : moneyWords(form.deposit) && <p className="text-xs text-gray-400 mt-1.5 ml-1">{moneyWords(form.deposit)}</p>}<div className="flex flex-wrap gap-2 mt-2">{DEPOSIT_MONTHS[land ? 'land' : commercial ? 'commercial' : 'residential'].map((m) => <button key={m} type="button" onClick={() => setDepositMonths(m)} className="dz-chip">{m} month{m > 1 ? 's' : ''} rent</button>)}</div></div>
           <div><label className={label}>Available From</label><AvailabilityField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} ariaLabel="Available from date" className={fld} /></div>
         </>
       )}
@@ -176,7 +184,7 @@ export function PhotosStep({ form, set }) {
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-gray-400">Add photos received from the owner (optional). The owner can also upload directly from their claim link.</p>
+      <p className="text-sm text-gray-400">Add photos received from the owner. The owner can also upload directly from their claim link.</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {form.photos.map((url, i) => (
           <div key={i} className="relative group rounded-xl overflow-hidden border border-white/10 aspect-[4/3]">
@@ -224,7 +232,7 @@ export function ReviewStep({ form }) {
         <ReviewRow label="Photos" value={`${form.photos.length} photo${form.photos.length === 1 ? '' : 's'} added`} />
       </div>
       <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-200 mt-6">
-        <strong>What happens next:</strong> The listing is saved as pending under the owner&apos;s mobile. Send them the claim link on WhatsApp from <span className="font-medium text-amber-100">Properties → Staff Posted</span>. It can go live only after they confirm it&apos;s their property.
+        <strong>What happens next:</strong> The listing is saved as pending under the owner&apos;s mobile. Send them the claim link on WhatsApp from the next screen; later you can find the listing under <span className="font-medium text-amber-100">Properties → All listings, Source: Staff posted</span>. It can go live only after they confirm it&apos;s their property.
       </div>
     </div>
   );

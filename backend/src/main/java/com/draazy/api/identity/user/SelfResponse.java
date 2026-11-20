@@ -12,6 +12,8 @@ public record SelfResponse(
         String role,
         boolean verified,
         String city,
+        String gender,
+        int genderChangesLeft,
         boolean verifiedContactOnly,
         boolean hideNumber,
         boolean shareActivityStatus,

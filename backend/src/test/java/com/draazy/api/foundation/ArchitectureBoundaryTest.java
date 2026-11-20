@@ -16,17 +16,12 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Package-level checks allow shared identity/catalog vocabulary without hiding real feature leaks.
 @DisplayName("Architecture — package boundaries (package-structure.md §2)")
 class ArchitectureBoundaryTest {
-
     private static final Path MAIN = Path.of("src", "main", "java", "com", "draazy", "api");
 
-    // The shared kernel. May never depend on a feature context.
     private static final Set<String> SHARED_KERNEL = Set.of("common", "security", "provider");
 
-    // Context layering. An import may only point at a <strong>strictly lower</strong> rank.
-    // Adding a bounded context to the codebase means adding a line here.
     private static final Map<String, Integer> LAYER = new LinkedHashMap<>();
 
     static {
@@ -37,30 +32,19 @@ class ArchitectureBoundaryTest {
         LAYER.put("documents", 2);
         LAYER.put("leads", 2);
 
-        // engagement depends on catalog (PropertyMapper, SocietyRepository) but not on leads,
-        // finance or deals, so it sits at the same rank as leads — the two never interact.
         LAYER.put("engagement", 2);
 
-        // It must stay strictly below finance, because the payment webhook finance already owns is what activates a
-        // paid subscription or boost — so the arrow is finance -> billing.
         LAYER.put("billing", 2);
 
-        // Ranking finance above deals would make that legitimate call a violation and invite someone to "fix" it by
-        // leads (2) and finance (4) never interact; only the strict ordering matters.
         LAYER.put("finance", 4);
 
         LAYER.put("services", 3);
-        // The aggregates (/bootstrap, /me/bootstrap, /me/dashboard) read across the platform and nothing reads them,
-        // so they rank above every context they compose.
         LAYER.put("bootstrap", 8);
-        // The scheduler calls into every context on a clock and nothing calls it, like the aggregates above.
         LAYER.put("jobs", 8);
         LAYER.put("deals", 5);
 
         LAYER.put("moderation", 6);
 
-        // The back-office reports on the whole platform, so ranking it top is the only placement that makes its reads
-        // legal.
         LAYER.put("admin", 7);
     }
 
@@ -149,7 +133,6 @@ class ArchitectureBoundaryTest {
     }
 
     private record SourceFile(String path, String body) {
-
         static SourceFile read(Path p) {
             try {
                 return new SourceFile(p.toString(), Files.readString(p, StandardCharsets.UTF_8));
@@ -158,8 +141,6 @@ class ArchitectureBoundaryTest {
             }
         }
 
-        // True if this file names the given context anywhere in code — as an import or as a fully-qualified inline
-        // reference.
         boolean references(String context) {
             return stripComments(body).contains("com.draazy.api." + context + ".");
         }

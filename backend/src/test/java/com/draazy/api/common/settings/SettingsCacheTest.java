@@ -13,9 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** The Java suite and e2e run with this cache off, so this is where its behaviour is proved. */
 class SettingsCacheTest {
-
     private final SettingRepository repository = mock(SettingRepository.class);
 
     @AfterEach

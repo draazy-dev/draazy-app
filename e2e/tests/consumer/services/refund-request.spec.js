@@ -118,7 +118,8 @@ test.describe('LIVE: a customer asks for a refund', () => {
     const pack = rowFor(page, 'Contact Pack');
     await expect(pack).toContainText('Refund declined', { timeout: 20000 });
     await expect(pack.getByTestId('refund-open')).toHaveCount(0);
-    await expect(pack.getByRole('link', { name: 'Ask for a review' })).toHaveAttribute('href', /\/support\?cat=payment/);
+    const reviewTopic = after.invoiceNo ? encodeURIComponent(`invoice:${after.invoiceNo}`) : 'general';
+    await expect(pack.getByRole('link', { name: 'Ask for a review' })).toHaveAttribute('href', `/messages?support=${reviewTopic}`);
 
     const again = await requestRefund(mobile, orderId);
     expect(again.status).toBe(422);
@@ -130,7 +131,8 @@ test.describe('LIVE: a customer asks for a refund', () => {
     await seedConsent(page);
 
     const spender = await newBuyer();
-    const [first, second] = (await (await fetch(`${API}/properties?size=2`)).json()).content;
+    const rentRows = (await (await fetch(`${API}/properties?size=50`)).json()).content.filter((p) => p.deal === 'rent');
+    const [first, second] = rentRows;
     expect((await call('POST', '/contacts/request', spender, { propertyId: first.id })).status).toBe(200);
     sql(`update contact_requests set first_requested_at = now() - interval '31 days' where requester_id = (select id from users where mobile = '${spender}')`);
     const usedPack = await paidPack(spender);

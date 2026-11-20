@@ -16,7 +16,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
 class MeEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -38,7 +37,6 @@ class MeEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.name").value("Asha Patil"));
     }
 
-    /** "Absent" and "present but empty" are the two answers a console has to tell apart. */
     @Test
     void getMeOmitsPermissionsForAConsumer() throws Exception {
         User u = saveUser("9876500704", "buyer");
@@ -48,7 +46,6 @@ class MeEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.desks").isEmpty());
     }
 
-    /** Asserts two atoms by name so the test does not depend on the catalogue's current length. */
     @Test
     void getMeCarriesResolvedAtomsForAnAdministrator() throws Exception {
         User u = saveUser("9876500705", "admin");
@@ -73,8 +70,6 @@ class MeEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.desks", contains("legal", "rental")));
     }
 
-    /** {@code settings:write} is admin-only however a staff document is written, so consoles must scope
-     * navigation from this list. */
     @Test
     void getMeNeverGrantsAnAdminOnlyAtomToStaff() throws Exception {
         User u = saveUser("9876500706", "staff");
@@ -94,7 +89,6 @@ class MeEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Asha R. Patil"))
                 .andExpect(jsonPath("$.email").value("asha@example.com"))
-                // untouched identity field is unchanged
                 .andExpect(jsonPath("$.mobile").value("9876500702"));
     }
 
@@ -109,8 +103,6 @@ class MeEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.fields[0].field").value("email"));
     }
 
-    /** The column has no length; a blank name passes {@code @Size} but would loop the "ask for a name"
-     * step forever. */
     @Test
     void patchMeRejectsANameOutsideItsBounds() throws Exception {
         User u = saveUser("9876500708", "buyer");
@@ -144,7 +136,6 @@ class MeEndpointsTest extends AbstractApiTest {
                         .content("{\"name\":\"आशा D'Souza-Patil\"}"))
                 .andExpect(status().isOk());
 
-        // Omitting it entirely is still how you edit only the email, so null must stay legal.
         mvc.perform(patch("/auth/me").header(HttpHeaders.AUTHORIZATION, bearer(u))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"bounds@example.com\"}"))
@@ -168,8 +159,6 @@ class MeEndpointsTest extends AbstractApiTest {
                         .andExpect(jsonPath("$.name").value("Asha Patil"));
             }
 
-    /** Both directions: this preference makes {@code ContactService#request} refuse every unverified caller,
-     * silently stopping enquiries, so it must be switchable off too. */
     @Test
     void patchMeTogglesContactPrivacyPreferencesBothWays() throws Exception {
         User u = saveUser("9876500707", "owner");
@@ -186,7 +175,6 @@ class MeEndpointsTest extends AbstractApiTest {
                         .content("{\"verifiedContactOnly\":false}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.verifiedContactOnly").value(false))
-                // the other toggle was not mentioned, so it must have survived the write
                 .andExpect(jsonPath("$.hideNumber").value(true));
 
         mvc.perform(get("/auth/me").header(HttpHeaders.AUTHORIZATION, bearer(u)))
@@ -195,7 +183,6 @@ class MeEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.hideNumber").value(true));
     }
 
-    /** Null means unchanged (boxed field): a name-only save must not reset the owner's privacy toggles. */
     @Test
     void patchMeLeavesUnmentionedPrivacyPreferencesAlone() throws Exception {
         User u = saveUser("9876500708", "owner");

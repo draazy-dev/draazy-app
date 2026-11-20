@@ -51,9 +51,7 @@ import org.springframework.security.web.method.annotation.AuthenticationPrincipa
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-/** Real controllers, services and scanner; only persistence/storage and authenticated identity are substituted. */
 class UploadPolicyEndpointsTest {
-
     private static final UUID OWNER = UUID.randomUUID();
     private static final UUID PROPERTY = UUID.randomUUID();
     private static final UUID MANAGED = UUID.randomUUID();
@@ -88,7 +86,9 @@ class UploadPolicyEndpointsTest {
                 mock(com.draazy.api.common.trust.UnsubmittedRequestLookup.class));
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 new AuthPrincipal(OWNER, "owner", null, true, false), null, List.of()));
-        mvc = MockMvcBuilders.standaloneSetup(new MePhotosController(new PhotoService(storage, new com.draazy.api.catalog.photo.PhotoKeys("test-secret"))),
+        mvc = MockMvcBuilders.standaloneSetup(new MePhotosController(new PhotoService(storage,
+                                new com.draazy.api.catalog.photo.PhotoKeys("test-secret"),
+                                mock(com.draazy.api.catalog.photo.PhotoUploadQuota.class))),
                         new MeDocumentsController(service))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -195,28 +195,41 @@ class UploadPolicyEndpointsTest {
 
     @Test
     void serviceRequestPathAcceptsPdfAndPersistsActualSize() {
-        service.uploadForServiceRequest(PROPERTY, UUID.randomUUID(), "agreement", file("pdf", 999_999, 8));
+        service.uploadForServiceRequest(PROPERTY, UUID.randomUUID(), "agreement", file("pdf", 999_999, 8), DocumentUploads.MAX_BYTES);
         verify(documents).saveAndFlush(argThat(doc -> doc.getSizeBytes() == 999_999
                 && doc.getMimeType().equals("application/pdf")));
         verify(storage).store(anyString(), argThat(bytes -> bytes.length == 999_999), eq("application/pdf"));
     }
 
     @Test
+    void registeredCopyLimitAcceptsUnderTwoMbAndRefusesTwoMb() {
+        UUID request = UUID.randomUUID();
+        long limit = DocumentUploads.REGISTERED_COPY_MAX_BYTES;
+        service.uploadForServiceRequest(PROPERTY, request, "final-document", file("pdf", 1_999_999, 8), limit);
+        verify(documents).saveAndFlush(argThat(doc -> doc.getSizeBytes() == 1_999_999));
+        assertThatExceptionOfType(PayloadTooLargeException.class).isThrownBy(() ->
+                service.uploadForServiceRequest(PROPERTY, request, "final-document", file("pdf", 2_000_000, 8), limit))
+                .withMessage("Files must be smaller than 2,000,000 bytes (2 MB)");
+    }
+
+    @Test
     void serviceRequestPathRefusesOversizeAndDisallowedFormatsBeforeStorage() {
         UUID request = UUID.randomUUID();
+        long limit = DocumentUploads.MAX_BYTES;
         assertThatExceptionOfType(PayloadTooLargeException.class).isThrownBy(() ->
-                service.uploadForServiceRequest(PROPERTY, request, "agreement", file("pdf", 1_000_000, 8)));
+                service.uploadForServiceRequest(PROPERTY, request, "agreement", file("pdf", 1_000_000, 8), limit))
+                .withMessage("Files must be smaller than 1,000,000 bytes (1 MB)");
         assertThatExceptionOfType(PayloadTooLargeException.class).isThrownBy(() ->
-                service.uploadForServiceRequest(PROPERTY, request, "agreement", file("pdf", 8, 1_000_000)));
+                service.uploadForServiceRequest(PROPERTY, request, "agreement", file("pdf", 8, 1_000_000), limit));
         for (String format : List.of("webp", "avif")) {
             MockMultipartFile file = new MockMultipartFile("file", "scan.png", "image/png", signature(format));
             assertThatExceptionOfType(UnsupportedMediaTypeException.class).isThrownBy(() ->
-                    service.uploadForServiceRequest(PROPERTY, request, "agreement", file));
+                    service.uploadForServiceRequest(PROPERTY, request, "agreement", file, limit));
         }
         MockMultipartFile html = new MockMultipartFile("file", "payload.html", "text/html",
                 "<script>".getBytes(StandardCharsets.US_ASCII));
         assertThatExceptionOfType(UnsupportedMediaTypeException.class).isThrownBy(() ->
-                service.uploadForServiceRequest(PROPERTY, request, "agreement", html));
+                service.uploadForServiceRequest(PROPERTY, request, "agreement", html, limit));
         verifyNoInteractions(storage, documents, personal, managed);
     }
 

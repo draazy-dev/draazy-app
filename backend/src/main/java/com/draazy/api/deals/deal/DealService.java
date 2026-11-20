@@ -1,5 +1,6 @@
 package com.draazy.api.deals.deal;
 
+import com.draazy.api.catalog.managed.ManagedPropertyService;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
@@ -9,6 +10,7 @@ import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.persistence.Savepoints;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.finance.tenancy.TenancyService;
 import com.draazy.api.identity.user.User;
@@ -18,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,7 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DealService {
-
     private static final Logger LOG = LoggerFactory.getLogger(DealService.class);
 
     private final DealRepository deals;
@@ -35,18 +37,22 @@ public class DealService {
     private final UserRepository users;
     private final PropertyLifecycle lifecycle;
 
-    // Deal state owns tenancy side effects, so the transaction crosses into finance.
     private final TenancyService tenancyService;
+    private final ManagedPropertyService managedHomes;
+    private final DataSource dataSource;
 
     public DealService(DealRepository deals, DealPartyRepository parties,
                        PropertyRepository properties, UserRepository users,
-                       PropertyLifecycle lifecycle, TenancyService tenancyService) {
+                       PropertyLifecycle lifecycle, TenancyService tenancyService,
+                       ManagedPropertyService managedHomes, DataSource dataSource) {
         this.deals = deals;
         this.parties = parties;
         this.properties = properties;
         this.users = users;
         this.lifecycle = lifecycle;
         this.tenancyService = tenancyService;
+        this.managedHomes = managedHomes;
+        this.dataSource = dataSource;
     }
 
     @Transactional(readOnly = true)
@@ -65,12 +71,12 @@ public class DealService {
 
     @Transactional
     public void reserve(UUID callerId, UUID propertyId) {
-        Property property = ownedProperty(callerId, propertyId);
+        Property property = lockedOwnedProperty(callerId, propertyId);
         requireLive(property, "reserved");
         Deal deal = getOrCreate(propertyId, property.getDeal());
 
         if (!DealStatuses.canTransition(deal.getStatus(), DealStatuses.RESERVED)) {
-            throw new ConflictException("Cannot reserve a deal in status " + deal.getStatus());
+            throw new ConflictException("This listing is already " + deal.getStatus() + ".");
         }
         deal.setStatus(DealStatuses.RESERVED);
         deals.save(deal);
@@ -80,12 +86,12 @@ public class DealService {
 
     @Transactional
     public void close(UUID callerId, UUID propertyId, DealCloseRequest body) {
-        Property property = ownedProperty(callerId, propertyId);
+        Property property = lockedOwnedProperty(callerId, propertyId);
         requireLive(property, "closed");
         Deal deal = getOrCreate(propertyId, property.getDeal());
 
         if (!DealStatuses.canTransition(deal.getStatus(), DealStatuses.CLOSED)) {
-            throw new ConflictException("Cannot close a deal in status " + deal.getStatus());
+            throw new ConflictException("This deal is already " + deal.getStatus() + ".");
         }
 
         String normalised = MobileMask.normalise(body.counterpartyMobile());
@@ -105,28 +111,19 @@ public class DealService {
 
         deals.save(deal);
 
-        if (DealIntent.RENT.equals(property.getDeal())) {
-            tenancyService.openFromClosedDeal(
-                            propertyId, callerId, deal.getCounterpartyId(), normalised, body.agreedPrice())
-                    .ifPresentOrElse(
-                            tenancy -> LOG.info("Tenancy {} proposed on rent close of property {}",
-                                    tenancy.getId(), propertyId),
-                            () -> LOG.info("Rent deal closed off-platform on property {}; "
-                                    + "no tenancy opened", propertyId));
-        }
+        proposeTenancy(property, callerId, deal.getCounterpartyId(), normalised, body.agreedPrice());
     }
 
     @Transactional
     public void reopen(AuthPrincipal caller, UUID propertyId, String availableOnRaw) {
-        Property property = ownedProperty(caller.userId(), propertyId);
+        Property property = lockedOwnedProperty(caller.userId(), propertyId);
         requireReopenable(property);
         LocalDate availableOn = AvailableOn.resolve(availableOnRaw, null, false, property.getDeal());
         Deal deal = deals.findByPropertyId(propertyId)
-                .orElseThrow(() -> new ConflictException(
-                        "Cannot reopen a deal in status " + DealStatuses.ACTIVE));
+                .orElseThrow(() -> new ConflictException("This listing is already open."));
 
         if (!DealStatuses.canTransition(deal.getStatus(), DealStatuses.ACTIVE)) {
-            throw new ConflictException("Cannot reopen a deal in status " + deal.getStatus());
+            throw new ConflictException("This listing is already open.");
         }
 
         deal.setStatus(DealStatuses.ACTIVE);
@@ -147,7 +144,6 @@ public class DealService {
             property.setAvailableOn(availableOn);
         }
 
-        // Otherwise the active-tenancy unique index stays occupied and the next tenant can never be let in.
         if (DealIntent.RENT.equals(property.getDeal())) {
             LocalDate today = AvailableOn.today();
             tenancyService.endActiveTenancy(propertyId,
@@ -168,12 +164,12 @@ public class DealService {
     @Transactional
     public void closeForFinalization(UUID ownerId, UUID propertyId, long agreedPrice,
                                      String counterpartyMobile, UUID counterpartyId) {
-        Property property = ownedProperty(ownerId, propertyId);
+        Property property = lockedOwnedProperty(ownerId, propertyId);
         requireLive(property, "closed");
         Deal deal = getOrCreate(propertyId, property.getDeal());
 
         if (!DealStatuses.canTransition(deal.getStatus(), DealStatuses.CLOSED)) {
-            throw new ConflictException("Cannot close a deal in status " + deal.getStatus());
+            throw new ConflictException("This deal is already " + deal.getStatus() + ".");
         }
 
         deal.setCounterpartyMobile(counterpartyMobile);
@@ -184,12 +180,45 @@ public class DealService {
         deals.save(deal);
 
         closeOut(property);
+        proposeTenancy(property, ownerId, counterpartyId,
+                MobileMask.normalise(counterpartyMobile), agreedPrice);
+    }
+
+    private void proposeTenancy(Property property, UUID ownerId, UUID tenantId,
+                                String tenantMobile, long monthlyRent) {
+        if (!DealIntent.RENT.equals(property.getDeal())) {
+            return;
+        }
+        tenancyService.openFromClosedDeal(property.getId(), ownerId, tenantId, tenantMobile, monthlyRent)
+                .ifPresentOrElse(
+                        tenancy -> {
+                            LOG.info("Tenancy {} proposed on rent close of property {}",
+                                    tenancy.getId(), property.getId());
+                            users.findById(tenantId).ifPresent(tenant -> fillManagedHome(ownerId, property, tenant, monthlyRent));
+                        },
+                        () -> LOG.info("Rent deal closed off-platform on property {}; "
+                                + "no tenancy opened", property.getId()));
+    }
+
+    private void fillManagedHome(UUID ownerId, Property property, User tenant, long monthlyRent) {
+        try {
+            Savepoints.isolated(dataSource,
+                    () -> managedHomes.fillFromClosedRental(ownerId, property.getId(), tenant, monthlyRent));
+        } catch (RuntimeException e) {
+            LOG.warn("Could not fill the managed home for closed rental on property {}", property.getId(), e);
+        }
     }
 
     private void closeOut(Property property) {
         property.setStatus(terminalStatusFor(property));
         property.setDealStatus(DealStatuses.CLOSED);
         properties.endListingPasses(property.getId());
+        lifecycle.announceClosed(property);
+    }
+
+    private Property lockedOwnedProperty(UUID callerId, UUID propertyId) {
+        return properties.findOwnedForUpdate(propertyId, callerId)
+                .orElseThrow(() -> NotFoundException.of("Property"));
     }
 
     private Property ownedProperty(UUID callerId, UUID propertyId) {
@@ -208,7 +237,6 @@ public class DealService {
         }
     }
 
-    // A closed deal's listing is sold/rented, so reopening must still reach it.
     private static void requireReopenable(Property property) {
         boolean closedOut = PropertyStatus.SOLD.equals(property.getStatus())
                 || PropertyStatus.RENTED.equals(property.getStatus());

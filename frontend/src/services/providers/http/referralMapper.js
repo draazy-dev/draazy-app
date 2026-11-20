@@ -1,10 +1,5 @@
-/** `clawed-back` is distinct from `rejected` because money left the building; risk is separate from status. */
-
-/** Wire timestamps are ISO; the desk formats dates and sorts on epoch millis (0 when absent). */
 const epoch = (iso) => (iso ? Date.parse(iso) || 0 : 0);
 
-/** `rewardAmount` rides beside the server-composed `reward` label because CSV totals need the number;
- * it counts owner contacts, so never format it as currency. */
 export function toViewModel(dto) {
   if (!dto) return null;
   return {
@@ -30,11 +25,60 @@ export function toViewModel(dto) {
   };
 }
 
-/** The single row a decision returns, so the desk can replace it in place rather than refetch. */
 export const toDecision = (dto) => toViewModel(dto);
 
-/** `total` is the envelope's, not `items.length`: stat tiles must be true on page 1 of 3.
- * `counts` is present only when the read asked for it. */
+const count = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+export function toSummary(s) {
+  if (!s) return s;
+  const rewards = s.rewards || {};
+  const friend = s.friendReward || {};
+  return {
+    code: s.code || '',
+    invited: count(s.invited),
+    joined: count(s.joined),
+    qualified: count(s.qualified),
+    checking: count(s.checking),
+    rewards: {
+      earned: count(rewards.earned),
+      used: count(rewards.used),
+      remaining: count(rewards.remaining),
+      locked: count(rewards.locked),
+      discountPercent: count(rewards.discountPercent),
+    },
+    friendReward: {
+      redeemed: !!friend.redeemed,
+      status: friend.status || '',
+      contacts: count(friend.contacts),
+      featuredDays: count(friend.featuredDays),
+    },
+    friends: (Array.isArray(s.friends) ? s.friends : []).map((f) => ({
+      name: f.name || '',
+      mobile: f.mobile || '',
+      at: f.at || '',
+      track: f.track || '',
+      state: f.state || 'joined',
+      kycPending: f.kycPending || '',
+    })),
+  };
+}
+
+export function toInviteResult(dto) {
+  const url = typeof dto?.whatsappUrl === 'string' ? dto.whatsappUrl : '';
+  if (dto?.delivery === 'sent' || !url) return { delivery: 'sent', whatsappUrl: '' };
+  if (!isWhatsAppUrl(url)) throw new Error('Refusing to open a non-WhatsApp invite link');
+  return { delivery: 'open_whatsapp', whatsappUrl: url };
+}
+
+function isWhatsAppUrl(url) {
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === 'https:' && hostname === 'wa.me';
+  } catch {
+    return false;
+  }
+}
+
 export function toViewModelPage(res, fallback = {}) {
   const rows = Array.isArray(res?.content) ? res.content : [];
   return {

@@ -5,7 +5,7 @@ category: renting
 audience: tenant
 order: 2
 featured: true
-updated: 2026-07-27
+updated: 2026-11-06
 summary: What deposits look like in Pune, which terms move in negotiation, and how to protect your money at exit.
 tags: [deposit, rent, negotiation, maintenance]
 ---
@@ -52,11 +52,17 @@ Ambiguity here causes more disputes than rent does. The agreement should state e
 Also worth doing:
 
 - Get a written receipt for the deposit, with the amount in words
-- Pay by bank transfer to the owner's named account, never in cash
+- Pay by bank transfer, UPI or cheque to the owner's named account. Cash of ₹2 lakh or more in one go is barred by section 269ST of the Income-tax Act, and the owner can be fined the same amount
+- Keep the payment reference: a registered rent agreement records how the deposit was paid (mode, reference, bank and date), and the amounts must add up to the deposit
 - Agree the refund timeline in the agreement — 15 to 30 days after handover is reasonable
 - Take final meter readings at handover, with photos
+
+## Rent above ₹50,000 a month
+
+If you are an individual tenant paying more than ₹50,000 a month, section 194-IB requires you to deduct 2% TDS and deposit it with Form 26QC against the owner's PAN. Ask a tax adviser if unsure.
 
 ## Related
 
 - [Rent agreement basics](/help/a/rent-agreement-basics)
+- [The rent agreement service](/help/a/rent-agreement-service)
 - [Spotting a rental scam](/help/a/spot-a-scam)

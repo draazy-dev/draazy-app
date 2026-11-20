@@ -32,10 +32,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// User administration endpoints (contract tag Moderation).
 @RestController
 public class UserAdminController {
-
     private static final String STAFF_OR_ADMIN =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
     private static final String MANAGER_OR_ADMIN =
@@ -50,7 +48,6 @@ public class UserAdminController {
     private static final String KYC_EDIT =
             STAFF_OR_ADMIN + " and " + BackOfficePermissions.REQUIRE_IDENTITY_WRITE;
 
-    // Admin-only because one timeline arm reads the audit log.
     private static final String TIMELINE_READ =
             ADMIN_ONLY + " and " + BackOfficePermissions.REQUIRE_USERS_READ;
 
@@ -63,8 +60,6 @@ public class UserAdminController {
         this.moderation = moderation;
     }
 
-    // status and archived are separate because an account can be suspended and archived.
-    // customers=true narrows to owners and buyers; back-office accounts live under Team & Access.
     @GetMapping(Routes.Users.BASE)
     @PreAuthorize(USERS_READ)
     public PageResponse<AdminUserRow> list(@RequestParam(required = false) String role,
@@ -74,19 +69,19 @@ public class UserAdminController {
             @RequestParam(required = false) Boolean flagged,
             @RequestParam(defaultValue = "false") boolean archived,
             @RequestParam(defaultValue = "false") boolean counts,
+            @RequestParam(required = false) Integer days,
             @PageableDefault(size = 20) Pageable pageable) {
         if (status != null && !status.isBlank() && !UserStatuses.ALL.contains(status)) {
             throw new ValidationException("Unknown status '" + status + "'. Expected one of "
                     + "active, suspended, archived.");
         }
         PageResponse<AdminUserRow> page = PageResponse.of(
-                service.list(role, customers, q, status, flagged, archived,
+                service.list(role, customers, q, status, flagged, archived, days,
                         Pageables.unsorted(pageable)),
                 dto -> dto);
         return counts ? page.withCounts(service.statusCounts(role, customers, q)) : page;
     }
 
-    // Literal /users/staff is safe because Spring matches it ahead of the /users/{id} template.
     @PostMapping(Routes.Users.STAFF)
     @PreAuthorize(TEAM_WRITE)
     public ResponseEntity<StaffCreateResponse> addStaff(@CurrentUser AuthPrincipal principal,
@@ -112,7 +107,6 @@ public class UserAdminController {
                 .body(service.reissueInvite(principal, id));
     }
 
-    /** {@code PATCH /users/{id}} (contract {@code adminUpdateUser}). */
     @PatchMapping(Routes.Users.BY_ID)
     @PreAuthorize(TEAM_WRITE)
     public AdminUserRow update(@CurrentUser AuthPrincipal principal, @PathVariable String id,
@@ -127,7 +121,6 @@ public class UserAdminController {
         return service.updateForKyc(principal, id, body.name(), body.email());
     }
 
-    /** {@code PATCH /users/{id}/archive} (contract {@code archiveUser}). */
     @PatchMapping(Routes.Users.ARCHIVE)
     @PreAuthorize(TEAM_WRITE)
     public void archive(@CurrentUser AuthPrincipal principal, @PathVariable String id,
@@ -135,14 +128,12 @@ public class UserAdminController {
         service.archive(principal, id, body == null ? null : body.reason());
     }
 
-    /** {@code PATCH /users/{id}/restore} (contract {@code restoreUser}). */
     @PatchMapping(Routes.Users.RESTORE)
     @PreAuthorize(TEAM_WRITE)
     public void restore(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         service.restore(principal, id);
     }
 
-    // 200 with no body to match archive and restore.
     @PatchMapping(Routes.Users.SUSPEND)
     @PreAuthorize(TEAM_WRITE)
     public void suspend(@CurrentUser AuthPrincipal principal, @PathVariable String id,
@@ -150,7 +141,6 @@ public class UserAdminController {
         moderation.suspend(principal, id, body == null ? null : body.reason());
     }
 
-    /** {@code PATCH /users/{id}/reactivate} (contract {@code reactivateUser}). */
     @PatchMapping(Routes.Users.REACTIVATE)
     @PreAuthorize(TEAM_WRITE)
     public void reactivate(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
@@ -164,7 +154,6 @@ public class UserAdminController {
         return moderation.setBadge(principal, id, body.granted(), body.reason());
     }
 
-    /** {@code PATCH /users/{id}/flag} (contract {@code setUserFlag}) — admin only. */
     @PatchMapping(Routes.Users.FLAG)
     @PreAuthorize(ADMIN_WRITE)
     public AdminUserRow setFlag(@CurrentUser AuthPrincipal principal, @PathVariable String id,
@@ -172,7 +161,6 @@ public class UserAdminController {
         return moderation.setFlag(principal, id, body.flagged(), body.reason());
     }
 
-    // Uses users:read, not users:write, because it reveals activity rather than changing it.
     @GetMapping(Routes.Users.TIMELINE)
     @PreAuthorize(TIMELINE_READ)
     public List<UserTimelineEntry> timeline(@PathVariable String id) {
@@ -185,18 +173,16 @@ public class UserAdminController {
             @NotBlank String role, List<String> functions) {
     }
 
-    public record UserPatchRequest(@Size(max = 80) String name, @Email @Size(max = 254) String email, String avatar) {
+    public record UserPatchRequest(@Size(max = 80) String name, @Email @Size(max = 254) String email, @Size(max = 2048) String avatar) {
     }
 
     public record ReasonBody(String reason) {
     }
 
-    // Boxed Boolean gives an omitted field a named 422.
     public record BadgeRequest(@NotNull Boolean granted,
             @NotBlank @Size(min = 10, max = 300) String reason) {
     }
 
-    // reason is conditional, which Bean Validation cannot express without a class-level validator.
     public record FlagRequest(@NotNull Boolean flagged, String reason) {
     }
 }

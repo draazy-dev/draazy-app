@@ -1,9 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../../components/Icon.jsx';
 import { SUPPORT_PHONE, SUPPORT_TEL } from '../../../../lib/supportContact.js';
-import { fmt } from './helpers.js';
-/* The charges half is rendered from the server's published fee breakdown, so the read has two states that must not
-   render a price: still loading, and failed. */
+import { fmt, fmtPaise } from './helpers.js';
 
 function ChargesUnavailable({ cost }) {
   const { t } = useTranslation();
@@ -30,8 +28,6 @@ function ChargesUnavailable({ cost }) {
 function CostLines({ cost }) {
   const { t } = useTranslation();
   const ready = cost.status === 'ready';
-  // Any figure this browser had to derive (see `useRentAgreement`) makes the total an estimate
-  // again, and it is labelled as one. All-server figures are the bill, not an estimate.
   const estimated = (cost.computed || []).length > 0;
   return (
     <div className="space-y-2.5 text-sm">
@@ -41,20 +37,19 @@ function CostLines({ cost }) {
       <div className="h-px bg-white/8 my-1" />
       {!ready ? <ChargesUnavailable cost={cost} /> : (
         <>
-          <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.stampDuty')}</span><span className="text-white font-medium">{fmt(cost.stamp)}</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.registrationFee')}</span><span className="text-white font-medium">{fmt(cost.reg)}</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.handling')}</span><span className="text-white font-medium">{fmt(cost.dhc)}</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.serviceFee')}</span><span className={cost.waived ? 'text-gray-500 line-through' : 'text-white font-medium'}>{fmt(cost.service)}</span></div>
-          {cost.waived > 0 && <p className="text-xs text-emerald-400">{t('services.ra.cost.referralWaiver', { amount: fmt(cost.waived) })}</p>}
+          <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.stampDuty')}</span><span className="text-white font-medium">{fmtPaise(cost.stamp)}</span></div>
+          {cost.exactPaise != null && <p className="text-[11px] text-gray-500 -mt-1.5">{t('services.ra.cost.exactDuty', { amount: fmtPaise(cost.exactPaise / 100) })}</p>}
+          <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.registrationFee')}</span><span className="text-white font-medium">{fmtPaise(cost.reg)}</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.handling')}</span><span className="text-white font-medium">{fmtPaise(cost.dhc)}</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">{t('services.ra.cost.serviceFee')}</span><span className="text-white font-medium">{fmtPaise(cost.service)}</span></div>
+          {cost.waived > 0 && <p className="text-xs text-emerald-400" data-testid="ra-cost-referral">{t('services.ra.cost.referralWaiver', { percent: cost.discountPercent, amount: fmtPaise(cost.waived) })}</p>}
           <div className="h-px bg-white/8 my-1" />
-          <div className="flex justify-between items-center"><span className="text-white font-semibold">{t(estimated ? 'services.ra.cost.estimatedTotal' : 'services.ra.cost.totalPayable')}</span><span className="text-lg font-bold gradient-text">{fmt(cost.total)}</span></div>
+          <div className="flex justify-between items-center"><span className="text-white font-semibold">{t(estimated ? 'services.ra.cost.estimatedTotal' : 'services.ra.cost.totalPayable')}</span><span className="text-lg font-bold gradient-text">{fmtPaise(cost.total)}</span></div>
         </>
       )}
     </div>
   );
 }
-/* The Art. 36A formula only describes a locally derived figure, so once the statutory numbers come from the server it
-   is replaced by the published schedule's own note. */
 
 function CostFootnote({ cost }) {
   const { t } = useTranslation();
@@ -63,17 +58,14 @@ function CostFootnote({ cost }) {
   if (!text) return null;
   return <p className="text-gray-600 text-[11px] mt-4 leading-relaxed">{text}</p>;
 }
-// Mobile-only collapsible cost summary so the estimate is reachable while filling the form.
 
 export function MobileCostSummary({ cost }) {
   const { t } = useTranslation();
   return (
     <details className="ra-mcost lg:hidden glass-card rounded-2xl p-4 mb-6 group">
       <summary className="flex items-center justify-between cursor-pointer select-none">
-        {/* A dash, not ₹0 — the collapsed summary is the one line most people read, so it must not be the place a
-           failed read gets rounded down into a price. */}
         <span className="text-white font-semibold text-sm flex items-center gap-2"><Icon name="receipt" className="w-4 h-4 text-teal-400" /> {t('services.ra.cost.estimatedTotal')}</span>
-        <span className="flex items-center gap-2"><span className="text-lg font-bold gradient-text">{cost.total == null ? '—' : fmt(cost.total)}</span><Icon name="chevron-down" className="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180" /></span>
+        <span className="flex items-center gap-2"><span className="text-lg font-bold gradient-text">{cost.total == null ? '—' : fmtPaise(cost.total)}</span><Icon name="chevron-down" className="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180" /></span>
       </summary>
       <div className="mt-4 pt-4 border-t border-white/8">
         <p className="text-gray-500 text-xs mb-3">{t('services.ra.cost.subtitle')}</p>

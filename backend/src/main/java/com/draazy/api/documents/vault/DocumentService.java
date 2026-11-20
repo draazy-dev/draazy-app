@@ -5,6 +5,7 @@ import com.draazy.api.catalog.managed.ManagedPropertyRepository;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.audit.AuditService;
+import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.PayloadTooLargeException;
@@ -17,6 +18,7 @@ import com.draazy.api.provider.DocumentScanner;
 import com.draazy.api.provider.FileStorage;
 import com.draazy.api.security.AuthPrincipal;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -26,6 +28,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class DocumentService {
+    static final Set<String> RETIRED_PERSONAL_CATEGORIES =
+            Set.of("aadhaar card", "pan card", "passport photo", "ownership proof");
 
     private final DocumentRepository documents;
     private final PersonalDocumentRepository personalDocuments;
@@ -67,7 +71,6 @@ public class DocumentService {
                 ownedProperty(ownerId, propId)));
     }
 
-    /** A signed URL for one of the caller's own files: a listing's vault, the personal vault or a managed record's. */
     @Transactional(readOnly = true)
     public DocumentUrl url(UUID ownerId, String docId) {
         UUID id = Ids.parseUuid(docId).orElseThrow(() -> NotFoundException.of("Document"));
@@ -85,12 +88,10 @@ public class DocumentService {
                 .orElseThrow(() -> NotFoundException.of("Document"));
         return new DocumentUrl(storage.signedDownloadUrl(key));
     }
-    /** Store object, then row: reversed order leaves a row pointing at nothing on storage failure. */
-    // Deliberately unscoped: caller passes an already-authorised `propertyId`.
     @Transactional
     public DocumentSummary upload(UUID ownerId, String propId, String category, MultipartFile file) {
         UUID propertyId = ownedProperty(ownerId, propId);
-        byte[] bytes = readBytes(file);
+        byte[] bytes = readBytes(file, DocumentUploads.MAX_BYTES);
         String type = DocumentUploads.validate(file.getContentType(), file.getSize(), bytes);
         scan(file.getOriginalFilename(), type, bytes);
 
@@ -104,13 +105,11 @@ public class DocumentService {
         return mapper.toSummary(saved);
     }
 
-    // Deliberately unscoped: caller passes an already-authorised `propertyId`.
-    // Same ordering, allowlist and server-minted key as `#upload`; key `personal/{ownerId`/{uuid}}.
     @Transactional
     public DocumentDto uploadForServiceRequest(UUID propertyId, UUID serviceRequestId,
-            String category, MultipartFile file) {
-        byte[] bytes = readBytes(file);
-        String type = DocumentUploads.validate(file.getContentType(), file.getSize(), bytes);
+            String category, MultipartFile file, long maxBytes) {
+        byte[] bytes = readBytes(file, maxBytes);
+        String type = DocumentUploads.validate(file.getContentType(), file.getSize(), bytes, maxBytes);
         scan(file.getOriginalFilename(), type, bytes);
 
         String key = (propertyId == null ? "documents/service-requests/" + serviceRequestId : "documents/" + propertyId)
@@ -122,13 +121,14 @@ public class DocumentService {
             bytes.length, type)));
     }
 
-    /** Same ordering, allowlist and server-minted key as {@link #upload}; key {@code personal/{ownerId}/{uuid}}. */
     @Transactional
-    public DocumentDto fileFromPersonalVault(UUID ownerId, String personalDocId, UUID propertyId,
+    public DocumentDto fileFromPropertyVault(UUID ownerId, String vaultDocId, UUID propertyId,
             UUID serviceRequestId, String category) {
-        PersonalDocument source = Ids.parseUuid(personalDocId)
-                .flatMap(personalDocuments::findById)
-                .filter(d -> d.getOwnerId().equals(ownerId))
+        Document source = Ids.parseUuid(vaultDocId)
+                .flatMap(documents::findById)
+                .filter(d -> d.getServiceRequestId() == null && propertyId != null
+                        && propertyId.equals(d.getPropertyId())
+                        && properties.findByIdAndOwner_Id(propertyId, ownerId).isPresent())
                 .orElseThrow(() -> NotFoundException.of("Document"));
         return mapper.toDto(documents.saveAndFlush(new Document(propertyId, serviceRequestId,
                 category, source.getFileName(), source.getStorageKey(),
@@ -144,31 +144,33 @@ public class DocumentService {
                 .orElseThrow(() -> NotFoundException.of("Document"));
         BadgeEvidenceLookup.Hold hold = badgeEvidence.holdOn(doc.getId());
         if (hold == BadgeEvidenceLookup.Hold.LIVE_BADGE) {
-            throw new ConflictException("This document is the evidence for your listing's Ownership"
-                    + " Verified badge and cannot be deleted while the badge stands. Ask support to"
+            throw new ConflictException("This document is the evidence for your listing's Verified"
+                    + " property badge and cannot be deleted while the badge stands. Ask support to"
                     + " withdraw the badge first.");
         }
         if (hold == BadgeEvidenceLookup.Hold.CITED) {
-
             audit.record(owner, "property.document.evidence.deleted", "document",
                     doc.getId().toString(), "propertyId", propertyId.toString(),
                     "category", doc.getCategory(), "fileName", doc.getFileName());
         }
+        removeUnsubmittedCopies(doc.getStorageKey());
         documents.delete(doc);
         purgeIfUnreferenced(doc.getStorageKey());
     }
 
-    // A private managed record may never be advertised, so its papers cannot require a listing.
     @Transactional(readOnly = true)
     public List<DocumentSummary> listPersonal(UUID ownerId) {
         return mapper.toPersonalSummaries(
                 personalDocuments.findByOwnerIdOrderByUploadedAtDescIdDesc(ownerId));
     }
 
-    /** Same ordering, allowlist, scan and minted key as {@link #upload}, under {@code managed/{managedId}}. */
     @Transactional
     public DocumentSummary uploadPersonal(UUID ownerId, String category, MultipartFile file) {
-        byte[] bytes = readBytes(file);
+        if (isRetiredPersonal(category)) {
+            throw new BadRequestException("Identity papers and ownership proof are not stored in"
+                    + " your personal documents. Add ownership proof to the property instead.");
+        }
+        byte[] bytes = readBytes(file, DocumentUploads.MAX_BYTES);
         String type = DocumentUploads.validate(file.getContentType(), file.getSize(), bytes);
         scan(file.getOriginalFilename(), type, bytes);
 
@@ -186,13 +188,27 @@ public class DocumentService {
                 .flatMap(personalDocuments::findById)
                 .filter(d -> d.getOwnerId().equals(ownerId))
                 .orElseThrow(() -> NotFoundException.of("Document"));
+        removePersonal(doc);
+    }
+
+    @Transactional
+    public int purgeRetiredPersonal() {
+        List<PersonalDocument> retired = personalDocuments.findByCategories(RETIRED_PERSONAL_CATEGORIES);
+        retired.forEach(this::removePersonal);
+        return retired.size();
+    }
+
+    static boolean isRetiredPersonal(String category) {
+        return category != null
+                && RETIRED_PERSONAL_CATEGORIES.contains(category.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private void removePersonal(PersonalDocument doc) {
         removeUnsubmittedCopies(doc.getStorageKey());
         personalDocuments.delete(doc);
         purgeIfUnreferenced(doc.getStorageKey());
     }
 
-    // The storage key is minted per vault upload, so it identifies the copies filed from this
-    // document. Copies on paid or submitted requests stay as the record.
     private void removeUnsubmittedCopies(String key) {
         List<Document> filed = documents.findByStorageKeyAndServiceRequestIdIsNotNull(key);
         if (filed.isEmpty()) {
@@ -214,7 +230,7 @@ public class DocumentService {
     public DocumentSummary uploadManaged(UUID ownerId, String managedId, String category,
             MultipartFile file) {
         UUID recordId = ownedManaged(ownerId, managedId);
-        byte[] bytes = readBytes(file);
+        byte[] bytes = readBytes(file, DocumentUploads.MAX_BYTES);
         String type = DocumentUploads.validate(file.getContentType(), file.getSize(), bytes);
         scan(file.getOriginalFilename(), type, bytes);
 
@@ -237,8 +253,14 @@ public class DocumentService {
         purgeIfUnreferenced(doc.getStorageKey());
     }
 
-    // fileFromPersonalVault shares one object between a personal row and document rows, so the
-    // bytes leave storage only with the last row pointing at them.
+    @Transactional
+    public void deleteFiledOn(UUID serviceRequestId) {
+        List<Document> filed = documents.findByServiceRequestIdOrderByUploadedAtDesc(serviceRequestId);
+        documents.deleteAll(filed);
+        documents.flush();
+        filed.stream().map(Document::getStorageKey).distinct().forEach(this::purgeIfUnreferenced);
+    }
+
     private void purgeIfUnreferenced(String key) {
         if (key != null && !documents.existsByStorageKey(key) && !personalDocuments.existsByStorageKey(key)) {
             filePurge.purgeKeys(List.of(key));
@@ -261,11 +283,9 @@ public class DocumentService {
                 .orElseThrow(() -> NotFoundException.of("Property"));
     }
 
-    private static byte[] readBytes(MultipartFile file) {
-
-        // Avoid buffering a known oversized upload; validation still checks the actual byte count.
-        if (file.getSize() >= DocumentUploads.MAX_BYTES) {
-            throw new PayloadTooLargeException("Files must be smaller than 1,000,000 bytes (1 MB)");
+    private static byte[] readBytes(MultipartFile file, long maxBytes) {
+        if (file.getSize() >= maxBytes) {
+            throw DocumentUploads.tooLarge(maxBytes);
         }
         try {
             return file.getBytes();
@@ -279,7 +299,6 @@ public class DocumentService {
             DocumentScanner.Verdict verdict = scanner.scan(fileName, provedType, bytes);
             switch (verdict.outcome()) {
                 case CLEAN -> {
-
                 }
                 case TOO_LARGE -> throw new PayloadTooLargeException(verdict.detail());
                 case REJECTED -> throw new UnsupportedMediaTypeException(verdict.detail());

@@ -13,23 +13,27 @@ import { SHARE_REPORT_REASONS } from '../../lib/reportReasons.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useVerification } from '../../context/VerificationContext.jsx';
-import { useSignInGate } from '../../lib/useSignInGate.js';
+import { useLatest, useSignInGate } from '../../lib/useSignInGate.js';
 import { useScrollReveal } from '../../lib/useScrollReveal.js';
 import { recordAskLocally, rememberAsk } from '../../lib/data/flatmates.js';
 import * as flatmateService from '../../services/flatmateService.js';
+import { REVISIT_MAX_AGE } from '../../services/http.js';
+import { readAccessToken, readUser } from '../../lib/auth.js';
 import { inr, perHead, roomTitle, FLATMATE_IMG, FLATMATE_GROUP_IMG } from './flatmates/helpers.js';
-import { SHARE_OPENER, SEEKER_OPENER, groupOpener } from './flatmates/openers.js';
+import { SHARE_OPENER, SEEKER_OPENER, GROUP_OPENER } from './flatmates/openers.js';
+import { useGenderGate } from './flatmates/useGenderGate.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const KINDS = ['group', 'room', 'post'];
 const interestKey = (kind, id) => (kind === 'post' ? id : `${kind}-${id}`);
 
-function askFor(kind, item, share) {
+function askFor(kind, item, share, gender) {
   if (kind === 'group') {
-    const message = groupOpener(item);
+    const message = GROUP_OPENER;
     return {
-      send: () => flatmateService.joinGroup(item.id, { share: 'solo', message }),
+      send: () => flatmateService.joinGroup(item.id, { share: 'solo', message, gender }),
       thread: { propertyId: 'group-' + item.id, property: { title: item.title, price: inr(perHead(item)) + '/mo', loc: (item.locality || 'Pune') + ', Pune', img: FLATMATE_GROUP_IMG }, party: { name: item.title, avatar: (item.title || 'GR').slice(0, 2).toUpperCase() }, firstMessage: message },
-      sent: [item.policy === 'any' ? 'flatmates.joinedToast' : 'flatmates.requestJoinToast', { title: item.title }],
+      sent: ['flatmates.requestJoinToast', { title: item.title }],
       dup: ['flatmates.joinRequestAlreadyRecorded', { title: item.title }],
     };
   }
@@ -37,7 +41,7 @@ function askFor(kind, item, share) {
     const message = SHARE_OPENER[share] || SHARE_OPENER.solo;
     const title = item.society || roomTitle(item);
     return {
-      send: () => flatmateService.roomInterest(item.id, { share, message }),
+      send: () => flatmateService.roomInterest(item.id, { share, message, gender }),
       thread: { propertyId: 'room-' + item.id, property: { title: item.society ? 'Room in ' + item.society : title, price: item.budget ? '₹' + item.budget + '/mo' : '', loc: item.localities?.[0] || 'Pune', img: item.photos?.[0] || FLATMATE_IMG }, party: { name: title, avatar: title.slice(0, 2).toUpperCase() }, firstMessage: message },
       sent: ['flatmates.messageSentOwner', { society: title }],
       dup: ['flatmates.enquiryAlreadyRecorded', { society: title }],
@@ -61,50 +65,52 @@ export default function FlatmateDetail() {
   const rootRef = useScrollReveal([]);
   const [state, setState] = useState({ status: 'loading' });
   const [myAsk, setMyAsk] = useState(null);
-  const interested = !!myAsk;
-  const [saved, setSaved] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const item = state.item;
   const owned = !!state.owned;
   const signedInAs = user?.mobile;
+  const { askGender, genderSheet } = useGenderGate();
 
   const load = useCallback(async () => {
     if (!KINDS.includes(kind)) { setState({ status: 'missing' }); return; }
+    const sentAsUser = !!readAccessToken() && !!readUser();
     try {
       const res = await flatmateService.getFlatmateDetail(kind, id);
       setState({ status: 'ready', owned: res.owned, item: res.item });
     } catch (err) {
+      // A stored session that can't be refreshed ends here; the guest reload follows from signedInAs.
+      if (err?.status === 401 && sentAsUser && !readAccessToken()) return;
       setState({ status: err?.status === 404 || err?.status === 400 ? 'missing' : 'error', error: err });
     }
   }, [kind, id]);
-  useEffect(() => { if (!authLoading) load(); }, [authLoading, signedInAs, load]);
+  const authKnown = !authLoading || (!!signedInAs && !!readAccessToken());
+  useEffect(() => { if (authKnown) load(); }, [authKnown, signedInAs, load]);
 
-  const loadMine = useCallback(() => flatmateService.myFlatmateInterestKeys()
+  const loadMine = useCallback(() => flatmateService.myFlatmateInterestKeys({ maxAge: REVISIT_MAX_AGE })
     .then((rows) => rows.find((r) => (r.kind === 'room' || r.kind === 'group' ? `${r.kind}-${r.targetId}` : r.targetId) === interestKey(kind, id)))
     .then((row) => row || null), [kind, id]);
 
   useEffect(() => {
-    if (!signedInAs || !KINDS.includes(kind)) { setMyAsk(null); setSaved(false); return undefined; }
+    if (!signedInAs || !KINDS.includes(kind)) { setMyAsk(null); return undefined; }
     let alive = true;
     loadMine().then((s) => { if (alive) setMyAsk(s); }).catch(() => {});
-    flatmateService.listFlatmateSaveKeys()
-      .then((rows) => { if (alive) setSaved(rows.some((r) => r.kind === kind && r.id === id)); })
-      .catch(() => {});
     return () => { alive = false; };
   }, [signedInAs, kind, id, loadMine]);
 
   const patchItem = (next) => setState((s) => ({ ...s, item: { ...s.item, ...next, photos: s.item.photos } }));
 
   const onAsk = async (target, share = 'solo') => {
-    if (!user) { sendToSignIn(kind === 'group' ? 'community' : 'contact'); return; }
+    if (!user) { sendToSignIn(kind === 'group' ? 'community' : 'contact', undefined, () => latest.current.onAsk(target, share)); return; }
     const isVerified = verifying ? (await refreshVerification().catch(() => null))?.verified : identityVerified;
     if (kind === 'post' && target.verifiedContactOnly && !isVerified) {
       toast(t('flatmates.acceptsVerifiedOnlyToast', { name: target.name }), 'error');
       setVerifyOpen(true);
       return;
     }
-    const ask = askFor(kind, target, share);
+    const gate = kind === 'post' ? { gender: undefined } : await askGender(target, kind);
+    if (!gate) return;
+    const ask = askFor(kind, target, share, gate.gender);
     setMyAsk({ status: 'pending' });
     let sent;
     try {
@@ -119,14 +125,13 @@ export default function FlatmateDetail() {
       }
       setMyAsk(null);
       if (err?.code === flatmateService.CONFLICT_GROUP_FULL) { await load(); toast(t('flatmates.groupAlreadyFull', { title: target.title }), 'error'); return; }
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     if (sent?.status) setMyAsk({ status: sent.status });
     rememberAsk(user.mobile, interestKey(kind, id));
     recordAskLocally({ request: ask.thread });
     toast(t(...ask.sent));
-    if (kind === 'group' && target.policy === 'any') await load();
   };
 
   const onLeave = async () => {
@@ -134,7 +139,7 @@ export default function FlatmateDetail() {
     try {
       await flatmateService.leaveGroup(id);
     } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     setMyAsk(null);
@@ -147,7 +152,7 @@ export default function FlatmateDetail() {
       await flatmateService.withdrawInterest(kind, id);
     } catch (err) {
       loadMine().then(setMyAsk).catch(() => {});
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     setMyAsk(null);
@@ -160,37 +165,25 @@ export default function FlatmateDetail() {
     try {
       await flatmateService.removeGroupMember(id, m.id);
     } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     toast(t('flatmates.memberRemoved', { name }));
     await load();
   };
 
-  const onSave = async () => {
-    if (!user) { sendToSignIn('save'); return; }
-    const next = !saved;
-    setSaved(next);
-    try {
-      if (next) await flatmateService.saveFlatmatePost(kind, id);
-      else await flatmateService.unsaveFlatmatePost(kind, id);
-    } catch {
-      setSaved(!next);
-      toast(t('flatmates.saveFailed'), 'error');
-    }
-  };
+  const latest = useLatest({ onAsk });
 
-  const back = (
-    <Link to={kind === 'post' ? '/flatmates?view=team-up' : '/flatmates'} className="inline-flex items-center gap-1.5 min-h-[44px] -ml-2 px-2 rounded-xl text-sm text-gray-400 hover:text-white"><Icon name="arrow-left" className="w-4 h-4" /> {t('flatmates.detailBack')}</Link>
-  );
-  const viewProps = { owned, saved, onSave, back, onReport: setReportTarget, ownerPanel: owned && <OwnerPanel kind={kind} item={item} patch={patchItem} /> };
+  const openReport = (target) => {
+    if (!user) { sendToSignIn('report', undefined, () => setReportTarget(target)); return; }
+    setReportTarget(target);
+  };
+  const viewProps = { owned, onReport: openReport, ownerPanel: owned && <OwnerPanel kind={kind} item={item} patch={patchItem} /> };
 
   return (
     <div ref={rootRef} className="sf-page">
       <div className="pt-2 pb-28 sm:pt-4 lg:pt-6 lg:pb-24 min-h-[100dvh]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          {state.status !== 'ready' && <div className="mb-3">{back}</div>}
-
           {state.status === 'loading' && <div className="sf-card rounded-2xl h-72 animate-pulse" aria-busy="true" />}
 
           {state.status === 'missing' && (
@@ -212,7 +205,7 @@ export default function FlatmateDetail() {
             <>
               {kind === 'room' && <RoomDetail {...viewProps} r={item} ask={myAsk} onAsk={onAsk} />}
               {kind === 'group' && <GroupDetail {...viewProps} g={item} myStatus={myAsk?.status || null} onJoin={onAsk} onLeave={onLeave} onCancel={onCancel} onRemoveMember={onRemoveMember} />}
-              {kind === 'post' && <SeekerDetail {...viewProps} r={item} interested={interested} onAsk={onAsk} />}
+              {kind === 'post' && <SeekerDetail {...viewProps} r={item} ask={myAsk} onAsk={onAsk} />}
             </>
           )}
         </div>
@@ -231,6 +224,7 @@ export default function FlatmateDetail() {
       )}
 
       {verifyOpen && <VerifyIdentityRedirect source="flatmates" onClose={() => setVerifyOpen(false)} />}
+      {genderSheet}
     </div>
   );
 }

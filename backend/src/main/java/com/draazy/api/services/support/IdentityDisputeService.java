@@ -7,21 +7,13 @@ import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.identity.verification.IdentityConflict;
 import com.draazy.api.identity.verification.IdentityConflictService;
 import com.draazy.api.security.AuthPrincipal;
-import java.util.List;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class IdentityDisputeService {
-
-    private static final List<Pattern> SENSITIVE_NUMBERS = List.of(
-            Pattern.compile("(?i)(?:\\d[\\s-]?){8,}"),
-            Pattern.compile("(?i)\\b[a-z]{5}[\\s-]?\\d{4}[\\s-]?[a-z]\\b"),
-            Pattern.compile("(?i)\\b[a-z][\\s-]?\\d{7}\\b"),
-            Pattern.compile("(?i)\\b[a-z]{3}[\\s-]?\\d{7}\\b"));
 
     private final IdentityConflictService conflicts;
     private final SupportTicketService supportTickets;
@@ -48,7 +40,7 @@ public class IdentityDisputeService {
         SupportTicketDto ticket;
         try {
             ticket = supportTickets.create(actor, new SupportTicketCreate(
-                    "Identity document already in use", "identity_dispute", visibleBody(note)));
+                    "Identity document already in use", "identity_dispute", visibleBody(note), null));
         } catch (DataIntegrityViolationException e) {
             throw new ConflictException(ErrorCodes.IDENTITY_DISPUTE_OPEN,
                     "An identity dispute is already open");
@@ -78,9 +70,6 @@ public class IdentityDisputeService {
         if (note.length() > 500) {
             throw new BadRequestException("note must be at most 500 characters");
         }
-        for (Pattern pattern : SENSITIVE_NUMBERS) {
-            note = pattern.matcher(note).replaceAll("[redacted]");
-        }
-        return note;
+        return IdentityNoteRedaction.redact(note);
     }
 }

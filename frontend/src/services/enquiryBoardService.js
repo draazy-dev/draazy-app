@@ -1,5 +1,3 @@
-/** Read-only demand console: `getEnquiry` / `getVisit` / `getDeal` are audited server-side;
- * the lists are not, and carry masked mobiles. */
 import { createProvider } from './config.js';
 
 const provider = createProvider('enquiryBoard');

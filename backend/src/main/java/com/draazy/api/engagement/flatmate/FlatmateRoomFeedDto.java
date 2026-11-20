@@ -5,8 +5,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/** Card-sized projection of a room. Trust-forensics and unread fields are omitted so anonymous
- * reads can't leak them. See docs/flows/consumer/flatmates.md#supply-side-rationale-moved-from-backend-javadoc. */
 public record FlatmateRoomFeedDto(
         UUID id,
         String type,
@@ -43,6 +41,8 @@ public record FlatmateRoomFeedDto(
         String flatType,
         String homeTypeLabel,
         boolean gatedCommunity,
+        String parking,
+        List<String> amenities,
         String furnishing,
         String facing,
         String overlooking,
@@ -50,7 +50,6 @@ public record FlatmateRoomFeedDto(
         LocalDate availableFrom,
         String gender,
         String food,
-        List<String> tags,
         String note,
         String cover,
         String owner,

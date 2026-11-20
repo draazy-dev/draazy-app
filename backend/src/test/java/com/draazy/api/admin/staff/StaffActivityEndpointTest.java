@@ -16,15 +16,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/** The Staff Activity feed reads {@code audit_log}, so it needs {@code audit:read}: anything weaker opens a second
- * door. Consumers write audit rows too and must not count as staff activity. */
 @DisplayName("D213 — staff activity")
 class StaffActivityEndpointTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
-    /** Other tests' rows commit past the class rollback and the seed has none; clean both ways for counts. */
+    // Other tests' rows commit past the class rollback; clean before and after so counts are exact.
     @BeforeEach
     @AfterEach
     void clearCommittedAuditRows() {
@@ -47,8 +44,6 @@ class StaffActivityEndpointTest extends AbstractApiTest {
                 + " VALUES (gen_random_uuid(), ?, ?, ?, ?, 'X1', ?::jsonb, now())",
                 actor.getId().toString(), role, action, entity, metadata);
     }
-
-    // ---------------------------------------------------------------- the feed
 
     @Test
     @DisplayName("admins see each action's details; managers do not")
@@ -89,7 +84,6 @@ class StaffActivityEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].entity").value("user"));
     }
 
-    /** Consumers also trigger {@code user.contact.reveal}; scope is enforced in SQL, so this tests the query. */
     @Test
     @DisplayName("consumer actions are not staff activity")
     void consumerActionsAreNotStaffActivity() throws Exception {
@@ -104,7 +98,6 @@ class StaffActivityEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
-    /** Unescaped, {@code %} is SQL's wildcard and would match the row below; escaped, it is literal. */
     @Test
     @DisplayName("free-text search treats a wildcard as a character, not as everything")
     void searchEscapesWildcards() throws Exception {
@@ -118,9 +111,6 @@ class StaffActivityEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
-    // ---------------------------------------------------------------- the summary
-
-    /** The leaderboard must count every row in the window, not just the rows one page holds. */
     @Test
     @DisplayName("the summary counts the whole window, and ranks by it")
     void theSummaryCountsTheWholeWindow() throws Exception {
@@ -144,7 +134,6 @@ class StaffActivityEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.leaderboard[1].total").value(1));
     }
 
-    /** The console's pickers are built from this; categories like {@code packers} were never audit actions. */
     @Test
     @DisplayName("the summary reports the vocabulary actually present, so filters cannot offer verbs that do not exist")
     void theSummaryReportsTheRealVocabulary() throws Exception {
@@ -159,7 +148,6 @@ class StaffActivityEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.actions[0]").value("d213.ticket.update"));
     }
 
-    /** Narrowing to one colleague must narrow the headline too, or the page lies above the list. */
     @Test
     @DisplayName("the summary answers for the filtered window, not the whole platform")
     void theSummaryFollowsTheFilter() throws Exception {
@@ -195,8 +183,6 @@ class StaffActivityEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].actorRole").value(Roles.Wire.STAFF));
     }
-
-    // ---------------------------------------------------------------- the guard
 
     @Test
     @DisplayName("staff cannot read their own review surface")

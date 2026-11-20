@@ -3,7 +3,6 @@ import { pageLabel } from '../../../lib/telemetry/pageLabels.js';
 import { fmtNum } from '../../../lib/format.js';
 import { C, AX, axis, Card, LoadFailedNotice } from './constants.jsx';
 
-// How much of the audience browses without an account, and where it leaves.
 export default function AudiencePanel({ report, failed, days }) {
   if (failed) {
     return (
@@ -18,7 +17,6 @@ export default function AudiencePanel({ report, failed, days }) {
     totalSessions, anonSessions, signups, anonSharePct, conversionRatePct, pages, dropOff,
   } = report;
 
-  // Rates arrive nullable because a missing denominator is unknown, not zero; `—` matches the Pricing tab, while a 0 count still prints 0.
   const pct = (v) => (v == null ? '—' : `${v}%`);
 
   return (
@@ -39,7 +37,6 @@ export default function AudiencePanel({ report, failed, days }) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* `sharePct` is a share of the exits shown (the list is capped), not of all exits. */}
         <Card title="Where visitors leave" desc="Share of the top exit points" height={260}>
           {dropOff.length ? (
             <BarChart horizontal labels={dropOff.map((d) => pageLabel(d.path))} datasets={[{ label: '% of shown exits', data: dropOff.map((d) => d.sharePct), color: C.rose }]} options={{ scales: { x: axis({ ticks: { callback: (v) => `${v}%` } }), y: AX } }} />

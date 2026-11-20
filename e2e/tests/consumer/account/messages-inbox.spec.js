@@ -88,7 +88,7 @@ test.describe('Messages inbox — live API', () => {
     await page.goto(`/messages?c=${thread.conversation.id}`);
     await detail;
 
-    await expect(page.locator('.pc-list-head h2')).toHaveText('Messages');
+    await expect(page.locator('.pc-list-head h1')).toHaveText('Messages');
     // The list first renders a real row, then the deliberately unmatched query reaches its empty state.
     await expect(page.locator('.pc-conv').first()).toBeVisible();
     await expect(page.locator('.pc-bubble.them', { hasText: OWNER_MESSAGE })).toBeVisible();
@@ -109,8 +109,14 @@ test.describe('Messages inbox — live API', () => {
     await expect(page.locator('.pc-bubble.me', { hasText: quickText })).toBeVisible();
     await expect(page.locator('.pc-bubble.me', { hasText: typedMessage })).toBeVisible();
     await expect(page.locator('.pc-conv').first()).toBeVisible();
+    await expect(page.locator('.pc-search input')).toHaveCount(0);
+    await page.getByTestId('msg-search-toggle').click();
     await page.locator('.pc-search input').fill('zzzz-no-live-conversation');
     await expect(page.locator('.pc-empty-list')).toBeVisible();
+
+    // Reading the thread cleared the only unread message, so the top-bar icon drops its count badge.
+    await page.goto('/');
+    await expect(page.locator('a[href="/messages"]').first().locator('span')).toHaveCount(0);
   });
 
   test('the owner sees the requester contact and can open the report modal', async ({ page }) => {
@@ -126,37 +132,42 @@ test.describe('Messages inbox — live API', () => {
     await expect(page.getByRole('dialog', { name: /Report/i })).toBeVisible();
   });
 
-  test('staged chats stay in Requests and are scoped to the signed-in user', async ({ page, request }) => {
+  test('a staged chat never shows in the list, a Sent request thread opens instead, and both are scoped to the signed-in user', async ({ page, request }) => {
     const first = await actor(request, `Staged Buyer A ${letterTag()}`);
     const second = await actor(request, `Staged Buyer B ${letterTag()}`);
-    const title = `Private staged chat ${Date.now()}`;
+    for (const who of [first, second]) {
+      const asked = await request.post(`${API}/contacts/request`, { headers: who.headers, data: { propertyId: BANER_FLAT_ID } });
+      expect(asked.status()).toBe(200);
+    }
+    const stagedMessage = `Private staged message ${Date.now()}`;
 
     await signedInAs(page, first.mobile);
     await page.goto('/');
     const firstUserId = await page.evaluate(() => JSON.parse(localStorage.getItem('draazyUser')).id);
-    await page.evaluate(({ userId, title: stagedTitle }) => {
+    await page.evaluate(({ userId, propertyId, body }) => {
       localStorage.setItem('dzPendingRequests', JSON.stringify([{
         kind: 'chat',
         userId,
-        propertyId: 'local-staged-property',
+        propertyId,
         at: Date.now(),
-        property: { title: stagedTitle, price: '₹28,000/mo', loc: 'Baner', img: '' },
+        property: { title: 'Staged flat', price: '₹28,000/mo', loc: 'Baner', img: '' },
         party: { name: 'Private Owner', role: 'Owner' },
-        firstMessage: 'Private staged message',
+        firstMessage: body,
       }]));
-    }, { userId: firstUserId, title });
+    }, { userId: firstUserId, propertyId: BANER_FLAT_ID, body: stagedMessage });
 
-    await page.goto('/messages');
+    await page.goto(`/messages?openProp=${BANER_FLAT_ID}`);
+    await expect(page.locator('.pc-conv[data-request-box="sent"]')).toHaveCount(1, { timeout: 20000 });
     await expect(page.locator('.pc-conv[data-staged="true"]')).toHaveCount(0);
-    await page.getByRole('tab', { name: /Requests/ }).click();
-    await expect(page.locator('.pc-conv[data-staged="true"]', { hasText: title })).toBeVisible();
+    await expect(page.getByTestId('request-thread')).toHaveAttribute('data-box', 'sent');
+    await expect(page.getByText(stagedMessage)).toHaveCount(0);
 
     await signedInAs(page, second.mobile);
-    await page.goto('/messages');
-    await page.getByRole('tab', { name: /Requests/ }).click();
-    await expect(page.locator('.pc-conv', { hasText: title })).toHaveCount(0);
+    await page.goto(`/messages?openProp=${BANER_FLAT_ID}`);
+    await expect(page.locator('.pc-conv[data-request-box="sent"]')).toHaveCount(1, { timeout: 20000 });
+    await expect(page.getByTestId('request-thread')).toHaveAttribute('data-box', 'sent');
+    await expect(page.getByText(stagedMessage)).toHaveCount(0);
   });
-
   test('thread actions reach the server: delete for me, mute, archive and block', async ({ page }) => {
     const id = thread.conversation.id;
     const read = async () => {
@@ -201,7 +212,7 @@ test.describe('Messages inbox — live API', () => {
     await expect(page.getByRole('button', { name: /Archived \(\d+\)/ })).toBeVisible();
   });
 
-  test('the dashboard Messages entry delegates to the canonical inbox', async ({ page }) => {
+  test('an old dashboard #messages link opens the canonical inbox', async ({ page }) => {
     await signedInAs(page, thread.buyer.mobile);
     const inbox = page.waitForResponse((response) =>
       new URL(response.url()).pathname === '/api/messages' && response.status() === 200,
@@ -210,7 +221,234 @@ test.describe('Messages inbox — live API', () => {
 
     await page.waitForURL(/\/messages/);
     await inbox;
-    await expect(page.locator('.pc-list-head h2')).toHaveText('Messages');
+    await expect(page.locator('.pc-list-head h1')).toHaveText('Messages');
     await expect(page.locator('.pc-conv', { hasText: thread.propertyTitle })).toBeVisible();
+  });
+});
+
+test.describe('Messages inbox — request threads (live API)', () => {
+  const askForContact = async (request, buyer, message) => {
+    const res = await request.post(`${API}/contacts/request`, {
+      headers: buyer.headers,
+      data: { propertyId: BANER_FLAT_ID, ...(message ? { message } : {}) },
+    });
+    expect(res.status()).toBe(200);
+    const ownerHeaders = await authHeaders(ACTORS.owner);
+    const inbox = await request.get(`${API}/me/contact-requests?size=100`, { headers: ownerHeaders });
+    const row = (await inbox.json()).content.find((r) => r.propertyId === BANER_FLAT_ID && r.requester?.name === buyer.name);
+    expect(row, 'the owner receives the request').toBeTruthy();
+    return row.id;
+  };
+
+  test('a new account has no tabs and an empty list that explains where requests go', async ({ page, request }) => {
+    const buyer = await actor(request, `Empty Inbox Buyer ${letterTag()}`);
+    await signedInAs(page, buyer.mobile);
+    await page.goto('/messages');
+    await expect(page.locator('.pc-empty-list')).toContainText('No chats yet');
+    await expect(page.locator('.pc-empty-list')).toContainText('Requests you send or receive show up here, and become chats once accepted.');
+    await expect(page.getByRole('tab', { name: /^(Chats|Requests)$/ })).toHaveCount(0);
+  });
+
+  test('the owner sees a received request row, opens its thread, and Approve & chat swaps it for the real chat', async ({ page, request }) => {
+    const buyer = await actor(request, `Thread Buyer ${letterTag()}`);
+    const message = `Zztest thread note ${Date.now()}`;
+    const requestId = await askForContact(request, buyer, message);
+    const rowId = `request:contact:${requestId}`;
+
+    await signedInAs(page, ACTORS.owner);
+    await page.goto('/messages');
+    const row = page.locator(`.pc-conv[data-conversation-id="${rowId}"]`);
+    await expect(row).toBeVisible({ timeout: 20000 });
+    await expect(row).toHaveAttribute('data-request-kind', 'contact');
+    await expect(row).toHaveAttribute('data-request-box', 'received');
+    await expect(row.locator('.pc-pill.req')).toHaveText('Request');
+    await expect(row).toContainText(message);
+
+    await row.click();
+    const thread = page.getByTestId('request-thread');
+    await expect(thread).toHaveAttribute('data-box', 'received');
+    await expect(thread).toHaveAttribute('data-state', 'pending');
+    await expect(thread.locator('.pc-bubble.them', { hasText: message })).toBeVisible();
+    await expect(page.locator('.pc-input')).toHaveCount(0);
+    await expect(thread.getByRole('button', { name: 'Decline' })).toBeVisible();
+    const chip = thread.getByTestId('chat-propchip');
+    await expect(chip).toBeVisible();
+    await expect(chip.getByRole('link', { name: 'View listing' })).toHaveAttribute('href', `/property/${BANER_FLAT_ID}`);
+    await expect(chip.getByRole('button', { name: 'Schedule visit' })).toHaveCount(0);
+
+    await thread.getByRole('button', { name: 'Approve & chat' }).click();
+    await expect(page).toHaveURL(/\/messages\?c=(?!request:)[^&]+/, { timeout: 20000 });
+    await expect(page.locator('.pc-input')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId('request-thread')).toHaveCount(0);
+    await expect(page.locator(`.pc-conv[data-conversation-id="${rowId}"]`)).toHaveCount(0);
+
+    const gate = await request.get(`${API}/contacts/status?propertyId=${BANER_FLAT_ID}`, { headers: buyer.headers });
+    expect((await gate.json()).status, 'approving from the thread opens the gate').toBe('approved');
+  });
+
+  test('the owner can decline from the thread, and the row leaves the list', async ({ page, request }) => {
+    const buyer = await actor(request, `Decline Thread Buyer ${letterTag()}`);
+    const requestId = await askForContact(request, buyer);
+    const rowId = `request:contact:${requestId}`;
+
+    await signedInAs(page, ACTORS.owner);
+    await page.goto(`/messages?c=${rowId}`);
+    const thread = page.getByTestId('request-thread');
+    await expect(thread).toHaveAttribute('data-kind', 'contact', { timeout: 20000 });
+    await thread.getByRole('button', { name: 'Decline' }).click();
+    await expect(page.locator(`.pc-conv[data-conversation-id="${rowId}"]`)).toHaveCount(0);
+    await expect(page.getByTestId('request-thread')).toHaveCount(0);
+
+    const gate = await request.get(`${API}/contacts/status?propertyId=${BANER_FLAT_ID}`, { headers: buyer.headers });
+    expect((await gate.json()).status).toBe('declined');
+  });
+
+  test('the buyer sees a sent request thread, withdraws it, then clears it', async ({ page, request }) => {
+    const buyer = await actor(request, `Sent Thread Buyer ${letterTag()}`);
+    const requestId = await askForContact(request, buyer);
+    const rowId = `request:contact:${requestId}`;
+
+    await signedInAs(page, buyer.mobile);
+    await page.goto('/messages');
+    const row = page.locator(`.pc-conv[data-conversation-id="${rowId}"]`);
+    await expect(row).toBeVisible({ timeout: 20000 });
+    await expect(row).toHaveAttribute('data-request-box', 'sent');
+    await expect(row.locator('.pc-req-pill')).toHaveText('Pending');
+
+    await row.click();
+    const thread = page.getByTestId('request-thread');
+    await expect(thread).toHaveAttribute('data-box', 'sent');
+    await expect(thread.locator('.pc-bubble.me')).toContainText('Could you share your contact details?');
+    await expect(page.locator('.pc-input')).toHaveCount(0);
+    await expect(thread.getByRole('button', { name: /^Remind/ })).toBeDisabled();
+    const chip = thread.getByTestId('chat-propchip');
+    await expect(chip.getByRole('link', { name: 'View listing' })).toHaveAttribute('href', `/property/${BANER_FLAT_ID}`);
+    await expect(chip.getByRole('button', { name: 'Schedule visit' })).toBeVisible();
+
+    await thread.getByRole('button', { name: 'Withdraw' }).click();
+    await page.getByRole('button', { name: 'Keep request' }).click();
+    await expect(thread).toHaveAttribute('data-state', 'pending');
+
+    await thread.getByRole('button', { name: 'Withdraw' }).click();
+    await expect(page.getByTestId('confirm-modal')).toContainText('Withdraw this request?');
+    await page.getByTestId('confirm-modal-ok').click();
+    await expect(thread).toHaveAttribute('data-state', 'withdrawn');
+    await expect(thread).toContainText('You withdrew this request');
+    await expect(row.locator('.pc-req-pill')).toHaveText('Withdrawn');
+
+    const gate = await request.get(`${API}/contacts/status?propertyId=${BANER_FLAT_ID}`, { headers: buyer.headers });
+    expect((await gate.json()).status).toBe('none');
+
+    await thread.getByRole('button', { name: 'Clear' }).click();
+    await expect(page.locator(`.pc-conv[data-conversation-id="${rowId}"]`)).toHaveCount(0);
+  });
+
+  const acceptedRequestThread = async (page, request, label) => {
+    const buyer = await actor(request, `${label} ${letterTag()}`);
+    const requestId = await askForContact(request, buyer);
+    const ownerHeaders = await authHeaders(ACTORS.owner);
+    const approved = await request.patch(`${API}/me/contact-requests/${requestId}`, { headers: ownerHeaders, data: { status: 'approved' } });
+    expect(approved.status()).toBe(200);
+
+    await signedInAs(page, buyer.mobile);
+    await page.goto(`/messages?openProp=${BANER_FLAT_ID}`);
+    const thread = page.getByTestId('request-thread');
+    await expect(thread).toHaveAttribute('data-state', 'accepted', { timeout: 20000 });
+    await expect(thread).toContainText('accepted your request');
+    await expect(thread.getByRole('button', { name: 'Clear' })).toBeVisible();
+    await thread.getByRole('button', { name: 'Open chat' }).click();
+    await expect(page).toHaveURL(/\/messages\?c=(?!request:)[^&]+/, { timeout: 20000 });
+    return requestId;
+  };
+
+  test('an accepted request shows Open chat from Sent, and ?openProp opens the request thread', async ({ page, request }) => {
+    const requestId = await acceptedRequestThread(page, request, 'Accepted Thread Buyer');
+    await expect(page.locator(`.pc-conv[data-conversation-id="request:contact:${requestId}"]`)).toHaveCount(0);
+    await expect(page.locator('.pc-conv[data-conversation-id]:not([data-request-kind])')).toHaveCount(1);
+  });
+
+  test('Open chat on an accepted request selects the real chat with its composer', async ({ page, request }) => {
+    await acceptedRequestThread(page, request, 'Composer Thread Buyer');
+    await expect(page.locator('.pc-input')).toBeVisible({ timeout: 20000 });
+  });
+  const ownerNotificationLink = async (request, buyerName) => {
+    const res = await request.get(`${API}/notifications?size=20`, { headers: await authHeaders(ACTORS.owner) });
+    expect(res.status()).toBe(200);
+    return ((await res.json()).content ?? []).find((n) => n.type === 'contact.received' && n.body?.includes(buyerName))?.link;
+  };
+
+  test('a contact request notification links to the dashboard request inbox', async ({ request }) => {
+    const buyer = await actor(request, `Notify Link Buyer ${letterTag()}`);
+    await askForContact(request, buyer);
+    expect(await ownerNotificationLink(request, buyer.name)).toBe('/dashboard?tab=leads&box=received');
+  });
+
+  test('tapping a contact request notification opens the dashboard Requests with that request to decide', async ({ page, request }) => {
+    const buyer = await actor(request, `Notify Tap Buyer ${letterTag()}`);
+    await askForContact(request, buyer);
+    await signedInAs(page, ACTORS.owner);
+    await page.goto('/notifications');
+    // Same-day contact requests collapse into one row, so the row is found by its link rather than this buyer's name.
+    await page.locator('.notif a[href="/dashboard?tab=leads&box=received"]').first().click();
+    await expect(page).toHaveURL(/\/dashboard\?tab=leads/);
+    const card = page.getByTestId('request-card').filter({ hasText: buyer.name });
+    await expect(card).toBeVisible({ timeout: 20000 });
+    await expect(card).toHaveAttribute('data-kind', 'contact');
+  });
+  test('?openProp selects the live chat even when the chat list loads after the sent requests', async ({ page, request }) => {
+    const buyer = await actor(request, `Slow List Buyer ${letterTag()}`);
+    const requestId = await askForContact(request, buyer);
+    const ownerHeaders = await authHeaders(ACTORS.owner);
+    const approved = await request.patch(`${API}/me/contact-requests/${requestId}`, { headers: ownerHeaders, data: { status: 'approved' } });
+    expect(approved.status()).toBe(200);
+    const opened = await request.post(`${API}/messages`, { headers: buyer.headers, data: { propertyId: BANER_FLAT_ID, body: 'Zztest slow list hello' } });
+    expect(opened.status()).toBe(201);
+
+    await signedInAs(page, buyer.mobile);
+    await page.route(/\/api\/messages(\?.*)?$/, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      await route.continue();
+    });
+    await page.goto(`/messages?openProp=${BANER_FLAT_ID}`);
+    await expect(page.locator('.pc-input')).toBeVisible({ timeout: 20000 });
+  });
+  test('the chat search is hidden until the header icon opens it, and closing clears the query', async ({ page, request }) => {
+    const buyer = await actor(request, `Search Toggle Buyer ${letterTag()}`);
+    const requestId = await askForContact(request, buyer);
+    const row = page.locator(`.pc-conv[data-conversation-id="request:contact:${requestId}"]`);
+
+    await signedInAs(page, ACTORS.owner);
+    await page.goto('/messages');
+    await expect(row).toBeVisible({ timeout: 20000 });
+    const toggle = page.getByTestId('msg-search-toggle');
+    const input = page.getByRole('textbox', { name: 'Search conversations' });
+    await expect(toggle).toHaveAttribute('aria-label', 'Open search');
+    await expect(input).toHaveCount(0);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-label', 'Close search');
+    await expect(input).toBeFocused();
+    await input.fill('zzz-no-such-conversation');
+    await expect(row).toHaveCount(0);
+    await input.fill(buyer.name);
+    await expect(row).toBeVisible();
+    await input.fill('zzz-no-such-conversation');
+
+    await toggle.click();
+    await expect(input).toHaveCount(0);
+    await expect(row).toBeVisible();
+    await toggle.click();
+    await expect(input).toHaveValue('');
+  });
+
+  test('the old Requests tab link lands on the dashboard Requests panel', async ({ page, request }) => {
+    const buyer = await actor(request, `Legacy Link Buyer ${letterTag()}`);
+    await askForContact(request, buyer);
+
+    await signedInAs(page, buyer.mobile);
+    await page.goto('/messages?tab=requests&box=sent');
+    await expect(page).toHaveURL(/\/dashboard\?tab=leads$/, { timeout: 20000 });
+    await expect(page.getByTestId('requests-panel')).toBeVisible();
+    await expect(page.getByTestId('request-card').first()).toHaveAttribute('data-box', 'sent');
   });
 });

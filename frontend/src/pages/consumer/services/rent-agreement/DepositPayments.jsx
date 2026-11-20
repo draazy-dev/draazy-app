@@ -4,9 +4,10 @@ import DateField from '../../../../components/ui/DateField.jsx';
 import Icon from '../../../../components/Icon.jsx';
 import FieldError from '../../../../components/ui/FieldError.jsx';
 import Field from '../../../../components/ui/Field.jsx';
+import AmountInput from '../../flatmates/AmountInput.jsx';
 import { BANKS, CASH_LIMIT, DEPOSIT_PAY_FIELDS, MAX_DEPOSIT_PAYMENTS } from './constants.js';
 import { todayIst } from './validation.js';
-import { digits, fmt, num } from './helpers.js';
+import { fmt, num } from './helpers.js';
 
 const FIELD = 'field w-full px-4 py-3 rounded-xl text-white text-sm';
 const WIDE = new Set(['ref', 'bank']);
@@ -30,7 +31,7 @@ export default function DepositPayments({ terms, setT, errors = {}, clearErr }) 
     const control = f === 'date'
       ? <DateField value={r.date} max={today} onChange={(v) => setRow(i, 'date', v)} className={cls} ariaLabel={`${label(r.mode, 'date')} ${i + 1}`} />
       : f === 'amount'
-        ? <input inputMode="numeric" value={r.amount || ''} onChange={(e) => setRow(i, 'amount', digits(e.target.value))} className={cls} />
+        ? <AmountInput value={r.amount || ''} onChange={(v) => setRow(i, 'amount', v)} className={errors[key] ? 'err' : ''} />
         : f === 'ref'
           ? <input value={r.ref || ''} autoCapitalize="characters" onChange={(e) => setRow(i, 'ref', e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 30))} className={cls} />
           : <input value={r[f] || ''} maxLength={80} list={f === 'bank' ? 'ra-banks' : undefined} onChange={(e) => setRow(i, f, e.target.value)} className={cls} />;
@@ -53,7 +54,7 @@ export default function DepositPayments({ terms, setT, errors = {}, clearErr }) 
                   {Object.keys(DEPOSIT_PAY_FIELDS).map((m) => <option key={m} value={m}>{t(`services.ra.terms.depositPay.modeOpt.${m}`)}</option>)}
                 </NativeSelect>
               </Field>
-              <button type="button" onClick={() => save(rows.filter((_, idx) => idx !== i))} className="p-3 rounded-xl text-gray-400 hover:text-red-400" title={t('services.ra.terms.depositPay.remove')} aria-label={t('services.ra.terms.depositPay.remove')}><Icon name="x" className="w-4 h-4" /></button>
+              <button type="button" onClick={() => save(rows.filter((_, idx) => idx !== i))} className="w-11 h-11 flex items-center justify-center flex-shrink-0 rounded-xl text-gray-400 hover:text-red-400" title={t('services.ra.terms.depositPay.remove')} aria-label={t('services.ra.terms.depositPay.remove')}><Icon name="x" className="w-4 h-4" /></button>
             </div>
             <div className="grid grid-cols-2 gap-3">{(DEPOSIT_PAY_FIELDS[r.mode] || []).map((f) => field(i, r, f))}</div>
             {r.mode === 'cash' && num(r.amount) >= CASH_LIMIT && <p role="status" className="text-amber-400 text-xs mt-2 leading-relaxed">{t('services.ra.terms.cashLimit')}</p>}
@@ -61,7 +62,7 @@ export default function DepositPayments({ terms, setT, errors = {}, clearErr }) 
         ))}
       </div>
       {rows.length < MAX_DEPOSIT_PAYMENTS && (
-        <button type="button" onClick={add} className="btn-outline px-4 py-2.5 rounded-xl text-teal-400 text-sm font-semibold flex items-center gap-2"><Icon name="plus-circle" className="w-4 h-4" /> {t('services.ra.terms.depositPay.add')}</button>
+        <button type="button" onClick={add} className="btn-outline h-btn px-4 rounded-xl text-teal-400 text-sm font-semibold flex items-center gap-2"><Icon name="plus-circle" className="w-4 h-4" /> {t('services.ra.terms.depositPay.add')}</button>
       )}
       <FieldError id="ra-deposit-pay-err" alert={false} show={!!errors.depositPayments}>{t(`services.ra.terms.depositPay.err.${errors.depositPayments}`, { paid: fmt(paid), deposit: fmt(deposit) })}</FieldError>
     </section>

@@ -20,9 +20,9 @@ async function findUser(page, name) {
   return row;
 }
 
-test('the directory lists accounts with role, status and a masked mobile, filters by status on the server, and narrows by search', async ({ page, login, consoleErrors }) => {
+test('the directory lists accounts with role, status and a full mobile, filters by status on the server, and narrows by search', async ({ page, login, consoleErrors }) => {
   await login.asAdmin();
-  await test.step('the directory lists accounts with role, status and a masked mobile', async () => {
+  await test.step('the directory lists accounts with role, status and a full mobile', async () => {
     await openUsers(page);
 
     // Directory copy depends on shared population size, not this test.
@@ -32,7 +32,7 @@ test('the directory lists accounts with role, status and a masked mobile, filter
 
     // Use Nikhil Sharma because Nikhil Nair is not unique in the seed.
     const row = await findUser(page, 'Nikhil Sharma');
-    await expect(row.getByText(/^\d{2}X{5}\d{3}$/)).toBeVisible();
+    await expect(row.getByText(/^[6-9]\d{9}$/)).toBeVisible();
     await expect(row.getByText('owner', { exact: true })).toBeVisible();
 
     expect(consoleErrors).toHaveLength(0);
@@ -184,6 +184,34 @@ test('suspending an account ends its sessions and refuses the next sign-in', asy
   await after.getByRole('button', { name: 'Reactivate' }).click();
   await page.getByRole('button', { name: 'Confirm' }).click();
   await expect(page.getByText('User reactivated')).toBeVisible();
+
+  expect(consoleErrors).toHaveLength(0);
+});
+
+test('an archived account shows as archived with Restore, and Restore brings it back', async ({ page, login, consoleErrors }) => {
+  const name = `Zzarchived ${Date.now().toString(36).replace(/\d/g, (d) => 'abcdefghij'[d])}`;
+  const person = await authHeaders(uniqueMobile());
+  const me = await fetch(`${API}/auth/me`, { method: 'PATCH', headers: person, body: JSON.stringify({ name }) });
+  expect(me.status).toBe(200);
+  const id = (await (await fetch(`${API}/auth/me`, { headers: person })).json()).id;
+  const archived = await fetch(`${API}/users/${id}/archive`, {
+    method: 'PATCH',
+    headers: await authHeaders(ACTORS.admin),
+    body: JSON.stringify({ reason: 'e2e archived row' }),
+  });
+  expect(archived.ok).toBeTruthy();
+
+  await login.asAdmin();
+  await page.goto('/admin/users?tab=archived');
+  await page.getByPlaceholder('Search name or mobile…').fill(name);
+  const row = rowFor(page, name);
+  await expect(row).toBeVisible();
+  await expect(row.getByText('archived', { exact: true })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Archive user' })).toHaveCount(0);
+
+  await row.getByRole('button', { name: 'Restore user' }).click();
+  await page.getByRole('button', { name: 'Confirm' }).click();
+  await expect(rowFor(page, name)).toHaveCount(0);
 
   expect(consoleErrors).toHaveLength(0);
 });

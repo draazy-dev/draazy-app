@@ -1,5 +1,6 @@
 import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile } from '../../helpers/liveAuth.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 async function fileRequest(reason) {
   const res = await fetch(`${API}/me/erasure`, {
@@ -59,5 +60,6 @@ test('a manager neither sees erasure requests nor reads their API', async ({ pag
   await login.asManager();
   await page.goto('/admin/erasure-requests');
   await expect(page).toHaveURL(/\/admin\/?$/);
+  await expandAdminNav(page);
   await expect(page.getByRole('link', { name: 'Erasure requests' })).toHaveCount(0);
 });

@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PushSubscriptionService implements PushNotifier {
-
     private static final Logger log = LoggerFactory.getLogger(PushSubscriptionService.class);
     private static final int MAX_PER_USER = 10;
 
@@ -26,7 +25,6 @@ public class PushSubscriptionService implements PushNotifier {
         this.sender = sender;
     }
 
-    /** A row owned by someone else is only re-bound when the keys match, i.e. the same browser subscription. */
     @Transactional
     public void upsert(UUID userId, PushSubscriptionRequest body) {
         int written = jdbc.update("""

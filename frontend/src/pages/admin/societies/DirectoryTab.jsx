@@ -3,7 +3,6 @@ import Loading from '../../../components/ui/Loading.jsx';
 import { PageNav, QueuePanel, SearchBox } from '../../../components/admin/WorkQueue.jsx';
 import { titleCase, actBtn, PLAIN } from './helpers.jsx';
 
-/** One server page of the directory. `Table` is used without `pageSize` because its client pager resets on `rows.length` and would fight the server pager. */
 export default function DirectoryTab({ state, query, onQuery, page, pageSize, onPage, openEdit, note }) {
   const dirCols = [
     { key: 'name', header: 'Society', render: (s) => <div><div className="font-semibold">{s.name}</div><div className="text-xs text-gray-400">{s.builder} · {s.year}</div></div> },

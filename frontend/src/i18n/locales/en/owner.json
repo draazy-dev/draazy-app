@@ -4,26 +4,25 @@
     "notFoundBody": "This profile may have been removed or the link is incorrect.",
     "browseListings": "Browse listings",
 
-    "verifiedOwner": "Verified owner",
+    "verifiedOwner": "KYC done",
     "zeroBrokerage": "Zero Brokerage",
     "roleLine": "Property Owner · Direct dealing, no middlemen",
     "reviewCount_one": "({{count}} review)",
     "reviewCount_other": "({{count}} reviews)",
 
     "call": "Call",
-    "whatsapp": "WhatsApp",
     "message": "Message",
     "report": "Report",
     "reportAria": "Report this owner",
 
     "statListed": "Properties Listed",
     "statMemberSince": "Member Since",
-    "statVerified": "Verified Listings",
+    "statVerified": "Verified properties",
 
     "aboutTitle": "About the Owner",
-    "aboutBody": "{{name}} is a verified property owner listing directly on Draazy. No brokers, no commission — you deal with the owner directly from enquiry to handover.",
+    "aboutBody": "{{name}} is a KYC-done owner listing directly on Draazy. No brokers, no commission — you deal with the owner directly from enquiry to handover.",
     "aboutBodyUnverified": "{{name}} lists directly on Draazy. No brokers, no commission — you deal with the owner directly from enquiry to handover.",
-    "badgeVerifiedOwner": "Verified owner",
+    "badgeVerifiedOwner": "KYC done",
     "badgeNumberProtected": "Number Protected",
 
     "listingsTitle": "Properties by this Owner",
@@ -38,7 +37,6 @@
     "reviewsSummary_one": "{{count}} review",
     "reviewsSummary_other": "{{count}} reviews",
     "rateExperience": "Rate your experience with this owner",
-    "starAria": "{{count}} star",
     "reviewPlaceholder": "Share your experience...",
     "postReview": "Post Review",
     "errRating": "Please add a star rating",
@@ -47,7 +45,6 @@
 
     "noBrokerageNote": "No brokerage. Deal directly.",
     "contactTitle": "Contact owner directly",
-    "chatWhatsapp": "Chat on WhatsApp",
     "approvedPrefersChat": "Approved — owner prefers in-app chat",
     "requestPending": "Request sent — awaiting owner",
     "requestDeclined": "Owner declined the request",
@@ -58,7 +55,7 @@
     "scheduleVisit": "Schedule a Visit",
     "visit": "Visit",
 
-    "toastVerificationRequired": "This owner accepts verified contacts only. Get the Verified badge from your profile to reach them.",
+    "toastVerificationRequired": "This owner only accepts contacts with KYC done. Get your KYC done from your profile to reach them.",
     "toastUnavailable": "Owner contact is unavailable for this listing right now. Please try again later.",
     "toastRequestSent": "Request sent — you'll get the number once the owner approves.",
     "toastApproved": "Owner has shared their number with you.",
@@ -77,25 +74,28 @@
         "confirm": "Confirm your listing",
         "live": "Live",
         "notApproved": "Not approved",
+        "changesNeeded": "Changes needed",
         "underReview": "Under review",
         "paused": "Paused",
         "sold": "Sold",
         "rented": "Rented",
         "archived": "Archived",
         "underOffer": "Under offer",
-        "private": "Private"
+        "private": "Private",
+        "expired": "Expired"
       },
       "line": {
         "pending": "Our team usually reviews listings within 24 hours.",
-        "confirm": "Draazy posted this for you. Check the details — it goes live only after you confirm.",
+        "confirm": "Draazy posted this for you. Complete the details and photos, then confirm to send it for review.",
         "underReview": "This listing is off search while Draazy reviews it.",
         "live": "Buyers can now find and contact you.",
-        "paused": "This listing is paused.",
+        "paused": "Hidden from search. Resume it to show it to buyers again.",
         "sold": "This listing is marked sold.",
         "rented": "This listing is marked rented.",
         "archived": "This listing is archived.",
         "underOffer": "This listing is under offer.",
-        "private": "This listing is private."
+        "private": "This listing is private.",
+        "expired": "Renew it to put it back on the board."
       },
       "actions": {
         "getBadge": "Get Verified property badge",
@@ -103,8 +103,9 @@
         "fixNow": "Fix now",
         "share": "Share listing",
         "contactSupport": "Contact support",
+        "editResubmit": "Edit & resubmit",
         "supportMessages": "Messages from Draazy Support",
-        "confirm": "Yes, this is my property",
+        "confirm": "Review & confirm",
         "reportWrong": "Something's wrong"
       },
       "reasons": {
@@ -119,7 +120,7 @@
       }
     },
 
-    "waIntro": "Hi {{name}}, I saw your profile on Draazy and I'm interested in your listings. Are they still available?",
-    "waFallbackName": "there"
+    "chatIntro": "Hi {{name}}, I saw your profile on Draazy and I'm interested in your listings. Are they still available?",
+    "chatFallbackName": "there"
   }
 }

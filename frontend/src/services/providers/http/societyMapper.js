@@ -13,7 +13,6 @@ export function toRatingIndex(rows) {
   return index;
 }
 
-/** `null`/absent stays absent; anything else becomes a number. Guards the four decimal fields. */
 const num = (v) => (v == null ? null : Number(v));
 
 export function toSociety(row) {
@@ -41,7 +40,6 @@ export function toSociety(row) {
     vegPolicy: row.vegPolicy || '',
     rera: row.rera || '',
     amenities: Array.isArray(row.amenities) ? row.amenities : [],
-    // Live listings across the merge family; `0` is a real zero, so it is always projected.
     listingCount: Number(row.listingCount) || 0,
     forSale: Number(row.forSale) || 0,
     forRent: Number(row.forRent) || 0,

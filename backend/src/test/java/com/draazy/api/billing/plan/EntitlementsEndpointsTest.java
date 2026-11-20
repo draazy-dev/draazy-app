@@ -2,6 +2,7 @@ package com.draazy.api.billing.plan;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -22,16 +23,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** The owner-contact quota is server-enforced; allowances derive from the live plan and referrals each call. */
 @DisplayName("Entitlements — the contact quota the browser used to keep")
 class EntitlementsEndpointsTest extends AbstractApiTest {
-
-    /** Owner Plus. Priced, and {@code unlimited_contacts} since V91. */
     private static final String UNLIMITED_PLAN = "b1000000-0000-4000-8000-000000000002";
 
-    /** {@code fees.freeContactLimit} and {@code fees.referralContactBonus} in the seeded row. */
     private static final int FREE_LIMIT = 15;
-    private static final int REFERRAL_BONUS = 15;
     private static final int FRIEND_BONUS = 5;
 
     @Autowired UserRepository users;
@@ -40,8 +36,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
 
     @Autowired PlanRepository plans;
     @Autowired TestPlanGrants grants;
-
-    // ---- fixtures ----
 
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
@@ -57,7 +51,11 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     }
 
     private Property listing(User owner, String title) {
-        Property p = new Property(owner, title, "rent", "apartment", 25000L, "Kothrud", "Pune");
+        return listing(owner, title, "rent");
+    }
+
+    private Property listing(User owner, String title, String deal) {
+        Property p = new Property(owner, title, deal, "apartment", 25000L, "Kothrud", "Pune");
         p.setBhk(new BigDecimal("2"));
         p.setStatus("approved");
         p.setPriceUnit("per-month");
@@ -65,7 +63,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** Put {@code buyer} in front of one owner, and say what the server made of it. */
     private int ask(User buyer, Property p) throws Exception {
         return mvc.perform(post(Routes.Contacts.REQUEST)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
@@ -74,7 +71,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andReturn().getResponse().getStatus();
     }
 
-    /** Spend {@code count} contacts against {@code count} different owners. */
     private void spend(User buyer, int count, long firstOwnerMobile) throws Exception {
         for (int i = 0; i < count; i++) {
             User owner = user(String.valueOf(firstOwnerMobile + i), "owner");
@@ -89,12 +85,10 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 Instant.now().plus(30, ChronoUnit.DAYS), null, null));
     }
 
-    /** Read, not written out: a literal price here would drift the first time the plan is repriced. */
     private long priceOf(String planId) {
         return plans.findById(UUID.fromString(planId)).orElseThrow().getPrice();
     }
 
-    /** Earns the referral through real endpoints; setting the status directly would pass even if it broke. */
     private String referralApprovedFor(User referrer, String refereeMobile, User staff)
             throws Exception {
         User referee = identityVerified(refereeMobile, "buyer");
@@ -120,8 +114,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
         return id;
     }
 
-    // ---- 1: what the free tier is worth ----
-
     @Test
     @DisplayName("a brand-new account is told the free allowance, not left to assume one")
     void freeTierReportsItsAllowance() throws Exception {
@@ -133,10 +125,11 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.contacts.used").value(0))
                 .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT))
                 .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT))
-                .andExpect(jsonPath("$.contacts.referralBonus").value(0))
+                .andExpect(jsonPath("$.contacts.referralBonus").doesNotExist())
                 .andExpect(jsonPath("$.contacts.friendBonus").value(0))
-                // Owner Free's listing_limit. Reported even to a buyer, because the number is a
-                // property of the account rather than of the role it is browsing under.
+                .andExpect(jsonPath("$.agreements.credits").value(0))
+                .andExpect(jsonPath("$.agreements.remaining").value(0))
+                .andExpect(jsonPath("$.agreements.discountPercent").value(50))
                 .andExpect(jsonPath("$.listings.allowance").value(1))
                 .andExpect(jsonPath("$.listings.referralBonus").doesNotExist())
                 .andExpect(jsonPath("$.listings.used").value(0));
@@ -176,6 +169,70 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("a buy pack opens sale listings only, and the refusal names the pack that would")
+    void aBuyPackNeverPaysForARentContact() throws Exception {
+        User buyer = user("9844400140", "buyer");
+        spend(buyer, FREE_LIMIT, 9844400141L);
+        // One test transaction stamps every contact alike; the replay needs the rent ones first.
+        jdbc.update("update contact_requests set first_requested_at = first_requested_at - interval '1 minute'"
+                + " where requester_id = ?", buyer.getId());
+        grants.grantBuyPack(buyer.getId(), Instant.now().minus(1, ChronoUnit.HOURS),
+                Instant.now().plus(60, ChronoUnit.DAYS));
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.contacts.remaining").value(15))
+                .andExpect(jsonPath("$.contacts.remainingRent").value(0))
+                .andExpect(jsonPath("$.contacts.remainingBuy").value(15));
+
+        mvc.perform(post(Routes.Contacts.REQUEST)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + listing(user("9844400170", "owner"), "Rent flat").getId()
+                                + "\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("Rent Contact Pack")));
+
+        assertThat(ask(buyer, listing(user("9844400171", "owner"), "Sale flat", "buy"))).isEqualTo(200);
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.contacts.remainingBuy").value(14));
+    }
+
+    @Test
+    @DisplayName("free contacts count toward either deal until spent")
+    void freeContactsServeBothDeals() throws Exception {
+        User buyer = user("9844400180", "buyer");
+        assertThat(ask(buyer, listing(user("9844400181", "owner"), "Sale home", "buy"))).isEqualTo(200);
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT - 1))
+                .andExpect(jsonPath("$.contacts.remainingRent").value(FREE_LIMIT - 1))
+                .andExpect(jsonPath("$.contacts.remainingBuy").value(FREE_LIMIT - 1));
+    }
+
+    @Test
+    @DisplayName("a listing with a seeker contact or a pass cannot flip between rent and sale")
+    void aPricedListingKeepsItsDeal() throws Exception {
+        User owner = user("9844400190", "owner");
+        Property contacted = listing(owner, "Contacted flat");
+        assertThat(ask(user("9844400191", "buyer"), contacted)).isEqualTo(200);
+        assertThat(flipToSale(owner, contacted)).isEqualTo(409);
+
+        Property passed = listing(owner, "Passed flat");
+        grants.grantPass(owner.getId(), passed.getId(), Instant.now().plus(60, ChronoUnit.DAYS));
+        assertThat(flipToSale(owner, passed)).isEqualTo(409);
+
+        assertThat(flipToSale(owner, listing(owner, "Quiet flat"))).isEqualTo(200);
+    }
+
+    private int flipToSale(User owner, Property p) throws Exception {
+        return mvc.perform(patch("/me/listings/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deal\":\"buy\",\"price\":5000000}"))
+                .andReturn().getResponse().getStatus();
+    }
+
+    @Test
     @DisplayName("the count is contact_requests itself — no tally to drift")
     void openingAContactSpendsExactlyOne() throws Exception {
         User buyer = user("9844400010", "buyer");
@@ -204,13 +261,11 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     void anOwnerNeverSpendsOnTheirOwnListing() throws Exception {
         User owner = user("9844400030", "owner");
 
-        assertThat(ask(owner, listing(owner, "My own flat"))).isEqualTo(200);
+        assertThat(ask(owner, listing(owner, "My own flat"))).isEqualTo(409);
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.contacts.used").value(0));
     }
-
-    // ---- 2: running out ----
 
     @Test
     @DisplayName("the sixteenth new owner is refused with 422, not 403 and not 429")
@@ -230,7 +285,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.error").value("contact_quota_exhausted"));
     }
 
-    /** Running out blocks only new owners; opened conversations must stay open for double-tap idempotency. */
     @Test
     @DisplayName("an exhausted caller can still re-read the requests they already opened")
     void exhaustionNeverClosesADoorAlreadyOpened() throws Exception {
@@ -246,33 +300,93 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .isEqualTo(422);
     }
 
-    // ---- 3: what a referral is worth ----
-
     @Test
-    @DisplayName("a qualified referral raises the ceiling, and says how much of it it bought")
-    void anApprovedReferralGrantsContacts() throws Exception {
-        User referrer = user("9844403000", "owner");
+    @DisplayName("a qualified referral buys the referrer a discount credit, never contacts")
+    void anApprovedReferralGrantsAnAgreementDiscount() throws Exception {
+        User referrer = identityVerified("9844403000", "owner");
         User staff = user("9844403009", "staff");
         referralApprovedFor(referrer, "9844403001", staff);
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT + REFERRAL_BONUS))
-                .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT + REFERRAL_BONUS))
-                .andExpect(jsonPath("$.contacts.referralBonus").value(REFERRAL_BONUS));
-
-        mvc.perform(get(Routes.Plans.ENTITLEMENTS)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
+                .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT))
+                .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT))
+                .andExpect(jsonPath("$.contacts.referralBonus").doesNotExist())
                 .andExpect(jsonPath("$.listings.referralBonus").doesNotExist())
                 .andExpect(jsonPath("$.listings.allowance").value(1))
-                .andExpect(jsonPath("$.agreements.free").value(0));
+                .andExpect(jsonPath("$.agreements.credits").value(1))
+                .andExpect(jsonPath("$.agreements.used").value(0))
+                .andExpect(jsonPath("$.agreements.remaining").value(1))
+                .andExpect(jsonPath("$.agreements.locked").value(0))
+                .andExpect(jsonPath("$.agreements.discountPercent").value(50));
     }
 
     @Test
-    @DisplayName("each owner-track referral buys one free agreement and no contacts; no listing slots")
-    void ownerTrackReferralsBuyAgreements() throws Exception {
-        User referrer = user("9844403100", "owner");
+    @DisplayName("an earned credit stays locked until the referrer and the friend both finish KYC")
+    void theCreditUnlocksOnlyWhenBothSidesAreVerified() throws Exception {
+        User referrer = user("9844403500", "owner");
+        User staff = user("9844403509", "staff");
+        referralApprovedFor(referrer, "9844403501", staff);
+        jdbc.update("update users set verified = false where mobile = '9844403501'");
+
+        expectAgreements(referrer, 1, 0, 1);
+
+        jdbc.update("update users set verified = true where id = ?", referrer.getId());
+        expectAgreements(referrer, 1, 0, 1);
+
+        jdbc.update("update users set verified = true where mobile = '9844403501'");
+        expectAgreements(referrer, 1, 1, 0);
+
+        jdbc.update("update users set verified = false where id = ?", referrer.getId());
+        expectAgreements(referrer, 1, 0, 1);
+    }
+
+    @Test
+    @DisplayName("the Refer page lists each friend with who still owes KYC, and invites that never joined")
+    void theFriendListExplainsEachReward() throws Exception {
+        User referrer = user("9844403600", "owner");
+        User staff = user("9844403609", "staff");
+        referralApprovedFor(referrer, "9844403601", staff);
+        referralApprovedFor(referrer, "9844403602", staff);
+        jdbc.update("update users set verified = false where mobile = '9844403602'");
+        mvc.perform(post(Routes.Referrals.INVITES).header(HttpHeaders.AUTHORIZATION, bearer(referrer))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"mobile\":\"9844403603\"}"))
+                .andExpect(status().isOk());
+
+        expectFriend(referrer, "9844403601", "locked", "you");
+        expectFriend(referrer, "9844403602", "locked", "both");
+        mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
+                .andExpect(jsonPath("$.friends.length()").value(3))
+                .andExpect(jsonPath("$.friends[0].mobile").value("9844403603"))
+                .andExpect(jsonPath("$.friends[0].state").value("invited"))
+                .andExpect(jsonPath("$.friends[0].name").doesNotExist());
+
+        jdbc.update("update users set verified = true where id = ?", referrer.getId());
+        expectFriend(referrer, "9844403601", "ready", null);
+        expectFriend(referrer, "9844403602", "locked", "friend");
+    }
+
+    private void expectFriend(User referrer, String mobile, String state, String kycPending) throws Exception {
+        String row = "$.friends[?(@.mobile == '" + mobile + "')]";
+        mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(row + ".state").value(org.hamcrest.Matchers.contains(state)))
+                .andExpect(jsonPath(row + ".kycPending").value(org.hamcrest.Matchers.contains(kycPending)));
+    }
+
+    private void expectAgreements(User referrer, int credits, int remaining, int locked) throws Exception {
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.agreements.credits").value(credits))
+                .andExpect(jsonPath("$.agreements.remaining").value(remaining))
+                .andExpect(jsonPath("$.agreements.locked").value(locked));
+    }
+
+    @Test
+    @DisplayName("each qualified friend adds one credit, whichever track they came in on")
+    void everyQualifiedFriendBuysACredit() throws Exception {
+        User referrer = identityVerified("9844403100", "owner");
         User staff = user("9844403109", "staff");
         String first = referralApprovedFor(referrer, "9844403101", staff);
         jdbc.update("update referrals set track = 'owner' where id = ?::uuid", first);
@@ -280,40 +394,38 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
         mvc.perform(get(Routes.Plans.ENTITLEMENTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.contacts.referralBonus").value(0))
+                .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT))
                 .andExpect(jsonPath("$.listings.allowance").value(1))
-                .andExpect(jsonPath("$.agreements.free").value(1));
+                .andExpect(jsonPath("$.agreements.credits").value(1));
 
-        String second = referralApprovedFor(referrer, "9844403102", staff);
-        jdbc.update("update referrals set track = 'owner' where id = ?::uuid", second);
+        referralApprovedFor(referrer, "9844403102", staff);
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(jsonPath("$.listings.allowance").value(1))
-                .andExpect(jsonPath("$.agreements.free").value(2));
+                .andExpect(jsonPath("$.agreements.credits").value(2))
+                .andExpect(jsonPath("$.agreements.remaining").value(2));
     }
 
     @Test
-    @DisplayName("the friend gets extra free contacts while the redeemed code stands, and loses them on rejection")
+    @DisplayName("the friend's gift waits for the referral to qualify, and goes on rejection")
     void theFriendBonusFollowsTheReferral() throws Exception {
         User referrer = user("9844403200", "owner");
-        User referee = user("9844403201", "buyer");
-        String code = mvc.perform(get(Routes.Referrals.MINE)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
-                .andReturn().getResponse().getContentAsString()
-                .replaceAll("^.*?\"code\":\"([^\"]+)\".*$", "$1");
-        mvc.perform(post(Routes.Referrals.REDEEM)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(referee))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"code\":\"" + code + "\"}"))
-                .andExpect(status().isOk());
+        User staff = user("9844403209", "staff");
+        String id = referralApprovedFor(referrer, "9844403201", staff);
+        User referee = users.findByMobile("9844403201").orElseThrow();
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(referee)))
                 .andExpect(jsonPath("$.contacts.friendBonus").value(FRIEND_BONUS))
                 .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT + FRIEND_BONUS))
                 .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT + FRIEND_BONUS));
 
-        jdbc.update("update referrals set status = 'rejected' where referred_mobile = ?", referee.getMobile());
+        jdbc.update("update referrals set status = 'pending' where id = ?::uuid", id);
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(referee)))
+                .andExpect(jsonPath("$.contacts.friendBonus").value(0));
+
+        jdbc.update("update referrals set status = 'rejected' where id = ?::uuid", id);
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(referee)))
                 .andExpect(jsonPath("$.contacts.friendBonus").value(0))
@@ -321,8 +433,8 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("clawing back withdraws the contacts, because nothing was ever stored")
-    void clawingBackAReferralWithdrawsTheContactsItGranted() throws Exception {
+    @DisplayName("clawing back withdraws the credit, because nothing was ever stored")
+    void clawingBackAReferralWithdrawsTheCreditItGranted() throws Exception {
         User referrer = user("9844404000", "owner");
         User staff = user("9844404009", "staff");
         String id = referralApprovedFor(referrer, "9844404001", staff);
@@ -336,13 +448,9 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
         mvc.perform(get(Routes.Plans.ENTITLEMENTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT))
-                .andExpect(jsonPath("$.contacts.referralBonus").value(0))
-                // The free agreement goes back with it, for the same reason: nothing was stored, so
-                // there is no counter anybody has to remember to un-increment.
-                .andExpect(jsonPath("$.agreements.free").value(0));
+                .andExpect(jsonPath("$.agreements.credits").value(0))
+                .andExpect(jsonPath("$.agreements.remaining").value(0));
     }
-
-    // ---- 4: what a priced plan is worth ----
 
     @Test
     @DisplayName("an unlimited plan reports null rather than a number nobody can read")
@@ -356,12 +464,10 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.contacts.unlimited").value(true))
                 .andExpect(jsonPath("$.contacts.allowance").doesNotExist())
                 .andExpect(jsonPath("$.contacts.remaining").doesNotExist())
-                // Usage is still reported. The plan makes it moot, not uninteresting.
                 .andExpect(jsonPath("$.contacts.used").value(1))
                 .andExpect(jsonPath("$.listings.allowance").value(2));
     }
 
-    /** Pending rows exist so unpaid orders can resume; reading entitlement off them would grant the plan. */
     @Test
     @DisplayName("an unpaid order confers nothing — capability is not the same question as standing")
     void aPendingSubscriptionEntitlesNothing() throws Exception {

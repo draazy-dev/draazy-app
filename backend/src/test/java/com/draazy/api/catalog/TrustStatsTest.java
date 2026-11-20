@@ -15,15 +15,14 @@ import com.draazy.api.identity.user.UserRepository;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Catalogue-wide and the seeded catalogue is shared, so every test asserts growth from a baseline read, never an absolute total. */
 class TrustStatsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -31,10 +30,8 @@ class TrustStatsTest extends AbstractApiTest {
     @Autowired
     ObjectMapper objectMapper;
 
-    /** A slug no seed uses, so the fixture listings are the only ones in it. */
     private static final String SLUG = "trust-tally-fixture";
 
-    /** {@code properties.locality_slug} is a foreign key to {@code localities}; rolled back with the test. */
     @BeforeEach
     void createFixtureLocality() {
         jdbc.update("insert into localities (slug, name, city) values (?, ?, 'Pune')"
@@ -90,7 +87,6 @@ class TrustStatsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.trustStats.verifiedOwners").exists());
     }
 
-    /** Four listings, one live: growth of 4 means the moderation predicate was dropped. */
     @Test
     void onlyApprovedAndUnarchivedListingsAreCounted() throws Exception {
         Tally before = tally();
@@ -105,7 +101,24 @@ class TrustStatsTest extends AbstractApiTest {
         assertGrewBy(before, 1, 0, 0);
     }
 
-    /** Owner-verified, ownership-verified and both make three; 4 means the clauses were summed instead of or'd. */
+    @Test
+    void dormantRealListingsDoNotInflatePublicTrustTotals() throws Exception {
+        Tally before = tally();
+        User asha = owner("9811100099");
+        Property demo = listing(asha, "Dormant demo", PropertyStatus.APPROVED);
+        Property real = listing(asha, "Dormant real", PropertyStatus.APPROVED);
+        Instant old = Instant.now().minus(32, ChronoUnit.DAYS);
+        jdbc.update("update properties set created_at = ?, demo = true where id = ?",
+                java.sql.Timestamp.from(old), demo.getId());
+        jdbc.update("update properties set created_at = ? where id = ?",
+                java.sql.Timestamp.from(old), real.getId());
+
+        assertGrewBy(before, 1, 0, 0);
+        jdbc.update("update properties set last_confirmed_at = ? where id = ?",
+                java.sql.Timestamp.from(Instant.now()), real.getId());
+        assertGrewBy(before, 2, 0, 0);
+    }
+
     @Test
     void eitherBadgeCountsAndBothTogetherCountOnce() throws Exception {
         Tally before = tally();
@@ -126,7 +139,6 @@ class TrustStatsTest extends AbstractApiTest {
         assertGrewBy(before, 3, 3, 1);
     }
 
-    /** An expired verdict does not count: {@code isOwnershipVerified()} lapses with no row write, so the column stays {@code true}. */
     @Test
     void anExpiredOwnershipVerdictDoesNotCountBecauseTheBadgeIsGone() throws Exception {
         Tally before = tally();
@@ -148,7 +160,6 @@ class TrustStatsTest extends AbstractApiTest {
         assertGrewBy(before, 3, 2, 0);
     }
 
-    /** One owner with three verified listings is one verified owner; counting rows would give 4. */
     @Test
     void verifiedOwnersCountsPeopleNotListings() throws Exception {
         Tally before = tally();
@@ -166,7 +177,6 @@ class TrustStatsTest extends AbstractApiTest {
         assertGrewBy(before, 4, 4, 2);
     }
 
-    /** A verified deed says nothing about the person, so it must not lend its owner the stronger wording. */
     @Test
     void aVerifiedDeedDoesNotMakeItsOwnerAVerifiedPerson() throws Exception {
         Tally before = tally();
@@ -178,7 +188,6 @@ class TrustStatsTest extends AbstractApiTest {
         assertGrewBy(before, 1, 1, 0);
     }
 
-    /** All three numbers share one live predicate, else a catalogue could report more owners than listings. */
     @Test
     void aVerifiedOwnerWithNothingLiveIsNotCounted() throws Exception {
         Tally before = tally();

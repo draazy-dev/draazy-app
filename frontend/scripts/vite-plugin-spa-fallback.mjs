@@ -1,9 +1,6 @@
-/* _redirects rules run before the asset lookup, so a catch-all rewrite would swallow /assets; each App.jsx
-   route rewrites to the shell, and a prerendered page needs a self-rewrite first or its rule shadows it. */
 import { copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-/* Pages counts every rule after the first dynamic one as dynamic and silently drops all rules past 100. */
 const MAX_DYNAMIC = 100;
 
 export function spaRedirects(appSource, htmlFiles) {

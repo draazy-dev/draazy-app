@@ -17,7 +17,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 class BootstrapEndpointsTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
 
     @Autowired ObjectMapper objectMapper;
@@ -36,7 +35,9 @@ class BootstrapEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.counts.counts").isArray())
                 .andExpect(jsonPath("$.trustStats.totalListings").isNumber())
                 .andExpect(jsonPath("$.trustStats.verifiedListings").isNumber())
-                .andExpect(jsonPath("$.trustStats.verifiedOwners").isNumber());
+                .andExpect(jsonPath("$.trustStats.verifiedOwners").isNumber())
+                .andExpect(jsonPath("$.flatmatePulse.seeking").isNumber())
+                .andExpect(jsonPath("$.flatmatePulse.initials").isArray());
     }
 
     @Test
@@ -44,8 +45,6 @@ class BootstrapEndpointsTest extends AbstractApiTest {
         mvc.perform(get(Routes.Bootstrap.ME)).andExpect(status().isUnauthorized());
     }
 
-    // The client primes each section into the cache slot of the endpoint it replaces, so a section
-    // that differs from that endpoint's own answer would be served as if the endpoint had said it.
     @Test
     void everyShellSectionIsExactlyWhatItsOwnEndpointAnswers() throws Exception {
         User u = new User("9877730001", "buyer");
@@ -62,8 +61,13 @@ class BootstrapEndpointsTest extends AbstractApiTest {
                 .isEqualTo(read(Routes.Engagement.NOTIFICATIONS_UNREAD_COUNT, token));
         assertThat(shell.get("messagesUnread"))
                 .isEqualTo(read(Routes.Conversations.UNREAD_COUNT, token));
+        assertThat(shell.get("requestsPending"))
+                .isEqualTo(read(Routes.MeRequests.PENDING_COUNT, token));
+        assertThat(shell.get("supportUnread"))
+                .isEqualTo(read(Routes.SupportChat.UNREAD_COUNT, token));
         assertThat(shell.properties()).extracting(java.util.Map.Entry::getKey).containsExactly(
-                "me", "subscription", "saved", "notificationsUnread", "messagesUnread");
+                "me", "subscription", "saved", "notificationsUnread", "messagesUnread", "requestsPending",
+                "supportUnread");
     }
 
     private JsonNode read(String uri, String token) throws Exception {

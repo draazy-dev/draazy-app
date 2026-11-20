@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { trackErrors } from '../../../helpers/console.js';
 import { API } from '../../../helpers/liveAuth.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 /* The benchmark is the server's listing-derived locality stats (null below three live listings), so
    each assertion follows what `GET /localities/<slug>` says rather than a fixed figure. */
-const SALE_FLAT_KNOWN = 'p5013';  // 1 BHK Flat, Baner
+const SALE_FLAT_KNOWN = 'p5013';  // 3 BHK Flat, Baner
 const SALE_LAND = 'p5124';        // Open Plot, Wagholi (buy, land) - seeded 2026-08-19
 const SALE_COMMERCIAL = 'p5101';  // Office Space, Baner (buy, commercial)
 const RENT_2BHK_KNOWN = 'p5121';  // 2 BHK Flat, Wakad
@@ -22,7 +23,7 @@ const statsOf = async (slug) => (await fetch(`${API}/localities/${slug}`)).json(
 const RETIRED_INTEL = ['appreciation', 'livability', "what's nearby", 'market rate'];
 
 async function gotoProp(page, id) {
-  await page.goto(`/property/${id}`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${id}`);
   await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 15000 });
   const reveal = async () => {
     await page.evaluate(() => document.querySelectorAll('.reveal,.fade-up,.fade-in').forEach((el) => el.classList.add('visible')));
@@ -94,13 +95,15 @@ test('a sale plot shows a neutral note, never a fabricated residential benchmark
 
 test('a rent flat shows the locality average rent only when the server has one, and the flatmate-split card', async ({ page }) => {
   const errors = await collectErrors(page);
+  // The page's own locality read: parallel workers can push Wakad over the average threshold between two reads.
+  const pageStats = page.waitForResponse((r) => /\/api\/localities\/wakad(\?|$)/.test(r.url()) && r.request().method() === 'GET');
   const txt = await gotoProp(page, RENT_2BHK_KNOWN);
 
   await test.step('the locality average rent tile follows the server stats', async () => {
-    const { avgRent } = await statsOf('wakad');
+    const { avgRent } = await (await pageStats).json();
     if (avgRent != null) {
-      await expect(page.getByTestId('rent-locality-avg')).toBeVisible();
-      expect(txt).toContain('avg rent in wakad');
+      await page.getByRole('tab', { name: 'Rent Details' }).click();
+      await expect(page.getByTestId('rent-locality-avg')).toContainText(/avg rent in wakad/i);
     } else {
       expect(txt).not.toContain('avg rent in wakad');
     }

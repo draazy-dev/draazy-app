@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAsNew, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { trackErrors } from '../../../helpers/console.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -13,6 +16,7 @@ const track = flatmateCleanup(test);
  *  both are born `pending` — the public board the seeker reads cannot see them until this runs. */
 async function approve(id) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, id, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),
@@ -23,7 +27,7 @@ async function approve(id) {
 /** A host who exists only on the API side — nothing here needs their browser. */
 async function newHost() {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Door Host' });
   return { mobile, accessToken };
 }
 
@@ -34,15 +38,16 @@ async function hostsRoom(token, society) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
+      ...(await roomBasics(token)),
       ...(await withSocietyId(token, { society })),
       roomType: 'Private room',
       locality: 'Baner',
       rentShare: 18000,
+      deposit: 36000,
       bhk: '2',
       attachedBath: 'attached',
       furnishing: 'semi',
       hostRole: 'tenant',
-      photos: await uploadedListingPhotos(token),
       ...(await tenantRoomAgreement(token)),
     }),
   });
@@ -58,10 +63,10 @@ async function hostsGroup(token, title, { seats = 2, seatsOpen = 1 } = {}) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(token),
-    body: JSON.stringify({
-      title, name: 'Door Host', locality: 'Baner', rent: 30000, seats, seatsOpen,
-      policy: 'any', role: 'tenant',
-    }),
+    body: JSON.stringify(huntingGroup({
+      title, locality: 'Baner', rent: 30000, deposit: 50000, seats, seatsOpen,
+      policy: 'any',
+    })),
   });
   const body = await res.text();
   expect(res.status, body).toBe(201);
@@ -110,14 +115,14 @@ const rememberedAsk = (page, key) => expect.poll(
 ).toBe(true);
 
 const openInboxRequests = async (page) => {
-  await page.goto(`${BASE}/messages`);
-  await page.getByRole('tab', { name: /Requests/i }).click();
+  await page.goto(`${BASE}/dashboard?tab=leads`);
+  await expect(page.getByTestId('requests-panel')).toBeVisible({ timeout: 20_000 });
 };
 /** The rooms board. A room created a moment ago is on the public feed only once `approve` has run,
  *  and the board fetches on mount, so this is always a fresh navigation rather than a tab click. */
 async function openRooms(page) {
   await page.goto(`${BASE}/flatmates?view=rooms`);
-  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 20_000 });
 }
 
 async function openDetail(page, kind, id) {
@@ -126,7 +131,7 @@ async function openDetail(page, kind, id) {
 }
 
 const door = (page, name) => page.getByRole('button', { name }).filter({ visible: true });
-const doneState = (page) => page.getByText(/^\s*(You're in|Requested)\s*$/).filter({ visible: true });
+const doneState = (page) => page.getByText(/^\s*Requested\s*$/).filter({ visible: true });
 
 test.describe('Flatmate interest doors (live)', () => {
   test('a room enquiry reaches the server, hands off to Messages and follows the seeker to a second device; a join does the same', async ({ page }) => {
@@ -149,17 +154,22 @@ test.describe('Flatmate interest doors (live)', () => {
       await expect(page.getByText(`Interest sent to the owner of ${society}.`)).toBeVisible({ timeout: 10_000 });
       expect(await isErrorToast(page), 'a successful enquiry must not render as an error').toBe(false);
       await expect(door(page, /Interest sent/i).first()).toBeVisible();
-      // The half the mock could not assert.
+      await expect(door(page, /Interest sent/i).first()).toHaveAttribute('data-ask-state', 'pending');
+      await door(page, /Interest sent/i).first().click();
+      await expect(page.getByText("Waiting for the owner. We'll notify you when they reply."), 'a sent door still answers a tap')
+        .toBeVisible();
       expect(await hostInboxTitles(host.accessToken), 'the host should be holding the enquiry')
         .toContain(society);
       expect(errors, `console errors: ${errors.join('\n')}`).toEqual([]);
     });
 
-    await test.step('the enquiry hands off to Messages, so the sent door has somewhere to point', async () => {
-      expect(await queuedFor(page, `room-${room.id}`), 'the ask should be queued for Messages').toHaveLength(1);
+    await test.step('the enquiry hands off to Requests, so the sent door has somewhere to point', async () => {
+      expect(await queuedFor(page, `room-${room.id}`), 'the ask should be queued for the inbox').toHaveLength(1);
 
       await openInboxRequests(page);
-      await expect(page.getByText(`Room in ${society}`).first()).toBeVisible({ timeout: 15_000 });
+      const sent = page.getByTestId('request-card').filter({ hasText: society });
+      await expect(sent).toHaveAttribute('data-kind', 'flatmate', { timeout: 15_000 });
+      await expect(sent.getByTestId('request-state')).toHaveText('Pending');
     });
 
     await test.step('the sent state follows the seeker to a second device, so the duplicate is never offered', async () => {
@@ -179,14 +189,14 @@ test.describe('Flatmate interest doors (live)', () => {
       const group = await hostsGroup(host.accessToken, title, { seats: 3, seatsOpen: 2 });
 
       await openDetail(page, 'group', group.id);
-      await door(page, /Join group/i).first().click();
+      await door(page, /Request to join/i).first().click();
       await expect(doneState(page).first()).toBeVisible({ timeout: 10_000 });
 
       await rememberedAsk(page, `group-${group.id}`);
       await forgetDevice(page);
 
       await expect(doneState(page).first()).toBeVisible({ timeout: 15_000 });
-      await expect(door(page, /Join group/i)).toHaveCount(0);
+      await expect(door(page, /Request to join/i)).toHaveCount(0);
     });
   });
   test('a group that fills behind the page answers group_full, not already-asked', async ({ page }) => {
@@ -196,7 +206,7 @@ test.describe('Flatmate interest doors (live)', () => {
     await signedInAsNew(page);
 
     await openDetail(page, 'group', group.id);
-    const join = door(page, /Join group/i).first();
+    const join = door(page, /Request to join/i).first();
     await join.waitFor({ state: 'visible', timeout: 15_000 });
 
     expect((await setSeats(host.accessToken, group.id, 0)).status).toBeLessThan(300);
@@ -208,8 +218,10 @@ test.describe('Flatmate interest doors (live)', () => {
     // Not the other 409 on the same door, and not the generic fallback.
     await expect(page.getByText(/already has your earlier request/i)).toHaveCount(0);
 
-    await expect(door(page, /^Join group$/i)).toHaveCount(0, { timeout: 10_000 });
+    await expect(door(page, /^Request to join$/i)).toHaveCount(0, { timeout: 10_000 });
     await expect(door(page, /Group full/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('group-full-notice')).toContainText('This team is full right now.');
+    await expect(page.getByTestId('group-full-see-open')).toHaveAttribute('href', '/flatmates?view=teams&loc=Baner');
   });
 
   test('an ordinary failure rolls the door back instead of leaving it claiming success', async ({ page }) => {
@@ -219,7 +231,7 @@ test.describe('Flatmate interest doors (live)', () => {
     await signedInAsNew(page);
 
     await openDetail(page, 'group', group.id);
-    const join = door(page, /Join group/i).first();
+    const join = door(page, /Request to join/i).first();
     await join.waitFor({ state: 'visible', timeout: 15_000 });
 
     const del = await fetch(`${API}/flatmates/groups/${group.id}`, {
@@ -274,11 +286,16 @@ test.describe('Flatmate interest doors (live)', () => {
     await expect(page).toHaveURL(/\/messages\?c=/, { timeout: 15_000 });
     const input = page.locator('.pc-input');
     await expect(input).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('link', { name: 'View listing' })).toHaveCount(0);
+    await expect(page.getByTestId('chat-propchip').getByRole('link', { name: 'View listing' })).toHaveAttribute('href', `/flatmates/room/${room.id}`);
     await expect(page.getByText('Photos coming soon')).toHaveCount(0);
+    const chips = page.locator('.pc-quick-chip');
+    await expect(chips.filter({ hasText: 'Is the room still available?' })).toBeVisible({ timeout: 15_000 });
+    await expect(chips.filter({ hasText: /final (price|rent)/i })).toHaveCount(0);
     await input.fill('Can I see the room on Saturday?');
+    await expect(chips, 'typing hides the ready-made replies').toHaveCount(0);
     await input.press('Enter');
     await expect(page.locator('.pc-bubble.me').last()).toContainText('Can I see the room on Saturday?');
+    await expect(chips, 'they are for opening the chat only').toHaveCount(0);
 
     const threadId = new URL(page.url()).searchParams.get('c');
     const hostSide = await (await fetch(`${API}/messages/flatmate-requests/${request.id}`, { method: 'POST', headers: auth(host.accessToken), body: '{}' })).json();

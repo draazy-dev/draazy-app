@@ -23,11 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/** {@code /admin/analytics/pricing}. Every locality is created by the test, under a slug nothing
- *  else uses, with prices chosen so each wrong implementation reports a different number. */
 @DisplayName("/admin/analytics/pricing — what live flats are asked for, from the listings alone")
 class AdminPricingAnalyticsTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
 
@@ -35,8 +32,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         User u = new User(mobile, role);
         u.setName(name);
         u.setMobileVerified(true);
-        // A staff account is keyed in the permission map by its desk, and one with no desk is refused
-        // outright. Which desk is immaterial here — the seeded document grants all six the same set.
         if (Roles.Wire.STAFF.equals(role)) u.setTeam(Teams.RENTAL);
         return bearer(users.saveAndFlush(u));
     }
@@ -45,13 +40,10 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         return bearerFor("9877750001", Roles.Wire.ADMIN, "Pricing admin");
     }
 
-    /** A plain authenticated consumer. Signed in, and with no business reading the back office. */
     private String consumer() {
         return bearerFor("9877750002", Roles.Wire.BUYER, "Pricing seeker");
     }
 
-    /** The mobile is drawn from a counter rather than the fixture suffix, which is not always a
-     *  digit and produced values the column's check constraint rejected. */
     private final AtomicInteger ownerSeq = new AtomicInteger();
 
     private User owner(String suffix) {
@@ -66,8 +58,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
                 slug, "Fixture " + slug);
     }
 
-    /** {@code area} is a {@code BigDecimal} so a test can hand in null or zero, the case the
-     *  averages have to survive. Returns the saved row so callers can push it out of scope. */
     private Property listing(String slug, String deal, long price, BigDecimal area, String suffix) {
         return listing(slug, deal, "apartment", price, area, suffix);
     }
@@ -83,7 +73,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** The report's row for one locality. Isolated by slug — the seeded localities are in here too. */
     private Map<String, Object> row(String token, String slug) throws Exception {
         String json = mvc.perform(get(Routes.Admin.ANALYTICS_PRICING)
                         .header(HttpHeaders.AUTHORIZATION, token))
@@ -122,8 +111,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         assertThat(row).doesNotContainKeys("marketRatePerSqft", "demand");
     }
 
-    /** One or two listings are an owner's opinion, not a locality's price, and a verdict of
-     *  "overpriced area" off them sends sourcing after noise. */
     @Test
     void fewerThanThreeFlatsIsTooFewToPrice() throws Exception {
         String slug = "d999-pricing-thin";
@@ -140,8 +127,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         assertThat(num(row, "buyCount")).as("still supply").isEqualTo(2L);
     }
 
-    /** The curated rate is a flat rate; a plot or a shop at a tenth of it per sqft is a different
-     *  market, not a bargain. */
     @Test
     void onlyFlatsAreAveragedAgainstTheMarketRate() throws Exception {
         String slug = "d999-pricing-mixed";
@@ -158,8 +143,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         assertThat(num(row, "buyCount")).as("every type is still supply").isEqualTo(5L);
     }
 
-    /** The only figure combining both halves: a missing ×12 reports 0.3, and dividing
-     *  by the monthly rent reports something absurd. */
     @Test
     void rentalYieldAnnualisesTheAskingRentOverTheCapitalRate() throws Exception {
         String slug = "d999-pricing-yield";
@@ -187,8 +170,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         assertThat(row(admin(), slug).get("rentalYieldPct")).isNull();
     }
 
-    /** A fallback figure gives an empty locality a deviation of exactly zero, which
-     *  reads as the best-priced place in the city. */
     @Test
     void aLocalityWithNoApprovedListingsReportsNull() throws Exception {
         String slug = "d999-pricing-empty";
@@ -209,8 +190,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         assertThat(num(row, "buyCount")).isZero();
     }
 
-    /** Coalescing a missing area to zero rupees a square foot halves this locality's average —
-     *  a 50% drop caused entirely by two owners skipping a form field. */
     @Test
     void aListingWithNoUsableAreaDoesNotCorruptTheAverage() throws Exception {
         String slug = "d999-pricing-noarea";
@@ -232,7 +211,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         assertThat(num(row, "totalListings")).isEqualTo(5L);
     }
 
-    /** Locality-by-locality pricing is commercially sensitive; a signed-in seeker is still public. */
     @Test
     void aPlainConsumerIsRefused() throws Exception {
         mvc.perform(get(Routes.Admin.ANALYTICS_PRICING)
@@ -240,8 +218,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** The acceptance half: refusing everyone would pass the test above while leaving the report
-     *  unreachable by the team that sources on it. */
     @Test
     void opsStaffReachesIt() throws Exception {
         mvc.perform(get(Routes.Admin.ANALYTICS_PRICING)
@@ -250,15 +226,12 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    /** No token at all is a different rejection from the wrong one, and worth pinning separately. */
     @Test
     void anAnonymousCallerIsRefused() throws Exception {
         mvc.perform(get(Routes.Admin.ANALYTICS_PRICING))
                 .andExpect(status().isUnauthorized());
     }
 
-    /** The only test that builds a non-approved or archived row: drop either clause and everything
-     *  else here still passes while the report prices localities off listings nobody can buy. */
     @Test
     void aPendingOrArchivedListingIsNeitherCountedNorAveraged() throws Exception {
         String slug = "d999-pricing-invisible";
@@ -285,7 +258,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         assertThat(num(row, "totalListings")).isEqualTo(3L);
     }
 
-    /** A non-live locality is reported only while approved listings are still bound to it. */
     @Test
     void aRetiredLocalityIsReportedOnlyWhileItHasLiveListings() throws Exception {
         String slug = "d999-pricing-retired";

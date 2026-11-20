@@ -2,9 +2,6 @@ import { useMemo, useState } from 'react';
 import NativeSelect from '../../../components/ui/NativeSelect.jsx';
 import Icon from '../../../components/Icon.jsx';
 
-/* Instant moving-cost estimator — the signature "customer touch" for the packers page.
-   Indicative only; the real quote comes from the hero form (anchored via #quote). Pure
-   cost math lives in estimateMove() so it stays testable. */
 const BASE = {
   '1 RK': [4000, 7000],
   '1 BHK': [6000, 12000],

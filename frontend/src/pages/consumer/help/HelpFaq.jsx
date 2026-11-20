@@ -2,12 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import { supportLink } from '../../../lib/supportLink.js';
 import HelpLayout from '../../../components/help/HelpLayout.jsx';
 import { Breadcrumbs, EmptyState } from '../../../components/help/HelpCards.jsx';
 import { listFaqs } from '../../../services/contentService.js';
 import { useHelpSearch } from '../../../lib/useHelp.js';
-/* FAQs are admin-editable records, so their translations live on the record under a nested `translations` object and
-   are resolved by lib/contentLang.js. */
 
 export default function HelpFaq() {
   const { t } = useTranslation();
@@ -39,7 +38,6 @@ export default function HelpFaq() {
     }
     return [...map.entries()];
   }, [visible, t]);
-  // Where a question needs more than a paragraph, point at the article that has it.
 
   const openFaq = faqs.find((f) => f.id === open);
   const relatedResults = useHelpSearch(openFaq ? openFaq.question : '', 1);
@@ -124,10 +122,10 @@ export default function HelpFaq() {
           <p className="text-sm font-semibold text-white">{t('help.faqNotAnswered')}</p>
           <p className="mt-1.5 text-xs leading-relaxed text-gray-500">{t('help.faqNotAnsweredBody')}</p>
           <Link
-            to="/support"
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-teal-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-teal-400"
+            to={supportLink('general')}
+            className="h-btn-sm mt-3 inline-flex items-center gap-1.5 rounded-lg bg-teal-500 px-4 text-xs font-semibold text-white transition-colors hover:bg-teal-400"
           >
-            <Icon name="life-buoy" className="w-4 h-4" /> {t('help.raiseATicket')}
+            <Icon name="message-square" className="w-4 h-4" /> {t('help.raiseATicket')}
           </Link>
         </div>
       </div>

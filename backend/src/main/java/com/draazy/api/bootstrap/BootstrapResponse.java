@@ -9,6 +9,7 @@ import com.draazy.api.common.settings.LegalResponse;
 import com.draazy.api.common.settings.ListingPolicyResponse;
 import com.draazy.api.common.settings.MovePackResponse;
 import com.draazy.api.common.settings.PricingResponse;
+import com.draazy.api.engagement.flatmate.FlatmatePulse;
 import java.util.List;
 import java.util.Map;
 
@@ -22,5 +23,6 @@ public record BootstrapResponse(
         List<PlanDto> plans,
         PropertyCountsResponse counts,
         TrustStatsResponse trustStats,
+        FlatmatePulse flatmatePulse,
         LegalResponse legal) {
 }

@@ -12,8 +12,6 @@ import org.springframework.data.repository.query.Param;
 
 public interface ConversationMessageRepository extends JpaRepository<ConversationMessage, UUID> {
 
-    List<ConversationMessage> findByConversationIdOrderByCreatedAtAsc(UUID conversationId);
-
     @Query(value = """
             select m.* from messages m
              where m.conversation_id = :conversationId
@@ -49,7 +47,6 @@ public interface ConversationMessageRepository extends JpaRepository<Conversatio
 
     Optional<ConversationMessage> findByIdAndConversationId(UUID id, UUID conversationId);
 
-    // The first-contact limit is per buyer-owner pair, so a new thread adds no capacity.
     @Query("""
             select count(m) > 0 from ConversationMessage m
             where m.authorId = :authorId

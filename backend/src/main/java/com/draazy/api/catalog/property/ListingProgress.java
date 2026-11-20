@@ -46,8 +46,8 @@ public record ListingProgress(String track, String step, List<String> flags) {
         if (PropertyStatus.APPROVED.equals(status)) {
             return "live";
         }
-        boolean reviewing = p.getReviewStartedAt() != null
-                || PropertyStatus.REJECTED.equals(status) || PropertyStatus.FLAGGED.equals(status);
+        boolean reviewing = !PropertyStatus.REJECTED.equals(status)
+                && (p.getReviewStartedAt() != null || PropertyStatus.FLAGGED.equals(status));
         if (!staff) {
             return reviewing ? "in_review" : "submitted";
         }

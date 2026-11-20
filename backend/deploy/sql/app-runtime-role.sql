@@ -1,5 +1,5 @@
--- Idempotent, as `postgres`; rollout order is docs/DEPLOY.md §2.1. `draazy_app` (runtime) gets rows only, so a
--- runtime-query flaw cannot run DDL. No password here: set it with \password draazy_app.
+-- For a managed database with a separate runtime role (the dev database has one user). Idempotent, as the schema
+-- owner `doadmin`; docs/DEPLOY.md §2.1. `draazy_app` gets rows only. Set its password with \password draazy_app.
 
 DO $$
 BEGIN
@@ -23,10 +23,10 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO draazy_app;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO draazy_app;
 REVOKE ALL ON public.flyway_schema_history FROM draazy_app;
 
--- Tables a later migration creates are owned by `postgres`; without these the next deploy 500s on them.
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO draazy_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO draazy_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO draazy_app;
+-- Tables a later migration creates are owned by `doadmin`; without these the next deploy 500s on them.
+ALTER DEFAULT PRIVILEGES FOR ROLE doadmin IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO draazy_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE doadmin IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO draazy_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE doadmin IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO draazy_app;
 
 -- Verify: every flag false, can_create false, owned_tables 0.
 SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls, rolconfig

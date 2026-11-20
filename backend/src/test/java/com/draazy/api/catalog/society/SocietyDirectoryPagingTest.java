@@ -19,6 +19,8 @@ import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
 import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -28,10 +30,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** The directory asks for one page at a time, so each filter and ordering must hold over the whole set. */
 @DisplayName("Societies — the paged directory read")
 class SocietyDirectoryPagingTest extends AbstractApiTest {
-
     private static final String FIXTURES = "q=zz socpage";
 
     @Autowired UserRepository users;
@@ -39,7 +39,6 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
 
     private User user;
 
-    /** Names sort after every seeded one, so a sort that only ordered a page could never put them first. */
     private void fixtures() {
         user = new User("9865200001", "owner");
         user.setName("Asha Patil");
@@ -100,7 +99,6 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
         return Arrays.stream(keys).map(k -> "zz-socpage-" + k).toArray(String[]::new);
     }
 
-    /** Every page of a query, {@code size} rows at a time, in the order the server gave them. */
     private List<String> walk(String query, int size) throws Exception {
         List<String> all = new ArrayList<>();
         for (int page = 0; page < 10; page++) {
@@ -121,6 +119,32 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
     }
 
     @Test
+    void dormantRealHomesAreAbsentFromSocietyCountsAndTiles() throws Exception {
+        user = new User("9865200099", "owner");
+        user.setName("Freshness owner");
+        user.setMobileVerified(true);
+        user = users.saveAndFlush(user);
+        UUID societyId = society("freshness");
+        listings(societyId, 3);
+        List<UUID> ids = jdbc.queryForList(
+                "select id from properties where society_id = ? order by id", UUID.class, societyId);
+        jdbc.update("update properties set created_at = ? where society_id = ?",
+                java.sql.Timestamp.from(Instant.now().minus(32, ChronoUnit.DAYS)), societyId);
+        jdbc.update("update properties set demo = true where id = ?", ids.get(0));
+        jdbc.update("update properties set last_confirmed_at = ? where id = ?",
+                java.sql.Timestamp.from(Instant.now()), ids.get(1));
+
+        mvc.perform(get("/societies/zz-socpage-freshness"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.listingCount").value(2))
+                .andExpect(jsonPath("$.homes.length()").value(2));
+        assertThat(walk("q=zz socpage freshness&hasListings=true&sort=homes", 10))
+                .containsExactly("zz-socpage-freshness");
+        mvc.perform(get("/societies?q=zz socpage freshness&hasListings=true"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
     @DisplayName("name paging walks every twin once, however the page boundary falls between them")
     void nameSortPagesThroughTiedNames() throws Exception {
         for (String key : List.of("c", "a", "d", "b")) {
@@ -137,12 +161,9 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
     void homesSortsTheWholeSetAcrossPages() throws Exception {
         fixtures();
 
-        // Delta (3 with its annexe) ties Bravo (3) and loses on name, then Charlie (2); the rest
-        // have none and fall back to name.
         assertThat(walk(FIXTURES + "&sort=homes", 2)).containsExactly(
                 slugs("bravo", "delta", "charlie", "alpha", "echo", "foxtrot"));
 
-        // None of them is on the first page of an alphabetical read of the whole directory.
         mvc.perform(get("/societies?sort=homes&size=2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].slug").value(contains(slugs("bravo", "delta"))))
@@ -169,7 +190,6 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
     void relevanceSortsTheWholeSetAcrossPages() throws Exception {
         fixtures();
 
-        // Delta 3+1, Bravo 3+.8, Charlie 2+1, Echo 0+1, Alpha 0, Foxtrot 0.
         assertThat(walk(FIXTURES + "&sort=relevance", 2)).containsExactly(
                 slugs("delta", "bravo", "charlie", "echo", "alpha", "foxtrot"));
 
@@ -263,7 +283,6 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
                                 + "|| replace(coalesce(locality_slug, ''), '-', ' ')) like '%kharadi%'")))
                 .andExpect(jsonPath("$.totalElements").value(greaterThan(namedKharadi)));
 
-        // The slug is hyphenated, the typed words are not.
         mvc.perform(get("/societies?q=koregaon park&size=100"))
                 .andExpect(jsonPath("$.totalElements").value(greaterThan(0)))
                 .andExpect(jsonPath("$.content[*].localitySlug").value(hasItem("koregaon-park")));

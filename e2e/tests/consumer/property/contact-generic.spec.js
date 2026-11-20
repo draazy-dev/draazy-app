@@ -1,17 +1,17 @@
 import { test, expect, MOBILE } from '../../../fixtures/live.js';
-import { API, authHeaders, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 /* `/contact` without a property must not fetch or render an owner; otherwise it bypasses the
    enquiry gate and leaks a personal number on a support page. */
 
 test('the generic support page shows no owner card and leaks no owner number', async ({ page, consoleErrors }) => {
-  await page.goto('/contact', { waitUntil: 'networkidle' });
+  await gotoSettled(page, '/contact');
 
   /* Positive assertions come first because the right rail mounts late; otherwise absence is
      indistinguishable from not-yet-rendered. */
   const support = page.locator('.glass-card', { hasText: 'Need help?' });
   await expect(support).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Send enquiry', exact: true })).toBeVisible();
+  await expect(page.getByTestId('contact-chat-cta')).toBeVisible();
 
   // And what it offers is Draazy's own channels, which belong to the company and not to a person.
   await expect(support.locator('a[href="tel:+918728872895"]')).toBeVisible();
@@ -29,12 +29,8 @@ test('the generic support page shows no owner card and leaks no owner number', a
   expect(consoleErrors).toEqual([]);
 });
 
-test('a signed-in user finds the enquiry form prefilled with their profile name', async ({ page }) => {
-  const mobile = uniqueMobile();
-  const name = 'Zztest Kavya Rao';
-  const res = await fetch(`${API}/auth/me`, { method: 'PATCH', headers: await authHeaders(mobile), body: JSON.stringify({ name }) });
-  expect(res.status).toBe(200);
-  await signedInAs(page, mobile);
-  await page.goto('/contact');
-  await expect(page.locator('#ct-name')).toHaveValue(name);
+test('a signed-out visitor following the chat link is asked to sign in, with the support chat as the next stop', async ({ page }) => {
+  await gotoSettled(page, '/contact');
+  await page.getByTestId('contact-chat-cta').click();
+  await expect(page).toHaveURL(/\/signin\?.*next=%2Fmessages%3Fsupport%3Dgeneral/);
 });

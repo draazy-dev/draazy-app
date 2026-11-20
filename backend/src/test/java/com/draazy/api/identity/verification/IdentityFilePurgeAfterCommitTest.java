@@ -26,7 +26,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 class IdentityFilePurgeAfterCommitTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -52,7 +51,6 @@ class IdentityFilePurgeAfterCommitTest {
         storage.clear();
     }
 
-    // These cases commit; erase them so later review-queue tests start from an empty queue.
     @AfterEach
     void eraseCreatedCases() {
         created.forEach(id -> transactions.executeWithoutResult(status -> service.erase(id)));
@@ -225,11 +223,6 @@ class IdentityFilePurgeAfterCommitTest {
         @Override
         public void store(String key, byte[] content, String contentType) {
             stored.add(key);
-        }
-
-        @Override
-        public String signedUploadUrl(String key) {
-            return key;
         }
 
         @Override

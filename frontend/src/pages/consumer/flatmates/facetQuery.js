@@ -1,10 +1,6 @@
 import { BUDGET_MIN, BUDGET_MAX } from './helpers.js';
+import { AGE_BANDS } from '../../../lib/flatmates/filterState.js';
 
-/* Panel state and search request are separate on purpose: the request is the cache key, so
-   anything that cannot change the answer (`nearLabel`, a pin's display name) stays out of it. */
-
-/** Answers `undefined`, not `null` like `helpers.budgetOf`, because these values become
-    query params and an absent one must not be serialised. */
 const budgetOf = (x) => {
   if (!x) return undefined;
   if (x.budget != null) return Number(x.budget);
@@ -12,8 +8,6 @@ const budgetOf = (x) => {
   return undefined;
 };
 
-/* Undefined rather than empty values when there is nothing to compare to: an empty comparison
-   scores every row alike, which is an arbitrary order wearing the name of a ranking. */
 const meFacets = (myPost) => {
   if (!myPost) return undefined;
   const localities = myPost.localities?.length
@@ -25,22 +19,29 @@ const meFacets = (myPost) => {
   return { localities, budget, gender };
 };
 
-/* Every field here reaches the server and nothing is re-filtered in the browser: two predicates
-   over one field intersect to the narrower, silently discarding what the server just matched. */
 export default function toFlatmateQuery(filters = {}, { sort, myPost = null } = {}) {
   const [lo, hi] = filters.budget || [];
+  const [minAge, maxAge] = AGE_BANDS[filters.age] || [];
   return {
     q: filters.q || undefined,
     locality: filters.locality || undefined,
-    // Untouched ends are dropped rather than sent as the extremes of the slider: "from ₹0" is not
-    // a filter, and "to ₹40,000" would exclude the handful of rooms priced above the scale.
     budget: (lo > BUDGET_MIN || hi < BUDGET_MAX) ? [lo, hi] : undefined,
     moveIn: filters.moveIn || undefined,
     gender: filters.gender || undefined,
+    strictGender: (filters.gender && filters.genderOnly) || undefined,
+    roomType: filters.roomType || undefined,
+    furnishing: filters.furnishing || undefined,
     sharing: filters.sharing || undefined,
     verifiedOnly: filters.verifiedOnly || undefined,
+    gated: filters.gated || undefined,
     attachedBath: filters.attachedBath || undefined,
-    habits: filters.habits?.length ? [...filters.habits] : undefined,
+    bhk: filters.bhk || undefined,
+    vegOnly: filters.vegOnly || undefined,
+    parking: filters.parking || undefined,
+    minAge,
+    maxAge,
+    minOpenSeats: filters.roomForTwo ? 2 : undefined,
+    vibe: filters.vibe?.length ? [...filters.vibe] : undefined,
     near: filters.near || undefined,
     nearRadius: filters.near ? filters.nearRadius : undefined,
     nearMode: filters.near ? filters.nearMode : undefined,

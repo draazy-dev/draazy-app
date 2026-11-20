@@ -40,8 +40,9 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
-// Kept as a base class rather than a utility because every helper needs the autowired `MockMvc` and the repositories.
 abstract class ServiceFixtures extends AbstractApiTest {
+    static final String IGR_PROP_FIELDS = "\"landmark\":\"Near D-Mart\",\"policeStation\":\"Chaturshringi\","
+            + "\"roadVicinity\":\"On main road\",\"roadType\":\"Tar road\"";
 
     @Autowired
     UserRepository users;
@@ -78,6 +79,10 @@ abstract class ServiceFixtures extends AbstractApiTest {
         return user(mobile, Roles.Wire.ADMIN, null, "Admin User");
     }
 
+    User manager(String mobile) {
+        return user(mobile, Roles.Wire.MANAGER, null, "Meera Manager");
+    }
+
     User user(String mobile, String role, String team, String name) {
         User u = new User(mobile, role);
         u.setName(name);
@@ -104,6 +109,17 @@ abstract class ServiceFixtures extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
+    String propertyVaultPaper(User owner, Property property, String fileName) throws Exception {
+        String body = mvc.perform(multipart(Routes.MeDocuments.FOR_PROPERTY, property.getId())
+                        .file(new MockMultipartFile("file", fileName, "application/pdf",
+                                "%PDF-1.4".getBytes(StandardCharsets.UTF_8)))
+                        .param("category", "Index II")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return field(body, "id");
+    }
+
     String raise(User caller, String type, Property property) throws Exception {
         String body = property == null
                 ? "{\"type\":\"" + type + "\"}"
@@ -116,8 +132,6 @@ abstract class ServiceFixtures extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString();
         String id = field(json, "id");
 
-        // These fixtures exercise the maker-checker that runs after payment, so open its checkout and settle it here
-        // exactly as the live webhook would.
         requestRepo.findById(UUID.fromString(id))
                 .filter(r -> r.getStatus() == ServiceRequestStatus.AWAITING_PAYMENT)
                 .ifPresent(r -> serviceRequests.applyWebhookOutcome(paymentRef(id), true, null, null));
@@ -137,7 +151,6 @@ abstract class ServiceFixtures extends AbstractApiTest {
         return id;
     }
 
-    /** The Cashfree order id a request is gated on, opening its checkout if nobody has yet. */
     String paymentRef(String id) {
         return CheckoutFixture.open(serviceRequests, requestRepo, UUID.fromString(id));
     }
@@ -164,10 +177,15 @@ abstract class ServiceFixtures extends AbstractApiTest {
                 + merchantRefundId + "\",\"order_id\":\"order_x\",\"refund_status\":\"" + refundStatus + "\"}}}");
     }
 
+    void deliverDashboardRefund(String orderId, String cfRefundId, long amount, String refundStatus) throws Exception {
+        deliverBody("{\"type\":\"REFUND_STATUS_WEBHOOK\",\"data\":{\"refund\":{\"refund_id\":\"refund_" + cfRefundId
+                + "\",\"cf_refund_id\":\"" + cfRefundId + "\",\"order_id\":\"" + orderId + "\",\"refund_amount\":"
+                + amount + ".00,\"refund_status\":\"" + refundStatus + "\"}}}");
+    }
+
     private void deliverBody(String body) throws Exception {
         String ts = String.valueOf(System.currentTimeMillis());
         String signature = webhookSignature.sign(ts, body);
-        // The endpoint answers 200 to every refusal, so isOk() alone cannot tell a settled delivery from a dropped one.
         assertThat(webhookSignature.verify(signature, ts, body.getBytes(StandardCharsets.UTF_8)))
                 .isEqualTo(WebhookSignature.Verification.VERIFIED);
         mvc.perform(post(Routes.Webhooks.CASHFREE_PAYMENT)
@@ -236,8 +254,7 @@ abstract class ServiceFixtures extends AbstractApiTest {
         LocalDate today = LocalDate.now(PlatformTime.IST);
         return new LinkedHashMap<>(Map.of("documentNo", "HVL11-" + n % 1_000_000 + "-" + today.getYear(),
                 "sro", "Haveli 11", "registeredOn", today.toString(),
-                "grn", "MH" + String.format("%016d", n % 10_000_000_000_000_000L) + "E",
-                "stampDuty", "1100", "registrationFee", "1000"));
+                "grn", "MH" + String.format("%016d", n % 10_000_000_000_000_000L) + "E"));
     }
 
     ResultActions finalDoc(User staff, String id, Map<String, String> fields, int expected)
@@ -257,7 +274,6 @@ abstract class ServiceFixtures extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString();
     }
 
-    /** Assert the request's current status without caring about the rest of the document. */
     void expectStatus(User caller, String id, String status) throws Exception {
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(caller)))
@@ -280,5 +296,12 @@ abstract class ServiceFixtures extends AbstractApiTest {
                         .param("category", category)
                         .header(HttpHeaders.AUTHORIZATION, bearer(caller)))
                 .andExpect(status().is(expected));
+    }
+
+    void nriParties(String id) {
+        jdbc.update("update service_requests set details = coalesce(details, '{}'::jsonb) || jsonb_build_object("
+                + "'_state', jsonb_build_object('owner', jsonb_build_object('residency', 'nri'),"
+                + " 'tenants', jsonb_build_array(jsonb_build_object('residency', 'nri')))) where id = ?::uuid", id);
+        em.clear();
     }
 }

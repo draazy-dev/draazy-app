@@ -1,4 +1,3 @@
-/* Rent maps real lets only; payment and payout rails are not modelled here. */
 export function toTenancyViewModel(row) {
   return {
     id: row?.id || '',
@@ -14,7 +13,6 @@ export function toTenancyViewModel(row) {
     confirmed: ['active', 'ended', 'terminated'].includes(row?.status || 'active'),
     tenantId: row?.tenant?.id || '',
     tenantName: row?.tenant?.name || '',
-    // Contact-gated server-side; passed through as it arrives. Masking is the server's decision.
     tenantMobile: row?.tenant?.mobile || '',
     ownerId: row?.owner?.id || '',
     ownerName: row?.owner?.name || '',
@@ -22,7 +20,6 @@ export function toTenancyViewModel(row) {
   };
 }
 
-/** Status is authoritative; pending is only an unopposed tenancy assertion. */
 export function toTenancyDeclarationViewModel(row) {
   return {
     id: row?.id || '',
@@ -38,7 +35,6 @@ export function toTenancyDeclarationViewModel(row) {
   };
 }
 
-/** `verified` is the server's state, not `idVerified`, so a stale call site reads `undefined` and fails closed. */
 export function toTenantProfileViewModel(row) {
   if (!row || (!row.mobile && !row.name)) return null;
   return {
@@ -55,7 +51,6 @@ export function toTenantProfileViewModel(row) {
   };
 }
 
-/** Wire `TransactionDto` → the seam's shape. Dates stay ISO `YYYY-MM-DD`, as the ledger renders them. */
 export function toTransactionViewModel(row) {
   return {
     id: row?.id || '',
@@ -70,14 +65,11 @@ export function toTransactionViewModel(row) {
   };
 }
 
-/** They are the server's arithmetic over the lease dates, and the April–March financial year has exactly one
- * definition. */
 export function toRentalViewModel(row) {
   return {
     id: row?.id || '',
     address: row?.address || '',
     monthlyRent: Number(row?.monthlyRent) || 0,
-    // Absent means "not recorded", which is not the same as a zero deposit.
     deposit: row?.deposit == null ? null : Number(row.deposit),
     leaseStart: row?.leaseStart || null,
     leaseEnd: row?.leaseEnd || null,
@@ -102,7 +94,6 @@ export const toCashflowPoint = (row) => ({
   net: Number(row?.net) || 0,
 });
 
-/** Wire `DueDto` → the seam's shape. `daysUntil` is server-computed, so it cannot drift by timezone. */
 export const toDueViewModel = (row) => ({
   id: row?.id || '',
   propId: row?.propertyId || '',
@@ -118,7 +109,6 @@ export const toDueViewModel = (row) => ({
   overdue: (Number(row?.daysUntil) || 0) < 0,
 });
 
-/** Wire `OwnershipBasisDto` → the seam's shape. All-null is a property with no basis recorded. */
 export function toBasisViewModel(row) {
   const has = row && (row.purchasePrice != null || row.purchaseDate || row.currentValue != null);
   if (!has) return null;
@@ -131,8 +121,6 @@ export function toBasisViewModel(row) {
   };
 }
 
-/** `endDate` is the server's (start plus term, less a day), never recomputed here: client month arithmetic rolls
- * over where the server clamps. */
 export function toRentAgreementViewModel(row) {
   const startDate = row?.startDate || null;
   const months = Number(row?.durationMonths) || 0;

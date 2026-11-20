@@ -3,8 +3,6 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import { pmfEnabled } from '../../lib/pmf.js';
 
-// One-line honest "early preview" banner for the PMF test build. Renders only
-// when VITE_PMF_MODE=on, so it never appears in normal dev/prod builds.
 export default function PreviewBanner() {
   const { t } = useTranslation();
   const [show, setShow] = useState(true);

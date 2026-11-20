@@ -13,10 +13,10 @@ import lombok.Getter;
 @Getter
 public class ServiceRequestRefund extends BaseEntity {
 
-    static final String REQUESTED = "requested";
-    static final String APPROVED = "approved";
-    static final String REJECTED = "rejected";
-    static final String FAILED = "failed";
+    public static final String REQUESTED = "requested";
+    public static final String APPROVED = "approved";
+    public static final String REJECTED = "rejected";
+    public static final String FAILED = "failed";
 
     @Column(name = "service_request_id", nullable = false, updatable = false)
     private UUID serviceRequestId;

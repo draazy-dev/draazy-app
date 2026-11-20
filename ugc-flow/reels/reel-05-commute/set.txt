@@ -1,0 +1,43 @@
+REEL 05 / SET IMAGE (0 credits)
+==========================
+JOB ID ............. r05-set
+WHY ................ every clip of the reel attaches this image so the place is the same in every clip (rule R1)
+FLOW SETTINGS
+  Type ............. Image
+  Model ............ Nano Banana 2 Lite
+  Aspect ratio ..... 9:16 portrait
+  Outputs .......... 2
+  Cost shown ....... 0 credits (anything else: stop and ask the user)
+INGREDIENTS ........ image 8b05fe7b (take-3 set E, user-liked) as style reference; no character chips: the set must be empty
+AFTER .............. the user picks one; rename it r05-set (or note its title in the ledger)
+
+PROMPT START
+Vertical 9:16 photorealistic photo taken from inside a cab, the camera at the driver's seat at the eye level
+of a seated adult, turned to look diagonally back across the cab at the empty rear left seat, the seat
+diagonally opposite the driver: the back seat of a cab stuck in slow evening traffic on the road to Kharadi,
+Pune, just after sunset. Use the reference image only for the cab interior, the cream seat fabric, the lighting
+and the traffic; the camera position is different. The empty cream fabric rear left seat fills the centre of
+the frame, seen at a three-quarter angle. The back seat has three headrests in one straight row, all three fixed
+on top of the seat back at the same height, the middle one included; nothing on the rear shelf. Only the top
+edge of the front passenger seat back shows at the bottom right corner; the two front seats sit close together.
+On the right side of the frame, the rear left door and its side window showing only blurred orange streetlights
+and the dusk sky, no vehicles. Through the rear windscreen at the top left, the cars queued behind the cab face
+the camera, their white headlights on, travelling in the same direction as the cab; no red tail lights anywhere.
+A light beige roof lining at the top of the frame. No dashboard, steering wheel, hands or phones visible. No
+signs or number plates readable anywhere. There are no people in the photo. Natural, slightly imperfect
+phone-camera look, true colours, everything in sharp focus.
+
+Lighting and colour: a dim cab interior lit by the orange glow of streetlights through the side window and the
+white headlights behind, a cool blue dusk sky, true warm colours, slight phone-camera grain.
+
+No text, no signs, no logos, no watermark.
+PROMPT END
+
+CHECK BEFORE THE USER PICKS
+  [ ] camera at the driver's seat looking DIAGONALLY back; the empty CREAM rear left seat at a 3/4 angle in the centre
+  [ ] three headrests in one row on the seat back (middle one NOT pushed back onto the rear shelf)
+  [ ] at most a sliver of the front passenger seat at the bottom right; no wide gap between the front seats
+  [ ] rear left door + side window on the RIGHT: orange streetlights + dusk sky only, no vehicles or people
+  [ ] rear windscreen top left: cars behind FACE the camera (white headlights); NO red tail lights
+  [ ] beige roof lining; no dashboard, steering wheel, hands or phones; dusk, not night
+  [ ] empty of people, nothing readable; room on the rear left seat for the character

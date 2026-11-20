@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
+import IdGateStep, { useIdGate } from './IdGateStep.jsx';
 import { badgeDocsFor } from '../../pages/consumer/list-property/constants.js';
 import { canonicalTypeKey, matchTypeKey } from '../../data/propertyTypes.js';
 import { requestOwnershipVerification } from '../../services/propertyReviewService.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const badgeTypeOf = (type) => {
   const raw = String(type || '').toLowerCase();
@@ -20,6 +22,7 @@ const STATE_CHIP = {
 
 export default function BadgeRequestCard({ listing, docs, onUpload, toast }) {
   const { t } = useTranslation();
+  const { canRequest, inReview } = useIdGate();
   const [requested, setRequested] = useState(null);
   const [busy, setBusy] = useState(false);
   const proofs = badgeDocsFor(listing.deal, badgeTypeOf(listing.type)).filter((doc) => doc.verifies);
@@ -39,7 +42,7 @@ export default function BadgeRequestCard({ listing, docs, onUpload, toast }) {
       setRequested(listing.uuid);
       toast(t('dash.badge.requestedToast'), 'success');
     } catch (err) {
-      toast(err?.message || t('dash.badge.requestFailed'), 'error');
+      toast(userMessage(err, t('dash.badge.requestFailed')), 'error');
     } finally {
       setBusy(false);
     }
@@ -52,7 +55,7 @@ export default function BadgeRequestCard({ listing, docs, onUpload, toast }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-white text-sm font-semibold truncate">{t('dash.badge.title')}</p>
-            <span data-testid="badge-state" className={'text-[10px] px-2 py-0.5 rounded-full font-semibold ' + chipCls}>{t(chipKey)}</span>
+            <span data-testid="badge-state" className={'dz-tag font-semibold ' + chipCls}>{t(chipKey)}</span>
           </div>
           <p className="text-gray-400 text-xs mt-0.5">
             {state === 'verified' ? t('dash.badge.lineVerified')
@@ -64,6 +67,7 @@ export default function BadgeRequestCard({ listing, docs, onUpload, toast }) {
       </div>
       {state === 'none' || state === 'declined' ? (
         <>
+          {(inReview || !canRequest) && <div className="mt-3"><IdGateStep inReview={inReview} source="property_badge" /></div>}
           <ul className="mt-3 space-y-2">
             {proofs.map((doc) => (
               <li key={doc.key} data-doc={doc.key} className="flex items-center gap-2 text-xs">
@@ -77,7 +81,7 @@ export default function BadgeRequestCard({ listing, docs, onUpload, toast }) {
               </li>
             ))}
           </ul>
-          <button type="button" onClick={request} disabled={!ready || busy} data-testid="request-badge"
+          <button type="button" onClick={request} disabled={!ready || !canRequest || busy} data-testid="request-badge"
             className="mt-4 w-full sm:w-auto min-h-[44px] px-4 rounded-lg bg-brand-teal text-ink text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
             <Icon name="shield-check" className="w-4 h-4" /> {busy ? t('dash.badge.requesting') : t('dash.badge.request')}
           </button>

@@ -55,6 +55,17 @@ test('with Google returning nothing the picker offers the live localities from t
   expect(errors, errors.join('\n')).toHaveLength(0);
 });
 
+test('a Google call that never answers still falls back to the live localities', async ({ page }) => {
+  await gotoStep2(page);
+  await stubGooglePlaces(page, { stalled: true });
+
+  const searched = page.waitForResponse((r) => r.url().includes('/api/localities/search') && r.status() === 200);
+  await chooseLocality(page, localityField(page).locator('.dz-dropdown__trigger'), 'Baner');
+  await searched;
+
+  await expect(localityField(page).locator('.dz-dropdown__value')).toHaveText(/Baner/);
+});
+
 test('a failed resolve keeps the old value and shows the locality error', async ({ page }) => {
   await gotoStep2(page);
   await page.route('**/api/localities/resolve', (route) => route.fulfill({

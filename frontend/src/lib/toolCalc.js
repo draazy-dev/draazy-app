@@ -9,22 +9,22 @@ export function computeStampDuty(value, ratePct) {
   return { stamp, reg, total: stamp + reg, rate: ratePct };
 }
 
-/* Rent for the whole term when it rises by `incrementPct` after every `every` (11 or 12) months. */
 export const rentForTerm = (rent, months, incrementPct, every) => {
   const pct = Number(incrementPct);
   const bps = Number.isFinite(pct) && pct >= 0 && pct <= 100 ? Math.round(pct * 100) : 0;
   const step = parseInt(every, 10) === 12 ? 12 : 11;
   let monthly = rent, total = 0;
   for (let paid = 0; paid < months; paid += step) {
-    if (paid > 0) monthly = Math.floor((monthly * (10000 + bps) + 5000) / 10000);
+    if (paid > 0) monthly = Math.floor(Math.floor((monthly * (10000 + bps) + 50) / 100) / 100);
     total += monthly * Math.min(step, months - paid);
   }
   return total;
 };
 
-/* Art. 36A: 0.25% of rent + non-refundable money + 10% a year on the deposit, rounded up to ₹100 (min ₹100). */
-export const leaveLicenceStamp = (rentTotal, nonRefundable, deposit, years) =>
-  Math.max(100, Math.ceil(((rentTotal + nonRefundable) * 10 + deposit * years) / 400000) * 100);
+export const leaveLicenceStamp = (rentTotal, nonRefundable, deposit, years) => {
+  const tenths = (rentTotal + nonRefundable) * 10 + deposit * years;
+  return { exactPaise: Math.floor((tenths + 20) / 40), stamp: Math.max(100, Math.floor((tenths + 2000) / 4000)) };
+};
 
 export function rentalYield({ price, rent, maintenance, propertyTax, vacancyMonths }) {
   const vacant = Math.min(Math.max(vacancyMonths, 0), 12);
@@ -40,7 +40,6 @@ export function rentalYield({ price, rent, maintenance, propertyTax, vacancyMont
   };
 }
 
-/** 'YYYY-MM' values from `from` to `to` inclusive; empty when either is missing, reversed or longer than the cap. */
 export function monthsBetween(from, to) {
   const ok = /^\d{4}-(0[1-9]|1[0-2])$/;
   if (!ok.test(from) || !ok.test(to) || to < from) return [];
@@ -53,5 +52,16 @@ export function monthsBetween(from, to) {
     return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}`;
   });
 }
+
+export function monthOptions(now = new Date()) {
+  const start = now.getFullYear() * 12 + now.getMonth() - 36;
+  return Array.from({ length: 49 }, (_, i) => {
+    const idx = start + i;
+    return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}`;
+  });
+}
+
+export const monthLabel = (ym, locale = 'en-IN') =>
+  new Date(Number(ym.slice(0, 4)), Number(ym.slice(5)) - 1, 1).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
 
 export const isPan = (s) => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(s);

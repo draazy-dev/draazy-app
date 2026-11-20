@@ -5,7 +5,6 @@ import Icon from './Icon.jsx';
 import Modal from './ui/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useSignInGate } from '../lib/useSignInGate.js';
-/* The one posting entry point for the whole consumer app — exactly one trigger per viewport, every branch navigates. */
 
 const Choice = ({ icon, title, desc, onClick, disabled }) => (
   <button
@@ -19,8 +18,6 @@ const Choice = ({ icon, title, desc, onClick, disabled }) => (
     <div className="min-w-0">
       <p className="text-sm font-semibold text-white">{title}</p>
       <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{desc}</p>
-    {/* Centred against the whole row, not nudged down by a fixed margin — the descriptions run to three lines in mr,
-       which a magic offset cannot follow. */}
     </div>
     <Icon name="chevron-right" className="w-4 h-4 text-gray-500 ml-auto shrink-0" />
   </button>
@@ -31,18 +28,12 @@ export default function PostChooser({ open, onClose }) {
   const navigate = useNavigate();
   const sendToSignIn = useSignInGate();
   const { isIn, loading } = useAuth();
-  // 'what' asks the one classifying question; 'who' only appears for people who
-  // have no place yet, where the remaining choice is solo vs an existing group.
   const [step, setStep] = useState('what');
-  /* Every way out of the sheet resets the fork, so someone who backed out on the second question cannot reopen it
-     mid-flow looking at an answer they were never asked for. */
 
   const close = () => { setStep('what'); onClose(); };
 
   const go = (to) => {
     close();
-    /* `to`, not the page the sheet was opened from: the choice the visitor just made is where they were going, so
-       that is where sign-in should return them. */
     if (to.startsWith('/list-property')) { navigate(to); return; }
     if (!isIn) { sendToSignIn('listproperty', to); return; }
     navigate(to);
@@ -52,25 +43,23 @@ export default function PostChooser({ open, onClose }) {
     <Modal
       open={open}
       onClose={close}
-      title={step === 'what' ? t('postChooser.title') : t('postChooser.whoTitle')}
+      title={step === 'what' ? t('postChooser.title') : t('postChooser.flatmateStepTitle')}
     >
       <p className="text-xs text-gray-400 mb-4 leading-relaxed">
-        {step === 'what' ? t('postChooser.subtitle') : t('postChooser.whoSubtitle')}
+        {step === 'what' ? t('postChooser.subtitle') : t('postChooser.flatmateStepSubtitle')}
       </p>
 
       {step === 'what' ? (
-          /* Supply-first, and the same order on every route — a sheet that reshuffles itself by where it was opened
-             has to be re-read each time. */
         <div className="space-y-2.5">
           <Choice icon="building-2" title={t('postChooser.propertyTitle')} desc={t('postChooser.propertyDesc')} onClick={() => go('/list-property')} disabled={loading} />
-          <Choice icon="door-open" title={t('postChooser.roomTitle')} desc={t('postChooser.roomDesc')} onClick={() => go('/list-property?flatmate=1')} disabled={loading} />
-          <Choice icon="users-round" title={t('postChooser.lookingTitle')} desc={t('postChooser.lookingDesc')} onClick={() => setStep('who')} />
+          <Choice icon="users-round" title={t('postChooser.flatmateTitle')} desc={t('postChooser.flatmateDesc')} onClick={() => setStep('flatmate')} />
         </div>
       ) : (
         <>
           <div className="space-y-2.5">
-            <Choice icon="user-search" title={t('postChooser.soloTitle')} desc={t('postChooser.soloDesc')} onClick={() => go('/flatmates?post=solo')} disabled={loading} />
-            <Choice icon="users" title={t('postChooser.groupTitle')} desc={t('postChooser.groupDesc')} onClick={() => go('/flatmates?post=group')} disabled={loading} />
+            <Choice icon="door-open" title={t('postChooser.roomTitle')} desc={t('postChooser.roomDesc')} onClick={() => go('/list-property?flatmate=1')} disabled={loading} />
+            <Choice icon="user-search" title={t('postChooser.seekerTitle')} desc={t('postChooser.seekerDesc')} onClick={() => go('/flatmates?post=solo')} disabled={loading} />
+            <Choice icon="users" title={t('postChooser.teamTitle')} desc={t('postChooser.teamDesc')} onClick={() => go('/flatmates?post=group')} disabled={loading} />
           </div>
           <button type="button" onClick={() => setStep('what')} className="mt-4 btn-ghost h-9 inline-flex items-center gap-1.5 px-3.5 rounded-full text-gray-300 text-xs font-medium">
             <Icon name="arrow-left" className="w-3.5 h-3.5" /> {t('postChooser.back')}

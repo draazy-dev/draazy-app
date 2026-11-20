@@ -12,39 +12,35 @@ import { SavedSearchProvider } from './context/SavedSearchContext.jsx';
 import { VerificationProvider } from './context/VerificationContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { ConversationProvider } from './context/ConversationContext.jsx';
+import { SupportChatProvider } from './context/SupportChatContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
+import { SignInGateProvider } from './context/SignInGateContext.jsx';
 import { installMapsLoader } from './lib/mapsConfig.js';
 import { installGlobalErrorHandlers } from './lib/errorReporter.js';
 import { initPmf } from './lib/pmf.js';
 import { initProductAnalytics } from './lib/productAnalytics.js';
 import { loadGeoPolicy } from './lib/geoConfig.js';
-import { readAccessToken } from './lib/auth.js';
+import { readAccessToken, sessionHinted } from './lib/auth.js';
+import { restoreSession } from './services/http.js';
 import { primeMeBootstrap } from './services/meBootstrapService.js';
+import { isGatewayPopupReturn } from './lib/paymentReturn.js';
+import PaymentPopupReturn from './components/PaymentPopupReturn.jsx';
 import './i18n';
-// Ahead of index.css so @font-face lands before anything sets font-family. A JS import because
-// postcss.config.js loads only tailwind + autoprefixer, so the JS graph is the reliable bundler.
+// Ahead of index.css so @font-face lands before anything sets font-family.
 import './styles/fonts.css';
 import './styles/index.css';
-// Tier 0 — used app-wide, so they load globally right after index.css rather than
-// being trapped inside whichever route chunk happened to import them.
 import './styles/components/buttons.css';
 import './styles/components/surfaces.css';
-// Global, not imported by DateField/TimeField: those are lazy, so a component-level import would
-// leave `.dz-cal` unstyled anywhere picker markup renders without pulling the component in.
+import './styles/components/chips.css';
 import './styles/components/date-time-fields.css';
-// The shared <Select>/<MultiSelect>/<Menu> dropdown skin (.dz-dropdown), used on every route.
 import './styles/components/dropdown.css';
-// Last: its island `color` rule must follow preflight's `button, a { color: inherit }`.
 import './styles/theme.css';
 
-// Boot the temporary PMF-test overlay (GA4). No-op unless VITE_PMF_MODE=on.
 initPmf();
 initProductAnalytics();
 installGlobalErrorHandlers();
 installMapsLoader();
 
-// "auto" restoration lands this SPA part-scrolled once async content and reveals run. Scoped to
-// reloads so back/forward still restores, and set before React renders to beat the deferred restore.
 if ('scrollRestoration' in history) {
   const navEntry = performance.getEntriesByType?.('navigation')?.[0];
   if (navEntry?.type === 'reload') history.scrollRestoration = 'manual';
@@ -52,29 +48,26 @@ if ('scrollRestoration' in history) {
 
 const app = (
   <StrictMode>
-    {/* The boundary that matters day to day is the one inside each layout, around the route outlet. */}
     <ErrorBoundary scope="app">
     <BrowserRouter>
       <AuthProvider>
         <CityProvider>
-          {/* Inside AuthProvider: the shortlist is caller-scoped, so it loads on sign-in and
-              clears on sign-out by watching that context. */}
           <SavedProvider>
             <SavedSearchProvider>
-              {/* One follow-state request here prevents per-card requests. */}
               <FollowProvider>
-              {/* One verification request feeds badges across profile, dashboard and contact flows. */}
               <VerificationProvider>
-              {/* The inbox is caller-scoped, so unread counts load on sign-in and zero on sign-out.
-                  Conversations sit outside: the bell's count rides the chat stream they open. */}
               <ConversationProvider>
+                <SupportChatProvider>
                 <NotificationProvider>
                   <CompareProvider>
                     <ToastProvider>
-                      <App />
+                      <SignInGateProvider>
+                        <App />
+                      </SignInGateProvider>
                     </ToastProvider>
                   </CompareProvider>
                 </NotificationProvider>
+                </SupportChatProvider>
               </ConversationProvider>
               </VerificationProvider>
               </FollowProvider>
@@ -87,10 +80,20 @@ const app = (
   </StrictMode>
 );
 
-/* The ready marker means the application has rendered. `loadGeoPolicy` stays asynchronous: its
-  synchronous readers use built-ins until it arrives, so first paint does not wait on configuration. */
 document.documentElement.dataset.dzBoot = 'ready';
-loadGeoPolicy();
-window.addEventListener('draazy-settings-change', loadGeoPolicy);
-if (readAccessToken()) primeMeBootstrap();
-createRoot(document.getElementById('root')).render(app);
+const root = createRoot(document.getElementById('root'));
+if (isGatewayPopupReturn()) {
+  window.close();
+  root.render(<PaymentPopupReturn />);
+} else {
+  loadGeoPolicy();
+  window.addEventListener('draazy-settings-change', loadGeoPolicy);
+  // Sync readAccessToken() checks across the app assume a live session already holds its token at first render.
+  const restored = !readAccessToken() && sessionHinted()
+    ? Promise.race([restoreSession().catch(() => null), new Promise((r) => setTimeout(r, 5000))])
+    : Promise.resolve();
+  restored.then(() => {
+    if (readAccessToken()) primeMeBootstrap();
+    root.render(app);
+  });
+}

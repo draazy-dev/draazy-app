@@ -3,13 +3,18 @@ package com.draazy.api.common.log;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.draazy.api.common.audit.AuditLogRetention;
+import com.draazy.api.engagement.messaging.OutboundMessageRetention;
+import com.draazy.api.identity.auth.OtpRetention;
+import com.draazy.api.identity.user.User;
+import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
 import java.time.Duration;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-@DisplayName("Log retention — error_event 30 days since first seen, audit_log 365 days")
+@DisplayName("Log retention — error_event 30 days, audit_log 365, otp_codes 7, outbound_message 180")
 class LogRetentionTest extends AbstractApiTest {
 
     @Autowired
@@ -17,6 +22,15 @@ class LogRetentionTest extends AbstractApiTest {
 
     @Autowired
     AuditLogRetention auditLog;
+
+    @Autowired
+    OtpRetention otpCodes;
+
+    @Autowired
+    OutboundMessageRetention outboundMessages;
+
+    @Autowired
+    UserRepository users;
 
     @Test
     @DisplayName("error events first seen 30+ days ago go, even if still recurring, across more than one batch")
@@ -60,5 +74,45 @@ class LogRetentionTest extends AbstractApiTest {
         assertThat(jdbc.queryForList(
                 "select actor from audit_log where actor like 'retention-test-%' order by actor", String.class))
                 .containsExactly("retention-test-approval", "retention-test-kept");
+    }
+
+    @Test
+    @DisplayName("OTP codes older than 7 days go; today's stay so the daily send budget still counts them")
+    void otpCodesAreKeptAWeek() {
+        assertThat(OtpRetention.RETENTION).isEqualTo(Duration.ofDays(7));
+        for (String[] row : new String[][] {{"9000000071", "8 days"}, {"9000000072", "6 days"}, {"9000000073", "0 days"}}) {
+            jdbc.update("""
+                    insert into otp_codes (mobile, code_hash, expires_at, created_at)
+                    values (?, 'hash', now() - cast(? as interval) + interval '5 minutes', now() - cast(? as interval))
+                    """, row[0], row[1], row[1]);
+        }
+
+        otpCodes.purgeNow();
+
+        assertThat(jdbc.queryForList(
+                "select mobile from otp_codes where mobile like '900000007%' order by mobile", String.class))
+                .containsExactly("9000000072", "9000000073");
+    }
+
+    @Test
+    @DisplayName("outbound messages prepared more than 180 days ago go; newer ones stay")
+    void outboundMessagesAreKeptHalfAYear() {
+        assertThat(OutboundMessageRetention.RETENTION).isEqualTo(Duration.ofDays(180));
+        UUID owner = users.saveAndFlush(new User("9000000081", "owner")).getId();
+        for (String[] row : new String[][] {{"retention-test-old", "181 days"}, {"retention-test-kept", "179 days"}}) {
+            jdbc.update("""
+                    insert into outbound_message
+                           (channel, subject_type, subject_id, recipient_id, recipient_mobile, body, prepared_by,
+                            prepared_at)
+                    values ('whatsapp', 'property', gen_random_uuid(), ?, '9000000081', ?, ?,
+                            now() - cast(? as interval))
+                    """, owner, row[0], owner, row[1]);
+        }
+
+        outboundMessages.purgeNow();
+
+        assertThat(jdbc.queryForList(
+                "select body from outbound_message where recipient_id = ?", String.class, owner))
+                .containsExactly("retention-test-kept");
     }
 }

@@ -15,11 +15,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-// A tenancy is only ever created by closing a rent deal; the tenant confirms or declines it here.
-// No role guard: the contract scopes tenancies by the caller, not by role.
 @RestController
 public class TenancyController {
-
     private final TenancyService tenancyService;
     private final TenantProfileService profileService;
 
@@ -58,8 +55,6 @@ public class TenancyController {
         return profileService.updateMine(principal.userId(), body);
     }
 
-    // Authorization is the same as `getByMobile`; true means that read would work.
-    // POST keeps this lookup inside the ordinary write-rate budget.
     @PostMapping(Routes.Tenancies.PROFILES_VERIFIED)
     public List<TenantVerifiedDto> tenantsVerified(@CurrentUser AuthPrincipal principal,
                                                    @Valid @RequestBody TenantVerifiedQuery body) {

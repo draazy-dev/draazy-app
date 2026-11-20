@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ExternalLink, LogOut, Menu,
   X, UserPlus,
-  BookOpen, Moon, Sun,
+  BookOpen, ChevronDown, Moon, Sun,
 } from 'lucide-react';
 import LogoMark from '../brand/LogoMark.jsx';
 import ConnectivityBanner from '../ConnectivityBanner.jsx';
@@ -13,10 +13,13 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { roleLabel } from '../../lib/auth.js';
 import { setAppPrefs } from '../../lib/localPrefs.js';
 import { useIsLightTheme } from '../../lib/themeColour.js';
-import { ADMIN_MODULES, canAccessModule, hasPermission, moduleForPath, portalBase, portalPath, runbooksFor } from '../../lib/adminModules.js';
-import { useHelpTree } from '../../lib/useHelp.js';
+import { ADMIN_MODULES, NAV_GROUPS, canAccessModule, hasPermission, moduleForPath, portalBase, portalPath, runbooksFor } from '../../lib/adminModules.js';
+import { useHelpIndex } from '../../lib/useHelp.js';
 import { AdminFlagsProvider, useAdminFlags } from '../../context/AdminFlagsContext.jsx';
 import AdminTopbarTools from './AdminTopbarTools.jsx';
+import BrowserAlertsPrompt from '../BrowserAlertsPrompt.jsx';
+import { StaffSupportChatProvider } from '../../context/StaffSupportChatContext.jsx';
+import StaffSupportDock from '../admin/support-chat/StaffSupportDock.jsx';
 
 export default function AdminLayout() {
   return (
@@ -30,27 +33,51 @@ function AdminLayoutInner() {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const { tabEnabled } = useAdminFlags();
-  /* `adminOnly` is not a third filter: the server's catalogue already makes those atoms administrator-only. */
-  const nav = ADMIN_MODULES
-    .filter((m) => (!m.flagKey || tabEnabled(m.flagKey)) && canAccessModule(user, m.key))
-    .map((m) => [portalPath(user, m.path), m.label, m.icon, m.end]);
+  const nav = ADMIN_MODULES.filter((m) => (!m.flagKey || tabEnabled(m.flagKey)) && canAccessModule(user, m.key));
+  const navGroups = NAV_GROUPS
+    .map((g) => ({ ...g, items: nav.filter((m) => m.group === g.key) }))
+    .filter((g) => g.items.length);
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState({});
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const light = useIsLightTheme();
-  const { articles } = useHelpTree();
-  const pageModule = moduleForPath(pathname)?.key;
+  const { articles } = useHelpIndex();
+  const currentModule = moduleForPath(pathname);
+  const pageModule = currentModule?.key;
   const pageRunbook = pageModule && runbooksFor(articles, user).find((a) => a.modules?.includes(pageModule));
   const runbookHref = portalPath(user, pageRunbook ? `/admin/runbooks/${pageRunbook.slug}` : '/admin/runbooks');
+  const canPostOnBehalf = hasPermission(user, 'postOnBehalf:write');
+  const goFromDrawer = (to) => { setOpen(false); navigate(to); };
 
   const doLogout = () => {
     logout();
     navigate('/staff-login');
   };
 
+  const navLink = ({ path, label, icon: Icon, end }) => {
+    const to = portalPath(user, path);
+    return (
+      <NavLink
+        key={to}
+        to={to}
+        end={!!end}
+        onClick={() => setOpen(false)}
+        className={({ isActive }) =>
+          'flex items-center gap-3 rounded-xl px-3 py-3 sm:py-2.5 text-sm transition-all ' +
+          (isActive ? 'bg-brand-teal/15 text-teal-300' : 'text-gray-300 hover:bg-white/5 hover:text-white')
+        }
+      >
+        <Icon className="h-4 w-4" /> {label}
+      </NavLink>
+    );
+  };
+
+  const supportChats = canAccessModule(user, 'support');
+
   return (
+    <StaffSupportChatProvider enabled={supportChats}>
     <div className="ph-no-capture min-h-[100dvh] bg-ink lg:flex">
-      {/* Staff get the same connectivity banner: a queue that fails to load looks exactly like an empty one. */}
       <ConnectivityBanner />
       <aside
         className={
@@ -59,8 +86,6 @@ function AdminLayoutInner() {
         }
       >
         <div className="flex items-center justify-between px-5 py-4">
-          {/* min-h on touch only: the drawer has nothing beside the
-              wordmark; the desktop rail keeps its 56px header. */}
           <Link to={portalBase(user)} className="flex min-h-[44px] items-center gap-2 sm:min-h-0">
             <LogoMark className="h-8 w-8 shrink-0 text-brand-teal" />
             <span className="font-extrabold">
@@ -68,29 +93,51 @@ function AdminLayoutInner() {
               <span className="ml-1 text-xs font-medium text-gray-400">{roleLabel(user?.role)}</span>
             </span>
           </Link>
-          {/* tap-extend, not tap-target: growing the box would push
-              the wordmark; aria-label as phones never show `title`. */}
-          <button onClick={() => setOpen(false)} aria-label="Close menu" className="tap-extend relative rounded-lg p-1 hover:bg-white/5 lg:hidden">
+          <button onClick={() => setOpen(false)} aria-label="Close menu" className="tap-extend relative rounded-lg p-1 hover:bg-white/5 lg:hidden [@media(pointer:coarse)]:p-3">
             <X className="h-5 w-5" />
           </button>
         </div>
+        {canPostOnBehalf ? (
+          <div className="space-y-1 border-b border-white/10 px-3 pb-3 lg:hidden">
+            <button type="button" onClick={() => goFromDrawer(portalPath(user, '/admin/post-on-behalf'))} className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-teal-500/30 bg-teal-500/10 px-3 text-sm font-medium text-teal-300 transition hover:bg-teal-500/20">
+              <UserPlus className="h-4 w-4" /> Post on Behalf
+            </button>
+            <button type="button" onClick={() => goFromDrawer('/')} className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 text-sm text-gray-300 transition hover:bg-white/5 hover:text-white">
+              <ExternalLink className="h-4 w-4" /> View live site
+            </button>
+          </div>
+        ) : null}
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pt-2 pb-[calc(0.5rem+var(--dz-safe-b))]">
-          {nav.map(([to, label, Icon, end]) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={!!end}
-              onClick={() => setOpen(false)}
-              className={({ isActive }) =>
-                /* py-3 below sm: 16 nav rows at 40px are a long thumb-drag,
-                   and a miss lands on the neighbouring section. */
-                'flex items-center gap-3 rounded-xl px-3 py-3 sm:py-2.5 text-sm transition-all ' +
-                (isActive ? 'bg-brand-teal/15 text-brand-teal' : 'text-gray-300 hover:bg-white/5 hover:text-white')
-              }
-            >
-              <Icon className="h-4 w-4" /> {label}
-            </NavLink>
-          ))}
+          {nav.filter((m) => !m.group).map(navLink)}
+          {navGroups.map((g) => {
+            if (g.items.length === 1) return navLink(g.items[0]);
+            const holdsPage = g.key === currentModule?.group;
+            const isOpen = expanded[g.key] ?? holdsPage;
+            const GroupIcon = g.icon;
+            return (
+              <div key={g.key}>
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  aria-controls={`admin-nav-${g.key}`}
+                  onClick={() => setExpanded((e) => ({ ...e, [g.key]: !isOpen }))}
+                  className={
+                    'flex w-full items-center gap-3 rounded-xl px-3 py-3 sm:py-2.5 text-sm font-semibold transition-all hover:bg-white/5 ' +
+                    (holdsPage && !isOpen ? 'text-teal-300' : 'text-gray-200 hover:text-white')
+                  }
+                >
+                  <GroupIcon className="h-4 w-4" />
+                  <span className="flex-1 text-left">{g.label}</span>
+                  <ChevronDown className={'h-4 w-4 text-gray-500 transition-transform ' + (isOpen ? 'rotate-180' : '')} />
+                </button>
+                {isOpen ? (
+                  <div id={`admin-nav-${g.key}`} className="ml-5 mt-1 space-y-1 border-l border-white/10 pl-2">
+                    {g.items.map(navLink)}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </nav>
       </aside>
 
@@ -103,7 +150,7 @@ function AdminLayoutInner() {
         />
       ) : null}
 
-      <div className="flex min-h-[100dvh] flex-1 flex-col">
+      <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b border-white/10 bg-ink/80 backdrop-blur">
           <div className="flex items-center gap-3 px-4 py-2.5">
             <button onClick={() => setOpen(true)} aria-label="Open menu" className="tap-extend relative rounded-lg p-2 hover:bg-white/5 lg:hidden">
@@ -112,7 +159,7 @@ function AdminLayoutInner() {
 
             <AdminTopbarTools />
 
-            {hasPermission(user, 'postOnBehalf:write') ? (
+            {canPostOnBehalf ? (
               <div className="hidden items-center gap-1.5 ml-auto lg:flex">
                 <button onClick={() => navigate(portalPath(user, '/admin/post-on-behalf'))} className="flex items-center gap-1.5 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-1.5 text-xs font-medium text-teal-300 hover:bg-teal-500/20 transition">
                   <UserPlus className="h-3.5 w-3.5" /> Post on Behalf
@@ -129,19 +176,17 @@ function AdminLayoutInner() {
               aria-label={light ? 'Switch to dark mode' : 'Switch to light mode'}
               aria-pressed={light}
               title={light ? 'Dark mode' : 'Light mode'}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 p-1.5 text-gray-300 transition hover:bg-white/10 hover:text-white sm:min-h-0 sm:min-w-0"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 p-1.5 text-gray-300 transition hover:bg-white/10 hover:text-white sm:min-h-0 sm:min-w-0 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11"
             >
               {light ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
             </button>
 
-            {/* New tab so checking an SLA mid-queue doesn't lose the
-                queue; AdminTopbarTools is flex-1, so no margin here. */}
             <a
               href={runbookHref}
               target="_blank"
               rel="noopener noreferrer"
               title={t('help.runbooks')}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition hover:bg-white/10 hover:text-white sm:min-h-0 sm:min-w-0"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition hover:bg-white/10 hover:text-white sm:min-h-0 sm:min-w-0 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11"
             >
               <BookOpen className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{t('help.runbooks')}</span>
@@ -158,22 +203,22 @@ function AdminLayoutInner() {
                     {roleLabel(user?.role)}
                   </div>
                 </div>
-                <button onClick={doLogout} aria-label="Log out" className="tap-extend relative rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition" title="Log out">
+                <button onClick={doLogout} aria-label="Log out" className="tap-extend relative rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition [@media(pointer:coarse)]:p-3.5" title="Log out">
                   <LogOut className="h-4 w-4" />
                 </button>
               </div>
             </div>
           </div>
         </header>
-        {/* Bottom padding carries the home-indicator inset (--dz-safe-b) so the last queue row isn't under the
-            gesture bar; env() is 0px outside an installed notched app. */}
         <main className="flex-1 p-4 pb-[calc(1rem+var(--dz-safe-b))] sm:p-6 sm:pb-[calc(1.5rem+var(--dz-safe-b))]">
-          {/* Same placement as the consumer shell: a throwing module must not take the sidebar down with it. */}
           <ErrorBoundary scope="admin-route" resetKey={pathname}>
             <Outlet />
           </ErrorBoundary>
         </main>
       </div>
+      <BrowserAlertsPrompt staff />
+      {supportChats ? <StaffSupportDock hidden={pageModule === 'support'} inboxPath={portalPath(user, '/admin/support')} /> : null}
     </div>
+    </StaffSupportChatProvider>
   );
 }

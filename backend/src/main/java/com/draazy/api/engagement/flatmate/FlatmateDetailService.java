@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.identity.user.UserStatuses;
@@ -15,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FlatmateDetailService {
-
     private final FlatmateGroupRepository groups;
     private final FlatmateRoomRepository rooms;
     private final FlatmateSeekerPostRepository posts;
@@ -66,6 +66,7 @@ public class FlatmateDetailService {
                 .filter(r -> isHost(caller, r.getHostId()) || r.isVisible() && hostActive(r.getHostId()))
                 .orElseThrow(() -> NotFoundException.of("Room"));
         List<String> photos = List.copyOf(room.getPhotos());
+        FlatmateDetailDto.Specs specs = FlatmateDetailDto.Specs.of(room.getDetails());
         if (isHost(caller, room.getHostId())) {
             User me = users.findById(caller.userId()).orElse(null);
             Optional<FlatmateReview> review = reviews.findByRoomId(room.getId());
@@ -73,10 +74,10 @@ public class FlatmateDetailService {
                     .get(room.getId()).withHost(hostAnswers(room, review));
             return FlatmateDetailDto.owned(FlatmateDetailDto.KIND_ROOM,
                     mapper.toDto(room, view), photos,
-                    review.map(FlatmateDetailDto.Verification::of).orElse(null));
+                    review.map(FlatmateDetailDto.Verification::of).orElse(null)).withSpecs(specs);
         }
         return FlatmateDetailDto.visitor(FlatmateDetailDto.KIND_ROOM,
-                cards.render(List.of(room)).get(0), photos);
+                cards.render(List.of(room)).get(0), photos).withSpecs(specs);
     }
 
     @Transactional(readOnly = true)
@@ -94,7 +95,7 @@ public class FlatmateDetailService {
     }
 
     private boolean hostActive(UUID hostId) {
-        return users.findById(hostId).filter(u -> !UserStatuses.SUSPENDED.equals(u.getStatus())).isPresent();
+        return users.findById(hostId).filter(u -> UserStatuses.ACTIVE.equals(u.getStatus()) && !u.isArchived()).isPresent();
     }
 
     private static boolean isHost(AuthPrincipal caller, UUID hostId) {
@@ -108,7 +109,18 @@ public class FlatmateDetailService {
                 review.map(FlatmateReview::getAgreementDoc).map(FlatmateDetailService::withoutBytes)
                         .orElse(null),
                 agreement.getValidTill(),
-                room.getOwnerConsentMobile());
+                room.getOwnerConsentMobile(),
+                attachedFlat(room, review),
+                review.map(FlatmateReview::getReason).orElse(null),
+                review.map(FlatmateReview::isOwnerConsent).orElse(null));
+    }
+
+    private static UUID attachedFlat(FlatmateRoom room, Optional<FlatmateReview> review) {
+        String fingerprint = room.getAddressFingerprint();
+        if (fingerprint != null && fingerprint.startsWith(FlatmateGuardrails.PROPERTY_PREFIX)) {
+            return Ids.parseUuid(fingerprint.substring(FlatmateGuardrails.PROPERTY_PREFIX.length())).orElse(null);
+        }
+        return review.map(FlatmateReview::getTenancyPropertyId).orElse(null);
     }
 
     private static Map<String, Object> withoutBytes(Map<String, Object> doc) {
@@ -126,7 +138,7 @@ public class FlatmateDetailService {
                 d.noticePeriodDays(), d.lockInMonths(), d.maintenanceBilling(), d.electricityBilling(),
                 d.perHead(), d.seatsTotal(), d.seatsOpen(), d.members(), d.propertyId(), d.hostRole(),
                 d.verificationTier(), d.agreementDeclared(), d.ownerConsent(), mobile, d.reviewStatus(),
-                d.addressFingerprint(), d.flagForReview(), d.modStatus(), d.tags(), d.note(),
+                d.addressFingerprint(), d.flagForReview(), d.modStatus(), d.note(),
                 d.ownerName(), d.ownerMobile(), d.createdAt(), d.preferences());
     }
 

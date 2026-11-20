@@ -27,7 +27,6 @@ import org.springframework.http.MediaType;
 
 @DisplayName("D216 — chasing a listing's owner")
 class OwnerOutreachTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -38,8 +37,6 @@ class OwnerOutreachTest extends AbstractApiTest {
 
     @AfterEach
     void clearAudit() {
-
-        // AuditService commits in its own transaction, so its rows outlive this test's rollback.
         jdbc.update("delete from audit_log where action = 'property.outreach'");
         jdbc.update("delete from outbound_message where body like '%Outreach flat%'");
     }
@@ -83,7 +80,6 @@ class OwnerOutreachTest extends AbstractApiTest {
                 .getContentAsString();
     }
 
-    // Caller supplies a template id only.
     @Test
     @DisplayName("the message is rendered server-side from the listing, its owner and the sender")
     void rendersFromTheDatabase() throws Exception {
@@ -98,7 +94,6 @@ class OwnerOutreachTest extends AbstractApiTest {
         assertThat(body).doesNotContain("{owner_name}").doesNotContain("{staff_name}");
     }
 
-    // Unresolved keys stay literal so staff see the template failure.
     @Test
     @DisplayName("an unresolved placeholder survives as literal text, where a human will see it")
     void unresolvedPlaceholdersAreVisible() throws Exception {
@@ -204,7 +199,6 @@ class OwnerOutreachTest extends AbstractApiTest {
                 .isEqualTo(body);
     }
 
-    // Asserted through the read endpoint because a ledger nobody can query is not a ledger.
     @Test
     @DisplayName("chasers accumulate in a log the next colleague can read, marked prepared")
     void chasersAreRecorded() throws Exception {
@@ -224,7 +218,6 @@ class OwnerOutreachTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[1].templateId").value("wa-photos"));
     }
 
-    // Count from outbound messages, not a stored column that can drift.
     @Test
     @DisplayName("reminderCount is counted from the ledger, not stored beside the listing")
     void reminderCountComesFromTheLedger() throws Exception {
@@ -255,8 +248,6 @@ class OwnerOutreachTest extends AbstractApiTest {
         chase(staff, p, "wa-does-not-exist", 400);
     }
 
-    // This messages a private phone in the platform's name,
-    // so it needs the post-on-behalf grant.
     @Test
     @DisplayName("verification reason templates render through the outreach endpoint")
     void reasonTemplatesRender() throws Exception {
@@ -297,7 +288,6 @@ class OwnerOutreachTest extends AbstractApiTest {
         chase(buyer, p, "wa-gentle", 403);
     }
 
-    /** The template library is served rather than bundled, so the console cannot drift from it. */
     @Test
     @DisplayName("the template library lists the active WhatsApp copy")
     void templatesAreServed() throws Exception {

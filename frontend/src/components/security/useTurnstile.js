@@ -1,16 +1,29 @@
 import { useCallback, useRef, useState } from 'react';
+import { createTokenSlot, sendWithToken } from './turnstileToken.js';
 
-/** Turnstile tokens are single-use: `spend` hands the current one over and remounts the widget (`key={round}`)
- * for a fresh challenge, so a Resend never replays a token the server has already consumed. */
+const SITE_KEY = import.meta.env?.VITE_TURNSTILE_SITE_KEY;
+
 export function useTurnstile() {
-  const token = useRef(null);
+  const slot = useRef(null);
+  if (!slot.current) slot.current = createTokenSlot();
   const [round, setRound] = useState(0);
-  const onToken = useCallback((tok) => { token.current = tok; }, []);
-  const spend = useCallback(() => {
-    const spent = token.current;
-    token.current = null;
+
+  const onToken = useCallback((tok) => slot.current.put(tok), []);
+
+  const remount = useCallback(() => {
+    slot.current.restarted();
     setRound((n) => n + 1);
-    return spent;
   }, []);
-  return { round, onToken, spend };
+
+  const spend = useCallback(async () => {
+    if (!SITE_KEY) return null;
+    if (slot.current.needsRestart()) remount();
+    const tok = await slot.current.take();
+    remount();
+    return tok;
+  }, [remount]);
+
+  const withToken = useCallback((request) => sendWithToken(spend, request), [spend]);
+
+  return { round, onToken, withToken };
 }

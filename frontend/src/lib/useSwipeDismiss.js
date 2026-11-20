@@ -2,25 +2,14 @@ import { useCallback, useRef } from 'react';
 
 const MOBILE = '(max-width: 639.98px)';
 
-/* Past this many pixels the gesture reads as intent to dismiss rather than a
-   stray drag, so releasing closes the overlay; below it, the panel snaps back. */
 const THRESHOLD = 72;
 
-/* A vertical drag may only begin inside this strip at the top of the panel (handle + header);
-   below it the sheet's own content scrolls, and an ambiguous drag would make both feel unreliable. */
 const HANDLE_ZONE = 40;
 
-/* Ignore the first few pixels so a tap on a control inside the overlay is never
-   swallowed by the gesture. */
 const SLOP = 4;
 
-/* Controls that interpret a drag themselves: a range thumb *is* a drag handle, so a pointerdown on
-   one is never "dismiss". Matched on the target so the gesture never arms rather than racing. */
 const DRAG_HANDLES = 'input[type="range"], .rng-thumb-hit';
 
-/* Pointer capture waits for the first qualifying *move*: on pointerdown it would break every button
-   inside. `query` is the width at which the caller is actually an overlay — the map detail panel
-   stays a sheet up to 767px and passes its own, or its grabber would be decoration in between. */
 export default function useSwipeDismiss(onDismiss, { axis = 'y', query = MOBILE, allowScrollableTop = false, scrollableSelector = '.filter-scroll' } = {}) {
   const drag = useRef(null);
 
@@ -67,8 +56,6 @@ export default function useSwipeDismiss(onDismiss, { axis = 'y', query = MOBILE,
 
     const el = e.currentTarget;
     const dismissing = d > THRESHOLD;
-    /* Dismissing hands the transform back to the stylesheet so the overlay's own close animation
-       plays; a snap-back has none to borrow, so supply one and clear it after. */
     if (dismissing) {
       el.style.transition = '';
     } else {

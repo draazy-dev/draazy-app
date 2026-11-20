@@ -27,16 +27,16 @@
       "hint": "On a phone already? Allow camera access and reopen this page."
     },
     "start": {
-      "title": "Get Verified",
-      "body": "Verified owners get more replies.",
+      "title": "Get KYC done",
+      "body": "KYC-done owners get more replies.",
       "docsLabel": "Choose identity document",
       "consentTitle": "Consent",
       "consent": {
         "line1": "We collect ID photo + selfie.",
-        "line2": "Verified badge only; staff review.",
+        "line2": "KYC done badge only; staff review.",
         "line3": "Images delete 7 days after decision. Withdraw here anytime."
       },
-      "agree": "I agree to identity review for the Verified badge.",
+      "agree": "I agree to identity review for the KYC done badge.",
       "cta": "Start capture"
     },
     "capture": {
@@ -105,20 +105,20 @@
       "sending": "Sending…",
       "sent": "Report sent. Our team will reply within 2 working days.",
       "open": "You already have an open report.",
-      "supportLink": "View support tickets"
+      "supportLink": "Message Draazy support"
     },
     "status": {
       "pendingTitle": "In review",
       "pendingBody": "We will update the badge after review.",
-      "verifiedTitle": "Verified",
+      "verifiedTitle": "KYC done",
       "verifiedBody": "Your badge is live.",
       "verifiedAs": "Verified as {{name}}",
       "rejectedTitle": "Needs attention",
       "rejectedBody": "Retake only if needed.",
       "revokedTitle": "Badge removed",
-      "revokedBody": "Your Verified badge is no longer active.",
-      "noneTitle": "Get Verified",
-      "noneBody": "Verified owners get more replies.",
+      "revokedBody": "Your KYC done badge is no longer active.",
+      "noneTitle": "Get KYC done",
+      "noneBody": "KYC-done owners get more replies.",
       "removedLabel": "Badge removed",
       "removedBody": "Your badge was removed.",
       "needsAttention": "Needs attention",
@@ -155,6 +155,20 @@
       "tryAgain": "Try again",
       "done": "Done",
       "cancel": "Cancel"
+    },
+    "appeal": {
+      "button": "Ask for a second look",
+      "title": "Ask for a second look",
+      "hint": "Tell us why this ID should be accepted. A reviewer will check it.",
+      "noteLabel": "Your note",
+      "send": "Send",
+      "sending": "Sending…",
+      "statusLabel": "Second look",
+      "open": "Under review. A reviewer will check your ID.",
+      "upheld": "Reviewed. The rejection stands. You can’t appeal this again.",
+      "reopened": "Reviewed. Your ID is back in the queue for a fresh check.",
+      "notAllowed": "This check can’t be appealed any more.",
+      "alreadyOpen": "A second look is already under review."
     },
     "errors": {
       "unreachable": "That did not send. Check your connection and try again.",

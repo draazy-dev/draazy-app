@@ -22,25 +22,30 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-// Co-fill requests need a party row; otherwise tenant-side work stays browser-only.
 @Component
 class CoFillParties {
-
-    // The sides of an agreement.
-    // Mirrors the role CHECK, which is the enforcement.
     static final Set<String> ROLES = Set.of("owner", "tenant");
 
-    // Named, because the read scope keys on this exact value in three places.
     static final String INVITED = "invited";
     static final String ACCEPTED = "accepted";
     static final String DECLINED = "declined";
 
-    // Pending invites expire when TRAI may recycle the mobile number.
-    // After that, a stranger could inherit the invite.
     static final Duration PENDING_INVITE_TTL = Duration.ofDays(90);
+
+    static Stream<ServiceRequestParty> joined(List<ServiceRequestParty> all) {
+        return all.stream().filter(p -> p.getUserId() != null && ACCEPTED.equals(p.getStatus()));
+    }
+
+    static Set<UUID> customers(ServiceRequest request, List<ServiceRequestParty> all) {
+        Set<UUID> to = new LinkedHashSet<>();
+        to.add(request.getRequesterId());
+        joined(all).forEach(p -> to.add(p.getUserId()));
+        return to;
+    }
 
     private final ServiceRequestPartyRepository parties;
     private final ServiceRequestRepository requests;
@@ -49,6 +54,8 @@ class CoFillParties {
     private final AuditService audit;
     private final Notifier notifier;
     private final AuditLogRepository auditLog;
+    private final RentAgreementOwnerTakeover takeover;
+    private final CoFillInviteWhatsApp whatsApp;
 
     CoFillParties(ServiceRequestPartyRepository parties,
             ServiceRequestRepository requests,
@@ -56,7 +63,9 @@ class CoFillParties {
             UserRepository users,
             AuditService audit,
             Notifier notifier,
-            AuditLogRepository auditLog) {
+            AuditLogRepository auditLog,
+            RentAgreementOwnerTakeover takeover,
+            CoFillInviteWhatsApp whatsApp) {
         this.parties = parties;
         this.requests = requests;
         this.documents = documents;
@@ -64,10 +73,10 @@ class CoFillParties {
         this.audit = audit;
         this.notifier = notifier;
         this.auditLog = auditLog;
+        this.takeover = takeover;
+        this.whatsApp = whatsApp;
     }
 
-    // Only the requester may invite; naming the other side grants read access.
-    // Staff/customer proxies would turn support or a typo into consent.
     @Transactional
     ServiceRequestPartyDto invite(AuthPrincipal caller, String requestId, String role, int partyIndex,
             String mobile) {
@@ -114,10 +123,11 @@ class CoFillParties {
         audit.record(caller, "service-request.party-invited", "service_request",
                 request.getId().toString(), "role", side, "party", invitee.getId().toString());
         notifyInvitee(request, saved, invitee.getId(), side);
-        return toDto(saved, request.getType(), invitee.getName(), displayName(caller.userId()));
+        String inviterName = displayName(caller.userId());
+        boolean queued = whatsApp.send(request, saved, normalised, inviterName);
+        return toDto(saved, request.getType(), invitee.getName(), inviterName, queued);
     }
 
-    // Pending-number invites have no inbox until #claimPendingFor binds them to a user.
     private void notifyInvitee(ServiceRequest request, ServiceRequestParty saved, UUID inviteeId,
             String side) {
         notifier.notify(inviteeId, "service.party-invited",
@@ -128,7 +138,6 @@ class CoFillParties {
                         + "&request=" + request.getId());
     }
 
-    // No self-invite check here: requester numbers resolve to their account above.
     private ServiceRequestPartyDto inviteByMobile(AuthPrincipal caller, ServiceRequest request,
             String side, int partyIndex, String normalised) {
         if (parties.existsByRequestIdAndMobile(request.getId(), normalised)) {
@@ -143,7 +152,9 @@ class CoFillParties {
                 partyIndex, caller.userId()));
         audit.record(caller, "service-request.party-invited", "service_request",
                 request.getId().toString(), "role", side, "party", MobileMask.mask(normalised));
-        return toDto(saved, request.getType(), null, displayName(caller.userId()));
+        String inviterName = displayName(caller.userId());
+        boolean queued = whatsApp.send(request, saved, normalised, inviterName);
+        return toDto(saved, request.getType(), null, inviterName, queued);
     }
 
     private void purgeSlotIdentityScans(UUID requestId, String side, int partyIndex) {
@@ -151,7 +162,6 @@ class CoFillParties {
         documents.deleteAll(stale);
     }
 
-    // Pending invites are indexed; the common no-invite path costs one empty probe.
     @Transactional
     void claimPendingFor(AuthPrincipal caller) {
         User self = users.findById(caller.userId()).orElse(null);
@@ -168,8 +178,6 @@ class CoFillParties {
                 continue;
             }
 
-            // Drop invitations that would put one user on both sides of the agreement.
-            // Claiming them would also trip uq_service_request_parties_user.
             boolean wouldDuplicate = parties.existsByRequestIdAndUserId(party.getRequestId(),
                     caller.userId())
                     || requests.findById(party.getRequestId()).map(r -> caller.userId().equals(r.getRequesterId())).orElse(true);
@@ -185,8 +193,6 @@ class CoFillParties {
         parties.flush();
     }
 
-    // Mistyped pending mobiles must be withdrawable.
-    // Otherwise the role slot stays occupied and checkout is blocked.
     @Transactional
     void withdraw(AuthPrincipal caller, String requestId, String partyId) {
         ServiceRequest request = Ids.parseUuid(requestId).flatMap(requests::findById).orElseThrow(() -> NotFoundException.of("Service request"));
@@ -209,7 +215,6 @@ class CoFillParties {
                 "party", String.valueOf(party.getUserId()));
     }
 
-    // Invites are the discoverable unit; pending parties cannot read the agreement yet.
     @Transactional(readOnly = true)
     List<ServiceRequestPartyDto> myInvites(AuthPrincipal caller) {
         List<ServiceRequestParty> pending =
@@ -224,8 +229,8 @@ class CoFillParties {
                         names.get(p.getUserId()), names.get(p.getInvitedBy()))).toList();
     }
 
-    // Acceptance grants agreement access, so only the invitee can perform it.
-    // Staff/requester acceptance would break maker-checker separation.
+    // Only the invitee may accept: acceptance grants agreement access, and staff or requester
+    // acceptance would break maker-checker separation.
     @Transactional
     ServiceRequestPartyDto decide(AuthPrincipal caller, String partyId, String decision) {
         ServiceRequestParty party = Ids.parseUuid(partyId).flatMap(parties::findById).orElseThrow(() -> NotFoundException.of("Invitation"));
@@ -240,18 +245,45 @@ class CoFillParties {
         if (!INVITED.equals(party.getStatus())) {
             throw new ConflictException("You have already " + party.getStatus() + " this invitation.");
         }
+        ServiceRequest request = requests.findById(party.getRequestId()).orElseThrow(() -> NotFoundException.of("Invitation"));
+        boolean takeOver = ACCEPTED.equals(outcome) && RentAgreementOwnerTakeover.applies(request, party);
+        if (takeOver) {
+            takeover.refuseIfBlocked(request, caller.userId());
+        }
         party.answer(outcome);
         parties.saveAndFlush(party);
         audit.record(caller, "service-request.party-" + outcome, "service_request",
                 party.getRequestId().toString(), "role", party.getRole());
-        String type = requests.findById(party.getRequestId()).map(ServiceRequest::getType).orElse(null);
         Map<UUID, String> names = names(List.of(party));
-        return toDto(party, type, names.get(party.getUserId()), names.get(party.getInvitedBy()));
+        ServiceRequestPartyDto answered = toDto(party, request.getType(), names.get(party.getUserId()),
+                names.get(party.getInvitedBy()));
+        if (takeOver) {
+            takeover.takeOver(request, party);
+            audit.record(caller, "service-request.owner-took-over", "service_request",
+                    request.getId().toString());
+        }
+        return answered;
     }
 
-    // Single DTO builder keeps embedded parties and invitation-list parties aligned.
+    void announcePaid(ServiceRequest request) {
+        UUID payer = request.payer();
+        Set<UUID> others = new LinkedHashSet<>();
+        others.add(request.getRequesterId());
+        joined(parties.findByRequestId(request.getId())).forEach(p -> others.add(p.getUserId()));
+        others.remove(payer);
+        String who = users.findById(payer).map(User::getName).filter(name -> !name.isBlank()).orElse("The other side");
+        others.forEach(person -> notifier.notify(person, "service.party-paid", who + " has paid for the agreement",
+                "Nothing more to pay. Our team will now prepare the draft.",
+                ServiceRequestTypes.pageFor(request.getType())));
+    }
+
     static ServiceRequestPartyDto toDto(ServiceRequestParty party, String requestType,
             String partyName, String invitedByName) {
+        return toDto(party, requestType, partyName, invitedByName, null);
+    }
+
+    private static ServiceRequestPartyDto toDto(ServiceRequestParty party, String requestType,
+            String partyName, String invitedByName, Boolean whatsappQueued) {
         return new ServiceRequestPartyDto(
                 party.getId().toString(),
                 party.getRequestId().toString(),
@@ -263,7 +295,8 @@ class CoFillParties {
                 MobileMask.mask(party.getMobile()),
                 party.isPending(),
                 invitedByName,
-                party.getCreatedAt());
+                party.getCreatedAt(),
+                whatsappQueued);
     }
 
     private Map<UUID, String> names(List<ServiceRequestParty> rows) {

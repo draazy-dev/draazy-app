@@ -6,25 +6,47 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/** Best-effort and never throws, unlike {@link OtpSender}: the in-app inbox row
- * duplicates a decision notice. */
 public interface DecisionMessenger {
-
     String IDENTITY_DECISION = "identity-decision";
     String WAITING_DIGEST = "waiting-digest";
+    String OWNER_NOTICE = "owner-notice";
+    String SERVICE_ATTENTION = "service-attention";
+    String AGREEMENT_INVITE = "agreement-invite";
+    String REFERRAL_INVITE = "referral-invite";
 
     void sendIdentityDecision(String mobile, String line);
 
-    /** Returns whether the vendor accepted it, so the caller can retry later rather than count it as sent. */
     boolean sendWaitingDigest(String mobile, String waiting);
+
+    // link carries a one-time credential: implementations must never log it.
+    boolean sendOwnerNotice(String mobile, String tenantName, String place, String link);
+
+    default boolean sendServiceAttention(String mobile, String service) {
+        return false;
+    }
+
+    default boolean agreementInviteDeliverable(String mobile) {
+        return false;
+    }
+
+    default boolean sendAgreementInvite(String mobile, String inviter, String side, String place, String link) {
+        return false;
+    }
+
+    default boolean referralInviteEnabled() {
+        return false;
+    }
+
+    // link carries the referrer's code: implementations must never log it.
+    default boolean sendReferralInvite(String mobile, String inviter, String link) {
+        return false;
+    }
 }
 
-/** Not profile-bound: a bean that threw here would roll back the very decision it announces. */
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.whatsapp", name = "enabled",
         havingValue = "false", matchIfMissing = true)
 class LoggingDecisionMessenger implements DecisionMessenger {
-
     private static final Logger log = LoggerFactory.getLogger(LoggingDecisionMessenger.class);
 
     private final ProviderCalls calls;
@@ -44,6 +66,39 @@ class LoggingDecisionMessenger implements DecisionMessenger {
     public boolean sendWaitingDigest(String mobile, String waiting) {
         log.info("[MOCK WHATSAPP] waiting digest to {}: {}", MobileMask.mask(mobile), waiting);
         calls.record(ProviderCalls.WHATSAPP, WAITING_DIGEST, ProviderCalls.Outcome.SKIPPED, mobile, null,
+                "mock", null);
+        return false;
+    }
+
+    @Override
+    public boolean sendOwnerNotice(String mobile, String tenantName, String place, String link) {
+        log.info("[MOCK WHATSAPP] owner notice to {} about {} ({})", MobileMask.mask(mobile), tenantName, place);
+        calls.record(ProviderCalls.WHATSAPP, OWNER_NOTICE, ProviderCalls.Outcome.SKIPPED, mobile, null,
+                "mock", null);
+        return false;
+    }
+
+    @Override
+    public boolean sendServiceAttention(String mobile, String service) {
+        log.info("[MOCK WHATSAPP] {} needs attention, to {}", service, MobileMask.mask(mobile));
+        calls.record(ProviderCalls.WHATSAPP, SERVICE_ATTENTION, ProviderCalls.Outcome.SKIPPED, mobile, null,
+                "mock", null);
+        return false;
+    }
+
+    @Override
+    public boolean sendAgreementInvite(String mobile, String inviter, String side, String place, String link) {
+        log.info("[MOCK WHATSAPP] agreement invite to {} as {} from {}: {}", MobileMask.mask(mobile), side,
+                inviter, link);
+        calls.record(ProviderCalls.WHATSAPP, AGREEMENT_INVITE, ProviderCalls.Outcome.SKIPPED, mobile, null,
+                "mock", null);
+        return false;
+    }
+
+    @Override
+    public boolean sendReferralInvite(String mobile, String inviter, String link) {
+        log.info("[MOCK WHATSAPP] referral invite to {} from {}", MobileMask.mask(mobile), inviter);
+        calls.record(ProviderCalls.WHATSAPP, REFERRAL_INVITE, ProviderCalls.Outcome.SKIPPED, mobile, null,
                 "mock", null);
         return false;
     }

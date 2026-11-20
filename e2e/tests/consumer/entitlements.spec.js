@@ -41,7 +41,7 @@ test('a fresh account starts on the free allowance and nothing is stored to make
   expect(ent.contacts.used, 'an account that has contacted nobody has spent nothing').toBe(0);
   expect(ent.contacts.allowance).toBe(FREE_LIMIT);
   expect(ent.contacts.remaining).toBe(FREE_LIMIT);
-  expect(ent.contacts.referralBonus, 'no referrals, no bonus').toBe(0);
+  expect(ent.contacts, 'a referrer earns no contacts any more').not.toHaveProperty('referralBonus');
   expect(ent.contacts.friendBonus, 'a code that was never redeemed gives no starting bonus').toBe(0);
   expect(ent.contacts.freeWindowEndsAt, 'the 30-day window starts at the first contact, not at signup').toBeNull();
   expect(ent.contacts.packExpiresAt).toBeNull();

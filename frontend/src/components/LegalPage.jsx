@@ -2,9 +2,6 @@ import { Children, cloneElement, isValidElement, useEffect, useMemo, useState } 
 import { Link } from 'react-router';
 import Icon from './Icon.jsx';
 
-/* Pages only author their prose; the shell owns navigation, anchors and chrome so all four stay consistent,
-   and the document head comes from data/routeHeads.js. */
-
 const POLICIES = [
   ['Privacy Policy', '/privacy', 'privacy'],
   ['Terms of Service', '/terms', 'terms'],
@@ -33,8 +30,6 @@ const isMobile = () => typeof window !== 'undefined' && window.matchMedia('(max-
 
 export default function LegalPage({ title, lastUpdated, current, children }) {
   const [showTop, setShowTop] = useState(false);
-  // TOC is a scanning aid, not the content. On phones a 10–13 item list buries
-  // the policy below the fold, so start collapsed there and open on desktop.
   const [tocOpen, setTocOpen] = useState(isDesktop);
 
   useEffect(() => {
@@ -44,7 +39,6 @@ export default function LegalPage({ title, lastUpdated, current, children }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Build the TOC from top-level <h2> headings and inject matching anchor ids.
   const { toc, enhanced } = useMemo(() => {
     const items = [];
     const seen = new Map();
@@ -118,7 +112,7 @@ export default function LegalPage({ title, lastUpdated, current, children }) {
             <Link
               key={to}
               to={to}
-              className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-gray-400 hover:text-teal-400 hover:border-teal-400/40 transition-colors"
+              className="dz-chip border border-white/10 bg-white/[0.03] text-gray-400 hover:text-teal-400 hover:border-teal-400/40"
             >
               {label}
             </Link>

@@ -2,7 +2,7 @@
 title: "Tenant police verification in Pune: an owner's guide"
 description: Why Pune owners must submit tenant details to the police, how to do it online for Pune City and Pimpri Chinchwad, and what happens if you skip it.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-06
 author: Draazy Team
 topic: owners
 tags: [police verification, tenant verification, owners, landlords, Pune, PCMC]
@@ -65,6 +65,8 @@ If several adults will live in the flat, give details for each of them.
 Partly. The registration department's i-SARITA system is linked to the police CCTNS network, so when a leave and licence agreement is registered online, the tenant's details are shared with the police. The department says owners need not submit them separately in that case. Pune Police still urge owners to submit tenant details through their online systems, so doing both takes a few minutes and removes any doubt.
 
 Registration itself is a legal duty. See our guide to [rent agreements in Pune](/blog/rent-agreement-pune) and the [rent agreement cost calculator](/tools/rent-agreement-cost-pune).
+
+If you register through [Draazy's rent agreement service](/services/rent-agreement), the agreement is registered on that IGR portal, so the tenant's details reach the police automatically and the tracker shows **Police informed**. Draazy does not file the separate Pune City or Pimpri Chinchwad Police forms for you. If your tenant is a foreign national, the owner also files Form C with FRRO on indiafrro.gov.in within 24 hours of arrival or occupation, and Draazy does not file that either.
 
 ## When to do it
 

@@ -1,5 +1,6 @@
 package com.draazy.api.catalog.society;
 
+import com.draazy.api.catalog.property.Freshness;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.persistence.LikePatterns;
@@ -10,24 +11,20 @@ import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.jpa.domain.Specification;
 
-/** A {@link Specification} avoids a derived-query method per filter combination, as in {@code PropertySpecs}. */
 public final class SocietySpecs {
-
     private SocietySpecs() {
     }
 
-    /** {@code findAll} only, never delete-by-Specification (societies.md section 9.5). */
     public static Specification<Society> browse(
-            String q, String localitySlug, Boolean hasListings) {
+            String q, String localitySlug, Boolean hasListings, Boolean mapped) {
         return (root, query, cb) -> {
             List<Predicate> where = new ArrayList<>();
 
-            // Merged-away duplicates are not results, and not a caller-supplied flag: listing both
-            // splits one building's listings, followers and reviews across two cards.
             where.add(cb.isNull(root.get("mergedInto")));
             where.add(cb.isNull(root.get("archivedAt")));
 
@@ -40,21 +37,21 @@ public final class SocietySpecs {
             if (Boolean.TRUE.equals(hasListings)) {
                 where.add(cb.exists(hasLiveListing(root, query, cb)));
             }
+            if (Boolean.TRUE.equals(mapped)) {
+                where.add(cb.isNotNull(root.get("placeId")));
+            }
             return cb.and(where.toArray(new Predicate[0]));
         };
     }
 
-    /** The lower-cased {@code LIKE} pattern for a free-text query, or null when there is none. */
     public static String likePattern(String q) {
         return LikePatterns.contains(q);
     }
 
-    /** The locality filter value, or null when blank. */
     public static String trimmed(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    /** Name, builder and the locality as words ("baner-road" is "baner road"), so a typed query finds all three. */
     private static Expression<String> searchText(Root<Society> root, CriteriaBuilder cb) {
         Expression<String> locality = cb.function("replace", String.class,
                 cb.coalesce(root.<String>get("localitySlug"), ""), cb.literal("-"), cb.literal(" "));
@@ -62,7 +59,6 @@ public final class SocietySpecs {
         return cb.concat(cb.concat(cb.concat(cb.concat(root.<String>get("name"), " "), builder), " "), locality);
     }
 
-    /** The second root is the merge family, and it is load-bearing: societies.md section 9.4. */
     private static Subquery<Integer> hasLiveListing(
             Root<Society> society, CriteriaQuery<?> query, CriteriaBuilder cb) {
         Subquery<Integer> sub = query.subquery(Integer.class);
@@ -75,6 +71,9 @@ public final class SocietySpecs {
                         cb.equal(owner.get("mergedInto"), society.get("id"))),
                 cb.equal(listing.get("status"), PropertyStatus.APPROVED),
                 cb.isFalse(listing.get("archived")),
+                cb.or(cb.isTrue(listing.get("demo")),
+                        cb.greaterThan(cb.coalesce(listing.get("lastConfirmedAt"), listing.get("createdAt")),
+                                Freshness.dormantCutoff(Instant.now()))),
                 cb.notEqual(listing.get("owner").get("status"), UserStatuses.SUSPENDED));
     }
 }

@@ -60,7 +60,8 @@
   "Saved prices; status: Live|Coming soon". Read by the consumer `/services` bundle.
 
 ### 5.3 Maps & Places (geo policy)
-`MapsGeoPanel` edits `settings.geo` (city limit + blacklist for Google Places). `saveGeo(nextGeo, detail)`
+`MapsGeoPanel` edits `settings.geo`: served districts (`ServedAreaCard`; each entry a name or `{name, placeId, bounds}`,
+at least one), the search limit to those districts, and the Google Places blacklist. `saveGeo(nextGeo, detail)`
 optimistically sets state, `updateSettings({ geo })`, audits "Maps & Places" with a detail, and is read live by
 `lib/geoConfig.js` across every locality/area search.
 
@@ -81,8 +82,7 @@ Detail). `exportAudit()` -> CSV `['When','User','Action','Detail']`; `wipeAudit(
 A banner cross-links to `/admin/staff-activity` for operational (staff) activity.
 
 ### 5.6 Team & Access - the RBAC model (server-resolved permission atoms)
-**Three internal roles.** `Role` is `buyer|owner|staff|manager|admin`; D209 removed only the old
-dead manager label, not this real schema role.
+**Three internal roles.** `Role` is `buyer|owner|staff|manager|admin`.
 - **admin:** exactly one; always holds every atom and cannot be narrowed (`PUT .../permissions` is
   422 for the admin).
 - **manager:** below admin, above staff. Holds every function by default plus `users:write` and
@@ -108,20 +108,19 @@ The five administrator-only atoms are `finance:read`, `users:write`, `audit:read
 account cannot be granted one - the `PUT` answers 422, and the console hides the row rather than
 offering something that will be refused.
 
-**`properties:verify` is gone.** It was a console-only sub-scope with no route behind it, invented by
-the module map; `rbac.spec.js` asserts it never reappears in the catalogue.
+`properties:verify` does not exist (a console-only sub-scope with no route behind it);
+`rbac.spec.js` asserts it never reappears in the catalogue.
 
 ### 5.7 Team & Access - member CRUD + guardrails
 `accessSummary(m)`: admin -> "Every module"; staff -> its team labels; otherwise "Open the record to
-see" (a per-row summary would cost one request per member to answer a question nobody has asked yet).
+see" (a per-row summary would cost one request per member).
 
 `saveMember()` validation and payload shaping:
-- Name required. **Mobile only on create**: it is the sign-in credential, there is no route that
-  changes it, and the directory publishes it masked (`97XXXXX115`), so the edit form renders it
-  read-only and omits it from the `PATCH`.
-- **Last-admin guardrail:** editing cannot demote or suspend the final active admin. This is a
-  console-only path precisely because the contract has no role-change route at all - `teamProvider`
-  refuses a role or team change outright rather than PATCHing the subset the server accepts and
+- Name required. **Mobile only on create**: it is the sign-in credential and no route changes it, so the
+  edit form renders it read-only and omits it from the `PATCH`.
+- **Last-admin guardrail:** editing cannot demote or suspend the final active admin. Console-only,
+  because the contract has no role-change route at all - `teamProvider`
+  refuses a role or team change outright rather than PATCHing the accepted subset and
   reporting success for the rest.
 - The roster is one read, `GET /admin/team`: every back-office account (live and archived) with its
   `functions`, in two queries. Desks reuse it for the assignee picker (`listTeamMembers`).
@@ -132,15 +131,15 @@ see" (a per-row summary would cost one request per member to answer a question n
 ### 5.8 Team & Access - the permission document
 Opening a member fetches `GET /users/{id}/permissions`, which answers
 `{ scoped, permissions, effective }`. `permissions` is what an administrator scoped them to;
-`effective` is what that resolves to against the role baseline. Both are shown, because they differ
-in the case that matters: a document may only **narrow**, so an atom ticked here that the role never
-held stays off in `effective`, and an operator not shown that will believe they granted it.
+`effective` is what that resolves to against the role baseline. Both are shown, because a document may
+only **narrow**: an atom ticked here that the role never held stays off in `effective`, and an operator
+not shown that will believe they granted it.
 
-`PUT /users/{id}/permissions` replaces the list wholesale. Three properties of it drive the UI:
+`PUT /users/{id}/permissions` replaces the list wholesale:
 - **An empty list is legal and means "holds no guarded back-office route".** It is not the same as
   having no document.
-- **There is no delete route.** Once a document exists it cannot be removed; scoping cannot be
-  undone. Restoring means writing the role's full baseline back.
+- **There is no delete route.** Once a document exists it cannot be removed; restoring means writing
+  the role's full baseline back.
 - Refusals: 403 on editing your own; 422 on an unknown name, on a name outside the role's ceiling, or
   on a consumer account; and the last-administrator floor still applies.
 
@@ -149,10 +148,9 @@ second request only fires when the grid actually changed. Otherwise correcting a
 would silently pin them to whatever their role allowed on the day of the typo.
 
 **Custom roles are retired.** They were a *widening* union (`BASE ∪ bundle ∪ moduleAccess`) against a
-server model that may only narrow, so honouring them server-side would have been privilege
-escalation - which is why `PUT /admin/settings` answered 422 for the key and V61 deleted the stored
-row. The bundles therefore granted nothing, and the tab carried a banner saying so. D209 resolves
-open decision 3 in favour of the server's model and deletes `lib/permissions.js` with them.
+server model that may only narrow, so honouring them server-side would be privilege
+escalation - hence `PUT /admin/settings` answers 422 for the key and V61 deleted the stored
+row. D209 resolves open decision 3 in favour of the server's model and deletes `lib/permissions.js`.
 
 ### 5.9 How team-scoping drives ops queues
 A staff member's `teams[]` (or a role's `teams`) select which service verticals they own; the Services desk
@@ -178,17 +176,16 @@ for assignment, and the staff portal shows a member only their own desk — enfo
   `role=admin`; there is one administrator per environment, created by startup bootstrap. Staff and
   manager accounts are created with **no usable password**, and the response returns a one-time,
   time-limited `/staff-invite#...` link to the creator. An unredeemed invite blocks login on every
-  path.
+  path. See "Staff account creation" below.
 - Maker-checker on the *other* sensitive changes (fee schedule, kill-switches like `maintenanceMode`) per
-  [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2 is still not present today.
+  [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2 is not present.
 
 ## 7. State machine
 - **Settings fields:** no lifecycle - each save overwrites (`updateSettings` merges the patched section).
 - **Feature flag:** `on <-> off` (confirmation-gated).
 - **Team member:** `active <-> suspended`; `create -> (edit)* -> delete`. Terminal-ish `suspended` still counts as
   a member; last-active-admin is protected from demotion/suspension/deletion.
-- **Permission document:** `narrow -> (re-narrow)*`; there is no delete, so "restore" is writing the
-  role's full baseline back.
+- **Permission document:** `narrow -> (re-narrow)*`; no delete (see 5.8).
 
 ## 8. Edge cases, validation & error states
 - **Loading:** `<Loading />` until `getSettings()` (Settings) / `listTeamMembers()`+`listCustomRoles()` (Team) resolve.
@@ -207,8 +204,7 @@ Rationale relocated from `UserAdminService.addStaff` Javadoc.
   without a `staff|manager` check the endpoint is a general-purpose account factory, and an admin
   typo mints an account with a role the platform has no notion of.
 - **`mobile` is required** (spec fix S33). `users.mobile` is `NOT NULL UNIQUE`, so the row
-  cannot be inserted without it; relaxing the column would have weakened the natural key for every
-  user to accommodate a handful of colleagues.
+  cannot be inserted without it; relaxing the column would weaken the natural key for every user.
 - **Activation (D206).** The account is created with no usable password and a single-use,
   time-limited invite link is returned once to the creator; the colleague sets their own credential
   via `POST /auth/staff-invite/redeem`. The token reaches neither logs nor the audit row.
@@ -227,5 +223,5 @@ Rationale relocated from `UserAdminService.addStaff` Javadoc.
 - **The approver's liveness is checked here.** Reaching the method proves only that the caller held
   a valid access token; an administrator archived five minutes ago still holds one until it expires.
 - **Audit rows survive the refusals** because `AuditService` is `REQUIRES_NEW`. Nothing else on
-  the refusal paths mutates state - if you add a write above them it will roll back and the audit
-  row will not.
+  the refusal paths mutates state - a write added above them would roll back and the audit
+  row would not.

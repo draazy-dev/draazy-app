@@ -22,11 +22,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// The confirmation instant must persist server-side and appear on public detail,
-// or the buyer-facing badge means nothing.
 @DisplayName("Listings — the owner confirms a listing is still available")
 class ListingConfirmAvailableTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -102,8 +99,6 @@ class ListingConfirmAvailableTest extends AbstractApiTest {
         mvc.perform(post(confirmPath(p)).header(HttpHeaders.AUTHORIZATION, bearer(o)))
                 .andExpect(status().isOk());
 
-        // No auth header: the freshness badge is a transparency signal and a signal only the owner
-        // can see is not one.
         mvc.perform(get("/properties/" + p.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lastConfirmedAt").exists());
@@ -125,8 +120,6 @@ class ListingConfirmAvailableTest extends AbstractApiTest {
         mvc.perform(post(confirmPath(p)).header(HttpHeaders.AUTHORIZATION, bearer(o)))
                 .andExpect(status().isOk())
 
-                // Otherwise any owner could dismiss their own re-check with one tap, which is the
-                // cheapest way to get an unreviewed price back in front of buyers.
                 .andExpect(jsonPath("$.recheckPending").value(true));
     }
 
@@ -139,8 +132,6 @@ class ListingConfirmAvailableTest extends AbstractApiTest {
         mvc.perform(post(confirmPath(p)).header(HttpHeaders.AUTHORIZATION, bearer(o)))
                 .andExpect(status().isOk());
 
-        // "Confirm all" on the dashboard sweeps every listing the owner has, and the owner cannot
-        // see which ones the badge already considers fresh.
         mvc.perform(post(confirmPath(p)).header(HttpHeaders.AUTHORIZATION, bearer(o)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lastConfirmedAt").exists());

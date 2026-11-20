@@ -5,9 +5,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-// Existence probes across several contexts' tables, kept apart from their repositories.
 interface OwnerRelationshipQueries extends Repository<Visit, UUID> {
-
     @Query("""
             select count(v) > 0 from Visit v
             where v.visitorId = :authorId and v.status = 'completed'

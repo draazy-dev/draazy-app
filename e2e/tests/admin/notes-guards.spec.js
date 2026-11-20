@@ -1,6 +1,7 @@
 // The two note guards about *not writing*; a note that exists is `admin/notes.spec.js`'s.
 import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders, uploadedListingPhotos, uniqueMobile } from '../../helpers/liveAuth.js';
+import { rejectListingWithFetch } from '../../helpers/moderation.js';
 
 // `pages/admin/properties/constants.js` — enough to be accepted, filed under a real locality.
 const BASE_LISTING = {
@@ -51,11 +52,7 @@ test.afterEach(async () => {
   if (!created.size) return;
   const headers = await authHeaders(ACTORS.admin);
   for (const id of created) {
-    await api('PATCH', `/properties/${id}/status`, headers, {
-      status: 'rejected',
-      reasonCode: 'other',
-      reason: 'Zztest cleanup \u2014 synthetic note fixture',
-    });
+    await rejectListingWithFetch(id, headers, { reasonCode: 'other', reason: 'Zztest cleanup \u2014 synthetic note fixture' });
   }
   created.clear();
 });

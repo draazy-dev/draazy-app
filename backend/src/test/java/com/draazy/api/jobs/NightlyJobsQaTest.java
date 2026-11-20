@@ -2,6 +2,7 @@ package com.draazy.api.jobs;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.draazy.api.engagement.notification.NotificationRetention;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.jobs.ScheduledJob.Group;
 import com.draazy.api.provider.FileStorage;
@@ -332,24 +333,27 @@ class NightlyJobsQaTest extends AbstractJobQaTest {
     }
 
     @Test
-    @DisplayName("notification-retention deletes read and unread rows older than 90 days and keeps the rest")
+    @DisplayName("notification-retention deletes rows older than 90 days, read rows older than 30, and keeps the rest")
     void notificationsExpireAfterNinetyDays() {
         User u = user("40", "buyer");
-        Duration window = Duration.ofDays(90);
+        Duration window = NotificationRetention.RETENTION;
+        Duration readWindow = NotificationRetention.READ_RETENTION;
         UUID oldUnread = notification(u, window.plus(MARGIN), false);
         UUID oldRead = notification(u, window.plus(Duration.ofDays(200)), true);
+        UUID staleRead = notification(u, readWindow.plus(MARGIN), true);
         UUID justInsideUnread = notification(u, window.minus(MARGIN), false);
-        UUID justInsideRead = notification(u, window.minus(MARGIN), true);
+        UUID justInsideRead = notification(u, readWindow.minus(MARGIN), true);
         UUID recent = notification(u, Duration.ZERO, false);
 
         runGroup(Group.NIGHTLY);
 
         assertThat(exists("notifications", "id", oldUnread)).isFalse();
         assertThat(exists("notifications", "id", oldRead)).isFalse();
+        assertThat(exists("notifications", "id", staleRead)).isFalse();
         assertThat(exists("notifications", "id", justInsideUnread)).isTrue();
         assertThat(exists("notifications", "id", justInsideRead)).isTrue();
         assertThat(exists("notifications", "id", recent)).isTrue();
-        assertThat(touched("notification-retention")).isEqualTo(2);
+        assertThat(touched("notification-retention")).isEqualTo(3);
 
         runGroup(Group.NIGHTLY);
         assertThat(touched("notification-retention")).isZero();

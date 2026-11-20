@@ -9,10 +9,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The property page's "similar homes": ranked here so the page receives three cards, not two hundred rows. */
 @Service
 public class SimilarListings {
-
     static final int LIMIT = 3;
     private static final int POOL = 100;
     private static final double RADIUS_KM = 6;
@@ -35,7 +33,6 @@ public class SimilarListings {
     public record Ranked(Property property, double km) {
     }
 
-    /** Same deal; nearby, similar size and price first, then nearest within the radius, then nearest at all. */
     @Transactional(readOnly = true)
     public List<Ranked> near(Query q) {
         List<Property> pool = q.locality() == null ? candidates(q, null) : candidates(q, q.locality());

@@ -6,7 +6,7 @@ import Icon from '../../../components/Icon.jsx';
 import { ServiceBreadcrumbs } from '../../../components/Breadcrumbs.jsx';
 import MobileField from '../../../components/MobileField.jsx';
 import { useScrollReveal } from '../../../lib/useScrollReveal.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../../lib/useSignInGate.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import ServiceTracker from '../../../components/ServiceTracker.jsx';
@@ -17,13 +17,9 @@ import { SUPPORT_PHONE, SUPPORT_TEL } from '../../../lib/supportContact.js';
 import { useFormDraft, useFieldErrors } from '../../../lib/hooks.js';
 
 const RATES= { 'Koregaon Park': 16500, 'Kalyani Nagar': 15500, Kothrud: 13000, 'Viman Nagar': 12500, Baner: 11500, Aundh: 12000, Kharadi: 10500, Wakad: 9200, Hadapsar: 8800, Hinjawadi: 8200, Wagholi: 6800, Undri: 7200, Ravet: 7800 };
-const YOY = { 'Koregaon Park': 6.2, 'Kalyani Nagar': 6.8, Kothrud: 7.1, 'Viman Nagar': 7.5, Baner: 8.4, Aundh: 7.8, Kharadi: 9.6, Wakad: 8.9, Hadapsar: 7.2, Hinjawadi: 9.2, Wagholi: 10.1, Undri: 8.0, Ravet: 9.4 };
-// City-average fallbacks so the estimator still returns an indicative figure for
-// any Pune locality (curated or user-minted) that has no hand-tuned rate/YoY.
 const PUNE_AVG_RATE = Math.round(Object.values(RATES).reduce((a, b) => a + b, 0) / Object.values(RATES).length);
-const PUNE_AVG_YOY = +(Object.values(YOY).reduce((a, b) => a + b, 0) / Object.values(YOY).length).toFixed(1);
 const fmtShort = (n) => (n >= 1e7 ? '₹' + (n / 1e7).toFixed(2) + ' Cr' : '₹' + (n / 1e5).toFixed(1) + ' L');
-const TREND = Object.keys(RATES).map((k) => ({ k, rate: RATES[k], yoy: YOY[k] })).sort((a, b) => b.yoy - a.yoy);
+const LOCALITY_RATES = Object.entries(RATES).sort((a, b) => b[1] - a[1]);
 
 const SERVICES = [
   ['Market Value Estimate', 'line-chart', 'A fair, current market value based on recent sale comparables in your micro-market.'],
@@ -75,47 +71,43 @@ export default function PropertyValuation() {
     const rate = base * typeM * ageM * floorM * 1.15;
     const mid = rate * a;
     if (!a) return null;
-    const yoy = YOY[loc] ?? PUNE_AVG_YOY;
-    const comps = Math.min(180, 24 + Math.round(a / 40) + Math.round(base / 1000));
     let conf = 92;
     if (a < 400 || a > 3000) conf -= 12;
     if (ageM < 0.9) conf -= 3;
     if (!known) conf -= 8;
     conf = Math.max(72, Math.min(95, conf));
-    return { range: `${fmtShort(mid * 0.93)}  –  ${fmtShort(mid * 1.07)}`, rateValue: Math.round(rate).toLocaleString('en-IN'), known, loc, conf: conf + '%', comps, trend: '+' + yoy.toFixed(1) + '%' };
+    return { range: `${fmtShort(mid * 0.93)}  –  ${fmtShort(mid * 1.07)}`, rateValue: Math.round(rate).toLocaleString('en-IN'), known, loc, conf: conf + '%' };
   }, [loc, type, area, age, floor]);
 
   const submit = (e) => {
     e.preventDefault();
-    // Instant estimate is public; the certified report requires sign-in (draft is restored on return).
-    if (!isIn) { sendToSignIn('services'); return; }
+    if (!isIn) { sendToSignIn('services', undefined, replay(e)); return; }
+    const name = form.name.trim() || user?.name || '';
+    const mobile = form.mobile || user?.mobile || '';
+    if (name !== form.name || mobile !== form.mobile) setForm((p) => ({ ...p, name, mobile }));
     const ok = err.check([
-      { name: 'name', ok: !!form.name.trim(), msg: tr('services.valuation.errName') },
-      { name: 'mobile', ok: /^[6-9]\d{9}$/.test((form.mobile || '').replace(/\D/g, '')), msg: tr('services.valuation.errMobile') },
+      { name: 'name', ok: !!name, msg: tr('services.valuation.errName') },
+      { name: 'mobile', ok: /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '')), msg: tr('services.valuation.errMobile') },
       { name: 'purpose', ok: !!form.purpose, msg: tr('services.valuation.errPurpose') },
     ], toast);
     if (!ok) return;
-    /* One write, so one record of the lead — see the note in InteriorRenovation.jsx. Contact fields
-       ride in `details`, which `toCreate` passes through untouched. */
     createFlowRequest({
       type: 'valuation',
       service: 'Property Valuation',
-      customer: { name: form.name },
+      customer: { name },
       details: {
         property: form.location || '',
         ptype: form.ptype,
         area: form.area ? form.area + ' sq.ft' : '',
         purpose: form.purpose,
-        contactName: form.name,
-        contactMobile: form.mobile,
+        contactName: name,
+        contactMobile: mobile,
       },
     }).catch(() => {});
     draft.clear();
     setDone(true);
   };
   const scrollToForm = () => {
-    // Carry the instant-estimate inputs into the certified-report lead so the
-    // customer doesn't re-enter locality/area (fill only empty fields).
     setForm((p) => ({ ...p, location: p.location || loc, area: p.area || String(area || '') }));
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
@@ -125,8 +117,6 @@ export default function PropertyValuation() {
   return (
     <div ref={rootRef}>
       <div>
-        {/* A dark valuation-specific gradient, because the shared bright-teal --hero-gradient washes
-            the translucent estimator controls out. */}
         <section className="theme-dark relative overflow-hidden" style={{ background: 'linear-gradient(140deg,rgb(var(--dz-c-slate-950)) 0%,rgb(var(--dz-c-teal-950)) 55%,rgb(var(--dz-c-teal-900)) 100%)' }}>
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1600&q=80')" }} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(140deg,rgb(var(--dz-c-slate-950) / .93) 0%,rgb(var(--dz-c-teal-950) / .9) 55%,rgb(var(--dz-c-teal-900) / .92) 100%)' }} />
@@ -134,7 +124,7 @@ export default function PropertyValuation() {
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="reveal">
               <ServiceBreadcrumbs k="valuation" />
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs text-teal-200 font-medium mb-5"><Icon name="trending-up" className="w-3.5 h-3.5" /> {tr('services.valuation.heroBadge')}</span>
+              <span className="dz-tag bg-white/10 border border-white/15 text-teal-200 font-medium mb-5"><Icon name="trending-up" className="w-3.5 h-3.5" /> {tr('services.valuation.heroBadge')}</span>
               <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight">{tr('services.valuation.heroTitle1')}<br /><span className="gradient-text">{tr('services.valuation.heroTitleAccent')}</span></h1>
               <p className="text-gray-200 text-base sm:text-lg mt-5 max-w-xl">{tr('services.valuation.heroSubtitle')}</p>
               <div className="flex flex-wrap gap-x-6 gap-y-3 mt-7">
@@ -144,7 +134,6 @@ export default function PropertyValuation() {
               </div>
             </div>
 
-            {/* Estimate widget */}
             <div className="glass-card svc-quote rounded-2xl p-6 sm:p-7 reveal">
               <div className="flex items-center gap-2 mb-1"><Icon name="calculator" className="w-5 h-5 text-teal-400" /><h2 className="text-lg font-bold text-white">{tr('services.valuation.widgetTitle')}</h2></div>
               <p className="text-gray-400 text-xs mb-5">{tr('services.valuation.widgetSub')}</p>
@@ -181,13 +170,11 @@ export default function PropertyValuation() {
                 </div>
 
                 <div className="mt-1 rounded-xl bg-teal-500/8 border border-teal-400/20 p-5 text-center">
-                  <p className="text-xs text-gray-400 mb-1 flex items-center justify-center gap-1.5"><span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider text-teal-200 bg-teal-500/25"><Icon name="sparkles" className="w-2.5 h-2.5" /> AI</span> {tr('services.valuation.aiEstLabel')}</p>
+                  <p className="text-xs text-gray-400 mb-1 flex items-center justify-center gap-1.5"><span className="dz-tag font-bold uppercase tracking-wider text-teal-200 bg-teal-500/25"><Icon name="sparkles" className="w-2.5 h-2.5" /> AI</span> {tr('services.valuation.aiEstLabel')}</p>
                   <p className="text-2xl font-extrabold gradient-text">{est ? est.range : '—'}</p>
-                  <p className="text-[11px] text-gray-500 mt-1.5">{est ? tr(est.known ? 'services.valuation.rateBasedComparables' : 'services.valuation.rateBasedCityAvg', { rate: est.rateValue, comps: est.comps, loc: est.loc }) : '—'}</p>
-                  <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-3 gap-2 text-center">
-                    <div><p className="text-[10px] text-gray-500">{tr('services.valuation.confidence')}</p><p className="text-sm font-bold text-teal-300">{est ? est.conf : '—'}</p></div>
-                    <div><p className="text-[10px] text-gray-500">{tr('services.valuation.comparables')}</p><p className="text-sm font-bold text-white">{est ? est.comps : '—'}</p></div>
-                    <div><p className="text-[10px] text-gray-500">{tr('services.valuation.trendYoY')}</p><p className="text-sm font-bold text-emerald-300">{est ? est.trend : '—'}</p></div>
+                  <p className="text-[11px] text-gray-500 mt-1.5">{est ? tr(est.known ? 'services.valuation.rateBasedComparables' : 'services.valuation.rateBasedCityAvg', { rate: est.rateValue, loc: est.loc }) : '—'}</p>
+                  <div className="mt-3 pt-3 border-t border-white/10 text-center">
+                    <p className="text-[10px] text-gray-500">{tr('services.valuation.confidence')}</p><p className="text-sm font-bold text-teal-300">{est ? est.conf : '—'}</p>
                   </div>
                 </div>
                 <button onClick={scrollToForm} className="btn-teal w-full py-3 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"><Icon name="file-badge" className="w-4 h-4" /> {tr('services.valuation.getCertified')}</button>
@@ -197,34 +184,28 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* Stats */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
           <div className="glass-card rounded-2xl p-6 grid grid-cols-2 lg:grid-cols-4 gap-6 reveal">
             {[['Free', 'estimate'], ['Pune', 'comparables'], ['24 hrs', 'callback'], ['Fixed', 'fees']].map(([v, slug]) => <div key={slug} className="text-center"><p className="text-3xl font-extrabold gradient-text">{v}</p><p className="text-gray-500 text-xs mt-1">{tr('services.valuation.stat.' + slug)}</p></div>)}
           </div>
         </section>
 
-        {/* Locality price-trend strip — the valuation page's signature data touch */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-y">
           <div className="text-center mb-8 reveal">
             <h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.valuation.trend.title')}</h2>
             <p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.valuation.trend.sub')}</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 reveal">
-            {TREND.map(({ k, rate, yoy }) => (
-              <div key={k} className="rounded-xl bg-white/[.03] p-4 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-white text-sm font-semibold truncate">{k}</p>
-                  <p className="text-gray-500 text-xs mt-0.5">₹{rate.toLocaleString('en-IN')}<span className="text-[10px]"> {tr('services.valuation.trend.perSqft')}</span></p>
-                </div>
-                <span className="shrink-0 inline-flex items-center gap-0.5 text-xs font-bold text-emerald-400"><Icon name="trending-up" className="w-3.5 h-3.5" />{yoy}%</span>
+            {LOCALITY_RATES.map(([k, rate]) => (
+              <div key={k} className="rounded-xl bg-white/[.03] p-4">
+                <p className="text-white text-sm font-semibold truncate">{k}</p>
+                <p className="text-gray-500 text-xs mt-0.5">₹{rate.toLocaleString('en-IN')}<span className="text-[10px]"> {tr('services.valuation.trend.perSqft')}</span></p>
               </div>
             ))}
           </div>
           <p className="text-[11px] text-gray-500 mt-4 text-center reveal">{tr('services.valuation.trend.note')}</p>
         </section>
 
-        {/* Services */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-y">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.valuation.servicesTitle')}</h2><p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.valuation.servicesSub')}</p></div>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
@@ -234,7 +215,6 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* Report form + factors */}
         <ServiceTracker typeFilter="valuation" title={tr('services.valuation.trackerTitle')} />
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
@@ -299,7 +279,6 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* How it works */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.valuation.howItWorks')}</h2></div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
@@ -312,7 +291,6 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* Why choose */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.valuation.whyTitle')}</h2></div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
@@ -322,7 +300,6 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* FAQ */}
         <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.valuation.faqTitle')}</h2></div>
           <div className="space-y-3">
@@ -335,7 +312,6 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* CTA */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="glass-card rounded-2xl p-8 sm:p-12 text-center relative overflow-hidden reveal">
             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%,rgb(var(--dz-c-teal-500)) 0,transparent 40%),radial-gradient(circle at 70% 50%,rgb(var(--dz-c-teal-600)) 0,transparent 40%)' }} />
@@ -344,7 +320,7 @@ export default function PropertyValuation() {
               <p className="text-gray-400 mt-3 mb-7">{tr('services.valuation.ctaSub')}</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button onClick={scrollToForm} className="btn-teal px-6 py-3.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name="file-badge" className="w-4 h-4" /> {tr('services.valuation.ctaRequest')}</button>
-                <a href={SUPPORT_TEL} className="px-6 py-3.5 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> {tr('services.valuation.ctaCall', { phone: SUPPORT_PHONE })}</a>
+                <a href={SUPPORT_TEL} className="h-btn-lg px-6 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> {tr('services.valuation.ctaCall', { phone: SUPPORT_PHONE })}</a>
               </div>
             </div>
           </div>

@@ -1,7 +1,6 @@
 package com.draazy.api.common.error;
 
 public final class ErrorCodes {
-
     private ErrorCodes() {
     }
 
@@ -9,10 +8,10 @@ public final class ErrorCodes {
 
     public static final String UNAUTHORIZED = "unauthorized";
 
-    /** 403 — authenticated but not permitted (RBAC deny, or an owner-only action). */
     public static final String FORBIDDEN = "forbidden";
 
-    /** 404 — no such resource, or archived and hidden from this caller. */
+    public static final String BOT_CHECK_FAILED = "bot_check_failed";
+
     public static final String NOT_FOUND = "not_found";
 
     public static final String CONFLICT = "conflict";
@@ -23,20 +22,18 @@ public final class ErrorCodes {
 
     public static final String ACCOUNT_ARCHIVED = "account_archived";
 
-    // 403 at sign-in or refresh; its own code so clients can tell it from a bot-defence refusal.
     public static final String ACCOUNT_SUSPENDED = "account_suspended";
 
     public static final String SIGNUPS_CLOSED = "signups_closed";
 
     public static final String PURCHASES_PAUSED = "purchases_paused";
 
-    // 403 on /auth/login: back-office accounts sign in with password + authenticator only.
+    public static final String ORDER_ALREADY_OPEN = "order_already_open";
+
     public static final String STAFF_SIGN_IN_REQUIRED = "staff_sign_in_required";
 
-    // 401: the password-step challenge is missing, forged or older than five minutes.
     public static final String STAFF_SIGN_IN_EXPIRED = "staff_sign_in_expired";
 
-    // 429: five consecutive misses on one back-office account.
     public static final String STAFF_SIGN_IN_LOCKED = "staff_sign_in_locked";
 
     public static final String VERIFICATION_REQUIRED = "verification_required";
@@ -51,28 +48,51 @@ public final class ErrorCodes {
 
     public static final String IDENTITY_CASE_CLAIM_LIMIT = "identity_case_claim_limit";
 
-    public static final String IDENTITY_QA_OPEN = "identity_qa_open";
-
     public static final String IDENTITY_CHALLENGE_INVALID = "identity_challenge_invalid";
 
     public static final String IDENTITY_POSE_UNCONFIRMED = "identity_pose_unconfirmed";
 
     public static final String IDENTITY_NUMBER_MISMATCH = "identity_number_mismatch";
+    public static final String IDENTITY_APPEAL_OPEN = "identity_appeal_open";
+    public static final String IDENTITY_APPEAL_NOT_ALLOWED = "identity_appeal_not_allowed";
+    public static final String IDENTITY_APPEAL_NONE = "identity_appeal_none";
+    public static final String IDENTITY_APPEAL_OWN_CASE = "identity_appeal_own_case";
 
     public static final String OWNER_CONSENT_SELF = "owner_consent_self";
+
+    public static final String REQUEST_CLOSED = "request_closed";
 
     public static final String OWNER_SIDE_REQUIRES_OWNER = "owner_side_requires_owner";
 
     public static final String OWNER_SIDE_PENDING = "owner_side_pending";
 
-    // No permission fixes it, only a completed visit or a tenancy does.
     public static final String REVIEW_NOT_ELIGIBLE = "review_not_eligible";
 
     public static final String CONTACT_QUOTA_EXHAUSTED = "contact_quota_exhausted";
 
     public static final String CONTACT_PENDING_LIMIT = "contact_pending_limit";
 
+    public static final String INVALID_BOX = "invalid_box";
+
+    public static final String REMINDER_TOO_SOON = "reminder_too_soon";
+
+    public static final String RECENTLY_WITHDRAWN = "recently_withdrawn";
+
     public static final String LISTING_NOT_LIVE = "listing_not_live";
+
+    public static final String LISTING_NOT_EDITABLE = "listing_not_editable";
+
+    public static final String LISTING_HAS_OPEN_WORK = "listing_has_open_work";
+
+    public static final String CONVERSATION_CLOSED = "conversation_closed";
+
+    public static final String LISTING_CONTENT_PURGED = "listing_content_purged";
+
+    public static final String LISTING_INCOMPLETE = "listing_incomplete";
+
+    public static final String DUPLICATE_SUBMISSION = "duplicate_submission";
+
+    public static final String OWN_LISTING = "own_listing";
 
     public static final String REFUND_NOT_ELIGIBLE = "refund_not_eligible";
 
@@ -82,31 +102,29 @@ public final class ErrorCodes {
 
     public static final String PRECONDITION_FAILED = "precondition_failed";
 
-    /** 429 — rate limit exceeded (e.g. OTP requests); pairs with a Retry-After hint. */
     public static final String RATE_LIMITED = "rate_limited";
 
-    // Its own code because waiting cannot help; see docs/system/api-standards.md §4.2.
+    public static final String INVALID_MOBILE = "invalid_mobile";
+
+    public static final String OWN_NUMBER = "own_number";
+
+    public static final String INVITE_LIMIT = "invite_limit";
+
     public static final String OTP_ATTEMPTS_EXHAUSTED = "otp_attempts_exhausted";
 
     public static final String MAINTENANCE_MODE = "maintenance_mode";
 
-    // 413 — the uploaded file exceeds the size limit.
-    // Raised by our own check and by the servlet container's multipart limit; both paths must emit this code.
     public static final String PAYLOAD_TOO_LARGE = "payload_too_large";
 
     public static final String UNSUPPORTED_MEDIA_TYPE = "unsupported_media_type";
 
     public static final String METHOD_NOT_ALLOWED = "method_not_allowed";
 
-    /** 503 — an outside service we depend on is down; retrying later can succeed. */
     public static final String SERVICE_UNAVAILABLE = "service_unavailable";
 
-    /** 500 — catch-all. The message is deliberately generic: never leak internals to the client. */
     public static final String INTERNAL = "internal";
 
-    // The filter chain and exception handler share strings so clients see one API.
     public static final class Messages {
-
         private Messages() {
         }
 
@@ -114,7 +132,6 @@ public final class ErrorCodes {
 
         public static final String ACCESS_DENIED = "You do not have permission to perform this action";
 
-        // Hide Jackson details because they can expose Java types and payload fragments.
         public static final String MALFORMED_BODY = "Request body could not be read";
 
         public static final String METHOD_NOT_ALLOWED = "That method is not supported on this resource";

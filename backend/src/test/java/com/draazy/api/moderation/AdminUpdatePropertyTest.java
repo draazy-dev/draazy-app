@@ -26,11 +26,8 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** {@code PATCH /properties/{id}/admin}: a moderator's fix must not revert the listing to pending (it would queue
- * their own change) and must be audited, as the owner is never told. */
 @DisplayName("Moderation — admin listing correction")
 class AdminUpdatePropertyTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired JwtService jwtService;
     @Autowired UserRepository users;
@@ -98,8 +95,6 @@ class AdminUpdatePropertyTest extends AbstractApiTest {
         assertThat(pinned.getLng()).isEqualTo(73.78);
     }
 
-    /** Foundation fields {@code price} and {@code bhk} cost an owner a re-review; here they must cost nothing, or
-     * fixing a typo would take the listing off the site or queue a re-check of the moderator's own correction. */
     @Test
     @DisplayName("a moderator's edit does NOT push an approved listing back into the queue")
     void moderatorEditDoesNotRevertToPending() throws Exception {
@@ -119,7 +114,6 @@ class AdminUpdatePropertyTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.recheckPending").value(false));
     }
 
-    /** The contrast: the owner's path still charges for the same body; the {@code bhk} revert wins. */
     @Test
     @DisplayName("the owner's own edit of the same fields still costs a re-review")
     void ownerEditStillReverts() throws Exception {
@@ -170,7 +164,6 @@ class AdminUpdatePropertyTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.description").value("Only this changed."));
     }
 
-    /** The desk that corrects a listing is the desk that then rings the owner about it. */
     @Test
     @DisplayName("the response carries the owner's mobile, because the corrector is the caller")
     void ownerContactIsRevealed() throws Exception {
@@ -252,6 +245,31 @@ class AdminUpdatePropertyTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"Nope\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("a staffer cannot correct a listing they own or posted on an owner's behalf")
+    void makerCannotCorrectOwnListing() throws Exception {
+        User landlordStaff = user("9871110017", Roles.Wire.STAFF, "Staff landlord");
+        Property own = approvedListing(landlordStaff);
+        User owner = user("9871110018", Roles.Wire.OWNER, "Owner");
+        User poster = user("9871110019", Roles.Wire.STAFF, "Poster");
+        Property onBehalf = approvedListing(owner);
+        onBehalf.markPostedOnBehalf(poster.getId().toString());
+        properties.saveAndFlush(onBehalf);
+
+        mvc.perform(patch(Routes.Moderation.PROPERTY_ADMIN_UPDATE, own.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(landlordStaff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\":31111}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(patch(Routes.Moderation.PROPERTY_ADMIN_UPDATE, onBehalf.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(poster))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\":31111}"))
+                .andExpect(status().isForbidden());
+
+        assertThat(properties.findById(onBehalf.getId()).orElseThrow().getPrice()).isEqualTo(28000L);
     }
 
     private void grant(User account, String functionsJson) {

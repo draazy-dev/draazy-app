@@ -1,5 +1,6 @@
 package com.draazy.api.moderation.user;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.access.BackOfficeGrant;
 import com.draazy.api.common.access.BackOfficeGrantRepository;
 import com.draazy.api.common.audit.AuditService;
@@ -10,9 +11,11 @@ import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.trust.MobileMask;
+import com.draazy.api.common.trust.ReferralTriggers;
 import com.draazy.api.identity.auth.RefreshTokenService;
 import com.draazy.api.identity.auth.StaffInviteService;
 import com.draazy.api.identity.auth.StaffSignInService;
+import com.draazy.api.identity.user.PersonNames;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserMapper;
 import com.draazy.api.identity.user.UserRepository;
@@ -24,6 +27,7 @@ import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.BackOfficeFunctions;
 import com.draazy.api.security.Roles;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +42,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class UserAdminService {
-
     private final UserRepository users;
     private final UserMapper mapper;
     private final AuditService audit;
@@ -52,9 +55,10 @@ public class UserAdminService {
     private final AccountPermissions accountPermissions;
     private final ObjectMapper objectMapper;
     private final IdentityVerificationService identity;
+    private final PersonNames personNames;
+    private final ReferralTriggers referralTriggers;
     private final String baseUrl;
 
-    /** Lookup and the back-office wire projection, shared with {@link UserModerationService}. */
     private final BackOfficeUserView view;
 
     public UserAdminService(UserRepository users, UserMapper mapper,
@@ -63,8 +67,9 @@ public class UserAdminService {
             StaffSignInService staffSignIn, RefreshTokenService refreshTokens,
             BackOfficeUserView view, AdminActionNotifier adminNotifications, StaffInviteMailer inviteMailer,
             BackOfficeGrantRepository grants, AccountPermissions accountPermissions,
-            ObjectMapper objectMapper, IdentityVerificationService identity,
-            @Value("${draazy.app.base-url}") String baseUrl) {
+            ObjectMapper objectMapper, IdentityVerificationService identity, PersonNames personNames,
+            ReferralTriggers referralTriggers, @Value("${draazy.app.base-url}") String baseUrl) {
+        this.referralTriggers = referralTriggers;
         this.users = users;
         this.mapper = mapper;
         this.audit = audit;
@@ -79,22 +84,21 @@ public class UserAdminService {
         this.accountPermissions = accountPermissions;
         this.objectMapper = objectMapper;
         this.identity = identity;
+        this.personNames = personNames;
         this.baseUrl = baseUrl.replaceAll("/+$", "");
     }
 
-    // Lists carry masked mobiles.
     @Transactional(readOnly = true)
     public Page<AdminUserRow> list(String role, boolean customers, String q, String status, Boolean flagged,
-            boolean archived, Pageable pageable) {
+            boolean archived, Integer days, Pageable pageable) {
+        Instant since = PlatformTime.sinceOrNull(days);
         String prefix = (q == null || q.isBlank()) ? null : likePrefix(q.trim().toLowerCase());
         String state = (status == null || status.isBlank()) ? null : status.trim();
         Page<User> page = users.searchForAdmin(role, customers, prefix, MobileMask.normalise(q), state, flagged,
-                archived, pageable);
+                archived, since == null ? Instant.EPOCH : since, pageable);
         return new PageImpl<>(view.rows(page.getContent()), pageable, page.getTotalElements());
     }
 
-    // One grouped COUNT over the same role/customers/q the list uses, so every status tab says what it
-    // would show. Archived is its own column: an archived row counts only under "archived".
     @Transactional(readOnly = true)
     public Map<String, Long> statusCounts(String role, boolean customers, String q) {
         String prefix = (q == null || q.isBlank()) ? null : likePrefix(q.trim().toLowerCase());
@@ -118,24 +122,20 @@ public class UserAdminService {
         return Map.of("all", all, "active", active, "suspended", suspended, "archived", archived);
     }
 
-    // Anchored prefix: ?q=% would otherwise be an unanchored scan of every user.
     private static String likePrefix(String term) {
         return LikePatterns.escape(term) + "%";
     }
 
-    // Catch email collisions here so operators see a named field, not a generic conflict.
     @Transactional
     public AdminUserRow update(AuthPrincipal actor, String id, String name, String email, String avatar) {
         User user = load(id);
         refuseManagerOnNonStaff(actor, user);
-        // The stored email receives reset links, so editing it is as strong as reissuing one.
         refuseManagerBeyondOwnFunctions(actor, user);
         applyProfile(actor, "user.update", user, name, email, avatar, false);
         adminNotifications.managerAction(actor, "Edited staff account", user);
         return view.row(user);
     }
 
-    // KYC reviewers correct a customer's account to match the document they submitted.
     @Transactional
     public UserResponse updateForKyc(AuthPrincipal actor, String id, String name, String email) {
         User user = load(id);
@@ -146,7 +146,6 @@ public class UserAdminService {
         if (VerificationStatuses.NONE.equals(caseStatus)) {
             throw NotFoundException.of("Identity review");
         }
-        // A hand-revoked badge clears user.verified but leaves the case verified.
         boolean caseVerified = VerificationStatuses.VERIFIED.equals(caseStatus);
         applyProfile(actor, "user.kycProfileUpdate", user, name, email, null, caseVerified);
         return view.full(user);
@@ -159,7 +158,7 @@ public class UserAdminService {
         String previousEmail = user.getEmail();
         boolean nameChanged = false;
         if (name != null && !name.isBlank()) {
-            String nextName = name.trim();
+            String nextName = personNames.require(name);
             nameChanged = !nextName.equals(previousName);
             if (nameChanged && (user.isVerified() || nameLocked)) {
                 throw new ConflictException(ErrorCodes.NAME_LOCKED_WHILE_VERIFIED,
@@ -182,7 +181,6 @@ public class UserAdminService {
                 "previousEmail", email == null || email.isBlank() ? null : previousEmail, "avatar", avatar);
     }
 
-    // Refuse self or last admin before archiving any back-office account.
     @Transactional
     public void archive(AuthPrincipal actor, String id, String reason) {
         User user = load(id);
@@ -193,6 +191,7 @@ public class UserAdminService {
         administrators.refuseIfLastAdministrator(user);
         refreshTokens.revokeAllForUser(user.getId());
         user.archive(reason);
+        referralTriggers.refereeSuspended(user.getId());
         audit.record(actor, "user.archive", "user", id, "reason", reason, "role", user.getRole());
         adminNotifications.managerAction(actor, "Archived staff account", user);
     }
@@ -219,13 +218,9 @@ public class UserAdminService {
         }
     }
 
-    // Privilege escalation: no password is set; the holder activates via invite.
     @Transactional
     public StaffCreateResponse addStaff(AuthPrincipal actor, String name, String mobile, String email,
             String role, List<String> functions) {
-
-        // @IndianMobile validated the shape; canonicalise so the dedup check and the stored row key
-        // off the same ten digits the column CHECK enforces.
         mobile = MobileMask.normalise(mobile);
         if (Roles.Wire.ADMIN.equals(role)) {
             throw new ForbiddenException(
@@ -287,7 +282,6 @@ public class UserAdminService {
         return names;
     }
 
-    // Lost phone: clear the authenticator and end live sessions; next sign-in enrols afresh.
     @Transactional
     public void resetSecondFactor(AuthPrincipal actor, String id) {
         User target = loadBackOfficeColleague(actor, id, "reset your own authenticator");
@@ -297,7 +291,6 @@ public class UserAdminService {
         adminNotifications.managerAction(actor, "Reset 2FA", target);
     }
 
-    // Forgotten password: the fresh open invite blocks sign-in until the holder sets a new one.
     @Transactional
     public StaffInviteResponse reissueInvite(AuthPrincipal actor, String id) {
         User target = loadBackOfficeColleague(actor, id, "reissue your own invite");
@@ -326,8 +319,6 @@ public class UserAdminService {
         return target;
     }
 
-    // A fresh invite, authenticator or reset address lets the holder sign in as the target, so a
-    // manager may only touch staff whose functions it holds itself.
     private void refuseManagerBeyondOwnFunctions(AuthPrincipal actor, User target) {
         if (Roles.Wire.MANAGER.equals(actor.role())
                 && !accountPermissions.functionsFor(actor.role(), actor.userId())

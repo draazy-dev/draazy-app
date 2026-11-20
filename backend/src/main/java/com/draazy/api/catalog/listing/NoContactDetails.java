@@ -14,13 +14,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-/** Refuses a phone number or email in free prose — the contact gate's back door. Digits are stripped before
- * matching; obfuscations in words are out of scope and remain the reviewer's job. */
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT, ElementType.TYPE_USE})
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = NoContactDetails.Validator.class)
 public @interface NoContactDetails {
-
     String message() default "must not contain a phone number, email address or messaging link."
             + " Buyers reach you through Draazy once they request your contact details";
 
@@ -29,8 +26,6 @@ public @interface NoContactDetails {
     Class<? extends Payload>[] payload() default {};
 
     class Validator implements ConstraintValidator<NoContactDetails, String> {
-
-        /** Any ten-digit Indian mobile, once separators are gone. Longer runs are not numbers. */
         private static final Pattern MOBILE = Pattern.compile("(?<![0-9])(?:0|91)?[6-9][0-9]{9}(?![0-9])");
 
         private static final String TLD = "(?:com|in|net|org|co|info|biz|me|io)(?!\\p{L})";
@@ -85,17 +80,14 @@ public @interface NoContactDetails {
 
         private static final Pattern RANGE_JOIN = Pattern.compile("(?<=[0-9]000)[\\p{Z}\\s]*[\\p{Pd}|,/](?=[\\p{Z}\\s]*[0-9])");
 
-        /** A thousands-grouped amount (65,00,000 or 1,250,000) is a price, so it never joins its neighbour. */
         private static final Pattern GROUPED = Pattern.compile(
                 "(?<![0-9,])[0-9]{1,3}(?:(?:,[0-9]{2})*,[0-9]{3}|(?:,[0-9]{3})+)(?![0-9])(?!,[0-9])");
 
         private static final Pattern TIGHT_JOIN = Pattern.compile("(?<=[0-9])[,/](?=[0-9])");
 
-        /** A run of digits and letter O (a zero typed as one), bounded by non-letters so "October" is left alone. */
         private static final Pattern ZERO_RUN = Pattern.compile(
                 "(?<![\\p{L}0-9])[0-9oO][0-9oO\\p{Z}\\p{Pd}\\s.()+_*:|']*(?<=[0-9oO])(?!\\p{L})");
 
-        /** A spelled-out separator between two digit groups; amounts ending 000 are ranges, not a number. */
         private static final Pattern FILLER_WORD = Pattern.compile(
                 "(?<=[0-9])(?<!000)[\\p{Z}\\s]{0,3}(?:dash|hyphen|dot|space|slash|comma|plus|then|next|okay|ok|ext|x)"
                         + "(?!\\p{L})[\\p{Z}\\s]{0,3}(?=[0-9])",
@@ -126,8 +118,6 @@ public @interface NoContactDetails {
                     .replaceAll(m -> m.group(2).repeat(m.group(1).equalsIgnoreCase("triple") || m.group(1).equals("ट्रिपल") ? 3 : 2));
         }
 
-        /** NFKC folds the fullwidth digits but not the Indic ones, which are separate characters
-         * rather than compatibility variants — so the digit value is read out explicitly. */
         private static String toAsciiDigits(String text) {
             StringBuilder out = new StringBuilder(text.length());
             text.codePoints().forEach(cp -> {

@@ -2,12 +2,14 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
 async function newHost() {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Asha K' });
   return { mobile, accessToken };
 }
 
@@ -17,17 +19,16 @@ async function createGroup(accessToken, overrides = {}) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
-    body: JSON.stringify({
+    body: JSON.stringify(huntingGroup({
       title: `Test Group ${Number(uniqueMobile()).toString(36)}`,
-      name: 'Asha K',
       locality: 'Baner',
       rent: 40000,
+      deposit: 50000,
       seats: 3,
       seatsOpen: 1,
       policy: 'any',
-      role: 'tenant',
       ...overrides,
-    }),
+    })),
   });
   expect(res.status).toBe(201);
   const group = await res.json();
@@ -44,6 +45,7 @@ const setSeats = (token, groupId, seatsOpen) =>
 
 async function approve(groupId) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, groupId, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${groupId}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),
@@ -76,7 +78,7 @@ test.describe('Backfill a seat', () => {
     expect(afterOver.content.find((g) => g.id === group.id).seatsOpen).toBe(1);
   });
 
-  test('a join takes a seat, and the host can backfill it', async ({ page }) => {
+  test('an accepted join takes a seat, and the host can backfill it', async ({ page }) => {
     const host = await newHost();
     const joiner = await newHost();
     const group = await createGroup(host.accessToken, { seats: 3, seatsOpen: 2, policy: 'any' });
@@ -92,6 +94,11 @@ test.describe('Backfill a seat', () => {
     const mine = async () => (await (await fetch(`${API}/me/flatmate-groups`, {
       headers: auth(host.accessToken),
     })).json()).content.find((g) => g.id === group.id);
+    expect((await mine()).seatsOpen, 'a pending ask holds no seat').toBe(2);
+    const accepted = await fetch(`${API}/me/flatmate-requests/${(await joinRes.json()).id}`, {
+      method: 'PATCH', headers: auth(host.accessToken), body: JSON.stringify({ decision: 'accepted' }),
+    });
+    expect(accepted.status, await accepted.clone().text()).toBe(200);
     expect((await mine()).seatsOpen).toBe(1);
     expect((await setSeats(host.accessToken, group.id, 2)).status).toBe(200);
     const after = await mine();

@@ -11,6 +11,7 @@ import { resolveLocality } from '../../services/localityService.js';
 import { newAutocompleteSession, fetchSuggestions, fetchPlaceDetails, LOCALITY_TYPES } from '../../lib/places.js';
 import { useCity } from '../../context/CityContext.jsx';
 import { cityHasData } from '../../lib/geoConfig.js';
+import { isImeComposing } from '../../lib/isImeComposing.js';
 
 const EMPTY = [];
 
@@ -67,7 +68,6 @@ export default function EntitySearchCombobox({
     if (closeSignal != null) setOpen(false);
   }, [closeSignal]);
 
-  // Read on first open rather than on every page that mounts a search box.
   const [indexWanted, setIndexWanted] = useState(false);
   useEffect(() => { if (open) setIndexWanted(true); }, [open]);
 
@@ -150,7 +150,6 @@ export default function EntitySearchCombobox({
   const cancelPick = () => { pickRef.current += 1; setResolving(false); };
 
   const tokenKey = tokens.map((t) => `${t.kind}:${t.id}`).join('|');
-  // Any token change from outside, or unmount, invalidates an in-flight place pick.
   useEffect(() => () => { pickRef.current += 1; setResolving(false); }, [tokenKey]);
 
   const addToken = (token) => {
@@ -247,6 +246,7 @@ export default function EntitySearchCombobox({
       if (!open) { setOpen(true); return; }
       if (rows.length) setActiveIdx((i) => (i <= 0 ? rows.length - 1 : i - 1));
     } else if (e.key === 'Enter') {
+      if (isImeComposing(e)) return;
       e.preventDefault();
       if (resolving) return;
       if (listOpen && activeIdx >= 0) pickRow(rows[activeIdx]);
@@ -315,7 +315,7 @@ export default function EntitySearchCombobox({
                   role="option"
                   aria-selected={i === activeIdx}
                   className={'loc-sugg' + (i === activeIdx ? ' active' : '') + (row.kind === 'place' ? ' loc-sugg--stack' : '') + (typeof row.count === 'number' && row.count === 0 ? ' loc-sugg--empty' : '')}
-                  onMouseEnter={() => setActiveIdx(i)}
+                  onMouseMove={(ev) => { if (ev.movementX || ev.movementY) setActiveIdx(i); }}
                   onClick={(ev) => { ev.stopPropagation(); pickRow(row); }}
                 >
                   <span className="flex items-center gap-2.5 min-w-0">

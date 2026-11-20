@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+# Test fixtures are synthetic by construction; the deploy spec holds only ${VAR} names that CI substitutes.
+[allowlist]
+paths = ['''(^|/)src/test/''', '''^backend/deploy/do-app-[a-z]+\.yaml$''']

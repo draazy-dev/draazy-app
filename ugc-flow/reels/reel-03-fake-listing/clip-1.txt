@@ -1,0 +1,59 @@
+REEL 03 / CLIP 1 of 3 - THE HOOK
+================================
+JOB ID ............. r03-c1
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r03-set picked by the user
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p (download the approved take at 720p for 0 credits)
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+  Cost shown ....... 6 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r03-set (image)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 0.0-7.7 s)
+
+PROMPT START
+Vertical 9:16 smartphone selfie video, a close-up from a phone held at arm's length at eye level, framing
+[@IshaanOutdoor] Ishaan from mid-chest up in the centre of the frame. Both his hands are out of frame. The
+camera distance and angle stay the same for the whole clip.
+
+Set (the attached set image r03-set; the same in every clip of this reel): a clean, quiet road just outside the
+entrance of a premium township in Pune, on a bright sunny morning. On the left side of the
+frame, the closed modern entrance gate in brushed steel and glass, set in a light stone entrance wall that
+is completely plain, with no sign, no letters and no logo, with a small white security cabin beside the
+gate, the cabin empty. Behind the gate, tall slender white residential towers with white balcony bands and thin
+bronze vertical strips rise into a clear blue sky above a landscaped podium, with palms and dense green trees at
+their base. On the right side of the frame, a neat row of parked two-wheelers along a clean footpath lined with
+mature trees. There is no readable text anywhere: no signs, no number plates readable, no text. The background stays exactly the same for the whole clip.
+
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. Clear skin with no moles, taper fade,
+light stubble. The outfit stays the same for the whole clip.
+
+He stands outside the society gate after waiting for an owner who never came, and talks to the lens, dry and
+deadpan. Not laughing, not grinning, not sad. Each line is spoken exactly once, nothing repeated, no other words.
+0.3-3.6 s, flatly: "Owner ne flat dikhaya, bola kal agreement karte hain."
+4.0-7.0 s, one eyebrow raised: "Kal gaya. Ab us owner ka number hi bandhh hai."
+7.0-8.0 s: silent, lips closed, a deadpan stare into the lens.
+
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking casual Hinglish
+with a natural Indian accent, clearly male and mid-pitched, conversational and fluent.
+
+Lighting and colour: soft, bright morning sunlight from the side, clear blue sky, true skin tones.
+Authentic Instagram UGC shot on a phone, natural skin texture, no beauty filter.
+
+Audio: a quiet morning lane, a distant scooter passing, birds chirping in the trees. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
+PROMPT END
+
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match the set image: closed steel-and-glass gate in a plain light stone wall (no sign) + empty white security cabin on the LEFT; tall white towers with bronze vertical strips behind it; parked two-wheelers + footpath trees on the RIGHT; bright morning sun, clear blue sky; no readable text anywhere
+  [ ] no phone, money or second person in frame; no readable text anywhere
+  [ ] after approval: save the anchor frame from the silent hold at the end (lips closed) as r03-anchor
+
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

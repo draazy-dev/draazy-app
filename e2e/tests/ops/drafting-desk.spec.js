@@ -1,7 +1,9 @@
 // Live drafting-desk checks cover behaviour the mock desks could not prove.
 import { execFileSync } from 'node:child_process';
-import { test, expect, ACTORS, MOBILE, STAFF } from '../../fixtures/live.js';
+import { randomUUID } from 'node:crypto';
+import { test, expect, ACTORS, STAFF } from '../../fixtures/live.js';
 import { API, apiLogin, authHeaders, signIn, signedInAsNew, uniqueMobile } from '../../helpers/liveAuth.js';
+import { sql } from '../../helpers/monetisation.js';
 
 const DOCUMENT = {
   name: 'agreement.png',
@@ -20,7 +22,7 @@ const OWNER_AADHAAR = '999988887779';
 const panRow = (dialog) => dialog.getByText('PAN', { exact: true });
 
 const UNASSIGNED_REFUSAL = /not assigned to anyone yet/;
-const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\13\\bin\\psql.exe';
+const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe';
 
 // Create one rental request as the customer and record the owner's identity numbers on it.
 async function seedRequest({ withProperty = false } = {}) {
@@ -64,7 +66,7 @@ async function seedRequest({ withProperty = false } = {}) {
   });
   if (put.status >= 300) throw new Error(`identities failed (${put.status}): ${await put.text()}`);
 
-  return { ...dto, auth, property };
+  return { ...dto, auth, property, mobile };
 }
 
 function settle(requestId) {
@@ -101,7 +103,7 @@ async function seedRentAgreement() {
   const dto = await request.json();
   if (request.status >= 300) throw new Error(`rent agreement create failed (${request.status}): ${JSON.stringify(dto)}`);
   settle(dto.id);
-  return dto;
+  return { ...dto, mobile };
 }
 
 async function countFor(page, key) {
@@ -133,16 +135,17 @@ const openRow = (row) => row.getByRole('button', { name: 'Open', exact: true }).
 const showTab = (page, name) => page.getByRole('tab', { name: new RegExp(`^${name}`) }).click();
 
 test.describe('Ops → Drafting desk (live)', () => {
-  test.beforeEach(async () => { await seedRequest(); });
+  let seeded;
+  test.beforeEach(async () => { seeded = await seedRequest(); });
 
-  test('the desk lists the server queue with its filters, the age cue, and no identity number or mobile in it', async ({ page }) => {
+  test("the desk lists the server queue with its filters, the age cue, the requester's full mobile and no identity number", async ({ page }) => {
     test.slow();
     await openDesk(page);
     await test.step('the desk lists the server queue with its filters', async () => {
 
       await expect(page.getByLabel('Filter by desk')).toHaveCount(0);
       await expect(page.getByRole('tab', { name: /^To pick up/ })).toHaveAttribute('aria-selected', 'true');
-      for (const name of ['My requests', 'In progress', 'With customer', 'Closed']) {
+      for (const name of ['My requests', 'In progress', 'With customer', 'Closed', 'Cancelled']) {
         await expect(page.getByRole('tab', { name: new RegExp(`^${name}`) })).toBeVisible();
       }
       await expect(page.getByPlaceholder('Name, mobile or request id')).toBeVisible();
@@ -152,14 +155,13 @@ test.describe('Ops → Drafting desk (live)', () => {
     await test.step('a fresh request has the opened-age cue', async () => {
       await expect(ourRow(page).getByTestId('service-request-age-fresh')).toBeVisible();
     });
-    await test.step('the queue itself never carries an identity number or a mobile', async () => {
-      await expect(ourRow(page)).toBeVisible();
+    await test.step("the queue shows the requester's full mobile but never an identity number", async () => {
+      await expect(rowFor(page, seeded.property).getByTestId('requester-mobile')).toContainText(seeded.mobile);
 
       const table = await page.getByRole('tabpanel').innerText();
       const tableWithoutUuids = table.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '');
       expect(tableWithoutUuids).not.toMatch(/\b[A-Z]{5}\d{4}[A-Z]\b/);
       expect(tableWithoutUuids).not.toMatch(/\b\d{4}\s?\d{4}\s?\d{4}\b/);
-      expect(tableWithoutUuids).not.toMatch(MOBILE);
     });
     await test.step('a desk can search its queue', async () => {
       await page.getByPlaceholder('Name, mobile or request id').fill('Live Desk Owner');
@@ -264,15 +266,25 @@ test.describe('Ops → Drafting desk (live)', () => {
     await openRow(rowFor(page, request.property));
 
     const dialog = page.getByRole('dialog').first();
-    await dialog.getByLabel('Reply to customer').fill('Please call the desk before 5pm.');
-    await dialog.getByRole('button', { name: 'Send' }).click();
-    await expect(dialog.getByText('Please call the desk before 5pm.')).toBeVisible();
+    await dialog.getByTestId('open-support-chat').click();
+    const chat = page.getByTestId('staff-dock-window').filter({ has: page.getByTestId('staff-chat') });
+    await expect(chat.getByLabel('Reply about')).toContainText(/Valuation #/);
+    await chat.getByTestId('staff-chat-input').fill('Please call the desk before 5pm.');
+    const sent = page.waitForResponse((r) => r.request().method() === 'POST' && /\/admin\/support\/chats\/[^/]+\/messages$/.test(r.url()));
+    await chat.getByTestId('staff-chat-send').click();
+    expect((await sent).ok()).toBe(true);
+    await expect(chat.getByTestId('staff-chat-msg').filter({ hasText: 'Please call the desk before 5pm.' })).toBeVisible();
+    await chat.getByRole('button', { name: 'Close chat', exact: true }).click();
 
     await dialog.getByRole('button', { name: 'Cancel request' }).click();
     const cancellation = page.getByRole('dialog').filter({ hasText: 'Reason for cancellation' });
-    await expect(cancellation.getByRole('button', { name: 'Cancel and notify' })).toBeDisabled();
-    await cancellation.getByLabel('Reason for cancellation').fill(reason);
-    await cancellation.getByRole('button', { name: 'Cancel and notify' }).click();
+    const confirm = cancellation.getByRole('button', { name: 'Cancel and notify' });
+    await expect(confirm).toBeDisabled();
+    await expect(confirm, 'the confirm button has a visible fill, not a transparent one').not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    const field = cancellation.getByLabel('Reason for cancellation');
+    await field.fill(reason);
+    await expect(confirm).toBeEnabled();
+    await field.press('Enter');
 
     await expect(page.getByRole('alert').filter({ hasText: 'customer was notified' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Cancel request' })).toHaveCount(0);
@@ -280,7 +292,7 @@ test.describe('Ops → Drafting desk (live)', () => {
     // Read back as the customer: the reason must reach their thread and their inbox, not only audit_log.
     const mine = await (await fetch(`${API}/service-requests/${request.id}`, { headers: request.auth })).json();
     expect(mine.status).toBe('cancelled');
-    expect((mine.messages || []).map((m) => m.body)).toContain(reason);
+    expect((mine.messages || []).map((m) => m.body)).toEqual(expect.arrayContaining(['Please call the desk before 5pm.', reason]));
     const inbox = await (await fetch(`${API}/notifications?size=100`, { headers: request.auth })).json();
     expect((inbox.content || []).some((n) => n.type === 'service.cancelled' && String(n.body).includes(reason))).toBe(true);
   });
@@ -299,7 +311,7 @@ test.describe('Ops → Drafting desk (live)', () => {
 
       const body = await dialog.innerText();
       expect(body).not.toMatch(/_state/);
-      expect(body).not.toMatch(MOBILE);
+      await expect(dialog.getByTestId('requester-mobile')).toContainText(request.mobile);
 
       await page.keyboard.press('Escape');
       await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -437,7 +449,11 @@ test.describe('Ops → Drafting desk (live)', () => {
     const mineBefore = await countFor(page, 'mine');
     await page.getByPlaceholder('Name, mobile or request id').fill(request.id);
     await expect(page.getByTestId('ra-row')).toHaveCount(1);
-    await page.getByTestId('ra-row').first().click();
+    const card = page.getByTestId('ra-row').first();
+    await expect(card.getByTestId('requester-mobile')).toContainText(request.mobile);
+    await expect(card.getByText('Unassigned', { exact: true })).toBeVisible();
+    await expect(card.getByText(/Step 1 of 7 · Paid/)).toBeVisible();
+    await card.getByRole('button', { name: /^Open case/ }).click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('list', { name: 'Case stages' })).toBeVisible();
@@ -452,6 +468,7 @@ test.describe('Ops → Drafting desk (live)', () => {
     await page.getByRole('tab', { name: /My cases/ }).click();
     await expect(page).toHaveURL(/tab=mine/);
     await expect(page.getByTestId('ra-row')).toHaveCount(1);
+    await expect(page.getByTestId('ra-row').first().getByText('Yours', { exact: true })).toBeVisible();
 
     const context = await browser.newContext();
     const legalPage = await context.newPage();
@@ -494,5 +511,37 @@ test.describe('Ops → Drafting desk (live)', () => {
     await page.goto('/ops/rent-agreement');
     await expect(page).toHaveURL(/\/admin\/rent-agreement$/);
     await expect(page.getByRole('heading', { name: 'Rent Agreement', level: 1 })).toBeVisible();
+  });
+
+  test('a desk notification opens the case it is about on that case\'s desk', async ({ page, login, consoleErrors }) => {
+    const rental = await seedRentAgreement();
+    const valuation = await seedRequest();
+    const tag = `Zzdesk ${Date.now()}`;
+    sql(`INSERT INTO notifications (user_id, type, title, body, read, link)
+      SELECT id, 'service.attention-resolved', '${tag} ' || t.kind, 'Back to you', false, t.link FROM users,
+      (VALUES ('rental', '/admin/rent-agreement?request=${rental.id}'),
+              ('valuation', '/admin/valuation?request=${valuation.id}')) AS t(kind, link)
+      WHERE mobile = '${ACTORS.admin}'`);
+
+    await login.asAdmin();
+    await page.goto('/admin/notifications');
+    await page.locator('.notif', { hasText: `${tag} rental` }).click();
+    await expect(page).toHaveURL(/\/admin\/rent-agreement(\?(?!.*request=).*)?$/);
+    const rentCase = page.getByRole('dialog');
+    await expect(rentCase.getByRole('heading', { name: /Queue Count Owner/ })).toBeVisible();
+    await expect(rentCase.getByRole('list', { name: 'Case stages' })).toBeVisible();
+    await rentCase.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(rentCase).toBeHidden();
+
+    await page.goto('/admin/notifications');
+    await page.locator('.notif', { hasText: `${tag} valuation` }).click();
+    await expect(page).toHaveURL(/\/admin\/valuation(\?(?!.*request=).*)?$/);
+    await expect(page.getByRole('dialog').getByRole('heading', { name: new RegExp(valuation.id) })).toBeVisible();
+    expect(consoleErrors).toHaveLength(0);
+
+    await page.goto(`/admin/valuation?request=${randomUUID()}`);
+    await expect(page.getByText('That case could not be opened. It may have moved to another desk.')).toBeVisible();
+    await expect(page).toHaveURL(/\/admin\/valuation(\?(?!.*request=).*)?$/);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 });

@@ -12,7 +12,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
 import java.util.ArrayList;
 import java.util.List;
 import org.hamcrest.Matchers;
@@ -24,11 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Broker contact can hide in unbounded title, note or locality text.
-// All three gates must hold; any one alone either hides or leaks the post.
 @DisplayName("Flatmate board — a flat is moderated before public, a flatless post after (D72)")
 class FlatmateModerationGateTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -70,7 +66,7 @@ class FlatmateModerationGateTest extends AbstractApiTest {
         return """
                 {"name":"%s","gender":"any","age":27,"occupation":"Analyst",
                  "budget":18000,"localities":["%s"],"moveIn":"2026-09-01",
-                 "flatPref":"any","roomPref":"private","tags":[],"note":"%s"}
+                 "flatPref":"any","roomPref":"private","note":"%s"}
                 """.formatted(name, locality, note);
     }
 
@@ -80,9 +76,9 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Three of us, hunting","policy":"any","seats":3,"seatsOpen":1,
-                                 "name":"Host","tags":[],
+                                 "name":"Host",
                                  "preferences":{"localities":["%s"],"bhk":["2"],"rentMin":30000,
-                                   "rentMax":45000,"gatedOnly":false,"bachelors":false}}
+                                   "rentMax":45000,"depositMax":100000,"gatedOnly":false,"bachelors":false}}
                                 """.formatted(locality)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.modStatus").value("live"))
@@ -95,25 +91,14 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                 "furnishing":"semi","locality":"%s","society":"%s",
+                                 "locality":"%s","society":"%s",
                                  "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                                  "lookingFor":"any","foodPref":"any",
-                                 "photos":["%s"],
+                                 %s,
                                  "hostRole":"owner",
-                                 "note":"Sunny room."}
-                                """.formatted(locality, society, UploadedPhotos.of(host.getId()))))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString());
-    }
-
-    private String createGroup(User host, String title, String locality) throws Exception {
-        return idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"%s","locality":"%s","policy":"any","rent":40000,
-                                 "seats":3,"seatsOpen":1,"name":"Host","tags":[]}
-                                """.formatted(title, locality)))
+                                 "note":"Sunny room.",%s,%s}
+                                """.formatted(locality, society, FlatmateRoomFixture.photos(host.getId()),
+                                FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
     }
@@ -121,8 +106,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
     @Nested
     @DisplayName("a post with a flat is not public")
     class NotPublic {
-
-            // No Authorization header: this is the surface the whole item is about.
         @Test
         @DisplayName("a room is absent from the anonymous feed until it is decided")
         void roomStartsInvisible() throws Exception {
@@ -134,22 +117,11 @@ class FlatmateModerationGateTest extends AbstractApiTest {
         }
 
         @Test
-        @DisplayName("a group with a flat is absent from the anonymous feed until it is decided")
-        void groupStartsInvisible() throws Exception {
-            createGroup(seeker("9811000003", "GroupHost"), "Three of us", "GateTownC");
-
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "GateTownC"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
-        }
-
-        @Test
         @DisplayName("nor can it be reached by acting on its id directly")
         void theDetailReadIsGatedToo() throws Exception {
             String id = createRoom(seeker("9811000004", "Direct"), "GateTownD", "Direct House");
             User other = seeker("9811000005", "Curious");
 
-            // The interest path uses `findVisible`; otherwise free text leaks by another route.
             mvc.perform(post(Routes.Flatmates.ROOM_INTEREST, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(other))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -161,7 +133,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
     @Nested
     @DisplayName("a post with no flat is public at once, but cannot carry a number")
     class FlatlessGoesLive {
-
         @Test
         @DisplayName("a seeker post is on the anonymous feed as soon as it is written")
         void seekerPostIsPublic() throws Exception {
@@ -200,7 +171,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
     @Nested
     @DisplayName("and its author is not left guessing")
     class TheAuthorCanStillSeeIt {
-
         @Test
         @DisplayName("the create response says live, so the page can say so")
         void createEchoesTheModerationState() throws Exception {
@@ -212,7 +182,7 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                             .content("""
                                     {"name":"Bhavna","gender":"any","age":27,"budget":18000,
                                      "localities":["GateTownE"],"moveIn":"2026-09-01",
-                                     "flatPref":"any","roomPref":"private","tags":[],"note":"Hi."}
+                                     "flatPref":"any","roomPref":"private","note":"Hi."}
                                     """))
                     .andExpect(status().isCreated())
 
@@ -229,14 +199,13 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                     "furnishing":"semi","locality":"GateTownF","society":"Ch House",
+                                     "locality":"GateTownF","society":"Ch House",
                                      "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                                      "lookingFor":"any","foodPref":"any",
-                                     "photos":["%s"],"hostRole":"owner","note":"Hi."}
-                                    """.formatted(UploadedPhotos.of(host.getId()))))
+                                     %s,"hostRole":"owner","note":"Hi.",%s,%s}
+                                    """.formatted(FlatmateRoomFixture.photos(host.getId()),
+                                    FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS)))
                     .andExpect(status().isCreated())
-                    // Without this the client has no way to distinguish "saved" from "published",
-                    // and would show a success screen for a post nobody can see.
                     .andExpect(jsonPath("$.modStatus").value("pending"));
         }
     }
@@ -244,7 +213,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
     @Nested
     @DisplayName("and there is a queue to let it out")
     class TheQueue {
-
         private User admin(String mobile) {
             return user(mobile, "Mod", Roles.Wire.ADMIN);
         }
@@ -268,8 +236,10 @@ class FlatmateModerationGateTest extends AbstractApiTest {
             User host = seeker("9811000022", "Patient");
             String id = createRoom(host, "GateTownH", "Patient House");
 
+            User desk = admin("9811000023");
+            FlatmateDeskTicks.tickAll(mvc, bearer(desk), id);
             mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION.replace("{id}", id))
-                            .header(HttpHeaders.AUTHORIZATION, bearer(admin("9811000023")))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"modStatus\":\"approved\"}"))
                     .andExpect(status().isOk());
@@ -302,8 +272,6 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
 
-            // A decided post must leave the queue, or the backlog never shrinks and the moderator
-            // re-reads the same rejection every morning.
             mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_QUEUE)
                             .param("kind", "room")
                             .header(HttpHeaders.AUTHORIZATION, bearer(mod)))
@@ -319,8 +287,8 @@ class FlatmateModerationGateTest extends AbstractApiTest {
         }
 
         @Test
-        @DisplayName("the queue carries no phone number, however many rows it has")
-        void theQueueIsNotAContactList() throws Exception {
+        @DisplayName("the queue shows each author's number in full")
+        void theQueueShowsTheAuthorsMobile() throws Exception {
             createPost(seeker("9811000026", "Eshan"), "Eshan", "GateTownJ");
 
             mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_QUEUE)
@@ -328,8 +296,7 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(admin("9811000027"))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].id").exists())
-                    .andExpect(jsonPath("$.content[0].mobile").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].authorMobile").doesNotExist());
+                    .andExpect(jsonPath("$.content[*].authorMobile", Matchers.hasItem("9811000026")));
         }
 
         @Test

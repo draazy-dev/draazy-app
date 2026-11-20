@@ -11,6 +11,7 @@ import { describeListing } from './describe.js';
 import { listingLabels } from './submit.js';
 import HeadlineField from '../../../components/ui/HeadlineField.jsx';
 import VideoLinkField from './VideoLinkField.jsx';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 
 const BEST_TIMES = ['anytime', 'morning', 'afternoon', 'evening'];
 
@@ -37,7 +38,7 @@ const PhotosDocumentsStep = ({
   photos, handlePhotoUpload, removePhoto, setPhotoCategory,
   isMediaBusy, mediaStatus,
   prevStep, submitProperty, onReset, posting, onJump,
-  needsAuthForMedia = false, onRequireAuth,
+  needsAuthForMedia = false, onRequireAuth, claimMode = false,
 }) => {
   const { t } = useTranslation();
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -66,7 +67,8 @@ const PhotosDocumentsStep = ({
     if (String(form.description || '').trim() && !window.confirm(t('listProperty.content.describe.replaceConfirm'))) return;
     set('description', next);
   };
-  const submitLabel = t(needsAuthForMedia ? 'listProperty.deferredLogin.submitCta' : 'listProperty.photosDocs.submitProperty');
+  const submitLabel = t(needsAuthForMedia ? 'listProperty.deferredLogin.submitCta'
+    : claimMode ? 'listProperty.claim.submit' : 'listProperty.photosDocs.submitProperty');
   return (
     <div className="lp-step">
       <StepHeader title={t('listProperty.steps.photosTitle')} subtitle={t('listProperty.steps.photosSubtitle')} onReset={onReset} />
@@ -92,7 +94,6 @@ const PhotosDocumentsStep = ({
         />
       )}
 
-      {/* The two fields that sell the place come before the optional paperwork. */}
       <div className="mb-6">
         <HeadlineField
           className="mb-6"
@@ -105,7 +106,7 @@ const PhotosDocumentsStep = ({
         />
         <div className="mb-2 flex items-center justify-between gap-3">
           <label className={lbl3}>{t('listProperty.fields.description')}</label>
-          <button type="button" onClick={writeDescription} className="text-xs font-semibold text-teal-300 hover:text-teal-200">{t('listProperty.content.describe.button')}</button>
+          <button type="button" onClick={writeDescription} className="tap-coarse text-xs font-semibold text-teal-300 hover:text-teal-200">{t('listProperty.content.describe.button')}</button>
         </div>
         <textarea rows={5} value={form.description} maxLength={4000} onChange={(e) => set('description', e.target.value)}
           placeholder={t('listProperty.ph.descPlaceholder')}
@@ -125,7 +126,7 @@ const PhotosDocumentsStep = ({
         <label className={lbl3}>{t('listProperty.bestTime.label')}</label>
         <div className="flex flex-wrap gap-3" role="radiogroup" aria-label={t('listProperty.bestTime.label')}>
           {BEST_TIMES.map((v) => (
-            <Pill key={v} role="radio" selected={form.bestTimeToCall === v} onClick={() => set('bestTimeToCall', v)} className="px-5 py-2.5">{t(`listProperty.bestTime.${v}`)}</Pill>
+            <Pill key={v} role="radio" selected={form.bestTimeToCall === v} onClick={() => set('bestTimeToCall', v)} className="px-5 h-btn inline-flex items-center justify-center">{t(`listProperty.bestTime.${v}`)}</Pill>
           ))}
         </div>
         <p className="mt-1.5 text-xs text-gray-500">{t('listProperty.bestTime.hint')}</p>
@@ -147,8 +148,8 @@ const PhotosDocumentsStep = ({
             </div>
           ) : null}
           <div className="mt-3 flex items-center gap-2 max-w-md">
-            <input value={draftAmenity} onChange={(e) => setDraftAmenity(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAmenity(); } }} placeholder={t('listProperty.ph.addOtherAmenity')} aria-label={t('ui.addCustom', { noun: t('listProperty.aria.amenity') })} maxLength={40} className="form-input flex-1 px-4 py-3 rounded-xl text-white text-sm" />
-            <button type="button" onClick={addAmenity} disabled={!draftAmenity.trim()} className="shrink-0 inline-flex items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold text-teal-300 border border-teal-500/40 hover:bg-teal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><Plus className="w-4 h-4" /> Add</button>
+            <input value={draftAmenity} onChange={(e) => setDraftAmenity(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !isImeComposing(e)) { e.preventDefault(); addAmenity(); } }} placeholder={t('listProperty.ph.addOtherAmenity')} aria-label={t('ui.addCustom', { noun: t('listProperty.aria.amenity') })} maxLength={40} className="form-input flex-1 px-4 py-3 rounded-xl text-white text-sm" />
+            <button type="button" onClick={addAmenity} disabled={!draftAmenity.trim()} className="h-btn shrink-0 inline-flex items-center gap-1.5 px-4 rounded-xl text-sm font-semibold text-teal-300 border border-teal-500/40 hover:bg-teal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><Plus className="w-4 h-4" /> Add</button>
           </div>
           {amenityStatus ? <p aria-live="polite" className="mt-2 text-xs font-medium text-teal-300">{amenityStatus}</p> : null}
         </div>

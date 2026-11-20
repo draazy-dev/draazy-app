@@ -1,8 +1,6 @@
-/* Hero-search token resolver: tokens are gated to a live-listing count > 0 so a suggestion never dead-ends. */
 import { LANDMARKS } from '../pages/consumer/listings/constants.js';
 import { nearToParams } from './nearParams.js';
 
-// Default proximity for a landmark match — mirrors the Listings near-filter default.
 export const LANDMARK_RADIUS_KM = 5;
 
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -14,14 +12,12 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Prefers the slug a listing already carries; slugifies as the server does only when none is known.
 export const slugOfName = (name, index) => {
   const lower = String(name || '').trim().toLowerCase();
   for (const [slug, known] of index?.locNames || []) if (known.toLowerCase() === lower) return slug;
   return lower.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 };
 
-// Counts are precomputed once per "in play" listing set, so keystrokes stay cheap.
 export function buildEntityIndex(listings, societies = []) {
   const arr = Array.isArray(listings) ? listings : [];
   const locCount = new Map();
@@ -52,7 +48,6 @@ const socSublabel = (s, index) => {
   return name ? `Society · ${name}` : 'Society';
 };
 
-// Resolves a query into ordered typed tokens (locality | society | landmark), each offered only with live stock.
 export function searchEntities(query, index, { limit = 8, perKind = 4 } = {}) {
   const q = String(query || '').trim().toLowerCase();
   if (!q) return [];
@@ -82,8 +77,6 @@ export function searchEntities(query, index, { limit = 8, perKind = 4 } = {}) {
   return [...localities, ...societies, ...landmarks].slice(0, limit);
 }
 
-// A society also emits its parent locality; landmarks and places must not, because ANDing a parent slug with
-// `near` dead-ends a gated landmark whose slug holds no stock.
 export function paramsFromTokens(tokens) {
   const loc = [];
   const soc = [];
@@ -94,7 +87,6 @@ export function paramsFromTokens(tokens) {
     if (t.kind === 'locality') addLoc(t.slug);
     else if (t.kind === 'society') { soc.push(t.slug); addLoc(t.loc); }
     else if (t.kind === 'landmark') { near = t.value; nearLabel = t.label || ''; }
-    // A non-locality Google place routes as a proximity search: single-valued, last pick wins, radius only.
     else if (t.kind === 'place' && t.near) { near = t.near; nearLabel = t.nearLabel || t.label || ''; }
   }
   const p = {};
@@ -104,5 +96,4 @@ export function paramsFromTokens(tokens) {
   return p;
 }
 
-// Icon name per entity kind (lucide) — shared by the hero chips + suggestion rows.
 export const KIND_ICON = { locality: 'map-pin', society: 'building-2', landmark: 'flag', place: 'map-pin' };

@@ -1,19 +1,24 @@
 package com.draazy.api.catalog.managed;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/**
- * Maps {@link ManagedProperty} entities to their wire {@link ManagedPropertyDto}. UUIDs render as
- * strings (the contract types every id as {@code string}); a null {@code publishedListingId} stays
- * null so the client can tell an unpublished record from a published one.
- */
 @Component
 public class ManagedPropertyMapper {
+    private final RentClaims claims;
+
+    ManagedPropertyMapper(RentClaims claims) {
+        this.claims = claims;
+    }
 
     public ManagedPropertyDto toDto(ManagedProperty m) {
+        return toDto(m, claims.pending(m));
+    }
+
+    private ManagedPropertyDto toDto(ManagedProperty m, List<String> pendingClaims) {
         return new ManagedPropertyDto(
                 m.getId().toString(),
                 m.getTitle(),
@@ -31,23 +36,33 @@ public class ManagedPropertyMapper {
                 m.getStatus(),
                 m.isRented(),
                 m.getTenantName(),
+                m.getTenantMobile(),
                 m.getMonthlyRent(),
                 m.getDueDay(),
+                m.getLeaseEnd(),
+                m.getDeposit(),
+                m.getLandlordPan(),
+                policeIntimation(m),
+                pendingClaims,
+                Objects.toString(TrackedRentService.firstRentMonth(m), null),
                 m.getValuation(),
                 Objects.toString(m.getPublishedListingId(), null),
+                Objects.toString(m.getSourceRoomId(), null),
                 m.getCreatedAt(),
-                m.getUpdatedAt());
+                m.getUpdatedAt(),
+                m.getAgreementRequestId() != null);
+    }
+
+    // Registering on the IGR portal informs the police (i-SARITA → CCTNS), so a Draazy agreement is done.
+    static String policeIntimation(ManagedProperty m) {
+        return m.getAgreementRequestId() == null ? null : "done";
     }
 
     public List<ManagedPropertyDto> toDtos(List<ManagedProperty> records) {
-        return records.stream().map(this::toDto).toList();
+        Map<UUID, List<String>> pending = claims.pending(records);
+        return records.stream().map(m -> toDto(m, pending.getOrDefault(m.getId(), List.of()))).toList();
     }
 
-    /**
-     * Maps a manual rent receipt (V120). Nothing is re-derived from the parent property here on
-     * purpose — the row already holds the snapshot taken when the month was recorded, and reading
-     * the property instead would silently rewrite receipts a tenant already has.
-     */
     public ManagedRentReceiptDto toDto(ManagedRentReceipt r) {
         return new ManagedRentReceiptDto(
                 r.getId().toString(),
@@ -59,11 +74,6 @@ public class ManagedPropertyMapper {
                 r.getCreatedAt());
     }
 
-    /**
-     * The plural sibling of {@link #toDtos(List)}, named for its element type rather than matching
-     * it — erasure makes {@code List<ManagedProperty>} and {@code List<ManagedRentReceipt>} the same
-     * signature, so the two plurals cannot share a name the way the singular {@code toDto} pair does.
-     */
     public List<ManagedRentReceiptDto> toReceiptDtos(List<ManagedRentReceipt> receipts) {
         return receipts.stream().map(this::toDto).toList();
     }

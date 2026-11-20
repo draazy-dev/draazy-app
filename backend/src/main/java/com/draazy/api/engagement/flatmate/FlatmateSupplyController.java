@@ -29,17 +29,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Rooms and groups — the supply side (contract tag {@code Engagement}). Lists are public, writes
- * authenticated; creates are consumer-role-gated because a host is somebody who lives there. */
 @RestController
 public class FlatmateSupplyController {
-
     private final FlatmateSupplyService service;
     private final FlatmateOwnerConsentService consentService;
     private final PhotoLimit photoLimit;
+    private final FlatmateBadgeRequestService badges;
 
     public FlatmateSupplyController(FlatmateSupplyService service,
-            FlatmateOwnerConsentService consentService, PhotoLimit photoLimit) {
+            FlatmateOwnerConsentService consentService, PhotoLimit photoLimit,
+            FlatmateBadgeRequestService badges) {
+        this.badges = badges;
         this.service = service;
         this.consentService = consentService;
         this.photoLimit = photoLimit;
@@ -54,8 +54,6 @@ public class FlatmateSupplyController {
         return service.createRoom(principal, body);
     }
 
-    /** Same role guard as the create: an account that may not write a flatmate ad may not rewrite
-     * one. */
     @PatchMapping(Routes.Flatmates.ROOM_BY_ID)
     @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public FlatmateRoomDto updateRoom(@CurrentUser AuthPrincipal principal,
@@ -78,11 +76,13 @@ public class FlatmateSupplyController {
 
     @PostMapping(Routes.Flatmates.ROOM_INTEREST)
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public void roomInterest(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @Valid @RequestBody(required = false) FlatmateSeekerController.InterestRequest body) {
         service.roomInterest(principal, id,
                 body == null ? null : body.share(),
-                body == null ? null : body.message());
+                body == null ? null : body.message(),
+                body == null ? null : body.gender());
     }
 
     @PostMapping(Routes.Flatmates.GROUPS)
@@ -99,8 +99,6 @@ public class FlatmateSupplyController {
         service.deleteGroup(principal, id);
     }
 
-    /** Contract {@code updateFlatmateGroup}. {@link #setGroupSeats} stays: one-tap "a seat just
-     * went" should not resend title, rent, policy. */
     @PatchMapping(Routes.Flatmates.GROUP_BY_ID)
     @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public FlatmateGroupDto updateGroup(@CurrentUser AuthPrincipal principal,
@@ -114,17 +112,17 @@ public class FlatmateSupplyController {
         return service.setGroupSeats(principal, id, body.seatsOpen());
     }
 
-         @PostMapping(Routes.Flatmates.GROUP_JOIN)
+    @PostMapping(Routes.Flatmates.GROUP_JOIN)
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public FlatmateRequestDto join(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @Valid @RequestBody(required = false) FlatmateSeekerController.InterestRequest body) {
         return service.join(principal, id,
                 body == null ? null : body.share(),
-                body == null ? null : body.message());
+                body == null ? null : body.message(),
+                body == null ? null : body.gender());
     }
 
-    /** 200 for both calls; the body says which happened. Role-guarded like the creates it serves:
-     * the consent flow spends a send budget against a third party's number. */
     @PostMapping(Routes.Flatmates.OWNER_CONSENT)
     @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public ConsentResult ownerConsent(@CurrentUser AuthPrincipal principal,
@@ -134,14 +132,10 @@ public class FlatmateSupplyController {
         return recorded ? ConsentResult.recorded() : ConsentResult.sent(resendAfterSeconds());
     }
 
-    /** Reported rather than guessed: a timer the client picks is wrong in every environment whose
-     * cooldown differs. */
     private int resendAfterSeconds() {
         return consentService.resendCooldownSeconds();
     }
 
-    /** {@code otp} absent means "send one". The address fields are deliberately not {@code @NotBlank}:
-     * the rule is about the composed address, enforced in {@code FlatmateGuardrails.fingerprint}. */
     public record OwnerConsentRequest(
             @NotBlank
             @IndianMobile
@@ -154,8 +148,6 @@ public class FlatmateSupplyController {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record ConsentResult(boolean consentRecorded, Integer resendAfterSeconds) {
-
-        /** A code is on its way; the client counts {@code resendAfterSeconds} down before offering another. */
         static ConsentResult sent(int resendAfterSeconds) {
             return new ConsentResult(false, resendAfterSeconds);
         }
@@ -169,5 +161,19 @@ public class FlatmateSupplyController {
     }
 
     public record OccupantsRequest(@NotNull @Min(0) Integer occupants) {
+    }
+
+    @PostMapping(Routes.Flatmates.ROOM_BADGE_REQUEST)
+    @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
+    public FlatmateRoomDto requestBadge(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
+            @Valid @RequestBody FlatmateBadgeRequest body) {
+        return badges.request(principal, id, body);
+    }
+
+    @PostMapping(Routes.Flatmates.GROUP_BADGE_REQUEST)
+    @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
+    public FlatmateGroupDto requestGroupBadge(@CurrentUser AuthPrincipal principal,
+            @PathVariable UUID id, @Valid @RequestBody FlatmateBadgeRequest body) {
+        return badges.requestForGroup(principal, id, body);
     }
 }

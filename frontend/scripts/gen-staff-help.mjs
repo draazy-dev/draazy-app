@@ -9,7 +9,7 @@ const json = JSON.stringify(compileStaffHelp(root), null, 1) + '\n';
 
 if (process.argv.includes('--check')) {
   let current = '';
-  try { current = readFileSync(target, 'utf-8').replace(/\r\n/g, '\n'); } catch { /* missing reads as stale */ }
+  try { current = readFileSync(target, 'utf-8').replace(/\r\n/g, '\n'); } catch { }
   if (current !== json) {
     console.error('Staff help is stale: run `npm run gen:staff-help` and commit backend/src/main/resources/help/staff-help.json');
     process.exit(1);

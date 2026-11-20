@@ -11,14 +11,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-// Seam for verifying a Google Place ID server-side: a society's identity is the place, never typed text.
 public interface PlacesLookup {
-
-    /** {@code hint} is what the client says the place is; only the dev implementation trusts it. */
     Optional<Place> details(String placeId, Place hint);
 
-    record Place(String placeId, String name, Double lat, Double lng, String pincode, List<String> types) {
-
+    record Place(String placeId, String name, Double lat, Double lng, String pincode, List<String> types,
+            String district) {
         public Place {
             types = types == null ? List.of() : List.copyOf(types);
         }
@@ -31,27 +28,30 @@ public interface PlacesLookup {
     }
 }
 
-// Local, e2e and the test suite: no key, so the client's hint is the place. The startup guard refuses it on a deployment.
 @Component
 @LocalOnly
 @ConditionalOnExpression("'${draazy.google.places.server-key:}'.isBlank()")
 class DevPlacesLookup implements PlacesLookup {
-
     @Override
     public Optional<Place> details(String placeId, Place hint) {
         if (hint == null || hint.name() == null || hint.name().isBlank()) {
             return Optional.empty();
         }
-        return Optional.of(new Place(placeId, hint.name().trim(), hint.lat(), hint.lng(), hint.pincode(), hint.types()));
+        return Optional.of(new Place(placeId, hint.name().trim(), hint.lat(), hint.lng(), hint.pincode(), hint.types(),
+                district(hint.lat(), hint.lng())));
+    }
+
+    // Without Google there is no district, so a box around Pune district stands in for it.
+    static String district(Double lat, Double lng) {
+        boolean inPune = lat != null && lng != null && lat >= 17.85 && lat <= 19.40 && lng >= 73.30 && lng <= 75.20;
+        return inPune ? "Pune" : null;
     }
 }
 
-// A deployment without a key fails on use rather than trusting a client-supplied society.
 @Component
 @Profile(LocalProfileGuard.NOT_LOCAL)
 @ConditionalOnExpression("'${draazy.google.places.server-key:}'.isBlank()")
 class UnconfiguredPlacesLookup implements PlacesLookup {
-
     private static final Logger log = LoggerFactory.getLogger(UnconfiguredPlacesLookup.class);
 
     private final AtomicBoolean reported = new AtomicBoolean();

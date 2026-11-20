@@ -11,13 +11,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-// The demo seed stays out of the test run only via `spring.flyway.locations` in the test properties; the local
-// profile would add it back.
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("The test database — schema only, never the demo seed")
 class TestDatabaseIsolationTest {
-
     @Autowired
     JdbcTemplate jdbc;
 
@@ -37,8 +34,6 @@ class TestDatabaseIsolationTest {
                 .isZero();
     }
 
-    // `R__DML_seed_reference_data.sql` runs for every profile, prod included: localities and cities are schema
-    // meaning, not demo content.
     @ParameterizedTest(name = "{0}")
     @ValueSource(
             strings = {

@@ -1,5 +1,6 @@
 package com.draazy.api.services.ticket;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ForbiddenException;
@@ -31,11 +32,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Team scoping: staff see only their desk's tickets plus team-less ones no desk owns yet; admins see all.
 @Service
 public class TicketService {
-
-    // Three matches SocietyLeadService: real households rarely hit it; scripts do fast.
     private static final int MAX_WAITLIST_SIGNUPS = 3;
 
     private static final Duration WAITLIST_WINDOW = Duration.ofHours(1);
@@ -77,10 +75,15 @@ public class TicketService {
                 page.getTotalElements());
     }
 
-    // The board's rows: the same scope as `list`, narrowed by priority and a contains-search, with no notes read.
     @Transactional(readOnly = true)
     public Page<TicketRow> rows(AuthPrincipal caller, String team, String status, String priority, String q,
             Pageable pageable) {
+        return rows(caller, team, status, priority, q, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TicketRow> rows(AuthPrincipal caller, String team, String status, String priority, String q,
+            Integer days, Pageable pageable) {
         String statusFilter = blankToNull(status);
         if (statusFilter != null && !TicketStatuses.isKnown(statusFilter)) {
             throw new BadRequestException("Unknown ticket status: " + statusFilter);
@@ -91,8 +94,9 @@ public class TicketService {
         }
         String term = blankToNull(q);
         BoardScope scope = boardScope(caller, team);
+        Instant since = PlatformTime.sinceOrNull(days);
         Page<Ticket> page = tickets.findRowsForBoard(scope.allTeams(), scope.teams(), scope.unassigned(), statusFilter, priorityFilter,
-                term == null ? null : containsPattern(term), pageable);
+                term == null ? null : containsPattern(term), since == null ? Instant.EPOCH : since, pageable);
         return new PageImpl<>(mapper.toRows(page.getContent()), page.getPageable(), page.getTotalElements());
     }
 
@@ -120,7 +124,6 @@ public class TicketService {
         return "%" + LikePatterns.escape(term.toLowerCase(Locale.ROOT)) + "%";
     }
 
-    /** What {@code list(team, "open")} would total, without reading a page. */
     @Transactional(readOnly = true)
     public long countOpen(AuthPrincipal caller, String team) {
         BoardScope scope = boardScope(caller, team);
@@ -149,7 +152,6 @@ public class TicketService {
         return new BoardScope(false, requested == null ? new ArrayList<>(desks) : List.of(requested), requested == null);
     }
 
-    // quotedValue is caller-owned at creation; ops fills platform facts later.
     @Transactional
     public CustomerTicketDto create(AuthPrincipal caller, TicketCreate body) {
         String team = blankToNull(body.team());
@@ -160,14 +162,7 @@ public class TicketService {
         if (priority != null && !TicketPriorities.isKnown(priority)) {
             throw new BadRequestException("Unknown priority: " + priority);
         }
-        UUID propertyId = body.propertyId() == null || body.propertyId().isBlank()
-                ? null
-                : Ids.parseUuid(body.propertyId()).orElseThrow(() -> new BadRequestException("propertyId must be a valid id"));
-
-        // Check FK upfront so bad property ids return caller-facing 404, not constraint 500.
-        if (propertyId != null && !properties.existsById(propertyId)) {
-            throw NotFoundException.of("Property");
-        }
+        UUID propertyId = existingProperty(body.propertyId());
 
         User requester = users.findById(caller.userId()).orElseThrow(() -> NotFoundException.of("User"));
         return mapper.toCustomer(tickets.saveAndFlush(new Ticket(body.subject().trim(), team,
@@ -175,7 +170,34 @@ public class TicketService {
                 requester.getMobile(), body.body(), body.quotedValue())));
     }
 
-    // Waitlist mobiles are unverified; do not resolve requesterId from typed numbers.
+    /** An internal lead for a service team, raised from a customer's chat; the customer is never told. */
+    @Transactional
+    public CustomerTicketDto createForCustomer(UUID customerId, String subject, String team, String propertyId,
+            String note) {
+        String teamKey = blankToNull(team);
+        if (teamKey == null || !Teams.isKnown(teamKey)) {
+            throw new BadRequestException("Unknown team: " + team);
+        }
+        UUID property = existingProperty(propertyId);
+        User customer = users.findById(customerId).orElseThrow(() -> NotFoundException.of("Customer"));
+        if (Roles.isBackOffice(customer.getRole())) {
+            throw new BadRequestException("A service ticket needs a customer, not a back-office account");
+        }
+        return mapper.toCustomer(tickets.saveAndFlush(new Ticket(subject.trim(), teamKey, null, property,
+                customer.getId(), customer.getName(), customer.getMobile(), blankToNull(note), null)));
+    }
+
+    private UUID existingProperty(String raw) {
+        UUID propertyId = raw == null || raw.isBlank()
+                ? null
+                : Ids.parseUuid(raw).orElseThrow(() -> new BadRequestException("propertyId must be a valid id"));
+        if (propertyId != null && !properties.existsById(propertyId)) {
+            throw NotFoundException.of("Property");
+        }
+        return propertyId;
+    }
+
+    // Waitlist mobiles are unverified; never resolve requesterId from a typed number.
     @Transactional
     public void joinWaitlist(ServiceWaitlistRequest body) {
         String slug = blankToNull(body.service());
@@ -184,13 +206,11 @@ public class TicketService {
         }
         String subject = ServiceWaitlists.subjectFor(slug);
 
-        // Canonicalise once so lock, budget query, and row share the same ten digits.
         String mobile = MobileMask.normalise(body.mobile());
 
         locks.holdUntilCommit(RateLimitLock.Limit.SERVICE_WAITLIST, mobile);
         if (tickets.existsByMobileAndSubjectAndStatusIn(
                 mobile, subject, TicketStatuses.UNRESOLVED)) {
-
             return;
         }
         if (tickets.countByMobileAndCreatedAtAfter(mobile, Instant.now().minus(WAITLIST_WINDOW))
@@ -205,8 +225,6 @@ public class TicketService {
                 name == null ? ANONYMOUS_CUSTOMER : name.strip(), mobile, null, null));
     }
 
-    // Omitted assignee leaves current value; UNASSIGN returns ticket to pool.
-    // Any other bad id stays 404, not quiet unassignment.
     @Transactional
     public TicketDto update(AuthPrincipal caller, String id, TicketUpdate body) {
         Ticket ticket = accessible(caller, id);
@@ -239,8 +257,6 @@ public class TicketService {
         }
         String assigneeId = blankToNull(body.assigneeId());
         if (body.unassigns()) {
-
-            // Null needs an explicit intent word; see TicketUpdate.UNASSIGN.
             ticket.setAssigneeId(null);
         } else if (assigneeId != null) {
             User assignee = Ids.parseUuid(assigneeId).flatMap(users::findById)
@@ -256,7 +272,6 @@ public class TicketService {
         return mapper.toDto(ticket);
     }
 
-    // Note author comes from principal; display name is not client input.
     @Transactional
     public TicketDto.Note addNote(AuthPrincipal caller, String id, String text) {
         Ticket ticket = accessible(caller, id);

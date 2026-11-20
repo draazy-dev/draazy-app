@@ -13,11 +13,8 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
-/** Batch-loaded because the contract carries the thread inline, so a per-ticket load would be
- * an N+1 across the caller's whole list. */
 @Component
 public class SupportTicketMapper {
-
     private static final int PREVIEW_CHARS = 160;
 
     private final SupportTicketMessageRepository messages;
@@ -50,7 +47,8 @@ public class SupportTicketMapper {
                             t.isUnread(),
                             m == null ? null : new SupportTicketSummary.LastMessage(
                                     m.getAuthorRole(), preview(m.getBody()), m.getCreatedAt()),
-                            t.getCreatedAt());
+                            t.getCreatedAt(),
+                            t.about());
                 })
                 .toList();
     }
@@ -94,36 +92,40 @@ public class SupportTicketMapper {
                                         m.getBody(),
                                         m.getCreatedAt()))
                                 .toList(),
-                        t.getCreatedAt()))
+                        t.getCreatedAt(),
+                        t.about()))
                 .toList();
     }
 
-    /** Names are resolved for the whole page before {@code Page#map} walks it; a per-element lookup
-     * inside the lambda would be an N+1 that only shows under load. */
     public Page<AdminSupportTicketDto> toAdminPage(Page<SupportTicket> page) {
-        Map<UUID, String> names = raiserNames(page.getContent());
-        return page.map(t -> new AdminSupportTicketDto(
-                t.getId().toString(),
-                t.getSubject(),
-                t.getCategory(),
-                t.getStatus(),
-                names.get(t.getUserId()),
-                t.isStaffUnread(),
-                t.isUnread(),
-                t.getCreatedAt()));
+        Map<UUID, User> raisers = raisers(page.getContent());
+        return page.map(t -> {
+            User raiser = raisers.get(t.getUserId());
+            return new AdminSupportTicketDto(
+                    t.getId().toString(),
+                    t.getSubject(),
+                    t.getCategory(),
+                    t.getStatus(),
+                    raiser == null ? null : raiser.getName(),
+                    raiser == null ? null : raiser.getMobile(),
+                    t.isStaffUnread(),
+                    t.isUnread(),
+                    t.getCreatedAt(),
+                    t.about());
+        });
     }
 
-    private Map<UUID, String> raiserNames(List<SupportTicket> tickets) {
+    private Map<UUID, User> raisers(List<SupportTicket> tickets) {
         Set<UUID> ids = tickets.stream()
                 .map(SupportTicket::getUserId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toCollection(HashSet::new));
-        Map<UUID, String> names = new HashMap<>();
+        Map<UUID, User> out = new HashMap<>();
         if (!ids.isEmpty()) {
             for (User u : users.findAllById(ids)) {
-                names.put(u.getId(), u.getName());
+                out.put(u.getId(), u);
             }
         }
-        return names;
+        return out;
     }
 }

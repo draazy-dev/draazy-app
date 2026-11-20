@@ -9,8 +9,9 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
+  BTN, CHIP, CHIP_TONE, Chips, DATE_CHIPS, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const RISK_TONE = { high: CHIP_TONE.red, medium: CHIP_TONE.amber, low: CHIP_TONE.green };
 const fmtDate = (ms) => (ms ? new Date(ms).toLocaleDateString('en-IN') : '—');
@@ -19,7 +20,6 @@ const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 250;
 
-/* Background-check signals. goodWhenTrue=true → green when present; false → red when present. */
 const SIGNALS = [
   ['activated', 'Activated', true],
   ['sameDevice', 'Same device', false],
@@ -43,8 +43,6 @@ const AUTO_REASONS = {
 const autoReasonLabel = (code) => AUTO_REASONS[code] || code.replace(/_/g, ' ');
 const TRACK_LABELS = { owner: 'Owner referral', seeker: 'Seeker referral' };
 
-/* Risk is a separate field, so **High risk** is a risk filter rather than a status one;
-   a status tab for it would stay permanently empty. */
 const TABS = [
   { key: 'held', label: 'Held', count: 'held', filter: { status: 'held' }, match: (r) => r.status === 'held' },
   { key: 'pending', label: 'Pending', count: 'pending', filter: { status: 'pending' }, match: (r) => r.status === 'pending' },
@@ -56,7 +54,6 @@ const TABS = [
 const TAB_KEYS = TABS.map((t) => t.key);
 const NOTE = 'Rewards are decided automatically. Held rows release or reject on their own once the hold ends; use this desk to audit, override or claw back.';
 
-/* Tab totals after one row changed from `before` to `after`. */
 const shiftCounts = (counts, before, after) => {
   const next = { ...counts };
   for (const t of TABS) {
@@ -74,6 +71,7 @@ export default function OpsReferrals() {
   const [page, setPage] = useState(0);
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
+  const [days, setDays] = useState('');
   const [reloading, setReloading] = useState(false);
   const [nonce, setNonce] = useState(0);
   const wantCounts = useRef(true);
@@ -90,7 +88,7 @@ export default function OpsReferrals() {
     const withCounts = wantCounts.current;
     let live = true;
     setReloading(true);
-    listReferralQueue({ ...filter, q: query, page, size: PAGE_SIZE, counts: withCounts })
+    listReferralQueue({ ...filter, q: query, days, page, size: PAGE_SIZE, counts: withCounts })
       .then((res) => {
         if (!live) return;
         if (!res.items.length && page > 0 && res.total > 0) {
@@ -106,16 +104,17 @@ export default function OpsReferrals() {
       })
       .catch((e) => {
         if (!live) return;
-        setState({ status: 'error', items: [], total: 0, error: e.message || 'Could not read the queue.' });
+        setState({ status: 'error', items: [], total: 0, error: userMessage(e, 'Could not read the queue.') });
         setReloading(false);
       });
     return () => { live = false; };
-  }, [tab, page, query]);
+  }, [tab, page, query, days]);
 
   useEffect(load, [load, nonce]);
 
   const reload = () => { wantCounts.current = true; setNonce((n) => n + 1); };
   const switchTab = (key) => { setTab(key); setPage(0); };
+  const changeDays = (value) => { setDays(value); setPage(0); };
 
   const doAction = async (r, act) => {
     if (busy.current) return;
@@ -139,7 +138,6 @@ export default function OpsReferrals() {
         toast('Reward clawed back', 'error');
       }
       if (!decided) { reload(); return; }
-      // The decision answers with the row: patch it in place instead of re-reading the page.
       const stays = TABS.find((t) => t.key === tab).match(decided);
       setState((s) => ({
         ...s,
@@ -148,8 +146,7 @@ export default function OpsReferrals() {
       }));
       setCounts((c) => shiftCounts(c, r, decided));
     } catch (e) {
-      // The server's own sentence names the refusal; paraphrasing it here would lose that.
-      toast(e.message || 'That decision was refused.', 'error');
+      toast(userMessage(e, 'That decision was refused.'), 'error');
     } finally {
       busy.current = false;
       setBusyId(null);
@@ -166,8 +163,6 @@ export default function OpsReferrals() {
     stale: reloading,
   };
 
-  /* No offline fallback: referral decisions release money, and the offline store disagreed with the
-     server about what a referral even is. The error branch below is the only failure left. */
   if (state.status === 'error') {
     return (
       <div>
@@ -190,7 +185,7 @@ export default function OpsReferrals() {
 
   const doExport = () => exportCsv('draazy-referrals.csv',
     ['ID', 'Referrer', 'Referred', 'Track', 'Reward', 'Amount', 'Risk', 'Status', 'Auto reason', 'Hold until', 'Same device', 'Same IP', 'High velocity', 'Redeemed'],
-    rows.map((r) => [r.id, r.referrer, r.referred, r.track || 'contacts only', r.reward, r.rewardAmount, r.risk, r.status, r.autoReason ? autoReasonLabel(r.autoReason) : '', r.holdUntil ? fmtDate(r.holdUntil) : '', r.sameDevice ? 'Yes' : 'No', r.sameIp ? 'Yes' : 'No', r.velocityHigh ? 'Yes' : 'No', fmtDate(r.at)]));
+    rows.map((r) => [r.id, r.referrer, r.referred, r.track || 'referral', r.reward, r.rewardAmount, r.risk, r.status, r.autoReason ? autoReasonLabel(r.autoReason) : '', r.holdUntil ? fmtDate(r.holdUntil) : '', r.sameDevice ? 'Yes' : 'No', r.sameIp ? 'Yes' : 'No', r.velocityHigh ? 'Yes' : 'No', fmtDate(r.at)]));
 
   const decisions = (r) => {
     const off = busyId === r.id;
@@ -225,6 +220,7 @@ export default function OpsReferrals() {
         toolbar={(
           <>
             <SearchBox value={q} onChange={setQ} placeholder="Referrer, referred or ID" label="Search referrals" />
+            <Chips label="Date" options={DATE_CHIPS} value={days} onChange={changeDays} />
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <button type="button" onClick={reload} className={BTN.ghost}><RefreshCw className="h-3.5 w-3.5" />Refresh</button>
               <button type="button" onClick={doExport} className={BTN.ghost}><Download className="h-3.5 w-3.5" />Export CSV</button>
@@ -234,14 +230,14 @@ export default function OpsReferrals() {
         )}
         footer={paging.pageCount > 1 ? <PageNav {...paging} /> : null}
       >
-        <RowList isEmpty={!rows.length} empty={query ? 'No referrals match this search.' : 'No referrals here.'}>
+        <RowList isEmpty={!rows.length} empty={query || days ? 'No referrals match this search.' : 'No referrals here.'}>
           {rows.map((r) => (
             <RowCard
               key={r.id}
               id={r.id}
               title={<>{r.referrer} <span className="font-normal text-gray-500">→</span> {r.referred}</>}
               badges={<><Badge status={r.status} /><span className={classNames(CHIP, 'capitalize', RISK_TONE[r.risk] || CHIP_TONE.neutral)}>{r.risk} risk</span></>}
-              meta={<><span className="font-mono">{r.id}</span><Dot /><span>{TRACK_LABELS[r.track] || 'Contacts-only referral'}</span><Dot /><span>Redeemed {fmtDate(r.at)}</span></>}
+              meta={<><span className="font-mono">{r.id}</span><Dot /><span>{TRACK_LABELS[r.track] || 'Referral'}</span><Dot /><span>Redeemed {fmtDate(r.at)}</span></>}
               facts={(
                 <>
                   <FactRow label="Mobiles"><span className="col-span-full tabular-nums">{r.referrerMobile || '—'} → {r.referredMobile || '—'}</span></FactRow>

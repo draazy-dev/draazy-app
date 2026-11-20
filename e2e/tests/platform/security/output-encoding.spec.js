@@ -14,13 +14,13 @@ async function seedConsent(page) {
   });
 }
 
-async function raiseTicket(accessToken, subject, body) {
-  const res = await fetch(`${API}/support/tickets`, {
+async function sendSupportMessage(accessToken, text) {
+  const res = await fetch(`${API}/support/chat/messages`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ subject, category: 'payment', body }),
+    body: JSON.stringify({ text, about: null }),
   });
-  if (res.status !== 201) throw new Error(`raiseTicket: ${res.status} ${await res.text()}`);
+  if (res.status !== 201) throw new Error(`sendSupportMessage: ${res.status} ${await res.text()}`);
 }
 
 const queryWasRead = (page, tag) => expect.poll(() => page.evaluate((t) =>
@@ -28,9 +28,8 @@ const queryWasRead = (page, tag) => expect.poll(() => page.evaluate((t) =>
   || [...document.querySelectorAll('input')].some((i) => i.value.includes(`canary ${t}`)), tag)).toBe(true);
 
 test.describe('Output encoding (live)', () => {
-  test('markup in a ticket renders as literal text for the customer and for the desk', async ({ page, login, browser, baseURL }) => {
+  test('markup in a support chat renders as literal text for the customer and for the desk', async ({ page, login, browser, baseURL }) => {
     const tag = stamp();
-    const subject = `Encoding check ${canary(tag)}`;
     const body = `Body ${canary(tag)} & "quotes" 'single'`;
 
     const customerContext = await browser.newContext({ baseURL });
@@ -38,25 +37,22 @@ test.describe('Output encoding (live)', () => {
     await seedConsent(customer);
     const mobile = await signedInAsNew(customer);
     const { accessToken } = await apiLogin(mobile);
-    await raiseTicket(accessToken, subject, body);
+    await sendSupportMessage(accessToken, body);
 
-    await test.step('the customer sees the literal markup in the list and the thread', async () => {
-      await customer.goto('/support');
-      const row = customer.getByText(subject, { exact: true });
-      await expect(row).toBeVisible();
-      await row.click();
-      await expect(customer.getByRole('dialog').getByText(body, { exact: true })).toBeVisible();
+    await test.step('the customer sees the literal markup in the Draazy support thread', async () => {
+      await customer.goto('/messages?support=general');
+      await expect(customer.getByTestId('support-thread').getByText(body, { exact: true })).toBeVisible();
       await expect(customer.locator('[data-canary]')).toHaveCount(0);
       await customerContext.close();
     });
 
-    await test.step('the desk sees the literal markup in the queue and the thread', async () => {
+    await test.step('the desk sees the literal markup in the inbox row and the chat', async () => {
       await login.asStaff('rental');
-      await page.goto('/ops/support');
-      const row = page.getByTestId('queue-row').filter({ hasText: subject });
-      await expect(row).toBeVisible();
-      await row.getByRole('button', { name: 'Reply' }).click();
-      await expect(page.getByRole('dialog').getByText(body, { exact: true })).toBeVisible();
+      await page.goto('/ops/support?view=all');
+      const row = page.getByTestId('support-chat-row').filter({ hasText: `canary ${tag}` });
+      await expect(row).toContainText(body);
+      await row.click();
+      await expect(page.getByTestId('staff-chat').getByText(body, { exact: true })).toBeVisible();
       await expect(page.locator('[data-canary]')).toHaveCount(0);
     });
   });

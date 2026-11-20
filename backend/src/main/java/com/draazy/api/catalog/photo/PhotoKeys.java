@@ -12,13 +12,10 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** {@code photos/<tag>/<uuid>}: the tag proves the uploader to the server without naming them in a public URL. */
 @Component
 public class PhotoKeys {
-
     private static final String UUID_RE = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
-    // Pre-tag uploads carry the owner's user id where the tag now sits; they stay valid.
     private static final Pattern KEY =
             Pattern.compile("photos/([0-9a-f]{16}|" + UUID_RE + ")/(" + UUID_RE + ")(?:-[0-9a-f]{16})?");
 
@@ -31,6 +28,10 @@ public class PhotoKeys {
     public String newKey(UUID ownerId) {
         String id = UUID.randomUUID().toString();
         return "photos/" + tag(ownerId, id) + "/" + id;
+    }
+
+    public boolean isPhotoKey(String key) {
+        return KEY.matcher(key).matches();
     }
 
     public boolean uploadedBy(String key, Collection<UUID> owners) {

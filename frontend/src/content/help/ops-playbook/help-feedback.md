@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 31
-updated: 2026-10-10
+updated: 2026-11-06
 summary: How to read reader ratings and comments on help articles and turn them into content fixes.
 tags: [ops, internal, help, feedback, content]
 modules: [helpFeedback]
@@ -42,7 +42,7 @@ The subtitle reads "How readers rate each help article, and what they wrote. Art
 
 At the bottom of every help article the reader sees "Was ... helpful?" with **Yes** and **No**.
 
-- After **No**, a box asks "What was missing?". It takes up to 500 characters. The note under it says the text goes to the team that maintains the help and is never shown to others. It tells readers not to include a phone number and offers a link to raise a ticket.
+- After **No**, a box asks "What was missing?". It takes up to 500 characters. The note under it says the text goes to the team that maintains the help and is never shown to others. It tells readers not to include a phone number and offers a link to chat with Draazy support.
 - Comments are anonymous. You cannot see who wrote one.
 - Each reader counts once per article. Voting again replaces their earlier vote and comment. A reader is the account when signed in, otherwise the browser, so clearing browser data lets them vote again.
 - The same network address can leave up to 20 votes per article per day. Any extra are dropped with no message.
@@ -54,7 +54,7 @@ At the bottom of every help article the reader sees "Was ... helpful?" with **Ye
 | **Articles** | The article slug and a language chip, then "N helpful · N not helpful · N% not helpful · N comments · last ..." | **Read comments**, only if the article has comments |
 | **Comments** | The article slug, language, a **Helpful** or **Not helpful** chip, the comment and the time | None |
 
-**Read comments** opens the **Comments** tab for that one article. A note "Comments on" and the slug shows, with **Clear filters** to go back to all comments. Each tab has 20 rows per page.
+**Date** chips (**All**, **Today**, **7d**, **30d**) on both tabs narrow the counts and comments to votes from that period. **Read comments** opens the **Comments** tab for that one article. A note "Comments on" and the slug shows. **Clear filters** appears when an article or a date is selected and goes back to all comments. Each tab has 20 rows per page.
 
 Things to know when you read the numbers:
 
@@ -89,6 +89,6 @@ Articles are plain text files in the product's help content folders, in English.
 ## Related
 
 - [Staff desks](/help/a/staff-desks)
-- [Ticket handling and escalation](/help/a/ticket-escalation)
+- [Chats, tickets and escalation](/help/a/ticket-escalation)
 - [Erasure requests](/help/a/erasure-requests)
 - [Analytics review](/help/a/analytics-review)

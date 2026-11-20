@@ -24,10 +24,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** {@code GET /admin/reviews}: reviews publish on write, so moderators could only act on ids they already had. */
 @DisplayName("Moderation — the review queue is reachable")
 class ReviewModerationQueueTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -35,7 +33,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
     @Autowired
     PropertyRepository properties;
 
-    /** Audit rows commit through REQUIRES_NEW, so the rollback does not take them with it. */
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
         jdbc.update("delete from audit_log where entity = 'review'");
@@ -90,7 +87,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
 
-    /** "What have we taken down": otherwise nothing on the platform can confirm a rejection happened. */
     @Test
     @DisplayName("the status filter narrows to one moderation state")
     void statusFilterNarrowsTheQueue() throws Exception {
@@ -106,7 +102,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].id").value(taken.getId().toString()));
     }
 
-    /** The queue is every review on the platform, so an ordinary account must not reach it. */
     @Test
     @DisplayName("an ordinary user cannot read the queue")
     void seekersAreForbidden() throws Exception {
@@ -116,7 +111,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** The find-then-take-down loop end to end; each endpoint alone is not a moderation system. */
     @Test
     @DisplayName("a review found in the queue can be taken down and the change is visible there")
     void queueAndDecisionCloseTheLoop() throws Exception {
@@ -149,6 +143,7 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.content[0].author").value("Reviewer 9840000020"))
+                .andExpect(jsonPath("$.content[0].authorMobile").value("9840000020"))
                 .andExpect(jsonPath("$.content[0].body").exists())
                 .andExpect(jsonPath("$.content[0].title").doesNotExist())
                 .andExpect(jsonPath("$.content[0].categories").doesNotExist())
@@ -163,8 +158,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.counts").doesNotExist());
     }
 
-    /** Rows carry their status: without it an unfiltered queue mixes live and rejected reviews indistinguishably.
-     * Uses {@code Matchers.contains} since a JSONPath filter yields an array even for one element. */
     @Test
     @DisplayName("every queue row carries its moderation status, so the unfiltered queue is usable")
     void queueRowsCarryTheirStatus() throws Exception {
@@ -181,8 +174,6 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                         .value(Matchers.contains(ReviewStatuses.REJECTED)));
     }
 
-    /** No public read carries {@code status}: it is constant there, and a constant field invites client branches
-     * that never run. Absent (NON_NULL), not null, so the response shape doesn't advertise a withheld field. */
     @Test
     @DisplayName("the public property read does not carry status — it would be a constant there")
     void publicReadsOmitStatus() throws Exception {
@@ -208,4 +199,23 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[?(@.id=='" + r.getId() + "')].status")
                         .value(Matchers.empty()));
     }
-}
+
+    @Test
+    @DisplayName("days limits the queue to reviews written in the last N IST days")
+    void daysFiltersByCreatedAt() throws Exception {
+        User author = user("9871503001", "buyer");
+        User staff = user("9871503002", "staff");
+        Review fresh = review(author.getId(), ReviewStatuses.PUBLISHED);
+        Review old = review(author.getId(), ReviewStatuses.PUBLISHED);
+        java.time.Instant yesterdayLate = java.time.LocalDate.now(com.draazy.api.common.PlatformTime.IST)
+                .atStartOfDay(com.draazy.api.common.PlatformTime.IST).toInstant()
+                .minus(1, java.time.temporal.ChronoUnit.MINUTES);
+        jdbc.update("update reviews set created_at = ? where id = ?", java.sql.Timestamp.from(yesterdayLate), old.getId());
+
+        mvc.perform(get("/admin/reviews").param("days", "1").header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(fresh.getId().toString()));
+        mvc.perform(get("/admin/reviews").param("days", "7").header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }}

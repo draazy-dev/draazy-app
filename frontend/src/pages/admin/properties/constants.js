@@ -1,8 +1,8 @@
 import { fmtArea, fmtINR, fmtNum, isSqftUnit } from '../../../lib/format.js';
 import { availabilityLabel } from '../../../lib/availability.js';
+import { COMMERCIAL_SUBTYPES } from '../../consumer/list-property/constants.js';
 import i18n from '../../../i18n/index.js';
 
-// The four pending buckets the server partitions by `progress`; their labels match the tracker's.
 export const PROGRESS_OPTS = [
   { value: 'awaiting_confirmation', label: 'Awaiting owner confirmation' },
   { value: 'ready', label: 'Ready for review' },
@@ -10,6 +10,10 @@ export const PROGRESS_OPTS = [
   { value: 'needs_info', label: 'Waiting on owner' },
 ];
 const PROGRESS = new Set(PROGRESS_OPTS.map((o) => o.value));
+
+export const isMadeBy = (listing, userId) => Boolean(userId)
+  && [listing?.ownerId, listing?.postedByStaff].some((id) => id != null && String(id) === String(userId));
+export const MAKER_REASON = 'You posted this listing, so another staff member must review or edit it.';
 
 export const STATUS_OPTS = [
   { value: '', label: 'All statuses' },
@@ -23,25 +27,35 @@ export const STATUS_OPTS = [
   { value: 'archived', label: 'Archived' },
 ];
 
-// Archived is its own axis, not a status: unset, a moderation read mixes soft-deleted rows in.
 export const statusQuery = (value) => (value === 'archived'
   ? { archived: true }
   : PROGRESS.has(value)
     ? { archived: false, progress: value }
     : { archived: false, status: value || undefined });
-export const DEAL_OPTS = [
-  { value: '', label: 'Buy & Rent' },
-  { value: 'buy', label: 'Buy' },
-  { value: 'rent', label: 'Rent' },
-];
 export const EDIT_DEAL_OPTS = [
   { value: 'buy', label: 'Buy' },
   { value: 'rent', label: 'Rent' },
 ];
-export const EDIT_STATUS_OPTS = [
+const EDIT_STATUS_OPTS = [
   { value: 'approved', label: 'Approved' },
   { value: 'pending', label: 'Pending' },
 ];
+
+const withCurrent = (opts, current, label) =>
+  (!current || opts.some((o) => o.value === current) ? opts : [...opts, { value: current, label }]);
+
+const EDIT_TYPES = ['Flat', 'Independent House', 'Villa', ...COMMERCIAL_SUBTYPES.map((s) => s.label), 'Open Plot', 'Farm Land']
+  .map((v) => ({ value: v, label: v }));
+export const editTypeOpts = (current) => withCurrent(EDIT_TYPES, current, current);
+
+const EDIT_BHKS = [
+  { value: '', label: 'Not applicable' },
+  { value: '0', label: '1 RK' },
+  ...['1', '2', '3', '4'].map((n) => ({ value: n, label: `${n} BHK` })),
+  { value: '5', label: '5+ BHK' },
+];
+export const editBhkOpts = (current) => withCurrent(EDIT_BHKS, current, `${current} BHK`);
+export const editStatusOpts = (current) => withCurrent(EDIT_STATUS_OPTS, current, `${statusLabel(current)} (current)`);
 
 export const PAGE_LIMIT = 10;
 
@@ -54,8 +68,6 @@ export const statusLabel = (status) => ({
   rejected: 'Not approved',
 }[status] || cap(String(status || '').replace(/[_-]/g, ' ')));
 export const perSqftLabel = (l) =>
-  // A plot priced by the acre divided by its acreage is a per-acre figure, so the row that captions
-  // it "/ sq.ft" has nothing honest to say about one.
   l.area && l.deal !== 'rent' && isSqftUnit(l.areaUnit)
     ? fmtINR(Math.round(l.price / l.area)) + ' / sq.ft'
     : l.deal === 'rent'
@@ -67,8 +79,6 @@ export { fmtAgo } from '../../../lib/format.js';
 
 export { exportCsv } from '../../../lib/csv.js';
 
-/* A row is worth showing only when the owner stated it: a grid of em-dashes hides the handful of facts
-   that decide the case. `0` and `false` are statements and survive; blank and null do not. */
 const stated = (v) => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && !v.length);
 
 export function detailKvs(l) {
@@ -88,13 +98,10 @@ export function detailKvs(l) {
   };
   const sqft = (v) => fmtNum(v) + ' sq.ft';
 
-  /* Three areas, three claims. The old single "Built-up area" row was labelled for one of them and
-     fed by the generic `area`, which is exactly the mislabelling a reviewer cannot catch. */
   push('Carpet area', stated(l.carpetArea) ? sqft(l.carpetArea) : null);
   push('Built-up area', stated(l.builtUpArea) ? sqft(l.builtUpArea) : null);
   push('Super built-up area', stated(l.superBuiltUpArea) ? sqft(l.superBuiltUpArea) : null);
   if (!stated(l.carpetArea) && !stated(l.builtUpArea) && !stated(l.superBuiltUpArea)) {
-    // The unqualified headline area, unlike the three above it, is whatever unit the owner chose.
     push('Area', stated(l.area) ? `${fmtArea(l.area, l.areaUnit)} (unqualified)` : null);
   }
 

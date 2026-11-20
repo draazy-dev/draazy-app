@@ -9,12 +9,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.security.Roles;
 import com.draazy.api.security.Teams;
 import com.draazy.api.services.support.AdminSupportTicketDto;
 import jakarta.persistence.EntityManager;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,19 +30,14 @@ import org.springframework.test.web.servlet.ResultActions;
 
 @DisplayName("Slice 12 — support tickets: the customer's thread with the platform")
 class SupportTicketEndpointsTest extends ServiceFixtures {
-
     @org.springframework.beans.factory.annotation.Autowired
     EntityManager em;
 
-    /** Distinctive enough that a substring search for it is a real leak check. */
     private static final String SECRET = "the card was declined three times";
 
-    // The assertions here are about the independence of the two unread signals, which a single shared column cannot
-    // provide.
     @Nested
     @DisplayName("scope")
     class Scope {
-
         @Test
         @DisplayName("the list is the caller's own — including for admin (S47)")
         void listIsAlwaysMine() throws Exception {
@@ -109,7 +109,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
     @Nested
     @DisplayName("the unread flag")
     class Unread {
-
         @Test
         @DisplayName("staff replying raises it; the customer's own reply does not; read clears it")
         void lifecycle() throws Exception {
@@ -156,7 +155,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
     @Nested
     @DisplayName("the two-sided read model (D50)")
     class TwoSided {
-
         @Test
         @DisplayName("a new ticket is already waiting on the desk — the opening message counts")
         void raisingPutsItOnTheQueue() throws Exception {
@@ -164,8 +162,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             User desk = staff("9840000132", Teams.RENTAL);
             String id = raiseTicket(asha, "Cannot log in");
 
-            // A queue that only counted replies would show an empty board on a day full of new
-            // tickets — the first message is the one nobody has answered.
             expectAwaitingReply(desk, id, true);
             expectUnread(asha, id, false);
         }
@@ -183,7 +179,6 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             expectAwaitingReply(desk, id, false);
 
             replyTicket(desk, id, "processing it", 201);
-            // Both sides have something outstanding — the state one boolean cannot represent.
             expectUnread(asha, id, true);
 
             expectAwaitingReply(desk, id, false);
@@ -218,12 +213,9 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
         }
     }
 
-    // `GET /support/tickets` stays the caller's own; this paged summary queue is how staff find every ticket without
-    // every message body.
     @Nested
     @DisplayName("the ops queue (D51)")
     class OpsQueue {
-
         @Test
         @DisplayName("staff and admin may read it; a customer may not")
         void authorised() throws Exception {
@@ -262,11 +254,9 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             User asha = customer("9840000144");
             User desk = staff("9840000145", Teams.RENTAL);
             raiseTicket(asha, "First");
-            raiseTicket(asha, "Second");
-            raiseTicket(asha, "Third");
+            raiseTicket(customer("9840000921"), "Second");
+            raiseTicket(customer("9840000922"), "Third");
 
-            // The order is fixed server-side, so an unknown property here would otherwise be a 500
-            // any caller can trigger with a guess (api-standards.md §5).
             mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(desk))
                             .param("size", "2"))
@@ -303,7 +293,7 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             User asha = customer("9840000147");
             User desk = staff("9840000148", Teams.RENTAL);
             String answered = raiseTicket(asha, "Already handled");
-            raiseTicket(asha, "Still waiting");
+            raiseTicket(customer("9840000923"), "Still waiting");
             markRead(desk, answered);
 
             mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
@@ -333,7 +323,7 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             long awaiting = countOf(desk, "awaiting");
             long answered = countOf(desk, "answered");
             String handled = raiseTicket(asha, "Handled soon");
-            raiseTicket(asha, "Waiting still");
+            raiseTicket(customer("9840000924"), "Waiting still");
             markRead(desk, handled);
 
             mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
@@ -356,6 +346,42 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
                     .andExpect(jsonPath("$.counts").doesNotExist());
         }
 
+        @Test
+        @DisplayName("days keeps the last N IST calendar days and composes with awaitingReply; counts ignore it")
+        void daysNarrowsRowsNotCounts() throws Exception {
+            User asha = customer("9840000171");
+            User desk = staff("9840000172", Teams.RENTAL);
+            raiseTicket(asha, "Datewin today");
+            String old = raiseTicket(customer("9840000925"), "Datewin yesterday");
+            Instant lateYesterday = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                    .minus(1, ChronoUnit.MINUTES);
+            jdbc.update("update support_tickets set created_at = ? where id = ?::uuid",
+                    Timestamp.from(lateYesterday), old);
+            long all = countOf(desk, "all");
+
+            mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                            .param("days", "1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.subject=='Datewin today')]", hasSize(1)))
+                    .andExpect(jsonPath("$.content[?(@.subject=='Datewin yesterday')]", hasSize(0)));
+            mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                            .param("days", "7").param("awaitingReply", "true"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.subject=='Datewin today')]", hasSize(1)))
+                    .andExpect(jsonPath("$.content[?(@.subject=='Datewin yesterday')]", hasSize(1)));
+            mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                            .param("days", "1").param("counts", "true"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.counts.all").value(all));
+            mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                            .param("days", "9999"))
+                    .andExpect(status().isBadRequest());
+        }
+
         private long countOf(User desk, String key) throws Exception {
             String body = queue(desk).andReturn().getResponse().getContentAsString();
             return Long.parseLong(body.replaceAll("(?s).*\"counts\":\\{[^}]*\"" + key + "\":(\\d+).*", "$1"));
@@ -372,12 +398,11 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             String body = queue(desk)
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].raiser").value("Asha Patil"))
+                    .andExpect(jsonPath("$.content[0].raiserMobile").value("9840000149"))
                     .andReturn().getResponse().getContentAsString();
 
-            // Absent, not empty: the thread is read one ticket at a time at GET /support/tickets/{id}, and a page of
-            // twenty threads is the unbounded response the page envelope was meant to prevent.
             assertThat(body).doesNotContain(SECRET).doesNotContain("\"messages\"")
-                    .doesNotContain("\"notes\"").doesNotContain("9840000149");
+                    .doesNotContain("\"notes\"");
             assertThat(AdminSupportTicketDto.class.getRecordComponents())
                     .noneMatch(c -> "messages".equals(c.getName()) || "notes".equals(c.getName()));
         }
@@ -386,9 +411,8 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
     @Nested
     @DisplayName("opening a ticket on the desk")
     class DeskRead {
-
         @Test
-        @DisplayName("the staff GET clears the desk flag in the same round trip; the raiser's GET does not")
+        @DisplayName("reading a ticket does not answer it: only a staff reply clears the desk flag")
         void staffGetMarksRead() throws Exception {
             User asha = customer("9840000161");
             User desk = staff("9840000162", Teams.RENTAL);
@@ -405,7 +429,12 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
                     .andExpect(jsonPath("$.messages[0].authorId").doesNotExist())
                     .andExpect(jsonPath("$.messages[0].attachments").doesNotExist());
 
+            expectAwaitingReply(desk, id, true);
+            replyTicket(desk, id, "on it", 201);
             expectAwaitingReply(desk, id, false);
+            assertThat(jdbc.queryForObject("select link from notifications where user_id = ?::uuid "
+                    + "and type = 'support.reply'", String.class, asha.getId().toString()))
+                    .isEqualTo("/messages?support=ticket:" + id);
         }
 
         @Test
@@ -459,13 +488,9 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             String id = raiseTicket(asha, "Receipt never arrived");
             replyTicket(desk, id, "Re-sending it now.", 201);
 
-            // `author_id` is nullable, and the seed for the e2e database exercises exactly this row: a desk message
-            // written by nobody in particular.
             jdbc.update("update support_ticket_messages set author_id = null where ticket_id = ? and author_role = 'staff'",
                     UUID.fromString(id));
 
-            // The row is already managed; without this the read answers from the first-level cache
-            // and the column change is invisible to the assertion below.
             em.flush();
             em.clear();
 
@@ -489,8 +514,34 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
         }
     }
 
-    private String raiseTicket(User caller, String subject) throws Exception {
-        String json = mvc.perform(post(Routes.SupportTickets.BASE)
+    @Nested
+    @DisplayName("closing")
+    class Closing {
+        @Test
+        @DisplayName("ops close a ticket and the customer sees it closed; the customer cannot close it")
+        void staffClosesTheTicket() throws Exception {
+            User asha = customer("9891300004");
+            User desk = staff("9891300005", Teams.RENTAL);
+            String id = raiseTicket(asha, "Refund not received");
+
+            mvc.perform(post(Routes.SupportTickets.CLOSE, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(asha)))
+                    .andExpect(status().isForbidden());
+
+            mvc.perform(post(Routes.SupportTickets.CLOSE, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("closed"));
+
+            mvc.perform(get(Routes.SupportTickets.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(asha)))
+                    .andExpect(jsonPath("$[0].status").value("closed"))
+                    .andExpect(jsonPath("$[0].unread").value(true));
+            expectAwaitingReply(desk, id, false);
+        }
+    }
+
+    private String raiseTicket(User caller, String subject) throws Exception {        String json = mvc.perform(post(Routes.SupportTickets.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(caller))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"subject\":\"" + subject

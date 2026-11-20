@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class InternalNoteService {
-
     private final InternalNoteRepository notes;
     private final InternalNoteMapper mapper;
     private final UserRepository users;
@@ -33,7 +32,6 @@ public class InternalNoteService {
         this.desks = desks;
     }
 
-    // Every note on one entity, newest first. Staff/admin.
     @Transactional(readOnly = true)
     public List<InternalNoteResponse> list(AuthPrincipal actor, String entityType, String entityId) {
         requireKnownType(entityType);
@@ -55,7 +53,6 @@ public class InternalNoteService {
         return decorate(List.of(notes.saveAndFlush(note))).getFirst();
     }
 
-    // One query lets the console badge a page without twenty round trips.
     @Transactional(readOnly = true)
     public Map<String, Long> countsFor(String entityType, List<String> entityIds) {
         requireKnownType(entityType);
@@ -71,7 +68,6 @@ public class InternalNoteService {
                         row -> (Long) row[1]));
     }
 
-    // Resolve author names once per batch; case files often repeat the same colleagues.
     private List<InternalNoteResponse> decorate(List<InternalNote> rows) {
         Set<UUID> authorIds =
                 rows.stream().map(InternalNote::getAuthorId).collect(Collectors.toSet());

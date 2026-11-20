@@ -7,8 +7,9 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, Chips, ClearFilters, IconAction, PageNav, SearchBox,
+  BTN, CHIP, CHIP_TONE, Chips, ClearFilters, DATE_CHIPS, IconAction, PageNav, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const PAGE_SIZE = 20;
 const SOURCES = [{ value: '', label: 'All' }, { value: 'api', label: 'API' }, { value: 'job', label: 'Jobs' }, { value: 'web', label: 'Web' }];
@@ -32,7 +33,7 @@ function ErrorDetail({ id, onClose, onResolved }) {
     let alive = true;
     getErrorLogEntry(id)
       .then((r) => { if (alive) setRow(r); })
-      .catch((err) => { if (alive) setFailed(err?.message || 'Could not load this error'); });
+      .catch((err) => { if (alive) setFailed(userMessage(err, 'Could not load this error')); });
     return () => { alive = false; };
   }, [id]);
 
@@ -43,7 +44,7 @@ function ErrorDetail({ id, onClose, onResolved }) {
       toast('Marked resolved', 'success');
       onResolved();
     } catch (err) {
-      toast(err?.message || 'Could not resolve', 'error');
+      toast(userMessage(err, 'Could not resolve'), 'error');
       setBusy(false);
     }
   };
@@ -124,6 +125,7 @@ function ErrorDetail({ id, onClose, onResolved }) {
 export default function AdminErrorLog() {
   const [source, setSource] = useState('');
   const [status, setStatus] = useState('open');
+  const [days, setDays] = useState('');
   const [q, setQ] = useState('');
   const [term, setTerm] = useState('');
   const [page, setPage] = useState(1);
@@ -140,15 +142,15 @@ export default function AdminErrorLog() {
   useEffect(() => {
     let alive = true;
     setData((prev) => (prev ? { ...prev, stale: true } : prev));
-    listErrorLog({ source, status, q: term, page: page - 1, size: PAGE_SIZE })
+    listErrorLog({ source, status, days, q: term, page: page - 1, size: PAGE_SIZE })
       .then((res) => { if (alive) { setFailed(''); setData(res); } })
-      .catch((err) => { if (alive) { setFailed(err?.message || 'Could not load the error log'); setData(EMPTY); } });
+      .catch((err) => { if (alive) { setFailed(userMessage(err, 'Could not load the error log')); setData(EMPTY); } });
     return () => { alive = false; };
-  }, [source, status, term, page, reload]);
+  }, [source, status, days, term, page, reload]);
 
   const filter = (set) => (value) => { set(value); setPage(1); };
-  const filtered = source || status !== 'open' || q;
-  const clear = () => { setSource(''); setStatus('open'); setQ(''); setTerm(''); setPage(1); };
+  const filtered = source || status !== 'open' || days || q;
+  const clear = () => { setSource(''); setStatus('open'); setDays(''); setQ(''); setTerm(''); setPage(1); };
 
   if (!data) return <Loading />;
 
@@ -160,6 +162,7 @@ export default function AdminErrorLog() {
         <div className="flex flex-wrap items-center gap-2 border-b border-white/10 p-3">
           <Chips label="Source" options={SOURCES} value={source} onChange={filter(setSource)} />
           <Chips label="Status" options={STATUSES} value={status} onChange={filter(setStatus)} />
+          <Chips label="Date" options={DATE_CHIPS} value={days} onChange={filter(setDays)} />
           <SearchBox value={q} onChange={setQ} placeholder="Search errors" label="Search errors" className="w-full sm:w-56" />
           {filtered ? <ClearFilters onClick={clear} /> : null}
           <div className="ml-auto">

@@ -17,11 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-// Feature tests read `audit_log` through JDBC, so route coverage misses
-// failures in the endpoint's own SQL.
 @DisplayName("Admin audit log — the unfiltered read the console opens with")
 class AuditLogEndpointTest extends AbstractApiTest {
-
     private static final String OLD_ACTOR = "audit-log-test-old";
     private static final String RECENT_ACTOR = "audit-log-test-recent";
 

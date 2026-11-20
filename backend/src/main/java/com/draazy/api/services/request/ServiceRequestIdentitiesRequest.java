@@ -11,17 +11,12 @@ import jakarta.validation.constraints.Size;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
-// Replace roles in the body; wizard resubmits owned parties after typo fixes.
-// Co-filled tenant rows survive requester resubmits.
 public record ServiceRequestIdentitiesRequest(
 
-        // Cap matches wizard parties; this endpoint writes rows and has no other throttle.
         @NotEmpty(message = "record at least one party")
         @Size(max = 12, message = "at most 12 parties")
-        List<@Valid Party> parties) {
-
+        List<@NotNull @Valid Party> parties) {
     @AssertTrue(message = "each party role and index may appear only once")
     public boolean isDistinct() {
         if (parties == null) {
@@ -37,11 +32,6 @@ public record ServiceRequestIdentitiesRequest(
             }
         }
         return true;
-    }
-
-    @AssertTrue(message = "witness index must be 0 or 1")
-    public boolean isWitnessIndexAllowed() {
-        return parties == null || parties.stream().filter(party -> party != null && "witness".equals(party.partyRole())).allMatch(party -> party.partyIndex() <= 1);
     }
 
     @AssertTrue(message = "the same Aadhaar number is recorded for two parties")
@@ -73,14 +63,9 @@ public record ServiceRequestIdentitiesRequest(
         return true;
     }
 
-    Set<String> roles() {
-        return parties.stream().map(Party::partyRole).collect(Collectors.toSet());
-    }
-
-    // A party with neither number says nothing, so reject instead of dropping it.
     public record Party(
             @NotNull
-            @Pattern(regexp = "^(owner|tenant|witness)$", message = "must be owner, tenant or witness")
+            @Pattern(regexp = "^(owner|tenant)$", message = "must be owner or tenant")
             String partyRole,
 
             @PositiveOrZero(message = "must not be negative")
@@ -94,8 +79,6 @@ public record ServiceRequestIdentitiesRequest(
 
             @Aadhaar
             String aadhaar) {
-
-        // Keep this as validation so incomplete and malformed identity rows share 422 fields[].
         @AssertTrue(message = "record a PAN or an Aadhaar number for each party")
         public boolean hasANumber() {
             return isPresent(pan) || isPresent(aadhaar);

@@ -2,15 +2,14 @@ package com.draazy.api.services.request;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 
-// Computed on read, not swept: sandbox schedulers may never fire.
-// Customer-decision drafts carry no desk deadline.
-final class RentAgreementSla {
-
+public final class RentAgreementSla {
     static final String DESK = "desk";
     static final String CUSTOMER = "customer";
+    static final String TENANT = "tenant";
 
     static final Duration PICKUP = Duration.ofHours(4);
     static final Duration FIRST_DRAFT = Duration.ofHours(48);
@@ -27,11 +26,20 @@ final class RentAgreementSla {
     private RentAgreementSla() {
     }
 
+    public static Map<ServiceRequestStatus, Duration> deskTargets() {
+        return Collections.unmodifiableMap(DESK_TARGETS);
+    }
+
+    static ServiceRequestDto.Sla of(ServiceRequest request, Instant now, boolean waitingOnTenant) {
+        return waitingOnTenant ? new ServiceRequestDto.Sla(TENANT, null, false) : of(request, now);
+    }
+
     static ServiceRequestDto.Sla of(ServiceRequest request, Instant now) {
         if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())) {
             return null;
         }
-        if (request.getStatus() == ServiceRequestStatus.DRAFT_SHARED) {
+        if (request.getStatus() == ServiceRequestStatus.DRAFT_SHARED
+                || request.getStatus() == ServiceRequestStatus.ACTION_REQUIRED) {
             return new ServiceRequestDto.Sla(CUSTOMER, null, false);
         }
         Duration target = DESK_TARGETS.get(request.getStatus());

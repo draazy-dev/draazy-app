@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class VisitRequestController {
-
     private final VisitService visitService;
 
     public VisitRequestController(VisitService visitService) {
@@ -34,7 +33,6 @@ public class VisitRequestController {
                 v -> v);
     }
 
-    // `PATCH /visit-requests/{id`/status} (contract `updateVisitStatus`) — confirm, cancel, complete, or no-show a visit.
     @PatchMapping(Routes.Visits.STATUS)
     public void updateVisitStatus(@CurrentUser AuthPrincipal principal,
                                    @PathVariable("id") String id,

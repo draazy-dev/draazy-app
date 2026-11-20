@@ -1,5 +1,6 @@
 package com.draazy.api.leads.conversation;
 
+import com.draazy.api.catalog.property.Property;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -11,10 +12,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-// Canonical party ordering keeps lookups as index seeks instead of OR scans.
-// Every finder relies on the the migration canonical pair ordering (`user_a_id < user_b_id`).
 public interface ConversationRepository extends JpaRepository<Conversation, UUID> {
-
     @Query("""
             select c from Conversation c
             where c.userAId = :userId or c.userBId = :userId
@@ -102,6 +100,11 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
                     or (blocker_id = :other and blocked_id = :one))
             """, nativeQuery = true)
     boolean blockedEitherWay(@Param("one") UUID one, @Param("other") UUID other);
+
+    @Query(value = "select exists (select 1 from conversations c join properties p on p.id = c.property_id"
+            + " where c.id = :id and p.archived and p.archive_reason = '" + Property.OWNER_DELETE_REASON + "')",
+            nativeQuery = true)
+    boolean aboutOwnerDeletedListing(@Param("id") UUID id);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """

@@ -11,10 +11,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Store feedback before building reports because these rows cannot be recreated later. */
 @RestController
 public class HelpFeedbackController {
-
     private final HelpFeedbackService service;
 
     public HelpFeedbackController(HelpFeedbackService service) {

@@ -1,10 +1,7 @@
-/* Fails the build when the gzip size of everything index.html loads before first paint (entry script, modulepreloads,
-   stylesheets) exceeds BUDGET_KB. BUDGET_KB is a ratchet: lower it when the path shrinks, make another namespace lazy rather than raise it. */
 import { gzipSync } from 'node:zlib';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** Current ceiling (KB gzip). TARGET is where §2 of the mobile review takes us. */
 const BUDGET_KB = 385;
 const TARGET_KB = 180;
 
@@ -18,8 +15,6 @@ if (!existsSync(HTML)) {
 
 const html = readFileSync(HTML, 'utf8');
 
-/* Same-origin only: a cross-origin <link> (Google Fonts) costs critical
-   path but is not a file we ship, so it cannot be measured from disk. */
 const local = (re) => [...html.matchAll(re)].map((m) => m[1]).filter((h) => h.startsWith('/'));
 
 const assets = [
@@ -28,8 +23,6 @@ const assets = [
   ...local(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/g),
 ];
 
-/* A gate that reports 0 KB because it found nothing is worse than no gate: it would
-   wave through every regression while looking green. */
 if (assets.length === 0) {
   console.error('✗ No local entry assets found in dist/index.html — the build output shape changed.');
   process.exit(1);

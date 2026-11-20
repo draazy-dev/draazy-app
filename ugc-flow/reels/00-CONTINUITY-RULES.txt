@@ -1,0 +1,165 @@
+CONTINUITY AND CREDIT RULES FOR EVERY REEL (read before any generation; overrides older notes)
+==============================================================================================
+Why this file exists: reel 1 plus its sign-off cost 91 credits, and about 56 of them went on retakes and fixes.
+Every rule below comes from one of those losses (see flow-ledger.csv).
+
+  LOSS (credits)                                            RULE THAT PREVENTS IT
+  phone held up in frame, r01-c1 t1 (6)                     R4 framing sentence; never mention a phone in the action
+  sad face, laughing, repeated words, r01-c1 t1-2 (incl.)   R5 expression line + "spoken exactly once"
+  Flow edit box used to fix a take, 6.2 s output (6)        R9 never fix a performance in the edit box
+  hoodie drifted open, r01-c3 t1 (6)                        R3 wardrobe lock, verbatim in every clip
+  brand line burned in as a caption, r00-signoff t1 (6)     R6 no-text first line in every prompt that says Draazy
+  length changed after a take was made, r00-signoff t2 (6) R8 decide length and trims before generating
+  window missing in clip 3 + sign-off: 2 video edits (20)   R1 one set + R2 look lock + R7 anchor frame
+  "Drauzzy" from a pronunciation hint (test takes)          R6 never respell or hint "Draazy"
+
+
+THE WORKFLOW FOR ONE REEL (in this order, no skipping)
+  0. Settings check: Flow can silently reset to Veo 3.1 Lite / 720p (10 credits). Before EVERY Generate read the
+     settings trigger: Video, Ingredients, 9:16, Gemini Omni Flash 1.1, 360p, 8 s, x1, and the cost: 6 credits for
+     8 s. Any other number: stop and ask the user.
+     From reel 4 the user chose native 720p (360p downloads are soft upscales): Omni 1.1 Flash, 720p, 8 s,
+     12 credits per clip. Download "720p Original size".
+  1. SET IMAGE (set.txt, 0 credits): Image, Nano Banana 2 Lite, 9:16, x2. The user picks one. It is the reel's set
+     reference and goes into every clip of the reel as an ingredient.
+  2. CLIP 1 (6 credits): character chip(s) + the set image. Visual check (below), then the user listens to the
+     DOWNLOADED file (the in-browser player lags). Clip 1 fixes the reel's look: approve it only if the set
+     landmarks in the look lock are all visible, because clips 2-3 will copy it.
+  3. ANCHOR FRAME (0 credits): open the approved clip 1, play it, pause in the silent hold near the end (lips closed,
+     neutral face; the time display is 00:SS:FF, FF = frames at about 24 fps), click "Save frame". The project
+     gets an image "Saved frame from <clip 1 title>". That image is rNN-anchor.
+  4. CLIPS 2-3 (6 credits each): chip(s) + set image + anchor frame. Visual check AGAINST THE ANCHOR, side by side,
+     then the user listens. Batch clips 2 and 3 only after clip 1 is approved.
+  5. DOWNLOAD 720p of each approved clip (0 credits) and assemble locally (brag-output\work\reels\ugc-r01 is
+     the template: hard cuts, overlays, sign-off pill, HTML end card with the real logo). 0 credits.
+  Ask the user before every Generate with: settings, ingredients, cost shown, credits left. Log every
+  generation in flow-ledger.csv.
+
+
+PROMPT RULES (every clip file already follows them; keep them when editing a prompt)
+  R1 ONE SET PER REEL. All clips of a reel are in the same place, at the same time of day, in the same outfit,
+     with the same framing. The story is told from that one spot. No time jumps, no location jumps.
+  R2 LOOK LOCK. The camera, set, wardrobe and light paragraphs are copied word for word into every clip of the
+     reel. Name 3-4 fixed landmarks and say where they sit in the frame ("on the left side of the frame...").
+     Never say "behind his right shoulder" (the selfie mirror makes left and right ambiguous). Only the action,
+     dialogue and audio lines change between clips.
+  R3 WARDROBE LOCK. Describe the outfit exactly as the character image and end with "The outfit stays the same for
+     the whole clip."
+  R4 FRAMING. Selfie: "a close-up from a phone held at arm's length ... from mid-chest up ... Both his hands are
+     out of frame." Two people: "a smartphone propped up ... a static, locked-off shot ... The camera does not
+     move." Never describe him holding or looking at a phone, except a speakerphone call that is heard, not seen.
+  R5 PERFORMANCE. Timed lines that fill the whole 8 s and end in a silent hold with lips closed. Complete,
+     connected sentences, "each line is spoken exactly once, nothing repeated, no other words". Expression is
+     dry, deadpan, wry or calm-hopeful: "Not laughing, not grinning, not sad."
+  R6 BRAND LINE. Any prompt that says Draazy opens with the no-text line ("Absolutely no text of any kind appears
+     on screen...") and writes plain "Draazy". Never add a respelling, phonetic hint or "as in ...".
+  R7 ANCHOR. Clips 2-3 attach rNN-anchor and say "Match the attached reference frame exactly". The set image
+     alone is not enough: reel 1's room image was attached to every clip and the window still vanished.
+     The anchor does not beat the prompt's set text: reel 3's c2 drew the gate + cabin from the text that c1 never showed.
+  R8 DECIDE FIRST. Length, line timing and how the clip is trimmed are fixed in the file before generating.
+     Don't change the spec after a take exists; that take becomes waste.
+  R9 FIXES. Never use the edit box ("Describe how to edit this video...") to change words, acting or length:
+     the output keeps the source length and loses context. The only edit allowed is the background-only
+     continuity edit below.
+  R10 VOICES. Ishaan and IshaanOutdoor use "Rasalgethi custom"; keep the proven voice sentence ("a 22-year-old
+     Indian college student...") in every prompt. Sana: "Achernar custom". Broker Bhaiya: "Sadachbia custom".
+  R11 HINDI WORDS. Flow's voice reads short Hinglish words as English ("das" -> "daaas", "band" -> "bandhh").
+     Write Hindi numbers that look like English words in Devanagari ("दस", "दो"). Same for place names:
+     "Wagholi" came out "Wgholi"; "वाघोली" was right first try (r05-c1).
+  R12 SET FROM TEXT. Omni ignores the set image's camera angle and light unless the prompt says them: r05-c1 t1
+     came out frontal and in daylight. Write the camera angle and "dusk" lighting into the look lock. "Deadpan,
+     tired" reads as sad: use "wry half-smile". Drop any detail the anchor doesn't show (r05's seat belt was
+     ignored twice, so clips 2-3 left it out).
+  R13 FILL THE SLOT. A spoken line must fill its time slot at about 3.6 words/s; a short line gets repeated by the
+     voice (r06-c1 t2 said "online hota hai" twice). Lengthen the line rather than the slot.
+  R14 SIGN-OFF APART. The tagline needs its own sentence after a silent beat (e.g. "...Draazy pe." 0.5 s beat,
+     then "Direct hai, easy hai, Draazy hai."). Written as one run, the voice joins it to the line before (r06-c3 t1).
+     To widen the beat in assembly, slow the silent frames (SEGS rate, e.g. 0.45) rather than jump-cutting: the
+     face never holds still, so a jump cut stutters.
+  R15 SET PROMPTS. Write "clean, premium" into every set prompt and name nothing you don't want drawn: "phone propped
+     on X" draws a phone, and set objects (a water tank) can carry a brand logo. Check the set image for both.
+  R16 MONTAGE. Cut-aways from earlier reels go in at assembly (muted video over the current clip's audio, one per
+     spoken word), never in the Flow prompt. Time them to the word with the clip's speech envelope and pitch.
+
+
+COMMON ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
+  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark (Flow's corner sparkle is fine)
+  [ ] each person matches their character chip: face, hair, skin with no moles; outfit exactly as the wardrobe lock
+      and unchanged for the whole clip
+  [ ] every landmark named in the look lock is visible in the same place as in the set image (clip 1) or the
+      anchor frame (clips 2-3); same camera distance, same light and colour; put the anchor next to the 4 s
+      screenshot and compare
+  [ ] no phone in frame unless the file allows it; hands look normal; nothing readable on any screen or sign
+  [ ] the action happens in the written order, nothing extra happens, never a sad face
+COMMON ACCEPT CHECK, AUDIO (the user listens to the downloaded file; Claude can't judge audio)
+  [ ] every line spoken once, in order, with no added or dropped words; lip-sync tight
+  [ ] each voice matches its saved character voice; no music
+  [ ] last clip: "Draazy" sounds like the plain brand name (not "Drauzzy", "Dray-zee", "Drazzy")
+
+
+WHEN A TAKE FAILS (cheapest fix first; one automatic retry per job, then stop and ask the user)
+  Performance and audio good, but the set or light drifted
+      -> CONTINUITY EDIT, 10 credits, keeps the audio and acting (proven on r01-c3 and the sign-off):
+         Video > Ingredients > Omni Flash 1.1, attach the drifted VIDEO plus rNN-anchor, the panel shows "Length
+         based on ingredient". Prompt template:
+           "Background-only edit of the attached video. Keep the person, his face, expression, lip movements,
+           timing, voice and audio exactly as they are; do not change any word or movement. Change only the
+           background so it matches the attached reference frame: <list the missing landmarks and where they
+           sit>. Same light and colour grade as the reference. Absolutely no text, captions or logos."
+  Words dropped, added, repeated or swapped           -> regenerate unchanged once (6 credits)
+  Draazy mispronounced                                -> regenerate unchanged once; never add a hint
+  Burned-in text                                      -> the first line must be the no-text line; regenerate
+  Face or outfit drift                                -> check the chip is a real chip and the ingredients are
+                                                         the right images, then regenerate
+  Phone in frame / wrong framing                      -> check the framing sentence was pasted in full; regenerate
+  Lip-sync poor twice                                 -> ask the user before trying Veo (costs more, no saved voice)
+
+
+FLOW UI NOTES (verified on this project)
+  - Ingredient picker: button[aria-label="Add ingredients to the prompt box"], click the [role=option] whose text
+    starts with the asset title, then "Add to prompt". A timed-out click silently attaches the FIRST asset: check
+    the ingredient thumbnails before generating.
+  - Character chips: type @ + exact name and click the CHARACTER suggestion. @Ishaan (hoodie) and @IshaanOutdoor
+    (overshirt) are different characters.
+  - "Extend" works only on Veo clips. Frames-to-video (first frame) is untested with character voices: don't use it.
+  - Downloads: "Download media" > 720p is free; judge audio from the file.
+  - Native 720p (Omni 1.1 Flash) costs 12 credits a clip. An EDIT set to 720p costs 20 credits but comes out at
+    360p (download offers only "360p Original" / "720p Upscaled"), and it also removes nearby objects: regenerate
+    instead.
+  - "Reuse prompt" on a tile's hover controls restores the prompt, chips and ingredients (anchor included)
+    exactly; it's the fastest way to rebuild the next clip.
+  - With the prompt box expanded, the first "Start generation" click only collapses it. Check that no new tile
+    appeared before clicking again, so a clip is never generated twice.
+  - A character chip can take up to ~10 s to render after picking the option; wait for it before pasting on.
+  - A phone or phone stand on the table appears at random even when the prompt says nothing about one;
+    check every take for it. Anchor frame + chips alone (no set image) held the set in r04-c2 and r04-c3.
+  - Image model defaults to Nano Banana 2.1: switch to "Nano Banana 2 Lite" (0 credits) before every set image.
+  - A mole or mark baked into a character image comes back in every clip whatever the prompt says. Fix the image
+    (a clean Nano Banana 2 Lite copy; r05 used B 77e4773f). Don't use the character editor for this: it outputs
+    16:9 and drifts the face.
+  - The viewer preview is a canvas, so the time can't be read from the DOM. Pause and save the anchor with JS clicks
+    on the aria-labels "Pause" and "Save frame". The saved frame appears as "Uploaded image" or "Saved frame
+    from ..."; check its id in the picker.
+  - A picker option can open a preview with its own "Add to prompt" button: that one needs a chrome click on its
+    snapshot uid (a JS click does nothing).
+  - Chips via execCommand: insert "@" and the name as two separate inserts, then pick the CHARACTER suggestion.
+  - A "Start generation" click can also be a no-op (box not collapsed, no tile, no charge). Verify both before
+    clicking again.
+  - The credit balance is only on the project page: button "Account details" (panel loads in ~6 s); close it with
+    "Close account panel" (Escape doesn't). Read it before and after each generation.
+  - Paste prompts with execCommand insertText. chrome type_text leaks keystrokes into Flow's shortcuts (it once
+    opened an old video's edit view). Fire "Start generation" with a chrome click on its uid; a JS .click() does
+    nothing.
+  - NEVER use execCommand insertParagraph (or Enter) in the video composer: each one SUBMITS the text so far as a
+    generation (r06 lost 84 credits to 7 partial-prompt submits). Paste the whole prompt as one paragraph.
+  - After picking a chip, wait ~1.5 s before pasting the rest: a paste right after can be reverted by the editor
+    (chip and text vanish). Re-check the length and hash before asking the user.
+  - Downloads land in Downloads as <GUID>.tmp, and tile titles repeat ("Man recording selfie video"), so old files
+    share the prefix. Take only files whose CreationTime is after the download click.
+  - Ingredients are cleared after every generation: re-add the set and anchor for each clip.
+  - "Reuse prompt" can restore x2 outputs: set x1 and recheck the cost. For a prompt with text before the chip,
+    Reuse prompt and then insert the leading paragraph at the start of the box. Verify the hash.
+  - The progress % isn't in innerText: wait for a generation by counting img[alt="Generated video thumbnail"]
+    until it goes up (about 40 s at 720p).
+  - Budget: credits reset on the 30th of each month. Plan: 17 clips x 6 = 102 credits for reels 2-7, plus about
+    one retake per reel and two continuity edits as reserve (worst case about 160).

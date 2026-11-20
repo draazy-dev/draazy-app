@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uploadedListingPhotos, uniqueMobile, signedInAs } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
@@ -70,6 +71,22 @@ test('owner finance transaction drives the API summary and the dashboard expense
 
   await expect(page.getByText('Rent received — August rent')).toBeVisible();
   await expect(page.getByText('Repairs — Plumbing repair')).toBeVisible();
+  await expect(page.getByText('₹24,000', { exact: true }), 'net cashflow leads the summary').toBeVisible();
+
+  await page.getByRole('button', { name: 'Expense', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Expense', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Rent received — August rent')).toHaveCount(0);
+  await expect(page.getByText('Repairs — Plumbing repair')).toBeVisible();
+
+  await page.getByRole('tab', { name: /Reports/i }).click();
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Export as CSV' }).click(),
+  ]);
+  const csv = await readFile(await download.path(), 'utf8');
+  expect(csv, 'the statement carries the server ledger').toContain('Plumbing repair');
+  expect(csv).toContain('August rent');
+
   await page.getByRole('tab', { name: /Insights/i }).click();
   await expect(page.getByText('Expense breakdown', { exact: true })).toBeVisible();
   await expect(page.locator('canvas').last()).toBeVisible();
@@ -113,4 +130,27 @@ test('saving or removing a transaction moves the figures on screen without re-re
   expect(calls.slice(loaded).map((c) => c.replace(/\/[0-9a-f-]{36}$/, ''))).toEqual(['POST transactions', 'DELETE transactions']);
   const emptied = await api('GET', `/me/finances/${owner.listing.id}/summary?period=all`, owner.headers);
   expect(emptied.body).toMatchObject({ income: 0, expense: 0, net: 0 });
+});
+
+test('Add transaction explains what is missing, and a double-click on Save records it once', async ({ page }) => {
+  const owner = await ownerWithListing();
+  await signedInAs(page, owner.mobile);
+  await page.goto('/dashboard#finances');
+
+  await page.getByRole('button', { name: 'Add transaction' }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(dialog.getByText('Choose a category.')).toBeVisible();
+  await expect(dialog.getByText('Enter an amount above zero.')).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Category' }).click();
+  await page.getByRole('option', { name: 'Rent received' }).click();
+  await dialog.locator('#tx-amount').fill('9000');
+  await dialog.getByRole('button', { name: 'Save', exact: true }).dblclick();
+  await expect(page.getByText('Transaction added')).toBeVisible();
+
+  await expect.poll(async () => {
+    const rows = await api('GET', `/me/finances/${owner.listing.id}/transactions?size=50`, owner.headers);
+    return (rows.body.content ?? rows.body).length;
+  }).toBe(1);
 });

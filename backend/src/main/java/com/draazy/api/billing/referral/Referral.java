@@ -9,12 +9,10 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 
-/** One redeemed referral and the signals its automatic decision used; see docs/flows/ops/referrals-fraud.md. */
 @Entity
 @Table(name = "referrals")
 @Getter
 public class Referral extends AuditedEntity {
-
     @Column(name = "referrer_id", updatable = false)
     private UUID referrerId;
 
@@ -30,11 +28,9 @@ public class Referral extends AuditedEntity {
     @Column(name = "channel", updatable = false)
     private String channel;
 
-    // How the link reached the referee; distinct from `channel`, the side of the marketplace they joined on.
     @Column(name = "share_channel", updatable = false)
     private String shareChannel;
 
-    // Human label of what the referrer earns; written when the track is decided.
     @Column(name = "reward")
     private String reward;
 
@@ -44,7 +40,6 @@ public class Referral extends AuditedEntity {
     @Column(name = "status", nullable = false)
     private String status;
 
-    // owner or seeker; the first qualifying event decides it, null until then.
     @Column(name = "track")
     private String track;
 
@@ -78,15 +73,12 @@ public class Referral extends AuditedEntity {
     @Column(name = "at", nullable = false, updatable = false)
     private Instant at;
 
-    // When the qualifying event happened; null until it does.
     @Column(name = "qualified_at")
     private Instant qualifiedAt;
 
-    // Evidence, not an association: no foreign key, so a withdrawn listing neither erases nor blocks it.
     @Column(name = "qualified_property_id")
     private UUID qualifiedPropertyId;
 
-    // When it began earning; starts the clawback window.
     @Column(name = "granted_at")
     private Instant grantedAt;
 
@@ -113,7 +105,6 @@ public class Referral extends AuditedEntity {
     private String handledReason;
 
     protected Referral() {
-        // JPA
     }
 
     Referral(UUID referrerId, String referrerMobile, String referred, String referredMobile,
@@ -144,7 +135,6 @@ public class Referral extends AuditedEntity {
         return ReferralStatuses.PENDING.equals(status);
     }
 
-    /** Records the first qualifying event; the status is then settled by one of the {@code auto*} moves. */
     void qualifyOn(String track, UUID propertyId, Instant eventAt, String rewardLabel, long amount) {
         this.track = track;
         this.qualifiedAt = eventAt;
@@ -174,7 +164,6 @@ public class Referral extends AuditedEntity {
         move(ReferralStatuses.CLAWED_BACK, ReferralStatuses.SYSTEM, reason, sentence);
     }
 
-    /** A staff override; the caller enforces the transition table so a refusal carries the right status. */
     void decide(String nextStatus, String handler, String reason) {
         this.holdUntil = null;
         if (ReferralStatuses.isGranting(nextStatus) && grantedAt == null) {

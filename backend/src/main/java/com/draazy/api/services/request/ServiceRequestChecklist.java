@@ -7,13 +7,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-// Same names/order as mock defaultDocs so the live swap keeps tracker columns.
 final class ServiceRequestChecklist {
-
     private ServiceRequestChecklist() {
     }
 
-    // Ordered map gives render order and category lookup without parallel structures.
     private static final Map<String, String> ITEMS = new LinkedHashMap<>();
 
     static {
@@ -75,7 +72,7 @@ final class ServiceRequestChecklist {
                         "Licensor " + number + " — Registered power of attorney");
             }
         }
-        items.put("ownership-proof", "Ownership proof (Index II / sale deed)");
+        items.put("ownership-proof", "Index II");
         List<Map<?, ?>> tenantRows = rows(state.get("tenants"));
         int tenants = Math.max(1, tenantRows.size());
         for (int i = 0; i < tenants; i++) {
@@ -88,17 +85,14 @@ final class ServiceRequestChecklist {
     }
 
     private static void personPapers(Map<String, String> items, String prefix, String label, Map<?, ?> party) {
-        items.put(prefix + "-pan", label + " — PAN card");
         String residency = residency(party);
         if ("resident".equals(residency)) {
-            items.put(prefix + "-aadhaar", label + " — Aadhaar card");
-        } else {
-            items.put(prefix + "-passport", label + " — Passport scan");
-            if ("foreign".equals(residency)) {
-                items.put(prefix + "-visa", label + " — Visa / OCI scan");
-            }
+            return;
         }
-        items.put(prefix + "-photo", label + " — Passport photo");
+        items.put(prefix + "-passport", label + " — Passport scan");
+        if ("foreign".equals(residency)) {
+            items.put(prefix + "-visa", label + " — Visa / OCI scan");
+        }
     }
 
     private static void tenantPolicePapers(Map<String, String> items, String prefix, String label, Map<?, ?> tenant) {
@@ -113,7 +107,7 @@ final class ServiceRequestChecklist {
             items.put(prefix + "-prevaddressproof", label + " — Previous address proof");
         }
         if (TenantPoliceRecordRules.requiresWorkplaceSection(tenant)) {
-            items.put(prefix + "-income", label + " — Work proof");
+            items.put(prefix + "-workidproof", label + " — Work ID proof");
         }
     }
 

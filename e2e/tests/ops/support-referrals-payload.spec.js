@@ -2,7 +2,7 @@ import { test, expect, ACTORS, STAFF } from '../../fixtures/live.js';
 import { API, apiLogin, authHeaders, seedConsent, staffSignInUi } from '../../helpers/liveAuth.js';
 
 /* Payload cost of the staff-side reads (support desk, referral desk, /admin/my-work, staff sign-in);
-   behaviour is covered by support-queue.spec.js and referrals.spec.js. */
+   behaviour is covered by support-chats.spec.js and referrals.spec.js. */
 
 const STAFF_USER_KEYS = ['id', 'name', 'mobile', 'email', 'role', 'permissions', 'desks'];
 const REFERRAL_KEYS = ['id', 'referrer', 'referrerMobile', 'referred', 'referredMobile', 'channel', 'reward',
@@ -10,17 +10,6 @@ const REFERRAL_KEYS = ['id', 'referrer', 'referrerMobile', 'referred', 'referred
   'activated', 'at', 'track', 'holdUntil', 'autoReason'];
 
 const searchOf = (url) => new URL(url).searchParams;
-
-async function raiseTicket(subject) {
-  const { accessToken } = await apiLogin(ACTORS.buyer);
-  const res = await fetch(`${API}/support/tickets`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ subject, category: 'payment', body: 'Payload check, please ignore.' }),
-  });
-  expect(res.status).toBe(201);
-  return (await res.json()).id;
-}
 
 test('a staff sign-in carries the slim identity and is not followed by an /auth/me read', async ({ page, consoleErrors }) => {
   const calls = [];
@@ -58,43 +47,47 @@ test('/admin/my-work is the caller and their own queues, nothing else', async ()
   }
 });
 
-test('the support desk reads counts once, and opening a ticket is a single read', async ({ page, login, consoleErrors }) => {
-  const subject = `Payload check ${Date.now().toString(36)}`;
-  const id = await raiseTicket(subject);
+test('the support inbox reads the list and counts once, and opening a chat is a single slim read', async ({ page, login, consoleErrors }) => {
+  const text = `Payload check ${Date.now().toString(36)}, please ignore.`;
+  const { accessToken, user } = await apiLogin(ACTORS.buyer);
+  const sent = await fetch(`${API}/support/chat/messages`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ text, about: null }),
+  });
+  expect(sent.status).toBe(201);
   await seedConsent(page);
   await login.asStaff('rental');
 
   const lists = [];
+  const counts = [];
   const opened = [];
   page.on('request', (req) => {
     const { pathname } = new URL(req.url());
-    if (pathname === '/api/admin/support-tickets') lists.push(searchOf(req.url()));
-    if (pathname.startsWith(`/api/support/tickets/${id}`)) opened.push(`${req.method()} ${pathname}`);
+    if (req.method() !== 'GET') return;
+    if (pathname === '/api/admin/support/chats') lists.push(searchOf(req.url()));
+    if (pathname === '/api/admin/support/chats/counts') counts.push(pathname);
+    if (pathname === `/api/admin/support/chats/${user.id}`) opened.push(pathname);
   });
-  let thread = null;
+  let chat = null;
   page.on('response', async (res) => {
-    if (new URL(res.url()).pathname === `/api/support/tickets/${id}` && res.status() === 200) thread = await res.json();
+    if (new URL(res.url()).pathname === `/api/admin/support/chats/${user.id}` && res.status() === 200) chat = await res.json();
   });
 
-  await page.goto('/ops/support');
-  const row = page.getByTestId('queue-row').filter({ hasText: subject });
+  await page.goto('/ops/support?view=all');
+  const row = page.getByTestId('support-chat-row').filter({ hasText: text });
   await expect(row).toBeVisible();
   expect(lists).toHaveLength(1);
-  expect(lists[0].get('counts')).toBe('true');
+  expect(lists[0].get('view')).toBe('all');
+  expect(counts).toHaveLength(1);
 
-  await page.getByRole('tab', { name: /^All/ }).click();
-  await expect.poll(() => lists.length).toBe(2);
-  expect(lists[1].get('counts')).toBeNull();
-
-  await page.getByRole('button', { name: 'Refresh' }).click();
-  await expect.poll(() => lists.length).toBe(3);
-  expect(lists[2].get('counts')).toBe('true');
-
-  await row.getByRole('button', { name: 'Reply' }).click();
-  await expect(page.getByRole('dialog').getByText('Payload check, please ignore.')).toBeVisible();
-  expect(opened).toEqual([`GET /api/support/tickets/${id}`]);
-  expect(thread.messages.length).toBeGreaterThan(0);
-  for (const message of thread.messages) {
+  await row.click();
+  await expect(page.getByTestId('staff-chat').getByText(text)).toBeVisible();
+  expect(opened).toHaveLength(1);
+  expect(lists).toHaveLength(1);
+  expect(Object.keys(chat.user).sort()).toEqual(['id', 'idVerified', 'mobile', 'name', 'roles']);
+  expect(chat.user.mobile).not.toBe(ACTORS.buyer);
+  for (const message of chat.messages) {
     expect(message).not.toHaveProperty('authorId');
     expect(message).not.toHaveProperty('attachments');
   }

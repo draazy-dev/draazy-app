@@ -1,5 +1,3 @@
-/* A guide makes /locality/<slug> indexable before the area has listings, so each is also written to
-   dist/locality/<slug>.html at build, as are the hub and the sitemap rows. */
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createRenderer, parseFrontmatter } from './vite-plugin-help-content.mjs';
@@ -159,7 +157,6 @@ ${zones.join('\n')}
   return renderPage(shell, head, body);
 }
 
-/** @param {{ root?: string, siteUrl?: string }} [options] */
 export default function localityGuidesPlugin(options = {}) {
   const root = options.root || process.cwd();
   const siteUrl = (options.siteUrl || 'https://draazy.com').replace(/\/$/, '');

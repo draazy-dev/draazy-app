@@ -2,8 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { listSaved, listSavedKeys, saveProperty, unsaveProperty } from '../services/savedService.js';
 import { useAuth } from './AuthContext.jsx';
 
-/* Saved membership is held as keys, so result cards answer from memory and the shell never
-   downloads the cards themselves; the pages that draw them read `useSavedItems`. */
 const SavedContext = createContext(null);
 
 const ITEMS_PAGE_SIZE = 100;
@@ -11,7 +9,6 @@ const FOREGROUND_RELOAD_MS = 30000;
 
 export function SavedProvider({ children }) {
   const { isIn } = useAuth();
-  // routing token (slug || uuid) -> uuid, because the writes take the uuid
   const [keys, setKeys] = useState(() => new Map());
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(isIn ? 'loading' : 'ready');
@@ -20,8 +17,15 @@ export function SavedProvider({ children }) {
   const keysRef = useRef(keys);
   const busyRef = useRef(new Set());
   const lastForegroundReload = useRef(0);
+  const writes = useRef(0);
 
   useEffect(() => { keysRef.current = keys; }, [keys]);
+
+  const readKeys = useCallback(async () => {
+    const seen = writes.current;
+    const rows = await listSavedKeys();
+    return seen === writes.current ? rows : listSavedKeys();
+  }, []);
 
   const applyKeys = useCallback((rows) => {
     setKeys(new Map(rows.map((k) => [k.token, k.uuid])));
@@ -38,11 +42,11 @@ export function SavedProvider({ children }) {
       setLoading(true);
       setStatus('loading');
     }
-    const rows = await listSavedKeys();
+    const rows = await readKeys();
     applyKeys(rows);
     if (!silent) setLoading(false);
     return rows;
-  }, [applyKeys, isIn]);
+  }, [applyKeys, isIn, readKeys]);
 
   useEffect(() => {
     if (!isIn) {
@@ -53,7 +57,7 @@ export function SavedProvider({ children }) {
     let alive = true;
     setLoading(true);
     setStatus('loading');
-    listSavedKeys()
+    readKeys()
       .then((rows) => { if (alive) applyKeys(rows); })
       .catch((err) => {
         if (!alive) return;
@@ -64,7 +68,7 @@ export function SavedProvider({ children }) {
         if (alive) setLoading(false);
       });
     return () => { alive = false; };
-  }, [applyKeys, isIn]);
+  }, [applyKeys, isIn, readKeys]);
 
   useEffect(() => {
     if (!isIn) return undefined;
@@ -108,6 +112,8 @@ export function SavedProvider({ children }) {
     flip(next);
     try {
       if (next) await saveProperty(address); else await unsaveProperty(address);
+      writes.current += 1;
+      flip(next);
       return true;
     } catch (err) {
       setError(err);
@@ -121,7 +127,6 @@ export function SavedProvider({ children }) {
   const save = useCallback((id, uuid) => write(id, uuid, true), [write]);
   const unsave = useCallback((id, uuid) => write(id, uuid, false), [write]);
 
-  /** Two identifiers, deliberately: `id` is the routing token this context keys on, `uuid` the row's primary key. */
   const toggle = useCallback(async (id, uuid) => {
     const next = !keysRef.current.has(id);
     const ok = await write(id, uuid, next);
@@ -146,14 +151,10 @@ export function SavedProvider({ children }) {
   return <SavedContext.Provider value={value}>{children}</SavedContext.Provider>;
 }
 
-/* Null-safe stub outside the provider so a component rendered in isolation degrades to "nothing
-   saved" instead of throwing on `.has`. */
 export function useSaved() {
   return useContext(SavedContext) ?? EMPTY;
 }
 
-/** The shortlist's cards, for the pages that draw them. Re-read only when the key set gains an id
- * (or, for a short `size`, loses one that may have hidden others); removals filter locally. */
 export function useSavedItems({ size = ITEMS_PAGE_SIZE } = {}) {
   const saved = useSaved();
   const { isIn } = useAuth();
@@ -186,7 +187,6 @@ export function useSavedItems({ size = ITEMS_PAGE_SIZE } = {}) {
       setStatus('ready');
       return;
     }
-    // A heart mid-write is in `ids` before the server has the row; read once the write settles.
     if (keysStatus !== 'ready' || busyIds.size) return;
     const prev = loadedFor.current;
     const stale = !prev

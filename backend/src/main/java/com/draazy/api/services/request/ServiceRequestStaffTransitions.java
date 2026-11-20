@@ -12,26 +12,27 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ServiceRequestStaffTransitions {
-
     private final ServiceRequestService requests;
     private final ServiceRequestMessageRepository messages;
     private final ServiceRequestMapper mapper;
     private final AuditService audit;
     private final Notifier notifier;
+    private final ServiceRequestRefunds refunds;
 
     public ServiceRequestStaffTransitions(ServiceRequestService requests,
             ServiceRequestMessageRepository messages,
             ServiceRequestMapper mapper,
             AuditService audit,
-            Notifier notifier) {
+            Notifier notifier,
+            ServiceRequestRefunds refunds) {
         this.requests = requests;
         this.messages = messages;
         this.mapper = mapper;
         this.audit = audit;
         this.notifier = notifier;
+        this.refunds = refunds;
     }
 
-    // Assignment and acknowledgement are one act; no assigning work to someone else by id.
     @Transactional
     public ServiceRequestDto updateStatus(AuthPrincipal caller, String id, String status, String note) {
         ServiceRequest request = requests.opsAccessible(caller, id);
@@ -59,12 +60,11 @@ public class ServiceRequestStaffTransitions {
                 "from", from.wire(), "to", target.wire(), "note", note,
                 "heldBy", heldBy == null ? null : heldBy.toString());
         if (target == ServiceRequestStatus.CANCELLED) {
-            announceCancellation(caller, request, reason);
+            announceCancellation(caller, request, reason, refunds.raiseOnCancel(caller, request, reason));
         }
         return mapper.toDto(request, caller);
     }
 
-    // The shared StatusUpdate schema cannot make `note` required for one target, so it is enforced here.
     private static String reasonFor(ServiceRequestStatus target, String note) {
         String reason = note == null || note.isBlank() ? null : note.trim();
         if (target == ServiceRequestStatus.CANCELLED && reason == null) {
@@ -74,7 +74,6 @@ public class ServiceRequestStaffTransitions {
         return reason;
     }
 
-    // Managers/admins are exempt: there is no release verb, so a leaver's matter must stay drainable.
     private void refuseSeizure(AuthPrincipal caller, UUID heldBy) {
         if (heldBy == null || heldBy.equals(caller.userId())
                 || Roles.Wire.ADMIN.equals(caller.role()) || Roles.Wire.MANAGER.equals(caller.role())) {
@@ -85,13 +84,14 @@ public class ServiceRequestStaffTransitions {
                 "%s is already working this request. Ask them to hand it over, or ask an admin to reassign it.".formatted(holder == null ? "Another operator" : holder));
     }
 
-    // Runs in the caller's transaction (see Notifier), so a rolled-back cancel announces nothing.
-    private void announceCancellation(AuthPrincipal caller, ServiceRequest request, String reason) {
+    private void announceCancellation(AuthPrincipal caller, ServiceRequest request, String reason, long refund) {
         messages.save(new ServiceRequestMessage(
                 request.getId(), caller.userId(), caller.role(), reason));
+        String refundLine = refund < 1 ? "" : (reason.matches("(?s).*[.!?]") ? " " : ". ") + "Your "
+                + Notifier.rupees(refund) + " refund is waiting for approval. We'll tell you when it's sent.";
         notifier.notify(request.getRequesterId(), "service.cancelled",
                 "Your request was cancelled",
-                "Our team cancelled this request: " + reason,
+                "Our team cancelled this request: " + reason + refundLine,
                 ServiceRequestTypes.pageFor(request.getType()));
     }
 }

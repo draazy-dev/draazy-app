@@ -3,6 +3,7 @@ package com.draazy.api.billing.plan;
 import com.draazy.api.billing.credit.CreditNotes;
 import com.draazy.api.billing.refund.RefundStaffAlerts;
 import com.draazy.api.catalog.listing.ListingDuplicateProbe;
+import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
@@ -32,10 +33,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** The listing-pass rules: what a pass may be bought for, and what activating one does to its listing. */
 @Component
 class ListingPasses {
-
     private static final Logger log = LoggerFactory.getLogger(ListingPasses.class);
 
     private static final int MAX_REFUNDS_PER_RUN = 50;
@@ -81,7 +80,7 @@ class ListingPasses {
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
-    UUID requireBuyable(UUID ownerId, String propertyId) {
+    UUID requireBuyable(UUID ownerId, String propertyId, String passDeal) {
         UUID id = Ids.parseUuid(propertyId)
                 .orElseThrow(() -> new ValidationException("propertyId is required for a listing pass"));
         Property property = properties.findByIdAndOwner_Id(id, ownerId)
@@ -89,20 +88,22 @@ class ListingPasses {
         if (property.isArchived() || !BUYABLE_STATUSES.contains(property.getStatus())) {
             throw new ConflictException("A listing pass can only be bought for a pending, live or paused listing.");
         }
+        if (passDeal != null && !passDeal.equalsIgnoreCase(property.getDeal())) {
+            throw new ConflictException(DealIntent.BUY.equalsIgnoreCase(property.getDeal())
+                    ? "This is a sale listing. Choose the Sale Listing Pass."
+                    : "This is a rent listing. Choose the Rent Listing Pass.");
+        }
         if (properties.hasActivePass(id, Instant.now())) {
             throw new ConflictException("This listing already has an active listing pass.");
         }
         return id;
     }
 
-    /** Locks the listing row, then re-reads the pass under lock, so a terminal transition that ended it is seen
-     * and a webhook cannot act on a stale copy. */
     void lock(Subscription pass) {
         properties.findForVerificationDecision(pass.getPropertyId());
         entityManager.refresh(pass, LockModeType.PESSIMISTIC_WRITE);
     }
 
-    /** A paused listing is the one the owner bought the pass to bring back. */
     void resumeIfPaused(Subscription pass) {
         properties.findForVerificationDecision(pass.getPropertyId())
                 .filter(p -> !p.isArchived() && PropertyStatus.PAUSED.equals(p.getStatus()))
@@ -113,35 +114,36 @@ class ListingPasses {
                 });
     }
 
-    /** Money arrived for an order that cannot buy anything: it was cancelled, or its listing is off the market. */
     boolean isDead(Subscription pass) {
         if (SubscriptionStatuses.CANCELLED.equals(pass.getStatus())) {
             return true;
         }
-        return SubscriptionStatuses.PENDING.equals(pass.getStatus())
+        return pass.getPropertyId() != null && SubscriptionStatuses.PENDING.equals(pass.getStatus())
                 && properties.findById(pass.getPropertyId())
                         .map(p -> p.isArchived() || PropertyStatus.RENTED.equals(p.getStatus())
                                 || PropertyStatus.SOLD.equals(p.getStatus()))
                         .orElse(true);
     }
 
-    /** Records the refund as due and tells the owner. The gateway call is {@link #sendDueRefunds}'s, so no
-     * HTTP happens inside the webhook's transaction. */
     void refund(Subscription pass, Instant now) {
+        boolean listingGone = pass.getPropertyId() != null
+                && !SubscriptionStatuses.CANCELLED.equals(pass.getStatus());
         pass.abandonCheckout();
-        if (pass.markRefundDue(now)) {
+        if (pass.markRefundDue(now, null,
+                listingGone ? RefundReasons.LISTING_GONE : RefundReasons.PAID_AFTER_CANCEL)) {
             audit.record("system", "admin", "subscription.passRefundDue", "subscription",
                     pass.getId().toString(), null,
                     "{\"amount\":" + pass.getAmount() + ",\"order\":\"" + pass.getPaymentRef() + "\"}");
             notifier.notify(pass.getUserId(), "subscription.refund",
                     Notifier.rupees(pass.getAmount()) + " will be refunded",
-                    "That listing is no longer live, so the pass was not activated and your payment goes back"
-                            + " to the account you paid from.", "/dashboard");
-            alertStaff(pass, pass.refundable(), "its listing is no longer live");
+                    (listingGone ? "That listing is no longer live" : "That order was cancelled before the payment"
+                            + " arrived") + ", so nothing was activated and your payment goes back to the account"
+                            + " you paid from.", "/dashboard");
+            alertStaff(pass, pass.refundable(), listingGone ? "its listing is no longer live"
+                    : "the order was cancelled before the payment arrived");
         }
     }
 
-    /** A signed paid callback whose sum or currency is not the order's grants nothing; the sum paid goes back. */
     boolean refundIfMismatched(Subscription order, Instant now, BigDecimal paid, String currency) {
         boolean wrongCurrency = currency != null && !currency.isBlank()
                 && !EXPECTED_CURRENCY.equalsIgnoreCase(currency);
@@ -151,7 +153,7 @@ class ListingPasses {
         }
         order.abandonCheckout();
         long back = paid == null ? order.getAmount() : paid.setScale(0, RoundingMode.DOWN).longValue();
-        if (order.markRefundDue(now, back)) {
+        if (order.markRefundDue(now, back, RefundReasons.AMOUNT_MISMATCH)) {
             audit.record("system", "admin", "subscription.amountMismatch", "subscription",
                     order.getId().toString(), Map.of("expected", order.getAmount(), "paid", String.valueOf(paid),
                             "currency", String.valueOf(currency), "order", order.getPaymentRef()));
@@ -171,7 +173,6 @@ class ListingPasses {
                 Notifier.rupees(amount) + " is going back on order " + order.getPaymentRef() + ": " + why + ".");
     }
 
-    /** One gateway call and one short transaction per row, so a refused refund leaves the others untouched. */
     int sendDueRefunds() {
         int sent = 0;
         for (Subscription due : subscriptions.findRefundsDue(Limit.of(MAX_REFUNDS_PER_RUN))) {
@@ -182,7 +183,6 @@ class ListingPasses {
         return sent;
     }
 
-    // The refund id derives from the subscription id, so a resend after a failed record is the same refund.
     private boolean settle(Subscription due) {
         String refundId = due.gatewayRefundId();
         String ref = send(due, refundId);
@@ -201,7 +201,6 @@ class ListingPasses {
         }
     }
 
-    // A refusal may mean the refund already exists (an earlier run sent it but could not record it).
     private String send(Subscription due, String refundId) {
         try {
             return gateway.refund(due.getPaymentRef(), due.refundable(), refundId, "Order not activated");
@@ -235,7 +234,6 @@ class ListingPasses {
                 "{\"amount\":" + pass.refundable() + ",\"gatewayRefund\":\"" + ref + "\"}");
     }
 
-    /** The gateway's refund status for one of our {@code lp_} refunds; false when the id is not one of ours. */
     boolean applyRefundWebhook(String refundId, String status, String gatewayRef) {
         Matcher m = refundId == null ? null : REFUND_ID.matcher(refundId);
         if (m == null || !m.matches()) {
@@ -255,6 +253,7 @@ class ListingPasses {
             if (pass.getRefundRef() == null) {
                 recordRefunded(pass, gatewayRef == null || gatewayRef.isBlank() ? refundId : gatewayRef);
             }
+            pass.refundSettled(Instant.now());
             creditNotes.issue(pass.getUserId(), CreditNotes.SUBSCRIPTION, pass.getId(), pass.getPaymentRef(),
                     pass.refundable(), Instant.now());
         } else if (REFUND_REFUSED.contains(status) && pass.getRefundDueAt() != null) {

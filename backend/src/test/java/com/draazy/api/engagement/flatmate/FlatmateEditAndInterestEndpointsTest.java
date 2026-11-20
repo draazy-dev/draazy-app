@@ -15,6 +15,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.IdentityCases;
 import com.draazy.api.support.UploadedPhotos;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
@@ -33,7 +34,6 @@ import org.springframework.http.MediaType;
 
 @DisplayName("Flatmates — publishing, editing, and taking an interest back")
 class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -43,7 +43,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
     @Autowired
     EntityManager entityManager;
 
-    /** Audit writes run {@code REQUIRES_NEW} and escape this test's rollback. */
     private final List<String> createdActors = new ArrayList<>();
     private final Map<UUID, String> hostPhotos = new HashMap<>();
 
@@ -58,41 +57,37 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
         u.setName(name);
         u.setMobileVerified(true);
         User saved = users.saveAndFlush(u);
+        IdentityCases.submitted(jdbc, saved.getId());
         createdActors.add(saved.getId().toString());
         return saved;
     }
 
     private String photoOf(User host) {
-        return hostPhotos.computeIfAbsent(host.getId(), UploadedPhotos::of);
+        return hostPhotos.computeIfAbsent(host.getId(),
+                id -> String.join("\",\"", UploadedPhotos.of(id), UploadedPhotos.of(id), UploadedPhotos.of(id)));
     }
 
     private String roomBody(User host, String locality, String society, long rentShare) {
         return withSocietyIds("""
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                 "furnishing":"semi","locality":"%s","society":"%s","rentShare":%d,
+                 "locality":"%s","society":"%s","rentShare":%d,
                  "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
                  "foodPref":"any","photos":["%s"],
                  "hostRole":"owner",
-                 "note":"Sunny room, quiet building."}
-                """.formatted(locality, society, rentShare, photoOf(host)));
+                 "note":"Sunny room, quiet building.",%s,%s}
+                """.formatted(locality, society, rentShare, photoOf(host), FlatmateRoomFixture.BASICS,
+                FlatmateRoomFixture.DETAILS));
     }
 
     private String liveRoomBody(User host, String locality, String society, long rentShare) {
         return roomBody(host, locality, society, rentShare)
                 .replace("\"hostRole\":\"owner\"",
-                        "\"hostRole\":\"tenant\",\"agreementDeclared\":true,"
+                        "\"hostRole\":\"tenant\",\"ownerConsentMobile\":\"9890000001\",\"agreementDeclared\":true,"
                                 + agreementEvidence(host));
     }
 
-    private String groupBody(User host, String title, String locality, String policy,
-        // `agreement` is what makes this tenant tier, and tenant tier is what publishes. An
-        // unpublished group cannot be joined: `findVisible` answers 404 for it.
-            int seats, int seatsOpen) {
-        return """
-                {"title":"%s","locality":"%s","policy":"%s","rent":40000,"agreement":true,
-                 "seats":%d,"seatsOpen":%d,"name":"Host","tags":["Vegetarian"],%s}
-                """.formatted(title, locality, policy, seats, seatsOpen,
-                agreementEvidence(host));
+    private String groupBody(String title, String locality, String policy, int seats, int seatsOpen) {
+        return FlatmateGroupFixture.hunting(title, locality, policy, 40000, seats, seatsOpen);
     }
 
     private static String idOf(String json) {
@@ -135,7 +130,7 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
         return approved("flatmate_groups", idOf(mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(groupBody(host, title, locality, policy, seats, seatsOpen)))
+                        .content(groupBody(title, locality, policy, seats, seatsOpen)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString()));
     }
@@ -143,7 +138,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("A newly written post")
     class Publishing {
-
         @Test
         @DisplayName("waits for Ops even when the host backed it with an agreement")
         void aTenantTierPostWaits() throws Exception {
@@ -175,7 +169,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("Editing a post")
     class Editing {
-
         @Test
         @DisplayName("changes the room the seeker sees, without a new id")
         void aRoomEditKeepsItsIdentity() throws Exception {
@@ -226,7 +219,7 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(stranger))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(liveRoomBody(host, "Baner", "Sunrise Heights", 1000)))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isNotFound());
         }
 
         @Test
@@ -239,22 +232,26 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(joiner)))
                     .andExpect(status().isCreated());
+            String requestId = jdbc.queryForObject(
+                    "select id::text from flatmate_requests where target_id = ?::uuid and requester_id = ?::uuid",
+                    String.class, id, joiner.getId().toString());
+            mvc.perform(patch(Routes.Flatmates.MY_REQUEST_BY_ID, requestId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"decision\":\"accepted\"}"))
+                    .andExpect(status().isOk());
 
-            // Seats move here and only here: PATCH .../seats adjusts how many of the existing seats
-            // are open. Growing is fine.
             mvc.perform(patch(Routes.Flatmates.GROUP_BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(groupBody(host, "Baner 3BHK", "Baner", "any", 4, 2)))
+                            .content(groupBody("Baner 3BHK", "Baner", "any", 4, 2)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.seatsTotal").value(4));
 
-            // Shrinking below the member count is an eviction, and no route means that. 400 rather
-            // than 422: the number is well-formed, the group it applies to makes it impossible.
             mvc.perform(patch(Routes.Flatmates.GROUP_BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(groupBody(host, "Baner 3BHK", "Baner", "any", 1, 0)))
+                            .content(groupBody("Baner 3BHK", "Baner", "any", 1, 0)))
                     .andExpect(status().isBadRequest());
         }
 
@@ -266,8 +263,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
             createRoom(host, "Kothrud", "Beta Towers");
             createRoom(host, "Wakad", "Gamma Towers");
 
-            // At the cap `evaluate` answers "blocked", and "duplicate" for this address, because it
-            // is a duplicate of itself. Copying the create path makes every edit here a 409.
             mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, first)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -297,7 +292,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("The seeker's own outbox")
     class Outbox {
-
         @Test
         @DisplayName("lists what this account asked for, named, across every kind of target")
         void listsInterestsWithTheirTargetNamed() throws Exception {
@@ -309,7 +303,7 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
-                                    {"message":"Call me on 9811000195."}
+                                    {"message":"Is the room still free?"}
                                     """))
                     .andExpect(status().isCreated());
 
@@ -333,8 +327,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isCreated());
 
-            // Contact in this feature is one-directional: the host decides, and accepting is what
-            // hands over a number. A read of "what I sent" must not become the back door.
             mvc.perform(get(Routes.Flatmates.MY_INTERESTS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isOk())
@@ -393,7 +385,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("The host's notification")
     class HostNotification {
-
         private String titleFor(User host) {
             List<String> titles = jdbc.queryForList(
                     "select title from notifications where user_id = ? and type = 'flatmate.room.interest'",
@@ -413,8 +404,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isCreated());
 
-            // Asserted positively first: without this, the nameless test below would still pass
-            // against a title that had stopped mentioning the seeker at all.
             assertThat(titleFor(host)).isEqualTo("Priya Kulkarni is interested in your room in Baner");
         }
 
@@ -444,9 +433,10 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isCreated());
 
             Map<String, Object> notification = jdbc.queryForMap("""
-                    select title, body from notifications
+                    select title, body, link from notifications
                      where user_id = ? and type = 'flatmate.room.interest'
                     """, host.getId());
+            assertThat(notification.get("link")).isEqualTo("/dashboard?tab=leads&box=received");
             assertThat((String) notification.get("title")).doesNotContainPattern("\\b\\d{10}\\b");
             assertThat((String) notification.get("body")).doesNotContainPattern("\\b\\d{10}\\b");
         }
@@ -455,9 +445,8 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("Withdrawing an interest")
     class Withdrawal {
-
         @Test
-        @DisplayName("removes the row, and lets the same person ask again afterwards")
+        @DisplayName("removes the row, and lets the same person ask again after the 7-day wait")
         void withdrawalIsAnUndoRatherThanALockout() throws Exception {
             User host = user("9811000116", "Host Four");
             User seeker = user("9811000117", "Asker Four");
@@ -476,6 +465,15 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content").isEmpty());
 
+            mvc.perform(post(Routes.Flatmates.ROOM_INTEREST, roomId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error").value("recently_withdrawn"));
+
+            entityManager.flush();
+            jdbc.update("update flatmate_interest_withdrawals set withdrawn_at = now() - interval '8 days' "
+                    + "where requester_id = ?", seeker.getId());
+            entityManager.clear();
             mvc.perform(post(Routes.Flatmates.ROOM_INTEREST, roomId)
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isCreated());
@@ -501,8 +499,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                             .content("{\"decision\":\"accepted\"}"))
                     .andExpect(status().isOk());
 
-            // 409 and not 403: the row is the seeker's, it is its state that refuses. The host has
-            // acted on it, and on a group they would have given up a seat to do so.
             mvc.perform(delete(Routes.Flatmates.INTEREST_BY_TARGET, "room", roomId)
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isConflict())
@@ -526,7 +522,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("The verified-only facet")
     class VerifiedOnly {
-
         @Test
         @DisplayName("filters on the server, so it survives past the first page")
         void keepsOnlyVerifiedRooms() throws Exception {
@@ -535,8 +530,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
             String verifiedRoom = createRoom(badged, "Hinjewadi", "Verified Court");
             String plainRoom = createRoom(plain, "Hinjewadi", "Unverified Court");
 
-            // Reaching owner tier honestly needs a property, an owner and an approval, none of
-            // which this test is about; the question is only whether the *server* drops the other row.
             jdbc.update("update flatmate_rooms set verification_tier = 'owner' where id = ?::uuid",
                     verifiedRoom);
 
@@ -555,8 +548,6 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
             User plain = user("9811000124", "Plain Host Two");
             String id = createRoom(plain, "Viman Nagar", "Ordinary Court");
 
-            // A client that always sends the toggle's state should need no special case for off,
-            // which is why the parameter is a Boolean and `false` widens rather than narrows.
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in")
                             .param("locality", "Viman Nagar")
                             .param("verifiedOnly", "false")

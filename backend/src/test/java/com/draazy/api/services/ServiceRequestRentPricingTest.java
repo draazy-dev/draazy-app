@@ -13,16 +13,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// The statutory half of the bill is computed from the customer's own terms, never read as a flat published figure.
 @DisplayName("Rent agreement pricing — the statutory charges are computed, not published")
 class ServiceRequestRentPricingTest extends ServiceFixtures {
-
     private static final int PLATFORM_HALF = 499;
 
     @Test
     @DisplayName("the published rent schedule states no flat stamp duty or registration")
     void statutoryLinesAreNotPublished() throws Exception {
-
         mvc.perform(get("/fees"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].deal").value("rent"))
@@ -31,8 +28,6 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                 .andExpect(jsonPath("$[0].registration").doesNotExist());
     }
 
-    // The non-refundable deposit lives only in the wizard's `_state` snapshot, so a pricer reading the top level
-    // alone would undercharge.
     @Test
     @DisplayName("a request that states its terms is charged the real Art. 36A duty")
     void pricesFromTheStatedTerms() throws Exception {
@@ -45,11 +40,15 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .content(terms(p, 32_000, 150_000, "11", "Municipal / Urban")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("awaiting-payment"))
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1000 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 918 + 1000 + 300))
+                .andExpect(jsonPath("$.charges.platformFee").value(PLATFORM_HALF))
+                .andExpect(jsonPath("$.charges.stampDuty").value(918))
+                .andExpect(jsonPath("$.charges.exactDutyInPaise").value(91_750))
+                .andExpect(jsonPath("$.charges.registration").value(1000))
+                .andExpect(jsonPath("$.charges.handling").value(300))
+                .andExpect(jsonPath("$.charges.referralCredit").value(false));
     }
 
-    // It is not: a statutory figure derived from a rent nobody stated is a wrong number wearing the clothes of a
-    // right one, and ops cannot draw the agreement from this request either.
     @Test
     @DisplayName("a customer who says Rural in a municipal locality is still charged ₹1,000")
     void customerCannotChooseTheCheaperFee() throws Exception {
@@ -61,12 +60,11 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(located(p, "false", "Rural")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1000 + 1000 + 300))
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 918 + 1000 + 300))
                 .andExpect(jsonPath("$.details.regArea").value("Municipal / Urban"))
                 .andExpect(jsonPath("$.details._state.regArea").value("urban"));
     }
 
-    /** A blank term is eleven months — the wizard's own default, so the two cannot diverge. */
     @Test
     @DisplayName("a property the customer says is under a gram panchayat is charged ₹500, whatever regArea says")
     void gramPanchayatAnswerIsRural() throws Exception {
@@ -78,7 +76,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(located(p, "true", "Municipal / Urban")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1000 + 500 + 300))
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 918 + 500 + 300))
                 .andExpect(jsonPath("$.details.regArea").value("Rural"))
                 .andExpect(jsonPath("$.details._state.regArea").value("rural"));
     }
@@ -114,7 +112,6 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    // Silently clamping it to the ceiling would bill a number the customer never asked for.
     @Test
     @DisplayName("a rural area smuggled into the terms snapshot is ignored")
     void termsSnapshotCannotChooseTheFee() throws Exception {
@@ -129,7 +126,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1000 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 918 + 1000 + 300));
     }
 
     @Test
@@ -147,7 +144,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1100 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1043 + 1000 + 300));
     }
 
     @Test
@@ -175,7 +172,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(terms(p, 32_000, 150_000, "", "Municipal / Urban")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1000 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 918 + 1000 + 300));
     }
 
     @Test
@@ -217,7 +214,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(escalated(p, "\"increment\":\"5\",\"incrementEvery\":\"12\"")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1200 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1175 + 1000 + 300));
     }
 
     @Test
@@ -231,7 +228,7 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(escalated(p, "\"increment\":\"5\"")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1200 + 1000 + 300));
+                .andExpect(jsonPath("$.amount").value(PLATFORM_HALF + 1178 + 1000 + 300));
     }
 
     @Test

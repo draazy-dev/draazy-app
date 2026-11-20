@@ -37,6 +37,7 @@ export function toRefundRow(dto) {
     amount: num(dto.amount),
     customerId: dto.customerId ?? null,
     customerName: dto.customerName || '',
+    customerMobile: dto.customerMobile || '',
     at: epoch(dto.requestedAt),
     decidedAt: epoch(dto.decidedAt),
     status: dto.status || 'pending_review',
@@ -45,6 +46,23 @@ export function toRefundRow(dto) {
     decisionReason: dto.decisionReason || '',
     creditNoteNo: dto.creditNoteNo || '',
     propertyId: dto.propertyId ?? null,
+    serviceRequestId: dto.serviceRequestId ?? null,
+    transaction: dto.transaction
+      ? {
+        paid: num(dto.transaction.paid),
+        paidAt: epoch(dto.transaction.paidAt),
+        orderStatus: dto.transaction.orderStatus || '',
+        invoiceNo: dto.transaction.invoiceNo || '',
+        refundReason: dto.transaction.refundReason || '',
+        refundAmount: dto.transaction.refundAmount == null ? null : num(dto.transaction.refundAmount),
+        refundDueAt: epoch(dto.transaction.refundDueAt),
+        refundState: dto.transaction.refundState || '',
+        refundSettledAt: epoch(dto.transaction.refundSettledAt),
+        gatewayRefund: dto.transaction.gatewayRefund || '',
+        refundAttempts: num(dto.transaction.refundAttempts),
+        refundTriedAt: epoch(dto.transaction.refundTriedAt),
+      }
+      : null,
     signals: dto.signals
       ? {
         refunds12m: num(dto.signals.refunds12m),

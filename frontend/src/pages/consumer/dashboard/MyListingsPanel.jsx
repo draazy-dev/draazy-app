@@ -1,47 +1,78 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Fragment, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { usePricing } from '../../../context/PricingContext';
 import Select from '../../../components/ui/Select.jsx';
 import Icon from '../../../components/Icon.jsx';
 import RefundGuarantee from '../../../components/billing/RefundGuarantee.jsx';
-import { confirmListingFresh, confirmOwnerListing, takeListingDown, pauseListing, resumeListing, myListingCard } from '../../../services/propertyService.js';
-import { deleteGroup, deletePost, deleteRoom, renewFlatmate, splitProperty, unsplitProperty } from '../../../services/flatmateService.js';
+import PassValueLine from '../../../components/billing/PassValueLine.jsx';
+import { passPriceKey, passSlug } from '../../../lib/dealPlans.js';
+import { confirmListingFresh, takeListingDown, pauseListing, resumeListing, myListingCard } from '../../../services/propertyService.js';
+import { deleteGroup, deletePost, deleteRoom, getOwnerHomes, renewFlatmate, splitProperty, unsplitProperty } from '../../../services/flatmateService.js';
 import { closeDeal, reopenDeal, reserveDeal } from '../../../services/dealService.js';
 import { composeOwnerProperties } from '../../../lib/data/ownerProperties.js';
 import { referralShareUrlNow } from '../../../lib/referralShare.js';
 import { usePrefetchReferralCode } from '../../../lib/usePrefetchReferralCode.js';
-import { getMyRooms, withRooms } from '../../../lib/data/myListings.js';
-import { publishManaged, deleteManaged, ensureManagedForListing } from '../../../services/managedService.js';
+import { flatmateCaseKey, getMyRooms, withRooms } from '../../../lib/data/myListings.js';
+import { deleteManaged, ensureManagedForListing } from '../../../services/managedService.js';
 import { listingFreshness } from '../../../lib/freshness.js';
 import { loadListingQuota } from '../../../lib/data/listingQuota.js';
 import { istToday } from '../../../lib/availability.js';
+import { useSingleFlight } from '../../../hooks/useSingleFlight.js';
 import { Card, SectionHead } from './components.jsx';
 import AttentionBanner from './myListings/AttentionBanner.jsx';
 import EmptyState from './myListings/EmptyState.jsx';
 import PrivateListingCard from './myListings/PrivateListingCard.jsx';
+import HomeRooms from './myListings/HomeRooms.jsx';
 import ListingCard from './myListings/ListingCard.jsx';
 import FinalizeDealModal from './myListings/FinalizeDealModal.jsx';
 import RelistModal from './myListings/RelistModal.jsx';
+import ConfirmModal from '../../../components/ui/ConfirmModal.jsx';
 import VerifyListingsBanner from './myListings/VerifyListingsBanner.jsx';
 import SplitFlatModal from '../flatmates/SplitFlatModal.jsx';
 import { useFlatmateEditing } from './myListings/useFlatmateEditing.jsx';
+import { UserError, userMessage } from '../../../lib/userMessage.js';
 
-/* Posts, groups, rooms and properties can share an id, so the kind is part of a row's identity. */
 const rowKey = (l) => `${l.flatmateGroup ? 'group' : l.flatmatePost ? 'post' : l.flatmate ? 'room' : 'property'}:${l.uuid || l.id}`;
+
+const NO_HOMES = { byManaged: new Map(), byListing: new Map() };
+
+function useOwnerHomes(managed) {
+  const [homes, setHomes] = useState(NO_HOMES);
+  const homeKey = managed.filter((m) => m.sourceRoomId).map((m) => `${m.id}:${m.publishedListingId}`).join(',');
+  useEffect(() => {
+    if (!homeKey) {
+      setHomes(NO_HOMES);
+      return undefined;
+    }
+    let live = true;
+    getOwnerHomes()
+      .then((rows) => {
+        if (!live) return;
+        setHomes({
+          byManaged: new Map(rows.map((h) => [h.managedId, h])),
+          byListing: new Map(rows.filter((h) => h.publishedListingId).map((h) => [String(h.publishedListingId), h])),
+        });
+      })
+      .catch(() => { if (live) setHomes(NO_HOMES); });
+    return () => { live = false; };
+  }, [homeKey]);
+  return homes;
+}
 
 export default function MyListingsPanel({ listings, listingsLoaded, setListings, managed = [], onManagedChanged, user, toast, openReview, reviewsByProp, onChanged }) {
   usePrefetchReferralCode();
   const { t } = useTranslation();
   const { fee } = usePricing();
   const listingsState = useMemo(() => composeOwnerProperties(listings, managed), [listings, managed]);
+  const homes = useOwnerHomes(managed);
   const [showDealModal, setShowDealModal] = useState(null);
-  // The rent listing the owner is carving into rooms, if any.
+  const [ask, setAsk] = useState(null);
+  const confirmAction = (opts) => new Promise((resolve) => setAsk({ ...opts, resolve }));
+  const settleAsk = (ok) => { ask.resolve(ok); setAsk(null); };
   const [splitTarget, setSplitTarget] = useState(null);
-  const [dealForm, setDealForm] = useState({ buyerName: '', buyerMobile: '', finalPrice: '', date: new Date().toISOString().slice(0, 10) });
+  const singleFlight = useSingleFlight();
   const navigate = useNavigate();
-  /* Lead counts, deal state and room splits all ride on the dashboard's own rows, so mounting this panel reads
-     nothing and an action re-reads only the row it moved. */
   const splitByProp = useMemo(() => {
     const map = {};
     listings.forEach((room) => {
@@ -64,7 +95,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   const dropRow = useCallback((l) => {
     setListings((rows) => rows.filter((r) => rowKey(r) !== rowKey(l)));
   }, [setListings]);
-  // A failed row read falls back to the dashboard's full refresh rather than leaving the row stale.
   const reloadRow = useCallback(async (l) => {
     try {
       patchRow(await myListingCard(l.uuid || l.id));
@@ -86,7 +116,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   const [quota, setQuota] = useState({ used: 0, allowance: null, passes: {} });
   const [resumeBlock, setResumeBlock] = useState(null);
   const [quotaTick, setQuotaTick] = useState(0);
-  // Slots held change only when a posted property is added, taken down, paused or resumed, not on every row patch.
   const postedCount = listingsState.filter((l) => !l.flatmate && !l.private).length;
   useEffect(() => {
     let live = true;
@@ -95,8 +124,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       .catch(() => { if (live) setQuota({ used: 0, allowance: null, passes: {} }); });
     return () => { live = false; };
   }, [user, postedCount, quotaTick]);
-  // Categorize each item so the type filter can group properties, flatmate rooms,
-  // flatmate requests and flatmate groups — the things a user can post.
 
   const catOf = (l) => (l.flatmateGroup ? 'group' : l.flatmatePost ? 'request' : l.flatmate ? 'room' : 'property');
   const counts = useMemo(() => {
@@ -104,8 +131,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     listingsState.forEach((l) => c[catOf(l)]++);
     return c;
   }, [listingsState]);
-  // Total across live properties (ADR-019 C2), so the verify nudge can attach to real interest
-  // rather than a generic pitch.
 
   const totalEnquiries = useMemo(
     () => listingsState.reduce((s, l) => (catOf(l) === 'property' ? s + (Number(l.enquiries) || 0) : s), 0),
@@ -113,7 +138,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   );
 
   const [typeFilter, setTypeFilter] = useState('all');
-  // Only surface filter options the user actually has something in.
   const filterOptions = useMemo(() => {
     const defs = [
       { value: 'all', label: 'All types', icon: 'layout-grid', badge: counts.all },
@@ -124,7 +148,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     ];
     return defs.filter((o) => o.value === 'all' || o.n > 0);
   }, [counts]);
-  // Reset to "all" when the active filter has no items left, e.g. after a delete.
 
   useEffect(() => {
     if (typeFilter !== 'all' && !filterOptions.some((o) => o.value === typeFilter)) setTypeFilter('all');
@@ -134,7 +157,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     () => (typeFilter === 'all' ? listingsState : listingsState.filter((l) => catOf(l) === typeFilter)),
     [listingsState, typeFilter],
   );
-  /* The deal routes take the property's UUID; `l.id` in the seam is its slug. */
 
   const dealIdOf = (l) => String(l.uuid || l.id);
 
@@ -144,51 +166,43 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       toast(`${l.title} marked as Under Offer`, 'success');
       await reloadRow(l);
     } catch (err) {
-      toast(err?.body?.error || err?.message || 'Could not mark under offer', 'error');
+      toast(userMessage(err, 'Could not mark under offer'), 'error');
     }
   };
 
-  const openFinalizeModal = (l) => {
-    setShowDealModal(l);
-    setDealForm({ buyerName: '', buyerMobile: '', finalPrice: l.price || '', date: new Date().toISOString().slice(0, 10) });
-  };
-
-  const handleFinalize = async () => {
+  const handleFinalize = (dealForm) => singleFlight(async () => {
     if (!showDealModal) return;
     const l = showDealModal;
     const isSale = l.deal === 'buy' || l.deal === 'sale';
     try {
-      // The server requires a positive agreed price and the counterparty's real ten-digit mobile,
-      // refusing a masked number; this modal is the only place that collects both.
       await closeDeal(dealIdOf(l), {
-        agreedPrice: parseFloat(dealForm.finalPrice) || l.price,
+        agreedPrice: dealForm.finalPrice,
         counterpartyMobile: dealForm.buyerMobile,
-        note: dealForm.buyerName ? `Closed with ${dealForm.buyerName} on ${dealForm.date}` : undefined,
+        note: `Closed with ${dealForm.buyerName} on ${dealForm.date}`,
       });
     } catch (err) {
-      toast(err?.body?.error || err?.message || 'Could not finalize the deal', 'error');
+      toast(userMessage(err, 'Could not finalize the deal'), 'error');
       return;
     }
     toast(isSale ? `${l.title} finalized as Sold!` : t('dash.tenancy.ownerClosedToast', { title: l.title }), 'success');
     setShowDealModal(null);
     setQuotaTick((n) => n + 1);
     await reloadRow(l);
-  };
+  });
 
-  const handleReopen = async (l, availableOn) => {
+  const handleReopen = (l, availableOn) => singleFlight(async () => {
     try {
       await reopenDeal(dealIdOf(l), availableOn);
     } catch (err) {
-      toast(err?.body?.error || err?.message || 'Could not reopen the listing', 'error');
+      toast(userMessage(err, 'Could not reopen the listing'), 'error');
       return false;
     }
     toast(`${l.title} reopened for listing`, 'success');
     setQuotaTick((n) => n + 1);
     await reloadRow(l);
     return true;
-  };
+  });
 
-  // `?relist=<id>&from=<date>` comes from the agreement-renewal strip; it is acted on once, then dropped from the URL.
   const location = useLocation();
   const relistRef = useRef(null);
   const [relist, setRelist] = useState(null);
@@ -216,15 +230,13 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     const { listing } = relist;
     if (await handleReopen(listing, date)) setRelist(null);
   };
-  /* Carve a live rent listing into per-room supply through the seam, so the rooms reach seekers rather than one
-     browser's localStorage. */
 
   const handleSplitConfirm = async ({ maxOccupants, rooms }) => {
     let created;
     try {
       created = await splitProperty(splitTarget?.uuid || splitTarget?.id, { maxOccupants, rooms });
     } catch (err) {
-      toast(err?.body?.error || err?.message || 'Could not list the rooms — please check the details.', 'error');
+      toast(userMessage(err, 'Could not list the rooms — please check the details.'), 'error');
       return;
     }
     setSplitTarget(null);
@@ -232,14 +244,12 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     const unbadged = (created?.rooms || []).some((r) => !r.verified);
     toast(
       unbadged
-        ? `${count} room${count > 1 ? 's' : ''} listed — they'll show as owner-verified once this property is approved.`
+        ? `${count} room${count > 1 ? 's' : ''} listed — they'll show as Verified property once this property is approved.`
         : `${count} room${count > 1 ? 's' : ''} listed in Flatmates`,
       'success',
     );
     await reloadRooms();
   };
-  /* Undoing a split is one decision about a flat, not a stack of per-room deletes — the per-room withdraw answers 409
-     `split_room` for exactly that reason. */
 
   const handleUnsplit = async (l) => {
     try {
@@ -248,7 +258,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       toast(
         err?.status === 409
           ? 'Someone has already moved in, so these rooms can\'t be withdrawn.'
-          : err?.body?.error || err?.message || 'Could not withdraw these rooms',
+          : userMessage(err, 'Could not withdraw these rooms'),
         'error',
       );
       return;
@@ -256,32 +266,25 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     toast(`${l.title} is no longer let room by room`, 'info');
     await reloadRooms();
   };
-  // The confirmation is stamped server-side and freshness is derived from that instant on read, so
-  // the row the call answers with is all there is to draw.
 
   const handleConfirmFresh = async (l) => {
     patchRow(await confirmListingFresh(l.id));
     toast(`"${l.title}" confirmed as available`, 'success');
   };
 
-  const handleConfirmListing = async (l) => {
-    try {
-      await confirmOwnerListing(l.uuid || l.id);
-      toast(`Thanks — "${l.title}" is now with our review team`, 'success');
-      await reloadRow(l);
-    } catch (err) {
-      toast(err?.body?.message || err?.message || 'Could not confirm this listing', 'error');
-    }
-  };
-
   const handlePause = async (l) => {
-    if (!window.confirm(t('listingLifecycle.pauseConfirm', { title: l.title }))) return;
+    const ok = await confirmAction({
+      title: t('listingLifecycle.pauseTitle'),
+      message: t('listingLifecycle.pauseConfirm', { title: l.title }),
+      confirmLabel: t('listingLifecycle.pause'),
+    });
+    if (!ok) return;
     try {
       patchRow(await pauseListing(l.uuid || l.id));
       setQuotaTick((n) => n + 1);
       toast(t('listingLifecycle.pauseToast', { title: l.title }), 'info');
     } catch (err) {
-      toast(err?.body?.message || err?.message || t('listingLifecycle.pauseError'), 'error');
+      toast(userMessage(err, t('listingLifecycle.pauseError')), 'error');
     }
   };
 
@@ -291,7 +294,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       toast(`"${l.title}" is back on the board for 30 days`, 'success');
       await onChanged?.();
     } catch (err) {
-      toast(err?.body?.message || err?.message || 'Could not renew this post', 'error');
+      toast(userMessage(err, 'Could not renew this post'), 'error');
     }
   };
 
@@ -303,10 +306,10 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       setQuotaTick((n) => n + 1);
     } catch (err) {
       if (err?.code === 'listing_quota_exhausted') {
-        setResumeBlock({ id: l.uuid || l.id, message: err.message });
+        setResumeBlock({ id: l.uuid || l.id, deal: l.deal, message: userMessage(err, t('listingLifecycle.resumeError')) });
         return;
       }
-      toast(err?.body?.message || err?.message || t('listingLifecycle.resumeError'), 'error');
+      toast(userMessage(err, t('listingLifecycle.resumeError')), 'error');
     }
   };
 
@@ -331,39 +334,38 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     }
     try {
       const created = await ensureManagedForListing(l);
-      if (!created?.id) throw new Error('Could not open property tools for this listing.');
+      if (!created?.id) throw new UserError('Could not open property tools for this listing.');
       await onManagedChanged?.();
       navigate(`/owner-hub/property/${created.id}`);
     } catch (err) {
-      toast(err?.message || 'Could not open property tools. Please try again.', 'error');
+      toast(userMessage(err, 'Could not open property tools. Please try again.'), 'error');
     }
   };
-  // Sequential rather than `Promise.all`: a burst of writes from one owner is exactly the shape
-  // that trips a rate limiter on the action the platform most wants owners to perform.
 
   const handleConfirmAll = async () => {
-    const stale = listingsState.filter((l) => !l.flatmate && listingFreshness(l).owner.cta);
+    const stale = listingsState.filter((l) => !l.flatmate && !l.archived && listingFreshness(l).owner.cta);
     for (const l of stale) patchRow(await confirmListingFresh(l.id));
     toast(`${stale.length} listing${stale.length === 1 ? '' : 's'} confirmed as available`, 'success');
   };
-  /* No WhatsApp chaser here: `POST /properties/{id}/outreach` 403s for an owner deliberately, since outreach is the
-     platform speaking *to* an owner — handing owners a message from us, to them, to send to themselves. */
-
-  // Listings (properties only) that need the owner's attention, for the nudge banner.
 
   const attentionListings = useMemo(
-    () => listingsState.filter((l) => !l.flatmate && listingFreshness(l).owner.cta),
+    () => listingsState.filter((l) => !l.flatmate && !l.archived && listingFreshness(l).owner.cta),
     [listingsState],
   );
   const dormantCount = useMemo(
-    () => listingsState.filter((l) => !l.flatmate && listingFreshness(l).state === 'dormant').length,
+    () => listingsState.filter((l) => !l.flatmate && !l.archived && listingFreshness(l).state === 'dormant').length,
     [listingsState],
   );
-  /* The branches are not interchangeable: a room is withdrawn through its own endpoint, which can 409 when its flat
-     shares one occupancy ledger — a refusal that has to reach the owner as words. */
 
   const handleDelete = async (l) => {
-    if (!window.confirm(`Take "${l.title}" down? Buyers will stop seeing it.`)) return;
+    const kind = l.flatmate || l.flatmatePost || l.flatmateGroup ? 'delete' : l.status === 'approved' ? 'takeDown' : 'withdraw';
+    const ok = await confirmAction({
+      title: t(`listingLifecycle.${kind}Title`),
+      message: t(`listingLifecycle.${kind}Confirm`, { title: l.title }),
+      confirmLabel: t(`listingLifecycle.${kind}Action`),
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       if (l.private) await deleteManaged(l.managedId);
@@ -372,27 +374,13 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       else if (l.flatmate) await deleteRoom(l.id);
       else await takeListingDown(l.uuid || l.id, user);
     } catch (e) {
-      toast(e?.message || `Could not take ${l.title} down. Please try again.`, 'error');
+      toast(userMessage(e, `Could not take ${l.title} down. Please try again.`), 'error');
       return;
     }
 
     toast(`${l.title} taken down`, 'info');
     if (l.private) await onManagedChanged?.();
     else dropRow(l);
-  };
-  /* Publish a managed-only property into the pending-review flow. */
-
-  const handlePublish = async (l) => {
-    let res;
-    try {
-      res = await publishManaged(l.managedId);
-    } catch (e) {
-      toast(e?.message || 'Could not publish this property. Please check its details.', 'error');
-      return;
-    }
-    if (res?.already) { toast('This property is already listed.', 'info'); return; }
-    toast('Submitted for review — buyers will see it once verified.', 'success');
-    await Promise.all([onManagedChanged?.(), onChanged?.()]);
   };
 
   return (
@@ -429,9 +417,10 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
             <div className="space-y-1">
               <span>{resumeBlock.message || t('listingLifecycle.resumeError')}</span>
               <RefundGuarantee kind="pass" className="text-xs text-emerald-300" />
+              <PassValueLine deal={resumeBlock.deal} className="text-xs text-amber-100/80" />
             </div>
-            <Link to={`/checkout?plan=listing-pass&property=${encodeURIComponent(resumeBlock.id)}`} className="btn-teal inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-xs font-semibold text-white">
-              {t('listingLifecycle.goLive', { price: fee('listingPass') })}
+            <Link to={`/checkout?plan=${passSlug(resumeBlock.deal)}&property=${encodeURIComponent(resumeBlock.id)}`} className="btn-teal inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-xs font-semibold text-white">
+              {t('listingLifecycle.goLive', { price: fee(passPriceKey(resumeBlock.deal)) })}
             </Link>
           </div>
         )}
@@ -444,54 +433,55 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
         ) : visibleListings.length === 0 ? (
           <p className="text-gray-500 text-sm text-center py-8">Nothing in this category yet. Try a different type.</p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {visibleListings.map((l) => (
               l.private ? (
                 <PrivateListingCard
                   key={l.id}
                   l={l}
-                  onPublish={handlePublish}
+                  home={homes.byManaged.get(l.managedId)}
                   onDelete={handleDelete}
                 />
               ) : (
-                <ListingCard
-                  key={l.id}
-                  l={l}
-                  split={splitOf(l)}
-                  review={reviewsByProp?.get(l.id) || null}
-                  navigate={navigate}
-                  openReview={openReview}
-                  onConfirmFresh={handleConfirmFresh}
-                  onConfirmListing={handleConfirmListing}
-                  onReopen={(row) => (row.deal === 'rent' ? setRelist({ listing: row, date: istToday() }) : handleReopen(row))}
-                  onMarkUnderOffer={handleMarkUnderOffer}
-                  onFinalize={openFinalizeModal}
-                  onDelete={handleDelete}
-                  onSplit={setSplitTarget}
-                  onUnsplit={handleUnsplit}
-                  onPause={handlePause}
-                  onResume={handleResume}
-                  onShare={handleShare}
-                  onOpenTools={handleOpenTools}
-                  onEditGroup={flatmateEditing.editGroup}
-                  onEditPost={flatmateEditing.editPost}
-                  onRenew={handleRenew}
-                  quota={quota}
-                  passPrice={fee('listingPass')}
-                  t={t}
-                />
+                <Fragment key={l.id}>
+                  <ListingCard
+                    l={l}
+                    split={splitOf(l)}
+                    review={reviewsByProp?.get(l.flatmate ? flatmateCaseKey(l) : l.id) || null}
+                    navigate={navigate}
+                    openReview={openReview}
+                    onConfirmFresh={handleConfirmFresh}
+                    onReopen={(row) => (row.deal === 'rent' ? setRelist({ listing: row, date: istToday() }) : handleReopen(row))}
+                    onMarkUnderOffer={handleMarkUnderOffer}
+                    onFinalize={setShowDealModal}
+                    onDelete={handleDelete}
+                    onSplit={setSplitTarget}
+                    onUnsplit={handleUnsplit}
+                    onPause={handlePause}
+                    onResume={handleResume}
+                    onShare={handleShare}
+                    onOpenTools={handleOpenTools}
+                    onEditGroup={flatmateEditing.editGroup}
+                    onEditPost={flatmateEditing.editPost}
+                    onRenew={handleRenew}
+                    quota={quota}
+                    passPrice={fee(passPriceKey(l.deal))}
+                    t={t}
+                  />
+                  {homes.byListing.get(String(l.uuid || l.id))?.rooms?.length > 0 && (
+                    <div className="rounded-xl bg-white/[0.03] overflow-hidden">
+                      <HomeRooms rooms={homes.byListing.get(String(l.uuid || l.id)).rooms} />
+                    </div>
+                  )}
+                </Fragment>
               )
             ))}
           </div>
         )}
       </Card>
-      {/* Finalize Deal Modal */}
-
       {showDealModal && (
         <FinalizeDealModal
           listing={showDealModal}
-          dealForm={dealForm}
-          setDealForm={setDealForm}
           onFinalize={handleFinalize}
           onClose={() => setShowDealModal(null)}
         />
@@ -499,7 +489,17 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       {relist && (
         <RelistModal listing={relist.listing} initialDate={relist.date} onConfirm={confirmRelist} onClose={() => setRelist(null)} />
       )}
-      {/* Let this flat room by room */}
+      {ask && (
+        <ConfirmModal
+          title={ask.title}
+          message={ask.message}
+          confirmLabel={ask.confirmLabel}
+          cancelLabel={t('listingLifecycle.confirmCancel')}
+          danger={ask.danger}
+          onConfirm={() => settleAsk(true)}
+          onCancel={() => settleAsk(false)}
+        />
+      )}
 
       {splitTarget && (
         <SplitFlatModal

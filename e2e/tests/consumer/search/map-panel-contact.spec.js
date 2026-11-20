@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { API, E2E_OTP, authHeaders, signedInAsNew, grantIdentityBadge, seedConsent, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { pickMarker } from '../../../helpers/mapMarker.js';
 
-/* Per ADR-019 the identity badge is a badge, not a gate: a signed-in buyer — verified or not —
+/* The identity badge is a badge, not a gate: a signed-in buyer — verified or not —
  * starts an in-app chat request from the drawer with no verification detour. */
 
 const SLUG = 'p5150';
@@ -32,9 +33,7 @@ async function banerVilla() {
 /** Open the map view and click the villa's marker. Returns the drawer, asserted open. */
 async function openDrawer(page, label) {
   await page.goto('/listings?deal=buy&view=map&loc=baner');
-  const marker = page.locator('.price-marker', { hasText: label }).first();
-  await marker.waitFor({ timeout: 20000 });
-  await marker.click();
+  await pickMarker(page, label);
 
   const drawer = page.locator('.dz-mdp');
   await expect(drawer, 'the marker click did not open the detail drawer').toBeVisible({ timeout: 10000 });
@@ -101,7 +100,7 @@ test('a verified buyer reaches the owner from the map drawer, in the app and not
   await drawer.getByRole('button', { name: /Contact Owner/i }).click();
 
   // Straight into the thread for this listing. No number-reveal popup, no interstitial.
-  await expect(page).toHaveURL(new RegExp(`/messages\\?openProp=${villa.slug}`, 'i'));
+  await expect(page).toHaveURL(new RegExp(`/messages\\?openProp=${villa.id}`, 'i'));
   await expect(page.getByText(/Waiting for the owner to accept/i)).toBeVisible({ timeout: 10000 });
 });
 
@@ -113,7 +112,7 @@ test('a signed-out buyer signs in inline from the map drawer and stays on the st
 
   await signInInlineFromDrawer(page, drawer, mobile);
 
-  const messagesUrl = new RegExp(`/messages\\?openProp=${villa.slug}`, 'i');
+  const messagesUrl = new RegExp(`/messages\\?openProp=${villa.id}`, 'i');
   await expect(page).toHaveURL(messagesUrl, { timeout: 20000 });
   await expect(page.getByText(/Waiting for the owner to accept/i)).toBeVisible({ timeout: 10000 });
   await page.waitForTimeout(500);
@@ -135,6 +134,6 @@ test('an unverified buyer reaches the same owner the same way (badge-not-gate, A
   const drawer = await openDrawer(page, label);
   await drawer.getByRole('button', { name: /Contact Owner/i }).click();
 
-  await expect(page).toHaveURL(new RegExp(`/messages\\?openProp=${villa.slug}`, 'i'));
+  await expect(page).toHaveURL(new RegExp(`/messages\\?openProp=${villa.id}`, 'i'));
   await expect(page.getByText(/Waiting for the owner to accept/i)).toBeVisible({ timeout: 10000 });
 });

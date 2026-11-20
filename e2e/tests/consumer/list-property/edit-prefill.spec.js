@@ -17,6 +17,10 @@ const DETAILS = {
   preferredTenants: ['family', 'bachelors'], petsPolicy: 'no', foodPref: 'veg',
   rentMaintMode: 'extra', possession: 'available', fixtures: [],
 };
+// A sale drops the tenancy answers on write.
+const SALE_DETAILS = Object.fromEntries(Object.entries(DETAILS).filter(([key]) => ![
+  'agreementDuration', 'lockIn', 'noticePeriod', 'preferredTenants', 'petsPolicy', 'foodPref', 'rentMaintMode',
+].includes(key)));
 const COMMERCIAL_DETAIL_KEYS = [
   'commercialType', 'washrooms', 'shellType', 'powerBackup', 'pantry', 'camCharges', 'suitableFor',
   'fixtures', 'fitOutMonths', 'escalationPct', 'tenancyStatus', 'inPlaceRent',
@@ -115,8 +119,16 @@ async function seedListing(page, request, { deal = 'rent', legacy = false } = {}
   expect(baseline.ownershipVerified).toBe(false);
   expect(baseline.verified).toBe(false);
   if (legacy) expect(baseline.formDetails == null).toBe(true);
-  else expect(baseline.formDetails).toEqual(DETAILS);
+  else expect(baseline.formDetails).toEqual(deal === 'rent' ? DETAILS : SALE_DETAILS);
   return { ...seeded, baseline };
+}
+
+// The seed quotes a RERA ID, which approval refuses until staff record the MahaRERA result.
+async function approveQuotingRera(request, id) {
+  const headers = await authHeaders(ACTORS.admin);
+  const checked = await request.post(`${API}/properties/${id}/rera-check`, { headers, data: { result: 'verified' } });
+  expect(checked.ok(), await checked.text()).toBe(true);
+  return approveListing(request, id, headers);
 }
 
 function listingRead(page, id) {
@@ -280,8 +292,8 @@ test('sale edit clears an optional maintenance amount without retaining a public
   expect(response.status(), 'clearing optional maintenance must succeed').toBe(200);
   expect(response.request().postDataJSON()).toEqual({ clearMaintenance: true });
 
-  const published = await approveListing(request, seeded.id, await authHeaders(ACTORS.admin));
-  expect(published.status()).toBe(200);
+  const published = await approveQuotingRera(request, seeded.id);
+  expect(published.status(), await published.text()).toBe(200);
   const publicListing = await request.get(`${API}/properties/${seeded.id}`);
   expect(publicListing.status()).toBe(200);
   expect(await publicListing.json()).not.toHaveProperty('maintenance');
@@ -301,8 +313,8 @@ test('a tenant-preference edit reaches the canonical field the rental facet sear
   expect((await patched).status(), 'a tenant-preference edit must succeed').toBe(200);
   expect((await patched).request().postDataJSON().tenants).toEqual(['family', 'bachelor-male']);
 
-  const published = await approveListing(request, seeded.id, await authHeaders(ACTORS.admin));
-  expect(published.status()).toBe(200);
+  const published = await approveQuotingRera(request, seeded.id);
+  expect(published.status(), await published.text()).toBe(200);
   const publicListing = await request.get(`${API}/properties/${seeded.id}`);
   expect(publicListing.status()).toBe(200);
   expect((await publicListing.json()).tenants).toEqual(['family', 'bachelor-male']);

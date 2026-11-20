@@ -1,0 +1,65 @@
+REEL 03 / CLIP 3 of 3 - TEASE + SIGN-OFF
+========================================
+JOB ID ............. r03-c3
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r03-c1 approved by the user AND r03-anchor saved
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p (download the approved take at 720p for 0 credits)
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+  Cost shown ....... 6 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r03-set (image) + r03-anchor (saved frame of the approved clip 1)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 15.4-23.1 s); the HTML end card follows
+
+PROMPT START
+Absolutely no text of any kind appears on screen at any moment: no subtitles, no captions, no title, no brand
+name written anywhere. The word Draazy is only spoken, never shown. A clean raw phone video like the previous
+clips.
+
+Vertical 9:16 smartphone selfie video, a close-up from a phone held at arm's length at eye level, framing
+[@IshaanOutdoor] Ishaan from mid-chest up in the centre of the frame. Both his hands are out of frame. The
+camera distance and angle stay the same for the whole clip.
+
+Set (the attached set image r03-set; the same in every clip of this reel): a clean, quiet road just outside the
+entrance of a premium township in Pune, on a bright sunny morning. On the left side of the
+frame, the closed modern entrance gate in brushed steel and glass, set in a light stone entrance wall that
+is completely plain, with no sign, no letters and no logo, with a small white security cabin beside the
+gate, the cabin empty. Behind the gate, tall slender white residential towers with white balcony bands and thin
+bronze vertical strips rise into a clear blue sky above a landscaped podium, with palms and dense green trees at
+their base. On the right side of the frame, a neat row of parked two-wheelers along a clean footpath lined with
+mature trees. There is no readable text anywhere: no signs, no number plates readable, no text. The background stays exactly the same for the whole clip. Match the
+attached reference frame exactly: the same camera distance and angle, the same background with every object in
+the same place, the same light and colour grade.
+
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. Clear skin with no moles, taper fade,
+light stubble. The outfit stays the same for the whole clip.
+
+He talks to the lens calm and hopeful, then confident. Not laughing, not grinning, not sad. Each line is spoken
+exactly once, nothing repeated, no other words.
+0.3-3.4 s, leaning slightly closer, voice lower and hopeful: "Socho, owner ka KYC done, aur property ke papers checked."
+3.6-7.6 s, Ishaan into the lens with a confident half-smile, eyebrows raised once on "Draazy", a tiny nod on "Bahut jald", slowly and clearly: "Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai."
+7.6-8.0 s: silent, lips closed, Ishaan holds the half-smile into the lens.
+
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking casual Hinglish
+with a natural Indian accent, clearly male and mid-pitched, conversational and fluent.
+
+Lighting and colour: soft, bright morning sunlight from the side, clear blue sky, true skin tones.
+Authentic Instagram UGC shot on a phone, natural skin texture, no beauty filter.
+
+Audio: a quiet morning lane, a distant scooter passing, birds chirping in the trees. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
+PROMPT END
+
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match r03-anchor side by side: closed steel-and-glass gate in a plain light stone wall (no sign) + empty white security cabin on the LEFT; tall white towers with bronze vertical strips behind it; parked two-wheelers + footpath trees on the RIGHT; bright morning sun, clear blue sky; no readable text anywhere
+  [ ] "KYC" said as letters (K-Y-C); the sign-off clearly audible; the tagline exactly "Direct hai, easy hai, Draazy hai"
+  [ ] no text on screen; "Draazy" said plainly, once, at about 5.5 s
+
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

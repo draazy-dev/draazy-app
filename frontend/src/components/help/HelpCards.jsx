@@ -1,7 +1,6 @@
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
-/* Small presentational pieces shared across the help centre pages. */
 
 export function Breadcrumbs({ trail }) {
   const { t } = useTranslation();
@@ -75,7 +74,6 @@ export function ArticleRow({ article }) {
     </Link>
   );
 }
-/** Shown when a category, search or filter produces nothing. */
 
 export function EmptyState({ icon = 'search', title, children }) {
   return (

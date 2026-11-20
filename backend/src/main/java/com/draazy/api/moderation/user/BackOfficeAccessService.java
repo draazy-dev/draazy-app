@@ -27,11 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Replaces one account's permission document; each write is audited since the table keeps only the current one.
- * Self-edit is refused: dropping {@code users:write} would lock the caller out. */
 @Service
 public class BackOfficeAccessService {
-
     private static final String DESK_PREFIX = BackOfficeFunctions.desk("");
 
     private final UserRepository users;
@@ -52,12 +49,10 @@ public class BackOfficeAccessService {
         this.adminNotifications = adminNotifications;
     }
 
-
     public List<BackOfficeFunctions.Function> functionCatalogue() {
         return BackOfficeFunctions.CATALOGUE;
     }
 
-    /** {@code GET /users/{id}/permissions}. */
     @Transactional(readOnly = true)
     public BackOfficeAccessResponse read(AuthPrincipal actor, String id) {
         User target = load(id);
@@ -77,8 +72,6 @@ public class BackOfficeAccessService {
                 List.copyOf(accountPermissions.desksFor(target.getRole(), target.getId())));
     }
 
-    /** Filled on the same terms as {@link #read}: an administrator reads any non-administrator,
-     * a manager only staff and itself. */
     @Transactional(readOnly = true)
     public List<TeamMemberResponse> roster(AuthPrincipal actor) {
         List<User> accounts = users.findBackOfficeAccounts();
@@ -94,7 +87,6 @@ public class BackOfficeAccessService {
                 .toList();
     }
 
-    /** The picker's view of {@link #roster}: active accounts only, and nothing but a name and the desks they work. */
     @Transactional(readOnly = true)
     public List<TeamAssignee> assignees(AuthPrincipal actor) {
         return roster(actor).stream()
@@ -121,7 +113,6 @@ public class BackOfficeAccessService {
                 : List.copyOf(BackOfficeFunctions.defaultForRole(target.getRole()));
     }
 
-    /** Wholesale as a merge cannot express "take this away"; an empty list is legal and means dashboard only. */
     @Transactional
     public BackOfficeAccessResponse replace(AuthPrincipal actor, String id,
             List<String> requested) {
@@ -142,7 +133,6 @@ public class BackOfficeAccessService {
         Set<String> actorCeiling = Roles.Wire.MANAGER.equals(actor.role())
                 ? accountPermissions.functionsFor(actor.role(), actor.userId())
                 : null;
-        // A manager may keep or remove what an administrator granted; only additions are capped.
         Set<String> held = accountPermissions.functionsFor(target.getRole(), target.getId());
         Set<String> names = new LinkedHashSet<>();
         for (String name : requested == null ? List.<String>of() : requested) {
@@ -174,7 +164,6 @@ public class BackOfficeAccessService {
         return read(actor, id);
     }
 
-    /** Unreadable rows give an empty list so the repair screen survives the row it repairs. */
     private List<String> parseStored(String raw) {
         try {
             JsonNode document = objectMapper.readTree(raw);

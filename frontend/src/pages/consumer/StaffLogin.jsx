@@ -11,8 +11,6 @@ import StaffShell, { StaffField, STAFF_SUBMIT } from '../../components/auth/Staf
 import OtpBoxes from '../../components/auth/OtpBoxes.jsx';
 import { portalBase } from '../../lib/adminModules.js';
 
-/* Password, then an authenticator code; a first sign-in sets the authenticator up and shows the
-   recovery codes once. The server decides role and functions. docs/flows/consumer/auth.md § Staff login */
 export default function StaffLogin() {
   const { staffVerify, staffConfirm } = useAuth();
   const navigate = useNavigate();
@@ -30,8 +28,6 @@ export default function StaffLogin() {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  /* Two separate questions: `safeInAppPath` (shared, so the doors cannot drift) answers "is it a
-     usable path", and the role checks answer "may this account go there". */
   const safeNext = (who) => {
     const n = safeInAppPath(params.get('next'));
     if (!n) return portalBase(who);
@@ -124,7 +120,7 @@ export default function StaffLogin() {
           <button
             type="button"
             onClick={() => navigator.clipboard?.writeText(recovery.codes.join('\n')).then(() => setCopied('Copied'), () => setCopied('Copy failed — write them down'))}
-            className="send-otp-btn w-full py-3 rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2"
+            className="send-otp-btn w-full h-btn-lg rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2"
           >
             <Copy className="w-4 h-4" /> <span aria-live="polite">{copied || 'Copy codes'}</span>
           </button>

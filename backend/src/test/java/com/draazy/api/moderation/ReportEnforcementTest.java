@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.moderation.report.Report;
@@ -17,6 +18,8 @@ import com.draazy.api.security.Roles;
 import com.draazy.api.security.Teams;
 import com.draazy.api.support.AbstractApiTest;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -26,10 +29,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** An {@code actioned} report with enforcement must change the target in one transaction, naming the moderator. */
 @DisplayName("Report triage — the decision reaches the thing that was reported")
 class ReportEnforcementTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -37,7 +38,6 @@ class ReportEnforcementTest extends AbstractApiTest {
     @Autowired
     ReportRepository reports;
 
-    /** Audit writes commit past rollback ({@code REQUIRES_NEW}); wipe them per actor to stay order-independent. */
     private final List<String> createdActors = new ArrayList<>();
 
     @AfterEach
@@ -82,9 +82,6 @@ class ReportEnforcementTest extends AbstractApiTest {
                 {"status":"%s","note":"upheld","enforcement":"%s"}""".formatted(status, enforcement);
     }
 
-    // ------------------------------------------------------------------ authorisation
-
-    /** Reading the queue is ops-only, acting more so: a buyer would learn every complaint and decide them. */
     @Test
     @DisplayName("a non-ops caller can neither read the queue nor decide a report")
     void buyerIsRefused() throws Exception {
@@ -102,12 +99,9 @@ class ReportEnforcementTest extends AbstractApiTest {
                         .content(triage("actioned", "hide_content")))
                 .andExpect(status().isForbidden());
 
-        // The refusal has to be a refusal, not a 403 on the way out of a method that already ran.
         assertThat(properties.findById(listing.getId()).orElseThrow().getStatus())
                 .isEqualTo(PropertyStatus.APPROVED);
     }
-
-    // ------------------------------------------------------------------ the decision lands
 
     @Test
     @DisplayName("actioned + hide_content takes the listing off the public site, attributed to the moderator")
@@ -127,12 +121,8 @@ class ReportEnforcementTest extends AbstractApiTest {
 
         Property after = properties.findById(listing.getId()).orElseThrow();
         assertThat(after.getStatus()).isEqualTo(PropertyStatus.FLAGGED);
-        // The reason is the half the owner and the next moderator actually read; a status change
-        // with no reason is a listing that went dark for no recorded cause.
         assertThat(after.getFlagReason()).contains("Reported: fake");
 
-        // Two audit rows, deliberately: one against the queue, one against the listing — an auditor
-        // must see why a listing went dark without knowing a report existed.
         assertThat(jdbc.queryForObject(
                 "select count(*) from audit_log where action = 'report.triage' and entity_id = ?",
                 Integer.class, filed.getId().toString())).isEqualTo(1);
@@ -159,9 +149,6 @@ class ReportEnforcementTest extends AbstractApiTest {
         assertThat(users.findById(offender.getId()).orElseThrow().isArchived()).isTrue();
     }
 
-    // ------------------------------------------------------------------ the refusals
-
-    /** "Dismissed, and also taken down" is a contradiction that would leave a self-contradicting audit trail. */
     @Test
     @DisplayName("an enforcement is refused unless the report is being upheld")
     void enforcementRequiresActioned() throws Exception {
@@ -182,7 +169,6 @@ class ReportEnforcementTest extends AbstractApiTest {
         assertThat(reports.findById(filed.getId()).orElseThrow().getStatus()).isEqualTo("open");
     }
 
-    /** The refusal must name the alternative, or the moderator will believe fake reviews can't be removed. */
     @Test
     @DisplayName("an unsupported target refuses by naming the endpoint that can do the job")
     void unsupportedTargetNamesTheAlternative() throws Exception {
@@ -199,7 +185,6 @@ class ReportEnforcementTest extends AbstractApiTest {
                         org.hamcrest.Matchers.containsString("/reviews/{id}/status")));
     }
 
-    /** A request with no enforcement is the pre-existing caller; it must still decide and touch nothing. */
     @Test
     @DisplayName("triage without an enforcement field still decides and still changes nothing")
     void absentEnforcementIsNone() throws Exception {
@@ -220,9 +205,6 @@ class ReportEnforcementTest extends AbstractApiTest {
                 .isEqualTo(PropertyStatus.APPROVED);
     }
 
-    // ------------------------------------------------------------------ filters
-
-    /** A client-side filter over one page silently stops being true once the queue outgrows the page. */
     @Test
     @DisplayName("the queue filters by reason and by target type, server-side")
     void queueFiltersServerSide() throws Exception {
@@ -247,11 +229,38 @@ class ReportEnforcementTest extends AbstractApiTest {
                         .value(org.hamcrest.Matchers.everyItem(
                                 org.hamcrest.Matchers.equalTo("fake"))));
 
-        // A mistyped filter must not read as "queue clear" — same appearance as a genuinely empty
-        // queue.
         mvc.perform(get("/reports").param("reason", "notareason")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("a report against a person names them in the queue, and one against a stranger id is refused")
+    void userReportNamesThePersonAndMustTargetOne() throws Exception {
+        User reporter = user("9800000241", "owner", "Reporter");
+        User offender = user("9800000242", "buyer", "Offender Name");
+        User staff = user("9800000243", "staff", "Ops");
+        Property listing = listing(reporter);
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/reports")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(reporter))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetType\":\"user\",\"targetId\":\"" + listing.getId()
+                                + "\",\"reason\":\"fraud\"}"))
+                .andExpect(status().isNotFound());
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/reports")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(reporter))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetType\":\"user\",\"targetId\":\"" + offender.getId()
+                                + "\",\"reason\":\"fraud\"}"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(get("/reports").param("targetType", "user")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].targetName").value("Offender Name"))
+                .andExpect(jsonPath("$.content[0].targetMobile").value("9800000242"));
     }
 
     @Test
@@ -287,14 +296,20 @@ class ReportEnforcementTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.counts").doesNotExist())
                 .andExpect(jsonPath("$.totalElements").value(org.hamcrest.Matchers.greaterThanOrEqualTo(3)));
+
+        Report lateYesterday = report("property", target, user("9800000236", "buyer", "Reporter 4"), "fake");
+        jdbc.update("update reports set created_at = ? where id = ?",
+                java.sql.Timestamp.from(LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                        .minus(1, ChronoUnit.MINUTES)),
+                lateYesterday.getId());
+        mvc.perform(get("/reports").param("sinceDays", "1").param("q", target.substring(0, 8))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(jsonPath("$.totalElements").value(3));
         mvc.perform(get("/reports").param("q", "zzz-no-such-report")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
-    // ------------------------------------------------------------------ the dashboard tile
-
-    /** The count comes from the queue's definition of outstanding, not a second copy of it. */
     @Test
     @DisplayName("the ops scorecard carries the reports backlog, counting claimed-but-undecided")
     void scorecardCarriesTheBacklog() throws Exception {

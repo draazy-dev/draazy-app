@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
 
-/* Cycling spans are aria-hidden; one sr-only label carries the full name so screen readers get no live-region
-   churn. Holds on the first word under prefers-reduced-motion. */
 const HERO_NOUNS = ['Home', 'Office', 'Shop', 'Plot'];
 
 const DEFAULT_WORD_CLASS =
   'bg-gradient-to-r from-teal-400 to-teal-500 bg-clip-text text-transparent';
 
-// "Home, Office, Shop or Plot" — the visible spread read as a single phrase.
 const srPhrase = (words) =>
   words.length > 1 ? `${words.slice(0, -1).join(', ')} or ${words[words.length - 1]}` : words[0];
 

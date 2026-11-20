@@ -3,7 +3,12 @@ import { API, apiLogin, authHeaders, uniqueMobile, uploadedListingPhotos } from 
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { trackErrors } from '../../../helpers/console.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays, shortLabel } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const track = flatmateCleanup(test);
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -12,15 +17,16 @@ const FALLBACK = /images\.unsplash\.com/;
 test.describe('LIVE: room card cover', () => {
   test('a room card shows the host\'s first photo, not the stock fallback', async ({ page }) => {
     const { accessToken } = await apiLogin(uniqueMobile());
-    const [COVER, SECOND] = await uploadedListingPhotos(accessToken, 2);
+    const [COVER, SECOND, THIRD] = await uploadedListingPhotos(accessToken, 3);
     const society = `Zztest Cover ${Date.now().toString(36)}`;
     const created = await fetch(`${API}/flatmates/rooms`, {
       method: 'POST',
       headers: auth(accessToken),
       body: JSON.stringify({
-        ...(await withSocietyId(accessToken, { society })), roomType: 'Private room', locality: 'Baner', rentShare: 17333, bhk: '2',
+        ...(await roomBasics(accessToken, { photos: 0 })),
+        ...(await withSocietyId(accessToken, { society })), roomType: 'Private room', locality: 'Baner', rentShare: 17333, deposit: 34666, bhk: '2',
         attachedBath: 'attached', furnishing: 'semi', lookingFor: 'any', foodPref: 'any',
-        availableFrom: '2026-12-01', hostRole: 'tenant', photos: [COVER, SECOND],
+        availableFrom: MOVE_IN, hostRole: 'tenant', photos: [COVER, SECOND, THIRD],
         ...(await tenantRoomAgreement(accessToken)),
       }),
     });
@@ -28,6 +34,7 @@ test.describe('LIVE: room card cover', () => {
     const room = await created.json();
     track('rooms', room.id, accessToken);
 
+    await tickDeskChecklist(API, room.id, await authHeaders(STAFF.rental));
     const published = await fetch(`${API}/admin/flatmates/${room.id}/moderation`, {
       method: 'PATCH',
       headers: await authHeaders(STAFF.rental),
@@ -40,18 +47,18 @@ test.describe('LIVE: room card cover', () => {
     expect(row, 'the published room should be on the public feed').toBeTruthy();
     expect(row.cover, 'the feed projects the first photo as the cover').toBe(COVER);
     expect(row.photos, 'the gallery itself stays on the detail read').toBeUndefined();
-    expect(row.availableFrom, "the card's Move-in column reads the room's date").toBe('2026-12-01');
+    expect(row.availableFrom, "the card's Move-in column reads the room's date").toBe(MOVE_IN);
 
     const errors = trackErrors(page);
     await page.goto('/flatmates');
-    await expect(page.getByRole('button', { name: /Move in now/i }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 30_000 });
     await page.getByPlaceholder(/^Try:/).fill(society);
     const card = page.locator(`[data-sf-id="r:${room.id}"]`);
     await expect(card).toBeVisible({ timeout: 15_000 });
     const img = card.locator('img').first();
     await expect(img).toHaveAttribute('src', COVER);
     await expect(img).not.toHaveAttribute('src', FALLBACK);
-    await expect(card.getByText('From 1 Dec')).toBeVisible();
+    await expect(card.getByText(`From ${shortLabel(MOVE_IN)}`)).toBeVisible();
     expect(errors.filter((e) => !/cdn\.example/.test(e)), `console errors: ${errors.join('\n')}`).toHaveLength(0);
   });
 });

@@ -1,8 +1,6 @@
 import { ExternalLink, Image as ImageIcon, MapPin, FileText } from 'lucide-react';
 import { titleCase } from '../../societies/helpers.jsx';
-
-/* Verbatim, because the details grid can only say a field was filled in: deciding whether a listing is real
-   means reading the prose, and a pending listing has no public page to read it on. */
+import RemovePhoto from './RemovePhoto.jsx';
 
 const text = (v) => (typeof v === 'string' ? v.trim() : '');
 const joined = (...parts) => parts.map(text).filter(Boolean).join(', ');
@@ -13,7 +11,6 @@ const dtClass = 'text-[11px] text-gray-500';
 const ddClass = 'mt-0.5 break-words text-sm font-semibold text-gray-100';
 const missing = <span className="font-medium text-amber-300">Not given</span>;
 
-/** Owner-supplied gallery text becomes `href` and `img src`, so only https or same-origin is allowed. */
 const safePhotoUrl = (src) => {
   if (typeof src !== 'string' || !src.trim()) return null;
   try {
@@ -24,7 +21,7 @@ const safePhotoUrl = (src) => {
   }
 };
 
-export function SubmittedPhotos({ listing }) {
+export function SubmittedPhotos({ listing, onPhotoRemoved }) {
   const photos = Array.isArray(listing.gallery) && listing.gallery.filter(Boolean).length
     ? listing.gallery.filter(Boolean)
     : [listing.image].filter(Boolean);
@@ -38,24 +35,26 @@ export function SubmittedPhotos({ listing }) {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {photos.map((raw, i) => {
             const src = safePhotoUrl(raw);
-            /* Keyed by position: nothing dedupes the gallery on the way in, and the list is never reordered
-               or re-sliced while open, so the index is the honest key. */
+            const key = `${raw}#${photos.slice(0, i).filter((p) => p === raw).length}`;
             if (!src) {
               return (
-                <p key={i} className="break-all rounded-xl border border-amber-400/30 bg-amber-400/5 p-2 text-xs text-amber-300">
+                <p key={key} className="break-all rounded-xl border border-amber-400/30 bg-amber-400/5 p-2 text-xs text-amber-300">
                   Not a usable photo address: {String(raw)}
                 </p>
               );
             }
             return (
-              <a key={i} href={src} target="_blank" rel="noreferrer" className="group block overflow-hidden rounded-xl border border-white/10">
-                <img
-                  src={src}
-                  alt={`Submitted ${i + 1} of ${listing.title || 'this listing'}`}
-                  loading="lazy"
-                  className="h-28 w-full object-cover transition group-hover:scale-105"
-                />
-              </a>
+              <div key={key}>
+                <a href={src} target="_blank" rel="noreferrer" className="group block overflow-hidden rounded-xl border border-white/10">
+                  <img
+                    src={src}
+                    alt={`Submitted ${i + 1} of ${listing.title || 'this listing'}`}
+                    loading="lazy"
+                    className="h-28 w-full object-cover transition group-hover:scale-105"
+                  />
+                </a>
+                {onPhotoRemoved ? <RemovePhoto listing={listing} photo={raw} onRemoved={onPhotoRemoved} /> : null}
+              </div>
             );
           })}
         </div>
@@ -94,7 +93,6 @@ export function SubmittedLocation({ listing }) {
   const society = text(d.society) || (listing.societySlug ? titleCase(listing.societySlug) : '');
   const unit = joined(d.flatNumber, d.tower);
   const near = joined(d.street, d.landmark);
-  /* The map pin is coordinates plus a Google Maps link, never owner prose. */
   const hasPin = Number.isFinite(listing.lat) && Number.isFinite(listing.lng);
   return (
     <div className={block}>

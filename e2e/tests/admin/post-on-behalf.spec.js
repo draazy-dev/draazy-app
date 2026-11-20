@@ -14,6 +14,7 @@ const listing = (title) => ({
   deal: 'rent',
   propertyType: 'Flat',
   price: 32000,
+  deposit: 64000,
   locality: 'Kharadi',
   city: 'Pune',
   bhk: 2,
@@ -217,7 +218,7 @@ test('the desk asks only the critical facts, and each one reaches the server', a
   await login.asAdmin();
   await page.goto('/admin/post-on-behalf');
 
-  await page.getByLabel('Internal Notes (optional)').fill('Zztest owner prefers calls after 6pm');
+  await page.getByLabel('Internal Notes').fill('Zztest owner prefers calls after 6pm');
   await ownerAndProperty(page, { name: 'Critical Owner', mobile: ownerMobile, carpetArea: '950' });
   await expect(page.getByRole('group', { name: 'Furnishing' })).toBeVisible();
   for (const gone of ['Amenities', 'Bathrooms', 'Balconies', 'Facing', 'Overlooking', 'Built-up Area (sq.ft)']) {
@@ -228,16 +229,16 @@ test('the desk asks only the critical facts, and each one reaches the server', a
   await page.getByLabel('Total floors').click();
   await page.getByRole('option', { name: '4', exact: true }).click();
   // Next, with nothing typed. The owner step must still be here, and the property step must not be.
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(page.getByText('Floor is above the total floors.')).toBeVisible();
   await page.getByLabel('Floor', { exact: true }).click();
   await page.getByRole('option', { name: 'Ground', exact: true }).click();
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
 
   await pickPlaceholderLocality(page, 'Wakad');
   await expect(page.getByText('Landmark', { exact: true })).toHaveCount(0);
   await pickGoogleSociety(page, 'Zztest Desk Heights', { input: page.locator('#pob-society') });
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
 
   await page.locator('#pob-price').fill('24000');
   // A deposit, which this test does not care about -- it is the control for the one below. See the
@@ -246,7 +247,7 @@ test('the desk asks only the critical facts, and each one reaches the server', a
   for (const gone of ['Maintenance Charges', 'Preferred Tenants', 'Agreement', 'Description (optional)', 'Price is negotiable']) {
     await expect(page.getByText(gone, { exact: true })).toHaveCount(0);
   }
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(page.getByText('Zztest Desk Heights, Wakad')).toBeVisible();
 
   await page.getByRole('button', { name: /Send to Owner/i }).click();
@@ -270,22 +271,28 @@ test('the desk asks only the critical facts, and each one reaches the server', a
 });
 
 const PIN = { lat: 18.5975, lng: 73.7701 };
-test('locality and society take Google suggestions, and a picked society binds the listing to it and its pin', async ({ page, login }) => {
+test('the society leads the location step and decides the locality, which a later locality pick can still correct', async ({ page, login }) => {
   const ownerMobile = uniqueMobile();
   const society = `Zztest Google Towers ${ownerMobile.slice(-6)}`;
   await login.asAdmin();
   await page.goto('/admin/post-on-behalf');
 
   await ownerAndProperty(page, { name: 'Google Owner', mobile: ownerMobile, carpetArea: '900' });
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
 
-  await pickGoogleLocality(page, 'Pashan', { field: page.getByLabel('Locality'), lat: 18.538, lng: 73.789 });
+  const locality = page.getByLabel('Locality');
+  const [societyBox, localityBox] = await Promise.all([page.locator('#pob-society').boundingBox(), locality.boundingBox()]);
+  expect(societyBox.y).toBeLessThan(localityBox.y);
 
-  await pickGoogleSociety(page, society, { input: page.locator('#pob-society'), ...PIN });
-  await page.getByRole('button', { name: /Next/i }).click();
+  await pickGoogleSociety(page, society, { input: page.locator('#pob-society'), ...PIN, locality: 'Wakad' });
+  await expect(locality.locator('.dz-dropdown__value')).toContainText('Wakad');
+
+  await pickGoogleLocality(page, 'Pashan', { field: locality, lat: 18.538, lng: 73.789 });
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
 
   await page.locator('#pob-price').fill('26000');
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.locator('#pob-deposit').fill('52000');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(page.getByText(`${society}, Pashan`)).toBeVisible();
   await page.getByRole('button', { name: /Send to Owner/i }).click();
   await expect(page.getByRole('heading', { name: 'Listing created' })).toBeVisible({ timeout: 15000 });
@@ -304,9 +311,9 @@ test('a deposit typed under rent is not filed against a sale', async ({ page, lo
   await page.goto('/admin/post-on-behalf');
 
   await ownerAndProperty(page, { name: 'NoDeposit Owner', mobile: ownerMobile, carpetArea: '900' });
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await pickPlaceholderLocality(page, 'Baner');
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
 
   await page.locator('input[inputmode="numeric"]').first().fill('25000');
   await page.getByRole('button', { name: '2 months rent' }).click();
@@ -317,7 +324,7 @@ test('a deposit typed under rent is not filed against a sale', async ({ page, lo
   await expect(page.getByText('Security Deposit')).toHaveCount(0);
   await page.locator('input[inputmode="numeric"]').first().fill('250000');
 
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: /Send to Owner/i }).click();
   await expect(page.getByRole('heading', { name: 'Listing created' })).toBeVisible({ timeout: 15000 });
 
@@ -335,11 +342,12 @@ test('the desk hands the owner a claim link over WhatsApp, and records it only o
   await page.goto('/admin/post-on-behalf');
 
   await ownerAndProperty(page, { name: 'Claim Owner', mobile: ownerMobile, carpetArea: '900' });
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await pickPlaceholderLocality(page, 'Baner');
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.locator('#pob-price').fill('25000');
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.locator('#pob-deposit').fill('50000');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: /Send to Owner/i }).click();
   await expect(page.getByRole('heading', { name: 'Listing created' })).toBeVisible({ timeout: 15000 });
 
@@ -370,18 +378,19 @@ test('the sidebar reaches the wizard, step one will not be skipped, and the mone
   await login.asAdmin();
 
   await page.goto('/admin');
+  await page.locator('aside').getByRole('button', { name: 'Listings & Users' }).click();
   await page.locator('aside').getByRole('link', { name: /Post on Behalf/i }).click();
   await expect(page).toHaveURL(/\/admin\/post-on-behalf$/);
   await expect(page.getByText('Post on Behalf of Owner')).toBeVisible();
 
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(page.getByPlaceholder('Full name of the property owner')).toBeVisible();
   await expect(page.getByText('Select locality')).toHaveCount(0);
 
   await ownerAndProperty(page, { name: 'Money Owner', mobile: ownerMobile, carpetArea: '950' });
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await pickPlaceholderLocality(page, 'Baner');
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
 
   const price = page.locator('#pob-price');
   const deposit = page.locator('#pob-deposit');
@@ -399,7 +408,7 @@ test('the sidebar reaches the wizard, step one will not be skipped, and the mone
   await page.getByRole('button', { name: '2 months rent' }).click();
   await expect(deposit).toHaveValue('50,000');
 
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: /Send to Owner/i }).click();
   await expect(page.getByRole('heading', { name: 'Listing created' })).toBeVisible({ timeout: 15000 });
 
@@ -424,11 +433,12 @@ test('a property type switched away from takes its bedroom configuration with it
   await page.getByPlaceholder('e.g. 850').fill('1200');
   await choose(page, 'Shell type', 'Bare Shell');
 
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await pickPlaceholderLocality(page, 'Baner');
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.locator('#pob-price').fill('9000000');
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.locator('#pob-deposit').fill('0');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
 
   // Destination one: the summary the operator reads immediately before pressing Send.
   await expect(page.getByText('Config', { exact: true })).toHaveCount(0);
@@ -463,9 +473,9 @@ test('the deal toggle and the land cascade decide what the operator may type, an
   await page.getByPlaceholder('e.g. 850').fill('2400');
   await choose(page, 'NA status', /Still agricultural/);
   await choose(page, 'Other rights', /Clear/);
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await pickPlaceholderLocality(page, 'Baner');
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   // For Sale, all the way through: the price field is renamed and the deposit is not offered.
   await expect(page.getByText('Expected Price')).toBeVisible();
   await expect(page.getByText('Monthly Rent')).toHaveCount(0);
@@ -505,17 +515,18 @@ test('a commercial listing files its type and shell, and asks nothing the owner 
   await expect(page.locator('#pob-floorLoad')).toHaveCount(0);
   await expect(page.getByLabel('Fixtures')).toHaveCount(0);
 
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await pickPlaceholderLocality(page, 'Baner');
   await expect(page.locator('#pob-society')).toBeVisible();
   await expect(page.locator('#pob-society')).toHaveAttribute('role', 'combobox');
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
 
   await page.locator('#pob-price').fill('180000');
+  await page.locator('#pob-deposit').fill('540000');
   // A rental is not asked its tenancy, on screen as well as on the wire.
   await expect(page.getByText('Tenancy Status')).toHaveCount(0);
 
-  await page.getByRole('button', { name: /Next/i }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: /Send to Owner/i }).click();
   await expect(page.getByRole('heading', { name: 'Listing created' })).toBeVisible({ timeout: 15000 });
 

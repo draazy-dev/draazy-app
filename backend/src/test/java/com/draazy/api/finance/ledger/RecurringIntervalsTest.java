@@ -6,22 +6,10 @@ import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Unit tests for the recurrence projection.
- *
- * <p>A plain unit test, not a {@code @SpringBootTest}: {@link RecurringIntervals} is pure date
- * arithmetic with no collaborators, and the date rules it encodes are exactly the kind that break
- * silently at a month boundary six months after anyone last looked at them.
- */
 class RecurringIntervalsTest {
-
     @Test
     @DisplayName("month-end rent stays at month-end after passing through February")
     void monthEndDoesNotDriftAfterFebruary() {
-        // The regression this class exists for. Stepping iteratively (next = next.plusMonths(1))
-        // clamps 31 Jan to 29 Feb and then keeps the 29th for good: 29 Mar, 29 Apr, 29 May. An
-        // owner whose rent falls due on the last day of the month would see it silently move two
-        // days earlier, permanently, after one leap February.
         LocalDate anchor = LocalDate.of(2024, 1, 31);
 
         assertThat(RecurringIntervals.nextOccurrenceOnOrAfter(

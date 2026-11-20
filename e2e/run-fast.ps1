@@ -7,9 +7,13 @@ param(
     [string[]]$Files,
     [string]$Base = 'HEAD',
     [int]$Shards = 4,
+    # Shards without a /src/ import serve one build by default (about 3x faster per spec); -Dev serves all from the dev server. See e2e/README.md "Shards".
+    [switch]$Dev,
     [string]$Grep,
     [switch]$DryRun,
-    [switch]$Stop
+    [switch]$Stop,
+    # Shard 1 must serve on an origin the Google Maps browser key admits; 3322 is reserved for the user's run-dev.ps1.
+    [int]$AppPort1 = 1122
 )
 $ErrorActionPreference = 'Stop'
 $E2E = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -17,7 +21,7 @@ $REPO = Split-Path -Parent $E2E
 $BACKEND = Join-Path $REPO 'backend'
 $STATE = Join-Path $E2E '.shards'
 $CLI = Join-Path $E2E 'node_modules\@playwright\test\cli.js'
-$PSQL = if ($env:PSQL) { $env:PSQL } else { 'C:\Program Files\PostgreSQL\13\bin\psql.exe' }
+$PSQL = if ($env:PSQL) { $env:PSQL } else { 'C:\Program Files\PostgreSQL\17\bin\psql.exe' }
 $JAVA_HOME = 'C:\Program Files\Zulu\zulu-25'
 $BUILD_DIR = 'target-shard'
 $JAR = Join-Path $BACKEND "$BUILD_DIR\draazy-api-0.0.1-SNAPSHOT.jar"
@@ -25,8 +29,9 @@ $MAX_SHARDS = 8
 Set-Location $E2E
 New-Item -ItemType Directory -Force -Path $STATE | Out-Null
 
-function ApiPort($i) { 8110 + $i }
-function AppPort($i) { 5210 + $i }
+function ApiPort($i) { if ($i -eq 1) { 1123 } else { 8110 + $i } }
+# Google's browser key admits localhost:1122; shards.mjs pins the Maps specs (maps-specs.js) to shard 1.
+function AppPort($i) { if ($i -eq 1) { $AppPort1 } else { 5210 + $i } }
 function DbName($i) { "draazy_e2e_sh$i" }
 function JvmFile($i) { Join-Path $STATE "jvm-$i.json" }
 function JvmLog($i) { Join-Path $env:TEMP "draazy-shard-$i.log" }
@@ -251,7 +256,8 @@ if ($n -gt 0) {
         $f = JvmFile $i
         if (Test-Path $f) {
             $info = Get-Content $f -Raw | ConvertFrom-Json
-            if ((Test-OurJvm $info) -and $info.signature -eq $signature) { continue }
+            # The JVM bakes in its port and app URL, so one launched for other ports cannot be reused.
+            if ((Test-OurJvm $info) -and $info.signature -eq $signature -and $info.port -eq (ApiPort $i) -and $info.app -eq (AppPort $i)) { continue }
             Stop-ShardJvm $i
         }
         if (Get-NetTCPConnection -LocalPort (ApiPort $i) -State Listen -ErrorAction SilentlyContinue) {
@@ -271,11 +277,17 @@ if ($n -gt 0) {
         $javaArgs = @('-jar', (Quote $JAR), '--spring.profiles.active=local,e2e', "--server.port=$(ApiPort $i)")
         $p = Start-Process -FilePath (Join-Path $JAVA_HOME 'bin\java.exe') -ArgumentList $javaArgs -WorkingDirectory $BACKEND `
             -RedirectStandardOutput $log -RedirectStandardError "$log.err" -WindowStyle Hidden -PassThru
-        @{ pid = $p.Id; started = "$($p.StartTime.ToFileTimeUtc())"; signature = $signature } | ConvertTo-Json | Set-Content (JvmFile $i)
+        @{ pid = $p.Id; started = "$($p.StartTime.ToFileTimeUtc())"; signature = $signature; port = (ApiPort $i); app = (AppPort $i) } | ConvertTo-Json | Set-Content (JvmFile $i)
         $starting += $i
     }
 
     if ($starting.Count) { Write-Host "Booting backend shard(s) $($starting -join ', ')..." }
+    $DIST = Join-Path $STATE 'dist'
+    $useBuild = -not $Dev -and $n -gt 1
+    if ($useBuild) {
+        & node scripts/build-app.mjs $DIST | Out-Host
+        if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
+    }
     $deadline = (Get-Date).AddSeconds(300)
     for ($i = 1; $i -le $n; $i++) {
         $info = Get-Content (JvmFile $i) -Raw | ConvertFrom-Json
@@ -324,10 +336,12 @@ for ($i = 1; $i -le $n; $i++) {
         '--reporter=blob,list', "--output=$(Join-Path $STATE "results\shard-$i")") +
         @($plan[$i - 1].files | ForEach-Object { Filters $_ })
     if ($Grep) { $a += @('-g', $Grep) }
-    $runs += Start-Run "shard-$i" $a @{
+    $vars = @{
         BASE_URL = "http://localhost:$(AppPort $i)"; API_PORT = "$(ApiPort $i)"; E2E_DB_NAME = (DbName $i)
         E2E_TIMEOUT_SCALE = $(if ($n -gt 1) { '2' } else { '1' })
     }
+    if ($useBuild -and -not $plan[$i - 1].dev) { $vars['E2E_DIST'] = $DIST }
+    $runs += Start-Run "shard-$i" $a $vars
     if ($i -lt $n) { Start-Sleep -Seconds 4 }
 }
 

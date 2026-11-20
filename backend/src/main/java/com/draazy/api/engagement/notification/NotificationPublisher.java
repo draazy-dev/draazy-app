@@ -9,22 +9,21 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Implements the notification port so lower layers announce without importing engagement. */
 @Component
 public class NotificationPublisher implements Notifier {
-
     private final NotificationRepository notifications;
     private final NotificationPreferenceService preferences;
     private final LiveUpdates live;
+    private final StaffEmailCopy staffEmail;
 
-    /** Clock is a test seam for quiet-hours decisions, not an application-wide knob. */
     private Clock clock = Clock.systemUTC();
 
     public NotificationPublisher(NotificationRepository notifications,
-            NotificationPreferenceService preferences, LiveUpdates live) {
+            NotificationPreferenceService preferences, LiveUpdates live, StaffEmailCopy staffEmail) {
         this.notifications = notifications;
         this.preferences = preferences;
         this.live = live;
+        this.staffEmail = staffEmail;
     }
 
     @Override
@@ -40,6 +39,10 @@ public class NotificationPublisher implements Notifier {
         notifications.saveAndFlush(note);
         if (note.getDeliverAfter() == null) {
             live.notificationsChanged(userId);
+        }
+        // Quiet hours hold only the bell: a held alert's email would otherwise never go out.
+        if (prefs.email()) {
+            staffEmail.send(userId, title, body, link);
         }
     }
 

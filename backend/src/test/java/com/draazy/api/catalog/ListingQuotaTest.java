@@ -25,10 +25,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
-// The free tier is one live listing; posting is unlimited and the gate is going live (approval and resume).
 @DisplayName("Listing quota — the ceiling the browser used to keep")
 class ListingQuotaTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
     @Autowired TestPlanGrants grants;
@@ -45,8 +43,6 @@ class ListingQuotaTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    // A listing already in the catalogue, saved directly.
-    // That is also what "posted from another device" means here.
     private Property existing(User owner, String title, String status) {
         Property p = new Property(owner, title, "rent", "apartment", 25000L, "Kothrud", "Pune");
         p.setBhk(new BigDecimal("2"));

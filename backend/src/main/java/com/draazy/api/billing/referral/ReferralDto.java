@@ -2,7 +2,6 @@ package com.draazy.api.billing.referral;
 
 import java.time.Instant;
 
-/** Contract {@code Referral}: the fraud desk's audit row. Rationale: docs/flows/ops/referrals-fraud.md. */
 public record ReferralDto(
         String id,
         String referrer,

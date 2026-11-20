@@ -1,15 +1,4 @@
-<#
-.SYNOPSIS
-    Read-only connectivity probe for the Cashfree sandbox, using backend/.env.local.
-
-.DESCRIPTION
-    Answers the one question you cannot answer from the code: do these keys work, and
-    which payment methods has Cashfree actually activated on the account? Never prints
-    the secret, never creates an order, never moves money.
-
-    Run before flipping CASHFREE_ENABLED=true - a 401 here is an hour of "why does the
-    pay button 500" later.
-#>
+# Read-only Cashfree probe: never prints the secret, creates an order or moves money.
 [CmdletBinding()]
 param([string]$EnvFile)
 
@@ -37,21 +26,17 @@ if ([string]::IsNullOrWhiteSpace($appId) -or $appId -eq 'replace_me' -or
     throw "CASHFREE_APP_ID / CASHFREE_SECRET_KEY are not filled in $EnvFile."
 }
 
-# This request carries the secret key, so the destination is checked before it leaves: a typo'd host
-# or an http:// scheme in the env file would hand a live API credential to whoever answers.
+# The secret key travels with this request, so only an https cashfree.com origin may receive it.
 if ($base -notmatch '^https://[a-z0-9.-]*cashfree\.com/?$') {
     throw "CASHFREE_BASE_URL must be an https cashfree.com origin; got '$base'."
 }
 
-# The host and the key prefix must agree or every call 401s for a reason the error does not name.
 $sandboxKey = $appId.StartsWith('TEST')
 $sandboxHost = $base -like '*sandbox.cashfree.com*'
 if ($sandboxKey -ne $sandboxHost) {
     Write-Warning "CASHFREE_BASE_URL ($base) and the App ID prefix disagree - one is test, the other live."
 }
 
-# Enough to tell two credentials apart, never enough to be one. -Min guards a truncated paste:
-# Substring(0,6) on a shorter value throws, reporting a bad .env.local as a crash in the probe.
 $appIdHint = $appId.Substring(0, [Math]::Min(6, $appId.Length))
 Write-Host "POST $base/pg/eligibility/payment_methods  (app id $appIdHint...)" -ForegroundColor Cyan
 
@@ -62,8 +47,7 @@ $headers = @{
 }
 
 try {
-    # No redirects: .NET strips Authorization on a cross-host hop but re-sends custom headers, so a
-    # 302 would carry x-client-secret onward. Cashfree does not redirect this endpoint.
+    # No redirects: a 302 would re-send x-client-secret to the next host.
     $response = Invoke-RestMethod -Method Post -Uri "$base/pg/eligibility/payment_methods" `
         -Headers $headers -ContentType 'application/json' -Body '{"queries":{"amount":100}}' `
         -MaximumRedirection 0
@@ -74,8 +58,6 @@ try {
 }
 
 Write-Host "AUTH OK. Methods activated on this account:" -ForegroundColor Green
-# The reply is a top-level array, not a { data: [...] } wrapper. The method is named by
-# entity_value; entity_details nests a per-method object whose keys vary, so it is only shown raw.
 foreach ($entry in $response) {
     $name = $entry.entity_value
     if (-not $name) { $name = ($entry.entity_details.payment_method_details | ConvertTo-Json -Compress -Depth 4) }

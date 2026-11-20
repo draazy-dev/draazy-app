@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Hand } from 'lucide-react';
 import {
-  addServiceRequestMessage, cancelServiceRequestAsOps, checkServiceRequestDraft, getServiceRequest, readServiceRequestChecklist,
+  cancelServiceRequestAsOps, getServiceRequest, getServiceRequestRefunds, readServiceRequestChecklist,
   shareServiceRequestDraft, takeServiceRequest, uploadServiceRequestFinalDoc,
 } from '../../../services/serviceRequestService.js';
 import { classNames, fmtINR } from '../../../lib/format.js';
@@ -13,31 +13,30 @@ import InternalNote, { saveNoteIfAny } from '../../../components/ui/InternalNote
 import AgeTone from '../service-queue/AgeTone.jsx';
 import AmendTerms from '../service-queue/AmendTerms.jsx';
 import CancelDialog from '../service-queue/CancelDialog.jsx';
-import DraftSecondCheck from '../service-queue/DraftSecondCheck.jsx';
-import MessageThread from '../service-queue/MessageThread.jsx';
+import OpenSupportChat from '../../../components/admin/support-chat/OpenSupportChat.jsx';
 import OverlapCheck from '../service-queue/OverlapCheck.jsx';
 import PartyIdentities from '../service-queue/PartyIdentities.jsx';
-import PoliceIntimation from '../service-queue/PoliceIntimation.jsx';
 import Refunds from '../service-queue/Refunds.jsx';
 import RegistrationCheck from '../service-queue/RegistrationCheck.jsx';
+import SendBackForCorrection from '../service-queue/SendBackForCorrection.jsx';
 import StaffWorkflowActions from '../service-queue/StaffWorkflowActions.jsx';
 import { fmtAgo } from '../service-queue/helpers.js';
 import CaseParticulars from './CaseParticulars.jsx';
 import { STAGES, caseSummary, nextStep, stagesDone } from './stages.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const card = 'rounded-xl border border-white/10 bg-black/10 p-4';
 const CLOSED = new Set(['completed', 'cancelled']);
-const PRE_DRAFT = new Set(['submitted', 'docs_review', 'changes_requested']);
+const PRE_DRAFT = new Set(['submitted', 'docs_review', 'changes_requested', 'action_required']);
+const DESK_EDITABLE = new Set(['docs_review', 'changes_requested', 'action_required']);
 const NEXT_TONE = {
   desk: 'border-brand-teal/40 bg-brand-teal/10 text-teal-100',
   customer: 'border-white/10 bg-white/5 text-gray-300',
-  colleague: 'border-amber-400/30 bg-amber-500/10 text-amber-100',
   done: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100',
 };
-const NEXT_WHO = { desk: 'Your move', customer: "Customer's move", colleague: 'Colleague check', done: 'Closed' };
+const NEXT_WHO = { desk: 'Your move', customer: "Customer's move", done: 'Closed' };
 
-/** One rent agreement case: everything to read on the left, every action in the rail on the right. */
-export default function RaCaseModal({ request, nextId, onNext, onClose, onChanged }) {
+export default function RaCaseModal({ request, loaded, nextId, onNext, onClose, onChanged }) {
   const s = request ? caseSummary(request.details) : null;
   const footer = (
     <>
@@ -53,30 +52,33 @@ export default function RaCaseModal({ request, nextId, onNext, onClose, onChange
       size="xl"
       footer={footer}
     >
-      {request ? <CaseBody key={request.id} id={request.id} onChanged={onChanged} /> : null}
+      {request ? <CaseBody key={request.id} id={request.id} preloaded={loaded ? request : null} onChanged={onChanged} /> : null}
     </Modal>
   );
 }
 
-/** A queue row is a summary, so the full case is read once when it opens and refreshed by the desk's own actions. */
-function CaseBody({ id, onChanged }) {
-  const [initial, setInitial] = useState(null);
+function CaseBody({ id, preloaded, onChanged }) {
+  const [initial, setInitial] = useState(preloaded);
+  const [checklistRead, setChecklistRead] = useState(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let live = true;
+    // Settled up front so a rejection is never unhandled while the detail read is still pending.
+    setChecklistRead(readServiceRequestChecklist(id).then((res) => ({ res }), () => ({ failed: true })));
+    if (preloaded) return undefined;
     getServiceRequest(id)
       .then((res) => { if (live) { if (res) setInitial(res); else setFailed(true); } })
       .catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
-  }, [id]);
+  }, [id, preloaded]);
 
   if (failed) return <p role="alert" className="p-4 text-sm text-gray-300">This case could not be opened. Close it and try again.</p>;
-  if (!initial) return <Loading label="Opening the case…" />;
-  return <CaseView initial={initial} onChanged={onChanged} />;
+  if (!initial || !checklistRead) return <Loading label="Opening the case…" />;
+  return <CaseView initial={initial} checklistRead={checklistRead} onChanged={onChanged} />;
 }
 
-function CaseView({ initial, onChanged }) {
+function CaseView({ initial, checklistRead, onChanged }) {
   const { toast } = useToast();
   const [detail, setDetail] = useState(initial);
   const [checklist, setChecklist] = useState(null);
@@ -87,15 +89,17 @@ function CaseView({ initial, onChanged }) {
 
   useEffect(() => {
     let live = true;
-    readServiceRequestChecklist(detail.id)
-      .then((res) => { if (live) { setChecklist(res); setChecklistStatus('ready'); } })
-      // Not an empty list: that would tell the desk the customer sent nothing.
-      .catch(() => { if (live) setChecklistStatus('error'); });
+    checklistRead.then(({ res, failed }) => {
+      if (!live) return;
+      if (failed) setChecklistStatus('error');
+      else { setChecklist(res); setChecklistStatus('ready'); }
+    });
     return () => { live = false; };
-  }, [detail.id]);
+  }, [checklistRead]);
 
   const s = caseSummary(detail.details);
   const done = stagesDone(detail, checklist);
+  const deskEditable = !!detail.assignedToMe && DESK_EDITABLE.has(detail.status);
   const next = nextStep(detail, checklistStatus === 'ready' ? checklist : null);
   const closed = CLOSED.has(detail.status);
   const toastError = (message) => toast(message, 'error');
@@ -113,14 +117,13 @@ function CaseView({ initial, onChanged }) {
     if (result.written) setInternalNote('');
   };
 
-  /** Runs one desk action; the server's sentence is the toast on failure, and the rethrow keeps the form's input. */
   const act = (fn, success, note) => async (...args) => {
     try {
       applyUpdate(await fn(detail.id, ...args));
       if (note) await fileNote(note);
       if (success) toast(typeof success === 'function' ? success(args) : success, 'success');
     } catch (err) {
-      toastError(err?.message || 'That did not go through.');
+      toastError(userMessage(err, 'That did not go through.'));
       throw err;
     }
   };
@@ -131,23 +134,21 @@ function CaseView({ initial, onChanged }) {
     try {
       await act(takeServiceRequest, 'This case is now yours. The customer can see the change.')();
     } catch {
-      // Toasted by `act`; a 409 names the colleague holding it.
     } finally {
       setTaking(false);
     }
   };
 
-  const shareDraft = act(async (id, payload) => {
-    const updated = await shareServiceRequestDraft(id, payload);
-    toast(updated?.draftCheck?.status === 'pending'
-      ? 'The draft is waiting for a colleague to check it before the customer sees it.'
-      : 'The draft was shared with the customer.', 'success');
-    return updated;
-  }, null, 'Draft shared');
+  const shareDraft = act(shareServiceRequestDraft, 'The draft was shared with the customer.', 'Draft shared');
+
   const uploadFinal = act(uploadServiceRequestFinalDoc, 'The registered copy was uploaded.', 'Registered copy uploaded');
-  const decideDraftCheck = act(checkServiceRequestDraft, ([decision]) => (decision === 'release' ? 'Draft released to the customer.' : 'Draft sent back to the holder.'));
-  const sendMessage = act(addServiceRequestMessage);
-  const cancel = act(cancelServiceRequestAsOps, 'The case was cancelled and the customer was notified.', 'Cancelled');
+  const cancel = async (reason) => {
+    await act(cancelServiceRequestAsOps, null, 'Cancelled')(reason);
+    const after = await getServiceRequestRefunds(detail.id).catch(() => null);
+    toast(after?.refunds?.some((refund) => refund.status === 'requested')
+      ? 'The case was cancelled. The customer was notified, and their refund is waiting for a manager.'
+      : 'The case was cancelled and the customer was notified.', 'success');
+  };
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -168,7 +169,7 @@ function CaseView({ initial, onChanged }) {
                 key={label}
                 aria-current={state === 'current' ? 'step' : undefined}
                 className={classNames(
-                  'flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs',
+                  'dz-tag flex border',
                   state === 'done' && 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200',
                   state === 'current' && 'border-brand-teal/50 bg-brand-teal/15 font-semibold text-white',
                   state === 'todo' && 'border-white/10 text-gray-500',
@@ -188,36 +189,29 @@ function CaseView({ initial, onChanged }) {
           onChecklist={setChecklist}
           onError={toastError}
           onUnavailable={docUnavailable}
+          editable={deskEditable}
+          onSaved={applyUpdate}
+          append={{
+            property: PRE_DRAFT.has(detail.status) ? <OverlapCheck key={`overlap-${detail.id}`} request={detail} /> : null,
+            terms: <AmendTerms key={`amend-${detail.id}`} request={detail} onUpdated={applyUpdate} />,
+          }}
+          tabs={[
+            { id: 'messages', title: 'Messages', body: <OpenSupportChat about={{ type: 'request', id: detail.id, label: detail.service || 'Rent agreement' }} label="Chat with customer" /> },
+            detail.amount > 0 ? {
+              id: 'payment', title: 'Payment',
+              body: <><PaymentCard request={detail} /><Refunds key={`refunds-${detail.id}`} request={detail} /></>,
+            } : null,
+            detail.timeline?.length ? { id: 'activity', title: 'Activity', body: <Timeline events={detail.timeline} /> } : null,
+          ]}
         >
-          <PartyIdentities key={`${detail.id}:${detail.assignedTo || ''}:${closed}`} requestId={detail.id} className={card} />
+          <PartyIdentities
+            key={`${detail.id}:${detail.assignedTo || ''}:${closed}`}
+            requestId={detail.id}
+            state={detail.details?._state}
+            editable={deskEditable}
+            className={card}
+          />
         </CaseParticulars>
-
-        {PRE_DRAFT.has(detail.status) ? <OverlapCheck key={`overlap-${detail.id}`} request={detail} /> : null}
-
-        {detail.draft ? <DraftStatus request={detail} /> : null}
-
-        {detail.status === 'completed' ? (
-          <RegistrationCheck key={`reg-${detail.id}`} request={detail} onError={toastError} onUnavailable={docUnavailable} />
-        ) : null}
-
-        <AmendTerms key={`amend-${detail.id}`} request={detail} onUpdated={applyUpdate} />
-        {detail.amount > 0 ? <Refunds key={`refunds-${detail.id}`} request={detail} /> : null}
-
-        <MessageThread messages={detail.messages} onSend={sendMessage} />
-
-        {detail.timeline?.length ? (
-          <details className={card}>
-            <summary className="cursor-pointer text-sm font-semibold">Timeline ({detail.timeline.length})</summary>
-            <ul className="mt-2 space-y-1 text-sm">
-              {detail.timeline.map((e, i) => (
-                <li key={`${e.stage}-${i}`} className="flex justify-between gap-2 border-b border-white/5 py-1 last:border-0">
-                  <span className="text-gray-300">{e.stage}</span>
-                  <span className="text-xs text-gray-500">{e.by || '—'} · {fmtAgo(e.at)}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : null}
       </div>
 
       <aside className="space-y-4 lg:sticky lg:top-0 lg:self-start">
@@ -236,12 +230,14 @@ function CaseView({ initial, onChanged }) {
           ) : null}
         </div>
 
-        {detail.draftCheck?.status === 'pending' ? <DraftSecondCheck request={detail} onDecide={decideDraftCheck} /> : null}
+        {detail.draft ? <DraftStatus request={detail} /> : null}
 
         <StaffWorkflowActions request={detail} onShareDraft={shareDraft} onUploadFinal={uploadFinal} />
 
+        <SendBackForCorrection key={`attention-${detail.id}`} request={detail} checklist={checklist} onUpdated={applyUpdate} />
+
         {detail.status === 'completed' ? (
-          <PoliceIntimation key={`police-${detail.id}`} request={detail} onUpdated={applyUpdate} onError={toastError} />
+          <RegistrationCheck key={`reg-${detail.id}`} request={detail} onError={toastError} onUnavailable={docUnavailable} />
         ) : null}
 
         <div className={card}>
@@ -288,5 +284,43 @@ function DraftStatus({ request }) {
         </ul>
       ) : null}
     </section>
+  );
+}
+
+function PaymentCard({ request }) {
+  const c = request.charges;
+  const rows = c ? [
+    ['Stamp duty', c.stampDuty],
+    ['Registration fee', c.registration],
+    ['Government handling', c.handling],
+    ['Service fee', c.platformFee],
+  ] : [];
+  return (
+    <section className={card} aria-label="Payment">
+      <h4 className="text-sm font-semibold">Paid {fmtINR(request.amount)}</h4>
+      {rows.length ? (
+        <dl className="mt-2 space-y-1 text-sm">
+          {rows.map(([l, v]) => (
+            <div key={l} className="flex justify-between gap-2">
+              <dt className="text-gray-400">{l === 'Service fee' && c.referralCredit ? 'Service fee (after referral discount)' : l}</dt>
+              <dd className="text-gray-200">{fmtINR(v)}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </section>
+  );
+}
+
+function Timeline({ events }) {
+  return (
+    <ol className={classNames(card, 'space-y-0')} aria-label="Timeline">
+      {events.map((e, i) => (
+        <li key={`${e.stage}-${i}`} className="flex justify-between gap-2 border-b border-white/5 py-2 text-sm last:border-0">
+          <span className="text-gray-300">{e.stage}</span>
+          <span className="shrink-0 text-xs text-gray-500">{e.by || '—'} · {fmtAgo(e.at)}</span>
+        </li>
+      ))}
+    </ol>
   );
 }

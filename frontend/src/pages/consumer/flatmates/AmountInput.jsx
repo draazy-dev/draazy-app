@@ -1,10 +1,8 @@
 import { formatIndian, moneyWords } from '../list-property/format.js';
 
-const MAX_DIGITS = 8;
-
-/* Keeps payloads as bare digits while the field displays Indian grouping and words. */
-export default function AmountInput({ value, onChange, className = '', ...rest }) {
+export default function AmountInput({ value, onChange, className = '', maxDigits = 8, suffix, ...rest }) {
   const words = moneyWords(value);
+  const padRight = suffix ? 'pr-16' : 'pr-3.5';
   return (
     <>
       <div className="relative">
@@ -12,10 +10,11 @@ export default function AmountInput({ value, onChange, className = '', ...rest }
         <input
           inputMode="numeric"
           value={formatIndian(value)}
-          onChange={(e) => onChange(e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, MAX_DIGITS))}
-          className={'field w-full rounded-xl pl-8 pr-3.5 py-2.5 text-sm' + className}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, maxDigits))}
+          className={`field w-full rounded-xl pl-8 ${padRight} py-2.5 text-sm ${className}`}
           {...rest}
         />
+        {suffix && <span aria-hidden="true" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs">{suffix}</span>}
       </div>
       {words && <p className="mt-1.5 ml-1 text-xs text-gray-500">{words}</p>}
     </>

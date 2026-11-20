@@ -10,6 +10,7 @@ import { estimateValuation } from '../../../lib/data/valuation.js';
 import { getLocality } from '../../../services/localityService.js';
 import { registerManaged } from '../../../services/managedService.js';
 import { HOME_TYPES, BHK_OPTIONS, FURNISHING_OPTIONS, FIELD_CLS } from './constants.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export default function RentOMeter({ onSaved }) {
   const { t } = useTranslation();
@@ -39,7 +40,7 @@ export default function RentOMeter({ onSaved }) {
       if (slugRef.current !== slug) return;
       setResult({ slug, name: loc.name, est: estimateValuation({ locality: loc, bhk: form.bhk, area: form.area, furnishing: form.furnishing }) });
     } catch (e) {
-      toast(e?.message || t('ownerHub.estimateFailed'), 'error');
+      toast(userMessage(e, t('ownerHub.estimateFailed')), 'error');
     } finally {
       setEstimating(false);
     }
@@ -62,13 +63,11 @@ export default function RentOMeter({ onSaved }) {
         price,
         rented: false,
         monthlyRent: est.rent.mid,
-        // Kept verbatim: the owner's evidence for the number shown; re-deriving later would rewrite history.
         valuation: { rent: est.rent, sale: est.sale, perSqft: est.perSqft, at: Date.now() },
       });
     } catch (e) {
-      // Without this the button stays in its saving state forever on a failure, with no explanation.
       setSaving(false);
-      toast(e?.message || t('ownerHub.publishFailed'), 'error');
+      toast(userMessage(e, t('ownerHub.publishFailed')), 'error');
       return;
     }
     toast(t('ownerHub.savedToast'), 'success');
@@ -84,7 +83,6 @@ export default function RentOMeter({ onSaved }) {
       </div>
       <p className="text-gray-400 text-sm mb-5">{t('ownerHub.rentometerSub')}</p>
 
-      {/* Deal toggle */}
       <div className="inline-flex p-1 rounded-xl bg-white/5 border border-white/10 mb-5">
         {[['rent', 'ownerHub.rentItOut'], ['sale', 'ownerHub.sellIt']].map(([v, labelKey]) => (
           <button
@@ -146,7 +144,6 @@ export default function RentOMeter({ onSaved }) {
 
       {est && (
         <div className="mt-6 pt-6 border-t border-white/10 fade-in visible">
-          {/* The number is the hero. */}
           <p className="text-xs text-gray-400 mb-1">{isRent ? t('ownerHub.estMonthlyRent') : t('ownerHub.estSaleValue')} · {est.locality}</p>
           <p className="text-4xl sm:text-5xl font-extrabold gradient-text leading-tight">
             {isRent ? rentStr(est.rent.mid) : fmtINR(est.sale.mid)}

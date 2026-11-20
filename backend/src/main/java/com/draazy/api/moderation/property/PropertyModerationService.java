@@ -12,14 +12,11 @@ import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.trust.ReferralTriggers;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.moderation.verification.ApprovalGate;
-import com.draazy.api.moderation.verification.PropertyOverrideRequest;
-import com.draazy.api.moderation.verification.PropertyOverrideRequestRepository;
 import com.draazy.api.moderation.verification.PropertyReview;
 import com.draazy.api.moderation.verification.PropertyReviewRepository;
 import com.draazy.api.moderation.verification.ReviewChecklistItem;
 import com.draazy.api.moderation.verification.ReviewReasonCodes;
 import com.draazy.api.moderation.verification.VerificationCases;
-import com.draazy.api.moderation.signal.ListingSignalService;
 import com.draazy.api.security.AuthPrincipal;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,10 +25,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Every method writes an audit row because one user is changing another's listing.
 @Service
 public class PropertyModerationService {
-
     private static final Set<String> SETTABLE = Set.of(
             PropertyStatus.PENDING, PropertyStatus.APPROVED, PropertyStatus.REJECTED);
 
@@ -41,22 +36,17 @@ public class PropertyModerationService {
     private final PropertyLifecycle lifecycle;
     private final VerificationCases cases;
     private final PropertyReviewRepository reviews;
-    private final ListingSignalService signals;
-    private final PropertyOverrideRequestRepository overrideRequests;
     private final ReferralTriggers referralTriggers;
 
     public PropertyModerationService(PropertyRepository properties, AuditService audit,
             Notifier notifier, PropertyLifecycle lifecycle, VerificationCases cases,
-            PropertyReviewRepository reviews, ListingSignalService signals,
-            PropertyOverrideRequestRepository overrideRequests, ReferralTriggers referralTriggers) {
+            PropertyReviewRepository reviews, ReferralTriggers referralTriggers) {
         this.properties = properties;
         this.audit = audit;
         this.notifier = notifier;
         this.lifecycle = lifecycle;
         this.cases = cases;
         this.reviews = reviews;
-        this.signals = signals;
-        this.overrideRequests = overrideRequests;
         this.referralTriggers = referralTriggers;
     }
 
@@ -72,32 +62,29 @@ public class PropertyModerationService {
         String from = property.getStatus();
         boolean clearingApprovedRecheck = PropertyStatus.APPROVED.equals(status)
                 && PropertyStatus.APPROVED.equals(from) && property.isRecheckPending();
-        requireExpected(from, expectedStatus);
         if (PropertyStatus.APPROVED.equals(status)) {
-            if (PropertyStatus.REJECTED.equals(from)) {
-                throw new ConflictException("second_approver_required",
-                        "A final rejection requires a second staff approver to approve.");
-            }
-
-            // Before anything is written, so a refusal costs the moderator nothing to retry.
             lifecycle.requireFiled(property);
         } else if (PropertyStatus.REJECTED.equals(status)) {
             ReviewReasonCodes.require("reject", reasonCode, reason);
+        } else if (property.isArchived() || PropertyStatus.SOLD.equals(from) || PropertyStatus.RENTED.equals(from)) {
+            throw new ConflictException("Restore or reopen this listing first");
+        }
+        requireExpected(from, expectedStatus, clearingApprovedRecheck);
+        if (PropertyStatus.APPROVED.equals(status) && PropertyStatus.APPROVED.equals(from) && !clearingApprovedRecheck) {
+            return property;
         }
 
         if (PropertyStatus.APPROVED.equals(status)) {
-
-            /* Re-listing a home whose deal fell through is an approval, so return the row to the queue first
-               and let the verification below be real. An archived listing has its own restore verb. */
             if (!property.isArchived() && (PropertyStatus.SOLD.equals(from) || PropertyStatus.RENTED.equals(from))) {
                 lifecycle.reenterPending(actor, property);
             }
+
+            if (PropertyStatus.REJECTED.equals(from)) {
+                property.revertToPending();
+            }
             PropertyReview review = cases.ensure(property.getId(), property.getDeal());
-            ApprovalGate.require(review);
-            if (clearingApprovedRecheck) {
-                requireSignalAlreadyOverridden(property);
-            } else {
-                requireNoSecondApproverBlock(property);
+            ApprovalGate.require(review, property);
+            if (!clearingApprovedRecheck) {
                 if (review.getDecidedAt() == null || !PropertyStatus.APPROVED.equals(review.getStatus())) {
                     review.decide(PropertyStatus.APPROVED, actor.userId().toString(), reason, null);
                     reviews.saveAndFlush(review);
@@ -108,51 +95,39 @@ public class PropertyModerationService {
             String normalizedReason = ReviewReasonCodes.require("reject", reasonCode, reason);
             PropertyReview review = cases.ensure(property.getId(), property.getDeal());
             review.decide(PropertyStatus.REJECTED, actor.userId().toString(), reason, normalizedReason);
-            review.addMessage(actor.userId(), rejectionMessage(normalizedReason, reason));
+            review.addMessage(actor.userId(), ReviewReasonCodes.rejectionThread(normalizedReason, reason));
             reviews.saveAndFlush(review);
             property.setStatus(status);
             referralTriggers.listingTakenDown(property.getId());
         } else {
-            if (property.isArchived() || PropertyStatus.SOLD.equals(property.getStatus())
-                    || PropertyStatus.RENTED.equals(property.getStatus())) {
-                throw new ConflictException("Restore or reopen this listing first");
-            }
-            if (PropertyStatus.REJECTED.equals(property.getStatus())) {
-                throw new ConflictException("second_approver_required",
-                        "A final rejection requires a second staff approver to reopen.");
-            }
             lifecycle.reenterPending(actor, property);
+            if (PropertyStatus.REJECTED.equals(from)) {
+                lifecycle.announceReopened(property);
+            }
         }
         property.clearRecheck();
-        audit.record(actor, "property.status", "property", id, "from", from, "to", status,
+        audit.record(actor, "property.status", "property", id, "from", from, "to", property.getStatus(),
                 "reason", reason, "reasonCode", reasonCode,
                 "checklist", checklistSnapshot(property.getId()),
                 "owner", String.valueOf(property.getOwner().getId()));
 
-        // Only the two terminal verdicts are announced; a bounce back to `pending` is a queue move.
-        // A rejected listing is not publicly viewable, so its link points at the dashboard.
         UUID ownerId = property.getOwner().getId();
         if (PropertyStatus.APPROVED.equals(status) && !clearingApprovedRecheck) {
             lifecycle.announceApproval(property);
         } else if (PropertyStatus.REJECTED.equals(status)) {
-            String ownerMessage = ReviewReasonCodes.ownerMessage(reasonCode, reason);
             notifier.notify(ownerId, "listing.rejected",
                     "Your listing was not approved",
-                    "A moderator could not approve it: " + ownerMessage,
-                    "/dashboard");
+                    "A moderator could not approve " + PropertyLifecycle.label(property) + ": "
+                            + ReviewReasonCodes.rejectionMessage(reasonCode, reason),
+                    PropertyLifecycle.reviewLink(property));
         }
         return property;
     }
 
-    // Sets both status and flag_reason: the status delists, the reason is for humans.
     @Transactional
     public Property flag(AuthPrincipal actor, String id, String reason) {
         Property property = load(id);
         lifecycle.requireChecker(actor, property);
-        if (PropertyStatus.REJECTED.equals(property.getStatus())) {
-            throw new ConflictException("second_approver_required",
-                    "A final rejection requires a second staff approver to reopen.");
-        }
 
         String from = property.getStatus();
         property.setStatus(PropertyStatus.FLAGGED);
@@ -160,6 +135,10 @@ public class PropertyModerationService {
         referralTriggers.listingTakenDown(property.getId());
         audit.record(actor, "property.flag", "property", id, "from", from, "reason", reason,
                 "owner", String.valueOf(property.getOwner().getId()));
+        notifier.notify(property.getOwner().getId(), "listing.flagged",
+                "Your listing has been taken down",
+                "A moderator took down your listing. Contact support if you think this is a mistake.",
+                "/dashboard");
         return property;
     }
 
@@ -182,20 +161,25 @@ public class PropertyModerationService {
         String from = property.getStatus();
         property.setFlagReason(null);
         lifecycle.reenterPending(actor, property);
-        audit.record(actor, "property.flag.clear", "property", id, "from", from,
+        audit.record(actor, "property.flag.clear", "property", id, "from", from, "to", property.getStatus(),
                 "owner", String.valueOf(property.getOwner().getId()));
+        notifier.notify(property.getOwner().getId(), "listing.unflagged", "Your listing is back under review",
+                PropertyLifecycle.label(property) + " is no longer flagged and is back in the review queue.",
+                PropertyLifecycle.reviewLink(property));
     }
 
-    private static void requireExpected(String current, String expected) {
-        if (expected != null && !expected.isBlank() && !current.equals(expected)) {
+    // Without an expected status only a pending listing may be decided, so the loser of two concurrent
+    // verdicts cannot overwrite the winner's.
+    private static void requireExpected(String current, String expected, boolean clearingRecheck) {
+        if (expected == null || expected.isBlank()) {
+            if (!PropertyStatus.PENDING.equals(current) && !clearingRecheck) {
+                throw new ConflictException("stale_decision",
+                        "This listing is already " + current + "; send expectedStatus to change it");
+            }
+        } else if (!current.equals(expected)) {
             throw new ConflictException("stale_decision",
                     "Listing status changed; refresh before deciding");
         }
-    }
-
-    private static String rejectionMessage(String reasonCode, String note) {
-        return "\u26D4 Your property could not be approved.\nReason: "
-                + ReviewReasonCodes.ownerMessage(reasonCode, note);
     }
 
     private Map<String, Boolean> checklistSnapshot(UUID propertyId) {
@@ -210,22 +194,6 @@ public class PropertyModerationService {
                 .orElseGet(Map::of);
     }
 
-    /** An approval that needed no second approver was made with no hard signal, so one standing now is new. */
-    private void requireSignalAlreadyOverridden(Property property) {
-        if (!overrideRequests.existsByPropertyIdAndActionAndStatus(property.getId(),
-                PropertyOverrideRequest.APPROVE, PropertyOverrideRequest.APPROVED)) {
-            requireNoSecondApproverBlock(property);
-        }
-    }
-
-    private void requireNoSecondApproverBlock(Property property) {
-        if (signals.hasHardSignal(property.getId())) {
-            throw new ConflictException("second_approver_required",
-                    "A hard broker signal requires a second staff approver.");
-        }
-    }
-
-    /** The desk's read of one listing by id or slug, archived rows included; no lock, no write. */
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public Property find(String idOrSlug) {
         return Ids.parseUuid(idOrSlug).flatMap(properties::findById)

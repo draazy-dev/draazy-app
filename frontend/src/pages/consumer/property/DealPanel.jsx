@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import DateField from '../../../components/ui/DateField.jsx';
 import FieldError from '../../../components/ui/FieldError.jsx';
+import Modal from '../../../components/ui/Modal.jsx';
+import AmountInput from '../flatmates/AmountInput.jsx';
+import { formatIndian } from '../list-property/format.js';
+import { istToday } from '../../../lib/availability.js';
 import { digits } from '../../../lib/contact.js';
 import { isoToDisplay } from '../../../lib/format.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { useLatest, useSignInGate } from '../../../lib/useSignInGate.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import { useSingleFlight } from '../../../hooks/useSingleFlight.js';
 import {
   getDeal, dealStatusForBuyer, reserveDeal, reopenDeal, listParties,
   submitOffer as submitOfferApi, respondOffer, myOffers, offersOnMine,
@@ -16,40 +20,40 @@ import {
   myFinalizationRequests, acceptFinalization, declineFinalization,
 } from '../../../services/dealService.js';
 import { tenantsVerified } from '../../../services/rentService.js';
+import { REVISIT_MAX_AGE } from '../../../services/http.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const fmtOffer = (n) => '₹' + (Number(n) || 0).toLocaleString('en-IN');
 
-/* `reload` re-reads after each mutation rather than patching optimistically, because a panel showing an
-   accepted offer the server rejected is worse than one that takes a moment to catch up. */
 export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   const { t } = useTranslation();
   const sendToSignIn = useSignInGate();
   const { user } = useAuth();
   const owner = String(p.ownerMobile || '');
-  /* The deal routes parse their path parameter with `Ids.parseUuid` and 404 on anything else, so they need the
-     **UUID**. */
   const propId = String(p.uuid || p.id || '');
   const isRent = p.deal === 'rent';
   const dealKind = isRent ? 'rent' : 'sell';
+  const asking = Number(p?.price) || 0;
+  const offerPlaceholder = asking ? `e.g. ${formatIndian(asking)}` : (isRent ? 'e.g. 25,000' : 'e.g. 70,00,000');
   const [offerOpen, setOfferOpen] = useState(false);
   const [offerAmt, setOfferAmt] = useState('');
-  const [offerErr, setOfferErr] = useState(false);
+  const [offerErr, setOfferErr] = useState('');
   const [offerMoveIn, setOfferMoveIn] = useState('');
+  const offerError = (v) => {
+    const floor = Math.ceil(asking / 2);
+    if (!Number(v)) return t('property.enterOfferAmount');
+    if (Number(v) < floor) return t('property.offerBelowFloor', { floor: fmtOffer(floor), asking: fmtOffer(asking) });
+    return '';
+  };
 
-  /* Read from the session, because the answer picks between two sets of endpoints and must match what the API is
-     working from. */
   const mine = digits(user?.mobile);
   const isOwner = isIn && !!mine && mine === digits(owner);
 
-  /* `verified` starts EMPTY instead, unlike `status`: a badge is a trust claim, so the safe
-   * default is not to make it. */
   const [state, setState] = useState({
     status: 'active', parties: [], offers: [], myOffer: null, myFinalize: null, pending: [],
     verified: new Set(),
   });
 
-  /* Prefers the row's own `buyerVerified`, the only source that can answer live: a buyer's mobile leaves the server
-     irreversibly masked, so it can never equal the number the badge is stored against. */
   const isVerifiedTenant = (row) => {
     if (row?.buyerVerified === true) return true;
     const d = digits(row?.buyerMobile || '').slice(-10);
@@ -58,19 +62,15 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
 
   const reload = useCallback(async () => {
     if (!propId) return;
+    const scoped = { propertyId: propId, maxAge: REVISIT_MAX_AGE };
     if (isOwner) {
-      // Four owner-scoped reads. Issued together because none depends on another's result and the
-      // panel blocks on all of them.
-      const [deal, parties, offers, requests] = await Promise.all([
+      const [deal, parties, ownOffers, pending] = await Promise.all([
         getDeal(propId).catch(() => null),
         listParties(propId).catch(() => []),
-        offersOnMine().catch(() => []),
-        myFinalizationRequests().catch(() => []),
+        offersOnMine(scoped).catch(() => []),
+        myFinalizationRequests(scoped).catch(() => []),
       ]);
-      const ownOffers = (offers || []).filter((o) => String(o.propId) === propId);
-      const pending = (requests || []).filter((r) => String(r.propId) === propId);
 
-      /* Fallback badge lookup for seams whose rows do not carry `buyerVerified`; one request for the whole panel. */
       const verified = await tenantsVerified([
         ...ownOffers.map((o) => o.buyerMobile),
         ...pending.map((r) => r.buyerMobile),
@@ -89,19 +89,16 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
     }
     const [status, mine, fin] = await Promise.all([
       dealStatusForBuyer(p).catch(() => 'active'),
-      isIn ? myOffers().catch(() => []) : Promise.resolve([]),
-      // Asked only once the buyer has engaged: the endpoint 404s when nothing is pending, which is
-      // the ordinary state of every listing, and the finalize card is gated on `contactApproved`.
+      isIn ? myOffers(scoped).catch(() => []) : Promise.resolve([]),
       isIn && contactApproved ? finalizationStatus(propId).catch(() => null) : Promise.resolve(null),
     ]);
     setState({
       status: status || 'active',
       parties: [],
       offers: [],
-      myOffer: (mine || []).find((o) => String(o.propId) === propId) || null,
+      myOffer: (mine || [])[0] || null,
       myFinalize: fin,
       pending: [],
-      // The badge only ever renders beside a buyer in the owner's lists; a buyer needs none.
       verified: new Set(),
     });
   }, [propId, isOwner, isIn, contactApproved]);
@@ -112,29 +109,26 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   const reserved = state.status === 'reserved';
   const dealWord = isRent ? t('property.rentedOutWord') : t('property.soldWord');
 
-  /* Every mutation funnels through here: surface the server's refusal, never a false success. */
-  const run = async (fn, okMsg, tone = 'success') => {
+  const singleFlight = useSingleFlight();
+  const run = (fn, okMsg, tone = 'success') => singleFlight(async () => {
     try {
       await fn();
       await reload();
       if (okMsg) toast(okMsg, tone);
     } catch (err) {
-      toast(err?.body?.error || err?.message || t('property.actionFailed'), 'error');
+      toast(userMessage(err, t('property.actionFailed')), 'error');
     }
-  };
+  });
 
   const doFinalize = () => {
     if (!isIn) { sendToSignIn('offer'); return; }
     if (isOwner) {
-      // Closing needs an agreed price and the counterparty's real mobile, neither of which this
-      // panel collects; the dashboard's finalize modal does.
       toast(t('property.finalizeInDashboard'), 'info');
       return;
     }
-    // The buyer proposes at the listed price against the listing's owner. Both are required by
-    // `FinalizationCreateRequest`; neither was sent before.
+    const agreed = state.myOffer?.status === 'accepted' ? state.myOffer.amount : p.price;
     run(
-      () => requestFinalization(propId, { counterpartyMobile: owner, agreedPrice: Number(p.price) || 0 }),
+      () => requestFinalization(propId, { counterpartyMobile: owner, agreedPrice: Number(agreed) || 0 }),
       t('property.finalizeRequestSent'),
     );
   };
@@ -148,17 +142,25 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   };
 
   const submitOffer = () => {
-    const amt = parseInt(String(offerAmt).replace(/[^\d]/g, ''), 10) || 0;
-    if (!amt) { setOfferErr(true); toast(t('property.enterAmount'), 'info'); return; }
-    setOfferErr(false);
-    const existing = state.myOffer;
-    // A second live offer on one listing is a 409, so revising means countering the existing one.
-    // A buyer countering is the one response the server allows them.
+    const invalid = offerError(offerAmt);
+    setOfferErr(invalid);
+    if (invalid) return;
+    const amt = Number(offerAmt);
+    const existing = state.myOffer && ['pending', 'countered'].includes(state.myOffer.status) ? state.myOffer : null;
     const call = existing
       ? () => respondOffer(existing.id, 'counter', amt, { isOwner: false, propId })
       : () => submitOfferApi({ propId, amount: amt, moveIn: offerMoveIn, deal: isRent ? 'rent' : 'buy' });
-    setOfferOpen(false); setOfferAmt(''); setOfferMoveIn('');
-    run(call, t('property.offerSent'));
+    singleFlight(async () => {
+      try {
+        await call();
+      } catch (err) {
+        setOfferErr(userMessage(err, t('property.actionFailed')));
+        return;
+      }
+      setOfferOpen(false); setOfferAmt(''); setOfferMoveIn('');
+      await reload().catch(() => {});
+      toast(t('property.offerSent'), 'success');
+    });
   };
   const ownerOfferAct = (id, action) => {
     if (action === 'counter') {
@@ -172,22 +174,21 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
     run(() => respondOffer(id, action, null, { isOwner: true, propId }),
       action === 'accept' ? t('property.offerAccepted') : t('property.offerDeclined'));
   };
-  /* The buyer agreeing to the owner's counter. */
   const agreeToCounter = (offer) => run(
     () => respondOffer(offer.id, 'counter', offer.amount, { isOwner: false, propId }),
     t('property.agreedAwaitingOwner'),
   );
   const openOffer = () => {
-    if (!isIn) { sendToSignIn('offer'); return; }
+    if (!isIn) { sendToSignIn('offer', undefined, () => { if (!latest.current.isOwner) latest.current.openOffer(); }); return; }
     setOfferAmt(state.myOffer ? String(state.myOffer.amount || '') : '');
+    setOfferErr('');
     setOfferOpen(true);
   };
+  const latest = useLatest({ openOffer, isOwner });
 
   const cardCls = 'glass-strong rounded-2xl p-5';
 
   const renderFinalize = () => {
-    // A closed sale is terminal for a buyer: the top banner already says sold/rented, and the card
-    // offers closing services and a reopen only the owner can use.
     if (closed && !isOwner) return null;
     if (closed) {
       return (
@@ -196,7 +197,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
           <p className="text-slate-400 text-xs mb-3">{t('property.markedWord', { word: dealWord })}{isOwner ? '' : t('property.closedForEnquiries')}</p>
           <div className="flex gap-2">
             <Link to={`/services?finalize=${dealKind}`} className="btn-teal flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs"><Icon name="layout-grid" className="w-3.5 h-3.5" /> {t('property.closingServices')}</Link>
-            {isOwner ? <button type="button" onClick={reopen} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-white/10 text-slate-300 text-xs font-medium hover:bg-white/5"><Icon name="rotate-ccw" className="w-3.5 h-3.5" /> {t('property.reopen')}</button> : null}
+            {isOwner ? <button type="button" onClick={reopen} className="h-btn-sm flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-white/10 text-slate-300 text-xs font-medium hover:bg-white/5"><Icon name="rotate-ccw" className="w-3.5 h-3.5" /> {t('property.reopen')}</button> : null}
           </div>
         </div>
       );
@@ -210,7 +211,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
             <p className="text-slate-400 text-xs mb-3">{parties.length ? t('property.finalizingParties', { count: parties.length }) : ''}{t('property.underOfferTokenNote')}</p>
             <div className="flex gap-2">
               <button type="button" onClick={doFinalize} className="btn-teal flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs"><Icon name="badge-check" className="w-3.5 h-3.5" /> {t('property.finalize')}</button>
-              <button type="button" onClick={reopen} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-white/10 text-slate-300 text-xs font-medium hover:bg-white/5"><Icon name="rotate-ccw" className="w-3.5 h-3.5" /> {t('property.release')}</button>
+              <button type="button" onClick={reopen} className="h-btn-sm flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-white/10 text-slate-300 text-xs font-medium hover:bg-white/5"><Icon name="rotate-ccw" className="w-3.5 h-3.5" /> {t('property.release')}</button>
             </div>
           </div>
         );
@@ -221,7 +222,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
           <div className="flex items-center gap-2 mb-1.5"><Icon name="handshake" className="w-5 h-5 text-amber-400" /><h3 className="text-white font-bold text-sm">{t('property.underOfferRegisterTitle')}</h3></div>
           <p className="text-slate-400 text-xs mb-3">{stR === 'pending' ? t('property.interestRegistered') : t('property.someoneFinalizing')}</p>
           {stR === 'pending'
-            ? <button type="button" onClick={cancelReq} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/10 text-slate-300 text-xs font-medium hover:bg-white/5"><Icon name="x" className="w-3.5 h-3.5" /> {t('property.withdrawInterest')}</button>
+            ? <button type="button" onClick={cancelReq} className="h-btn w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 text-slate-300 text-xs font-medium hover:bg-white/5"><Icon name="x" className="w-3.5 h-3.5" /> {t('property.withdrawInterest')}</button>
             : <button type="button" onClick={doFinalize} className="btn-teal w-full flex items-center justify-center gap-2 py-2.5 px-4 text-sm"><Icon name="bell-plus" className="w-4 h-4" /> {t('property.registerBackupInterest')}</button>}
         </div>
       );
@@ -251,7 +252,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
           <div className="flex items-center gap-2 mb-1.5"><Icon name="handshake" className="w-5 h-5 text-emerald-400" /><h3 className="text-white font-bold text-sm">{t('property.closedDealQ')}</h3></div>
           <p className="text-slate-400 text-xs mb-3">{t('property.closedDealBodyPre')}<b className="text-amber-300">{t('property.underOffer')}</b>{t('property.closedDealBodyPost')}</p>
           <button type="button" onClick={doFinalize} className="btn-teal w-full flex items-center justify-center gap-2 py-2.5 px-4 text-sm"><Icon name="badge-check" className="w-4 h-4" /> {t('property.finalizeDeal')}</button>
-          <button type="button" onClick={markUO} className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-amber-400/30 text-amber-200 text-xs font-semibold hover:bg-amber-400/10"><Icon name="handshake" className="w-3.5 h-3.5" /> {t('property.markAsUnderOffer')}</button>
+          <button type="button" onClick={markUO} className="h-btn w-full mt-2 flex items-center justify-center gap-2 rounded-xl border border-amber-400/30 text-amber-200 text-xs font-semibold hover:bg-amber-400/10"><Icon name="handshake" className="w-3.5 h-3.5" /> {t('property.markAsUnderOffer')}</button>
         </div>
       );
     }
@@ -261,13 +262,11 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
         <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgb(var(--dz-c-emerald-500) / .06)' }}>
           <div className="flex items-center gap-2 mb-1.5"><Icon name="hourglass" className="w-5 h-5 text-amber-400" /><h3 className="text-white font-bold text-sm">{t('property.finalizeRequested')}</h3></div>
           <p className="text-slate-400 text-xs mb-3">{t('property.waitingOwnerConfirm')}</p>
-          <button type="button" onClick={cancelReq} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/10 text-slate-300 text-xs font-medium hover:bg-white/5"><Icon name="x" className="w-3.5 h-3.5" /> {t('property.withdrawRequest')}</button>
+          <button type="button" onClick={cancelReq} className="h-btn w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 text-slate-300 text-xs font-medium hover:bg-white/5"><Icon name="x" className="w-3.5 h-3.5" /> {t('property.withdrawRequest')}</button>
         </div>
       );
     }
     const declined = st === 'declined';
-    // Finalising is an end-of-deal step, so don't lead a cold buyer with it: surface only once they
-    // have engaged (contact approved) or already tried and were turned down.
     if (!declined && !contactApproved) return null;
     return (
       <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgb(var(--dz-c-emerald-500) / .06)' }}>
@@ -279,8 +278,6 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   };
 
   const renderOffers = () => {
-    // A closed listing takes no more offers from anyone; the buyer's negotiate card is hidden (Q2).
-    // A reserved listing still takes offers (Q3), so it falls through to the normal render.
     if (closed && !isOwner) return null;
     if (isOwner) {
       const offers = state.offers.filter((o) => o.status !== 'declined');
@@ -337,17 +334,17 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
               <button onClick={() => agreeToCounter(my)} className="btn-teal flex-1 py-2 rounded-lg text-xs font-semibold">{t('property.agreeAt', { amount: fmtOffer(my.amount) })}</button>
               <button onClick={openOffer} className="flex-1 py-2 rounded-lg text-xs border border-white/15 text-slate-200">{t('property.counter')}</button>
             </div>
-          ) : (
+          ) : my.status === 'accepted' ? null : (
             <button onClick={openOffer} className="btn-teal w-full py-2.5 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-1.5"><Icon name="repeat" className="w-4 h-4" /> {t('property.reviseOffer')}</button>
           )}
         </div>
       );
     }
     return (
-      <div className={cardCls}>
+      <div className="glass-strong rounded-2xl p-4">
         <div className="flex items-center gap-2 mb-1"><Icon name="gavel" className="w-5 h-5 text-amber-400" /><h3 className="text-white font-bold text-sm">{t('property.negotiatePrice')}</h3></div>
         <p className="text-slate-400 text-xs mb-3">{t('property.negotiateBody')}</p>
-        <button onClick={openOffer} className="btn-teal w-full py-2.5 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-1.5"><Icon name="gavel" className="w-4 h-4" /> {t('property.makeOffer')}</button>
+        <button onClick={openOffer} className="h-btn w-full rounded-xl border border-brand-teal-2/30 bg-brand-teal-1/10 text-brand-teal-3 text-sm font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-brand-teal-1/20 transition-smooth"><Icon name="gavel" className="w-4 h-4" /> {t('property.makeOffer')}</button>
       </div>
     );
   };
@@ -374,23 +371,38 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
       {renderFinalize()}
       {renderOffers()}
 
-      {offerOpen ? createPortal(
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: 'rgb(var(--dz-c-black) / .6)', backdropFilter: 'blur(4px)' }} onClick={() => setOfferOpen(false)}>
-          <div className="glass-strong rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-white mb-1">{state.myOffer ? t('property.updateYourOffer') : t('property.makeOffer')}</h3>
+      <Modal
+        open={offerOpen}
+        onClose={() => setOfferOpen(false)}
+        size="sm"
+        title={state.myOffer ? t('property.updateYourOffer') : t('property.makeOffer')}
+        footer={(
+          <>
+            <button onClick={() => setOfferOpen(false)} className="btn btn-secondary">{t('property.cancel')}</button>
+            <button onClick={submitOffer} className="btn btn-primary">{t('property.sendOffer')}</button>
+          </>
+        )}
+      >
             <p className="text-slate-400 text-xs mb-3">{t('property.offerModalSub')}</p>
-            <input value={offerAmt} onChange={(e) => { setOfferAmt(e.target.value); if (offerErr) setOfferErr(false); }} inputMode="numeric" data-err="offerAmt" className={'w-full rounded-lg bg-white/5 border px-3 py-2.5 text-sm text-white outline-none focus:border-teal-400/50 ' + (offerErr ? 'dz-invalid mb-1' : 'border-white/10 mb-3')} placeholder={t('property.offerPlaceholder')} />
-            <FieldError show={offerErr} className="mb-3">{t('property.enterOfferAmount')}</FieldError>
-            <p className="text-[11px] text-slate-400 mb-1.5">{isRent ? t('property.preferredMoveInDate') : t('property.targetPossessionDate')}</p>
-            <DateField value={offerMoveIn} onChange={(v) => setOfferMoveIn(v)} className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white mb-4" ariaLabel={isRent ? t('property.preferredMoveInDate') : t('property.targetPossessionDateAria')} />
-            <div className="flex gap-2">
-              <button onClick={submitOffer} className="btn-teal flex-1 py-2.5 rounded-lg text-sm font-semibold">{t('property.sendOffer')}</button>
-              <button onClick={() => setOfferOpen(false)} className="flex-1 py-2.5 rounded-lg text-sm border border-white/15 text-slate-200">{t('property.cancel')}</button>
+            <label htmlFor="deal-offer-amt" className="block text-xs font-medium text-slate-300 mb-1.5">
+              {t('property.offerAmountLabel')} <span className="text-slate-500 font-normal">(₹)</span>
+            </label>
+            <div className="mb-3">
+              <AmountInput
+                id="deal-offer-amt"
+                value={offerAmt}
+                onChange={(v) => { setOfferAmt(v); if (offerErr) setOfferErr(offerError(v)); }}
+                onBlur={() => offerAmt && setOfferErr(offerError(offerAmt))}
+                maxDigits={10}
+                data-err="offerAmt"
+                className={offerErr ? ' dz-invalid' : ''}
+                placeholder={offerPlaceholder}
+              />
+              <FieldError show={!!offerErr}>{offerErr}</FieldError>
             </div>
-          </div>
-        </div>,
-        document.body,
-      ) : null}
+            <p className="text-[11px] text-slate-400 mb-1.5">{isRent ? t('property.preferredMoveInDate') : t('property.targetPossessionDate')}</p>
+            <DateField value={offerMoveIn} onChange={(v) => setOfferMoveIn(v)} min={istToday()} className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white" ariaLabel={isRent ? t('property.preferredMoveInDate') : t('property.targetPossessionDateAria')} />
+      </Modal>
     </>
   );
 }

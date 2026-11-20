@@ -27,10 +27,11 @@ test('a post table scrolls inside the article instead of widening the phone page
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test('blog and locality share cards are real, light JPEGs', async ({ page }) => {
-  for (const path of ['/og/blog/rent-agreement-pune.jpg', '/og/locality/baner.jpg']) {
+test('share cards are real, light JPEGs for every kind of link', async ({ page }) => {
+  for (const path of ['/og-image.jpg', '/og/blog/rent-agreement-pune.jpg', '/og/locality/baner.jpg', '/og/route/services-rent-agreement.jpg',
+    '/og/rent/baner.jpg', '/og/flatmates/women-only-pune.jpg', '/og/listing/buy-farmland.jpg', '/og/page/society.jpg', '/og/page/signup.jpg']) {
     const res = await page.request.get(path);
-    expect(res.headers()['content-type']).toBe('image/jpeg');
-    expect((await res.body()).length).toBeLessThan(60 * 1024);
+    expect(res.headers()['content-type'], path).toBe('image/jpeg');
+    expect((await res.body()).length, path).toBeLessThan(60 * 1024);
   }
 });

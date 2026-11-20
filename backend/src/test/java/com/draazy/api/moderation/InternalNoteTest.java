@@ -21,11 +21,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-// Notes must be shared across staff, audited on edit, token-authored,
-// and limited to known entity kinds so unknown cases do not look clean.
 @DisplayName("Internal notes — what the team knows about a case")
 class InternalNoteTest extends AbstractApiTest {
-
     private static final String ANY_LISTING = "22222222-2222-2222-2222-222222222222";
 
     @Autowired MockMvc mvc;
@@ -57,8 +54,6 @@ class InternalNoteTest extends AbstractApiTest {
         return com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.id");
     }
 
-    // Same-test notes often share a millisecond, so ordering on `now()` is flaky.
-    // Backdating one makes the assertion about the ordering rather than about the clock.
     private void writtenAgo(String noteId, int minutes) {
         jdbc.update("update internal_notes set created_at = ? where id = cast(? as uuid)",
                 Timestamp.from(Instant.now().minus(minutes, ChronoUnit.MINUTES)), noteId);
@@ -134,8 +129,6 @@ class InternalNoteTest extends AbstractApiTest {
         User author = staff("9822100004", "Asha");
         User other = staff("9822100005", "Rohan");
 
-        // A body naming somebody else. The field does not exist on the contract; the point is that
-        // sending it anyway changes nothing.
         add(author, "property", ANY_LISTING,
                 "{\"text\":\"Chased twice.\",\"authorId\":\"" + other.getId() + "\"}");
 
@@ -160,8 +153,6 @@ class InternalNoteTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[1].text").value("First look."));
     }
 
-    // After an edit, this row is the only copy of the new text and nothing holds the old.
-    // The audit entry is where the previous wording survives — without it, "mutable" would mean "quietly rewritable".
     @Test
     @DisplayName("a note is scoped to the entity it was written about")
     void scopedToItsEntity() throws Exception {

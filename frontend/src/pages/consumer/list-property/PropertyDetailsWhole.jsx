@@ -20,7 +20,6 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
   const areaLabel = isLand() ? (isFarm ? tr('listProperty.fields.landArea') : tr('listProperty.fields.plotAreaLabel')) : tr('listProperty.fields.carpetArea');
   const unitOptions = landUnitOptionsFor(form.propertyType);
   const unitLabel = isLand() ? unitOptions.find(([v]) => v === form.areaUnit)?.[1] : 'sq.ft.';
-  // Null until a subtype is chosen — everything keyed on it stays off screen until then.
   const commercialProfile = commercialProfileOf(form.commercialType);
   const parkingOptions = parkingChoices(tr);
 
@@ -45,15 +44,13 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                             <label className={lbl3}>{tr('listProperty.fields.bhk')}</label>
                             <div className={`flex flex-wrap gap-2.5 ${errors.bhk ? 'dz-invalid-group' : ''}`} data-err="bhk">
                               {['0', '1', '2', '3', '4', '5'].map((n) => (
-                                <Pill key={n} selected={form.bhk === n} onClick={() => set('bhk', n)} className="px-5 py-2.5">{n === '0' ? tr('listProperty.opt.oneRk') : n === '5' ? '5+' : n}</Pill>
+                                <Pill key={n} selected={form.bhk === n} onClick={() => set('bhk', n)} className="px-5 h-btn inline-flex items-center justify-center">{n === '0' ? tr('listProperty.opt.oneRk') : n === '5' ? '5+' : n}</Pill>
                               ))}
                             </div>
                             <FieldError show={!!errors.bhk}>{tr('listProperty.err.bhk')}</FieldError>
                           </div>
                         )}
 
-                        {/* Commercial sub-type — required second choice so a shop and a warehouse never share one
-                           bucket. */}
                         {isCommercial() && (
                           <div>
                             <label className={lbl3}>{tr('listProperty.fields.commercialType')}</label>
@@ -76,7 +73,7 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                             <label className={lbl3}>{tr('listProperty.fields.bathrooms')}</label>
                             <div className={`flex flex-wrap gap-2.5 ${errors.bathrooms ? 'dz-invalid-group' : ''}`} data-err="bathrooms">
                               {['1', '2', '3', '4'].map((n) => (
-                                <Pill key={n} selected={form.bathrooms === n} onClick={() => set('bathrooms', n)} className="px-5 py-2.5">{n === '4' ? '4+' : n}</Pill>
+                                <Pill key={n} selected={form.bathrooms === n} onClick={() => set('bathrooms', n)} className="px-5 h-btn inline-flex items-center justify-center">{n === '4' ? '4+' : n}</Pill>
                               ))}
                             </div>
                             <FieldError show={!!errors.bathrooms}>{tr('listProperty.err.bathrooms')}</FieldError>
@@ -85,7 +82,7 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                             <label className={lbl3}>{tr('listProperty.fields.balconies')}</label>
                             <div className="flex flex-wrap gap-2.5">
                               {[['0', tr('listProperty.opt.none')], ['1', '1'], ['2', '2'], ['3', '3+']].map(([v, l]) => (
-                                <Pill key={v} selected={form.balconies === v} onClick={() => set('balconies', v)} className="px-5 py-2.5">{l}</Pill>
+                                <Pill key={v} selected={form.balconies === v} onClick={() => set('balconies', v)} className="px-5 h-btn inline-flex items-center justify-center">{l}</Pill>
                               ))}
                             </div>
                           </div>
@@ -98,7 +95,7 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                             <label className={lbl3}>{tr('listProperty.fields.parkingSpaces')}</label>
                             <div className="flex flex-wrap gap-2.5">
                               {parkingOptions.map(([v, l]) => (
-                                <Pill key={v} selected={form.parkingSpaces === v} onClick={() => set('parkingSpaces', v)} className="px-5 py-2.5">{l}</Pill>
+                                <Pill key={v} selected={form.parkingSpaces === v} onClick={() => set('parkingSpaces', v)} className="px-5 h-btn inline-flex items-center justify-center">{l}</Pill>
                               ))}
                             </div>
                           </div>
@@ -107,9 +104,9 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
 
                       <div className="mb-6 grid grid-cols-2 gap-4">
                         <div>
-                          <label className={lbl3}>{areaLabel} *</label>
+                          <label htmlFor="lp-carpet-area" className={lbl3}>{areaLabel} *</label>
                           <div className="relative">
-                            <input inputMode="decimal" maxLength={9} value={form.carpetArea} onChange={(e) => set('carpetArea', toDecimal(e.target.value))} data-err="carpetArea"
+                            <input id="lp-carpet-area" inputMode="decimal" maxLength={9} value={form.carpetArea} onChange={(e) => set('carpetArea', toDecimal(e.target.value))} data-err="carpetArea"
                               placeholder={tr('listProperty.ph.eg1050')} className={`${fld} pr-14 ${errors.carpetArea ? 'dz-invalid' : ''}`} />
 
                             <div className={unitSuffix}>{unitLabel}</div>
@@ -135,9 +132,9 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                           </div>
                         ) : isCommercial() ? null : (
                           <div>
-                            <label className={lbl3}>{tr('listProperty.fields.builtUpArea')}</label>
+                            <label htmlFor="lp-built-up" className={lbl3}>{tr('listProperty.fields.builtUpArea')}</label>
                             <div className="relative">
-                              <input inputMode="decimal" maxLength={9} value={form.builtUp} onChange={(e) => set('builtUp', toDecimal(e.target.value))}
+                              <input id="lp-built-up" inputMode="decimal" maxLength={9} value={form.builtUp} onChange={(e) => set('builtUp', toDecimal(e.target.value))}
                                 data-err="builtUp" placeholder={tr('listProperty.ph.eg1200')} className={`${fld} pr-12 ${errors.builtUp ? 'dz-invalid' : ''}`} />
                               <div className={unitSuffix}>sq.ft.</div>
                             </div>
@@ -146,12 +143,11 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                         )}
                       </div>
 
-                      {/* Optional, because only a builder-sold flat has one. */}
                       {!isLand() && !isCommercial() && (
                         <div className="mb-6">
-                          <label className={lbl3}>{tr('listProperty.fields.superBuiltUpArea')}</label>
+                          <label htmlFor="lp-super-built-up" className={lbl3}>{tr('listProperty.fields.superBuiltUpArea')}</label>
                           <div className="relative">
-                            <input inputMode="decimal" maxLength={9} value={form.superBuiltUp} onChange={(e) => set('superBuiltUp', toDecimal(e.target.value))}
+                            <input id="lp-super-built-up" inputMode="decimal" maxLength={9} value={form.superBuiltUp} onChange={(e) => set('superBuiltUp', toDecimal(e.target.value))}
                               data-err="superBuiltUp" placeholder={tr('listProperty.ph.eg1400')} className={`${fld} pr-12 ${errors.superBuiltUp ? 'dz-invalid' : ''}`} />
                             <div className={unitSuffix}>sq.ft.</div>
                           </div>
@@ -162,9 +158,9 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                       {isHouse() && (
                         <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className={lbl3}>{tr('listProperty.fields.plotArea')}</label>
+                            <label htmlFor="lp-plot-area" className={lbl3}>{tr('listProperty.fields.plotArea')}</label>
                             <div className="relative">
-                              <input inputMode="decimal" maxLength={9} value={form.plotArea} onChange={(e) => set('plotArea', toDecimal(e.target.value))}
+                              <input id="lp-plot-area" inputMode="decimal" maxLength={9} value={form.plotArea} onChange={(e) => set('plotArea', toDecimal(e.target.value))}
                                 placeholder={tr('listProperty.ph.eg2400')} className={`${fld} pr-12`} />
                               <div className={unitSuffix}>sq.ft.</div>
                             </div>
@@ -173,7 +169,7 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                             <label className={lbl3}>{tr('listProperty.fields.floorsInHouse')}</label>
                             <div className="flex flex-wrap gap-2.5">
                               {[['1', tr('listProperty.opt.ground')], ['2', 'G+1'], ['3', 'G+2'], ['4', 'G+3+']].map(([v, l]) => (
-                                <Pill key={v} selected={form.floorsInHouse === v} onClick={() => set('floorsInHouse', v)} className="px-5 py-2.5">{l}</Pill>
+                                <Pill key={v} selected={form.floorsInHouse === v} onClick={() => set('floorsInHouse', v)} className="px-5 h-btn inline-flex items-center justify-center">{l}</Pill>
                               ))}
                             </div>
                           </div>
@@ -199,7 +195,6 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                         <div>
                           <label className={lbl3}>{tr('listProperty.fields.facing')}</label>
 
-                          {/* Disable auto-search so more options cannot summon a mobile keyboard. */}
                           <Select value={form.facing} onChange={(v) => set('facing', v)} ariaLabel={tr('listProperty.fields.facing')} placeholder={tr('listProperty.ph.selectFacing')} searchable={false} options={facingOptions} />
                         </div>
                         {!isLand() && (
@@ -222,7 +217,7 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                           <label className={lbl3}>{tr('listProperty.fields.furnishingStatus')}</label>
                           <div className="flex flex-wrap gap-1.5 sm:gap-3">
                             {[['unfurnished', tr('listProperty.opt.unfurnished')], ['semi', tr('listProperty.opt.semiFurnished')], ['furnished', tr('listProperty.opt.furnished')]].map(([v, l]) => (
-                              <Pill key={v} selected={form.furnishing === v} onClick={() => set('furnishing', v)} className="grow shrink-0 whitespace-nowrap px-2 py-3 text-center sm:grow-0 sm:px-6">{l}</Pill>
+                              <Pill key={v} selected={form.furnishing === v} onClick={() => set('furnishing', v)} className="grow shrink-0 whitespace-nowrap px-2 h-btn inline-flex items-center justify-center text-center sm:grow-0 sm:px-6">{l}</Pill>
                             ))}
                           </div>
                         </div>
@@ -236,7 +231,7 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                             <label className={lbl3}>{tr('listProperty.fields.fitOutStatusReq')}</label>
                             <div className="flex flex-wrap gap-3" data-err="shellType">
                               {shellOptions.map(([v, l]) => (
-                                <Pill key={v} selected={form.shellType === v} onClick={() => set('shellType', v)} className={`px-6 py-3 ${errors.shellType ? 'dz-invalid' : ''}`}>{l}</Pill>
+                                <Pill key={v} selected={form.shellType === v} onClick={() => set('shellType', v)} className={`px-6 h-btn inline-flex items-center justify-center ${errors.shellType ? 'dz-invalid' : ''}`}>{l}</Pill>
                               ))}
                             </div>
                             <FieldError show={!!errors.shellType}>{tr('listProperty.err.shellType')}</FieldError>
@@ -247,7 +242,7 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                               <label className={lbl3}>{tr('listProperty.fields.washrooms')}</label>
                               <div className="flex flex-wrap gap-2.5">
                                 {washroomOptions.map((n) => (
-                                  <Pill key={n} selected={form.washrooms === n} onClick={() => set('washrooms', n)} className="px-5 py-2.5">{n}</Pill>
+                                  <Pill key={n} selected={form.washrooms === n} onClick={() => set('washrooms', n)} className="px-5 h-btn inline-flex items-center justify-center">{n}</Pill>
                                 ))}
                               </div>
                             </div>
@@ -255,7 +250,7 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                               <label className={lbl3}>{tr('listProperty.fields.parkingSpaces')}</label>
                               <div className="flex flex-wrap gap-2.5">
                                 {parkingOptions.map(([v, l]) => (
-                                  <Pill key={v} selected={form.parkingSpaces === v} onClick={() => set('parkingSpaces', v)} className="px-5 py-2.5">{l}</Pill>
+                                  <Pill key={v} selected={form.parkingSpaces === v} onClick={() => set('parkingSpaces', v)} className="px-5 h-btn inline-flex items-center justify-center">{l}</Pill>
                                 ))}
                               </div>
                             </div>
@@ -347,7 +342,7 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                                 <label className={lbl3}>{tr('listProperty.fields.openSides')}</label>
                                 <div className="flex flex-wrap gap-2.5">
                                   {openSidesOptions.map((n) => (
-                                    <Pill key={n} selected={form.openSides === n} onClick={() => set('openSides', n)} className="px-5 py-2.5">{n}</Pill>
+                                    <Pill key={n} selected={form.openSides === n} onClick={() => set('openSides', n)} className="px-5 h-btn inline-flex items-center justify-center">{n}</Pill>
                                   ))}
                                 </div>
                               </div>

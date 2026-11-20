@@ -22,6 +22,7 @@ import com.draazy.api.services.request.CoFillInviteRetention;
 import com.draazy.api.services.request.ServiceRequestEventRepository;
 import com.draazy.api.services.request.ServiceRequestMessageRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -31,11 +32,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 
-// The assisted-service workflow, organised around the one property that matters: whoever produces the draft never
-// accepts it.
 @DisplayName("Slice 11 — service requests: the maker-checker workflow")
 class ServiceRequestFlowTest extends ServiceFixtures {
-
     @Autowired
     private CoFillInviteRetention retention;
 
@@ -51,7 +49,6 @@ class ServiceRequestFlowTest extends ServiceFixtures {
     @Nested
     @DisplayName("maker-checker integrity")
     class MakerChecker {
-
         @Test
         @DisplayName("staff cannot approve their own draft — not even an admin")
         void staffCannotDecide() throws Exception {
@@ -203,7 +200,6 @@ class ServiceRequestFlowTest extends ServiceFixtures {
     @Nested
     @DisplayName("the transition table")
     class Transitions {
-
         @Test
         @DisplayName("cancelling requires a reason the customer receives in the thread and inbox")
         void cancellationIsExplainedToTheCustomer() throws Exception {
@@ -225,7 +221,7 @@ class ServiceRequestFlowTest extends ServiceFixtures {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("cancelled"));
 
-            assertThat(messages.findByRequestIdOrderByCreatedAtAsc(UUID.fromString(id)))
+            assertThat(messages.findByRequestIdInOrderByCreatedAtAsc(List.of(UUID.fromString(id))))
                 .extracting(message -> message.getBody())
                 .contains("The owner withdrew consent");
             assertThat(notifications.findAll())
@@ -341,7 +337,6 @@ class ServiceRequestFlowTest extends ServiceFixtures {
     @Nested
     @DisplayName("visibility")
     class Visibility {
-
         @Test
         @DisplayName("a stranger's request is a 404, never a 403")
         void strangersRequestIsInvisible() throws Exception {
@@ -459,7 +454,6 @@ class ServiceRequestFlowTest extends ServiceFixtures {
     @Nested
     @DisplayName("the conversation and the timeline")
     class Conversation {
-
         @Test
         @DisplayName("the author's role is taken from the token, not the body")
         void authorRoleIsServerResolved() throws Exception {
@@ -516,7 +510,6 @@ class ServiceRequestFlowTest extends ServiceFixtures {
     @Nested
     @DisplayName("creation")
     class Creation {
-
         @Test
         @DisplayName("the requester is the caller, and a free desk starts at new whatever the client claims")
         void createIgnoresClientClaims() throws Exception {
@@ -550,14 +543,11 @@ class ServiceRequestFlowTest extends ServiceFixtures {
                     .andExpect(status().isUnprocessableEntity());
         }
 
-        // Creating a priced request opens a gateway order, so one outstanding order per desk caps an otherwise
-        // unbounded cost loop.
         @Test
         @DisplayName("a malformed propertyId is a 400, not a silent null")
         void malformedPropertyIdRejected() throws Exception {
             User buyer = customer("9820000135");
 
-            // A free desk is unaffected -- it opens no order, so there is nothing to cap.
             mvc.perform(post(Routes.ServiceRequests.BASE)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -662,7 +652,6 @@ class ServiceRequestFlowTest extends ServiceFixtures {
     @Nested
     @DisplayName("the paid gate on a rent agreement")
     class PaidGate {
-
         @Test
         @DisplayName("a rent agreement is created awaiting-payment and priced, with checkout left for later")
         void createdAwaitingPayment() throws Exception {
@@ -691,7 +680,7 @@ class ServiceRequestFlowTest extends ServiceFixtures {
             mvc.perform(post(Routes.ServiceRequests.CHECKOUT, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"declaration\":\"ra-decl-2026-09\"}"))
+                            .content("{\"declaration\":\"ra-decl-2026-10\"}"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message", containsString("Upload required documents before checkout")));
             mvc.perform(get(Routes.ServiceRequests.BASE)
@@ -738,13 +727,17 @@ class ServiceRequestFlowTest extends ServiceFixtures {
         }
 
         @Test
-        @DisplayName("a failed payment cancels the request")
-        void failedPaymentCancels() throws Exception {
+        @DisplayName("a declined attempt leaves the request payable, and a retry on the same order settles it")
+        void aDeclineKeepsTheOrderOpen() throws Exception {
             User buyer = customer("9820000143");
             String id = raiseUnpaid(buyer, listing(buyer));
+            String ref = paymentRef(id);
 
-            deliverSigned(paymentRef(id), false);
-            expectStatus(buyer, id, "cancelled");
+            deliverSigned(ref, false);
+            expectStatus(buyer, id, "awaiting-payment");
+
+            deliverSigned(ref, true);
+            expectStatus(buyer, id, "new");
         }
 
         @Test
@@ -784,7 +777,6 @@ class ServiceRequestFlowTest extends ServiceFixtures {
             deliverSigned(ref, true);
             expectStatus(buyer, id, "new");
 
-            // Cashfree may redeliver; a second success must not disturb a request now in the queue.
             deliverSigned(ref, false);
             expectStatus(buyer, id, "new");
         }
@@ -810,6 +802,7 @@ class ServiceRequestFlowTest extends ServiceFixtures {
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.status").value("awaiting-payment"))
                     .andExpect(jsonPath("$.paymentSessionId").doesNotExist())
+                    .andExpect(jsonPath("$.parties[0].whatsappQueued").value(false))
                     .andReturn().getResponse().getContentAsString();
                 String requestId = field(created, "id");
 
@@ -822,6 +815,7 @@ class ServiceRequestFlowTest extends ServiceFixtures {
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].whatsappQueued").doesNotExist())
                     .andReturn().getResponse().getContentAsString();
                 String partyId = field(invites, "id");
 
@@ -866,8 +860,6 @@ class ServiceRequestFlowTest extends ServiceFixtures {
                     .andReturn().getResponse().getContentAsString();
                 String requestId = field(created, "id");
 
-                // Masked and not plain: they typed the number, so this tells them nothing they did not already know,
-                // and an API that echoes whole mobiles back is one API bug away from being a directory.
                 mvc.perform(get(Routes.ServiceRequests.BY_ID, requestId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                     .andExpect(status().isOk())
@@ -885,8 +877,6 @@ class ServiceRequestFlowTest extends ServiceFixtures {
                     .andExpect(jsonPath("$[0].mobile").doesNotExist())
                     .andReturn().getResponse().getContentAsString();
 
-                // Claiming is not accepting. The invitation is now addressed to a person and still
-                // unanswered, which is why checkout must stay shut.
                 mvc.perform(post(Routes.ServiceRequests.CHECKOUT, requestId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                     .andExpect(status().isConflict());
@@ -956,7 +946,6 @@ class ServiceRequestFlowTest extends ServiceFixtures {
                             + "\"role\":\"tenant\",\"mobile\":\"9820000996\"}"))
                     .andExpect(status().isCreated());
 
-                // Nothing is due yet -- the sweep must not take a live invitation with it.
                 assertThat(retention.expireNow()).isZero();
 
                 long swept = retention.expireInvitesOlderThan(

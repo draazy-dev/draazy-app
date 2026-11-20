@@ -1,13 +1,6 @@
 
-// There is no prose `detail` and one is not synthesised here. `metadata` arrives already parsed and
-// is normalised to `{}` so callers can enumerate its keys without guarding.
 import { get, unwrapPage } from '../../http.js';
 
-// Only send parameters that are actually set: an empty string is a filter on the server, so
-// `entity=''` asks for rows whose entity is the empty string.
-
-// `action` is **not** here and must not be added without a matching `@RequestParam` — Spring drops
-// an unknown parameter, so the console would show an unfiltered page under a narrowed filter.
 const query = ({ actor, entity, entityId, from, to } = {}) => {
   const params = {};
   if (actor) params.actor = actor;

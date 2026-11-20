@@ -19,7 +19,6 @@ function DocumentLink({ propertyId, file }) {
       setOpening(false);
     }
   };
-  // The visible text stays inside the accessible name, so "click Open" still matches.
   return (
     <button type="button" onClick={open} disabled={opening}
       className="dz-btn dz-btn-ghost dz-btn-sm shrink-0 text-teal-300"
@@ -28,7 +27,6 @@ function DocumentLink({ propertyId, file }) {
     </button>
   );
 }
-/** The vault files on this listing; each Open mints its own signed link. */
 export default function UploadedDocuments({ propertyId, documents }) {
   if (!documents.length) {
     return <p className="text-sm text-gray-500">Nothing in the owner's document vault yet.</p>;

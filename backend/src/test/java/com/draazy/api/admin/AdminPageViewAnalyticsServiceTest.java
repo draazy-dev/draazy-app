@@ -17,12 +17,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.draazy.api.support.AbstractApiTest;
 
-/** End to end from raw page views through the rollup: rates and windows split across a SQL aggregate and a Java
- * fold, so mocking the repository would leave the half the compiler can't check untested. */
 @DisplayName("Admin page-view analytics")
 class AdminPageViewAnalyticsServiceTest extends AbstractApiTest {
-
-    /** Yesterday: a "today 10:00" fixture is mostly in the future, which the collector can't produce. */
     private static final LocalDate DAY = LocalDate.now(PlatformTime.IST).minusDays(1);
 
     @Autowired AdminPageViewAnalyticsService service;
@@ -80,7 +76,6 @@ class AdminPageViewAnalyticsServiceTest extends AbstractApiTest {
     @Test
     @DisplayName("counts devices once per session, on the device the session arrived with")
     void countsDevicesPerSessionNotPerView() {
-        // One visitor who rotated a tablet: three views, two device strings, one session.
         view("s-rotate", null, "/", "tablet", null, at(10, 0));
         view("s-rotate", null, "/listings", "desktop", null, at(10, 1));
         view("s-rotate", null, "/property/:id", "desktop", null, at(10, 2));
@@ -101,8 +96,6 @@ class AdminPageViewAnalyticsServiceTest extends AbstractApiTest {
     @Test
     @DisplayName("bounce rate is the week's bounces over the week's sessions, not a mean of days")
     void weighsBounceRateBySessionsNotByDay() {
-        // A day with one session that bounced, and a day with four of which one bounced.
-        // Mean-of-daily-rates would say (100 + 25) / 2 = 62.5%. The real rate is 2 in 5 = 40%.
         LocalDate quiet = mondayOf(DAY);
         LocalDate busy = quiet.plusDays(1);
         view("q1", null, "/", "mobile", null, at(quiet, 10, 0));
@@ -128,7 +121,6 @@ class AdminPageViewAnalyticsServiceTest extends AbstractApiTest {
     @DisplayName("reports session length in decimal minutes")
     void reportsSessionLengthInMinutes() {
         LocalDate monday = mondayOf(DAY);
-        // 3 minutes exactly, and a bounce of zero: mean 1.5 minutes over two sessions.
         view("s-long", null, "/", "mobile", null, at(monday, 10, 0));
         view("s-long", null, "/listings", "mobile", null, at(monday, 10, 3));
         view("s-short", null, "/", "mobile", null, at(monday, 11, 0));
@@ -142,8 +134,6 @@ class AdminPageViewAnalyticsServiceTest extends AbstractApiTest {
     @Test
     @DisplayName("rates are null when there is nothing to measure, never a confident zero")
     void leavesRatesNullWhenThereIsNoTraffic() {
-        // Deliberately no fixture. An empty window is the state a brand-new deployment is in, and
-        // the state a broken rollup job looks like.
         AdminAnalyticsSurfers surfers = service.surfers(7);
 
         assertThat(surfers.totalSessions()).isZero();
@@ -194,7 +184,6 @@ class AdminPageViewAnalyticsServiceTest extends AbstractApiTest {
     @Test
     @DisplayName("ranks exits separately from views, so a page few people reach still surfaces")
     void ranksExitsOnTheirOwn() {
-        // /listings is viewed most and exited from least; /pricing is viewed once and always exited.
         view("s1", null, "/listings", "mobile", null, at(9, 0));
         view("s1", null, "/property/:id", "mobile", null, at(9, 1));
         view("s2", null, "/listings", "mobile", null, at(9, 10));
@@ -261,9 +250,6 @@ class AdminPageViewAnalyticsServiceTest extends AbstractApiTest {
         assertThat(AdminPageViewAnalyticsService.channelOf("someblog.in")).isEqualTo("Other referrals");
     }
 
-    // ---------------------------------------------------------------------------------------------
-
-    /** Rolls up a window wide enough to cover every fixture below, which all sit in the last week. */
     private void rollUp() {
         LocalDate today = LocalDate.now(PlatformTime.IST);
         rollup.rollUpBetween(
@@ -272,8 +258,6 @@ class AdminPageViewAnalyticsServiceTest extends AbstractApiTest {
     }
 
     private static LocalDate mondayOf(LocalDate day) {
-        // A fixed weekday inside the window, so a test spanning two days cannot straddle a week
-        // boundary and split its own fixture across two buckets depending on when it is run.
         return day.with(DayOfWeek.MONDAY);
     }
 
@@ -293,7 +277,6 @@ class AdminPageViewAnalyticsServiceTest extends AbstractApiTest {
         return day.atTime(hour, minute).atZone(PlatformTime.IST).toInstant();
     }
 
-    /** Raw SQL, not the collector, which anchors events to its own clock and can't place a view on a day. */
     private void view(String sessionId, UUID userId, String path, String device,
             String referrerHost, Instant at) {
         jdbc.update("""
@@ -302,7 +285,6 @@ class AdminPageViewAnalyticsServiceTest extends AbstractApiTest {
                 """, sessionId, userId, userId != null, path, referrerHost, device, java.sql.Timestamp.from(at));
     }
 
-    /** A bare account row: the conversion rate counts users, and only {@code mobile} is required. */
     private void signup(Instant at) {
         jdbc.update("insert into users (mobile, created_at) values (?, ?)",
                 "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode()) % 1_000_000_000),

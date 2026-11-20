@@ -8,27 +8,30 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Expires the referral correlation digests after the configured retention window. */
 @Service
 public class ReferralSignalRetention {
-
     private static final Logger log = LoggerFactory.getLogger(ReferralSignalRetention.class);
 
     private final ReferralRepository referrals;
     private final ReferralCodeRepository codes;
+    private final ReferralRedeemFailureRepository redeemFailures;
+    private final ReferralInviteRepository invites;
     private final PlatformSettings settings;
 
     public ReferralSignalRetention(ReferralRepository referrals, ReferralCodeRepository codes,
+            ReferralRedeemFailureRepository redeemFailures, ReferralInviteRepository invites,
             PlatformSettings settings) {
         this.referrals = referrals;
         this.codes = codes;
+        this.redeemFailures = redeemFailures;
+        this.invites = invites;
         this.settings = settings;
     }
 
-    // One transaction over both tables so no comparison is left half-erased.
     @Transactional
     public int expireSignalsOlderThan(Instant cutoff) {
-        int cleared = referrals.clearSignalsOlderThan(cutoff) + codes.clearSignalsOlderThan(cutoff);
+        int cleared = referrals.clearSignalsOlderThan(cutoff) + codes.clearSignalsOlderThan(cutoff)
+                + redeemFailures.deleteOlderThan(cutoff) + invites.deleteOlderThan(cutoff);
         if (cleared > 0) {
             log.info("Referral signal retention cleared digests on {} row(s)", cleared);
         }

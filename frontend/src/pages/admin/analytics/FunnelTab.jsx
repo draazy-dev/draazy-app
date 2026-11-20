@@ -10,7 +10,6 @@ const STAGES = [
   { key: 'deals', label: 'Deals closed', get color() { return C.emerald; } },
 ];
 
-/** Share of the previous stage, or null when there was nothing to convert. */
 const stepPct = (cur, prev) => (prev > 0 ? Math.round((cur / prev) * 100) : null);
 
 export default function FunnelTab({ report, failed, days }) {

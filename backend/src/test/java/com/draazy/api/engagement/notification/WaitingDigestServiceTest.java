@@ -167,11 +167,26 @@ class WaitingDigestServiceTest extends AbstractApiTest {
         User buyer = user("9810100062");
         contactRequest(listing(owner, "approved"), buyer, "pending", hoursAgo(3));
         NotificationPreference row = new NotificationPreference(owner.getId());
-        row.replace(true, false, false, true, false, "22:00", "07:00", "en");
+        row.replace(true, false, false, true, false, "22:00", "07:00", "en", false);
         preferences.saveAndFlush(row);
 
         assertThat(digest.sendDue(NOW)).isZero();
         verify(messenger, never()).sendWaitingDigest(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("a number that replied STOP on WhatsApp is not even claimed")
+    void optedOutNumberIsNotACandidate() {
+        User owner = user("9810100065");
+        User buyer = user("9810100066");
+        contactRequest(listing(owner, "approved"), buyer, "pending", hoursAgo(3));
+        jdbc.update("insert into whatsapp_opt_outs (mobile, opted_out, changed_at) values (?, true, now())",
+                owner.getMobile());
+
+        assertThat(digest.sendDue(NOW)).isZero();
+        verify(messenger, never()).sendWaitingDigest(anyString(), anyString());
+        assertThat(jdbc.queryForObject("select waiting_digest_at from users where id = ?", Timestamp.class,
+                owner.getId())).isNull();
     }
 
     @Test

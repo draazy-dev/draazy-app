@@ -19,9 +19,14 @@ import lombok.Setter;
 @Table(name = "property_reviews")
 @Getter
 public class PropertyReview extends AuditedEntity {
-
-    @Column(name = "property_id", nullable = false, unique = true, updatable = false)
+    @Column(name = "property_id", unique = true, updatable = false)
     private UUID propertyId;
+
+    @Column(name = "flatmate_post_id", unique = true, updatable = false)
+    private UUID flatmatePostId;
+
+    @Column(name = "flatmate_kind", updatable = false)
+    private String flatmateKind;
 
     @Column(name = "status", nullable = false)
     @Setter
@@ -52,11 +57,17 @@ public class PropertyReview extends AuditedEntity {
     private List<ReviewMessage> messages = new ArrayList<>();
 
     protected PropertyReview() {
-
     }
 
     public PropertyReview(UUID propertyId) {
         this.propertyId = propertyId;
+    }
+
+    static PropertyReview forFlatmate(String kind, UUID postId) {
+        PropertyReview review = new PropertyReview();
+        review.flatmateKind = kind;
+        review.flatmatePostId = postId;
+        return review;
     }
 
     public void addChecklistItem(String item) {
@@ -71,7 +82,12 @@ public class PropertyReview extends AuditedEntity {
         return add(senderId, body, false, clarificationRequested);
     }
 
-    // No sender: a system user would add a fictional participant to the thread.
+    public ReviewMessage addApprovalMessage(UUID senderId, String body) {
+        ReviewMessage message = addMessage(senderId, body);
+        message.markRead();
+        return message;
+    }
+
     public ReviewMessage addInternalNote(String body) {
         return add(null, body, true, false);
     }
@@ -104,5 +120,4 @@ public class PropertyReview extends AuditedEntity {
         this.reasonCode = null;
         this.checklist.forEach(ReviewChecklistItem::reset);
     }
-
 }

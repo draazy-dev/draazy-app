@@ -21,10 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Managed records are owner-scoped private supply; only publish may create
-// the linked pending marketplace listing.
 class ManagedPropertyFlowTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -61,7 +58,6 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
         mvc.perform(post(Routes.MeManagedProperties.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
 
-                        // visibility/status in the body must be ignored, not honoured.
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"deal\":\"rent\",\"propertyType\":\"Flat\",\"bhk\":2,"
                                 + "\"price\":25000,\"locality\":\"Baner\","
@@ -163,13 +159,70 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
         mvc.perform(patch(Routes.MeManagedProperties.BASE + "/" + id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"rented\":true,\"tenantName\":\"Rohan\",\"dueDay\":5}"))
+                        .content("{\"rented\":true,\"tenantName\":\"Rohan\",\"tenantMobile\":\"+91 98310 03990\","
+                                + "\"dueDay\":5}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rented").value(true))
                 .andExpect(jsonPath("$.tenantName").value("Rohan"))
+                .andExpect(jsonPath("$.tenantMobile").value("9831003990"))
                 .andExpect(jsonPath("$.dueDay").value(5))
 
                 .andExpect(jsonPath("$.locality").value("Baner"))
+                .andExpect(jsonPath("$.price").value(25000));
+    }
+
+    @Test
+    void rentTracking_requiresTenantNameMobileAndRent_withSaneBounds() throws Exception {
+        User owner = user("9831003991");
+
+        for (String bad : new String[] {
+                "{\"rented\":true,\"tenantMobile\":\"9831003992\"}",
+                "{\"rented\":true,\"tenantName\":\"Rohan\"}",
+                "{\"rented\":true,\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003991\"}",
+                "{\"rented\":true,\"tenantName\":\"Rohan\",\"tenantMobile\":\"5831003992\"}",
+                "{\"rented\":true,\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003992\",\"monthlyRent\":0}",
+                "{\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003992\",\"monthlyRent\":10000001}",
+                "{\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003992\",\"dueDay\":29}"}) {
+            String id = register(owner, flat("Baner", 25000));
+            mvc.perform(patch(Routes.MeManagedProperties.BASE + "/" + id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(bad))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+
+        mvc.perform(post(Routes.MeManagedProperties.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deal\":\"rent\",\"propertyType\":\"Flat\",\"price\":10000001,"
+                                + "\"locality\":\"Baner\",\"rented\":true,\"tenantName\":\"Rohan\","
+                                + "\"tenantMobile\":\"9831003992\"}"))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void stopRentTracking_clearsTheTenantButKeepsTheRecord() throws Exception {
+        User owner = user("9831003993");
+        String id = register(owner, flat("Baner", 25000));
+        String byId = Routes.MeManagedProperties.BASE + "/" + id;
+        mvc.perform(patch(byId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rented\":true,\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003994\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(delete(byId + "/rent-tracking")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(user("9831003995"))))
+                .andExpect(status().isNotFound());
+
+        mvc.perform(delete(byId + "/rent-tracking")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.rented").value(false))
+                .andExpect(jsonPath("$.tenantName").doesNotExist())
+                .andExpect(jsonPath("$.tenantMobile").doesNotExist())
+                .andExpect(jsonPath("$.monthlyRent").doesNotExist())
                 .andExpect(jsonPath("$.price").value(25000));
     }
 
@@ -211,55 +264,59 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
+    private String publishWith(User owner, String id, String photos) throws Exception {
+        return mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/listing")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"2 BHK in Baner\",\"deal\":\"rent\",\"propertyType\":\"apartment\","
+                                + "\"price\":25000,\"locality\":\"Baner\",\"city\":\"Pune\"" + photos + "}"))
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    private String publishedListingOf(String id) {
+        return jdbc.queryForObject("select published_listing_id::text from managed_properties where id = ?::uuid",
+                String.class, id);
+    }
+
     @Test
     void publish_spawnsAPendingListing_linksBack_andFlipsTheRecordPublic() throws Exception {
         User owner = user("9831003017");
         String id = register(owner, flat("Baner", 25000));
 
-        String json = mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/publish")
+        publishWith(owner, id, "," + listingImages(owner));
+
+        String listingId = publishedListingOf(id);
+        assertThat(listingId).isNotNull();
+        mvc.perform(get(Routes.MeManagedProperties.BASE + "/" + id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.visibility").value("public"))
                 .andExpect(jsonPath("$.status").value("published"))
-                .andExpect(jsonPath("$.publishedListingId").exists())
-                .andReturn().getResponse().getContentAsString();
-
-        String listingId = json.replaceAll("^.*?\"publishedListingId\":\"([^\"]+)\".*$", "$1");
+                .andExpect(jsonPath("$.publishedListingId").value(listingId));
         String status = jdbc.queryForObject(
                 "SELECT status FROM properties WHERE id = ?::uuid", String.class, listingId);
         assertThat(status).isEqualTo(PropertyStatus.PENDING);
     }
 
     @Test
-    void publish_acceptsARecordBoundToARetiredLocality() throws Exception {
+    void publish_refusesAListingWithoutPhotos_andTheRecordStaysPrivate() throws Exception {
         User owner = user("9831003099");
         String id = register(owner, flat("Baner", 25000));
-        jdbc.update("insert into localities (slug, name, city, active, archived_at) "
-                + "values ('zzold-baner', 'Zzold Baner', 'Pune', false, now())");
-        jdbc.update("update managed_properties set locality = 'Zzold Baner', locality_slug = 'zzold-baner' "
-                + "where id = ?::uuid", id);
 
-        mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/publish")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("published"));
+        assertThat(publishWith(owner, id, "")).contains("must include at least one photo");
+
+        assertThat(publishedListingOf(id)).isNull();
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM properties WHERE owner_id = ?::uuid", Integer.class, owner.getId().toString());
+        assertThat(count).isZero();
     }
 
     @Test
-    void publish_isIdempotent_noSecondListing() throws Exception {
+    void publish_isRefusedASecondTime_noSecondListing() throws Exception {
         User owner = user("9831003018");
         String id = register(owner, flat("Baner", 25000));
+        publishWith(owner, id, "," + listingImages(owner));
 
-        String first = mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/publish")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String firstListing = first.replaceAll("^.*?\"publishedListingId\":\"([^\"]+)\".*$", "$1");
-
-        mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/publish")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.publishedListingId").value(firstListing));
+        assertThat(publishWith(owner, id, "," + listingImages(owner))).contains("already listed");
 
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM properties WHERE owner_id = ?::uuid", Integer.class,
@@ -273,8 +330,12 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
         User other = user("9831003020");
         String id = register(owner, flat("Baner", 25000));
 
-        mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/publish")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(other)))
+        mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/listing")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(other))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Not mine\",\"deal\":\"rent\",\"propertyType\":\"apartment\","
+                                + "\"price\":25000,\"locality\":\"Baner\",\"city\":\"Pune\","
+                                + listingImages(other) + "}"))
                 .andExpect(status().isNotFound());
     }
 
@@ -289,56 +350,10 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
         }
         String id = register(owner, flat("Baner", 25000));
 
-        mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/publish")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.error").value("rate_limited"));
+        assertThat(publishWith(owner, id, "," + listingImages(owner))).contains("rate_limited");
+        assertThat(publishedListingOf(id)).isNull();
     }
 
-    @Test
-    void publish_rePublishOfAPublishedRecordSpendsNoQuota() throws Exception {
-        User owner = user("9831003043");
-        for (int i = 0; i < 2; i++) {
-            Property p = new Property(owner, "Turned down " + i, "rent", "apartment", 25000L,
-                    "Baner", "Pune");
-            p.setStatus(PropertyStatus.REJECTED);
-            properties.saveAndFlush(p);
-        }
-        String id = register(owner, flat("Baner", 25000));
-        String publish = Routes.MeManagedProperties.BASE + "/" + id + "/publish";
-
-        mvc.perform(post(publish).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk());
-
-        // The window now holds three posts, so a second creation would be paced; an idempotent return must not.
-        mvc.perform(post(publish).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("published"));
-    }
-
-    @Test
-    void publish_rejectsARecordThatCannotLegallyBecomeAListing() throws Exception {
-        User owner = user("9831003021");
-
-        // Private drafts may have zero price; marketplace listings may not.
-        // Publish is the boundary, so it must 422 rather than slip a ?0 listing into the catalogue.
-        String id = register(owner, "{\"deal\":\"rent\",\"propertyType\":\"Flat\",\"bhk\":2,"
-                + "\"price\":0,\"locality\":\"Baner\"}");
-
-        mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/publish")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isUnprocessableEntity());
-
-        // ...and the record stayed private — no half-published state.
-        mvc.perform(get(Routes.MeManagedProperties.BASE + "/" + id)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("managed"))
-                .andExpect(jsonPath("$.publishedListingId").doesNotExist());
-    }
-
-    // Adoption must merge an existing live ad into one managed record;
-    // the server links by `publishedListingId` because the client would guess.
     private String listing(User owner, String title) throws Exception {
         String json = mvc.perform(post(Routes.MeListings.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -365,8 +380,6 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
                                 + "\"publishedListingId\":\"" + listingId + "\"}"))
                 .andExpect(status().isCreated())
 
-                // This is the one exception to "born private/managed": the record is describing
-                // something the world can already see, so claiming otherwise would be a lie.
                 .andExpect(jsonPath("$.visibility").value("public"))
                 .andExpect(jsonPath("$.status").value("published"))
                 .andExpect(jsonPath("$.publishedListingId").value(listingId));
@@ -392,11 +405,8 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
         User owner = user("9831003025");
 
         String first = register(owner, flat("Baner", 25000));
-        String json = mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + first + "/publish")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String listingId = json.replaceAll("^.*?\"publishedListingId\":\"([^\"]+)\".*$", "$1");
+        publishWith(owner, first, "," + listingImages(owner));
+        String listingId = publishedListingOf(first);
 
         mvc.perform(post(Routes.MeManagedProperties.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))

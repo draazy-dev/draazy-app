@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Icon from './Icon.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { addServiceRequestDoc, readServiceRequestChecklist } from '../services/serviceRequestService.js';
-/** The rent-agreement papers the desk sent back, each with its reason and a re-upload. */
+import { userMessage } from '../lib/userMessage.js';
 
 export default function RejectedPapers({ requestId, onUploaded }) {
   const { toast } = useToast();
@@ -27,7 +27,7 @@ export default function RejectedPapers({ requestId, onUploaded }) {
       setNonce((n) => n + 1);
       onUploaded?.();
     } catch (error) {
-      toast(error?.message || 'The upload failed. Please try again.', 'error');
+      toast(userMessage(error, 'The upload failed. Please try again.'), 'error');
     } finally {
       setBusy('');
     }

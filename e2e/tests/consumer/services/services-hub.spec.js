@@ -65,6 +65,14 @@ test.describe('LIVE: the services hub routes people to the nine services', () =>
     expect(consoleErrors).toEqual([]);
   });
 
+  test('the service pages carry no stray "?" where a dash belongs', async ({ page }) => {
+    for (const href of ['/services/packers-movers', '/services/interior-renovation', '/services/property-valuation', '/home-loans']) {
+      await page.goto(href);
+      await expect(page.locator('h1').first()).toBeVisible();
+      await expect(page.locator('body'), `${href} shows a lost-dash "?"`).not.toContainText(/\w \? [a-z]/);
+    }
+  });
+
   test('every service card points at a route that renders its content against the API', async ({ page }) => {
     // Nine full route loads against a real backend — comfortably over the default budget.
     test.slow();

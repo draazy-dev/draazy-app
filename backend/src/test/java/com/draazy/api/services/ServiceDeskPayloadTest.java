@@ -43,6 +43,7 @@ class ServiceDeskPayloadTest extends ServiceFixtures {
                     .andExpect(jsonPath("$.content[0].type").value("rent-agreement"))
                     .andExpect(jsonPath("$.content[0].status").isNotEmpty())
                     .andExpect(jsonPath("$.content[0].createdAt").isNotEmpty())
+                    .andExpect(jsonPath("$.content[0].requesterMobile").value("9820016001"))
                     .andExpect(jsonPath("$.content[0].documents").doesNotExist())
                     .andExpect(jsonPath("$.content[0].messages").doesNotExist())
                     .andExpect(jsonPath("$.content[0].parties").doesNotExist())

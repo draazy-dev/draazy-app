@@ -1,14 +1,9 @@
-/* Tier 0 surfaces, loaded after index.css. Known issue: this file wins over index.css's `@supports not (backdrop-filter)` `.glass-card`
-   fallback, so that fallback never applies; fix by moving the fallback below this block. */
 .glass-card {
   background: var(--glass);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgb(var(--dz-c-white) / calc(.08 * var(--dz-line-boost)));
 }
-
-/* Dashboard "tools" row: opaque cards so backdrop-filter can't blur the contrasty
-   edge of the listings panel above into a faint horizontal band across each card. */
 .dash-tools-row .glass-card {
   background: rgb(var(--dz-c-ink-2) / .94);
   backdrop-filter: none;

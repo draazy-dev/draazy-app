@@ -17,10 +17,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Read-only by construction: a review surface that could write audit rows could edit the record it reviews. */
 @RestController
 public class StaffActivityController {
-
     private static final String GUARD = "hasAnyRole('" + Roles.MANAGER + "', '" + Roles.ADMIN + "') and "
             + BackOfficePermissions.REQUIRE_AUDIT_READ;
 
@@ -48,7 +46,6 @@ public class StaffActivityController {
                 Function.identity());
     }
 
-    /** Takes the same filters as the feed so the totals describe what the console is showing. */
     @GetMapping(Routes.Admin.STAFF_ACTIVITY_SUMMARY)
     @PreAuthorize(GUARD)
     public StaffActivitySummary summary(

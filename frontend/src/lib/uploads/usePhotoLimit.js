@@ -13,7 +13,6 @@ const load = () => {
   return pending;
 };
 
-/** The admin-configured photo ceiling. The server enforces the same number on every write. */
 export default function usePhotoLimit() {
   const [maxPhotos, setMaxPhotos] = useState(cached ?? DEFAULT_MAX_PHOTOS);
   useEffect(() => {

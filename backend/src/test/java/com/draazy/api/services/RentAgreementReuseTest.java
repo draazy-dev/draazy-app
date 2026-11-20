@@ -3,12 +3,12 @@ package com.draazy.api.services;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.Property;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.engagement.notification.NotificationRepository;
 import com.draazy.api.identity.user.User;
@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.ResultActions;
 
 @DisplayName("A rent agreement reuses what the platform already holds")
@@ -28,54 +27,63 @@ class RentAgreementReuseTest extends ServiceFixtures {
     private NotificationRepository notifications;
 
     @Nested
-    @DisplayName("filing a personal-vault paper on the request")
+    @DisplayName("filing a paper from the request property's vault")
     class FromVault {
 
         @Test
-        @DisplayName("the caller's own paper is filed without a re-upload and reads back with a URL")
+        @DisplayName("the owner's paper on this property is filed without a re-upload and reads back without a URL")
         void ownPaperIsFiled() throws Exception {
             User owner = customer("9820000801");
-            String id = create(owner);
-            String vaultId = vaultUpload(owner, "PAN Card");
+            Property flat = listing(owner);
+            String id = create(owner, flat);
+            String vaultId = propertyVaultPaper(owner, flat, "index-ii.pdf");
 
-            fromVault(owner, id, vaultId, "licensor-0-pan", 201)
-                    .andExpect(jsonPath("$.category").value("licensor-0-pan"))
-                    .andExpect(jsonPath("$.fileName").value("pan.pdf"));
+            fromVault(owner, id, vaultId, "ownership-proof", 201)
+                    .andExpect(jsonPath("$.category").value("ownership-proof"))
+                    .andExpect(jsonPath("$.fileName").value("index-ii.pdf"));
             mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.documents[0].category").value("licensor-0-pan"))
-                    .andExpect(jsonPath("$.documents[0].fileName").value("pan.pdf"))
+                    .andExpect(jsonPath("$.documents[0].category").value("ownership-proof"))
+                    .andExpect(jsonPath("$.documents[0].fileName").value("index-ii.pdf"))
                     .andExpect(jsonPath("$.documents[0].url").doesNotExist());
         }
 
         @Test
-        @DisplayName("somebody else's vault paper is a 404, and the desk may not file from a vault at all")
-        void onlyTheOwnersVault() throws Exception {
+        @DisplayName("only a vault paper on the request's own property is filed, and the desk may not file from a vault at all")
+        void onlyTheRequestsProperty() throws Exception {
             User owner = customer("9820000802");
             User stranger = customer("9820000803");
-            String id = create(owner);
-            String strangers = vaultUpload(stranger, "PAN Card");
+            Property flat = listing(owner);
+            String id = create(owner, flat);
+            String otherFlat = propertyVaultPaper(owner, listing(owner), "other.pdf");
+            String strangers = propertyVaultPaper(stranger, listing(stranger), "theirs.pdf");
+            String copy = field(fromVault(owner, id, propertyVaultPaper(owner, flat, "index-ii.pdf"),
+                    "ownership-proof", 201).andReturn().getResponse().getContentAsString(), "id");
 
+            fromVault(owner, id, otherFlat, "licensor-0-pan", 404);
             fromVault(owner, id, strangers, "licensor-0-pan", 404);
+            fromVault(owner, id, copy, "licensor-0-pan", 404);
             fromVault(owner, id, "not-a-uuid", "licensor-0-pan", 404);
             fromVault(stranger, id, strangers, "licensor-0-pan", 404);
-            fromVault(admin("9820000804"), id, vaultUpload(owner, "PAN Card"), "licensor-0-pan", 403);
+            fromVault(stranger, create(stranger, null), strangers, "licensor-0-pan", 404);
+            fromVault(admin("9820000804"), id, propertyVaultPaper(owner, flat, "pan.pdf"), "licensor-0-pan", 403);
         }
 
         @Test
-        @DisplayName("the side rules of a direct upload hold: an invited tenant cannot file the owner's papers")
+        @DisplayName("the side rules of a direct upload hold, and a tenant cannot file the owner's property papers")
         void sideRulesHold() throws Exception {
             User owner = customer("9820000805");
             User tenant = customer("9820000806");
-            String id = create(owner);
+            Property flat = listing(owner);
+            String id = create(owner, flat);
             String party = invite(owner, id, tenant, 201);
             decide(tenant, field(party, "id"), "accept");
-            String tenantPan = vaultUpload(tenant, "PAN Card");
+            String index = propertyVaultPaper(owner, flat, "index-ii.pdf");
 
-            fromVault(tenant, id, tenantPan, "licensor-0-pan", 403);
-            fromVault(tenant, id, tenantPan, "tenant-0-pan", 201);
-            fromVault(owner, id, vaultUpload(owner, "PAN Card"), "draft", 422);
+            fromVault(tenant, id, index, "ownership-proof", 403);
+            fromVault(tenant, id, index, "tenant-0-pan", 404);
+            fromVault(owner, id, index, "draft", 422);
         }
     }
 
@@ -143,21 +151,16 @@ class RentAgreementReuseTest extends ServiceFixtures {
     }
 
     private String create(User owner) throws Exception {
+        return create(owner, null);
+    }
+
+    private String create(User owner, Property property) throws Exception {
+        String listing = property == null ? "" : ",\"propertyId\":\"" + property.getId() + "\"";
         String body = mvc.perform(post(Routes.ServiceRequests.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"type\":\"rent-agreement\",\"details\":{\"_state\":"
+                        .content("{\"type\":\"rent-agreement\"" + listing + ",\"details\":{\"_state\":"
                                 + "{\"owner\":{\"oMobile\":\"" + owner.getMobile() + "\"}}}}"))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return field(body, "id");
-    }
-
-    private String vaultUpload(User caller, String category) throws Exception {
-        String body = mvc.perform(multipart(Routes.MeDocuments.PERSONAL)
-                        .file(new MockMultipartFile("file", "pan.pdf", "application/pdf", "%PDF-1.4".getBytes()))
-                        .param("category", category)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(caller)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return field(body, "id");

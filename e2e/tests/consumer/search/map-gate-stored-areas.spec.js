@@ -1,7 +1,19 @@
 import { test, expect } from '@playwright/test';
+import { mintLocality, uniqueLocalityName } from '../../../helpers/locality.js';
+
+test('a map focused on areas with nothing to show offers to change the areas', async ({ page }) => {
+  const { slug } = await mintLocality(uniqueLocalityName('Zzempty Map'));
+  await page.goto(`/listings?deal=buy&view=map&loc=${slug}`);
+  const empty = page.getByTestId('map-empty');
+  await expect(empty).toContainText('No properties in these areas', { timeout: 20000 });
+  await empty.getByRole('button', { name: 'Change areas' }).click();
+  await expect(page.getByRole('heading', { name: /Focus your map/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Show Map view' }), 'the gate is ready for a new area').toBeVisible();
+  await expect(page, 'the empty area is dropped').not.toHaveURL(/[?&]loc=/);
+});
 
 // The gate pre-selects the areas of the last search; one that does not resolve is never drawn, so it must not
-// be applied or hold one of the five slots.
+// be applied or hold one of the three slots.
 test('a stored area that no longer exists is neither pre-selected nor applied by Show Map view', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('draazy.listings.lastSearch.v1', JSON.stringify({
@@ -22,4 +34,15 @@ test('a stored area that no longer exists is neither pre-selected nor applied by
   await show.click();
   await expect(page).toHaveURL(/[?&]loc=baner(&|$)/);
   expect(new URL(page.url()).searchParams.get('loc')).toBe('baner');
+});
+
+test('the listings map holds three areas: a fourth sends you back to trim the list', async ({ page }) => {
+  await page.goto('/listings?deal=buy&view=map&loc=baner,wakad,aundh');
+  await expect(page.getByRole('heading', { name: /Focus your map/i })).toHaveCount(0);
+
+  await page.goto('/listings?deal=buy&view=map&loc=baner,wakad,aundh,kothrud');
+  await expect(page.getByText(/Map view stays fast with up to\s*3\s*areas/)).toBeVisible();
+  await page.getByRole('button', { name: 'Remove area Kothrud' }).click();
+  await expect(page.getByText(/Map view stays fast with up to/)).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /Focus your map/i })).toHaveCount(0);
 });

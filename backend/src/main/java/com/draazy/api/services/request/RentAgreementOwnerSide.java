@@ -14,10 +14,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-// Owner-side KYC and identities come from the owner, never from a tenant who raised the request.
 @Component
 class RentAgreementOwnerSide {
-
     private final ServiceRequestPartyRepository parties;
     private final PropertyRepository properties;
     private final UserRepository users;
@@ -34,8 +32,6 @@ class RentAgreementOwnerSide {
                 "Owner papers and identity numbers are filed by the owner. Invite the owner to fill their part.");
     }
 
-    // A listing settles it: only its owner is the owner side. Without one the request's own
-    // record is all there is: the requester's number among the licensors, else an accepted tenant co-fill party.
     boolean requesterIsOwner(ServiceRequest request) {
         if (request.getPropertyId() != null) {
             return properties.findById(request.getPropertyId())
@@ -48,7 +44,6 @@ class RentAgreementOwnerSide {
                         .anyMatch(p -> CoFillParties.ACCEPTED.equals(p.getStatus()) && "tenant".equals(p.getRole()));
     }
 
-    // Licensor slots no accepted owner party stands behind.
     List<String> licensorsAwaitingOwner(ServiceRequest request) {
         Set<Integer> represented = parties.findByRequestId(request.getId()).stream()
                 .filter(p -> "owner".equals(p.getRole()) && CoFillParties.ACCEPTED.equals(p.getStatus()))

@@ -1,4 +1,3 @@
-/* Readable prerender of /compare/nobroker from src/data/compareNobroker.js, the copy the page itself renders. */
 import { esc } from './seo-html.mjs';
 import { AS_OF, CHECKED_ON, CORRECTIONS_EMAIL, SOURCES } from '../src/data/compareNobroker.js';
 

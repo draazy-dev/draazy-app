@@ -1,4 +1,3 @@
-/* `category` must match the vault category the server stores for the same document. */
 export const DOC_TYPES = [
   { value: 'electricity_bill', label: 'Electricity bill', category: 'Electricity Bill' },
   { value: 'tax_receipt', label: 'Property tax receipt', category: 'Property Tax Receipt' },
@@ -32,12 +31,9 @@ export const KIND_LABELS = {
 
 export const dateLabel = (value) => value ? new Date(value).toLocaleDateString('en-IN') : 'Not recorded';
 
-/* One spelling for both the missing-evidence list and the disabled Grant button that describes
-   itself by it: a dangling `aria-describedby` neither throws nor lints, it just goes silent. */
 export const missingEvidenceId = (panelId) => `${panelId}-missing`;
 
 const IST = 'Asia/Kolkata';
-/* Document issue dates are Pune calendar dates, so format in IST rather than the reviewer locale. */
 export const istDate = (at = new Date()) => new Intl.DateTimeFormat('en-CA', {
   timeZone: IST, year: 'numeric', month: '2-digit', day: '2-digit',
 }).format(at);

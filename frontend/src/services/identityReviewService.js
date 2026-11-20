@@ -10,6 +10,5 @@ export const releaseIdentityReview = async (id, options) => (await provider()).r
 export const approveIdentityReview = async (id, payload) => (await provider()).approveIdentityReview(id, payload);
 export const rejectIdentityReview = async (id, payload) => (await provider()).rejectIdentityReview(id, payload);
 export const revokeIdentityReview = async (id, reason) => (await provider()).revokeIdentityReview(id, reason);
-export const qaIdentityReview = async (id, payload) => (await provider()).qaIdentityReview(id, payload);
-/** Correct the applicant's account name/email from their case. Blank fields are left unchanged. */
+export const decideIdentityAppeal = async (id, outcome) => (await provider()).decideIdentityAppeal(id, outcome);
 export const updateKycProfile = async (userId, profile) => (await provider()).updateKycProfile(userId, profile);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { CheckCircle2, Download, Eye } from 'lucide-react';
 import { getDeal, getEnquiry, getEnquirySummary, getVisit, listDeals, listEnquiries, listVisits } from '../../services/enquiryBoardService.js';
 import { addNote } from '../../services/noteService.js';
@@ -16,8 +17,8 @@ import {
 } from '../../components/admin/WorkQueue.jsx';
 import FunnelView from './enquiries/FunnelView.jsx';
 import { ENQUIRY_STATUS_OPTS, VISIT_STATUS_OPTS, DEAL_STATUS_OPTS, DEAL_TYPE_OPTS, AWAITING_STATUSES } from './enquiries/constants.js';
+import { userMessage } from '../../lib/userMessage.js';
 
-// Non-ISO values (a pre-written slot string) pass through unchanged.
 const fmtWhen = (v) => {
   if (!v) return '\u2014';
   const d = new Date(v);
@@ -36,13 +37,12 @@ const NOTES = {
 };
 const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 
-/** The board is read-only: `contact_requests.status` is the owner's decision, so "Responded" writes a note.
- * Lists carry masked mobiles; opening a row's detail returns the full number and is audited. */
 export default function AdminEnquiries() {
   const { toast } = useToast();
   const [tab, setTab] = useTabParam(['enquiries', 'visits', 'deals', 'funnel'], 'enquiries');
+  const [searchParams] = useSearchParams();
   const [q, setQ] = useState('');
-  const [statusF, setStatusF] = useState('');
+  const [statusF, setStatusF] = useState(() => searchParams.get('status') || '');
   const [typeF, setTypeF] = useState('');
   const [dateRange, setDateRange] = useState('');
   const [list, setList] = useState(null);
@@ -56,7 +56,6 @@ export default function AdminEnquiries() {
   const page = pageState.key === resetKey ? pageState.page : 1;
   const latest = useRef(0);
 
-  // Debounced: `q` changes on every keystroke and each settled value is a request.
   useEffect(() => {
     const id = setTimeout(() => setQLive(q.trim()), 250);
     return () => clearTimeout(id);
@@ -68,26 +67,24 @@ export default function AdminEnquiries() {
     setStale(true);
     LISTERS[tab]({ status: statusF, deal: tab === 'deals' ? typeF : '', q: qLive, days: dateRange, page: page - 1, size: PAGE_SIZE })
       .then((res) => { if (ticket === latest.current) { setList(res); setStale(false); } })
-      .catch((e) => { if (ticket === latest.current) { setStale(false); setList((cur) => cur || { items: [], total: 0 }); toast(e?.message || 'Could not load the board', 'error'); } });
+      .catch((e) => { if (ticket === latest.current) { setStale(false); setList((cur) => cur || { items: [], total: 0 }); toast(userMessage(e, 'Could not load the board'), 'error'); } });
     return () => { latest.current += 1; };
   }, [tab, statusF, typeF, qLive, dateRange, page, toast]);
 
-  // One read feeds the tab and chip counts, the GMV note and the funnel; only the funnel date filter moves it.
   useEffect(() => {
     let live = true;
     getEnquirySummary({ days: funnelTime })
       .then((s) => { if (live) setSummary(s); })
-      .catch((e) => toast(e?.message || 'Could not load the board totals', 'error'));
+      .catch((e) => toast(userMessage(e, 'Could not load the board totals'), 'error'));
     return () => { live = false; };
   }, [funnelTime, toast]);
 
-  // Filed against the listing: that is the case file a colleague opens tomorrow.
   const noteResponded = async (r) => {
     try {
       await addNote('listing', r.propertyId, `Responded to enquiry from ${r.customer}.`, 'responded');
       toast('Note added to the listing');
     } catch (e) {
-      toast(e?.message || 'Could not add the note', 'error');
+      toast(userMessage(e, 'Could not add the note'), 'error');
     }
   };
 
@@ -98,7 +95,7 @@ export default function AdminEnquiries() {
       const full = await fetcher(r.id);
       setDetail((d) => (d && d.id === full.id ? { ...d, ...full } : d));
     } catch (e) {
-      toast(e?.message || 'Could not load the latest details', 'error');
+      toast(userMessage(e, 'Could not load the latest details'), 'error');
     }
   };
 
@@ -124,7 +121,6 @@ export default function AdminEnquiries() {
 
   const note = tab === 'deals' ? `Deals agreed through the platform \u2014 ${fmtINR(summary.gmv)} across all deals.` : NOTES[tab];
 
-  // The export is the first 100 matching rows; the list's masked mobile is what it carries.
   const doExport = async () => {
     try {
       const all = (await LISTERS[tab]({ status: statusF, deal: tab === 'deals' ? typeF : '', q: qLive, days: dateRange, page: 0, size: MAX_PAGE_SIZE })).items;
@@ -132,7 +128,7 @@ export default function AdminEnquiries() {
       else if (tab === 'visits') exportCsv('draazy-visits.csv', ['ID', 'Listing', 'Customer', 'Mobile', 'When', 'Status'], all.map((r) => [r.id, r.listing, r.customer, r.mobile, r.when || fmtWhen(r.slot), r.status]));
       else exportCsv('draazy-enquiries.csv', ['ID', 'Listing', 'Customer', 'Mobile', 'Locality', 'Date', 'Status'], all.map((r) => [r.id, r.listing, r.customer, r.mobile, r.locality, fmtWhen(r.at), r.status]));
     } catch (e) {
-      toast(e?.message || 'Could not export the board', 'error');
+      toast(userMessage(e, 'Could not export the board'), 'error');
     }
   };
 

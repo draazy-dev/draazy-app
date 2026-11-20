@@ -51,40 +51,29 @@
   ownerMobile (digits), reason, reasonLabel, details, reportedBy, reporterMobile (digits),
   url, at: Date.now(), status: 'open', actionTaken: '', handledAt: 0 }
 ```
-- **Reasons** are per-surface and exported from `src/lib/reportReasons.js`:
+- **Reasons** are per-surface and exported from `src/lib/reportReasons.js` (not `components/`: the ops queue
+  and the http mapper need them, and a services-layer module should not import from `components/`):
   `LISTING_REPORT_REASONS` (the modal's default, property listings), `SHARE_REPORT_REASONS`
-  (Flatmates seeker/room/group posts), `OWNER_REPORT_REASONS` (owner profiles and chat). They lived
-  in `src/components/ReportModal.jsx` until the reports slice; they moved because the ops queue and
-  the http mapper need them too, and a services-layer module should not import from `components/`.
-  A fourth, byte-identical copy of the listing set survived as `REPORT_REASONS` in
-  `src/lib/data/reports.js` with no importers — deleted, because an unimported duplicate sitting in
-  the file the mock writer calls is the one a future edit lands in.
-- **The three-way mismatch is closed.** The admin filter used to carry its own hand-written
-  moderation set (`fake`, `inaccurate`, `fraud`, `impersonation`, `offensive`, `spam`) — two of those
-  codes existed in no vocabulary at all, so filtering by them always emptied the queue, and nine
-  codes reports genuinely carry were unfilterable. It now derives its options from the two
-  vocabularies above, per tab, and an inapplicable selection is *derived* away rather than cleared,
-  so the tab never paints a frame filtered by a code its rows cannot carry — and returning to the
-  original tab restores the filter. Labels are
-  resolved the same way: `reportMapper.reasonLabel(reason, targetType)` indexes the vocabularies by
-  target type, because `spam` on a listing ("duplicate listing"), on a flatmate post ("duplicate
-  post") and from an owner ("irrelevant messages") are different complaints. Data-model
-  inconsistency #7 is resolved.
+  (Flatmates seeker/room/group posts), `OWNER_REPORT_REASONS` (owner profiles and chat). There is no
+  duplicate `REPORT_REASONS` in `src/lib/data/reports.js`; keep it that way, since the mock writer's file is where a future edit would land in a stale copy.
+- **The admin reason filter derives its options from the two moderation vocabularies, per tab** (no hand-written
+  set: codes absent from the vocabularies would empty the queue, and genuine codes would be unfilterable). An
+  inapplicable selection is *derived* away rather than cleared, so the tab never paints a frame filtered by a code
+  its rows cannot carry, and returning to the original tab restores the filter. Labels resolve the same way:
+  `reportMapper.reasonLabel(reason, targetType)` indexes the vocabularies by target type, because `spam` on a
+  listing ("duplicate listing"), on a flatmate post ("duplicate post") and from an owner ("irrelevant messages")
+  are different complaints. Data-model inconsistency #7 is resolved.
 - **The reporter is never named to the queue.** `ReportResponse` deliberately omits `reporterId`, so
   the http mapper resolves `reportedBy` to `''` and every live row falls back. The fallback reads
   **"Withheld"**, not "Anonymous": `reports.reporter_id` is NOT NULL and drives the duplicate index,
-  so the platform knows exactly who filed the report — telling a moderator it was anonymous would
-  suggest an unattributable complaint, which is a far easier one to dismiss. The string is rendered
-  in four places (table column, detail drawer, mobile card and the CSV export, where a blank cell
+  so the platform knows who filed it — "anonymous" would suggest an unattributable complaint, a far easier one to
+  dismiss. The string is rendered in four places (table column, detail drawer, mobile card and the CSV export, where a blank cell
   would read as missing rather than withheld); `admin/reports` asserts that "Anonymous" appears
-  **nowhere** on the page, which is what caught the last two copies.
+  **nowhere** on the page.
 - **`kind` routing:** rooms, flatmate seekers and groups all report as `kind: 'share'` →
-  `targetType: 'post'`, and land in the admin **posts** tab. That tab arrived late: the queue split
-  its rows with `kind === 'listing' ? … : kind === 'user'`, so `share` rows matched neither branch
-  and rendered in no tab at all. It was masked by an older bug in `Flatmates.jsx`, which sent
-  `kind: 'user'` — wrong, but *visible*, under the owner vocabulary. Fixing the mapping is what made
-  the reports vanish. `TAB_KIND` in `AdminReports.jsx` is now the single place the three-way
-  correspondence is written down, so a fourth target type cannot be added without confronting it.
+  `targetType: 'post'`, and land in the admin **posts** tab. `TAB_KIND` in `AdminReports.jsx` is the single place
+  the three-way correspondence (tab ↔ kind ↔ target type) is written down, so a fourth target type cannot be added
+  without confronting it; a `kind` matching no tab would render in no tab at all.
 - Every new report starts `status: 'open'` with no action taken.
 
 ### 5.2 Triage states & moderator actions
@@ -95,13 +84,11 @@ path:
   alongside the from-status, the to-status and the authenticated actor.
 - Writes `{ status, handledAt: Date.now() }`, plus `actionTaken` when supplied; **reopening
   (`status='open'`) clears `actionTaken` back to `''`**.
-- **No** `addInternalNote` and no `logAudit`. Both stood here once and both wrote a browser-local
-  second copy of something the server had already stored under a real author. The note went under
-  the key `report:<id>` in localStorage, which nothing ever read. `report` is one of the `note`
-  domain's four entity families and the route is open to this screen, but nothing here calls it
-  yet, deliberately: the triage record already carries the moderator's words for the decision
-  itself, and a note here would be for something the triage record cannot hold — context that
-  outlives the decision. Adding the panel is a product choice, not a gap in the plumbing.
+- **No** `addInternalNote` and no `logAudit` (both would write a browser-local second copy of what the server
+  already stores under a real author). `report` is one of the `note` domain's four entity families and the route
+  is open to this screen, but nothing here calls it, deliberately: the triage record already carries the
+  moderator's words for the decision, and a note would be for context that outlives the decision. Adding the
+  panel is a product choice, not a gap in the plumbing.
 - The server's answer is authoritative for `status` — `resolved` is stored as `dismissed`.
 
 | Trigger | status | actionTaken | Effect |
@@ -113,10 +100,10 @@ path:
 | Dismiss | `dismissed` | (unchanged) | closed as not actionable |
 | Reopen | `open` | cleared to `''` | back to the queue |
 
-> Note: the queue records the moderation **decision and audit**; the actual listing takedown /
+> The queue records the moderation **decision and audit**; the actual listing takedown /
 > user suspension is executed through the property and user admin flows
 > ([`property-verification.md`](./property-verification.md) flag/archive,
-> [`users-kyc.md`](./users-kyc.md) suspend). The report row is the decision + evidence trail.
+> [`users-kyc.md`](./users-kyc.md) suspend).
 
 ### 5.3 Escalation signal
 `targetCounts` (a memoized `O(n)` map of `targetId -> report count`) flags targets reported multiple
@@ -127,8 +114,7 @@ times, so a repeat offender stands out even if each individual report looks mino
 - **Filters:** status (`open|resolved|actioned|dismissed`), reason, date range, and free-text search
   over the whole record (`JSON.stringify(r).includes(q)`).
 - **KPIs:** `open`, `listings`, `users`, `posts`, `closed` (status != open). The two partitions
-  (`open + closed` and `listings + users + posts`) must total the same number; the live spec asserts
-  it, and that arithmetic is what would have caught the missing posts tab.
+  (`open + closed` and `listings + users + posts`) must total the same number; the live spec asserts it.
 - Selection resets on any tab/filter change; the header checkbox selects all **open** rows only.
 
 ### 5.5 Bulk actions
@@ -146,9 +132,8 @@ The detail modal (`?open=<id>` or the Eye action) shows the full record for cont
   it (`resolved` / `dismissed`), or defers (`reopen`). Approval fires the downstream side-effect
   (takedown / suspend) and writes an audit row. See
   [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2.
-- There is **no second-approver** on the moderator's action today - a single moderator both reviews
-  and acts. A future backend can require a checker to approve high-impact takedowns (a true two-person
-  rule), which is the natural place to add dual control.
+- There is **no second-approver** on the moderator's action - a single moderator both reviews
+  and acts. A future backend can require a checker to approve high-impact takedowns (a true two-person rule).
 
 ## 7. State machine
 ```
@@ -167,7 +152,7 @@ actioned|resolved|dismissed --(reopen)--> open   (clears actionTaken)
 - **Reopen resets action:** intentional - a reopened report has no decision, matching the persisted
   patch (`resolveAction`).
 - **Bulk on open only:** the select-all header targets open rows, so bulk resolve/dismiss cannot
-  accidentally re-close already-closed reports.
+  re-close already-closed reports.
 - **Duplicate reports:** multiple reports can target one entity; `targetCounts` surfaces the cluster
   but each report is triaged independently.
 - **Concurrency:** shared store, last write wins; no locking.

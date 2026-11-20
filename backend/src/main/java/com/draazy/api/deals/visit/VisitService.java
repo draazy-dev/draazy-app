@@ -1,8 +1,10 @@
 package com.draazy.api.deals.visit;
 
+import com.draazy.api.catalog.property.ListingClosed;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.ContactVisibility;
@@ -12,6 +14,8 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.leads.contact.ContactService;
 import com.draazy.api.security.AuthPrincipal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,8 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class VisitService {
-
     private static final Logger LOG = LoggerFactory.getLogger(VisitService.class);
+    private static final Duration REBOOK_WAIT = Duration.ofHours(24);
 
     private final VisitRepository visits;
     private final PropertyRepository properties;
@@ -47,24 +51,28 @@ public class VisitService {
         this.contacts = contacts;
     }
 
-    // The caller must be either the visitor or the listing owner.
-    // Who may do what (the security-critical rule).
     @Transactional
     public VisitDto schedule(UUID callerId, VisitCreateRequest body) {
         UUID propertyId = Ids.parseUuid(body.propertyId()).orElse(null);
-        // Row lock: an archive running alongside either waits for this visit or is seen as archived here.
         Property property = propertyId == null ? null
                 : properties.findForVerificationDecision(propertyId).orElse(null);
-        if (property == null || !property.isPubliclyVisible()) {
+        if (property == null) {
             throw NotFoundException.of("Property");
         }
+        if (!property.isPubliclyVisible()) {
+            throw ListingClosed.refusal(property);
+        }
 
-        // Duplicate prevention: service pre-check for a clean error message.
         if (visits.findLiveByVisitorAndProperty(callerId, propertyId).isPresent()) {
             throw new ConflictException("You already have a live visit on this property");
         }
         UUID ownerId = property.getOwner().getId();
         if (!ownerId.equals(callerId)) {
+            Instant cancelled = visits.lastCancelledByVisitor(callerId, propertyId);
+            if (cancelled != null && cancelled.plus(REBOOK_WAIT).isAfter(Instant.now())) {
+                throw new ConflictException(ErrorCodes.RECENTLY_WITHDRAWN,
+                        "You cancelled a visit here in the last day. You can book again after 24 hours.");
+            }
             contacts.requireRoomForVisit(callerId, propertyId);
         }
 
@@ -73,7 +81,6 @@ public class VisitService {
             visit = new Visit(propertyId, callerId, body.slot(), body.mode(), body.note());
             visit = visits.saveAndFlush(visit);
         } catch (DataIntegrityViolationException constraintViolation) {
-
             LOG.debug("Concurrent duplicate visit for user {} on property {}", callerId, propertyId);
             throw new ConflictException("You already have a live visit on this property");
         }
@@ -86,11 +93,9 @@ public class VisitService {
                             + ". Confirm it or suggest another time.",
                     "/dashboard#visits");
         }
-        return VisitMapper.toDto(visit, visitor, ContactVisibility.REVEALED);
+        return VisitMapper.toDto(visit, property, visitor, ContactVisibility.REVEALED);
     }
 
-    // The caller must be either the visitor or the listing owner.
-    // Who may do what (the security-critical rule).
     @Transactional
     public void updateStatus(AuthPrincipal caller, UUID visitId, VisitStatusUpdateRequest body) {
         Visit visit = visits.lockById(visitId)
@@ -106,8 +111,7 @@ public class VisitService {
             throw NotFoundException.of("Visit");
         }
 
-        // Role-split: the visitor may ONLY cancel. Any other transition from a visitor is 403.
-        // why: a visitor marking 'completed' would forge the anti-fake-review signal (item f).
+        // A visitor may only cancel: a visitor marking 'completed' would forge the anti-fake-review signal.
         if (isVisitor && !VisitStatuses.CANCELLED.equals(body.status())) {
             throw new ForbiddenException(
                     "Only the listing owner can set status '" + body.status() + "'");
@@ -122,12 +126,15 @@ public class VisitService {
                     "Cannot transition from '" + visit.getStatus() + "' to '" + body.status() + "'");
         }
 
-        visit.setStatus(body.status());
+        if (VisitStatuses.CANCELLED.equals(body.status()) && isVisitor) {
+            visit.cancelByVisitor();
+        } else {
+            visit.setStatus(body.status());
+        }
         visits.saveAndFlush(visit);
 
         if (VisitStatuses.CONFIRMED.equals(body.status())
                 && !visit.getVisitorId().equals(caller.userId())) {
-            // `completed` and `no-show` are bookkeeping after the fact and change nothing either party has to act on.
             notifier.notify(visit.getVisitorId(), "visit.confirmed",
                     "Your visit is confirmed",
                     "The owner confirmed your visit to " + property.getTitle()
@@ -172,8 +179,6 @@ public class VisitService {
         visit.reschedule(body.slot());
         visits.saveAndFlush(visit);
 
-        // An owner can book their own listing, so both roles may point to one user.
-        // Reschedule is two-sided, so the recipient is derived from who called rather than fixed.
         UUID other = isOwner ? visit.getVisitorId() : ownerId;
         if (!other.equals(callerId)) {
             String mover = isOwner ? "The owner" : "The visitor";
@@ -218,19 +223,21 @@ public class VisitService {
                         rows.stream().map(Visit::getVisitorId).distinct().toList())
                 .stream().collect(Collectors.toMap(User::getId, Function.identity()));
 
+        Map<UUID, Property> propertyMap = properties.findAllById(
+                        rows.stream().map(Visit::getPropertyId).distinct().toList())
+                .stream().collect(Collectors.toMap(Property::getId, Function.identity()));
+
         return rows.stream().map(visit -> {
             User visitor = visitorMap.get(visit.getVisitorId());
+            Property property = propertyMap.get(visit.getPropertyId());
             ContactVisibility visibility = visitorMobileVisibility(viewerId, visit, viewerOwnedPropertyIds);
-            return VisitMapper.toDto(visit, visitor, visibility);
+            return VisitMapper.toDto(visit, property, visitor, visibility);
         }).toList();
     }
 
-    // Scheduled visits are excluded so booking cannot harvest a phone number.
     private static final Set<String> OWNER_MAY_SEE_VISITOR_MOBILE =
             Set.of(VisitStatuses.CONFIRMED, VisitStatuses.COMPLETED, VisitStatuses.NO_SHOW);
 
-    // Rescheduling re-masks the number until the owner confirms the new slot.
-    // Anyone who is neither party sees `MASKED`.
     private ContactVisibility visitorMobileVisibility(UUID viewerId, Visit visit,
                                                       Set<UUID> viewerOwnedPropertyIds) {
         if (viewerId.equals(visit.getVisitorId())) {

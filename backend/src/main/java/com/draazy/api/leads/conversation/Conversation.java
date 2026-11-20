@@ -11,7 +11,6 @@ import lombok.Getter;
 @Table(name = "conversations")
 @Getter
 public class Conversation extends AuditedEntity {
-
     @Column(name = "user_a_id", updatable = false)
     private UUID userAId;
 
@@ -24,14 +23,18 @@ public class Conversation extends AuditedEntity {
     @Column(name = "property_id", updatable = false)
     private UUID propertyId;
 
+    @Column(name = "flatmate_kind")
+    private String flatmateKind;
+
+    @Column(name = "flatmate_target_id")
+    private UUID flatmateTargetId;
+
     @Column(name = "last_message")
     private String lastMessage;
 
     protected Conversation() {
-
     }
 
-    // Constructor canonicalises parties, so caller argument order cannot matter.
     Conversation(UUID oneUser, UUID otherUser, UUID propertyId, String lastMessage) {
         if (oneUser.equals(otherUser)) {
             throw new IllegalArgumentException("a conversation needs two different people");
@@ -62,8 +65,12 @@ public class Conversation extends AuditedEntity {
         return flatmateGroupId != null;
     }
 
-    // The lower of the two ids, by Postgres uuid order.
     void setLastMessage(String lastMessage) {
         this.lastMessage = lastMessage;
+    }
+
+    void aboutFlatmate(String kind, UUID targetId) {
+        this.flatmateKind = kind;
+        this.flatmateTargetId = targetId;
     }
     }

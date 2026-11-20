@@ -1,5 +1,6 @@
 package com.draazy.api.identity.verification;
 
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.provider.FileStorage;
 import java.time.Instant;
 import java.util.List;
@@ -15,7 +16,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class IdentityFilePurgeService {
-
     private static final Logger log = LoggerFactory.getLogger(IdentityFilePurgeService.class);
 
     private final IdentityVerificationFileRepository files;
@@ -45,10 +45,9 @@ public class IdentityFilePurgeService {
     public void purgeKeys(List<String> keys) {
         Instant queuedAt = Instant.now();
         keys.forEach(key -> deletes.queue(key, queuedAt));
-        afterCommit(() -> keys.forEach(this::deleteStoredFile));
+        AfterCommit.run(() -> keys.forEach(this::deleteStoredFile));
     }
 
-    /** Tries each due row once and returns how many files were really deleted. */
     public int retryQueuedDeletes(Instant now, int batchSize) {
         int deleted = 0;
         for (IdentityStorageDelete row : deletes.findDue(now, PageRequest.of(0, batchSize))) {
@@ -69,19 +68,6 @@ public class IdentityFilePurgeService {
                 if (status == STATUS_ROLLED_BACK) {
                     deleteStoredFile(key, true);
                 }
-            }
-        });
-    }
-
-    private void afterCommit(Runnable action) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            action.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
             }
         });
     }

@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { pickDate } from '../helpers/datePicker.helper.js';
 import { IGNORE as SHARED_IGNORE } from '../helpers/console.js';
-import { signedInAs, signedInAsNew, authHeaders, API } from '../helpers/liveAuth.js';
+import { signedInAs, signedInAsNew, authHeaders, API, uniqueMobile } from '../helpers/liveAuth.js';
+import { signInSheet, verifyInSheet } from '../helpers/signInSheet.js';
 
 // OWNER has four listings, including one non-public row, to distinguish /me/listings from public search.
 const OWNER = { mobile: '9470744469', name: 'Meera Deshpande', total: 4, publiclyVisible: 3 };
@@ -82,7 +83,8 @@ test.describe('LIVE: conversations against the real API', () => {
     expect(body.totalElements).toBeGreaterThan(0);
 
     // Establish a real thread before making negative assertions about the inbox fixture.
-    const thread = page.locator('.pc-conv').first();
+    // Request rows (flatmate/contact asks) share the list but never read /messages/<id>.
+    const thread = page.locator('.pc-conv[data-staged="false"]').first();
     await expect(thread).toBeVisible({ timeout: 15000 });
 
     const seededIds = await page.evaluate(() => {
@@ -140,55 +142,51 @@ test.describe('LIVE: support tickets against the real API', () => {
     expect(errors.filter((e) => !IGNORE.test(e)), `failed API calls: ${apiFails.join(', ') || 'none'}`).toEqual([]);
   });
 
-  test('a ticket round-trips, and the controls the API cannot carry are not offered', async ({ page }) => {
-    await signedInAs(page, CHATTER.mobile);
+  test('a support chat round-trips, and the controls the API cannot carry are not offered', async ({ page }) => {
+    await signedInAsNew(page);
 
     const listed = page.waitForResponse(
-      (r) => /\/api\/support\/tickets(\?|$)/.test(r.url()) && r.request().method() === 'GET' && r.status() === 200,
+      (r) => new URL(r.url()).pathname === '/api/support/chat' && r.request().method() === 'GET' && r.status() === 200,
       { timeout: 20000 },
     );
-    await page.goto('/support');
+    await page.goto('/messages?support=general');
 
     const body = await (await listed).json();
-    expect(Array.isArray(body)).toBe(true);
+    expect(body.status).toBe('none');
+    expect(body.messages).toEqual([]);
 
-    await expect(page.getByText('Priority', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('Attach screenshots')).toHaveCount(0);
-    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+    const thread = page.getByTestId('support-thread');
+    const composer = thread.getByRole('textbox', { name: 'Message Draazy support' });
+    await expect(composer).toBeVisible();
+    await expect(thread.getByText('Priority', { exact: true })).toHaveCount(0);
+    await expect(thread.locator('input[type="file"]')).toHaveCount(0);
 
-    const subject = `Parity check ${Date.now()}`;
-    const created = page.waitForResponse(
-      (r) => /\/api\/support\/tickets$/.test(r.url()) && r.request().method() === 'POST',
+    const sent = () => page.waitForResponse(
+      (r) => new URL(r.url()).pathname === '/api/support/chat/messages' && r.request().method() === 'POST',
       { timeout: 20000 },
     );
-
-    await page.getByPlaceholder('Brief summary of your issue').fill(subject);
-    await page.getByPlaceholder(/Share as much detail/i).fill('Raised by the live integration suite.');
-    await page.getByRole('button', { name: /submit ticket/i }).click();
+    const first = `Parity check ${Date.now()}`;
+    const created = sent();
+    await composer.fill(first);
+    await thread.getByRole('button', { name: 'Send message' }).click();
 
     const res = await created;
     expect(res.status()).toBe(201);
-    const ticket = await res.json();
-    expect(ticket.status).toBe('open');
-    expect(ticket).not.toHaveProperty('priority');
-    expect(ticket).not.toHaveProperty('mobile');
+    const msg = await res.json();
+    expect(msg).toMatchObject({ from: 'me', text: first, about: { type: 'general' } });
+    expect(msg).not.toHaveProperty('priority');
+    expect(msg).not.toHaveProperty('mobile');
+    await expect(thread.getByText(first)).toBeVisible({ timeout: 15000 });
 
-    await expect(page.getByText(subject).first()).toBeVisible({ timeout: 15000 });
-
-    const replied = page.waitForResponse(
-      (r) => /\/api\/support\/tickets\/[^/]+\/messages$/.test(r.url()) && r.request().method() === 'POST',
-      { timeout: 20000 },
-    );
+    const replied = sent();
     const reply = `Following up ${Date.now()}`;
-    await page.getByPlaceholder(/type your reply/i).fill(reply);
-    await page.getByRole('button', { name: /^send$/i }).click();
+    await composer.fill(reply);
+    await thread.getByRole('button', { name: 'Send message' }).click();
 
     expect((await replied).status()).toBe(201);
-    // The reply appears in both the thread and preview, so select the first match.
-    await expect(page.getByText(reply).first()).toBeVisible({ timeout: 15000 });
+    await expect(thread.getByText(reply)).toBeVisible({ timeout: 15000 });
   });
 });
-
 test.describe('LIVE: abuse reports against the real API', () => {
   let errors;
   let apiFails;
@@ -207,6 +205,26 @@ test.describe('LIVE: abuse reports against the real API', () => {
       errors.filter((e) => !IGNORE.test(e) && !expected.test(e)),
       `failed API calls: ${apiFails.filter((f) => !expected.test(f)).join(', ') || 'none'}`,
     ).toEqual([]);
+  });
+
+  test('a signed-out visitor is asked to sign in before reporting, and the report form opens once they do', async ({ page }) => {
+    await page.context().clearCookies();
+    const posts = [];
+    page.on('request', (r) => { if (/\/api\/reports$/.test(r.url()) && r.method() === 'POST') posts.push(r.url()); });
+    await page.goto('/listings');
+    const card = page.locator('a[href^="/property/"]').first();
+    await expect(card).toBeVisible({ timeout: 20000 });
+    await page.goto(await card.getAttribute('href'));
+
+    await page.getByRole('button', { name: /report/i }).first().click();
+    const sheet = signInSheet(page);
+    await expect(sheet).toBeVisible({ timeout: 10000 });
+    await expect(sheet.getByRole('heading', { name: 'Sign in to report' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /report this listing/i })).toHaveCount(0);
+
+    await verifyInSheet(page, uniqueMobile());
+    await expect(page.getByRole('dialog', { name: /report this listing/i })).toBeVisible({ timeout: 10000 });
+    expect(posts, 'nothing is filed until the reporter submits').toEqual([]);
   });
 
   test('a report reaches the ops queue, and a duplicate is refused', async ({ page }) => {
@@ -323,7 +341,7 @@ test.describe('LIVE: saved, alerts, visits and the contact gate against the real
       .toEqual(expect.arrayContaining([expect.stringMatching(/^200 PATCH \/api\/visits\/[^/]+\/slot$/)]));
 
     const saved = await page.evaluate(async () => {
-      const tokens = JSON.parse(localStorage.getItem('draazyTokens') || sessionStorage.getItem('draazyTokens') || 'null');
+      const tokens = { accessToken: (await import('/src/lib/auth.js')).readAccessToken() };
       const res = await fetch('/api/me/saved?size=5', { headers: { Authorization: `Bearer ${tokens.accessToken}` } });
       return res.json();
     });

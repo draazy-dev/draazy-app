@@ -8,12 +8,10 @@ import com.draazy.api.common.error.PayloadTooLargeException;
 import com.draazy.api.common.error.RateLimitedException;
 import com.draazy.api.common.error.UnsupportedMediaTypeException;
 import com.draazy.api.common.error.ValidationException;
-import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.trust.OwnerBadgeSink;
 import com.draazy.api.common.validation.MediaSignatures;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
-import com.draazy.api.provider.DecisionMessenger;
 import com.draazy.api.provider.DocumentScanner;
 import com.draazy.api.provider.FileStorage;
 import com.draazy.api.security.AuthPrincipal;
@@ -26,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +34,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class IdentityVerificationService {
-
     static final int MAX_ATTEMPTS_PER_WINDOW = 3;
     static final Duration ATTEMPT_WINDOW = Duration.ofHours(24);
     static final String CONSENT_NOTICE_VERSION = "2026-09";
@@ -55,18 +53,22 @@ public class IdentityVerificationService {
     private final IdentityHasher hasher;
     private final ObjectMapper json;
     private final OwnerBadgeSink ownerBadge;
-    private final Notifier notifier;
-    private final DecisionMessenger decisionMessenger;
+    private final IdentityRejectionNotice rejectionNotice;
     private final AuditService audit;
     private final LivenessCheck livenessCheck;
     private final Clock clock;
+    private final IdentityStatusMapper statusMapper;
+    private final ApplicationEventPublisher events;
 
     public IdentityVerificationService(IdentityVerificationRepository verifications,
             IdentityVerificationFileRepository files, UserRepository users, FileStorage storage,
             List<DocumentScanner> scanners, IdentityHasher hasher, ObjectMapper json,
-            OwnerBadgeSink ownerBadge, Notifier notifier, DecisionMessenger decisionMessenger,
+            OwnerBadgeSink ownerBadge, IdentityRejectionNotice rejectionNotice,
             AuditService audit, IdentityFilePurgeService filePurge, IdentityConflictService conflicts,
-            LivenessCheck livenessCheck, Clock clock) {
+            LivenessCheck livenessCheck, Clock clock, IdentityStatusMapper statusMapper,
+            ApplicationEventPublisher events) {
+        this.statusMapper = statusMapper;
+        this.events = events;
         this.verifications = verifications;
         this.files = files;
         this.filePurge = filePurge;
@@ -77,8 +79,7 @@ public class IdentityVerificationService {
         this.hasher = hasher;
         this.json = json;
         this.ownerBadge = ownerBadge;
-        this.notifier = notifier;
-        this.decisionMessenger = decisionMessenger;
+        this.rejectionNotice = rejectionNotice;
         this.audit = audit;
         this.livenessCheck = livenessCheck;
         this.clock = clock;
@@ -87,15 +88,37 @@ public class IdentityVerificationService {
     @Transactional(readOnly = true)
     public IdentityVerificationResponse status(UUID userId) {
         return verifications.findByUserId(userId)
-                .map(v -> toStatus(v, Instant.now(clock)))
-                .orElse(new IdentityVerificationResponse(VerificationStatuses.NONE, null, null, null,
-                        null, null, null, null, null, MAX_ATTEMPTS_PER_WINDOW, null));
+                .map(v -> statusMapper.toStatus(v, Instant.now(clock)))
+                .orElseGet(statusMapper::none);
+    }
+
+    // The badge can also come from staff or a registered rent agreement, with no KYC case behind it.
+    @Transactional(readOnly = true)
+    public IdentityVerificationResponse badge(UUID userId) {
+        IdentityVerificationResponse own = status(userId);
+        boolean granted = !VerificationStatuses.VERIFIED.equals(own.status())
+                && users.findById(userId).map(User::isVerified).orElse(false);
+        return granted ? statusMapper.granted() : own;
     }
 
     @Transactional(readOnly = true)
     public boolean isVerified(UUID userId) {
         return verifications.findByUserId(userId)
                 .map(v -> VerificationStatuses.VERIFIED.equals(v.getStatus()))
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isApproved(UUID userId) {
+        return users.findById(userId).map(User::isVerified).orElse(false) || isVerified(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isSubmitted(UUID userId) {
+        boolean flagged = users.findById(userId).map(User::isVerified).orElse(false);
+        return flagged || verifications.findByUserId(userId)
+                .map(v -> VerificationStatuses.VERIFIED.equals(v.getStatus())
+                        || VerificationStatuses.PENDING.equals(v.getStatus()))
                 .orElse(false);
     }
 
@@ -154,6 +177,7 @@ public class IdentityVerificationService {
         if (v == null) {
             v = verifications.save(new IdentityVerification(userId, docType, now));
         } else {
+            events.publishEvent(new IdentityCaseReset(v.getId()));
             filePurge.purgeFiles(v);
             v.resetForResubmission(docType, now);
         }
@@ -165,7 +189,7 @@ public class IdentityVerificationService {
         for (PreparedImage image : images) {
             storeImage(v, image);
         }
-        return toStatus(v, now);
+        return statusMapper.toStatus(v, now);
     }
 
     private static String normaliseConsentLanguage(String consentLanguage) {
@@ -314,30 +338,6 @@ public class IdentityVerificationService {
         };
     }
 
-    private IdentityVerificationResponse toStatus(IdentityVerification v, Instant now) {
-        if (VerificationStatuses.WITHDRAWN.equals(v.getStatus())) {
-            return new IdentityVerificationResponse(VerificationStatuses.NONE, null, null, null,
-                    null, null, null, null, null, MAX_ATTEMPTS_PER_WINDOW, null);
-        }
-        Instant windowEnd = v.getAttemptWindowStart().plus(ATTEMPT_WINDOW);
-        int used = now.isBefore(windowEnd) ? v.getAttemptCount() : 0;
-        int remaining = Math.max(0, MAX_ATTEMPTS_PER_WINDOW - used);
-        boolean open = VerificationStatuses.REJECTED.equals(v.getStatus())
-                || VerificationStatuses.REVOKED.equals(v.getStatus());
-        return new IdentityVerificationResponse(
-                v.getStatus(),
-                v.getDocType(),
-                v.getDocLast4(),
-                v.getSubmittedAt(),
-                v.getDecidedAt(),
-                v.getRejectionReason(),
-                v.getRejectionNote(),
-                v.getRevokedAt(),
-                v.getRevocationReason(),
-                open ? remaining : 0,
-                open && remaining == 0 ? windowEnd : null);
-    }
-
     @Transactional
     public int purgeExpiredFiles(int retentionDays) {
         Instant cutoff = Instant.now(clock).minus(Duration.ofDays(retentionDays));
@@ -365,7 +365,7 @@ public class IdentityVerificationService {
             v.setAttemptWindowStart(now);
             filePurge.purgeFiles(v);
             v.setFilesPurgedAt(now);
-            notifyRejected(v.getUserId(), STALE_NOTE);
+            rejectionNotice.send(v.getUserId(), STALE_NOTE);
             audit.record("system", "admin", "identity.verification.expired", "identity_verification",
                     v.getId().toString(), null, "{\"reason\":\"not_reviewed\"}");
         }
@@ -395,6 +395,7 @@ public class IdentityVerificationService {
             return;
         }
         String previousStatus = v.getStatus();
+        events.publishEvent(new IdentityCaseReset(v.getId()));
         if (VerificationStatuses.VERIFIED.equals(v.getStatus())) {
             clearBadge(actor.userId());
         }
@@ -438,13 +439,5 @@ public class IdentityVerificationService {
             user.setVerified(false);
         }
         ownerBadge.markOwnerUnverified(userId);
-    }
-
-    void notifyRejected(UUID userId, String text) {
-        notifier.notify(userId, "identity.rejected", "Verification needs another try",
-                text, "/verify-identity");
-        users.findById(userId).filter(user -> notifier.allowsWhatsapp(userId)).ifPresent(user ->
-                decisionMessenger.sendIdentityDecision(user.getMobile(),
-                        "Your Draazy identity verification could not be completed. Open the app to see the reason and retake your photos."));
     }
 }

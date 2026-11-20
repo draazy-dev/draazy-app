@@ -82,7 +82,8 @@ test.describe('Messages media — live API', () => {
     await page.locator('input[type="file"]').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image') });
     const invalidToast = page.locator('[role="alert"]', { hasText: /Upload a JPEG or PNG up to 8 MB/i });
     await expect(invalidToast.first()).toBeVisible();
-    await expect(invalidToast).toHaveCount(0, { timeout: 5000 });
+    await invalidToast.first().getByRole('button', { name: 'Dismiss' }).click();
+    await expect(invalidToast).toHaveCount(0);
     await page.locator('input[type="file"]').setInputFiles({ name: 'huge.png', mimeType: 'image/png', buffer: Buffer.alloc(8_000_001) });
     await expect(invalidToast.first()).toBeVisible();
 

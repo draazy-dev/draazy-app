@@ -12,17 +12,17 @@ import {
 import { openDocFrom } from '../../../lib/openDoc.js';
 import { DOC_CAT_KEYS } from './constants.js';
 import { DOCUMENT_ACCEPT, DOCUMENT_GUIDANCE_KEY, PDF_GUIDANCE_KEY } from '../../../lib/uploads/policy.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const CATEGORY_NAMES = Object.keys(DOC_CATEGORIES);
 
-/* A recognisable icon per document category so the picker doubles as a filing
-   cabinet the owner can scan at a glance. */
 const CAT_ICON = {
   'Title & Ownership': 'scroll-text',
   Society: 'building-2',
   'Approvals & Plans': 'ruler',
   'Purchase & Payments': 'receipt-indian-rupee',
   'Tax & Utilities': 'landmark',
+  'Rent Agreement': 'file-signature',
 };
 const catIcon = (c) => CAT_ICON[c] || 'file-text';
 
@@ -30,7 +30,6 @@ async function openDoc(d, toast, t) {
   if (!(await openDocFrom(() => getDocumentUrl(d.id)))) toast(t('ownerHub.cantOpen'), 'error');
 }
 
-// A passport's managed-property id exists independently of any public listing.
 export default function DocVault({ mobile, propId, onChange }) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -40,8 +39,6 @@ export default function DocVault({ mobile, propId, onChange }) {
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
-  /* Every write resolves to the list as it now stands, so `sync` is also how a write commits its
-     result to the screen. `mounted` is checked because an upload can outlive the passport page. */
   const sync = async () => {
     let next = [];
     try {
@@ -63,7 +60,7 @@ export default function DocVault({ mobile, propId, onChange }) {
     try {
       await uploadManagedDocument(mobile, propId, { category, file });
     } catch (err) {
-      if (mounted.current) toast(err?.message || t('ownerHub.cantOpen'), 'error');
+      if (mounted.current) toast(userMessage(err, t('ownerHub.cantOpen')), 'error');
       return;
     }
     await sync();
@@ -74,14 +71,13 @@ export default function DocVault({ mobile, propId, onChange }) {
     try {
       await deleteManagedDocument(mobile, propId, id);
     } catch (err) {
-      if (mounted.current) toast(err?.message || t('ownerHub.cantOpen'), 'error');
+      if (mounted.current) toast(userMessage(err, t('ownerHub.cantOpen')), 'error');
       return;
     }
     await sync();
     if (mounted.current) toast(t('ownerHub.docRemoved'), 'info');
   };
 
-  // Count per category powers both the picker badges and the coverage line.
   const countByCat = useMemo(() => {
     const m = {};
     for (const d of docs) m[d.category] = (m[d.category] || 0) + 1;
@@ -95,7 +91,6 @@ export default function DocVault({ mobile, propId, onChange }) {
     badge: countByCat[c] || undefined,
   })), [countByCat, t]);
 
-  // Group the list by category, in canonical order; stray/legacy categories fall under "Other".
   const groups = useMemo(() => {
     const known = new Set(CATEGORY_NAMES);
     const g = CATEGORY_NAMES

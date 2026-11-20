@@ -11,31 +11,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * The Redis-backed write rate limit (tech-debt D158), against a scripted fake.
- *
- * <p><strong>What this proves, and what it does not.</strong> There is no Redis server in this
- * project and no Testcontainers, so nothing here touches a real one. What is verified is everything
- * on this side of the wire: that exactly one command is issued per request, that the command is a
- * script containing the increment, the expiry and the remaining-time read together, that the count
- * is compared against the budget correctly at the boundary, that the retry hint is derived from the
- * key's actual remaining time, that the two families of counters use different keys, and that an
- * unavailable Redis degrades to per-instance counting rather than to nothing.
- *
- * <p>What it cannot prove is that the Lua is valid Lua, that Redis accepts it, that the reply really
- * arrives as two integers, or that the script is atomic in practice. Those are properties of the
- * server, and the fake will agree with whatever this class assumes — including if the assumption is
- * wrong. The atomicity argument here rests on Redis's documented execution model, not on this test.
- */
 @DisplayName("Redis write rate limit store (D158)")
 class RedisWriteRateLimitStoreTest {
-
     private static final Duration WINDOW = Duration.ofSeconds(60);
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
 
-    /** A fake Redis that counts per key and reports a fixed remaining time. */
     private static final class FakeRedis implements RedisEval {
-
         private final List<String> keysSeen = new ArrayList<>();
         private final List<String> scriptsSeen = new ArrayList<>();
         private final AtomicInteger count = new AtomicInteger();

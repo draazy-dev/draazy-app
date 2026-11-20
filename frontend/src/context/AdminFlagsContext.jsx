@@ -23,12 +23,9 @@ export function AdminFlagsProvider({ children }) {
       setAdminFlags((prev) => deepMerge(prev, flags));
       setLoading(false);
     }).catch(() => {
-      // The route guard below blocks on `loading`, so a failed read must still clear it or the
-      // admin shell is permanently blank. Defaults are all `true`: nothing hidden, not everything.
       if (alive) setLoading(false);
     });
     load();
-    // Keep flags fresh after edits elsewhere in the console.
     const onChange = () => load();
     window.addEventListener('draazy-settings-change', onChange);
     return () => { alive = false; window.removeEventListener('draazy-settings-change', onChange); };
@@ -36,8 +33,6 @@ export function AdminFlagsProvider({ children }) {
 
   const setFlag = useCallback(async (section, key, value) => {
     setAdminFlags((prev) => ({ ...prev, [section]: { ...prev[section], [key]: value } }));
-    /* Send only the edited flag: after a failed load, block writes would persist
-       `DEFAULT_ADMIN_FLAGS` over the real configuration. */
     await updateSettings({ adminFlags: { [section]: { [key]: value } } });
   }, []);
 
@@ -48,7 +43,6 @@ export function AdminFlagsProvider({ children }) {
 
   const optionEnabled = useCallback((dotPath) => {
     const [section, option] = dotPath.split('.');
-    // Only these sections are tabs, so a stale `tab.services` must not gate.
     if (section in DEFAULT_ADMIN_FLAGS.tab && adminFlags.tab?.[section] === false) {
       return false;
     }
@@ -80,8 +74,6 @@ export function useAdminFlags() {
 function deepMerge(target, source) {
   const result = { ...target };
   for (const key of Object.keys(source)) {
-    // `Object.keys` on a `JSON.parse` result does include an own `__proto__` key, and assigning to
-    // it would invoke the inherited setter and reparent `result` instead of adding a flag.
     if (key === '__proto__' || key === 'constructor') continue;
     if (typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key])) {
       result[key] = { ...(target[key] || {}), ...source[key] };

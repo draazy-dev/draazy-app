@@ -1,7 +1,5 @@
 import { SITE_DESCRIPTION } from './routeHeads.js';
 
-/* Read by both the page and the build-time prerender (scripts/vite-plugin-route-heads.mjs),
-   so the HTML never says more than the screen; change claims with the code and help centre. */
 export const TRUST_PAGES = {
   '/about': {
     top: 'About',
@@ -66,14 +64,14 @@ export const TRUST_PAGES = {
       {
         title: 'How we check owners',
         body: [
-          'Owner identity verification is optional and earns an ID verified badge. The owner photographs a government ID (Aadhaar, PAN, driving licence or passport) with the camera and records a live selfie. A reviewer on our team compares the two and decides. No badge is granted automatically, and submitting is not the same as passing.',
-          'Some owners accept contact requests from ID verified people only. If you meet one, you are asked to verify first.',
+          'Owner identity verification is optional and earns a KYC done badge. The owner photographs a government ID (Aadhaar, PAN, driving licence or passport) with the camera and records a live selfie. A reviewer on our team compares the two and decides. No badge is granted automatically, and submitting is not the same as passing.',
+          'Some owners accept contact requests from KYC-done people only. If you meet one, you are asked to verify first.',
         ],
       },
       {
         title: 'How we check listings',
         body: [
-          'Every new listing waits for staff review. The reviewer checks the photos, the details, the address and locality, and whether the same home is already listed. The listing is then approved, sent back to the owner with a reason, or rejected.',
+          'Every new listing waits for staff review. The reviewer checks that the photos look genuine and are not a duplicate, that the details are consistent, the address and locality, and whether the same home is already listed. The listing is then approved, sent back to the owner with a reason, or rejected.',
         ],
       },
       {
@@ -93,8 +91,9 @@ export const TRUST_PAGES = {
       {
         title: 'What verification does not mean',
         body: [
-          'An ID verified badge confirms who posted the listing. A Verified property badge means the accepted papers were current when reviewed. Neither certifies legal title, the condition of the building, society approvals or the final rent.',
-          'Before you pay for a purchase, get an independent title check.',
+          'A KYC done badge confirms who posted the listing. A Verified property badge means the accepted papers were current when reviewed. Neither certifies legal title, the condition of the building,           society approvals or the final rent. We do not check listing photos against the actual home.',
+                    'A RERA number on a listing is shared by the owner. Draazy does not verify it, so check it on MahaRERA. We never verify societies.',
+                    'Before you pay for a purchase, get an independent title check.',
         ],
         links: [['Full guide in the help centre', '/help/a/how-we-verify'], ['Spotting a rental scam', '/help/a/spot-a-scam']],
       },
@@ -105,7 +104,7 @@ export const TRUST_PAGES = {
         a: 'Yes. A person on our team reviews every new listing before it appears in search. They can approve it, ask the owner for more information, or reject it.',
       },
       {
-        q: 'What does the ID verified badge mean?',
+        q: 'What does the KYC done badge mean?',
         a: 'The owner photographed a government ID and recorded a live selfie, and a reviewer on our team accepted them. It confirms who posted the listing. It is optional, so many listings do not have it.',
       },
       {

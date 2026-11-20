@@ -5,10 +5,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
-// Decides which body a rent agreement registers with, and so its registration fee (D-h).
 @Component
 class RegistrationArea {
-
     static final String URBAN = "Municipal / Urban";
     static final String RURAL = "Rural";
 

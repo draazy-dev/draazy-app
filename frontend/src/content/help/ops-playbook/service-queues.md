@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 11
-updated: 2026-10-10
+updated: 2026-11-06
 summary: How staff work non-rent-agreement service requests on their service desk pages.
 tags: [ops, services, queues, internal]
 modules: [desk:legal, desk:interior, desk:packers, desk:valuation]
@@ -19,9 +19,9 @@ modules: [desk:legal, desk:interior, desk:packers, desk:valuation]
 **Monitor**
 
 - **To pick up** count on your desk.
-- Row age ? amber after 24 h, rose after 72 h while the request is open.
-- **My requests** ? what you hold right now.
-- **Customer tickets** count, if the tab shows for you.
+- Row age: amber ("due soon") after 24 h, rose ("overdue") after 72 h while the request is open.
+- **My requests**: what you hold right now.
+- **Customer tickets** count, if the tab shows for you. These are internal service tickets raised by Support, not customer chats.
 - Ignore **Overdue** here: it only covers rent agreements and finds nothing on these desks.
 
 **Work on**
@@ -29,7 +29,7 @@ modules: [desk:legal, desk:interior, desk:packers, desk:valuation]
 - Work **To pick up**, taking rose and amber rows first.
 - Press **Take this request** before you reveal identity numbers or upload files.
 - Check **Documents**; if the checklist failed to load, retry before asking the customer for anything.
-- Move **My requests** forward with **Share draft** and the **Message thread**.
+- Move **My requests** forward with **Share draft** and **Chat with customer**.
 
 ## Desk and access
 
@@ -46,14 +46,15 @@ Legacy `/ops/legal`, `/ops/interior`, `/ops/packers`, and `/ops/valuation` bookm
 | `packers` | Packers & Movers |
 | `valuation` | Property Valuation |
 
-**Home Loans** (`/admin/home-loans`) has no service requests: it is the loans ticket board, worked like any other ticket.
+**Home Loans** (`/admin/home-loans`) has no service requests: it is the loans board of internal service tickets. See [Chats, tickets and escalation](/help/a/ticket-escalation).
 
 ## Queue controls
 
 | Control | Use it for |
 | --- | --- |
-| **To pick up / My requests / In progress / With customer / Closed** | Stage tabs with live counts; **My requests** is what you hold |
-| **Customer tickets** | The desk's tickets tab (needs `tickets:read`) |
+| **To pick up / My requests / In progress / With customer / Closed / Cancelled** | Stage tabs with live counts; **My requests** is what you hold |
+| **Customer tickets** | The desk's internal service-ticket tab (needs `tickets:read`) |
+| **Date** chips | Narrow the list by how recently the request was filed |
 | **Name, mobile or request id** | Search requester or request |
 | **Refresh** | Re-read the current page |
 
@@ -68,6 +69,7 @@ The **Overdue** toggle is tied to rent-agreement SLA data and finds nothing on t
 | `in-progress` | Work is underway |
 | `draft-shared` | A deliverable was shared with the customer |
 | `changes-requested` | Customer asked for changes |
+| `action-required` | The desk asked the customer to do something before work continues |
 | `approved` | Customer approved the draft |
 | `completed` | Final document uploaded |
 | `cancelled` | Terminal cancellation |
@@ -81,7 +83,7 @@ Staff may set only `assigned`, `in-progress`, and `cancelled`. Use **Share draft
 3. Read **Documents**. If the checklist fails, retry before asking the customer for anything.
 4. Use **Files on this request** to open customer uploads and previously shared deliverables.
 5. Use **Drafting workflow → Share draft** when the customer needs to review a deliverable.
-6. Use **Message thread** for customer-visible updates.
+6. Use **Chat with customer** for customer-visible updates. It opens the customer's [support chat](/help/a/support-chats) at this request.
 7. Use **Internal notes** for staff-only context.
 8. Use **Cancel request** only with a clear reason; the customer is notified.
 
@@ -105,9 +107,10 @@ The **Parties' identity numbers** panel can appear on any service request, but i
 - Never treat a load failure as no documents filed
 - Never reveal identity numbers before taking the request
 - Never invent a loans queue from this screen
-- Never use rent-agreement-only actions such as overlap, refunds, registration check, or police intimation on these desks
+- Never use rent-agreement-only actions such as overlap, refunds or registration check on these desks
 
 ## Related
 
 - [Drafting desk and service queues](/help/a/drafting-desk)
-- [Ticket handling and escalation](/help/a/ticket-escalation)
+- [Support chats](/help/a/support-chats)
+- [Chats, tickets and escalation](/help/a/ticket-escalation)

@@ -1,7 +1,5 @@
 import Icon from '../../../../components/Icon.jsx';
 
-// Nudge banner: prompts the owner to reconfirm listings that have gone quiet,
-// so buyers keep trusting them. Rendered only when there is something to confirm.
 export default function AttentionBanner({ attentionListings, dormantCount, onConfirmAll }) {
   return (
     <div className="mb-5 rounded-xl bg-amber-500/[0.07] border border-amber-500/20 p-4 flex flex-col sm:flex-row sm:items-center gap-3">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { jsPDF } from 'jspdf';
@@ -8,9 +8,9 @@ import PropertyImage from '../../components/ui/PropertyImage.jsx';
 import { compareProperties, listProperties } from '../../services/propertyService.js';
 import { fmtArea, fmtINR, isSqftUnit } from '../../lib/format.js';
 import { useCompare } from '../../context/CompareContext.jsx';
-import useModalDialog from '../../hooks/useModalDialog.js';
-import useScrollLock from '../../hooks/useScrollLock.js';
+import Modal from '../../components/ui/Modal.jsx';
 import { cityLabelFor } from '../../lib/geoConfig.js';
+import { mahaReraSearchUrl } from '../../lib/maharera.js';
 
 const MAX = 4;
 const AMENITIES = [
@@ -23,8 +23,6 @@ const AMENITIES = [
 ];
 
 const FURNISH_MAP = { unfurnished: 'furnUnfurnished', semi: 'furnSemi', furnished: 'furnFurnished' };
-// Map the real `construction` field to a buyer-facing possession status. No fabrication —
-// every value shown traces back to a real listing field.
 const POSSESSION = { ready: 'possReady', new: 'possNew', under: 'possUnder' };
 
 function metric(p, t) {
@@ -52,12 +50,10 @@ function metric(p, t) {
     area: p.area || 0,
     areaUnit: p.areaUnit || 'sqft',
     areaLabel: fmtArea(p.area, p.areaUnit),
-    /* Only when the area is in sq.ft.: dividing a price by an acreage gives a per-acre figure, and
-       the row that shows it is captioned per sq.ft. A plot compares on its own unit's area row. */
     psf: p.area && isSqftUnit(p.areaUnit) ? Math.round(p.price / p.area) : 0,
     furnish: FURNISH_MAP[p.furnishing] ? t('compare.' + FURNISH_MAP[p.furnishing]) : (p.furnishing || '—'),
     possession: POSSESSION[p.construction] ? t('compare.' + POSSESSION[p.construction]) : '—',
-    rera: p.rera,
+    reraId: p.reraId || '',
     am,
   };
 }
@@ -73,7 +69,7 @@ const ROWS = [
   { label: 'Price / sq.ft.', tk: 'rowPsf', icon: 'ruler', best: 'min', get: (m) => (m.psf ? '₹' + m.psf.toLocaleString('en-IN') : '—'), cmp: (m) => m.psf },
   { label: 'Furnishing', tk: 'rowFurnishing', icon: 'sofa', get: (m) => m.furnish },
   { label: 'Possession', tk: 'rowPossession', icon: 'calendar', get: (m) => m.possession },
-  { label: 'RERA Verified', tk: 'rowRera', icon: 'shield-check', get: (m) => (m.rera ? 'rera-yes' : 'rera-no') },
+  { label: 'RERA shared', tk: 'rowRera', icon: 'file-text', get: (m) => m.reraId || 'rera-no' },
 ];
 
 export default function Compare() {
@@ -84,11 +80,7 @@ export default function Compare() {
   const [pickFailed, setPickFailed] = useState(false);
   const [modal, setModal] = useState(false);
   const [q, setQ] = useState('');
-  useScrollLock(modal);
-  const closeModal = useCallback(() => setModal(false), []);
-  const modalRef = useModalDialog(modal, closeModal);
 
-  // Ids that fail to resolve stay in the list as `available: false`.
   useEffect(() => {
     let alive = true;
     if (!ids.length) { setCompared([]); return () => { alive = false; }; }
@@ -98,27 +90,19 @@ export default function Compare() {
     return () => { alive = false; };
   }, [ids]);
 
-  // Debounced only once something is typed: the first empty-query load has no keystrokes to
-  // collapse. Gated on `modal` so /compare does not pull a page for a sheet most visitors never open.
   useEffect(() => {
     if (!modal) { setPickable(null); setPickFailed(false); setQ(''); return undefined; }
     let alive = true;
-    // Cleared per attempt, so typing again after a failure is a real retry rather than a search
-    // whose result is hidden behind a stale error.
     setPickFailed(false);
     const timer = setTimeout(() => {
       listProperties({ q: q.trim() || undefined }, 'newest')
         .then((list) => { if (alive) setPickable(list.filter((p) => !ids.includes(p.id))); })
-        // "The search failed" is a third state: without it a rejected search leaves `pickable` at
-        // `null` forever — a spinner that never resolves.
         .catch(() => { if (alive) setPickFailed(true); });
     }, q.trim() ? 250 : 0);
     return () => { alive = false; clearTimeout(timer); };
   }, [modal, q, ids]);
 
   const loading = compared === null;
-  // Keep a column for every compared id, so a removed or expired listing shows an honest
-  // unavailable card rather than silently vanishing.
   const items = useMemo(() => {
     if (!compared) return [];
     return ids.map((id) => {
@@ -130,8 +114,6 @@ export default function Compare() {
 
   const bestIds = (row) => {
     if (!row.best || !row.cmp || liveItems.length < 2) return [];
-    // 2 acres is not smaller than 900 sq.ft. Without a shared unit the figures are not comparable,
-    // so the row shows them and names no winner.
     if (row.sameUnit && new Set(liveItems.map((m) => m.areaUnit)).size > 1) return [];
     const vals = liveItems.map(row.cmp).filter((v) => v > 0);
     if (vals.length < 2) return [];
@@ -145,10 +127,8 @@ export default function Compare() {
     return liveItems.filter((m) => amenityCount(m) === max).map((m) => m.id);
   }, [liveItems]);
 
-  const contactHref = (m) => `/contact?ref=${encodeURIComponent(m.id)}&subject=${encodeURIComponent('Enquiry about ' + m.title)}`;
+  const contactHref = (m) => `/contact?ref=${encodeURIComponent(m.id)}`;
 
-  // Only available listings and real fields are exported; falls back to the browser print dialog
-  // if PDF generation fails for any reason.
   const exportPdf = () => {
     try {
       const cols = liveItems;
@@ -171,7 +151,6 @@ export default function Compare() {
 
       const colX = (i) => marginX + labelW + i * colW;
 
-      // Column headers
       doc.setFontSize(10);
       doc.setTextColor(20, 20, 20);
       cols.forEach((m, i) => {
@@ -186,8 +165,7 @@ export default function Compare() {
         [t('compare.location'), (m) => m.loc],
         ...ROWS.map((r) => [t('compare.' + r.tk, { defaultValue: r.label }), (m) => {
           const v = r.get(m);
-          if (v === 'rera-yes') return t('compare.reraVerified');
-          if (v === 'rera-no') return t('compare.reraNotListed');
+          if (v === 'rera-no') return t('compare.reraNotShared');
           return String(v);
         }]),
         [t('compare.amenities'), (m) => `${amenityCount(m)} / ${AMENITIES.length}`],
@@ -217,18 +195,17 @@ export default function Compare() {
     <div>
       <div className="pb-20 min-h-[100dvh]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
             <div>
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-sm font-medium mb-4">
-                <Icon name="git-compare" className="w-4 h-4" /> {t('compare.badge')}
+                <Icon name="scale" className="w-4 h-4" /> {t('compare.badge')}
               </div>
               <h1 className="text-3xl sm:text-4xl font-bold text-white">{t('compare.title')}</h1>
               <p className="text-gray-400 text-sm mt-2">{t('compare.subtitle', { max: MAX })} <span className="text-teal-400">{t('compare.subtitleHighlight')}</span></p>
             </div>
             {ids.length > 0 && (
               <div className="flex items-center gap-3">
-                <button type="button" onClick={clear} className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-300 text-sm font-medium hover:bg-white/5 transition-all flex items-center gap-2">
+                <button type="button" onClick={clear} className="h-btn px-4 rounded-xl border border-white/10 text-gray-300 text-sm font-medium hover:bg-white/5 transition-all flex items-center gap-2">
                   <Icon name="rotate-ccw" className="w-4 h-4" /> {t('compare.reset')}
                 </button>
                 {liveItems.length > 0 && (
@@ -242,7 +219,7 @@ export default function Compare() {
 
           {ids.length === 0 ? (
             <div className="glass-card rounded-2xl p-16 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-5"><Icon name="git-compare" className="w-8 h-8 text-gray-500" /></div>
+              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-5"><Icon name="scale" className="w-8 h-8 text-gray-500" /></div>
               <h3 className="text-xl font-bold text-white mb-2">{t('compare.emptyTitle')}</h3>
               <p className="text-gray-400 text-sm mb-6">{t('compare.emptyBody')}</p>
               <Link to="/listings" className="btn-teal inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white text-sm font-semibold"><Icon name="search" className="w-4 h-4" /> {t('compare.browseListings')}</Link>
@@ -251,8 +228,6 @@ export default function Compare() {
             <div className="glass-card rounded-2xl p-16 text-center text-gray-500 text-sm">{t('compare.loading')}</div>
           ) : (
             <div className="glass-card rounded-2xl overflow-hidden">
-              {/* The table pages horizontally on small screens, so tell touch users they can swipe.
-                 Hidden once 4 are added — nothing left to reveal — and on sm+. */}
               {items.length > 1 ? (
                 <div className="flex sm:hidden items-center justify-center gap-1.5 py-2 text-[11px] font-medium text-gray-400 border-b border-white/5">
                   <Icon name="chevrons-left-right" className="w-3.5 h-3.5 text-teal-400" />
@@ -270,7 +245,7 @@ export default function Compare() {
                             <div className="col-card rounded-2xl overflow-hidden">
                               <div className="relative h-32 overflow-hidden">
                                 <PropertyImage src={m.img} alt="" className="w-full h-full object-cover" />
-                                <span className="absolute top-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/40 backdrop-blur text-teal-300">{m.deal}</span>
+                                <span className="dz-tag absolute top-2 left-2 font-semibold bg-black/40 backdrop-blur text-teal-300">{m.deal}</span>
                                 <button type="button" onClick={() => toggle(m.id)} aria-label={t('compare.removeAria', { title: m.title })} className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-black/40 backdrop-blur flex items-center justify-center text-white hover:bg-red-500/70 transition-colors"><Icon name="x" className="w-4 h-4" /></button>
                               </div>
                               <div className="p-2.5 sm:p-3 text-left">
@@ -321,8 +296,12 @@ export default function Compare() {
                               <td key={m.id} className="cmp-cell">
                                 <span className={'text-sm text-gray-200 ' + (win ? 'best' : '')}>
                                   {!m.available ? <span className="text-gray-600">—</span>
-                                    : raw === 'rera-yes' ? (<><Icon name="check-circle-2" className="w-4 h-4 chk inline" /> <span className="text-emerald-400">{t('compare.reraVerified')}</span></>)
-                                    : raw === 'rera-no' ? (<><Icon name="x-circle" className="w-4 h-4 crs inline" /> <span className="text-gray-500">{t('compare.reraNotListed')}</span></>)
+                                    : raw === 'rera-no' ? <span className="text-gray-500">{t('compare.reraNotShared')}</span>
+                                    : row.tk === 'rowRera' ? (
+                                      <a href={mahaReraSearchUrl(raw)} target="_blank" rel="noopener noreferrer" title={t('compare.reraVerifyTitle')} className="inline-flex items-center gap-1 text-teal-300 hover:underline">
+                                        {raw} <Icon name="external-link" className="w-3.5 h-3.5" />
+                                      </a>
+                                    )
                                     : raw}
                                   {win ? <span className="best-tag">{t('compare.best')}</span> : null}
                                 </span>
@@ -333,7 +312,6 @@ export default function Compare() {
                         </tr>
                       );
                     })}
-                    {/* Amenities Summary */}
                     <tr>
                       <td className="feature-col cmp-cell"><span className="row-label text-teal-400"><Icon name="sparkles" className="w-4 h-4" />{t('compare.amenities')}</span></td>
                       {items.map((m) => {
@@ -344,7 +322,6 @@ export default function Compare() {
                       })}
                       {items.length < MAX ? <td className="cmp-cell" /> : null}
                     </tr>
-                    {/* Individual Amenity Rows */}
                     {AMENITIES.map(([key, label, icon]) => (
                       <tr key={key} className="cmp-row">
                         <td className="feature-col cmp-cell">
@@ -380,42 +357,30 @@ export default function Compare() {
         </div>
       </div>
 
-      {modal ? (
-        <div className="fixed inset-0 z-[60] modal-overlay flex items-center justify-center p-4" onClick={() => setModal(false)}>
-          <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t('compare.modalTitle')} className="dz-modal-panel rounded-2xl border border-white/10 w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl outline-none" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-white/10">
-              <h3 className="text-lg font-bold text-white">{t('compare.modalTitle')}</h3>
-              <button type="button" onClick={() => setModal(false)} aria-label={t('compare.close')} className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5"><Icon name="x" className="w-5 h-5" /></button>
-            </div>
-            <div className="p-4 border-b border-white/10">
-              <div className="relative">
-                <Icon name="search" className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input value={q} onChange={(e) => setQ(e.target.value)} type="text" placeholder={t('compare.searchPlaceholder')} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:border-teal-400" />
-              </div>
-            </div>
-            <div className="overflow-y-auto p-4 space-y-2">
-              {/* Three states, not two: `null` is "the search has not answered yet" and
-                 `pickFailed` is "it answered with an error". */}
-              {pickFailed ? (
-                <p className="text-center text-gray-500 text-sm py-6">{t('compare.searchFailed')}</p>
-              ) : pickable === null ? (
-                <p className="text-center text-gray-500 text-sm py-6">{t('compare.searching')}</p>
-              ) : pickable.length === 0 ? (
-                <p className="text-center text-gray-500 text-sm py-6">{t('compare.noMore')}</p>
-              ) : pickable.slice(0, 20).map((p) => (
-                <button type="button" key={p.id} onClick={() => { toggle(p.id); setModal(false); }} className="modal-pick w-full flex items-center gap-3 rounded-xl p-2.5 text-left">
-                  <PropertyImage src={p.image} alt="" className="w-16 h-12 rounded-lg object-cover flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-white text-sm font-semibold truncate">{p.bhkNum ? p.bhkNum + ' BHK ' : ''}{p.type}</p>
-                    <p className="text-gray-500 text-xs truncate">{p.locality}, {cityLabelFor(p)}</p>
-                  </div>
-                  <span className="text-teal-300 text-sm font-bold">{p.deal === 'rent' ? '₹' + (p.price || 0).toLocaleString('en-IN') + '/mo' : fmtINR(p.price)}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+      <Modal open={modal} onClose={() => setModal(false)} title={t('compare.modalTitle')}>
+        <div className="relative mb-4">
+          <Icon name="search" className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} type="text" placeholder={t('compare.searchPlaceholder')} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:border-teal-400" />
         </div>
-      ) : null}
+        <div className="space-y-2">
+          {pickFailed ? (
+            <p className="text-center text-gray-500 text-sm py-6">{t('compare.searchFailed')}</p>
+          ) : pickable === null ? (
+            <p className="text-center text-gray-500 text-sm py-6">{t('compare.searching')}</p>
+          ) : pickable.length === 0 ? (
+            <p className="text-center text-gray-500 text-sm py-6">{t('compare.noMore')}</p>
+          ) : pickable.slice(0, 20).map((p) => (
+            <button type="button" key={p.id} onClick={() => { toggle(p.id); setModal(false); }} className="modal-pick w-full flex items-center gap-3 rounded-xl p-2.5 text-left">
+              <PropertyImage src={p.image} alt="" className="w-16 h-12 rounded-lg object-cover flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-white text-sm font-semibold truncate">{p.bhkNum ? p.bhkNum + ' BHK ' : ''}{p.type}</p>
+                <p className="text-gray-500 text-xs truncate">{p.locality}, {cityLabelFor(p)}</p>
+              </div>
+              <span className="text-teal-300 text-sm font-bold">{p.deal === 'rent' ? '₹' + (p.price || 0).toLocaleString('en-IN') + '/mo' : fmtINR(p.price)}</span>
+            </button>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }

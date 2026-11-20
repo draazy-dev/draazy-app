@@ -3,9 +3,6 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import LocalitySearchInput from '../../../components/search/LocalitySearchInput.jsx';
 
-/* The map only appears after focusing on 1–maxAreas localities: a whole city of markers is expensive. */
-
-// Areas worth suggesting first: most live stock.
 const popularAreas = (localities, limit = 8) =>
   localities
     .filter((l) => !l.archived)
@@ -25,7 +22,6 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
   }, [f.localities.size, initialDraft]);
 
   const bySlug = useMemo(() => new Map(localities.filter((l) => !l.archived).map((l) => [l.slug, l])), [localities]);
-  // A stored slug that is retired or failed to load is never drawn, so it must not count as chosen either.
   const shown = [...draft].filter((slug) => bySlug.has(slug));
   const choices = useMemo(() => {
     const first = [...new Set([...initialDraft, ...draft])];
@@ -81,10 +77,10 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
                   type="button"
                   onClick={() => toggleArea(slug)}
                   aria-label={t('listings.removeArea', { name: locNameBySlug[slug] || slug })}
-                  className="inline-flex items-center gap-1.5 min-h-[44px] sm:min-h-0 pl-3 pr-2 py-1.5 rounded-full bg-teal-500/12 border border-teal-400/30 text-teal-200 text-xs font-medium hover:bg-rose-500/15 hover:border-rose-400/40 hover:text-rose-200 t-all"
+                  className="dz-chip dz-chip--accent dz-chip--sm hover:bg-rose-500/15 hover:border-rose-400/40 hover:text-rose-200"
                 >
                   {locNameBySlug[slug] || slug}
-                  <Icon name="x" className="w-3 h-3" />
+                  <Icon name="x" />
                 </button>
               ))}
             </div>
@@ -92,7 +88,7 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
             <button
               type="button"
               onClick={() => setView('grid')}
-              className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-500/10 border border-teal-400/30 text-teal-300 text-sm font-semibold hover:bg-teal-500/20 t-all"
+              className="h-btn mt-6 inline-flex items-center gap-2 px-5 rounded-xl bg-teal-500/10 border border-teal-400/30 text-teal-300 text-sm font-semibold hover:bg-teal-500/20 t-all"
             >
               <Icon name="layout-grid" className="w-4 h-4" /> {t('listings.viewAllAreasGrid', { count: selected.length })}
             </button>
@@ -118,7 +114,7 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
                     onClick={() => toggleDraftArea(l.slug)}
                     aria-pressed={on}
                     className={
-                      'inline-flex min-h-11 items-center gap-1.5 px-3.5 py-2 rounded-full border text-sm font-medium t-all ' +
+                      'h-btn inline-flex items-center gap-1.5 px-3.5 rounded-full border text-sm font-medium t-all ' +
                       (on
                         ? 'bg-teal-500/15 border-teal-400/40 text-teal-200'
                         : 'bg-white/5 border-white/10 text-gray-300 hover:border-teal-400/40 hover:text-white')
@@ -134,7 +130,7 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
               type="button"
               onClick={showMap}
               disabled={shown.length === 0}
-              className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-bold text-slate-950 transition-all disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-gray-500"
+              className="h-btn mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-teal-500 px-5 text-sm font-bold text-slate-950 transition-all disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-gray-500"
             >
               <Icon name="map" className="w-4 h-4" /> {t('listings.showBtn')} {t('listings.mapView')}
             </button>

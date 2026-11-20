@@ -4,11 +4,8 @@ import com.draazy.api.provider.FileStorage;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
-/** Hand-written, not MapStruct: {@code url} is minted per read by {@link FileStorage} and expires, and a generated
- * expression would hide that security-relevant line. */
 @Component
 public class DocumentMapper {
-
     private final FileStorage storage;
 
     public DocumentMapper(FileStorage storage) {

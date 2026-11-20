@@ -1,10 +1,6 @@
-/* Pure string helpers shared by the build-time prerender plugins and the Pages Functions in
-   functions/ (which cannot import node:fs), so a prerendered page and an edge-rendered one carry the same head. */
-
 export const esc = (s) => String(s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-// `<` escaped so post text can never close the script element.
 export const jsonLd = (data) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`;
 
 const EDITORIAL_AUTHOR = 'Draazy Editorial Team';
@@ -49,8 +45,6 @@ export function headTags({ title, description, url, image, imageAlt, imageSize, 
 const SHELL_SEO = /\s*<title>[\s\S]*?<\/title>|\s*<meta\s+(?:name|property)="(?:description|og:[\w:]+|twitter:[\w:]+)"[^>]*>/g;
 const attr = (s) => s.replace(/"/g, '&quot;');
 
-/* `data-shell` carries the app-wide value each tag replaced, so src/lib/usePageHead.js can put it
-   back when the reader navigates in-app away from a page that was loaded prerendered. */
 export function renderPage(shell, head, body) {
   if (!shell.includes('<div id="root"></div>')) throw new Error('[seo-html] the shell has no empty #root to prerender into');
   const shellTitle = shell.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? '';
@@ -59,7 +53,6 @@ export function renderPage(shell, head, body) {
     .replace('<title>', () => `<title data-shell="${attr(shellTitle)}">`)
     .replace('<meta name="description"', () => `<meta data-shell="${attr(shellDescription)}" name="description"`)
     .replace('<link rel="canonical"', '<link data-shell="" rel="canonical"');
-  // Function replacements: a `$` in post text must not be read as a replacement pattern.
   return shell
     .replace(SHELL_SEO, '')
     .replace('</head>', () => `${taggedHead}\n  </head>`)

@@ -28,7 +28,12 @@ export async function chooseLocality(page, opener, name = 'Baner', { query = nam
   const multi = (await localityMenu(page).getAttribute('aria-multiselectable')) === 'true';
   if (domClick) await option.evaluate((el) => el.click());
   else if (tap) await option.tap();
-  else await option.click();
+  else {
+    // The fixed menu follows its trigger, so a late page scroll can carry it off-screen
+    // where Playwright cannot reach it.
+    await opener.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+    await option.click();
+  }
   if (multi && await localityMenu(page).isVisible()) await page.keyboard.press('Escape');
   await expect(localityMenu(page)).toBeHidden();
 }
@@ -77,6 +82,18 @@ export async function mintLocality(name, { lat = 18.52, lng = 73.85 } = {}) {
 
 export const uniqueLocalityName = (prefix = 'Zztest Mint') => `${prefix} ${Date.now().toString(36)}`;
 
+// Flatmates map gate: Google is stubbed empty so the saved-locality fallback answers deterministically.
+export async function focusFlatmateMap(page, names = ['Baner']) {
+  await stubGooglePlaces(page, { empty: true });
+  const search = page.getByPlaceholder('Search any Pune locality');
+  for (const name of names) {
+    await search.fill(name);
+    await page.getByRole('option', { name: new RegExp(`^${escapeRe(name)}`) }).first().click({ timeout: 15000 });
+    await expect(page.locator(`[data-sf-area="${name}"]`)).toBeVisible();
+  }
+  await page.getByRole('button', { name: 'Show Map view' }).click();
+}
+
 // What the home search offers by name: a locality is suggested only while it has approved listings for the deal.
 export async function stockBySlug(deal = 'buy') {
   const stock = new Map();
@@ -91,4 +108,16 @@ export async function stockBySlug(deal = 'buy') {
     if (page + 1 >= (body.totalPages ?? 1)) break;
   }
   return stock;
+}
+
+// The first locality holding live listings whose public read satisfies `wanted`.
+export async function localityWithStock(wanted, deals = ['buy', 'rent']) {
+  const tallies = await Promise.all(deals.map((deal) => stockBySlug(deal)));
+  for (const slug of new Set(tallies.flatMap((t) => [...t.keys()]))) {
+    if (!slug) continue;
+    const res = await fetch(`${API}/localities/${slug}`);
+    const row = res.ok ? await res.json() : null;
+    if (row && wanted(row)) return row;
+  }
+  return undefined;
 }

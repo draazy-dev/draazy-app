@@ -1,10 +1,12 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.persistence.AuditedEntity;
+import com.draazy.api.common.trust.OwnedDocumentLookup;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
@@ -16,7 +18,6 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "flatmate_reviews")
 @Getter
 public class FlatmateReview extends AuditedEntity {
-
     @Column(name = "kind", nullable = false, updatable = false)
     private String kind;
 
@@ -35,7 +36,6 @@ public class FlatmateReview extends AuditedEntity {
     @Column(name = "tier", nullable = false)
     private String tier;
 
-    /** A different host already claimed this address. Fuzzy match, so it flags rather than blocks. */
     @Column(name = "flag_for_review", nullable = false)
     private boolean flagForReview = false;
 
@@ -45,25 +45,35 @@ public class FlatmateReview extends AuditedEntity {
     @Column(name = "tenancy_property_id")
     private UUID tenancyPropertyId;
 
-    /** jsonb rather than columns because nothing queries inside it — Ops reads it whole. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "agreement_doc")
     private Map<String, Object> agreementDoc;
 
-    /** Columns rather than keys in {@link #agreementDoc} because {@code validTill} is queried. */
     @Embedded
     private AgreementRegistration agreement = new AgreementRegistration();
 
-    /** Hibernate hydrates an all-null embeddable as null (every row before V28); the empty value
-     * keeps {@code complete()} and {@code expiredOn()} answerable for those rows. */
     AgreementRegistration getAgreement() {
         return agreement == null ? new AgreementRegistration() : agreement;
     }
 
+    @Column(name = "evidence_type")
+    private String evidenceType;
+
+    @Column(name = "evidence_issued_on")
+    private LocalDate evidenceIssuedOn;
+
+    @Column(name = "name_matches")
+    private Boolean nameMatches;
+
+    @Column(name = "address_matches")
+    private Boolean addressMatches;
+
     @Column(name = "status", nullable = false)
     private String status = FlatmateVocabulary.STATUS_PENDING;
 
-    /** Required on reject and shown to the host — a rejection nobody can act on is a dead end. */
+    @Column(name = "pending_since", nullable = false)
+    private Instant pendingSince = Instant.now();
+
     @Column(name = "reason")
     private String reason;
 
@@ -77,6 +87,15 @@ public class FlatmateReview extends AuditedEntity {
             String tier, boolean flagForReview, boolean ownerConsent,
             Map<String, Object> agreementDoc, AgreementRegistration agreement,
             UUID tenancyPropertyId) {
+        this(kind, roomId, groupId, hostId, address, tier, flagForReview, ownerConsent, agreementDoc,
+                agreement, tenancyPropertyId, null);
+    }
+
+    FlatmateReview(String kind, UUID roomId, UUID groupId, UUID hostId, String address,
+            String tier, boolean flagForReview, boolean ownerConsent,
+            Map<String, Object> agreementDoc, AgreementRegistration agreement,
+            UUID tenancyPropertyId, String evidenceType) {
+        this.evidenceType = evidenceType;
         this.kind = kind;
         this.roomId = roomId;
         this.groupId = groupId;
@@ -99,15 +118,13 @@ public class FlatmateReview extends AuditedEntity {
         AgreementRegistration current = getAgreement();
         if (FlatmateVocabulary.STATUS_APPROVED.equals(decision)
                 && FlatmateVocabulary.TIER_TENANT.equals(tier) && current.getValidTill() == null) {
-            this.agreement = new AgreementRegistration(LocalDate.now().plusMonths(BADGE_MONTHS));
+            this.agreement = new AgreementRegistration(FlatmateReviewChecks.today().plusMonths(BADGE_MONTHS));
         }
     }
 
-    /** Re-opened in place because {@code uq_flatmate_reviews_room} and its group twin allow one row
-     * per target; clearing the verdict also drops the badge, which both feeds derive from it. */
     void reopenAfterEdit(String address, String tier, boolean flagForReview, boolean ownerConsent,
             Map<String, Object> agreementDoc, AgreementRegistration agreement,
-            UUID tenancyPropertyId) {
+            UUID tenancyPropertyId, String evidenceType) {
         this.address = address;
         this.tier = tier;
         this.flagForReview = flagForReview;
@@ -116,33 +133,69 @@ public class FlatmateReview extends AuditedEntity {
         if (!namesStoredFile(agreementDoc)) {
             this.agreementDoc = agreementDoc;
             this.agreement = agreement;
+            this.evidenceType = evidenceType;
         }
+        clearChecks();
         this.tenancyPropertyId = tenancyPropertyId;
-        this.status = FlatmateVocabulary.STATUS_PENDING;
+        backToPending();
         this.reason = null;
         this.decidedBy = null;
     }
 
+    private void backToPending() {
+        if (!FlatmateVocabulary.STATUS_PENDING.equals(status)) {
+            this.pendingSince = Instant.now();
+        }
+        this.status = FlatmateVocabulary.STATUS_PENDING;
+    }
+
+    private void clearChecks() {
+        this.nameMatches = null;
+        this.addressMatches = null;
+        this.evidenceIssuedOn = null;
+    }
+
     private boolean namesStoredFile(Map<String, Object> doc) {
         return doc != null && this.agreementDoc != null && doc.get("dataUrl") == null
+                && !doc.containsKey(AgreementPeriod.TILL)
                 && doc.get("id") != null && doc.get("id").equals(this.agreementDoc.get("id"));
     }
 
-    void recordOwnerConsent() {
-        this.ownerConsent = true;
+    void approveChecked(String why, UUID decider, FlatmateReviewChecks checks, LocalDate today) {
+        this.status = FlatmateVocabulary.STATUS_APPROVED;
+        this.reason = why;
+        this.decidedBy = decider;
+        this.nameMatches = checks.nameMatches();
+        this.addressMatches = checks.addressMatches();
+        this.evidenceIssuedOn = checks.issuedOn();
+        this.agreement = new AgreementRegistration(checks.badgeUntil(effectiveEvidenceType(), today));
     }
 
-    /** One predicate for both {@code requireConsentToApprove} and the unsupervised
-     * {@code FlatmateTrustReconciler} sweep, so a new condition cannot be enforced on only one. */
+    String effectiveEvidenceType() {
+        return evidenceType == null ? OwnedDocumentLookup.RENT_AGREEMENT : evidenceType;
+    }
+
+    void revoke(String why, UUID decider) {
+        this.status = FlatmateVocabulary.STATUS_REJECTED;
+        this.reason = why;
+        this.decidedBy = decider;
+    }
+
+    void holdForReview(String why) {
+        this.flagForReview = true;
+        this.ownerConsent = false;
+        backToPending();
+        this.reason = why;
+        this.decidedBy = null;
+    }
+
     boolean badgeable() {
         return ownerConsent;
     }
 
-    /** Reuses {@code rejected} rather than a status every consumer would have to learn. The DB
-     * requires a reason on rejection; {@code decidedBy} stays null because no person decided. */
     void expire(LocalDate on) {
         this.status = FlatmateVocabulary.STATUS_REJECTED;
-        this.reason = "The agreement check behind your Tenant-verified badge lapsed on " + on
+        this.reason = "The agreement check behind your Verified property badge lapsed on " + on
                 + ". Upload your current agreement to get the badge back.";
         this.decidedBy = null;
     }

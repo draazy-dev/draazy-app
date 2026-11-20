@@ -3,7 +3,6 @@ package com.draazy.api.catalog.property;
 import java.math.BigDecimal;
 import java.util.List;
 
-/** Every component means "do not filter" when absent: docs/flows/consumer/search-listings.md#94-facet-semantics. */
 public record ListingFacets(
         List<String> types,
         List<String> commercialUses,
@@ -40,7 +39,6 @@ public record ListingFacets(
         Double nearRadiusKm,
         List<String> ids,
         Integer minPhotos) {
-
     public ListingFacets(List<String> types, List<String> commercialUses, List<String> bhks,
             List<String> furnishings, List<String> localities, List<String> societies,
             List<String> amenities, List<String> landUse, List<String> room, List<String> tenants,
@@ -68,7 +66,6 @@ public record ListingFacets(
                 null, null, null, null, null, null, null, null, null, ids, null);
     }
 
-    /** Days ahead a listing may become available within, or null when unfiltered; -1 for an unknown bucket. */
     public Integer availableWithinDays() {
         if (availableFrom == null || availableFrom.isBlank()) {
             return null;
@@ -81,7 +78,6 @@ public record ListingFacets(
         };
     }
 
-    /** True when a centre and a radius were both supplied, so the radius predicate can be built. */
     public boolean hasNearPoint() {
         return nearLat != null && nearLng != null && nearRadiusKm != null && nearRadiusKm > 0
                 && nearLat >= -90 && nearLat <= 90 && nearLng >= -180 && nearLng <= 180;

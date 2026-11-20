@@ -19,18 +19,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// A React overlay cannot enforce the flag — the API keeps accepting writes from anything that is not
-// that overlay, which is every caller here. "Allowed" is asserted as not-503 so no fixture is needed.
 @DisplayName("Maintenance mode (server-side)")
 class MaintenanceModeFilterTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
     @PersistenceContext
     EntityManager em;
 
-    // Counterweight: a filter that answered 503 unconditionally would look correct without this.
     @Test
     void maintenanceRefusesAConsumerWrite() throws Exception {
         setMaintenance(true);
@@ -41,8 +37,6 @@ class MaintenanceModeFilterTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.error").value("maintenance_mode"));
     }
 
-    // A real signed token, not a mocked security context: the exemption reads the authority
-    // {@link JwtAuthFilter} resolved, so hand-installing it would prove only the setup.
     @Test
     void anOpenPlatformDoesNotRefuseThatSameWrite() throws Exception {
         setMaintenance(false);
@@ -79,8 +73,6 @@ class MaintenanceModeFilterTest extends AbstractApiTest {
                 .andExpect(status().is(Matchers.not(503)));
     }
 
-    // {@code clear()} because a JPA-cached settings row would hide the raw UPDATE from the filter.
-    // The row count is asserted so an unseeded {@code flags} key cannot make every test above a no-op.
     private void setMaintenance(boolean on) {
         int flipped = jdbc.update("update settings set value = "
                 + "jsonb_set(value, '{maintenanceMode}', ?::jsonb) where key = 'flags'",

@@ -1,37 +1,35 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
+import { supportLink } from '../../lib/supportLink.js';
 import { getFeedback, saveFeedback } from '../../lib/help.js';
 import { submitHelpFeedback } from '../../services/contentService.js';
 
-/* localStorage is the widget's own memory (a returning reader sees "thanks"); the POST is the measurement. */
+const TAP_GUARD_MS = 800;
+
 export default function ArticleFeedback({ slug, title }) {
   const { t } = useTranslation();
   const remembered = () => getFeedback(slug);
   const [choice, setChoice] = useState(() => remembered()?.helpful ?? null);
   const [comment, setComment] = useState('');
   const [sent, setSent] = useState(() => !!remembered());
-  // Fire-and-forget on purpose: the reader has answered and been thanked, and there is nothing
-  // they could do about an upload failure. Loud in dev only.
+  const sentAt = useRef(0);
 
   const report = (helpful, reason) => {
     submitHelpFeedback({ slug, helpful, comment: reason }).catch((err) => {
       if (import.meta.env.DEV) console.warn('[help] feedback upload failed', err);
     });
   };
-  // Double-click is guarded only by `setSent(true)` running in the same tick as the handler, so
-  // React removes the button before the second click lands. Moving it after an await reopens it.
 
   const pick = (helpful) => {
     setChoice(helpful);
     if (helpful) {
       saveFeedback(slug, true);
       report(true);
+      sentAt.current = Date.now();
       setSent(true);
     } else {
-      // Reported before the reason is typed: a negative that only counts when explained biases the
-      // measure. No local record here, so abandoning still leaves the box reachable next time.
       report(false);
       setSent(false);
     }
@@ -42,7 +40,12 @@ export default function ArticleFeedback({ slug, title }) {
     const reason = comment.trim();
     saveFeedback(slug, false, reason);
     report(false, reason);
+    sentAt.current = Date.now();
     setSent(true);
+  };
+
+  const ignoreEarlyTap = (e) => {
+    if (Date.now() - sentAt.current < TAP_GUARD_MS) e.preventDefault();
   };
 
   return (
@@ -55,7 +58,7 @@ export default function ArticleFeedback({ slug, title }) {
             <p className="mt-1 text-xs text-gray-500">
               {choice ? t('help.thanksPositive') : t('help.thanksNegative')}
               {' '}{t('help.stillStuck')}{' '}
-              <Link to={`/support?cat=other&ref=${encodeURIComponent(slug)}`} className="text-teal-400 hover:underline">
+              <Link to={supportLink('general')} onClick={ignoreEarlyTap} className="text-teal-400 hover:underline">
                 {t('help.raiseTicket')}
               </Link>.
             </p>
@@ -81,19 +84,19 @@ export default function ArticleFeedback({ slug, title }) {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="submit"
-              className="rounded-lg bg-teal-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-teal-400"
+              className="h-btn-sm inline-flex items-center justify-center rounded-lg bg-teal-500 px-4 text-xs font-semibold text-white transition-colors hover:bg-teal-400"
             >
               {t('help.sendFeedback')}
             </button>
             <button
               type="button"
               onClick={() => setChoice(null)}
-              className="rounded-lg px-3 py-2 text-xs font-medium text-gray-500 hover:text-gray-300"
+              className="h-btn-sm inline-flex items-center justify-center rounded-lg px-3 text-xs font-medium text-gray-500 hover:text-gray-300"
             >
               {t('help.cancel')}
             </button>
             <Link
-              to={`/support?cat=other&ref=${encodeURIComponent(slug)}`}
+              to={supportLink('general')}
               className="ml-auto text-xs font-medium text-teal-400 hover:underline"
             >
               {t('help.contactSupportInstead')}
@@ -109,14 +112,14 @@ export default function ArticleFeedback({ slug, title }) {
             <button
               type="button"
               onClick={() => pick(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-teal-400/40 hover:text-teal-300"
+              className="h-btn-sm flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 text-xs font-medium text-gray-300 transition-colors hover:border-teal-400/40 hover:text-teal-300"
             >
               <Icon name="thumbs-up" className="w-4 h-4" /> {t('help.yes')}
             </button>
             <button
               type="button"
               onClick={() => pick(false)}
-              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-white/25 hover:text-white"
+              className="h-btn-sm flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 text-xs font-medium text-gray-300 transition-colors hover:border-white/25 hover:text-white"
             >
               <Icon name="thumbs-down" className="w-4 h-4" /> {t('help.no')}
             </button>

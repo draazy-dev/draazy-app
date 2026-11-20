@@ -21,7 +21,6 @@ import org.yaml.snakeyaml.Yaml;
 @AutoConfigureMockMvc
 @DisplayName("The contract — every served route is declared, and coverage only grows")
 class SpecCoverageTest {
-
     private static final int IMPLEMENTED_FLOOR = 218;
 
     private static final List<String> NOT_OURS = List.of("/error", "/actuator");
@@ -30,8 +29,6 @@ class SpecCoverageTest {
     @Qualifier("requestMappingHandlerMapping")
     RequestMappingHandlerMapping handlers;
 
-    /** The direction the coverage ratchet cannot see: a declaration nothing serves 404s for every
-     *  client generated from the contract. Held as an exact set — see api-standards.md §1.1. */
     @Test
     @DisplayName("no route is served that the contract does not declare")
     void noUndeclaredRoutes() {
@@ -89,8 +86,6 @@ class SpecCoverageTest {
         return served;
     }
 
-    /** A {@code @LocalOnly} controller answers 404 wherever clients live, so declaring its routes
-     *  would publish the rot this test catches. Keyed on the marker, not the profile expression. */
     private static boolean isLocalOnly(org.springframework.web.method.HandlerMethod handler) {
         return org.springframework.core.annotation.AnnotatedElementUtils
                 .hasAnnotation(handler.getBeanType(), com.draazy.api.security.LocalOnly.class);

@@ -16,7 +16,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("Two parallel checkouts cannot both spend the last referral credit")
 class ReferralCreditRaceTest extends AbstractCommittedApiTest {
-
     @Autowired ServiceRequestRepository requests;
     @Autowired ServiceRequestReferralCredit referralCredit;
     @Autowired TransactionTemplate tx;
@@ -41,10 +40,12 @@ class ReferralCreditRaceTest extends AbstractCommittedApiTest {
     @DisplayName("one earned credit, two requests, two racing spends: exactly one wins")
     void onlyOneSpendWins() {
         User caller = user("01", "owner");
+        User friend = user("02", "buyer");
+        jdbc.update("update users set verified = true where id in (?, ?)", caller.getId(), friend.getId());
         jdbc.update("""
                 insert into referrals (referrer_id, referrer_mobile, referred_mobile, channel, status, track)
                 values (?, ?, ?, 'owner', 'qualified', 'owner')
-                """, caller.getId(), caller.getMobile(), "9782019001");
+                """, caller.getId(), caller.getMobile(), friend.getMobile());
         UUID a = filed(caller, false);
         UUID b = filed(caller, true);
         AtomicInteger spent = new AtomicInteger();
@@ -52,7 +53,7 @@ class ReferralCreditRaceTest extends AbstractCommittedApiTest {
 
         List<Throwable> outcomes = Races.run(2, i -> tx.executeWithoutResult(s -> {
             ServiceRequest request = requests.findByIdForUpdate(ids[i]).orElseThrow();
-            if (referralCredit.spend(request)) {
+            if (referralCredit.spend(request).isPresent()) {
                 spent.incrementAndGet();
                 requests.saveAndFlush(request);
             }
@@ -67,7 +68,6 @@ class ReferralCreditRaceTest extends AbstractCommittedApiTest {
                 """, Long.class, caller.getId())).isEqualTo(1L);
     }
 
-    // Holds the lock long enough that an unserialised second spend would have read the stale balance.
     private static void pause() {
         try {
             Thread.sleep(300);

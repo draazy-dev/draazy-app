@@ -1,10 +1,6 @@
-// Pure helpers for the property Location / Price tabs. No locality data lives here: the benchmark is
-// handed the server's listing-derived locality, and commute is computed from the property's own pin.
 import { IT_HUBS } from '../../../lib/commuteHubs.js';
 import { getCommute } from '../../../lib/commuteCache.js';
 
-/* Benchmarks a sale listing's ₹/sq.ft against the locality's `ratePerSqft`; residential only, and null below 3 live listings
-   so an average is never fabricated. `hasData` tells the UI whether to show the comparison or a neutral state. */
 export function valueBenchmark(p, loc) {
   const perSqft = (p?.area > 0) ? Math.round((p.price || 0) / p.area) : 0;
   const kind = String(p?.type || '').toLowerCase();
@@ -19,7 +15,6 @@ export function valueBenchmark(p, loc) {
   if (diffPct <= -4) { rating = 'Good deal'; tone = 'good'; arrow = 'arrow-down'; }
   else if (diffPct >= 5) { rating = 'Above average'; tone = 'high'; arrow = 'arrow-up'; }
   else { rating = 'At market'; tone = 'fair'; arrow = 'minus'; }
-  // Bar fill proportional to property vs locality, clamped for display.
   const pct = Math.min(95, Math.max(20, Math.round((perSqft / localityAvg) * 55)));
   return { perSqft, localityAvg, diffPct, rating, tone, arrow, pct, hasData: true };
 }
@@ -32,8 +27,6 @@ function haversineKm(aLat, aLng, bLat, bLng) {
   return 2 * R * Math.asin(Math.sqrt(s));
 }
 
-// Free-flow by-road estimate (fallback): road factor 1.35 over crow-flight;
-// ~24 km/h effective city speed. Used only when the live cache has no coords.
 function commuteEstimate(lat, lng) {
   return IT_HUBS.map((h) => {
     const km = haversineKm(lat, lng, h.lat, h.lng);
@@ -42,7 +35,6 @@ function commuteEstimate(lat, lng) {
   }).sort((a, b) => a.min - b.min);
 }
 
-// Prefers the traffic-aware "live" commute when the backend provides one; else the free-flow estimate.
 export function commuteInfo(lat, lng) {
   if (lat == null || lng == null) return { legs: [], source: 'none', fetchedAt: 0 };
   const cached = getCommute(lat, lng);

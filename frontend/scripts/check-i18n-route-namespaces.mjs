@@ -1,4 +1,3 @@
-/* Missing route namespaces render raw keys without throwing, so this catches silent i18n drift. */
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -24,8 +23,6 @@ for (const file of readdirSync(LOCALES_EN).filter((f) => f.endsWith('.json'))) {
 }
 const allKeys = [...keyToNs.keys()];
 
-/** Two eager files must not share a top-level prefix: the eager merge is a shallow Object.assign, so one would
- * silently erase the other. */
 const eagerPrefixOwner = new Map();
 for (const [key, ns] of keyToNs) {
   if (!EAGER.has(ns)) continue;
@@ -39,8 +36,6 @@ for (const [key, ns] of keyToNs) {
   eagerPrefixOwner.set(prefix, ns);
 }
 
-/** Namespace for a string literal: an exact key, or a prefix of one (keys are
- *  built at runtime in places — `i18n.t('misc.cat_' + k)` in lib/data/support.js). */
 const literalCache = new Map();
 function nsForLiteral(literal) {
   if (literalCache.has(literal)) return literalCache.get(literal);
@@ -53,7 +48,6 @@ function nsForLiteral(literal) {
   return ns;
 }
 
-/* ── 2. import-graph walk ── */
 function resolveImport(fromFile, spec) {
   if (!spec.startsWith('.')) return null;
   const base = resolve(dirname(fromFile), spec);
@@ -65,9 +59,13 @@ function resolveImport(fromFile, spec) {
 
 const KEY_LITERAL = /['"`]([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)['"`]/g;
 const IMPORT_SPEC = /(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
+const NESTED_LAZY_PAGE = /lazyPage\(\(\) => import\('([^']+)'\)((?:,\s*'[^']+')*)\)/g;
 
-/* Per-file facts, read once. Recomputing these per route turned a linear walk
-   into a quadratic one and the script stopped finishing. */
+const parseDeclared = (argsRaw) => new Set(
+  (argsRaw || '').split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean),
+);
+
+const nestedBoundaries = [];
 const fileFacts = new Map();
 function factsFor(file) {
   let facts = fileFacts.get(file);
@@ -75,14 +73,19 @@ function factsFor(file) {
   facts = { direct: new Set(), imports: [] };
   fileFacts.set(file, facts);
 
-  // i18n's own modules reference every namespace by construction.
   if (file.includes(join('src', 'i18n'))) return facts;
 
   let source;
   try { source = readFileSync(file, 'utf8'); } catch { return facts; }
 
-  /** Strip comments before scanning: comment text must not spoof route code. */
   source = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+  // A nested lazyPage loads its own namespaces, so it is checked as a boundary, not charged to this file.
+  source = source.replace(NESTED_LAZY_PAGE, (_, spec, argsRaw) => {
+    const target = resolveImport(file, spec);
+    if (target) nestedBoundaries.push({ from: file, spec, target, declared: parseDeclared(argsRaw) });
+    return '';
+  });
 
   for (const [, literal] of source.matchAll(KEY_LITERAL)) {
     const ns = nsForLiteral(literal);
@@ -95,7 +98,6 @@ function factsFor(file) {
   return facts;
 }
 
-/** Namespaces reachable from `file` through static/dynamic local imports. */
 function namespacesReachedBy(file) {
   const found = new Set();
   if (!file) return found;
@@ -113,7 +115,6 @@ function namespacesReachedBy(file) {
   return found;
 }
 
-/* ── 3. routes ── */
 const app = readFileSync(APP, 'utf8');
 const ROUTE = /const (\w+) = lazyPage\(\(\) => import\('([^']+)'\)(?:,\s*([^)]*))?\);/g;
 const PLAIN_LAZY = /const (\w+) = lazy\(\(\) => import\('([^']+)'\)\);/g;
@@ -122,9 +123,7 @@ let failures = 0;
 const hints = [];
 
 for (const [, name, spec, argsRaw] of app.matchAll(ROUTE)) {
-  const declared = new Set(
-    (argsRaw || '').split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean),
-  );
+  const declared = parseDeclared(argsRaw);
   const required = namespacesReachedBy(resolveImport(APP, spec));
   const missing = [...required].filter((ns) => !declared.has(ns) && !EAGER.has(ns)).sort();
   const spare = [...declared].filter((ns) => !required.has(ns)).sort();
@@ -145,7 +144,6 @@ for (const [, name, spec] of app.matchAll(PLAIN_LAZY)) {
   }
 }
 
-/* ── 4. the shell renders outside every route boundary ── */
 const SYNC_IMPORT = /^import\s+(?:\w+|\{[^}]*\})\s+from\s+'(\.[^']+\.jsx?)';$/gm;
 for (const [, spec] of app.matchAll(SYNC_IMPORT)) {
   const file = resolveImport(APP, spec);
@@ -158,7 +156,14 @@ for (const [, spec] of app.matchAll(SYNC_IMPORT)) {
   }
 }
 
-/* ── 5. the eager list and the eager imports are the same list ── */
+for (const { from, spec, target, declared } of nestedBoundaries) {
+  const missing = [...namespacesReachedBy(target)].filter((ns) => !declared.has(ns) && !EAGER.has(ns)).sort();
+  if (missing.length) {
+    console.error(`✗ lazyPage(() => import('${spec}')) in ${from.replace(SRC, 'src')} reaches ${missing.join(', ')} but does not declare it.`);
+    failures++;
+  }
+}
+
 const i18nIndex = readFileSync(join(SRC, 'i18n', 'index.js'), 'utf8');
 const imported = new Set(
   [...i18nIndex.matchAll(/from '\.\/locales\/en\/([^']+)\.json'/g)].map(([, ns]) => ns),

@@ -1,5 +1,3 @@
-/* View-documents secure viewer (Tier 1 - route CSS, imported from pages/consumer/ViewDocuments.jsx). Moved from index.css. All rules are .vd-page-scoped. */
-/* View-documents secure viewer */
 .vd-page {
   -webkit-user-select: none;
   -moz-user-select: none;

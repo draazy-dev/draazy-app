@@ -54,11 +54,10 @@ class RentAgreementDraftApprovalTest extends ServiceFixtures {
     }
 
     @Test
-    @DisplayName("a high-rent draft waits for a different operator before the customer sees it")
-    void riskyDraftNeedsSecondOperator() throws Exception {
+    @DisplayName("a high-rent draft shared by one operator reaches the customer at once and can be approved")
+    void riskyDraftIsImmediatelyApprovable() throws Exception {
         User owner = customer("9820006111");
         User holder = staff("9820006112", Teams.RENTAL);
-        User checker = staff("9820006113", Teams.RENTAL);
         String id = raiseWithState(owner, listing(owner), "{\"owner\":{\"oMobile\":\"" + owner.getMobile()
                 + "\"},\"tenants\":[{\"name\":\"Ria\",\"mobile\":\"9820006114\"}],"
                 + "\"terms\":{\"rent\":\"55000\",\"months\":\"11\"}}");
@@ -68,25 +67,35 @@ class RentAgreementDraftApprovalTest extends ServiceFixtures {
 
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("assigned"))
-                .andExpect(jsonPath("$.documents[?(@.category=='draft')]").isEmpty());
-        mvc.perform(post(Routes.ServiceRequests.DRAFT_CHECK, id)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(holder))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"decision\":\"release\"}"))
-                .andExpect(status().isForbidden());
-        mvc.perform(post(Routes.ServiceRequests.DRAFT_CHECK, id)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(checker))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"decision\":\"release\"}"))
-                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("draft-shared"))
-                .andExpect(jsonPath("$.draftCheck.reasons[0]").value("rent_ge_50000"));
+                .andExpect(jsonPath("$.documents[?(@.category=='draft')]", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.draftApproval.total").value(2));
+        openDraft(owner, id, 204);
+        decide(owner, id, "approve", 200);
+        org.assertj.core.api.Assertions.assertThat(detail(owner, id)).contains("\"approved\":1");
+    }
+
+    @Test
+    @DisplayName("a revision re-shared while the draft is out is visible to the customer and approvable at once")
+    void reSharedRevisionIsImmediatelyApprovable() throws Exception {
+        User owner = customer("9820006121");
+        User holder = staff("9820006122", Teams.RENTAL);
+        String id = raiseWithState(owner, listing(owner), "{\"owner\":{\"oMobile\":\"" + owner.getMobile()
+                + "\"},\"tenants\":[{\"name\":\"Ria\",\"mobile\":\"9820006124\"}],"
+                + "\"terms\":{\"rent\":\"55000\",\"months\":\"11\"}}");
+        setStatus(holder, id, "assigned", 200);
+        shareDraft(holder, id, 200);
+        shareDraft(holder, id, 200);
+
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("draft-shared"))
-                .andExpect(jsonPath("$.documents[?(@.category=='draft')]", org.hamcrest.Matchers.hasSize(1)));
+                .andExpect(jsonPath("$.documents[?(@.category=='draft')]", org.hamcrest.Matchers.hasSize(2)))
+                .andExpect(jsonPath("$.draftApproval.version").value(2));
+        openDraft(owner, id, 204);
+        decide(owner, id, "approve", 200);
     }
+
 
     private String raiseWithState(User caller, Property property, String stateJson) throws Exception {
         String json = mvc.perform(post(Routes.ServiceRequests.BASE)
@@ -111,8 +120,9 @@ class RentAgreementDraftApprovalTest extends ServiceFixtures {
 
     private void forceOtp(String mobile) {
         em.flush();
-        jdbc.update("update otp_codes set code_hash = encode(sha256(convert_to('424242', 'UTF8')), 'hex')"
-                + " where id = (select id from otp_codes where mobile = ? order by created_at desc limit 1)", mobile);
+        jdbc.update("update otp_codes set code_hash = ?"
+                + " where id = (select id from otp_codes where mobile = ? order by created_at desc limit 1)",
+                otpHash("424242"), mobile);
         em.clear();
     }
 }

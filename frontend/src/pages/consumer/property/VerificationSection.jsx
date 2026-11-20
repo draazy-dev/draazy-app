@@ -1,11 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import { listingFreshness } from '../../../lib/freshness.js';
+import { mahaReraSearchUrl } from '../../../lib/maharera.js';
 
-/* Verification tab. Trust is the product in Indian real estate, so instead of two
-   flat cards we surface a data-driven trust checklist + a "trust score" meter that
-   tallies the independent checks Draazy has actually passed for this listing.
-   Every signal is backed by a real field — nothing is implied that we can't show. */
 export function VerificationSection({ p }) {
   const { t } = useTranslation();
   const fresh = listingFreshness(p);
@@ -43,24 +40,6 @@ export function VerificationSection({ p }) {
       noLabel: t('property.unconfirmed'),
     },
   ];
-  if (p.reraId) {
-    checks.push({
-      passed: true,
-      icon: 'badge-check',
-      title: t('property.reraRegistered'),
-      yes: (
-        <>
-          {t('property.reraYes')}{' '}
-          <a href="https://maharera.maharashtra.gov.in/" target="_blank" rel="noopener noreferrer" className="text-emerald-300 hover:underline">
-            {t('property.mahaReraId', { id: p.reraId })}
-          </a>
-        </>
-      ),
-      no: '',
-      yesLabel: t('property.registered'),
-      noLabel: '',
-    });
-  }
 
   const passed = checks.filter((c) => c.passed).length;
   const total = checks.length;
@@ -87,13 +66,29 @@ export function VerificationSection({ p }) {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <p className="font-semibold text-white text-sm">{c.title}</p>
-                  <span className={'text-[11px] font-semibold px-2 py-0.5 rounded-full ' + (c.passed ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-slate-400')}>{c.passed ? c.yesLabel : c.noLabel}</span>
+                  <span className={'dz-tag font-semibold ' + (c.passed ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-slate-400')}>{c.passed ? c.yesLabel : c.noLabel}</span>
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">{c.passed ? c.yes : c.no}</p>
               </div>
             </div>
           ))}
         </div>
+        {p.reraId ? (
+          <div data-testid="rera-shared" className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-5 flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-white/10">
+              <Icon name="file-text" className="w-5 h-5 text-slate-400" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-white text-sm mb-1">{t('property.reraSharedTitle')}</p>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {t('property.reraSharedDesc')}{' '}
+                <a href={mahaReraSearchUrl(p.reraId)} target="_blank" rel="noopener noreferrer" className="text-teal-300 hover:underline">
+                  {t('property.mahaReraId', { id: p.reraId })}
+                </a>
+              </p>
+            </div>
+          </div>
+        ) : null}
         <p className="text-slate-500 text-xs mt-4 flex items-start gap-1.5"><Icon name="info" className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> {t('property.verificationFooter', { ownership: isRent ? t('property.ownershipVerifiedTitle') : t('property.ownershipIndexTitle') })}</p>
       </div>
     </section>

@@ -4,9 +4,7 @@ import com.draazy.api.common.trust.ContactVisibility;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.identity.user.User;
 
-/** Hand-written to keep each projection's mobile masking visible; the owner's mobile is masked while pending. */
 public final class TenancyMapper {
-
     private TenancyMapper() {
     }
 
@@ -50,14 +48,12 @@ public final class TenancyMapper {
                 profile.isVerified());
     }
 
-    // Score stays null, not 0: "never assessed" and "scored nothing" render differently.
     public static TenantProfileDto emptyProfile(String mobile, boolean verified) {
         return new TenantProfileDto(
                 maskMobile(mobile, ContactVisibility.REVEALED),
                 null, null, null, null, null, null, null, null, verified);
     }
 
-    // Routed through MobileMask so the masking rule has one definition.
     private static TenancyDto.Party toParty(User user, String role, boolean revealed) {
         if (user == null) {
             return null;
@@ -69,7 +65,6 @@ public final class TenancyMapper {
                 role);
     }
 
-    /** Delegates to {@link MobileMask} — the single definition. Private by §8.1. */
     private static String maskMobile(String mobile, ContactVisibility visibility) {
         return MobileMask.applyTo(mobile, visibility);
     }

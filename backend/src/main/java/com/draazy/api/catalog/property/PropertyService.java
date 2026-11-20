@@ -16,14 +16,10 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Every method serves {@code security: []}, so the approved + non-archived floor is enforced in the query. */
 @Service
 public class PropertyService {
-
-    /** The home strip draws six; the contract's featured endpoint takes no limit, so we bound it here. */
     private static final int FEATURED_CAP = 6;
 
-    /** A rail of recently viewed listings never holds more than this. */
     public static final int CARDS_CAP = 16;
 
     // ponytail: newest 100 only, so counts undercount once live stock outgrows it; aggregate server-side then.
@@ -68,13 +64,10 @@ public class PropertyService {
         PropertySearchFragment.Totals totals = properties.countTotals(
                 match, PropertySpecs.anyVerified(now), PropertySpecs.unstatedFiltered(extra));
 
-        // `exec`, not `safe` — the page must carry the pageable its rows were actually read with, or
-        // a client reading `sort` off the response would be told about an order that was overridden.
         return new SearchResult(new PageImpl<>(rows, exec, totals.total()), totals.verified(),
                 totals.unstated());
     }
 
-    /** Null for a blank or unknown slug, or a locality with no pin: those match on the slug alone. */
     PropertySpecs.LocalityPoint localityCenter(String slug) {
         if (slug == null || slug.isBlank()) {
             return null;
@@ -85,25 +78,29 @@ public class PropertyService {
                 .orElse(null);
     }
 
-    /** The two counts describe the whole match, not the page, so neither fits in a {@link Page}. */
     public record SearchResult(Page<Property> page, long verifiedTotal, long unstatedTotal) {
     }
 
-    /** No visibility floor, only {@code @PreAuthorize} on its one caller, so a new one needs its own. */
     @Transactional(readOnly = true)
     public Page<Property> searchForModeration(PropertySearchQuery filters, ModerationFacets mod,
             Pageable pageable) {
-        return properties.findAll(PropertySpecs.adminSearch(filters, mod),
+        return searchForModeration(filters, mod, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Property> searchForModeration(PropertySearchQuery filters, ModerationFacets mod, Instant since,
+            Pageable pageable) {
+        return properties.findAll(PropertySpecs.adminSearch(filters, mod, since),
                 PropertySort.sanitizeModeration(pageable));
     }
 
     @Transactional(readOnly = true)
     public List<Property> featured() {
-        return properties.findByStatusAndArchivedFalseAndOwner_StatusNotOrderByFeaturedDescCreatedAtDesc(
-                PropertyStatus.APPROVED, UserStatuses.SUSPENDED, PageRequest.of(0, FEATURED_CAP));
+        return properties.featuredVisible(
+                PropertyStatus.APPROVED, UserStatuses.SUSPENDED,
+                Freshness.dormantCutoff(Instant.now()), PageRequest.of(0, FEATURED_CAP));
     }
 
-    /** The publicly live rows among {@code ids} (slugs or UUIDs), in no particular order. */
     @Transactional(readOnly = true)
     public List<Property> publicByIds(List<String> ids) {
         return properties.findPage(PropertySpecs.publicSearch(NO_FILTERS, ListingFacets.ofIds(ids)),
@@ -112,7 +109,8 @@ public class PropertyService {
 
     @Transactional(readOnly = true)
     public List<Property> newestReels(ListingFacets facets) {
-        return properties.findPage(PropertySpecs.publicSearch(NO_FILTERS, facets).and(PropertySpecs.newestFirst()),
+        return properties.findPage(PropertySpecs.publicSearch(NO_FILTERS, facets).and(PropertySpecs.residential())
+                .and(PropertySpecs.newestFirst()),
                 PageRequest.of(0, REELS_CAP));
     }
 
@@ -131,7 +129,6 @@ public class PropertyService {
         return p;
     }
 
-    /** A signed-in viewer owning a listing that has not been taken down. */
     private static boolean isOwnedBy(Property p, UUID viewerId) {
         return viewerId != null && !p.isArchived() && p.getOwner() != null
                 && viewerId.equals(p.getOwner().getId());
@@ -142,7 +139,6 @@ public class PropertyService {
         return id != null ? properties.findById(id) : properties.findBySlug(idOrSlug);
     }
 
-    /** {@code null} when the token isn't a UUID — the signal to fall back to a slug lookup. */
     static UUID tryUuid(String token) {
         return Ids.parseUuid(token).orElse(null);
     }

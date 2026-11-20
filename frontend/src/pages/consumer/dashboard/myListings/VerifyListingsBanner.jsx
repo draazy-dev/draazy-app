@@ -4,16 +4,14 @@ import { ShieldCheck, Star, X } from 'lucide-react';
 import VerifyIdentityRedirect from '../../../../components/auth/VerifyIdentityRedirect.jsx';
 import { useVerification } from '../../../../context/VerificationContext.jsx';
 import { trackKyc } from '../../../../lib/kycTrack.js';
-/* One badge lifts ALL of an owner's listings, so this is a single panel banner rather than per-card noise. */
 
 export default function VerifyListingsBanner({ enquiryCount = 0 }) {
   const { t } = useTranslation();
-  const { verified, loading } = useVerification();
+  const { verified, status, loading } = useVerification();
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  if (verified || loading || dismissed) return null;
-  // C2: when the owner already has enquiries, lead with that value moment.
+  if (verified || status === 'pending' || loading || dismissed) return null;
 
   const hasLeads = enquiryCount > 0;
   const headline = hasLeads

@@ -13,7 +13,7 @@ export default function HeadlineField({ value, onChange, suggestion, error, clas
       <div className="mb-2 flex items-center justify-between gap-3">
         <label htmlFor={id} className={labelClassName}>{t('common.headline.label')}</label>
         {offerSuggestion ? (
-          <button type="button" onClick={() => onChange(suggestion)} className="text-xs font-semibold text-teal-300 hover:text-teal-200">
+          <button type="button" onClick={() => onChange(suggestion)} className="tap-coarse text-xs font-semibold text-teal-300 hover:text-teal-200">
             {t('common.headline.useSuggestion')}
           </button>
         ) : null}

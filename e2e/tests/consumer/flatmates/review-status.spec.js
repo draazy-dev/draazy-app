@@ -1,9 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { API, E2E_OTP, apiLogin, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, E2E_OTP, apiLogin, grantIdentityBadge, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
-import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { badgeChecks, tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 /* `reviewStatus` is joined onto the feed rows server-side (`FlatmateReviewStatuses`), so every row
    here is created over HTTP and published through real moderation — the two gates are independent. */
 
@@ -35,29 +40,13 @@ async function consentTo(token, address) {
 }
 /** Let a row past the moderation gate, which is a different gate from the one under test. */
 async function publish(id) {
+  await tickDeskChecklist(API, id, auth(await adminToken()));
   const response = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(await adminToken()),
     body: JSON.stringify({ modStatus: 'live', note: 'e2e review-status fixture' }),
   });
   expect(response.status).toBeLessThan(300);
-}
-
-async function createGroup(token, body) {
-  const response = await fetch(`${API}/flatmates/groups`, {
-    method: 'POST',
-    headers: auth(token),
-    body: JSON.stringify({
-      locality: 'Baner', rent: 40000, seats: 3, seatsOpen: 1, policy: 'any', name: 'Review Host',
-      ...body,
-      ...(body.agreementDoc ? { agreementDoc: (await tenantRoomAgreement(token)).agreementDoc } : {}),
-    }),
-  });
-  const group = await response.json();
-  expect(response.status, JSON.stringify(group)).toBe(201);
-  track('groups', group.id, token);
-  await publish(group.id);
-  return group;
 }
 
 async function createRoom(token, body) {
@@ -68,9 +57,10 @@ async function createRoom(token, body) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
+      ...(await roomBasics(token)),
       bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi',
-      locality: 'Baner', rentShare: 15000, deposit: 30000, availableFrom: '2026-12-01',
-      lookingFor: 'any', foodPref: 'any', photos: await uploadedListingPhotos(token),
+      locality: 'Baner', rentShare: 15000, deposit: 30000, availableFrom: MOVE_IN,
+      lookingFor: 'any', foodPref: 'any',
       ...(await withSocietyId(token, payload)),
     }),
   });
@@ -94,7 +84,7 @@ async function decide(target, decision, note = 'e2e verdict') {
   const response = await fetch(`${API}/admin/flatmate-reviews/${row.id}`, {
     method: 'PATCH',
     headers: auth(token),
-    body: JSON.stringify({ decision, note }),
+    body: JSON.stringify({ decision, note, ...(decision === 'approved' ? { checks: badgeChecks() } : {}) }),
   });
   const decided = await response.json();
   expect(response.status, JSON.stringify(decided)).toBe(200);
@@ -105,12 +95,6 @@ async function tapChip(page, chip) {
   await chip.scrollIntoViewIfNeeded();
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   await chip.click();
-}
-async function openTeamUp(page) {
-  await page.goto(`${BASE}/flatmates`);
-  const tab = page.getByRole('button', { name: /Team up/i }).first();
-  await expect(tab).toBeVisible({ timeout: 20_000 });
-  await tab.click();
 }
 
 async function openRooms(page) {
@@ -130,76 +114,48 @@ async function openFilters(page) {
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
-test('a tenant group waits on Ops without the badge it asked for, then an approval turns it Tenant-verified', async ({ page }) => {
-  test.slow();
+test('a rejected room says it is not a verified property yet, and gives the host the reason', async ({ page }) => {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
-  const title = `Live approved verdict ${stamp()} in Baner`;
-  const consentMobile = await consentTo(accessToken, { title, locality: 'Baner' });
-  const group = await createGroup(accessToken, {
-    title, role: 'tenant', agreement: true, consentMobile, ...REGISTERED,
-  });
-  expect(group.verificationTier).toBe('tenant');
-  await signedInAs(page, mobile);
-  const card = page.locator('main');
-
-  await test.step('a tenant group waiting on Ops says so, and is not given the badge it asked for', async () => {
-    await openDetail(page, 'group', group.id);
-
-    await expect(card.getByText('Agreement under review', { exact: true })).toBeVisible();
-    await expect(card.getByText('Tenant-verified', { exact: true })).toHaveCount(0);
+  const { accessToken } = await apiLogin(mobile, { name: 'Review Host' });
+  const room = await createRoom(accessToken, {
+    society: `Live rejected verdict ${stamp()}`, hostRole: 'tenant', agreementDeclared: true, ...REGISTERED,
   });
 
-  await test.step('an Ops approval turns the same group into Tenant-verified', async () => {
-    await decide(group.id, 'approved');
-
-    await openDetail(page, 'group', group.id);
-    await expect(card.getByText('Tenant-verified', { exact: true })).toBeVisible();
-    await expect(card.getByText('Agreement verified', { exact: true })).toBeVisible();
-    await expect(card.getByText('Agreement under review', { exact: true })).toHaveCount(0);
-  });
-});
-
-test('a rejected group stays on the board, says the agreement was not verified, and gives the host the reason', async ({ page }) => {
-  const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
-  const group = await createGroup(accessToken, {
-    title: `Live rejected verdict ${stamp()} in Baner`, role: 'tenant', agreement: true, ...REGISTERED,
-  });
-
-  await decide(group.id, 'rejected', 'Registration number does not match the document');
+  await decide(room.id, 'rejected', 'Registration number does not match the document');
 
   await signedInAs(page, mobile);
-  await openDetail(page, 'group', group.id);
+  await openDetail(page, 'room', room.id);
   const card = page.locator('main');
-  await expect(card.getByText('Agreement not verified', { exact: true })).toBeVisible();
-  await expect(card.getByText('Tenant-verified', { exact: true })).toHaveCount(0);
+  await expect(card.getByText('Not a verified property yet', { exact: true })).toBeVisible();
+  await expect(card.getByText('Verified property', { exact: true })).toHaveCount(0);
 
-  await tapChip(page, page.getByRole('button', { name: 'Agreement not verified' }).first());
+  await tapChip(page, page.getByRole('button', { name: 'Not a verified property yet' }).first());
   const tip = page.getByRole('tooltip');
   await expect(tip).toContainText('Registration number does not match the document');
   await expect(tip).toContainText('Edit your post to fix it');
 });
-test('"Verified only" keeps the approved tenant group and drops the one still waiting', async ({ page }) => {
+test('"Verified only" keeps the approved tenant room and drops the one still waiting', async ({ page }) => {
   const viewer = uniqueMobile();
-  const { accessToken: approvedToken } = await apiLogin(uniqueMobile());
-  const { accessToken: pendingToken } = await apiLogin(uniqueMobile());
+  const approvedHost = uniqueMobile();
+  const { accessToken: approvedToken } = await apiLogin(approvedHost, { name: 'Review Host' });
+  await grantIdentityBadge(approvedHost);
+  const { accessToken: pendingToken } = await apiLogin(uniqueMobile(), { name: 'Review Host' });
 
-  const approvedTitle = `Live filter approved ${stamp()} in Baner`;
-  const consentMobile = await consentTo(approvedToken, { title: approvedTitle, locality: 'Baner' });
-  const approved = await createGroup(approvedToken, {
-    title: approvedTitle, role: 'tenant', agreement: true, consentMobile, ...REGISTERED,
+  const society = `Live filter approved ${stamp()}`;
+  const ownerConsentMobile = await consentTo(approvedToken, { society, locality: 'Baner' });
+  const approved = await createRoom(approvedToken, {
+    society, hostRole: 'tenant', agreementDeclared: true, ownerConsentMobile, ownerConsent: true, ...REGISTERED,
   });
   // The one still waiting needs no consent: it is never approved, so the gate never applies.
-  const pending = await createGroup(pendingToken, {
-    title: `Live filter pending ${stamp()} in Baner`, role: 'tenant', agreement: true, ...REGISTERED,
+  const pending = await createRoom(pendingToken, {
+    society: `Live filter pending ${stamp()}`, hostRole: 'tenant', agreementDeclared: true, ...REGISTERED,
   });
   await decide(approved.id, 'approved');
 
   await signedInAs(page, viewer);
-  await openTeamUp(page);
-  const approvedCard = page.locator(`[data-sf-id="g:${approved.id}"]`);
-  const pendingCard = page.locator(`[data-sf-id="g:${pending.id}"]`);
+  await openRooms(page);
+  const approvedCard = page.locator(`[data-sf-id="r:${approved.id}"]`);
+  const pendingCard = page.locator(`[data-sf-id="r:${pending.id}"]`);
   // Both present first: an all-absent assertion would also pass if the board were empty.
   await expect(approvedCard).toBeVisible({ timeout: 15_000 });
   await expect(pendingCard).toBeVisible();
@@ -212,7 +168,9 @@ test('"Verified only" keeps the approved tenant group and drops the one still wa
 
 test('the same verdict drives a room card, and the room filter with it', async ({ page }) => {
   const viewer = uniqueMobile();
-  const { accessToken: tenantToken } = await apiLogin(uniqueMobile());
+  const tenantHost = uniqueMobile();
+  const { accessToken: tenantToken } = await apiLogin(tenantHost);
+  await grantIdentityBadge(tenantHost);
   const { accessToken: plainToken } = await apiLogin(uniqueMobile());
   const society = `Review Claim Villa ${stamp()}`;
   const ownerConsentMobile = await consentTo(tenantToken, { society, locality: 'Baner' });
@@ -235,7 +193,7 @@ test('the same verdict drives a room card, and the room filter with it', async (
 
   await openRooms(page);
   const claimedCard = page.locator(`[data-sf-id="r:${claimed.id}"]`);
-  await expect(claimedCard.getByRole('img', { name: 'Tenant-verified', exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(claimedCard.getByRole('img', { name: 'Verified property', exact: true })).toBeVisible({ timeout: 15_000 });
 
   await openFilters(page);
   await page.getByRole('button', { name: 'Verified only', exact: true }).click();
@@ -245,17 +203,17 @@ test('the same verdict drives a room card, and the room filter with it', async (
 
 test('a post nobody had to review carries neither a badge nor a review chip', async ({ page }) => {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
-  const title = `Live no claim ${stamp()} in Baner`;
-  const group = await createGroup(accessToken, { title, role: 'tenant' });
-  expect(group.verificationTier).toBe('identity');
+  const { accessToken } = await apiLogin(mobile, { name: 'Review Host' });
+  const society = `Live no claim ${stamp()}`;
+  const room = await createRoom(accessToken, { society, hostRole: 'owner' });
+  expect(room.verificationTier).toBe('identity');
 
   await signedInAs(page, mobile);
-  await openDetail(page, 'group', group.id);
+  await openDetail(page, 'room', room.id);
   const card = page.locator('main');
-  await expect(card.getByText(title).first()).toBeVisible({ timeout: 15_000 });
+  await expect(card.getByText(society).first()).toBeVisible({ timeout: 15_000 });
   await expect(card.getByText('Agreement under review', { exact: true })).toHaveCount(0);
-  await expect(card.getByText(/Tenant-verified|Owner-verified/)).toHaveCount(0);
+  await expect(card.getByText('Verified property')).toHaveCount(0);
 });
 
 test('tapping the agreement chip explains it in place, without the host detail', async ({ page }) => {

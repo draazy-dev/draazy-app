@@ -14,17 +14,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ReferralRepository extends JpaRepository<Referral, UUID> {
-
-    // Locked: approve, reject and clawback are check-then-act on status.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Referral r where r.id = :id")
     Optional<Referral> findForDecision(@Param("id") UUID id);
 
-    // Null-tolerant predicates in one query so the planner keeps its options; `statuses` is never empty.
     @Query("""
             select r from Referral r
             where (:anyStatus = true or r.status in :statuses)
               and (:risk is null or r.risk = :risk)
+              and r.at >= :since
               and (:q is null
                    or lower(r.referred) like :q escape '\\'
                    or r.referrerMobile like :q escape '\\'
@@ -34,9 +32,8 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
             order by r.at desc
             """)
     Page<Referral> queue(@Param("anyStatus") boolean anyStatus, @Param("statuses") List<String> statuses,
-            @Param("risk") String risk, @Param("q") String q, Pageable pageable);
+            @Param("risk") String risk, @Param("q") String q, @Param("since") Instant since, Pageable pageable);
 
-    // Tab totals over the whole table: all, pending, held, high risk, rewarded, refused.
     @Query("""
             select count(r),
                    coalesce(sum(case when r.status = 'pending' then 1 else 0 end), 0),
@@ -50,13 +47,10 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
 
     List<Referral> findByReferrerId(UUID referrerId);
 
-    // The unique index uq_referrals_referred_mobile is what actually enforces it.
     boolean existsByReferredMobile(String referredMobile);
 
-    // Counts rows of every outcome: a referrer whose referrals were all rejected is who this is for.
     long countByReferrerIdAndAtAfter(UUID referrerId, Instant since);
 
-    // Locked so a retried verification or a second accepted contact finds the row already decided.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select r from Referral r
@@ -65,7 +59,6 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
             """)
     Optional<Referral> findPendingForQualification(@Param("userId") UUID userId);
 
-    // Referrals that count against a cap: earning or waiting to, decided inside [from, to).
     @Query("""
             select count(r) from Referral r
             where r.referrerId = :referrerId
@@ -75,19 +68,33 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
     long countCappedBetween(@Param("referrerId") UUID referrerId, @Param("from") Instant from,
             @Param("to") Instant to);
 
-    // The entitlement is derived from this: a stored counter would need un-incrementing on clawback.
-    // Rows with no track predate the tracks and earn owner contacts.
     @Query("""
-            select coalesce(sum(case when r.track = 'owner' then 1 else 0 end), 0),
-                   coalesce(sum(case when r.track is null or r.track = 'seeker' then 1 else 0 end), 0)
-            from Referral r
+            select count(r) from Referral r
             where r.referrerId = :referrerId and r.status in ('qualified', 'rewarded')
             """)
-    List<Object[]> grantedByTrack(@Param("referrerId") UUID referrerId);
+    long countGranted(@Param("referrerId") UUID referrerId);
+
+    @Query("""
+            select count(r) from Referral r
+            where r.referrerId = :referrerId and r.status in ('qualified', 'rewarded')
+              and exists (select 1 from User me where me.id = :referrerId and me.verified = true)
+              and exists (select 1 from User f where f.mobile = r.referredMobile and f.verified = true)
+            """)
+    long countUnlocked(@Param("referrerId") UUID referrerId);
+
+    @Query("""
+            select r.referredMobile from Referral r
+            where r.referrerId = :referrerId and r.status in ('qualified', 'rewarded')
+              and exists (select 1 from User f where f.mobile = r.referredMobile and f.verified = true)
+            """)
+    List<String> verifiedGrantedFriends(@Param("referrerId") UUID referrerId);
+
+    @Query("select count(u) > 0 from User u where u.id = :userId and u.verified = true")
+    boolean isVerified(@Param("userId") UUID userId);
 
     @Query("""
             select count(r) > 0 from Referral r
-            where r.status in ('pending', 'qualified', 'held', 'rewarded')
+            where r.status in ('qualified', 'rewarded')
               and (r.track is null or r.track = 'seeker')
               and r.referredMobile = (select u.mobile from User u where u.id = :userId)
             """)
@@ -114,7 +121,6 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
             """)
     List<Referral> findLiveForProperty(@Param("propertyId") UUID propertyId);
 
-    // Other referees of this referrer whose first contact the same owner accepted since `since`.
     @Query("""
             select count(r) from Referral r, Property p
             where p.id = r.qualifiedPropertyId and p.owner.id = :ownerId
@@ -133,7 +139,6 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
             """)
     List<UUID> grantedSinceIds(@Param("since") Instant since);
 
-    // Bulk update so retention never loads unbounded rows; `is not null` stops every tick rewriting null over null.
     @Modifying
     @Query("""
             update Referral r

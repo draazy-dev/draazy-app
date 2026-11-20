@@ -13,20 +13,16 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-// ServiceRequest owns the workflow after RentAgreementService produces a draft.
 @Entity
 @Table(name = "service_requests")
 @Getter
 public class ServiceRequest extends VersionedEntity {
-
-    @Column(name = "requester_id", updatable = false)
+    @Column(name = "requester_id")
     private UUID requesterId;
 
     @Column(name = "type", nullable = false, updatable = false)
     private String type;
 
-    // The ops desk that works this request.
-    // One of com.draazy.api.security.Teams.
     @Column(name = "team", nullable = false, updatable = false)
     private String team;
 
@@ -44,7 +40,6 @@ public class ServiceRequest extends VersionedEntity {
     @Setter
     private UUID assigneeId;
 
-    // Structured customer payload; kept as JSON so DTO round-trips the create shape.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "details")
     private Map<String, Object> details;
@@ -55,16 +50,20 @@ public class ServiceRequest extends VersionedEntity {
     @Column(name = "status_changed_at", nullable = false)
     private Instant statusChangedAt = Instant.now();
 
-    // Cashfree order id; webhook uses it to find the request.
-    // It is attached after commit so payable orders never point at rolled-back rows.
     @Column(name = "payment_ref")
     private String paymentRef;
+
+    @Column(name = "payer_id")
+    private UUID payerId;
 
     @Column(name = "referral_credit", nullable = false)
     private boolean referralCredit;
 
-    protected ServiceRequest() {
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "attention")
+    private Map<String, Object> attention;
 
+    protected ServiceRequest() {
     }
 
     public ServiceRequest(UUID requesterId, String type, UUID propertyId,
@@ -77,20 +76,26 @@ public class ServiceRequest extends VersionedEntity {
         this.ticketId = ticketId;
     }
 
-    // Package-private: only the co-fill flow may merge invited-party details.
     void replaceDetails(Map<String, Object> details) {
         this.details = details;
+    }
+
+    void handOverTo(UUID holder) {
+        this.requesterId = holder;
+    }
+
+    void askAttention(Map<String, Object> attention) {
+        this.attention = attention;
     }
 
     void charge(long extra) {
         this.amount = (amount == null ? 0L : amount) + extra;
     }
 
-    // Priced requests start at awaiting-payment before Cashfree order creation.
-    // The row must commit first, so callbacks can always find it.
     void awaitPayment(long amount) {
         this.status = ServiceRequestStatus.AWAITING_PAYMENT;
         this.amount = amount;
+        this.referralCredit = false;
     }
 
     void spendReferralCredit(long amountAfterWaiver) {
@@ -98,19 +103,33 @@ public class ServiceRequest extends VersionedEntity {
         this.amount = amountAfterWaiver;
     }
 
-    // Never overwrite an order ref; displaced payable orders would lose their request.
-    boolean attachOrder(String orderId) {
+    boolean attachOrder(String orderId, UUID payer) {
         if (status != ServiceRequestStatus.AWAITING_PAYMENT || paymentRef != null) {
             return false;
         }
         this.paymentRef = orderId;
+        this.payerId = payer;
         return true;
     }
 
-    // Only ServiceRequestService moves statuses; it has caller authority and transition rules.
+    void releaseOrder() {
+        this.paymentRef = null;
+        this.payerId = null;
+    }
+
+    UUID payer() {
+        return payerId != null ? payerId : requesterId;
+    }
+
+    UUID payerOf(String orderId) {
+        return orderId != null && orderId.equals(paymentRef) ? payer() : requesterId;
+    }
+
     void moveTo(ServiceRequestStatus status) {
         this.status = status;
         this.statusChangedAt = Instant.now();
+        if (status != ServiceRequestStatus.ACTION_REQUIRED) {
+            this.attention = null;
+        }
     }
-
 }

@@ -5,7 +5,7 @@ import { API, authHeaders } from '../../../helpers/liveAuth.js';
    saved list and no shell reads for alerts, follows or identity. */
 
 const CARD = ['id', 'slug', 'title', 'deal', 'propertyType', 'bhk', 'price', 'area', 'locality', 'city',
-  'coverImage', 'ownerVerified', 'ownershipVerified'];
+  'coverImage', 'images', 'ownerVerified', 'ownershipVerified'];
 const SOCIETY = ['slug', 'name', 'localitySlug', 'listingCount'];
 const INDEX = ['deal', 'locality', 'localitySlug', 'societySlug', 'societyName', 'lat', 'lng'];
 const LAZY = ['/api/me/saved-searches', '/api/me/societies/following', '/api/me/verification/identity', '/api/me/saved'];
@@ -48,7 +48,7 @@ test('signed-in home boots from a slim /me/bootstrap and defers screen-only read
 
   // index.html preloads this read, and Playwright reports that buffered body as empty: read the shape directly.
   const doc = await (await fetch(`${API}/me/bootstrap`, { headers: await authHeaders(ACTORS.buyer) })).json();
-  expect(Object.keys(doc).sort()).toEqual(['me', 'messagesUnread', 'notificationsUnread', 'saved', 'subscription']);
+  expect(Object.keys(doc).sort()).toEqual(['me', 'messagesUnread', 'notificationsUnread', 'requestsPending', 'saved', 'subscription', 'supportUnread']);
   expect(extraKeys(doc.saved, ['id', 'slug'])).toEqual([]);
   expect(doc.me.passwordHash).toBeUndefined();
   expect(doc.me.mobileVerified).toBeUndefined();

@@ -18,10 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 
-// Strict UUID routes should fail before auth conversion; lenient routes document slug support.
-// If a strict route becomes lenient, this guard should fail until the contract is updated.
 class PropIdAcceptanceTest extends AbstractApiTest {
-
     private static final String SLUG = "2bhk-kothrud-propid-guard";
 
     @Autowired
@@ -47,13 +44,6 @@ class PropIdAcceptanceTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /**
-     * Strict routes reject a slug (400 from conversion, or 404 from a helper — the status differs
-     * only in how the constraint is expressed); the vault is lenient. The positive rows matter as
-     * much as the negative ones: without them a route that started answering 400 to everything
-     * would still pass. The public reviews route sends no bearer, since the identifier must be
-     * rejected before authorisation would matter.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("routes")
     void propIdAcceptance(String label, HttpMethod method, String route, boolean uuid,

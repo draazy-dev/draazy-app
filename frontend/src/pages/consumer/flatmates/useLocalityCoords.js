@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { searchLocalities } from '../../../services/localityService.js';
 
-/* Localities are created on demand, so there is no list to read centres from: each area on screen is looked up by
-   name, once per session. */
 const lookups = new Map();
 const centres = new Map();
 

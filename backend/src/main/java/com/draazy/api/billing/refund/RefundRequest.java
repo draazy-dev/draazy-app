@@ -8,12 +8,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-/** A customer's request to have one paid order refunded; staff decide it exactly once. */
 @Entity
 @Table(name = "refund_requests")
 @Getter
 public class RefundRequest extends VersionedEntity {
-
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
@@ -57,7 +55,6 @@ public class RefundRequest extends VersionedEntity {
     private String decisionReason;
 
     protected RefundRequest() {
-        // JPA
     }
 
     RefundRequest(UUID userId, UUID subscriptionId, String kind, String basis, long amount,

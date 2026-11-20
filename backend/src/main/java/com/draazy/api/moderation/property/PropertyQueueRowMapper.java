@@ -11,10 +11,8 @@ import com.draazy.api.moderation.signal.ListingSignals;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 
-/** Hand-written: the row is the desk's view, so every private field it carries is revealed on purpose. */
 @Component
 public class PropertyQueueRowMapper {
-
     private final PropertyMapper properties;
 
     public PropertyQueueRowMapper(PropertyMapper properties) {
@@ -47,6 +45,7 @@ public class PropertyQueueRowMapper {
                 p.getOwnershipRequestedAt(),
                 p.isRecheckPending(),
                 p.getRecheckReason(),
+                p.getRecheckChanges(),
                 p.getRecheckRequestedAt(),
                 p.isFeatured(),
                 p.isArchived(),

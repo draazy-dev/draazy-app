@@ -18,10 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The refunds desk (contracts {@code listRefunds}, {@code approveRefund}, {@code rejectRefund}). */
 @RestController
 public class RefundsController {
-
     private static final String STAFF_OR_ADMIN = "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "') and ";
     private static final String READ = STAFF_OR_ADMIN + BackOfficePermissions.REQUIRE_REFUNDS_READ;
     private static final String WRITE = STAFF_OR_ADMIN + BackOfficePermissions.REQUIRE_REFUNDS_WRITE;
@@ -37,10 +35,13 @@ public class RefundsController {
     @GetMapping(Routes.Refunds.DESK)
     @PreAuthorize(READ)
     public PageResponse<RefundDesk.Row> list(@RequestParam(required = false) String status,
+            @RequestParam(required = false) String feature,
+            @RequestParam(required = false) Integer days,
             @RequestParam(defaultValue = "false") boolean counts,
             @PageableDefault(size = 20) Pageable pageable) {
-        PageResponse<RefundDesk.Row> page = PageResponse.of(desk.list(status, Pageables.unsorted(pageable)), row -> row);
-        return counts ? page.withCounts(desk.counts()) : page;
+        PageResponse<RefundDesk.Row> page = PageResponse.of(
+                desk.list(status, feature, days, Pageables.unsorted(pageable)), row -> row);
+        return counts ? page.withCounts(desk.counts(feature)) : page;
     }
 
     @PostMapping(Routes.Refunds.APPROVE)

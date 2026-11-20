@@ -1,11 +1,9 @@
 
-/* English is the fallback for every user, so it is eager; Marathi/Hindi load on demand. */
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 import { EAGER_NAMESPACES } from './namespaces.js';
 
-/** Static imports keep the eager namespace list deliberate rather than folder-driven. */
 import enAuth from './locales/en/auth.json';
 import enChrome from './locales/en/chrome.json';
 import enCommon from './locales/en/common.json';
@@ -24,7 +22,6 @@ const enLazyModules = import.meta.glob('./locales/en/*.json');
 
 const inflight = new Map();
 
-/** Ensure the given English namespaces are in the i18next store. */
 export function loadNamespaces(namespaces) {
   const pending = [];
   for (const ns of namespaces) {
@@ -36,11 +33,11 @@ export function loadNamespaces(namespaces) {
         console.error(`[i18n] Unknown locale namespace "${ns}" — no locales/en/${ns}.json.`);
         continue;
       }
-      promise = importer()
-        .then((mod) => {
-          // Deep merge, overwriting: namespaces may share a top-level key.
-          i18n.addResourceBundle('en', 'translation', mod.default || mod, true, true);
-        })
+      const load = () => importer().then((mod) => {
+        i18n.addResourceBundle('en', 'translation', mod.default || mod, true, true);
+      });
+      promise = load()
+        .catch(load)
         .catch((err) => {
           console.error(`[i18n] Failed to load locale namespace "${ns}"`, err);
           inflight.delete(ns);
@@ -60,6 +57,7 @@ i18n
     fallbackLng: 'en',
     interpolation: { escapeValue: false },
     returnEmptyString: false,
+    react: { bindI18nStore: 'added' },
   });
 
 export default i18n;

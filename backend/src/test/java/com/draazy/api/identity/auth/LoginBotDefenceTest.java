@@ -8,16 +8,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.security.BotDefence;
+import com.draazy.api.security.InMemoryWriteRateLimitStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
-// A Turnstile token is single-use, so challenging the verify step would refuse every sign-in once enforced.
 @DisplayName("POST /auth/login bot defence")
 class LoginBotDefenceTest {
-
     private static final String GOOD = "a-token-the-provider-accepts";
 
     private final AuthService auth = mock(AuthService.class);
@@ -32,14 +32,17 @@ class LoginBotDefenceTest {
                 public boolean verify(String token, String remoteIp) {
                     return GOOD.equals(token);
                 }
-            });
+            },
+            new OtpSendIpBudget(InMemoryWriteRateLimitStore::new, 100));
 
     @Test
-    @DisplayName("refuses the send step without a token, before an SMS is spent")
+    @DisplayName("refuses the send step without a token, before an SMS is spent, as a retryable bot check")
     void refusesSendWithoutToken() {
         assertThatThrownBy(() -> controller.login(
                 new LoginRequest("9876500999", null, null, null), new MockHttpServletRequest()))
-                .isInstanceOf(ForbiddenException.class);
+                .isInstanceOfSatisfying(ForbiddenException.class, refused -> assertThat(refused.getCode())
+                        .as("plain `forbidden` would read to the client as a terminal block")
+                        .isEqualTo(ErrorCodes.BOT_CHECK_FAILED));
         verify(auth, never()).login(any());
     }
 

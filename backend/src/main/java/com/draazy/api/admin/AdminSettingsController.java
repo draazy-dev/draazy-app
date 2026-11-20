@@ -15,11 +15,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Admin only on both verbs: the document holds the fee table and permission map. The body is a free-form
- * {@code Map} because {@code additionalProperties: true} blocks would lose unnamed keys in a record. */
 @RestController
 public class AdminSettingsController {
-
     private static final String ADMIN_ONLY = "hasRole('" + Roles.ADMIN + "')";
     private static final String BACK_OFFICE = "hasAnyRole('" + Roles.STAFF + "', '" + Roles.MANAGER + "', '"
             + Roles.ADMIN + "')";
@@ -34,7 +31,6 @@ public class AdminSettingsController {
         this.service = service;
     }
 
-    /** Carries an {@code ETag} computed in the same read as the body, so the tag always describes it. */
     @GetMapping(Routes.Admin.SETTINGS)
     @PreAuthorize(SETTINGS_READ)
     public ResponseEntity<Map<String, Object>> current() {
@@ -42,15 +38,12 @@ public class AdminSettingsController {
         return ResponseEntity.ok().eTag(settings.etag()).body(settings.body());
     }
 
-    /** Only the module switches, so the shell does not download the fee table and permission map on every page. */
     @GetMapping(Routes.Admin.SETTINGS_FLAGS)
     @PreAuthorize(BACK_OFFICE)
     public Map<String, Object> flags() {
         return service.adminFlags();
     }
 
-    /** Returns the stored result of each written block, not the patch: after merging, stored differs from sent.
-     * {@code If-Match} is optional; when supplied it answers {@code 412} instead of overwriting a colleague. */
     @PutMapping(Routes.Admin.SETTINGS)
     @PreAuthorize(SETTINGS_WRITE)
     public ResponseEntity<Map<String, Object>> update(@CurrentUser AuthPrincipal principal,

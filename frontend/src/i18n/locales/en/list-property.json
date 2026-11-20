@@ -16,10 +16,15 @@
       "legacyLandAddress": "The separate address details were never saved. Leave them blank to keep this address, or fill in the details below to replace it."
     },
     "editLoadFailed": "We could not load that listing. Reload the page and try again.",
+    "claim": {
+      "banner": "Draazy started this listing for you. Fill in anything missing and add photos, then confirm to send it for review.",
+      "submit": "Confirm & send for review",
+      "confirmed": "Thanks — your listing is now with our review team.",
+      "confirmFailed": "Your details are saved, but we could not confirm the listing. Please try again."
+    },
     "next": "Next Step",
     "back": "Back",
     "checking": "Checking…",
-    "optional": "(optional)",
     "startOver": "Start over",
     "startOverAria": "Start over — clear all entered details",
     "page": {
@@ -37,7 +42,9 @@
       "photoCount_other": "{{count}} photos",
       "amenityCount_one": "{{count}} amenity",
       "amenityCount_other": "{{count}} amenities",
-      "privacyNote": "Buyers see these facts. Your flat number and phone number are not shown on the listing — buyers reach you through Draazy."
+      "privacyNote": "Buyers see these facts. Your flat number and phone number are not shown on the listing — buyers reach you through Draazy.",
+      "privacyNote_space": "Buyers see these facts. Your unit number and phone number are not shown on the listing — buyers reach you through Draazy.",
+      "privacyNote_land": "Buyers see these facts. Your plot number and phone number are not shown on the listing — buyers reach you through Draazy."
     },
     "stepNav": {
       "ariaLabel": "Listing progress",
@@ -54,7 +61,11 @@
       "strength": "listing strength",
       "nudge": {
         "photos": "Add {{count}} photos so buyers can see more of the home.",
+        "photos_space": "Add {{count}} photos so buyers can see more of the space.",
+        "photos_land": "Add {{count}} photos so buyers can see more of the land.",
         "description": "A few lines about the home help buyers picture it.",
+        "description_space": "A few lines about the space help buyers picture it.",
+        "description_land": "A few lines about the land help buyers picture it.",
         "amenities": "Pick the amenities buyers filter by."
       },
       "cheer": {
@@ -74,12 +85,14 @@
       "pricingSubtitle": "What are you asking, and on what terms?",
       "photosTitle": "Photos & description",
       "photosSubtitle": "Add photos and a few details to attract buyers",
+      "flatmateRoomTitle": "Room details",
+      "flatmateRoomSubtitle": "The home, the room and who it suits",
       "flatmateLocationTitle": "Location",
-      "flatmateLocationSubtitle": "Where’s the flat?",
-      "flatmatePriceTitle": "Rent & move-in",
-      "flatmatePriceSubtitle": "What the room costs, and when it’s free",
-      "flatmatePhotosTitle": "Photos",
-      "flatmatePhotosSubtitle": "The room and shared spaces"
+      "flatmateLocationSubtitle": "Where exactly is the home?",
+      "flatmatePriceTitle": "Rent & terms",
+      "flatmatePriceSubtitle": "What it costs, when it’s free, and the house rules",
+      "flatmatePhotosTitle": "Photos & post",
+      "flatmatePhotosSubtitle": "Show the room and shared spaces"
     },
     "terms": {
       "standard": "11-month agreement · No lock-in · 1 month notice",
@@ -97,7 +110,6 @@
       "bhk": "BHK *",
       "commercialType": "Commercial Type *",
       "bathrooms": "Bathrooms *",
-      "bathroomsOptional": "Bathrooms",
       "balconies": "Balconies",
       "landArea": "Land Area",
       "plotAreaLabel": "Plot Area",
@@ -155,7 +167,6 @@
       "occupantsNow": "People living in the flat now",
       "lookingFor": "Looking for",
       "foodPreference": "Food Preference",
-      "lifestyle": "Lifestyle",
       "shortNote": "A short note",
       "roomPhotos": "Room Photos",
       "locality": "Locality *",
@@ -205,7 +216,6 @@
       "sale": "Sale",
       "rent": "Rent",
       "none": "None",
-      "nobodyYet": "Nobody yet",
       "roomSingle": "Single (1 person)",
       "roomDouble": "Double sharing (up to 2)",
       "yes": "Yes",
@@ -221,6 +231,9 @@
       "any": "Any",
       "vegOnly": "Veg only",
       "nonvegOk": "Non-veg ok",
+      "parkingNone": "None",
+      "parkingBike": "Bike",
+      "parkingCar": "Car",
       "attachedPrivate": "Attached (private)",
       "sharedCommon": "Shared / common",
       "newProperty": "New Property",
@@ -255,6 +268,7 @@
       "tenantDesc": "Replacing an outgoing flatmate.",
       "agreementTitle": "I have a registered rent agreement",
       "agreementAria": "Upload registered rent agreement for room",
+      "agreementLater": "After posting, request your badge in Dashboard → Documents.",
       "ownerConsentTitle": "The owner knows and agrees to sharing"
     },
     "toggle": {
@@ -281,13 +295,11 @@
       "camPerSqft": "₹ per sq.ft / month.",
       "tenancyStatus": "A leased unit is bought for its yield, a vacant one for its use — buyers price the two differently.",
       "suitableForHelp": "Pick the businesses this space works best for.",
-      "fixturesHelp": "Highlight the sub-type fit-out seekers look for — e.g. loading bay, server room, frontage. Optional.",
+      "fixturesHelp": "Highlight the sub-type fit-out seekers look for — e.g. loading bay, server room, frontage.",
       "pinPropertyHint": "Search an area or drag the pin to the exact spot — we'll try to fill the address below from it.",
-      "searchOrDragFlat": "Search an area or drag the pin to the exact spot.",
       "locationSet": "Location set: {{lat}}, {{lng}} — drag the pin to fine-tune.",
       "searchOrDragProperty": "Search an area or drag the pin to place your property on the map.",
       "dragProperty": "Pick your society above, or drag the pin to your building.",
-      "pickLocalityFlat": "Pick a locality above or search to place the flat on the map.",
       "fillingAddress": "Filling the address from your pin…",
       "filledAddress": "Filled some address fields from the map — please check them below.",
       "saleTypeCommercial": "New/under-construction sale, or a resale by the current owner?",
@@ -386,13 +398,22 @@
       "society": "Pick your society, or choose Not on Google Maps.",
       "house": "Pick your building, or choose Not on Google Maps.",
       "rentShare": "Enter the room's monthly rent.",
+      "roomDeposit": "Enter the deposit. Type 0 if there is none.",
+      "ownerMobile": "Enter the owner's 10-digit mobile number.",
       "availableRoom": "Select when the room is available.",
       "enterHouseName": "Enter the house / building name.",
       "enterSocietyName": "Enter the society / building name.",
       "addRoomPhoto": "Add at least one room photo.",
       "location": "Nobody can find this listing yet. Seekers browse by area, so a property with no point on the map never appears in their results. Search your locality above, or drag the pin to the exact spot.",
-      "locationFlat": "Place the flat on the map — pick a locality, search, or drag the pin.",
+      "locationFlat": "Place the home on the map — pick your society above, or drag the pin.",
       "flatNumber": "Enter the flat / unit number.",
+      "houseNumber": "Enter the house / plot number.",
+      "homeType": "Select the home type.",
+      "washroom": "Choose attached or shared washroom.",
+      "furnishing": "Select the furnishing.",
+      "floorsInHouse": "Select how many floors the house has.",
+      "noticePeriod": "Enter the notice period in days (0–180). Type 0 if there is none.",
+      "lockIn": "Enter the minimum stay in months (0–24). Type 0 if there is none.",
       "unitShopNumber": "Enter the unit / shop number.",
       "pincode": "Enter a valid 6-digit pincode.",
       "price": "Enter the expected price.",
@@ -404,17 +425,23 @@
       "reraFormat": "MahaRERA ID looks like P52100012345 — P followed by 11 digits.",
       "descriptionLength": "Keep the description within 4000 characters.",
       "contactDetails": "Do not include a phone number, email, WhatsApp/social link or handle. Buyers can contact you through Draazy.",
-      "photosMin": "Add at least one photo.",
+      "photosMin": "Add at least {{count}} photos.",
       "deal": "Choose Sale or Rent.",
       "agreementRequired": "Upload your registered rent agreement.",
       "ownerConsent": "Confirm that the owner knows and agrees to sharing.",
       "photosMax": "Keep at most {{count}} photos. Remove the extra photos before saving.",
+      "photosCapped": "Only {{count}} photos are allowed. Skipped {{skipped}} from your selection.",
+      "photosExpired_one": "A saved photo expired. Add it again.",
+      "photosExpired_other": "{{count}} saved photos expired. Add them again.",
+      "photosFailed": "A photo did not upload. Remove it, or add a different one, before posting.",
       "photosKeyCats": "Label at least {{count}} photos with what they show ({{cats}}) — seekers skip listings that hide the rooms.",
       "availableFromDate": "Select the available-from date.",
       "deposit": "Enter the security deposit.",
       "monthlyRent": "Enter the monthly rent.",
       "priceMin": "A sale price starts at ₹1,00,000. Enter the full amount, e.g. 85,00,000 for 85 lakh.",
       "monthlyRentMin": "Monthly rent starts at ₹1,000.",
+      "monthlyRentMax": "Monthly rent can't be more than ₹1,00,00,000.",
+      "priceMax": "A sale price can't be more than ₹1,000 crore.",
       "depositMax": "The deposit can't be more than 24 months' rent.",
       "builtUpMin": "Built-up area can't be less than the carpet area.",
       "superBuiltUpMin": "Super built-up area can't be less than the built-up area (or the carpet area, if built-up is blank).",
@@ -439,11 +466,11 @@
       "defaultLabel": "Property Photos *",
       "dropTitle": "Drag & drop or click to upload",
       "dropSub": "PNG, JPG up to 10MB each. Max 20 photos.",
-      "errorAddPhoto": "Add at least one photo — listings with photos get far more enquiries.",
+      "errorAddPhoto": "Add photos — listings with photos get far more enquiries.",
       "cover": "COVER",
       "photoCategoryAria": "Photo category",
       "addPhoto": "Add photo",
-      "threePhotoHint": "Add at least 3 photos — listings with 3+ photos are approved faster.",
+      "minPhotoHint": "Add at least {{count}} photos and label what 2 of them show.",
       "photoCount_one": "{{count}} photo",
       "photoCount_other": "{{count}} photos"
     },
@@ -462,8 +489,53 @@
       "submitting": "Posting…"
     },
     "flatmate": {
-      "photosHint": "Rooms without photos need a review before going live.",
-      "postFind": "Post & Find Flatmates"
+      "photosHint": "Show the room and the shared spaces: kitchen, living room or bathroom.",
+      "postFind": "Post & Find Flatmates",
+      "moreAddress": "More address details",
+      "occupantsLess": "One fewer person",
+      "occupantsMore": "One more person",
+      "label": {
+        "roomType": "Room type",
+        "rent": "Rent per month",
+        "deposit": "Deposit",
+        "availableFrom": "Available from",
+        "openTo": "Open to",
+        "locality": "Locality",
+        "society": "Find your society / building",
+        "house": "Find your house / building",
+        "flatNo": "Flat no.",
+        "houseNo": "House / plot no.",
+        "tower": "Tower / block",
+        "homeType": "Home type",
+        "bhk": "Size",
+        "occupants": "People living there now",
+        "role": "You are the",
+        "owner": "Owner",
+        "tenant": "Tenant",
+        "ownerMobile": "Owner's mobile",
+        "washroom": "Washroom",
+        "bathrooms": "Bathrooms",
+        "floorsInHouse": "Floors in the house",
+        "floor": "Floor",
+        "totalFloors": "Total floors",
+        "food": "Food",
+        "parking": "Parking",
+        "amenities": "Amenities"
+      },
+      "amenity": {
+        "wifi": "Wi-Fi",
+        "ac": "AC",
+        "washing_machine": "Washing machine",
+        "lift": "Lift",
+        "power_backup": "Power backup"
+      },
+      "attach": {
+        "none": "Don't link",
+        "listing": "Link your Draazy listing",
+        "listingHint": "Your approved listing proves you own the flat, so the room shows Verified property.",
+        "tenancy": "Renting through Draazy? Link your tenancy",
+        "tenancyHint": "Fills the locality and owner's mobile, and lets us match your registered agreement."
+      }
     },
     "areaSearch": {
       "searchAria": "Search location",
@@ -482,16 +554,18 @@
       "adding": "Adding…",
       "addFailed": "Couldn't add that society. Check your connection and try again.",
       "notABuilding": "Pick the building, not an area.",
-      "empty": "No match on Google Maps"
+      "empty": "No match on Google Maps",
+      "savedHeading": "Already on Draazy"
     },
     "locationPicker": {
-      "unavailable": "Map picker unavailable"
+      "unavailable": "Map picker unavailable",
+      "down": "Map is down. We'll pin your society or locality; fine-tune it later from Edit."
     },
     "editPolicy": {
       "publishInstantly": "Publishes instantly",
-      "publishInstantlyDesc": "Description, amenities, availability, deposit, address details & new photos.",
+      "publishInstantlyDesc": "Title, deposit, maintenance, availability, floor, facing, age, pets, tenants & other details.",
       "needsRecheck": "Needs a re-check",
-      "needsRecheckDesc": "Price, furnishing & possession — re-checked while your listing stays live. Property type, locality, BHK, buy vs rent & removing verified photos come off search until approved.",
+      "needsRecheckDesc": "Price, furnishing, possession, address, society, description, amenities, photos, video & RERA ID — re-checked while your listing stays live. Property type, locality, BHK, buy vs rent & land use come off search until approved.",
       "updatesGoLive_one": "{{count}} update go live now",
       "updatesGoLive_other": "{{count}} updates go live now",
       "changesRecheck_one": "{{count}} change need a re-check",
@@ -514,7 +588,10 @@
       "newBody": "Our team will verify and publish your listing within 24 hours. You'll receive a notification once it's live.",
       "goToListings": "Go to My Listings",
       "passNote": "You already have a free live listing — this one stays paused after approval. Go live with a {{price}} pass or pause the other.",
-      "passCta": "Go live — {{price}} pass"
+      "passCta": "Go live — {{price}} pass",
+      "agreementTitle": "Get the Verified property badge",
+      "agreementBody": "Upload your registered rent agreement in Documents, then request a review.",
+      "agreementCta": "Get verified"
     },
     "split": {
       "nudgeTitle": "Want to let it one room at a time?",
@@ -522,8 +599,8 @@
       "nudgeCta": "Let room by room",
       "done_one": "{{count}} room is now live in Flatmates",
       "done_other": "{{count}} rooms are now live in Flatmates",
-      "donePending_one": "{{count}} room listed — it'll show as owner-verified once this property is approved",
-      "donePending_other": "{{count}} rooms listed — they'll show as owner-verified once this property is approved",
+      "donePending_one": "{{count}} room listed — it'll show as Verified property once this property is approved",
+      "donePending_other": "{{count}} rooms listed — they'll show as Verified property once this property is approved",
       "liveNote": "Your rooms are live in Flatmates",
       "failed": "Could not list the rooms — please check the details."
     },
@@ -560,7 +637,7 @@
         "replaceConfirm": "Replace the existing description with a factual draft?"
       },
       "youtube": {
-        "label": "YouTube walkthrough link (optional)",
+        "label": "YouTube walkthrough link",
         "placeholder": "https://youtu.be/VIDEO_ID",
         "error": "Add a YouTube watch, shorts, or youtu.be link.",
         "hint": "We store only the video id and show it as a privacy-enhanced embed."

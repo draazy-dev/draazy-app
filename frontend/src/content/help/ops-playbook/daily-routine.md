@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 1
-updated: 2026-10-10
+updated: 2026-11-06
 summary: What to check when you start a shift, how to use the Dashboard, the notification bell and Ctrl+K search, and how to hand over at the end.
 tags: [ops, internal, dashboard, shift, handover]
 modules: [dashboard]
@@ -54,24 +54,24 @@ Tiles exist only for these desks:
 
 | Function | What the tile counts |
 |---|---|
-| Identity checks | Pending identity reviews |
-| Property verification | Pending property reviews and ownership requests |
+| KYC review | Pending identity reviews |
+| Property verification | Pending property reviews and ownership (**Verified property**) requests |
 | Listing moderation | Pending listings |
-| Support | Tickets with unread staff replies, not resolved or closed |
+| Support | Support chats with an unread customer message, not resolved or closed |
 | Reports | Reports that are open or in review |
 | Review moderation | Reviews awaiting moderation |
 | Enquiries | Contact requests still pending |
-| Flatmates | Flatmate posts, rooms, groups, applications and badge claims awaiting review |
+| Flatmates | Flatmate posts, rooms, groups and group applications awaiting review, plus edited posts waiting for a re-check |
 | Societies | Member-added societies not yet merged or archived |
-| Each service desk | Open service requests (not awaiting payment, draft shared, completed or cancelled) and open, in-progress or waiting tickets |
+| Each service desk | Open service requests (not awaiting payment, draft shared, action required, completed or cancelled) and open, in-progress or waiting tickets |
 
-A tile with a count but no **Oldest** age reads **Waiting**. **No tile exists** for Users, Content, Localities, Analytics or Post on behalf. If you hold one of these, open the desk at the start of the shift and look for yourself.
+A tile with a count but no **Oldest** age reads **Waiting**. **No tile exists** for Users, Content, Localities, Analytics, Refunds, Referrals, Leads or Post on behalf. The Flatmates tile does not count **Badge requests**. If you hold one of these, open the desk at the start of the shift and look for yourself.
 
 ## The manager and admin Dashboard
 
-- **SLA health** (only if you have analytics access): Listing approval 24h, Ticket pickup 4h, Service delivery 3d, Concierge to live 7d. Green is 90% or more on time, amber 75-89%, red below 75%. Grey **Not recorded** means no data. **View full analytics** opens the SLA tab.
-- **Needs attention**: Pending Verification, Needs Follow-up, Flagged Listings, Open Reports, New Enquiries, Scheduled Visits, Open Service Requests, Deals in Progress. Each opens its desk.
-- **At a glance**: Total Users, Active Listings, Deals closed (30d), Signups today, Visits today. Revenue (last 30 days) shows for admins only.
+- **SLA health** (only if you have analytics access): Listing approval 24h, Ticket pickup 4h, Service delivery 3d, Concierge to live 7d, Flatmate review 24h. Green is 90% or more on time, amber 75-89%, red below 75%. Grey **Not recorded** means no data. **View full analytics** opens the SLA tab.
+- **Needs attention**: Pending Verification, Needs Follow-up, Flagged Listings, Open Reports, New Enquiries, Scheduled Visits, Open Service Requests, Deals in Progress, Flatmate Posts to Review, Flatmate Reports, Unanswered Flatmate Requests (pending over 48h). Each opens its desk.
+- **At a glance**: Total Users, Active Listings, Deals closed (30d), Signups today, Visits today. Revenue (last 30 days) shows for admins only. A **Flatmates** row adds Live Rooms, Active Seekers, Matches (30d) and Host Reply Rate (30d); the last two open the Flatmates analytics tab.
 - **Latest activity**: oldest pending verifications (5 rows, **View all**) and the latest service requests.
 - A tile is hidden when you cannot open its desk. A tile at 0 reads **All clear**.
 
@@ -91,6 +91,35 @@ Click the bell in the top bar.
 - **All caught up.** means nothing is waiting.
 - **This bell is not counting anything here.** or **Part of this bell is dark here.** means a count failed. Open Properties and the service desks, which are the record.
 - Queues show only if you can open Properties or Tickets.
+
+## Desk alerts
+
+**For you** also gets automatic desk alerts. A sweep runs every 15 minutes and sends each alert once. Staff
+accounts also get each alert by email, at the email on their account, unless Email is off in their notification
+settings. Managers and admins get the bell only.
+
+| Alert | When | Who gets it |
+|---|---|---|
+| **New …** | An unassigned item arrived in the last hour, or a customer approved or asked for changes on a draft | The person handling it, else everyone holding that desk's function |
+| **Waiting …** | The item passed its reminder time | The person handling it, else everyone holding the function |
+| **Escalated …** | The item passed its escalation time | Managers (admins if there are none) |
+
+| Queue | Reminder | Escalation |
+|---|---|---|
+| Listing review, re-check of an edited live listing | 24h | 36h |
+| Owner reply, ID check, identity appeal, flatmate check, refund request, verified-badge request | 48h | 72h |
+| Unassigned service request | 4h | 8h |
+| Support chat waiting on us (the alert reads "support ticket"), abuse report, flatmate post | 24h | 48h |
+| Rent agreement | the stage deadline | 1.5 × the stage deadline |
+| Customer draft decision, community society | New alert only | — |
+| Data-erasure request (admins only) | 7d | 20d |
+
+- Several items on one desk arrive as one alert ("3 listings to review"). It opens the queue; a single item opens the item.
+- An ID check you claimed sends its alerts to you while your claim holds.
+- Refund requests send no **New** alert, only reminders and escalations.
+- A paid rent agreement waiting on the tenant sends no alert. The desk cannot act until the tenant fills their part.
+- Once the item is handled, its unread alert marks itself read. You do not need to clear it.
+- No function holder for a desk means its alerts go straight to managers.
 
 ## Search (Ctrl+K)
 

@@ -25,10 +25,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** The four properties a bug here costs money on: the price lists are public and non-empty, only
- *  the signed webhook may write {@code active}, a retry does not buy twice, a boost is owner-scoped. */
 class BillingEndpointsTest extends AbstractApiTest {
-
     private static final String LISTING_PASS = "b1000000-0000-4000-8000-000000000005";
 
     private static final String CONTACT_PACK = "b1000000-0000-4000-8000-000000000006";
@@ -105,8 +102,6 @@ class BillingEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.startedAt").doesNotExist())
                 .andReturn().getResponse().getContentAsString();
 
-        // With nothing else held, the pending order is still reported so the checkout can be
-        // resumed — but it is reported as pending, never as an entitlement.
         mvc.perform(get(Routes.Plans.SUBSCRIPTION).header(HttpHeaders.AUTHORIZATION, bearer(u)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(SubscriptionStatuses.PENDING))
@@ -121,7 +116,6 @@ class BillingEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.status").value(SubscriptionStatuses.ACTIVE))
                 .andExpect(jsonPath("$.renewsAt").doesNotExist());
 
-        // A redelivery of the same event must not move it again or extend the term.
         var renewsAt = subscriptions.findByPaymentRef(orderId).orElseThrow().getRenewsAt();
         assertThat(renewsAt).isAfter(Instant.now().plus(29, ChronoUnit.DAYS))
                 .isBefore(Instant.now().plus(31, ChronoUnit.DAYS));
@@ -130,7 +124,6 @@ class BillingEndpointsTest extends AbstractApiTest {
                 .isEqualTo(renewsAt);
     }
 
-    /** A second pack bought while one is held is a new order beside it, never a replacement. */
     @Test
     void anAbandonedSecondPackDoesNotHideThePackAlreadyHeld() throws Exception {
         User u = user("9855500003", "owner");
@@ -164,6 +157,7 @@ class BillingEndpointsTest extends AbstractApiTest {
         assertThat(order.getRenewsAt()).isNull();
         assertThat(order.getRefundDueAt()).isNotNull();
         assertThat(order.getRefundAmount()).isEqualTo(1L);
+        assertThat(order.getRefundReason()).isEqualTo("amount_mismatch");
         assertThat(jdbc.queryForObject("select count(*) from audit_log where action = ? and entity_id = ?",
                 Integer.class, "subscription.amountMismatch", order.getId().toString())).isEqualTo(1);
 
@@ -197,6 +191,25 @@ class BillingEndpointsTest extends AbstractApiTest {
         Subscription order = subscriptions.findByPaymentRef(orderId).orElseThrow();
         assertThat(order.getStatus()).isEqualTo(SubscriptionStatuses.ACTIVE);
         assertThat(order.getRefundDueAt()).isNull();
+    }
+
+    @Test
+    void aPaymentLandingAfterTheUserCancelledIsRefundedNotLost() throws Exception {
+        User u = user("9855500009", "owner");
+        String orderId = orderFor(u);
+        mvc.perform(post(Routes.Plans.CANCEL_SUBSCRIPTION).header(HttpHeaders.AUTHORIZATION, bearer(u)))
+                .andExpect(status().isNoContent());
+
+        deliverSigned(orderId, "SUCCESS");
+        deliverSigned(orderId, "SUCCESS");
+
+        Subscription order = subscriptions.findByPaymentRef(orderId).orElseThrow();
+        assertThat(order.getStatus()).isEqualTo(SubscriptionStatuses.CANCELLED);
+        assertThat(order.getRefundDueAt()).isNotNull();
+        assertThat(order.getRefundReason()).isEqualTo("paid_after_cancel");
+        assertThat(jdbc.queryForObject("select count(*) from audit_log where action = ? and entity_id = ?",
+                Integer.class, "subscription.passRefundDue", order.getId().toString())).isEqualTo(1);
+        jdbc.update("delete from audit_log where entity_id = ?", order.getId().toString());
     }
 
     private String orderFor(User u) throws Exception {

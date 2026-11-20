@@ -8,10 +8,6 @@ public record RegistrationDto(
         String sro,
         LocalDate registeredOn,
         String grn,
-        long stampDuty,
-        long registrationFee,
-        Long quotedStampDuty,
-        Long quotedRegistrationFee,
         String recordedBy,
         Instant recordedAt) {
 }

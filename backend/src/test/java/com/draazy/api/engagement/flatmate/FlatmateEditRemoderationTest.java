@@ -14,6 +14,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.IdentityCases;
 import com.draazy.api.support.UploadedPhotos;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
@@ -33,11 +34,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** Every supply fixture declares an agreement: at identity tier the ladder returns {@code pending}
- *  for any edit whatever {@link FlatmateEditRules} says, so such a fixture asserts nothing. */
 @DisplayName("Flatmate edits — re-moderated for what changed (D4, D5)")
 class FlatmateEditRemoderationTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -63,6 +61,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
         u.setName(name);
         u.setMobileVerified(true);
         User saved = users.saveAndFlush(u);
+        IdentityCases.submitted(jdbc, saved.getId());
         createdActors.add(saved.getId().toString());
         return saved;
     }
@@ -79,16 +78,16 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
         return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
-    /** A tenant-tier room: agreement declared, so it is on the board from the first write. */
     private static String roomBody(String locality, String society, String roomType, int rent,
             String photo, String note) {
         return """
-                {"bhk":"2","roomType":"%s","attachedBath":"attached","furnishing":"semi",
+                {"bhk":"2","roomType":"%s","attachedBath":"attached",
                  "locality":"%s","society":"%s","rentShare":%d,"deposit":30000,
                  "availableFrom":"2026-09-01","lookingFor":"any","foodPref":"any",
-                 "agreementDeclared":true,"photos":["%s"],"note":"%s",%s}
-                """.formatted(roomType, locality, society, rent, photo, note,
-                FlatmateAgreementFixture.EVIDENCE);
+                 "ownerConsentMobile":"9890000001","agreementDeclared":true,"photos":["%s","%s","%s"],"note":"%s",%s,%s,%s}
+                """.formatted(roomType, locality, society, rent, photo, photo.replace(".jpg", "-2.jpg"),
+                photo.replace(".jpg", "-3.jpg"), note, FlatmateAgreementFixture.EVIDENCE,
+                FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS);
     }
 
     private String withUploads(User owner, String body) {
@@ -104,7 +103,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                 body.replace("\"id\":\"agr-doc-1\"", "\"id\":\"" + doc.getId() + "\""));
     }
 
-    // New supply waits in the queue; every test below starts from an already-public post.
     private String approved(String table, String id) {
         jdbc.update("update " + table + " set mod_status = 'approved' where id = ?::uuid", id);
         entityManager.clear();
@@ -130,7 +128,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    /** What the {@code recheck} board says about one row, or an empty page. */
     private org.springframework.test.web.servlet.ResultActions recheckBoard(User mod, String kind)
             throws Exception {
         return mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_QUEUE)
@@ -143,7 +140,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     @Nested
     @DisplayName("foundation — the post stops being the one that was approved")
     class Foundation {
-
         @Test
         @DisplayName("moving a room to another locality takes it off the board")
         void relocatingSendsItBack() throws Exception {
@@ -156,8 +152,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                     roomBody("EditTownZ", "Alpha Heights", "Private room", 15000,
                             "https://cdn.example/a1.jpg", "Sunny room."));
 
-            // The locality also feeds the duplicate-address fingerprint, so nothing about it is
-            // cosmetic.
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "EditTownZ"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
@@ -178,13 +172,10 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                     roomBody("EditTownB", "Beta Court", "Private room", 15000,
                             "https://cdn.example/b1.jpg", "Sunny room."));
 
-            // Both a foundation field and a re-checked one, in one PATCH.
             editRoom(owner, id,
                     roomBody("EditTownY", "Beta Court", "Private room", 21000,
                             "https://cdn.example/b2.jpg", "Rewritten."));
 
-            // A row waiting in the queue is not also a work item on a second board: the moderator's
-            // second read would be about an invisible post.
             recheckBoard(admin("9812000004"), "room")
                     .andExpect(jsonPath("$.content[?(@.id == '" + id + "')]", Matchers.hasSize(0)));
         }
@@ -193,7 +184,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     @Nested
     @DisplayName("stays live, re-checked — the evidence moved, the offer did not")
     class StaysLiveRechecked {
-
         @Test
         @DisplayName("swapping every photo leaves the room up and raises a work item")
         void photoSwapIsRechecked() throws Exception {
@@ -206,8 +196,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                     roomBody("EditTownC", "Gamma Towers", "Private room", 15000,
                             "https://cdn.example/c-swapped.jpg", "Sunny room."));
 
-            // Still up: taking a room dark for a day whenever its pictures change teaches hosts not
-            // to change them, and a stale gallery is its own harm.
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "EditTownC"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)));
@@ -216,7 +204,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckReason",
                             Matchers.contains("photos")))
                     .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].photoCount",
-                            Matchers.contains(1)))
+                            Matchers.contains(3)))
                     .andExpect(jsonPath("$.content[0].photos").doesNotExist());
         }
 
@@ -242,8 +230,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
             recheckBoard(mod, "room")
                     .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckReason",
                             Matchers.contains("photos, rent")))
-                    // The stamp is the SLA: re-stamping on every edit would let a host who re-crops
-                    // a photo daily walk their own row back down the queue forever.
                     .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckRequestedAt",
                             Matchers.contains(stampOf(firstStamp, id))));
         }
@@ -275,7 +261,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     @Nested
     @DisplayName("silent — a bounded facet moved and nobody needs to know")
     class Silent {
-
         @Test
         @DisplayName("changing the food preference raises nothing")
         void chipListFacetsAreSilent() throws Exception {
@@ -289,19 +274,19 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(ownedEvidence(owner, """
                                     {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                     "furnishing":"semi","locality":"EditTownF","society":"Zeta Villa",
+                                     "locality":"EditTownF","society":"Zeta Villa",
                                      "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
-                                     "lookingFor":"any","foodPref":"veg","agreementDeclared":true,
-                                     "photos":["https://cdn.example/f1.jpg"],"note":"Sunny room.",%s}
-                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
+                                     "lookingFor":"any","foodPref":"veg","ownerConsentMobile":"9890000001","agreementDeclared":true,
+                                     "photos":["https://cdn.example/f1.jpg","https://cdn.example/f1-2.jpg","https://cdn.example/f1-3.jpg"],
+                                     "note":"Sunny room.",%s,%s,%s}
+                                    """.formatted(FlatmateAgreementFixture.EVIDENCE, FlatmateRoomFixture.BASICS,
+                                    FlatmateRoomFixture.DETAILS))))
                     .andExpect(status().isOk());
 
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "EditTownF"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)));
 
-            // The gate exists because the *unbounded* strings are where abuse lands; a value the UI
-            // only offers as one of three chips cannot carry a phone number.
             recheckBoard(admin("9812000021"), "room")
                     .andExpect(jsonPath("$.content[?(@.id == '" + id + "')]", Matchers.hasSize(0)));
         }
@@ -310,14 +295,12 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     @Nested
     @DisplayName("an edit may lower visibility, never raise it")
     class Takedowns {
-
-        /** Hide the room by moderator verdict, then have the host re-save an unchanged body. */
         private void hideThenResave(String verdict, String locality, String society, User owner,
                 User mod, String id) throws Exception {
             mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION.replace("{id}", id))
                             .header(HttpHeaders.AUTHORIZATION, bearer(mod))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"modStatus\":\"" + verdict + "\"}"))
+                            .content("{\"modStatus\":\"" + verdict + "\",\"note\":\"Breaks the rules\"}"))
                     .andExpect(status().isOk());
 
             editRoom(owner, id, roomBody(locality, society, "Private room", 15000,
@@ -334,8 +317,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                             Matchers.hasSize(1)));
         }
 
-        // The ladder sees the tier, not a verdict; the rule is "was it public" so a `flagged` room isn't sent
-        // back `live` on the host's next save.
         @ParameterizedTest(name = "{0}")
         @CsvSource({
                 "removed, 9812000026, 9812000027, EditTownK, Lambda Lodge",
@@ -358,23 +339,22 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
             User mod = admin("9812000032");
             String body = """
                     {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                     "furnishing":"semi","locality":"EditTownM","society":"Nu Nest",
+                     "locality":"EditTownM","society":"Nu Nest",
                      "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
-                     "lookingFor":"any","foodPref":"any","hostRole":"%s","agreementDeclared":%s,%s
-                     "photos":["https://cdn.example/m1.jpg"],"note":"Sunny room."}
+                     "lookingFor":"any","foodPref":"any","hostRole":"%s","ownerConsentMobile":"9890000001","agreementDeclared":%s,%s
+                     "photos":["https://cdn.example/m1.jpg","https://cdn.example/m2.jpg","https://cdn.example/m3.jpg"],
+                     "note":"Sunny room.",%s,%s}
                     """;
-            // No agreement, so the ladder leaves it at identity tier: pending, never reviewed.
             String id = idIn(mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(withUploads(owner, body.formatted("owner", "false", ""))))
+                            .content(withUploads(owner, body.formatted("owner", "false", "", FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS))))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.modStatus").value("pending"))
                     .andReturn().getResponse().getContentAsString());
 
-            // A declared agreement silently moves the tier, so edit must not let a pending
-            // post walk itself onto the feed without real evidence.
-            editRoom(owner, id, body.formatted("tenant", "true", FlatmateAgreementFixture.EVIDENCE + ","));
+            editRoom(owner, id, body.formatted("tenant", "true", FlatmateAgreementFixture.EVIDENCE + ",",
+                    FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS));
 
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "EditTownM"))
                     .andExpect(status().isOk())
@@ -394,19 +374,19 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
             String id = createRoom(owner, roomBody("EditTownN", "Xi Court", "Private room",
                     15000, "https://cdn.example/n1.jpg", "Sunny room."));
 
-            /* The locality text is what a moderator cross-checks, so a room whose coordinates move
-               across the city reads as unchanged. Not prose, so the first cut let it through. */
             mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(ownedEvidence(owner, """
                                     {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                     "furnishing":"semi","locality":"EditTownN","society":"Xi Court",
+                                     "locality":"EditTownN","society":"Xi Court",
                                      "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
-                                     "lookingFor":"any","foodPref":"any","agreementDeclared":true,
+                                     "lookingFor":"any","foodPref":"any","ownerConsentMobile":"9890000001","agreementDeclared":true,
                                      "lat":18.5362,"lng":73.8939,
-                                     "photos":["https://cdn.example/n1.jpg"],"note":"Sunny room.",%s}
-                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
+                                     "photos":["https://cdn.example/n1.jpg","https://cdn.example/n1-2.jpg","https://cdn.example/n1-3.jpg"],
+                                     "note":"Sunny room.",%s,%s,%s}
+                                    """.formatted(FlatmateAgreementFixture.EVIDENCE, FlatmateRoomFixture.BASICS,
+                                    FlatmateRoomFixture.DETAILS))))
                     .andExpect(status().isOk());
 
             recheckBoard(admin("9812000034"), "room")
@@ -416,46 +396,8 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     }
 
     @Nested
-    @DisplayName("a group keeps its default locality without being taken down for it")
+    @DisplayName("a group's locality")
     class Groups {
-
-        private String createGroup(User owner, String title, String locality, int rent)
-                throws Exception {
-            return approved("flatmate_groups", idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
-                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(ownedEvidence(owner, """
-                                    {"title":"%s","locality":"%s","policy":"any","rent":%d,
-                                     "seats":3,"seatsOpen":1,"name":"Host","tags":[],
-                                     "agreement":true,"note":"Chill flat.",%s}
-                                    """.formatted(title, locality, rent,
-                                    FlatmateAgreementFixture.EVIDENCE))))
-                    .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.modStatus").value("pending"))
-                    .andReturn().getResponse().getContentAsString()));
-        }
-
-        @Test
-        @DisplayName("an edit that keeps the locality re-checks the title, and stays up")
-        void unchangedLocalityIsNotARelocation() throws Exception {
-            User owner = host("9812000030", "Grouper");
-            String id = createGroup(owner, "Three of us", "EditTownP", 40000);
-
-            mvc.perform(patch(Routes.Flatmates.GROUP_BY_ID, id)
-                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(ownedEvidence(owner, """
-                                    {"title":"Four of us now","locality":"EditTownP","policy":"any",
-                                     "rent":40000,"seats":3,"seatsOpen":1,"name":"Host","tags":[],
-                                     "agreement":true,"note":"Chill flat.",%s}
-                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
-                    .andExpect(status().isOk());
-
-            recheckBoard(admin("9812000031"), "group")
-                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckReason",
-                            Matchers.contains("title")));
-        }
-
         @Test
         @DisplayName("a blank locality is refused rather than defaulted to a locality nobody named")
         void blankLocalityIsRefused() throws Exception {
@@ -465,8 +407,8 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
-                                    {"title":"Three of us","locality":"","policy":"any","rent":40000,
-                                     "seats":3,"seatsOpen":1,"name":"Host","tags":[],
+                                    {"title":"Three of us","locality":"","policy":"any","rent":40000,"deposit":10000,
+                                     "seats":3,"seatsOpen":1,"name":"Host",
                                      "agreement":true,"note":"Chill flat."}
                                     """))
                     .andExpect(status().isUnprocessableEntity())
@@ -477,7 +419,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     @Nested
     @DisplayName("a seeker post — nothing but prose, so nothing is foundation (D4)")
     class SeekerPosts {
-
         private String createPost(User author, String name, String note) throws Exception {
             return idIn(mvc.perform(post(Routes.Flatmates.POSTS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(author))
@@ -486,7 +427,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                                     {"name":"%s","gender":"any","age":27,"occupation":"Analyst",
                                      "budget":18000,"localities":["EditTownG"],
                                      "moveIn":"2026-09-01","flatPref":"any","roomPref":"private",
-                                     "tags":[],"note":"%s"}
+                                     "note":"%s"}
                                     """.formatted(name, note)))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString());
@@ -512,13 +453,11 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                                     {"name":"Writer","gender":"any","age":27,
                                      "occupation":"Analyst","budget":18000,
                                      "localities":["EditTownG"],"moveIn":"2026-09-01",
-                                     "flatPref":"any","roomPref":"private","tags":[],
+                                     "flatPref":"any","roomPref":"private",
                                      "note":"Now near the metro, flexible on dates."}
                                     """))
                     .andExpect(status().isOk());
 
-            // Without a moderation hook on the write path a new note goes straight onto a
-            // published post, and the free text is the entire reason the desk exists.
             recheckBoard(mod, "post")
                     .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckReason",
                             Matchers.contains("note")))
@@ -530,7 +469,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     @Nested
     @DisplayName("a moderator's correction is audited and stays live")
     class ModeratorEdit {
-
         private org.springframework.test.web.servlet.ResultActions edit(User mod, String id,
                 String body) throws Exception {
             return mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION_DETAIL, id)
@@ -580,7 +518,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                             .content("""
                                     {"name":"Seeker","gender":"any","budget":18000,
                                      "localities":["EditTownG"],"moveIn":"2026-09-01",
-                                     "flatPref":"any","roomPref":"private","tags":[],"note":"Hi"}
+                                     "flatPref":"any","roomPref":"private","note":"Hi"}
                                     """))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString());
@@ -592,31 +530,36 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.post.localities", Matchers.contains("EditTownG", "EditTownH")))
                     .andExpect(jsonPath("$.post.moveIn").value("2026-11-01"));
             edit(mod, id, "{\"deposit\":10000}").andExpect(status().isUnprocessableEntity());
+            edit(mod, id, "{\"localities\":[\"EditTownG\",\"EditTownH\",\"EditTownI\",\"EditTownJ\"]}")
+                    .andExpect(status().isUnprocessableEntity());
+            mvc.perform(post(Routes.Flatmates.POSTS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host("9812000067", "Seeker4")))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"name":"Seeker","gender":"any","budget":18000,
+                                     "localities":["EditTownG","EditTownH","EditTownI","EditTownJ"],
+                                     "flatPref":"any","roomPref":"private","note":"Hi"}
+                                    """))
+                    .andExpect(status().isUnprocessableEntity());
         }
 
         @Test
-        @DisplayName("a settled group's rent changes; a move-in date it does not have is refused")
+        @DisplayName("a hunting group's rent changes; a deposit it does not have is refused")
         void groupCorrection() throws Exception {
             User owner = host("9812000064", "Grouper");
-            String id = approved("flatmate_groups", idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
+            String id = idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ownedEvidence(owner, """
-                                    {"title":"Three of us","locality":"EditTownQ","policy":"any",
-                                     "rent":40000,"seats":3,"seatsOpen":1,"name":"Host","tags":[],
-                                     "agreement":true,"note":"Chill flat.",%s}
-                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
+                            .content(FlatmateGroupFixture.hunting("Three of us", "EditTownQ", "any", 40000, 3, 1)))
                     .andExpect(status().isCreated())
-                    .andReturn().getResponse().getContentAsString()));
+                    .andReturn().getResponse().getContentAsString());
             User mod = admin("9812000065");
 
             edit(mod, id, "{\"title\":\"Three of us in Baner\",\"rent\":42000}")
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.group.title").value("Three of us in Baner"))
-                    .andExpect(jsonPath("$.group.rent").value(42000))
-                    .andExpect(jsonPath("$.group.modStatus").value("approved"));
-            assertThat(fingerprint("flatmate_groups", id)).isEqualTo("addr:three of us in baner|edittownq");
-            edit(mod, id, "{\"moveIn\":\"2026-11-01\"}").andExpect(status().isUnprocessableEntity());
+                    .andExpect(jsonPath("$.group.rent").value(42000));
+            edit(mod, id, "{\"deposit\":5000}").andExpect(status().isUnprocessableEntity());
             edit(mod, id, "{\"localities\":[]}").andExpect(status().isUnprocessableEntity());
         }
 
@@ -637,11 +580,10 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     }
 
     @Nested
-    @DisplayName("the verification desk shows the host's number in the popup, not on every card")
+    @DisplayName("the verification desk shows the host's number on the card and in the popup")
     class HostMobile {
-
         @Test
-        @DisplayName("a tenant-tier host's number leaves the server in full, from the detail only")
+        @DisplayName("a tenant-tier host's number leaves the server in full")
         void theDetailShowsTheMobile() throws Exception {
             String id = createRoom(host("9812000050", "Documented"),
                     roomBody("EditTownH", "Theta Place", "Private room", 15000,
@@ -651,7 +593,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
             mvc.perform(get(Routes.Moderation.FLATMATE_REVIEWS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content[*].hostMobile").doesNotExist());
+                    .andExpect(jsonPath("$.content[*].hostMobile", Matchers.hasItem("9812000050")));
 
             mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_DETAIL, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
@@ -660,7 +602,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
         }
     }
 
-    /** The `recheckRequestedAt` this board reported for one row, read back out of its own JSON. */
     private static String stampOf(String queueJson, String id) {
         String afterId = queueJson.substring(queueJson.indexOf("\"id\":\"" + id + "\""));
         return afterId.replaceAll("(?s).*?\"recheckRequestedAt\"\\s*:\\s*\"([^\"]+)\".*", "$1");

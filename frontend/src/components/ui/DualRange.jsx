@@ -2,7 +2,6 @@ import { forwardRef, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCommitOnRelease } from '../../lib/useCommitOnRelease.js';
 
-/** Strip formatting and read a number, understanding ₹, commas and Cr/L/K suffixes. */
 function defaultParse(str) {
   const s = String(str).toLowerCase().replace(/[₹,\s+]/g, '');
   if (!s) return null;
@@ -17,36 +16,18 @@ function defaultParse(str) {
   return n;
 }
 
-/**
- * Dual-range slider for min/max selection (budget, area, age). Drag a thumb or type into a label.
- * @param {object} props
- * @param {number} props.min - Minimum range value.
- * @param {number} props.max - Maximum range value.
- * @param {number} [props.step=1] - Step increment.
- * @param {[number, number]} props.value - Current [low, high] values.
- * @param {(value: [number, number]) => void} props.onChange - Fires once a drag has settled or a
- *   typed figure is committed, so each call is one user intent (see `useCommitOnRelease`).
- * @param {(value: number) => string} [props.format] - Formatter for display values.
- * @param {(text: string) => number|null} [props.parse] - Parse an edited string back to a number (null = ignore).
- * @param {string} [props.label] - Descriptive label for accessibility (prefixed to aria-label).
- * @param {boolean} [props.disabled] - Disable interaction.
- */
 const DualRange = forwardRef(function DualRange({ min, max, step = 1, value, onChange, format = (v) => v, parse = defaultParse, label = '', disabled = false }, ref) {
   const { t } = useTranslation();
   const id = useId();
-  const [editing, setEditing] = useState(null); // 'lo' | 'hi' | null
+  const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState('');
   const inputRef = useRef(null);
   const rangeRef = useRef(null);
   const thumbDragRef = useRef(null);
   const thumbLiveRef = useRef(null);
 
-  /* A drag is one intent, not eighty: `useCommitOnRelease` holds the in-flight tuple and lifts it
-     to `onChange` only once the value settles. Everything below reads the live tuple. */
   const [[lo, hi], setLive, commitProps] = useCommitOnRelease(value, onChange);
 
-  // Manual entry may push a bound past the visual max (commercial rents, large plots), so the
-  // track grows to include the typed value and both thumbs stay draggable.
   const sMin = Math.min(min, lo);
   const sMax = Math.max(max, hi);
   const pct = (v) => Math.min(100, Math.max(0, ((v - sMin) / (sMax - sMin || 1)) * 100));
@@ -56,8 +37,6 @@ const DualRange = forwardRef(function DualRange({ min, max, step = 1, value, onC
     return Math.min(Math.max(stepped, lowBound), highBound);
   };
 
-  // Dragging is bounded by the (possibly grown) track; typed entry may exceed the
-  // visual max entirely (highBound = the typed value's own ceiling).
   const nextLo = (v) => [snap(Number(v), min, hi), hi];
   const nextHi = (v) => [lo, snap(Number(v), lo, Math.max(max, Number(v)))];
   const valueFromClientX = (clientX) => {
@@ -96,8 +75,6 @@ const DualRange = forwardRef(function DualRange({ min, max, step = 1, value, onC
   };
   const commitEdit = (which) => {
     const n = parse(draft);
-    /* Straight to the owner, bypassing the hold-until-settled path the thumbs use: typing a
-       figure is already one deliberate act, with no intermediate values to collapse. */
     if (n != null && !Number.isNaN(n)) onChange(which === 'lo' ? nextLo(n) : nextHi(n));
     setEditing(null);
   };

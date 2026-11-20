@@ -1,7 +1,6 @@
 import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 
-// Literal class strings so Tailwind's scanner keeps them; keys match TOPICS in scripts/vite-plugin-blog.mjs.
 const TONES = {
   renting: { icon: 'key-round', text: 'text-teal-400', cover: 'from-teal-400/25 via-teal-400/[0.08]' },
   buying: { icon: 'building', text: 'text-sky-400', cover: 'from-sky-400/25 via-sky-400/[0.08]' },
@@ -59,7 +58,7 @@ export function FeaturedCard({ post }) {
       <Cover tone={toneOf(post.topic)} featured />
       <div className="flex flex-1 flex-col p-5 sm:p-7">
         <p className="flex items-center gap-2">
-          <span className="rounded-full bg-teal-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-teal-300">Latest</span>
+          <span className="dz-tag bg-teal-400/10 font-bold uppercase tracking-widest text-teal-300">Latest</span>
           <TopicLabel post={post} />
         </p>
         <h2 className="mt-2.5 text-xl font-extrabold leading-snug text-white group-hover:text-teal-300 sm:text-2xl">{post.title}</h2>

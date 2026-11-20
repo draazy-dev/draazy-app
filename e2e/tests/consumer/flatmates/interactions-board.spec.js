@@ -1,9 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, letterTag, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { postAsSolo } from '../../../helpers/app.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays } from '../../../helpers/availability.js';
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
+
+const MOVE_IN = istInDays(28);
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const POST_BUTTON = /^Post(?: Property| property — Free)?$/;
@@ -14,6 +20,7 @@ const track = flatmateCleanup(test);
 let adminToken;
 async function approve(id) {
   adminToken ??= (await apiLogin(ACTORS.admin)).accessToken;
+  await tickDeskChecklist(API, id, auth(adminToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(adminToken),
@@ -22,9 +29,9 @@ async function approve(id) {
   expect(res.status).toBeLessThan(300);
 }
 
-async function newSeeker() {
+async function newSeeker(name) {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name });
   return { mobile, accessToken };
 }
 
@@ -33,14 +40,15 @@ async function seedRoom(hostToken, over = {}) {
     method: 'POST',
     headers: auth(hostToken),
     body: JSON.stringify({
+      ...(await roomBasics(hostToken)),
       roomType: 'Private room',
       locality: 'Baner',
       rentShare: 18000,
+      deposit: 36000,
       bhk: '2',
       attachedBath: 'attached',
       furnishing: 'semi',
       hostRole: 'tenant',
-      photos: await uploadedListingPhotos(hostToken),
       ...(await tenantRoomAgreement(hostToken)),
       ...over,
     }),
@@ -57,16 +65,14 @@ async function seedPost(token, over = {}) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
-      name: 'Own Post Tester',
       gender: 'female',
       age: 26,
       occupation: 'Software Engineer',
       budget: 16000,
       localities: ['Baner'],
-      moveIn: '2026-12-01',
+      moveIn: MOVE_IN,
       flatPref: 'women',
       roomPref: 'private',
-      tags: ['Vegetarian'],
       note: 'Looking for a place to stay',
       ...over,
     }),
@@ -84,9 +90,7 @@ async function seedGroup(hostToken, over = {}) {
     headers: auth(hostToken),
     body: JSON.stringify({
       title: `Group ${Number(uniqueMobile()).toString(36)}`,
-      name: 'Asha K',
-      locality: 'Baner',
-      rent: 30000,
+      preferences: { localities: ['Baner'], rentMax: 30000, depositMax: 50000, gatedOnly: false, bachelors: false },
       seats: 3,
       seatsOpen: 2,
       policy: 'any',
@@ -111,8 +115,8 @@ async function myAsks(token) {
 test.describe('Flatmates board', () => {
   test('a seeker\'s live request is announced as theirs, earns match pills, and routes a second post into an update', async ({ page }) => {
     test.slow();
-    const { mobile, accessToken } = await newSeeker();
-    const NAME = `Own ${mobile.slice(-6)}`;
+    const NAME = `Own ${letterTag()}`;
+    const { mobile, accessToken } = await newSeeker(NAME);
 
     await signedInAs(page, mobile);
     await page.goto(`${BASE}/flatmates?view=flatmates`);
@@ -120,7 +124,7 @@ test.describe('Flatmates board', () => {
     await expect(page.locator('.sf-match')).toHaveCount(0);
 
     // Budget and locality chosen to overlap the seeded Baner seekers, so the band model scores.
-    await seedPost(accessToken, { name: NAME, budget: 16000, localities: ['Baner'] });
+    await seedPost(accessToken, { budget: 16000, localities: ['Baner'] });
     await page.reload();
 
     await test.step('a seeker\'s own live request is announced as theirs, not offered back as a card', async () => {
@@ -141,7 +145,8 @@ test.describe('Flatmates board', () => {
       // The guard runs only on this chooser branch, not when the sheet first opens.
       await postAsSolo(page);
 
-      await expect(page.getByText(/already have a live request/i)).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('heading', { name: 'Edit your flatmate request' })).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText('One live request at a time.')).toBeVisible();
       await expect(page.getByRole('button', { name: /Update request/i })).toBeVisible();
       await expect(page.getByLabel('Lowest monthly budget')).toHaveValue('16,000');
       // And the guard did not quietly create the duplicate it was warning about.
@@ -149,6 +154,21 @@ test.describe('Flatmates board', () => {
       expect(after).toBe(before);
     });
   });
+  test('a signed-out visitor who reports a room is asked to sign in first, then lands in the report form', async ({ page }) => {
+    const host = await newSeeker();
+    const room = await seedRoom(host.accessToken);
+    await page.goto(`${BASE}/flatmates/room/${room.id}`);
+
+    const flag = page.getByRole('button', { name: 'Report this room' });
+    await flag.waitFor({ state: 'visible', timeout: 15000 });
+    await flag.click();
+    await expect(signInSheet(page).getByRole('heading', { name: 'Sign in to report' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('dialog', { name: /Report this post/i })).toHaveCount(0);
+
+    await verifyInSheet(page, uniqueMobile());
+    await expect(page.getByRole('dialog', { name: /Report this post/i })).toBeVisible({ timeout: 10000 });
+  });
+
   test('reporting a room from its detail page reaches the server, and the seeker is told so', async ({ page }) => {
     const host = await newSeeker();
     const room = await seedRoom(host.accessToken);
@@ -156,8 +176,9 @@ test.describe('Flatmates board', () => {
     await signedInAs(page, seeker.mobile);
     await page.goto(`${BASE}/flatmates/room/${room.id}`);
 
-    const flag = page.locator('.report-btn');
+    const flag = page.getByRole('button', { name: 'Report this room' });
     await flag.waitFor({ state: 'visible', timeout: 15000 });
+    await expect(page.getByRole('link', { name: 'All flatmates' }), 'the app header owns back').toHaveCount(0);
     await flag.click();
 
     await expect(page.getByRole('dialog', { name: /Report this post/i })).toBeVisible({ timeout: 10000 });
@@ -171,12 +192,12 @@ test.describe('Flatmates board', () => {
   });
 
   test('reporting a group files against that group, under the wire\'s word for a share', async ({ page }) => {
-    const host = await newSeeker();
+    const host = await newSeeker('Asha K');
     const TITLE = `Reportable ${uniqueMobile().slice(-6)}`;
     const group = await seedGroup(host.accessToken, { title: TITLE });
     const seeker = await newSeeker();
     await signedInAs(page, seeker.mobile);
-    await page.goto(`${BASE}/flatmates?view=groups`);
+    await page.goto(`${BASE}/flatmates?view=teams`);
     // Scope to the seeded card because the shared feed makes the first report button nondeterministic.
     const card = page.locator('.sf-card').filter({ hasText: TITLE }).first();
     await card.waitFor({ state: 'visible', timeout: 15000 });
@@ -248,7 +269,7 @@ test.describe('Flatmates board', () => {
     await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 15000 });
 
     const sortPill = page.getByRole('button', { name: 'Sort posts' });
-    const count = page.getByText(/homes? with a room available/);
+    const count = page.getByText(/rooms? to move into/);
     await expect(sortPill).toBeVisible();
     const [s, c] = [await sortPill.boundingBox(), await count.boundingBox()];
     expect(Math.abs((s.y + s.height / 2) - (c.y + c.height / 2)), 'one row: count left, sort right').toBeLessThan(12);

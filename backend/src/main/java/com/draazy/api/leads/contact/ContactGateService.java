@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class ContactGateService implements ContactGate {
-
     private final ContactRequestRepository contactRequests;
     private final UserRepository users;
 
@@ -17,7 +16,6 @@ public class ContactGateService implements ContactGate {
         this.users = users;
     }
 
-    // Owners see their own number; every other viewer gets the masked form.
     @Override
     public ContactVisibility visibilityFor(UUID viewerId, UUID propertyId, UUID ownerId) {
         if (viewerId != null && viewerId.equals(ownerId)) {

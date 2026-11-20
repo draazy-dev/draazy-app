@@ -46,7 +46,7 @@ Nothing in the repository sets this for you on purpose - see docs/LOCAL_DEV.md.
 }
 
 # --- 2. Refuse to inherit a deployment's database ---------------------------
-# Env overrides outrank application.properties, so a stale DB_URL would point local Spring at Supabase.
+# Env overrides outrank application.properties, so a stale DB_URL would point local Spring at a deployed database.
 $deployVars ='DB_URL', 'DB_USER', 'DB_PASSWORD', 'FLYWAY_DB_URL', 'SPRING_PROFILES_ACTIVE'
 $leaked = $deployVars | Where-Object { Test-Path "Env:$_" }
 if ($leaked) {

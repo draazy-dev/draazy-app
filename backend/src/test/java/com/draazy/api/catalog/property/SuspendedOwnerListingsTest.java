@@ -38,7 +38,8 @@ class SuspendedOwnerListingsTest extends AbstractApiTest {
     }
 
     private long liveInPune() {
-        return properties.countLiveByCity(PropertyStatus.APPROVED).stream()
+        return properties.countLiveByCity(PropertyStatus.APPROVED,
+                Freshness.dormantCutoff(java.time.Instant.now())).stream()
                 .filter(row -> "pune".equals(row[0])).mapToLong(row -> ((Number) row[1]).longValue()).sum();
     }
 
@@ -77,12 +78,14 @@ class SuspendedOwnerListingsTest extends AbstractApiTest {
                         .content("{\"propertyId\":\"" + p.getId() + "\"}"))
                 .andExpect(status().isNotFound());
         mvc.perform(get(Routes.Engagement.SAVED).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
-                .andExpect(jsonPath("$.content[0].available").value(false));
+                .andExpect(jsonPath("$.content").isEmpty());
 
         owner.setStatus(UserStatuses.ACTIVE);
         users.saveAndFlush(owner);
 
         assertThat(search()).contains(p.getId().toString());
         mvc.perform(get(byId)).andExpect(status().isOk());
+        mvc.perform(get(Routes.Engagement.SAVED).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.content.length()").value(1));
     }
 }

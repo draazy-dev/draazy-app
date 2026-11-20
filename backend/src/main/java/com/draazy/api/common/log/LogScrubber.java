@@ -3,9 +3,7 @@ package com.draazy.api.common.log;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Removes personal data and credentials from free text before it is stored. Pure and null-safe. */
 public final class LogScrubber {
-
     private static final Pattern UUID = Pattern.compile(
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
     private static final Pattern QUERY = Pattern.compile("(?<=[\\w/.~%-])\\?[^\\s\"'<>]+");
@@ -13,13 +11,12 @@ public final class LogScrubber {
     private static final Pattern SECRET_PAIR = Pattern.compile("(?i)(?:\\b|(?<=_))"
             + "(password|passwd|pwd|secret|token|api[_-]?key|authorization|otp)([\"']?\\s*[=:]\\s*[\"']?)[^\\s&,;\"']+");
     private static final Pattern BEARER = Pattern.compile("(?i)\\bBearer\\s+[A-Za-z0-9._~+/=-]+");
-    // The lookbehinds anchor each match at the start of a run; without them a long run is re-scanned from every
-    // position, which is quadratic on attacker-sized input.
+    // Lookbehinds anchor each match at the start of a run; without them
+    // attacker-sized input is rescanned quadratically.
     private static final Pattern JWT = Pattern.compile(
             "(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{4,}\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]*");
     private static final Pattern EMAIL = Pattern.compile(
             "(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}");
-    // Postgres constraint errors quote whole row and key values, which can be names and addresses.
     private static final Pattern DB_ROW = Pattern.compile("(?s)(Failing row contains \\().*");
     private static final Pattern DB_KEY = Pattern.compile("(?s)(Key \\((?:[^()\\n]|\\([^()\\n]*\\)){0,200}\\)=\\().*");
     private static final Pattern MOBILE = Pattern.compile(
@@ -33,8 +30,6 @@ public final class LogScrubber {
     private LogScrubber() {
     }
 
-    /** UUIDs are ids, not secrets, and are what an operator searches by, so they pass through intact, unless they sit
-     * in a query string or after a secret's name; those rules run on the whole text, before the UUID split. */
     public static String scrub(String text) {
         if (text == null || text.isEmpty()) {
             return text;
@@ -55,7 +50,6 @@ public final class LogScrubber {
         return out.append(scrubSegment(safe.substring(from))).toString();
     }
 
-    /** Cuts with headroom, scrubs, then truncates to {@code max}: the scrub never runs over an unbounded string. */
     public static String scrub(String text, int max) {
         int headroom = max * 2 + 200;
         String out = scrub(text == null || text.length() <= headroom ? text : text.substring(0, headroom));
@@ -72,7 +66,6 @@ public final class LogScrubber {
         return LONG_RUN.matcher(out).replaceAll(match -> Matcher.quoteReplacement(longRun(match.group())));
     }
 
-    // A digit is required so a long identifier such as a class name is not mistaken for a secret.
     private static String longRun(String run) {
         return run.chars().anyMatch(Character::isDigit) ? "[token]" : run;
     }

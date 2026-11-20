@@ -12,7 +12,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -25,15 +24,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Server-side saves close the device-local shortlist gap and keep cards fresh
-// when rooms, groups or seeker posts change after the heart was tapped.
 @DisplayName("Flatmates — the shortlist, and what it is allowed to point at")
 class FlatmateSaveEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
-    /** Audit writes run {@code REQUIRES_NEW} and escape this test's rollback. */
+    @Autowired
+    jakarta.persistence.EntityManager em;
+
+    private String published(String table, String id) {
+        em.flush();
+        jdbc.update("update " + table + " set mod_status = 'approved' where id = ?::uuid", id);
+        em.clear();
+        return id;
+    }
     private final List<String> createdActors = new ArrayList<>();
 
     @AfterEach
@@ -61,38 +65,36 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
     private String createRoom(User host, String society) throws Exception {
         String body = withSocietyIds("""
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                 "furnishing":"semi","locality":"Baner","society":"%s","rentShare":15000,
+                 "locality":"Baner","society":"%s","rentShare":15000,
                  "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
-                 "foodPref":"any","hostRole":"owner","photos":["%s"]}
-                """.formatted(society, UploadedPhotos.of(host.getId())));
+                 "foodPref":"any","hostRole":"owner",%s,%s,%s}
+                """.formatted(society, FlatmateRoomFixture.photos(host.getId()), FlatmateRoomFixture.BASICS,
+                FlatmateRoomFixture.DETAILS));
         String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return idOf(json);
+        return published("flatmate_rooms", idOf(json));
     }
 
     private String createGroup(User host, String title) throws Exception {
-        String body = """
-                {"title":"%s","locality":"Baner","policy":"women","rent":40000,
-                 "seats":3,"seatsOpen":1,"name":"Host"}
-                """.formatted(title);
+        String body = FlatmateGroupFixture.hunting(title, "Baner", "women", 40000, 3, 1);
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return idOf(json);
+        return published("flatmate_groups", idOf(json));
     }
 
     private String createPost(User author, String name) throws Exception {
         String body = """
                 {"name":"%s","gender":"female","age":26,"occupation":"UX Designer",
                  "budget":18000,"localities":["Baner"],"moveIn":"2026-09-01",
-                 "flatPref":"women","roomPref":"private","tags":["Vegetarian"]}
+                 "flatPref":"women","roomPref":"private"}
                 """.formatted(name);
         String json = mvc.perform(post(Routes.Flatmates.POSTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(author))
@@ -110,7 +112,6 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("saving")
     class Saving {
-
         @Test
         @DisplayName("shortlists a room, and answers with the card rather than the key")
         void savedRoomComesBackAsACard() throws Exception {
@@ -122,8 +123,6 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isNoContent());
 
-            // The shortlist returns the live feed projection, not the stale card copied
-            // when the heart was tapped.
             mvc.perform(get(Routes.Engagement.FLATMATE_SAVES)
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isOk())
@@ -131,7 +130,8 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[0].id").value(roomId))
                     .andExpect(jsonPath("$.content[0].society").value("Zztest Heights"))
                     .andExpect(jsonPath("$.content[0].budget").value(15000))
-                    // A shortlist is a browsing aid, not an introduction: the card is the anonymous one.
+                    .andExpect(jsonPath("$.content[0].savedAt").isNotEmpty())
+                    .andExpect(jsonPath("$.content[0].card").doesNotExist())
                     .andExpect(jsonPath("$.content[0].ownerMobile").doesNotExist());
         }
 
@@ -151,8 +151,6 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
                         .andExpect(status().isNoContent());
             }
 
-            // Newest-first is user-visible; leaving this to planner order makes a shortlist
-            // reshuffle between visits for no visible reason.
             mvc.perform(get(Routes.Engagement.FLATMATE_SAVES)
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isOk())
@@ -186,8 +184,6 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
         void unknownTargetIs404() throws Exception {
             User seeker = user("9840000007", "Seeker");
 
-            // `post_id` may name any of three tables, so there is no foreign key to stop
-            // a typo from becoming a forever-empty saved row.
             mvc.perform(put(saveUrl("room", UUID.randomUUID().toString()))
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isNotFound());
@@ -214,7 +210,6 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("reading it back")
     class Reading {
-
         @Test
         @DisplayName("is scoped to the person, not the device — and not to anyone else")
         void oneUsersShortlistIsNotAnothers() throws Exception {
@@ -227,8 +222,6 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(mine)))
                     .andExpect(status().isNoContent());
 
-            /* The claim the localStorage version could not make at all: a save is a fact about a
-               person. It follows them onto a second device, and it does not follow anyone else. */
             mvc.perform(get(Routes.Engagement.FLATMATE_SAVES)
                             .header(HttpHeaders.AUTHORIZATION, bearer(mine)))
                     .andExpect(jsonPath("$.totalElements").value(1));
@@ -254,7 +247,6 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$", Matchers.hasSize(1)))
                     .andExpect(jsonPath("$[0].kind").value("room"))
                     .andExpect(jsonPath("$[0].id").value(roomId))
-                    // Keys, deliberately: the board is already holding the card.
                     .andExpect(jsonPath("$[0].society").doesNotExist());
         }
 
@@ -275,8 +267,6 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(host)))
                     .andExpect(status().isNoContent());
 
-            // A withdrawn room disappears instead of rendering as an empty card:
-            // one row shorter beats a page with holes.
             mvc.perform(get(Routes.Engagement.FLATMATE_SAVES)
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isOk())
@@ -288,7 +278,6 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("removing")
     class Removing {
-
         @Test
         @DisplayName("takes it off the shortlist, and says 204 whether or not it was there")
         void unsaveIsIdempotent() throws Exception {
@@ -302,7 +291,6 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
             mvc.perform(delete(saveUrl("room", roomId))
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isNoContent());
-            // Again: a repeat tap on an already-empty bookmark is not an error.
             mvc.perform(delete(saveUrl("room", roomId))
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isNoContent());

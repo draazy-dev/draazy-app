@@ -8,7 +8,6 @@ import PageHeader from '../../../components/ui/PageHeader.jsx';
 
 const WINDOWS = [7, 30];
 
-// Staff cannot read the function catalogue (manager/admin only), so labels and landing pages live here.
 const FUNCTIONS = {
   kyc: { label: 'KYC review', path: '/admin/kyc-review' },
   propertyVerification: { label: 'Property verification', path: '/admin/properties' },

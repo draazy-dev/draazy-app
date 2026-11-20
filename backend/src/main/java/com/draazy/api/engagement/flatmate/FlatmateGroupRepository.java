@@ -15,17 +15,19 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UUID> {
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select g from FlatmateGroup g where g.id = :id and g.archived = false")
     Optional<FlatmateGroup> lockLive(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<FlatmateGroup> findLockedById(UUID id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select g from FlatmateGroup g
             where g.id = :id and g.archived = false
               and g.modStatus in ('live','approved')
-              and not exists (select 1 from User u where u.id = g.hostId and u.status = 'suspended')
+              and not exists (select 1 from User u where u.id = g.hostId and (u.status <> 'active' or u.archived = true))
             """)
     Optional<FlatmateGroup> lockVisible(@Param("id") UUID id);
 
@@ -34,6 +36,7 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
             left join fetch g.members
             where g.id = :id and g.archived = false
               and g.modStatus in ('live','approved')
+              and not exists (select 1 from User u where u.id = g.hostId and (u.status <> 'active' or u.archived = true))
             """)
     Optional<FlatmateGroup> findVisible(@Param("id") UUID id);
 
@@ -41,22 +44,29 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
             select count(g) from FlatmateGroup g
             where g.hostId = :hostId and g.archived = false
               and g.verificationTier <> 'owner'
+              and (g.seatsOpen is null or g.seatsOpen > 0) and g.seatsTotal > size(g.members)
             """)
     long countCappedByHost(@Param("hostId") UUID hostId);
 
-    List<FlatmateGroup> findByAddressFingerprintAndArchivedFalse(String fingerprint);
+    List<FlatmateGroup> findByAddressFingerprintAndArchivedFalseOrderByIdAsc(String fingerprint);
 
+    List<FlatmateGroup> findByHostIdAndArchivedFalse(UUID hostId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select g from FlatmateGroup g
             where g.archived = false and g.verificationTier = 'owner'
               and g.addressFingerprint like 'prop:%'
+            order by g.id
             """)
     List<FlatmateGroup> findOwnerTierClaims();
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select g from FlatmateGroup g
             where g.archived = false and g.modStatus in ('live','approved')
               and g.expiry.activeUntil < :before and (g.expiry.reminded = false or :remindedToo = true)
+            order by g.id
             """)
     List<FlatmateGroup> findPublicActiveUntil(@Param("before") Instant before,
             @Param("remindedToo") boolean remindedToo);
@@ -70,8 +80,6 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
 
     long countByRecheckRequestedAtNotNullAndArchivedFalse();
 
-    /** {@code cast(:locality as string)} is required: with a bare parameter Hibernate binds a null as
-     * {@code bytea} and PostgreSQL has no {@code lower(bytea)}, 500ing the unfiltered feed. */
     @Query(value = """
             select distinct g from FlatmateGroup g
             left join fetch g.members
@@ -89,6 +97,12 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
             where m.userId = :userId and m.group.archived = false and m.group.hostId <> :userId
             """)
     long countJoinedBy(@Param("userId") UUID userId);
+
+    @Query("""
+            select distinct m.group.id from FlatmateGroupMember m
+            where m.userId = :userId and m.group.hostId <> :userId
+            """)
+    List<UUID> findJoinedIds(@Param("userId") UUID userId);
 
     @Query("""
             select count(m) > 0 from FlatmateGroupMember m

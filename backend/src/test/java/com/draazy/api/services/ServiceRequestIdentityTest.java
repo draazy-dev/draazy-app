@@ -20,17 +20,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// A Leave &amp; License prints PAN and Aadhaar, so the drafting desk needs them; the security pass that closed the
-// {@code details} leak stopped them reaching the server at all, and this is the replacement.
 @DisplayName("D151 — service-request identities: one reader, recorded, and discarded when done")
 class ServiceRequestIdentityTest extends ServiceFixtures {
-
     private static final String OWNER_PAN = "ABCDE1234F";
     private static final String OWNER_AADHAAR = "211122223335";
     private static final String TENANT_AADHAAR = "444455556666";
 
-    // `AuditService` writes in `REQUIRES_NEW`, so its rows commit outside this test's transaction and survive the
-    // rollback.
     @AfterEach
     void clearAuditRows() {
         jdbc.update("delete from audit_log where action in "
@@ -41,7 +36,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
     @Nested
     @DisplayName("only the assigned operator can read them")
     class OneReader {
-
         @Test
         @DisplayName("the assignee reads the full numbers; a second staff member cannot")
         void onlyTheAssignee() throws Exception {
@@ -111,8 +105,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
             record(buyer, id, 204);
             setStatus(desk, id, "assigned", 200);
 
-            // The role guard, not the assignee check — but the outcome the wizard depends on is the
-            // same: nothing restores these into a form, and no customer-facing read exists.
             readIdentities(buyer, id, 403);
         }
 
@@ -125,18 +117,42 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
             record(buyer, id, 204);
             setStatus(desk, id, "assigned", 200);
 
-            // Assert on the raw JSON rather than on a field, because the failure being guarded against is a number
-            // appearing somewhere nobody thought to look.
             assertThat(detail(desk, id)).doesNotContain(OWNER_AADHAAR, OWNER_PAN, TENANT_AADHAAR);
             assertThat(queue(desk)).doesNotContain(OWNER_AADHAAR, OWNER_PAN, TENANT_AADHAAR);
             assertThat(detail(buyer, id)).doesNotContain(OWNER_AADHAAR, TENANT_AADHAAR);
+        }
+
+        @Test
+        @DisplayName("a party reads them masked to the last four; strangers and the desk get 404")
+        void partiesReadMasked() throws Exception {
+            User buyer = customer("9820000340");
+            User stranger = customer("9820000341");
+            User desk = staff("9820000342", Teams.RENTAL);
+            String id = raise(buyer, "rent-agreement", listing(buyer));
+            record(buyer, id, 204);
+
+            String body = mvc.perform(get(Routes.ServiceRequests.MASKED_IDENTITIES, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].partyRole").value("owner"))
+                    .andExpect(jsonPath("$[0].pan").value("XXXXXX234F"))
+                    .andExpect(jsonPath("$[0].aadhaar").value("XXXX XXXX 3335"))
+                    .andExpect(jsonPath("$[1].aadhaar").value("XXXX XXXX 6666"))
+                    .andExpect(jsonPath("$[1].pan").doesNotExist())
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(body).doesNotContain(OWNER_AADHAAR, OWNER_PAN, TENANT_AADHAAR);
+
+            for (User outsider : List.of(stranger, desk)) {
+                mvc.perform(get(Routes.ServiceRequests.MASKED_IDENTITIES, id)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(outsider)))
+                        .andExpect(status().isNotFound());
+            }
         }
     }
 
     @Nested
     @DisplayName("only the requester writes them")
     class OneWriter {
-
         @Test
         @DisplayName("staff and admin are refused — a desk that could write them could invent them")
         void staffCannotWrite() throws Exception {
@@ -173,8 +189,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
             String id = raise(buyer, "rent-agreement", listing(buyer));
             record(buyer, id, 204);
 
-            // The old value must not survive under a shifted index, or the desk has two candidates; the tenant's row
-            // is the co-filling tenant's to write and must survive.
             putIdentities(buyer, id, """
                     {"parties":[
                       {"partyRole":"owner","partyIndex":0,"partyName":"Asha Patil",
@@ -191,6 +205,38 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
                     .singleElement().asString()
                     .doesNotContain("ZZZZZ9999Z", "999988887779")
                     .matches("enc:v1:[a-z0-9-]+:\\S+\\|enc:v1:[a-z0-9-]+:\\S+");
+        }
+
+        @Test
+        @DisplayName("an omitted party keeps its numbers only while the same person holds that slot on the form")
+        void omittedPartyOnTheFormKeepsItsNumbers() throws Exception {
+            User buyer = customer("9820000331");
+            User desk = staff("9820000332", Teams.RENTAL);
+            String id = raise(buyer, "rent-agreement", listing(buyer));
+            tenantOnForm(id, "rahul  joshi");
+            record(buyer, id, 204);
+            String ownerOnly = """
+                    {"parties":[{"partyRole":"owner","partyIndex":0,"partyName":"Asha Patil","pan":"ZZZZZ9999Z"}]}""";
+
+            putIdentities(buyer, id, ownerOnly, 204);
+            assertThat(tenantRows(id)).isEqualTo(1);
+
+            tenantOnForm(id, "Neha Kulkarni");
+            putIdentities(buyer, id, ownerOnly, 204);
+            setStatus(desk, id, "assigned", 200);
+            assertThat(readIdentities(desk, id, 200)).contains("ZZZZZ9999Z").doesNotContain(TENANT_AADHAAR);
+        }
+
+        private Integer tenantRows(String id) {
+            return jdbc.queryForObject("select count(*) from service_request_identities where service_request_id = ?"
+                    + " and party_role = 'tenant'", Integer.class, UUID.fromString(id));
+        }
+
+        private void tenantOnForm(String id, String name) {
+            em.flush();
+            jdbc.update("update service_requests set details = jsonb_build_object('_state', jsonb_build_object("
+                    + "'tenants', jsonb_build_array(jsonb_build_object('name', ?::text)))) where id = ?::uuid", name, id);
+            em.clear();
         }
 
         @Test
@@ -226,14 +272,14 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
                       {"partyRole":"tenant","partyIndex":0,"pan":"ABCDE1234F"}
                     ]}""", 422);
             putIdentities(buyer, id, """
-                    {"parties":[{"partyRole":"witness","partyIndex":2,"aadhaar":"%s"}]}"""
+                    {"parties":[{"partyRole":"witness","partyIndex":0,"aadhaar":"%s"}]}"""
                     .formatted(OWNER_AADHAAR), 422);
             putIdentities(buyer, id, "{\"parties\":[]}", 422);
         }
 
         @Test
-        @DisplayName("co-owners and both attesting witnesses are recorded alongside the owner")
-        void coOwnersAndWitnesses() throws Exception {
+        @DisplayName("co-owners are recorded alongside the owner")
+        void coOwners() throws Exception {
             User buyer = customer("9820000328");
             User desk = staff("9820000329", Teams.RENTAL);
             String id = raise(buyer, "rent-agreement", listing(buyer));
@@ -241,25 +287,22 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
             putIdentities(buyer, id, """
                     {"parties":[
                       {"partyRole":"owner","partyIndex":0,"partyName":"Asha Patil","aadhaar":"%s"},
-                      {"partyRole":"owner","partyIndex":1,"partyName":"Vikram Patil","aadhaar":"555566667771"},
-                      {"partyRole":"witness","partyIndex":0,"partyName":"Meera Kulkarni","aadhaar":"666677778888"},
-                      {"partyRole":"witness","partyIndex":1,"partyName":"Sunil Deshmukh","aadhaar":"234567890124"}
+                      {"partyRole":"owner","partyIndex":1,"partyName":"Vikram Patil","aadhaar":"555566667771"}
                     ]}""".formatted(OWNER_AADHAAR), 204);
 
             setStatus(desk, id, "assigned", 200);
             mvc.perform(get(Routes.ServiceRequests.IDENTITIES, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(4)))
-                    .andExpect(jsonPath("$[?(@.partyRole == 'witness')].partyName",
-                            org.hamcrest.Matchers.containsInAnyOrder("Meera Kulkarni", "Sunil Deshmukh")));
+                    .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(2)))
+                    .andExpect(jsonPath("$[?(@.partyRole == 'owner')].partyName",
+                            org.hamcrest.Matchers.containsInAnyOrder("Asha Patil", "Vikram Patil")));
         }
     }
 
     @Nested
     @DisplayName("the numbers do not outlive the matter")
     class Retention {
-
         @Test
         @DisplayName("completing the request discards them and says so on the timeline")
         void completionPurges() throws Exception {
@@ -314,7 +357,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
     @Nested
     @DisplayName("every access is recorded")
     class Audited {
-
         @Test
         @DisplayName("a read and a refused read both leave an audit row naming the caller")
         void readsAreAudited() throws Exception {
@@ -338,7 +380,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
         }
     }
 
-    /** Record the standard two-party set: an owner with both numbers, a tenant with only Aadhaar. */
     private void record(User caller, String id, int expected) throws Exception {
         putIdentities(caller, id, """
                 {"parties":[
@@ -371,8 +412,6 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
                 .andReturn().getResponse().getContentAsString();
     }
 
-    // Read straight from the table: `AuditService` writes in `REQUIRES_NEW`, so a JPA read of the rolled-back session
-    // cannot see the rows.
     private List<String> auditActions(String requestId, UUID actorId) {
         return jdbc.queryForList(
                 "SELECT action FROM audit_log WHERE entity = 'service_request' AND entity_id = ? "

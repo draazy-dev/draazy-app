@@ -2,17 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import {
   CheckCircle, ExternalLink, FileCheck2, HelpCircle, MapPin, Pencil,
-  Send, XCircle, History, ArrowRight, AlertTriangle, TrendingDown, User,
+  XCircle, History, ArrowRight, AlertTriangle, TrendingDown, User,
 } from 'lucide-react';
 import {
-  startPropertyReview,
-  setPropertyReviewChecklistItem, addPropertyReviewMessage, decidePropertyReview,
-  requestPropertyReviewOverride, approvePropertyReviewOverride,
+  startPropertyReview, beginPropertyReview,
+  setPropertyReviewChecklistItem, decidePropertyReview, recordPropertyReraCheck,
 } from '../../../services/propertyReviewService.js';
 import { setListingStatus } from '../../../services/propertyService.js';
+import { getLocality } from '../../../services/localityService.js';
 import { chaseOwner, listOutreachTemplates, listOwnerOutreach, markOutreachSent } from '../../../services/outreachService.js';
 import { interpolateOutreachTemplate } from '../../../lib/outreachTemplate.js';
-import { fmtINR, classNames } from '../../../lib/format.js';
+import { fmtINR, fmtNum, classNames } from '../../../lib/format.js';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import Modal from '../../../components/ui/Modal.jsx';
@@ -21,25 +21,30 @@ import Badge from '../../../components/ui/Badge.jsx';
 import QualityScoreBadge from '../../../components/ui/QualityScoreBadge.jsx';
 import InternalNote, { saveNoteIfAny } from '../../../components/ui/InternalNote.jsx';
 import { listNotes } from '../../../services/noteService.js';
-import { dealLabel, perSqftLabel, liveHref, fmtAgo, detailKvs, statusLabel } from './constants.js';
+import { dealLabel, perSqftLabel, liveHref, fmtAgo, detailKvs, statusLabel, isMadeBy, MAKER_REASON } from './constants.js';
 import {
   REVIEW_REASONS, ownerMessagePreview, reasonTemplateHints, signalLabel, signalsForChecklistItem,
 } from './reviewReasons.js';
 import WhatsappTemplates from './review-modal/WhatsappTemplates.jsx';
 import CommunicationLog from './review-modal/CommunicationLog.jsx';
 import OwnershipEvidencePanel from './review-modal/OwnershipEvidencePanel.jsx';
+import OpenSupportChat from '../../../components/admin/support-chat/OpenSupportChat.jsx';
 import BadgeRequestBanner from './review-modal/BadgeRequestBanner.jsx';
 import { OWNERSHIP_REVIEW_ITEM, seeksOwnershipBadge } from '../../../lib/recheckFields.js';
 import { SubmittedPhotos, SubmittedDescription, SubmittedLocation } from './review-modal/SubmittedContent.jsx';
+import ReraCheckRow, { RERA_REVIEW_ITEM } from './review-modal/ReraCheckRow.jsx';
+import { hasPermission } from '../../../lib/adminModules.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
-// Verification routes require UUIDs; the display id may be a public slug.
 const pid = (listing) => listing?.uuid || listing?.id;
 
-// The server names the edited fields but keeps no before/after; the mock store's `reReview` carries both.
 const editedFields = (listing) => (listing.recheckPending
   ? String(listing.recheckReason || '').split(/,\s*/).filter((f) => f && f !== OWNERSHIP_REVIEW_ITEM)
   : []);
-const ownerEdited = (listing) => Boolean(listing.reReview) || editedFields(listing).length > 0;
+const changeRowsOf = (listing) => listing.reReview?.fields
+  ?? (listing.recheckChanges || []).map((c) => ({ label: c.field, from: c.before, to: c.after }));
+const ownerEdited = (listing) => Boolean(listing.reReview) || editedFields(listing).length > 0
+  || (listing.recheckPending && changeRowsOf(listing).length > 0);
 
 const openingSection = (listing) => {
   if (ownerEdited(listing)) return 'changes';
@@ -52,7 +57,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
   const [thread, setThread] = useState(null);
   const [threadError, setThreadError] = useState(null);
   const [threadReload, setThreadReload] = useState(0);
-  // Derive timeline labels at render because templates and ledger rows load independently.
   const [outreach, setOutreach] = useState([]);
   const [notes, setNotes] = useState([]);
   const [commsOpen, setCommsOpen] = useState(false);
@@ -65,18 +69,14 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
   const [decisionMode, setDecisionMode] = useState(null);
   const [reasonCode, setReasonCode] = useState('');
   const [reasonNote, setReasonNote] = useState('');
-  const [overrideReason, setOverrideReason] = useState('');
-  const [secondApprovalNeeded, setSecondApprovalNeeded] = useState(false);
-  const [msg, setMsg] = useState('');
   const [internalNote, setInternalNote] = useState('');
-  // Decisions stay disabled while their server write is pending.
   const [busy, setBusy] = useState(false);
-  // The live answer from the badge panel, which outruns the `review` snapshot after a grant or decline.
   const [badgeCase, setBadgeCase] = useState(null);
   const [section, setSection] = useState('overview');
   const [sectionFor, setSectionFor] = useState(null);
   const [badgeSeenFor, setBadgeSeenFor] = useState(null);
   const reviewKey = review ? pid(review) : null;
+  const maker = Boolean(review) && isMadeBy(review, user?.id);
   if (sectionFor !== reviewKey) {
     setSectionFor(reviewKey);
     if (review) setSection(openingSection(review));
@@ -84,8 +84,19 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     setBadgeSeenFor(reviewKey);
   }
 
-  // `openCall` shares one open write across StrictMode's second effect pass; per-run cancellation covers
-  // listing switches. Idempotent open avoids a get-then-create race; `markRead` folds the read receipt in.
+  const openCase = async (listing) => {
+    const caseFile = await startPropertyReview(pid(listing), { markRead: true });
+    if (listing.status !== 'pending' || isMadeBy(listing, user?.id) || ['approved', 'rejected'].includes(caseFile?.status)) return caseFile;
+    try {
+      const started = await beginPropertyReview(pid(listing));
+      if (listing.progress?.step !== 'in_review') onRefresh?.();
+      return started;
+    } catch (err) {
+      console.error('[PropertyReviewModal] could not start the review', err);
+      return caseFile;
+    }
+  };
+
   useEffect(() => {
     if (!review) {
       openCall.current = null;
@@ -95,7 +106,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     const listing = review;
     const callKey = `${reviewKey}:${threadReload}`;
     if (openCall.current?.key !== callKey) {
-      openCall.current = { key: callKey, promise: startPropertyReview(pid(listing), { markRead: true }) };
+      openCall.current = { key: callKey, promise: openCase(listing) };
     }
     const { promise } = openCall.current;
     (async () => {
@@ -106,7 +117,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
         setThread(caseFile);
       } catch (err) {
         if (cancelled) return;
-        toast(err?.message || 'Could not open the verification case file', 'error');
+        toast(userMessage(err, 'Could not open the verification case file'), 'error');
         setThread(null);
         setThreadError(err);
       }
@@ -118,14 +129,10 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     setDecisionMode(null);
     setReasonCode('');
     setReasonNote('');
-    setOverrideReason('');
-    setSecondApprovalNeeded(false);
-    setMsg('');
     setInternalNote('');
     setWaOpen(false);
     setWaPreview(null);
     setBusy(false);
-    // Under review is derived from pending status; opening a case must not rewrite pipeline stages.
     return () => {
       cancelled = true;
       setThread(null);
@@ -133,7 +140,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewKey, threadReload]);
 
-  // The timeline fetches only once opened; notes and chasers load independently so one failure cannot erase both.
   useEffect(() => {
     if (!reviewKey || !commsOpen || commsLoadedFor === reviewKey) return undefined;
     let cancelled = false;
@@ -146,7 +152,18 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewKey, commsOpen, commsLoadedFor]);
 
-  // The shared template library is listing-independent; it is needed only by the template picker and the log's labels.
+  const localitySlug = review?.localitySlug;
+  const [marketRate, setMarketRate] = useState({ slug: null, value: null });
+  useEffect(() => {
+    if (!waOpen || !localitySlug) return undefined;
+    let cancelled = false;
+    getLocality(localitySlug).then(
+      (loc) => { if (!cancelled) setMarketRate({ slug: localitySlug, value: loc?.ratePerSqft ?? null }); },
+      () => { if (!cancelled) setMarketRate({ slug: localitySlug, value: null }); },
+    );
+    return () => { cancelled = true; };
+  }, [waOpen, localitySlug]);
+
   useEffect(() => {
     if (!(waOpen || commsOpen) || templatesRequested.current) return;
     templatesRequested.current = true;
@@ -171,8 +188,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     if (match) setWaPreview(match);
   }, [waOpen, waPreview, reasonCode, waTemplates]);
 
-  // Only timestamped server records belong here; a chaser reads "sent" only once staff attest it.
-  // Outreach actor UUIDs stay absent: resolving them requires an admin-only audit surface.
   const commsLog = useMemo(() => {
     const chasers = outreach.map((row) => ({
       id: row.id,
@@ -196,16 +211,33 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       .sort((a, b) => String(b.at).localeCompare(String(a.at)));
   }, [outreach, waTemplates, notes]);
 
-  // Checklist text is the server key; refusal reasons belong in the owner's thread, not a third state.
   const setChecklistItem = async (item, pass) => {
     try {
       setThread(await setPropertyReviewChecklistItem(pid(review), item, pass));
     } catch (err) {
-      toast(err?.message || 'Could not update the checklist', 'error');
+      toast(userMessage(err, 'Could not update the checklist'), 'error');
     }
   };
 
   const checklistComplete = Boolean(thread?.checklist?.length) && thread.checklist.every((line) => line.pass);
+
+  const reraFailedReason = { not_found: 'rera_not_found', mismatch: 'rera_mismatch' }[thread?.reraCheck] ?? '';
+
+  const recordRera = async (result) => {
+    try {
+      setThread(await recordPropertyReraCheck(pid(review), result));
+    } catch (err) {
+      toast(userMessage(err, 'Could not save the RERA check'), 'error');
+    }
+  };
+
+  const photoRemoved = (updated) => {
+    const gallery = updated?.gallery ?? [];
+    setReview((current) => current
+      ? { ...current, gallery, image: updated?.image ?? null, ...(gallery.length ? {} : { status: 'needs_info' }) }
+      : current);
+    onRefresh?.();
+  };
 
   const reloadCase = async () => {
     const caseFile = await startPropertyReview(pid(review));
@@ -220,45 +252,9 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       try { await reloadCase(); } catch { onRefresh?.(); }
       return;
     }
-    if (err?.code === 'second_approver_required' || err?.code === 'override_request_pending') {
-      setSecondApprovalNeeded(true);
-      try { await reloadCase(); } catch { onRefresh?.(); }
-      toast(err?.code === 'override_request_pending'
-        ? 'Second approval is already pending — refreshed'
-        : 'This listing needs second approval before it can go live', 'error');
-      return;
-    }
-    if (err?.code === 'override_request_decided' || err?.code === 'override_not_required') {
-      try { await reloadCase(); } catch { onRefresh?.(); }
-      toast(err?.code === 'override_request_decided'
-        ? 'This second approval was already decided — refreshed'
-        : 'Second approval is no longer required — refreshed', 'error');
-      return;
-    }
-    toast(err?.message || fallback, 'error');
+    toast(userMessage(err, fallback), 'error');
   };
 
-  const reviewSend = async (clarificationRequested = false) => {
-    const v = msg.trim();
-    if (!v) return;
-    try {
-      const caseFile = await addPropertyReviewMessage(pid(review), v, clarificationRequested);
-      setMsg('');
-      setThread(caseFile);
-      toast(clarificationRequested
-        ? 'Needs info sent \u2014 returned to the owner'
-        : 'Message sent to owner');
-      if (clarificationRequested) {
-        setReview((current) => current ? { ...current, status: 'needs_info' } : current);
-        onRefresh();
-      }
-    } catch (err) {
-      toast(err?.message || 'Could not send the message', 'error');
-    }
-  };
-
-  // A decision atomically updates the case, listing status and owner message, so do not pair it with a
-  // separate status write. The server refuses an approval while any checklist line is still open.
   const reviewApprove = async () => {
     if (busy) return;
     if (!checklistComplete) {
@@ -267,12 +263,16 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     }
     setBusy(true);
     try {
-      await decidePropertyReview(pid(review), 'approve', { expectedStatus: review.status });
+      const res = await decidePropertyReview(pid(review), 'approve', { expectedStatus: review.status });
       const noted = await saveNoteIfAny('listing', review.id, internalNote, 'Approved');
       handleClose();
+      const heldPaused = res?.propertyStatus === 'paused';
+      const successMsg = heldPaused
+        ? 'Approved \u2014 held as paused (owner on free tier limit)'
+        : 'Approved & published \u2014 owner notified';
       toast(noted.error
-        ? 'Approved & published \u2014 but the internal note could not be saved'
-        : 'Approved & published \u2014 owner notified', noted.error ? 'error' : 'success');
+        ? `${heldPaused ? 'Approved (held as paused)' : 'Approved & published'} \u2014 but the internal note could not be saved`
+        : successMsg, noted.error ? 'error' : 'success');
       onRefresh();
     } catch (err) {
       await handleDecisionError(err, 'Could not approve this listing');
@@ -307,31 +307,16 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     }
   };
 
-  const requestOverride = async () => {
-    if (busy || !overrideReason.trim()) return;
+  const reopenCase = async () => {
+    if (busy) return;
     setBusy(true);
     try {
-      setThread(await requestPropertyReviewOverride(pid(review), overrideReason.trim()));
-      setOverrideReason('');
-      toast(thread?.status === 'rejected' ? 'Reopen requested' : 'Second approval requested', 'success');
+      await setListingStatus(pid(review), 'pending', { expectedStatus: 'rejected' });
+      handleClose();
+      toast('Listing reopened for review — owner notified', 'success');
       onRefresh();
     } catch (err) {
-      await handleDecisionError(err, thread?.status === 'rejected' ? 'Could not request reopen' : 'Could not request second approval');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const approveOverride = async () => {
-    const requestId = thread?.overrideRequest?.id;
-    if (busy || !requestId) return;
-    setBusy(true);
-    try {
-      setThread(await approvePropertyReviewOverride(pid(review), requestId));
-      toast(thread?.status === 'rejected' ? 'Reopen approved' : 'Second approval recorded', 'success');
-      onRefresh();
-    } catch (err) {
-      await handleDecisionError(err, thread?.status === 'rejected' ? 'Could not approve reopen' : 'Could not approve as second reviewer');
+      await handleDecisionError(err, 'Could not reopen this listing');
     } finally {
       setBusy(false);
     }
@@ -339,39 +324,36 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
 
   const handleClose = () => { setReview(null); setThread(null); setThreadError(null); };
 
-  // Re-approval clears the re-check and notifies the owner atomically without taking the listing down.
   const approveEdits = async () => {
     if (busy) return;
     setBusy(true);
     try {
-      await setListingStatus(review.id, 'approved', 'Owner edits reviewed');
-      /* Close rather than refetch: the re-review panel renders from `review`, the parent's row, so refreshing
-         only the case file left the modal announcing an edit it had cleared, over a button that now 409s. */
+      await setListingStatus(review.id, 'approved', { reason: 'Owner edits reviewed', expectedStatus: review.status });
       handleClose();
       toast('Owner edits approved \u2014 re-review cleared', 'success');
       onRefresh();
     } catch (err) {
-      toast(err?.message || 'Could not clear the re-review', 'error');
+      toast(userMessage(err, 'Could not clear the re-review'), 'error');
     } finally {
       setBusy(false);
     }
   };
 
-  // Match the server's template vocabulary without inventing unavailable locality rates.
-  // The server's prepared message is authoritative; this listing-based preview is only guidance.
+  const rateKnown = marketRate.slug === localitySlug && marketRate.value != null;
   const previewVariables = (listing) => ({
     owner_name: listing.owner || 'there',
     owner_mobile: listing.ownerMobile || '',
     title: listing.title || '',
     locality: listing.locality || '',
-    price: String(listing.price ?? ''),
+    price: listing.price != null ? fmtNum(listing.price) : '',
     listing_id: pid(listing),
     staff_name: user?.name || 'Draazy',
     claim_link: `${window.location.origin}/signin?claim=${pid(listing)}`,
+    listing_link: `${window.location.origin}/property/${pid(listing)}`,
+    ...(rateKnown ? { market_rate: fmtNum(marketRate.value) } : {}),
   });
+  const unresolvedKeys = (body) => [...interpolateOutreachTemplate(body, previewVariables(review)).matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
 
-  /* `window.open` runs first and synchronously so the tab stays inside the authorising gesture, then is
-     navigated only once the server accepts — a refusal leaves an empty tab, not an unrecorded message. */
   const handleSendWaTemplate = async () => {
     if (busy || !waPreview) return;
     setBusy(true);
@@ -382,17 +364,14 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       toast('Chaser written \u2014 send it in WhatsApp, then mark it sent in the log', 'success');
       setWaOpen(false);
       setWaPreview(null);
-      // Re-read the server ledger rather than manufacturing a local history entry.
       try {
         setOutreach(await listOwnerOutreach(pid(review)));
       } catch {
-        /* The chaser was written; a failed refresh of the panel below it is not worth a second
-           toast contradicting the first. */
       }
       onRefresh();
     } catch (err) {
       if (handoff) handoff.close();
-      toast(err?.message || 'Could not write this chaser', 'error');
+      toast(userMessage(err, 'Could not write this chaser'), 'error');
     } finally {
       setBusy(false);
     }
@@ -404,7 +383,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       setOutreach((rows) => rows.map((row) => (row.id === entry.id ? entry : row)));
       onRefresh();
     } catch (err) {
-      toast(err?.message || 'Could not mark this chaser as sent', 'error');
+      toast(userMessage(err, 'Could not mark this chaser as sent'), 'error');
     }
   };
 
@@ -422,31 +401,19 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     ) : null;
   }
   const noPhotos = !review.image && !(Array.isArray(review.gallery) && review.gallery.filter(Boolean).length);
+  const changeRows = changeRowsOf(review);
   const caseRejected = thread.status === 'rejected';
   const liveBadgeCase = badgeCase?.id === pid(review) ? badgeCase : null;
   const badgeRequestedAt = liveBadgeCase ? liveBadgeCase.requestedAt : review.ownershipRequestedAt;
   const seeksBadge = liveBadgeCase ? Boolean(liveBadgeCase.requestedAt && !liveBadgeCase.verified) : seeksOwnershipBadge(review);
   const trackBadgeCase = (verification) => setBadgeCase({ id: pid(review), requestedAt: verification.requestedAt, verified: verification.verified });
-  const overrideCopy = caseRejected ? {
-    requestHeading: 'Request reopen',
-    requestPlaceholder: 'Why should this final reject be reopened?',
-    pending: 'Awaiting second reviewer to reopen',
-    approve: 'Approve reopen as second reviewer',
-    label: 'Reopen requested:',
-  } : {
-    requestHeading: 'Request second approval',
-    requestPlaceholder: 'Why should this hard signal be overridden?',
-    pending: 'Awaiting second approver',
-    approve: 'Approve as second reviewer',
-    label: 'Second approval requested:',
-  };
 
   const sections = [
     ['overview', 'Overview'],
     ['details', 'Details'],
     ownerEdited(review) ? ['changes', 'Changes'] : null,
     ['badge', 'Verified badge'],
-    ['messages', thread.messages.length ? `Messages (${thread.messages.length})` : 'Messages'],
+    ['messages', 'Messages'],
   ].filter(Boolean);
   const activeSection = sections.some(([key]) => key === section) ? section : 'overview';
 
@@ -465,7 +432,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
           ) : (
             <span className="mr-auto text-xs text-gray-500 italic">Not yet published</span>
           )}
-          {onEdit ? <button type="button" onClick={() => onEdit(review)} className="dz-btn dz-btn-ghost"><Pencil className="h-4 w-4" /> Edit details</button> : null}
+          {onEdit ? <button type="button" onClick={() => onEdit(review)} disabled={maker} title={maker ? MAKER_REASON : undefined} className="dz-btn dz-btn-ghost"><Pencil className="h-4 w-4" /> Edit details</button> : null}
           <button onClick={handleClose} className="dz-btn dz-btn-ghost">Close</button>
         </>
       }
@@ -477,10 +444,10 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
               <div className="text-lg font-extrabold text-white">{review.title}</div>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <Badge status={review.status}>{statusLabel(review.status)}</Badge>
-                <span className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-gray-300">{dealLabel(review.deal)}</span>
-                {review.featured ? <span className="rounded-full border border-teal-400/30 bg-teal-500/15 px-2.5 py-0.5 text-xs text-teal-300">{'\u2605'} Featured</span> : null}
-                {ownerEdited(review) ? <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-0.5 text-xs text-amber-300"><History className="h-3 w-3" /> Owner edited</span> : null}
-                {review.priceReduced ? <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-0.5 text-xs text-emerald-300"><TrendingDown className="h-3 w-3" /> Price reduced</span> : null}
+                <span className="dz-tag border border-white/10 text-gray-300">{dealLabel(review.deal)}</span>
+                {review.featured ? <span className="dz-tag border border-teal-400/30 bg-teal-500/15 text-teal-300">{'\u2605'} Featured</span> : null}
+                {ownerEdited(review) ? <span className="dz-tag border border-amber-400/30 bg-amber-500/15 text-amber-300"><History className="h-3 w-3" /> Owner edited</span> : null}
+                {review.priceReduced ? <span className="dz-tag border border-emerald-400/30 bg-emerald-500/15 text-emerald-300"><TrendingDown className="h-3 w-3" /> Price reduced</span> : null}
                 <QualityScoreBadge listing={review} />
               </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-300">
@@ -499,7 +466,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
             </div>
           </div>
 
-          {seeksBadge ? <BadgeRequestBanner propertyId={pid(review)} requestedAt={badgeRequestedAt} onDeclined={() => { handleClose(); onRefresh(); }} /> : null}
+          {seeksBadge ? <BadgeRequestBanner propertyId={pid(review)} requestedAt={badgeRequestedAt} disabledReason={maker ? MAKER_REASON : undefined} onDeclined={() => { handleClose(); onRefresh(); }} /> : null}
           {noPhotos ? (
             <div className="flex items-start gap-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100">
               <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-rose-300" />
@@ -531,7 +498,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
           <div id="review-panel" role="tabpanel" aria-labelledby={`review-tab-${activeSection}`} className="space-y-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
             {activeSection === 'overview' ? (
               <>
-                <SubmittedPhotos listing={review} />
+                <SubmittedPhotos listing={review} onPhotoRemoved={hasPermission(user, 'properties:moderate') ? photoRemoved : undefined} />
                 <SubmittedDescription listing={review} />
               </>
             ) : null}
@@ -555,7 +522,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
                 <div className="mb-3 flex items-center gap-2 text-sm font-bold text-amber-200">
                   <History className="h-4 w-4" /> Owner edited this live listing
                   {review.materialEditFlag ? (
-                    <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-rose-400/30 bg-rose-500/15 px-2 py-0.5 text-[11px] font-semibold text-rose-300">
+                    <span className="dz-tag ml-auto border border-rose-400/30 bg-rose-500/15 font-semibold text-rose-300">
                       <AlertTriangle className="h-3 w-3" /> Needs a closer look
                     </span>
                   ) : null}
@@ -564,35 +531,36 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
                   The listing stayed live. Review the changes below and approve to clear the re-check.
                   {review.reReview?.identityChanged ? ' The owner changed a core identity field (type/locality).' : ''}
                 </p>
-                {review.reReview ? null : (
+                {changeRows.length ? (
+                  review.recheckReason ? <p data-testid="recheck-reason" className="mb-2 text-xs text-gray-300">Re-check reason: <span className="font-semibold text-amber-100">{review.recheckReason}</span></p> : null
+                ) : (
                   <div className="flex flex-wrap gap-1.5" data-testid="changed-fields">
                     {editedFields(review).map((f) => (
-                      <span key={f} className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-100">{f}</span>
+                      <span key={f} className="dz-tag border border-amber-400/30 bg-amber-500/10 font-semibold text-amber-100">{f}</span>
                     ))}
                   </div>
                 )}
-                <div className="space-y-1.5">
-                  {(review.reReview?.fields || []).map((f) => (
+                <div className="space-y-1.5" data-testid="recheck-changes">
+                  {changeRows.map((f) => (
                     <div key={f.label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm">
                       <div className="min-w-0">
                         <div className="text-[11px] uppercase tracking-wide text-gray-500">{f.label}</div>
-                        <div className="truncate text-gray-400 line-through">{f.from}</div>
+                        <div className="truncate text-gray-400 line-through" title={f.from}>{f.from}</div>
                       </div>
                       <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-gray-500" />
                       <div className="min-w-0 text-right">
                         <div className="text-[11px] uppercase tracking-wide text-gray-500">Now</div>
-                        <div className="truncate font-semibold text-gray-100">{f.to}</div>
+                        <div className="truncate font-semibold text-gray-100" title={f.to}>{f.to}</div>
                       </div>
                     </div>
                   ))}
                 </div>
-                <button onClick={approveEdits} disabled={busy} className="dz-btn dz-btn-success mt-3">
+                <button onClick={approveEdits} disabled={busy || maker} title={maker ? MAKER_REASON : undefined} className="dz-btn dz-btn-success mt-3">
                   <CheckCircle className="h-4 w-4" /> Approve edits
                 </button>
               </div>
             ) : null}
 
-            {/* Mounted on first visit and kept, so a half-filled evidence form survives a look at another tab. */}
             {activeSection === 'badge' || badgeSeenFor === reviewKey ? (
               <div hidden={activeSection !== 'badge'}>
                 <OwnershipEvidencePanel propertyId={pid(review)} listing={review} onRefresh={onRefresh} onVerification={trackBadgeCase} />
@@ -601,68 +569,20 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
 
             {activeSection === 'messages' ? (
               <div className="space-y-4">
-                <div className="overflow-hidden rounded-xl border border-white/10 focus-within:border-brand-teal/60">
-                  <div className="flex max-h-72 min-h-[96px] flex-col gap-2 overflow-y-auto bg-black/20 p-3">
-                    {thread.messages.length ? (
-                      thread.messages.map((m) => {
-                        /* An internal message must not be laid out as part of a conversation the owner is party to:
-                           read as an ordinary bubble, a moderator assumes the owner was told. */
-                        if (m.internal) {
-                          return (
-                            <div key={m.id} className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">
-                              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-300">
-                                <AlertTriangle className="h-3.5 w-3.5" /> Staff only {'\u00B7'} not shown to the owner
-                              </div>
-                              <div className="whitespace-pre-wrap">{m.body}</div>
-                              <div className="mt-1 text-[11px] text-amber-200/70">{fmtAgo(m.at)}</div>
-                            </div>
-                          );
-                        }
-                        const me = m.from === 'ops';
-                        return (
-                          <div key={m.id} className={classNames('flex', me && 'justify-end')}>
-                            <div className={classNames('max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm', me ? 'rounded-br-sm bg-teal-500/20 text-teal-50' : 'rounded-bl-sm bg-white/[0.07] text-gray-100')}>
-                              {m.body}
-                              <div className="mt-1 text-[11px] text-gray-400">{me ? 'You (Draazy)' : review.owner} {'\u00B7'} {fmtAgo(m.at)}</div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p className="m-auto text-center text-sm text-gray-500">No messages yet. Ask the owner anything before deciding.</p>
-                    )}
+                <OpenSupportChat about={{ type: 'property', id: pid(review), label: review.title }} label="Chat with owner" />
+                {thread.messages.some((m) => m.internal) ? (
+                  <div className="space-y-2" data-testid="review-staff-notes">
+                    {thread.messages.filter((m) => m.internal).map((m) => (
+                      <div key={m.id} className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">
+                        <div className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-300">
+                          <AlertTriangle className="h-3.5 w-3.5" /> Staff only {'\u00B7'} not shown to the owner
+                        </div>
+                        <div className="whitespace-pre-wrap">{m.body}</div>
+                        <div className="mt-1 text-[11px] text-amber-200/70">{fmtAgo(m.at)}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="border-t border-white/10 bg-white/[0.02] px-3 py-2.5">
-                    <textarea
-                      value={msg}
-                      onChange={(e) => setMsg(e.target.value)}
-                      onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') reviewSend(false); }}
-                      rows={2}
-                      aria-label="Message to the owner"
-                      placeholder={'Share a note, or ask for a clarification to hand the listing back for correction\u2026'}
-                      className="block w-full resize-none bg-transparent text-sm leading-relaxed text-white outline-none placeholder:text-gray-500"
-                    />
-                    <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-                      <span className="mr-auto hidden text-[11px] text-gray-500 sm:inline">Ctrl + Enter to send</span>
-                      {/* The server refuses a hand-back once the listing is published, so the button only shows
-                          while it awaits us. A staff-posted listing is refused too, but not visible here. */}
-                      <button
-                        type="button"
-                        onClick={() => reviewSend(true)}
-                        disabled={!(review.status === 'pending' || thread.status === 'in_review')}
-                        title={review.status === 'pending' || thread.status === 'in_review'
-                          ? 'Hands the listing back to the owner to correct'
-                          : 'Only a listing still awaiting review can be handed back'}
-                        className="dz-btn dz-btn-ghost dz-btn-sm"
-                      >
-                        <HelpCircle className="h-3.5 w-3.5" /> Ask for clarification
-                      </button>
-                      <button type="button" onClick={() => reviewSend(false)} className="dz-btn dz-btn-primary dz-btn-sm">
-                        <Send className="h-3.5 w-3.5" /> Send
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                ) : null}
 
                 <div className="divide-y divide-white/10 rounded-xl border border-white/10">
                   {review.ownerMobile && (
@@ -674,6 +594,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
                       waPreview={waPreview}
                       setWaPreview={setWaPreview}
                       waPreviewText={waPreview ? interpolateOutreachTemplate(waPreview.body, previewVariables(review)) : ''}
+                      unresolvedKeys={unresolvedKeys}
                       busy={busy}
                       handleSendWaTemplate={handleSendWaTemplate}
                     />
@@ -700,26 +621,29 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
               </span>
             </div>
             <div className="space-y-2" role="group" aria-labelledby="review-checklist-title">
-              {thread.checklist.map((c) => (
+              {thread.checklist.map((c) => (c.item === RERA_REVIEW_ITEM ? (
+                <ReraCheckRow key={c.item} reraId={review.reraId} result={thread.reraCheck} onRecord={recordRera} />
+              ) : (
                 <label key={c.item} className={classNames('flex min-h-[44px] cursor-pointer flex-wrap items-center gap-2.5 rounded-xl border px-3 py-2 transition-colors', c.pass
                   ? 'border-emerald-400/30 bg-emerald-500/10'
                   : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.05]')}>
                   <input
                     type="checkbox"
                     checked={c.pass}
+                    disabled={maker}
                     onChange={(e) => setChecklistItem(c.item, e.target.checked)}
                     className="h-5 w-5 flex-shrink-0 cursor-pointer accent-emerald-500"
                   />
                   <span className={classNames('text-sm font-semibold', c.pass ? 'text-emerald-100' : 'text-gray-100')}>{c.item}</span>
                   {signalsForChecklistItem(thread.signals || review.signals, c.item).map((item) => (
-                    <span key={`${c.item}:${item.code}`} className={classNames('rounded-full border px-2 py-0.5 text-[11px] font-semibold', item.severity === 'hard'
+                    <span key={`${c.item}:${item.code}`} className={classNames('dz-tag border font-semibold', item.severity === 'hard'
                       ? 'border-rose-400/40 bg-rose-500/15 text-rose-200'
                       : 'border-white/10 bg-white/5 text-gray-300')} title={item.detail || signalLabel(item.code)}>
                       {signalLabel(item.code)}
                     </span>
                   ))}
                 </label>
-              ))}
+              )))}
             </div>
           </div>
 
@@ -728,16 +652,23 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
               <CheckCircle className="h-4 w-4 text-brand-teal" /> Decision
             </div>
             {caseRejected ? (
-              <p className="text-sm text-gray-300">This listing was not approved. Reopening it needs a second reviewer.</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm text-gray-300">This listing was not approved.</p>
+                {hasPermission(user, 'properties:moderate') ? (
+                  <button type="button" onClick={reopenCase} disabled={busy || maker} title={maker ? MAKER_REASON : undefined} className="dz-btn dz-btn-primary min-h-[44px]">Reopen for review</button>
+                ) : null}
+              </div>
+            ) : maker ? (
+              <p data-testid="maker-notice" role="note" className="text-sm font-semibold text-amber-300">{MAKER_REASON}</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 <button onClick={reviewApprove} disabled={busy || !checklistComplete} title={checklistComplete ? 'Approve this listing' : 'Tick every check'} className="dz-btn dz-btn-success min-h-[44px] disabled:opacity-50">
                   <CheckCircle className="h-4 w-4" /> Approve
                 </button>
-                <button onClick={() => { setDecisionMode('needs_info'); setReasonCode(''); setReasonNote(''); }} disabled={busy} className="dz-btn dz-btn-ghost min-h-[44px]">
+                <button onClick={() => { setDecisionMode('needs_info'); setReasonCode(reraFailedReason); setReasonNote(''); }} disabled={busy} className="dz-btn dz-btn-ghost min-h-[44px]">
                   <HelpCircle className="h-4 w-4" /> Needs info
                 </button>
-                <button onClick={() => { setDecisionMode('reject'); setReasonCode(''); setReasonNote(''); }} disabled={busy} className="dz-btn dz-btn-danger min-h-[44px]">
+                <button onClick={() => { setDecisionMode('reject'); setReasonCode(reraFailedReason); setReasonNote(''); }} disabled={busy} className="dz-btn dz-btn-danger min-h-[44px]">
                   <XCircle className="h-4 w-4" /> Reject
                 </button>
                 {!checklistComplete ? <span className="self-center text-xs font-semibold text-amber-300">Tick every check</span> : null}
@@ -752,7 +683,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
                 <div className="flex flex-wrap gap-2" role="group" aria-label="Reason">
                   {REVIEW_REASONS.map((reason) => (
                     <button key={reason.code} type="button" aria-pressed={reasonCode === reason.code} onClick={() => setReasonCode(reason.code)}
-                      className={classNames('rounded-full border px-3 py-1.5 text-xs font-semibold transition', reasonCode === reason.code
+                      className={classNames('dz-chip border', reasonCode === reason.code
                         ? 'border-brand-teal bg-brand-teal text-ink'
                         : 'border-white/10 bg-white/[0.03] text-gray-300 hover:border-white/20')}>
                       {reason.label}
@@ -775,27 +706,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
                     {decisionMode === 'reject' ? 'Reject final' : 'Send needs info'}
                   </button>
                 </div>
-              </div>
-            ) : null}
-            {(caseRejected || secondApprovalNeeded || thread.overrideRequest) ? (
-              <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
-                {thread.overrideRequest?.requestedBy && String(thread.overrideRequest.requestedBy) === String(user?.id) ? (
-                  <p className="font-semibold">{overrideCopy.pending}</p>
-                ) : thread.overrideRequest ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{overrideCopy.label}</span>
-                    <span>{thread.overrideRequest.reason}</span>
-                    <button type="button" onClick={approveOverride} disabled={busy} className="dz-btn dz-btn-primary dz-btn-sm">{overrideCopy.approve}</button>
-                  </div>
-                ) : (
-                  <>
-                    <label className="block">
-                      <span className="mb-1 block font-semibold">{overrideCopy.requestHeading}</span>
-                      <textarea value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} rows={2} className="dz-input resize-none" placeholder={overrideCopy.requestPlaceholder} />
-                    </label>
-                    <button type="button" onClick={requestOverride} disabled={busy || !overrideReason.trim()} className="dz-btn dz-btn-primary mt-2">{overrideCopy.requestHeading}</button>
-                  </>
-                )}
               </div>
             ) : null}
           </div>

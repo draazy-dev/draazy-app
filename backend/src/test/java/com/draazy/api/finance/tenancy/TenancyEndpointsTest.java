@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.managed.ManagedProperty;
+import com.draazy.api.catalog.managed.ManagedPropertyRepository;
 import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -21,6 +23,7 @@ import com.draazy.api.security.JwtService;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -32,10 +35,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
-// Contract + behaviour proof for the tenancy lifecycle and tenant screening profile. The load-bearing tests
-// here are the ones that would let somebody read a stranger's income.
 class TenancyEndpointsTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired EntityManager em;
     @Autowired JwtService jwtService;
@@ -44,6 +44,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
     @Autowired TenancyRepository tenancies;
     @Autowired PropertyExperienceService experience;
     @Autowired NotificationRepository notifications;
+    @Autowired ManagedPropertyRepository managedHomes;
     @Autowired @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping handlerMapping;
 
     private User user(String mobile, String role) {
@@ -81,8 +82,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    // There is no user row to point `tenant_id` at, so the deal closes without a tenancy rather than the platform
-    // inventing a shadow user.
     @Test
     void closingARentDeal_proposesAPendingTenancyForARegisteredTenant() throws Exception {
         User owner = user("9822200001", "owner");
@@ -92,7 +91,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
         closeDeal(owner, p, tenant.getMobile(), 28000L);
 
         assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
-        assertThat(tenancies.findPendingByPropertyId(p.getId())).isPresent();
+        assertThat(pendingTenancy(p.getId())).isPresent();
 
         mvc.perform(get(Routes.Tenancies.MINE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
@@ -110,7 +109,27 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
-    // ---- 4: the tenant profile round-trips, and the score is server-computed ----
+    @Test
+    void closingARentDeal_onAManagedHome_fillsItsTenantAndRent() throws Exception {
+        User owner = user("9822200091", "owner");
+        User tenant = user("9822200092", "buyer");
+        Property p = rentListing(owner);
+        ManagedProperty home = new ManagedProperty(owner.getId(), "Managed let", "rent", "apartment",
+                new BigDecimal("2"), 25000L, "Baner", "baner", null, new BigDecimal("950"), "sqft", null);
+        home.markPublished(p.getId());
+        managedHomes.saveAndFlush(home);
+
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+
+        em.clear();
+        ManagedProperty filled = managedHomes.findById(home.getId()).orElseThrow();
+        assertThat(filled.isRented()).isTrue();
+        assertThat(filled.getTenantName()).isEqualTo(tenant.getName());
+        assertThat(filled.getTenantMobile()).isEqualTo(tenant.getMobile());
+        assertThat(filled.getMonthlyRent()).isEqualTo(28000L);
+        assertThat(filled.getTenantSince()).isNotNull();
+    }
+
     @Test
     void closingARentDeal_offPlatformTenant_opensNoTenancyButStillCloses() throws Exception {
         User owner = user("9822200003", "owner");
@@ -162,7 +181,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
         User next = user("9822200008", "buyer");
         closeDeal(owner, p, next.getMobile(), 30000L);
         assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
-        assertThat(tenancies.findPendingByPropertyId(p.getId())).isPresent();
+        assertThat(pendingTenancy(p.getId())).isPresent();
     }
 
     @Test
@@ -325,7 +344,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
         mvc.perform(post(url)).andExpect(status().isUnauthorized());
 
-        assertThat(tenancies.findPendingByPropertyId(p.getId())).isPresent();
+        assertThat(pendingTenancy(p.getId())).isPresent();
     }
 
     @Test
@@ -339,7 +358,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
         tenant.setMobileVerified(false);
         users.saveAndFlush(tenant);
         mvc.perform(post(url).header(HttpHeaders.AUTHORIZATION, bearer(tenant))).andExpect(status().isNotFound());
-
     }
 
     @Test
@@ -380,7 +398,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
     }
 
     private UUID pendingId(Property p) {
-        return tenancies.findPendingByPropertyId(p.getId()).orElseThrow().getId();
+        return pendingTenancy(p.getId()).orElseThrow().getId();
     }
 
     private void confirm(User tenant, UUID id) throws Exception {
@@ -397,8 +415,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
     void myProfile_emptyBeforeAnySave() throws Exception {
         User tenant = user("9822200012", "buyer");
 
-        // "Never assessed" and "assessed, scored nothing" are different claims about a person, and the screening
-        // meter renders them differently.
         mvc.perform(get(Routes.Tenancies.MY_PROFILE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
                 .andExpect(status().isOk())
@@ -407,7 +423,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.name").doesNotExist());
     }
 
-    // The client must not be able to set its own score or verified badge.
     @Test
     void updateMyProfile_computesTheScoreFromTheStoredFields() throws Exception {
         User tenant = user("9822200013", "buyer");
@@ -426,7 +441,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.income").value(95000));
     }
 
-    // PUT replaces: a field the tenant removed from the form must actually go.
     @Test
     void updateMyProfile_cannotSetItsOwnScoreOrVerifiedBadge() throws Exception {
         User tenant = user("9822200014", "buyer");
@@ -440,7 +454,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.verified").value(false));
     }
 
-    // The three refusals must be indistinguishable.
     @Test
     void updateMyProfile_replacesRatherThanMerges() throws Exception {
         User tenant = user("9822200015", "buyer");
@@ -458,7 +471,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.about").doesNotExist());
     }
 
-    // A screening owner reads the profile, not the number — the contact gate still applies.
     @Test
     void updateMyProfile_rejectsAnUnknownOccupantType() throws Exception {
         User tenant = user("9822200016", "buyer");
@@ -470,7 +482,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // ---- 6: there is deliberately no create route (spec fix S9) ----
     @Test
     void thereIsNoWayForAClientToCreateATenancy() {
         Set<String> mapped = handlerMapping.getHandlerMethods().entrySet().stream()
@@ -481,5 +492,10 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .collect(Collectors.toSet());
 
         assertThat(mapped).doesNotContain("POST /tenancies");
+    }
+
+    private Optional<Tenancy> pendingTenancy(UUID propertyId) {
+        return tenancies.findByPropertyId(propertyId).stream()
+                .filter(t -> "pending".equals(t.getStatus())).findFirst();
     }
 }

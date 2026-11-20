@@ -9,8 +9,9 @@ export default function PackersMovers() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const [prefillService, setPrefillService] = useState('');
+  const dateParam = searchParams.get('date') || '';
+  const prefillDate = /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : '';
 
-  // Prefill service from URL (?service=vehicle)
   useEffect(() => {
     const serviceParam = searchParams.get('service');
     if (serviceParam) {
@@ -34,7 +35,7 @@ export default function PackersMovers() {
       titleTop={t('services.packers.titleTop')}
       titleAccent={t('services.packers.titleAccent')}
       subtitle={t('services.packers.subtitle')}
-      features={[['shield-check', t('services.packers.feature1')], ['indian-rupee', t('services.packers.feature2')], ['headset', t('services.packers.feature3')]]}
+      features={[['clipboard-list', t('services.packers.feature1')], ['indian-rupee', t('services.packers.feature2')], ['headset', t('services.packers.feature3')]]}
       quote={{
         icon: 'truck', title: t('services.packers.quoteTitle'), subtitle: t('services.packers.quoteSub'),
         serviceField: 'service', submitLabel: t('services.packers.submitLabel'),
@@ -46,7 +47,7 @@ export default function PackersMovers() {
           { name: 'from', label: t('services.packers.fFrom'), type: 'locality', unrestricted: true, placeholder: t('services.packers.fFromPlaceholder') },
           { name: 'to', label: t('services.packers.fTo'), type: 'locality', unrestricted: true, placeholder: t('services.packers.fToPlaceholder') },
           { name: 'size', label: t('services.packers.fSize'), type: 'select', options: ['1 RK', '1 BHK', '2 BHK', '3 BHK', '4 BHK / Villa', 'Office / Commercial', 'Few items only'] },
-          { name: 'date', label: t('services.packers.fDate'), type: 'date' },
+          { name: 'date', label: t('services.packers.fDate'), type: 'date', value: prefillDate },
         ],
         successMessage: t('services.packers.successMessage'),
       }}
@@ -61,9 +62,9 @@ export default function PackersMovers() {
       ]}
       extra={<PackersEstimator t={t} />}
       trust={[
-        [t('services.packers.trust.0.t'), 'badge-check', t('services.packers.trust.0.d')],
+        [t('services.packers.trust.0.t'), 'clipboard-list', t('services.packers.trust.0.d')],
         [t('services.packers.trust.1.t'), 'indian-rupee', t('services.packers.trust.1.d')],
-        [t('services.packers.trust.2.t'), 'shield-check', t('services.packers.trust.2.d')],
+        [t('services.packers.trust.2.t'), 'video', t('services.packers.trust.2.d')],
         [t('services.packers.trust.3.t'), 'headset', t('services.packers.trust.3.d')],
       ]}
       steps={[

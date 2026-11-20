@@ -7,7 +7,7 @@ import { approveListingWithFetch } from './moderation.js';
 export const LISTING_PASS_PLAN = 'b1000000-0000-4000-8000-000000000005';
 export const CONTACT_PACK_PLAN = 'b1000000-0000-4000-8000-000000000006';
 
-const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\13\\bin\\psql.exe';
+const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe';
 
 /** Runs one statement against the database this shard's backend uses and returns the trimmed stdout. */
 export function sql(statement) {

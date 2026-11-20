@@ -23,7 +23,7 @@ async function anyPublishedListing() {
   throw new Error('no published listing carries a complete owner card — the fixture, not the page, is wrong');
 }
 
-test('the enquiry page names the listing the API returns, not one it found in localStorage', async ({ page }) => {
+test('the contact page names the listing the API returns, not one it found in localStorage', async ({ page }) => {
   const listing = await anyPublishedListing();
 
   const detail = page.waitForResponse(
@@ -39,8 +39,6 @@ test('the enquiry page names the listing the API returns, not one it found in lo
   await expect(about).toBeVisible();
   await expect(about).toHaveAttribute('href', `/property/${publicId}`);
   await expect(about).toContainText(listing.locality);
-
-  await expect(page.locator('textarea').first()).toHaveValue(new RegExp(`Ref: ${publicId}`));
 });
 
 test('the signed-out owner card is built from the server response, and the number stays masked', async ({ page }) => {
@@ -64,39 +62,24 @@ test('the signed-out owner card is built from the server response, and the numbe
     await expect(page.getByText(digits)).toHaveCount(0);
   }
   await expect(card.locator('a[href^="tel:"], a[href^="mailto:"], a[href^="https://wa.me/"]')).toHaveCount(0);
-  await expect(card.getByRole('button', { name: /request it/i })).toBeVisible();
-});
-
-test('a slow lookup does not overwrite what the visitor has already typed', async ({ page }) => {
-  const listing = await anyPublishedListing();
-
-  let release;
-  const held = new Promise((r) => { release = r; });
-  await page.route(`**/api/properties/${listing.id}*`, async (route) => {
-    await held;
-    await route.continue();
-  });
-
-  await page.goto(`/contact?ref=${listing.id}`);
-  const msg = page.locator('textarea').first();
-  await expect(msg).toHaveValue('');
-  await msg.fill('I can only view on weekends.');
-
-  release();
-
-  await expect(page.getByRole('link', { name: /Enquiring about/i })).toBeVisible();
-  await expect(msg).toHaveValue('I can only view on weekends.');
+  // The number is requested through the listing's own contact gate, not from this page.
+  await expect(card.getByRole('link', { name: /request it on the listing/i }))
+    .toHaveAttribute('href', `/property/${listing.slug || listing.id}`);
 });
 
 test('an unknown ref leaves the page as the plain support page rather than breaking it', async ({ page }) => {
   const errors = trackErrors(page);
+  const ref = '00000000-0000-4000-8000-000000000000';
+  const lookup = page.waitForResponse((r) => r.url().endsWith(`/api/properties/${ref}`));
 
-  await page.goto('/contact?ref=00000000-0000-4000-8000-000000000000');
+  await page.goto(`/contact?ref=${ref}`);
+  expect((await lookup).status()).toBe(404);
 
   await expect(page.locator('.glass-card', { hasText: 'Contact owner directly' })).toHaveCount(0);
   // The positive anchor: the support page itself still rendered. Without this the assertion above
   // would pass just as happily on a blank screen.
-  await expect(page.getByRole('button', { name: 'Send enquiry', exact: true })).toBeVisible();
-  await expect(page.locator('textarea').first()).toHaveValue('');
-  expect(errors).toEqual([]);
+  await expect(page.getByTestId('contact-chat-cta')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Enquiring about/i })).toHaveCount(0);
+  // Chromium logs the lookup's own 404; anything beyond it is a real error.
+  expect(errors).toEqual(['Failed to load resource: the server responded with a status of 404 (Not Found)']);
 });

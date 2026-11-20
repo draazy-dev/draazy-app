@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Sparkles, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { classNames } from '../../lib/format.js';
+import { isImeComposing } from '../../lib/isImeComposing.js';
 import '../../styles/components/furniture-tiles.css';
-/* Custom entries are held in the same plain string array as the predefined ones, so they flow through the existing
-   state/submit path with no schema change. */
 
 export default function FeatureSelector({
   options,
@@ -17,8 +16,6 @@ export default function FeatureSelector({
   const ph = placeholder || t('ui.addYourOwn');
   const noun = addAriaLabel || t('ui.featureNoun');
   const [draft, setDraft] = useState('');
-  // A short-lived confirmation so a commit always visibly "does something": re-adding an entry
-  // already in the list would otherwise just clear the box and read as nothing happening.
   const [status, setStatus] = useState(null);
   const inputRef = useRef(null);
   const statusTimer = useRef(null);
@@ -37,7 +34,6 @@ export default function FeatureSelector({
   const commit = () => {
     const label = draft.trim().replace(/\s+/g, ' ');
     if (!label) return;
-    // Typing a name we already offer just selects that predefined tile.
     const match = options.find((o) => o.label.toLowerCase() === label.toLowerCase());
     const target = match ? match.label : label;
     const alreadySelected = values.some((v) => v.toLowerCase() === target.toLowerCase());
@@ -52,7 +48,7 @@ export default function FeatureSelector({
   };
 
   const onKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isImeComposing(e)) {
       e.preventDefault();
       commit();
     }
@@ -77,7 +73,6 @@ export default function FeatureSelector({
             </button>
           );
         })}
-          {/* aria-label overrides title for screen readers but not the mouse tooltip. */}
         {customValues.map((label) => {
           const removeLabel = `Remove ${label}`;
           return (
@@ -114,7 +109,7 @@ export default function FeatureSelector({
           type="button"
           onClick={commit}
           disabled={!draft.trim()}
-          className="shrink-0 inline-flex items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold text-teal-300 border border-teal-500/40 hover:bg-teal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="h-btn shrink-0 inline-flex items-center gap-1.5 px-4 rounded-xl text-sm font-semibold text-teal-300 border border-teal-500/40 hover:bg-teal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <Plus className="w-4 h-4" /> Add
         </button>

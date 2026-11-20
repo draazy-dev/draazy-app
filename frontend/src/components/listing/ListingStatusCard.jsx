@@ -2,8 +2,17 @@ import { Link } from 'react-router';
 import Icon from '../Icon.jsx';
 import ProgressTracker from './ProgressTracker.jsx';
 import { seeksOwnershipBadge } from '../../lib/recheckFields.js';
+import { isResubmittableReason } from '../../pages/admin/properties/reviewReasons.js';
+import { flatmateKindOf } from '../../lib/data/myListings.js';
+import { supportLink } from '../../lib/supportLink.js';
 
 const statusKey = (suffix) => ['owner', 'listingStatus', ...String(suffix).split('.')].join('.');
+
+function listingSupportLink(listing) {
+  if (!listing) return supportLink('general');
+  const kind = flatmateKindOf(listing);
+  return kind ? supportLink(`flatmate_${kind}`, listing.id) : supportLink('property', listing.uuid || listing.id);
+}
 
 const STATUS_ALIASES = {
   pending: 'pending',
@@ -30,6 +39,7 @@ const STATUS_META = {
   archived: { icon: 'folder-lock', labelKey: statusKey('status.archived'), label: 'Archived', cls: 'text-slate-300 bg-slate-500/15 border-slate-500/20' },
   under_offer: { icon: 'handshake', labelKey: statusKey('status.underOffer'), label: 'Under offer', cls: 'text-purple-300 bg-purple-500/15 border-purple-500/20' },
   private: { icon: 'lock', labelKey: statusKey('status.private'), label: 'Private', cls: 'text-gray-300 bg-white/10 border-white/10' },
+  expired: { icon: 'clock', labelKey: statusKey('status.expired'), label: 'Expired', cls: 'text-rose-300 bg-rose-500/15 border-rose-500/20' },
 };
 
 const REASON_DEFAULTS = {
@@ -43,10 +53,13 @@ const REASON_DEFAULTS = {
   other: 'Our reviewer needs one more detail.',
 };
 
-const CLOSED_STATUSES = new Set(['paused', 'sold', 'rented', 'archived', 'under_offer', 'private']);
+const CLOSED_STATUSES = new Set(['paused', 'sold', 'rented', 'archived', 'under_offer', 'private', 'expired']);
 const REVIEW_ACTION_REASONS = new Set(['document_unreadable', 'name_mismatch']);
 const AWAITING_CONFIRM = new Set(['created', 'link_sent']);
-const TRACKED_STATES = new Set(['pending', 'needs_info', 'confirm', 'flagged']);
+const TRACKED_STATES = new Set(['pending', 'needs_info', 'confirm', 'flagged', 'rejected']);
+
+const reasonCodeOf = (review) => review?.reasonCode || review?.reason || review?.reason_code;
+export const mayResubmit = (state, review) => state === 'rejected' && isResubmittableReason(reasonCodeOf(review));
 
 const normalizedStatus = (status) => STATUS_ALIASES[String(status || '').toLowerCase()] || String(status || '').toLowerCase();
 const tr = (t, key, defaultValue) => (typeof t === 'function' ? t(key, { defaultValue }) : defaultValue);
@@ -79,7 +92,7 @@ const hasBadgeRequest = (listing = {}) => Boolean(listing.ownershipVerified || s
 const badgeHref = (listing = {}) => `/dashboard?tab=documents&prop=${encodeURIComponent(listing.uuid || listing.id || '')}`;
 
 const reasonText = (t, review = {}) => {
-  const code = review?.reasonCode || review?.reason || review?.reason_code;
+  const code = reasonCodeOf(review);
   const fallback = REASON_DEFAULTS[code] || REASON_DEFAULTS.other;
   const reason = code
     ? tr(t, statusKey(`reasons.${code}`), fallback)
@@ -92,25 +105,40 @@ const statusLine = (state, t, review) => {
   if (state === 'rejected') return reasonText(t, review);
   const lines = {
     pending: [statusKey('line.pending'), 'Our team usually reviews listings within 24 hours.'],
-    confirm: [statusKey('line.confirm'), 'Draazy posted this for you. Check the details — it goes live only after you confirm.'],
+    confirm: [statusKey('line.confirm'), 'Draazy posted this for you. Complete the details and photos, then confirm to send it for review.'],
     flagged: [statusKey('line.underReview'), 'This listing is off search while Draazy reviews it.'],
     live: [statusKey('line.live'), 'Buyers can now find and contact you.'],
-    paused: [statusKey('line.paused'), 'This listing is paused.'],
+    paused: [statusKey('line.paused'), 'Hidden from search. Resume it to show it to buyers again.'],
     sold: [statusKey('line.sold'), 'This listing is marked sold.'],
     rented: [statusKey('line.rented'), 'This listing is marked rented.'],
     archived: [statusKey('line.archived'), 'This listing is archived.'],
     under_offer: [statusKey('line.underOffer'), 'This listing is under offer.'],
     private: [statusKey('line.private'), 'This listing is private.'],
+    expired: [statusKey('line.expired'), 'Renew it to put it back on the board.'],
   };
   const [key, fallback] = lines[state] || lines.pending;
   return tr(t, key, fallback);
 };
 
-const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, onConfirm, t }) => {
+const flatmateActionFor = ({ state, viewHref, supportHref, onOpenReview, onShare, t }) => {
+  if (state === 'needs_info' && onOpenReview) {
+    return { kind: 'button', onClick: onOpenReview, icon: 'message-square', label: tr(t, statusKey('actions.fixNow'), 'Fix now') };
+  }
+  if (state === 'rejected') {
+    return { kind: 'link', href: supportHref, icon: 'life-buoy', label: tr(t, statusKey('actions.contactSupport'), 'Contact support') };
+  }
+  if (onShare && (state === 'pending' || state === 'live')) {
+    return { kind: 'button', onClick: onShare, icon: 'share-network', label: tr(t, statusKey('actions.share'), 'Share listing') };
+  }
+  return { kind: 'link', href: viewHref, icon: 'eye', label: tr(t, statusKey('actions.view'), 'View listing') };
+};
+
+const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, claimHref, flatmate, t }) => {
+  if (flatmate) return flatmateActionFor({ state, viewHref, supportHref, onOpenReview, onShare, t });
   const badgeRequested = hasBadgeRequest(listing);
   const verified = Boolean(listing?.ownershipVerified);
-  if (state === 'confirm' && onConfirm) {
-    return { kind: 'button', onClick: onConfirm, icon: 'check-circle', label: tr(t, statusKey('actions.confirm'), 'Yes, this is my property'), testId: 'confirm-listing' };
+  if (state === 'confirm' && claimHref) {
+    return { kind: 'link', href: claimHref, icon: 'check-circle', label: tr(t, statusKey('actions.confirm'), 'Review & confirm'), testId: 'confirm-listing' };
   }
   if (state === 'pending') {
     return badgeRequested
@@ -118,26 +146,27 @@ const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, on
       : { kind: 'link', href: badgeHref(listing), icon: 'shield-check', label: tr(t, statusKey('actions.getBadge'), 'Get Verified property badge') };
   }
   if (state === 'needs_info') {
-    const useThread = REVIEW_ACTION_REASONS.has(review?.reasonCode || review?.reason || review?.reason_code) && onOpenReview;
+    const useThread = REVIEW_ACTION_REASONS.has(reasonCodeOf(review)) && onOpenReview;
     return useThread
       ? { kind: 'button', onClick: onOpenReview, icon: 'message-square', label: tr(t, statusKey('actions.fixNow'), 'Fix now') }
       : { kind: 'link', href: editHref, icon: 'edit', label: tr(t, statusKey('actions.fixNow'), 'Fix now') };
   }
   if (state === 'live') {
+    if (onShare) return { kind: 'button', onClick: onShare, icon: 'share-network', label: tr(t, statusKey('actions.share'), 'Share listing') };
     if (!verified && !badgeRequested) return { kind: 'link', href: badgeHref(listing), icon: 'shield-check', label: tr(t, statusKey('actions.getBadge'), 'Get Verified property badge') };
-    return onShare
-      ? { kind: 'button', onClick: onShare, icon: 'share-2', label: tr(t, statusKey('actions.share'), 'Share listing') }
-      : { kind: 'link', href: viewHref, icon: 'eye', label: tr(t, statusKey('actions.view'), 'View listing') };
+    return { kind: 'link', href: viewHref, icon: 'eye', label: tr(t, statusKey('actions.view'), 'View listing') };
   }
   if (state === 'rejected') {
-    return { kind: 'link', href: supportHref, icon: 'life-buoy', label: tr(t, statusKey('actions.contactSupport'), 'Contact support') };
+    return mayResubmit(state, review) && editHref
+      ? { kind: 'link', href: editHref, icon: 'edit', label: tr(t, statusKey('actions.editResubmit'), 'Edit & resubmit'), testId: 'edit-resubmit' }
+      : { kind: 'link', href: supportHref, icon: 'life-buoy', label: tr(t, statusKey('actions.contactSupport'), 'Contact support') };
   }
   return { kind: 'link', href: viewHref, icon: 'eye', label: tr(t, statusKey('actions.view'), 'View listing') };
 };
 
-function Action({ action, secondary = false }) {
+export function ListingStatusAction({ action, secondary = false }) {
   const cls = secondary
-    ? 'min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-gray-300 transition-colors hover:text-white'
+    ? 'min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-teal/25 bg-brand-teal/10 px-3 py-2 text-xs font-semibold text-brand-teal-3 transition-colors hover:bg-brand-teal/20'
     : 'min-h-[44px] flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-teal px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-teal-1';
   if (action.kind === 'button') {
     return (
@@ -159,60 +188,93 @@ export default function ListingStatusCard({
   variant = 'slim',
   editHref,
   viewHref,
-  supportHref = '/support',
+  supportHref: supportHrefProp,
   onOpenReview,
   onShare,
-  onConfirm,
+  claimHref,
+  omitView = false,
+  flatmate = null,
+  testId = 'listing-status-card',
   t,
   className = '',
 }) {
   const meta = getOwnerListingStatusMeta(listing, review, t);
+  const supportHref = supportHrefProp || listingSupportLink(listing);
   const unread = Number(review?.unread) || 0;
   const compact = variant === 'slim';
-  const action = actionFor({ state: meta.state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, onConfirm, t });
-  const reportWrong = meta.state === 'confirm' && onConfirm
+  const resolved = actionFor({ state: meta.state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, claimHref, flatmate, t });
+  const action = omitView && resolved.icon === 'eye' ? null : resolved;
+  const flatmateBadge = flatmate?.badge && (meta.state === 'pending' || meta.state === 'live')
+    ? { kind: 'link', href: flatmate.badge.href, testId: flatmate.badge.testId, icon: 'shield-check', label: flatmate.badge.label }
+    : null;
+  const getBadge = flatmate ? flatmateBadge
+    : meta.state === 'live' && onShare && !listing?.ownershipVerified && !hasBadgeRequest(listing)
+      ? { kind: 'link', href: badgeHref(listing), icon: 'shield-check', label: tr(t, statusKey('actions.getBadge'), 'Get Verified property badge') }
+      : null;
+  const reportWrong = meta.state === 'confirm' && claimHref
     ? { kind: onOpenReview ? 'button' : 'link', onClick: onOpenReview, href: supportHref, icon: 'alert-circle', label: tr(t, statusKey('actions.reportWrong'), "Something's wrong"), testId: 'report-listing-wrong' }
     : null;
-  const line = statusLine(meta.state, t, review);
+  const flatmateLine = flatmate && meta.state === 'live' ? tr(t, 'dash.flatmateCard.live', 'Flatmates can now find and contact you.')
+    : flatmate && meta.state === 'pending' ? tr(t, 'dash.flatmateCard.pending', 'Your post is being reviewed.')
+    : null;
+  const line = flatmateLine || statusLine(meta.state, t, review);
   const badgeLabel = tr(t, statusKey('badge'), 'Verified property');
   const wrapper = compact
     ? 'rounded-xl border border-white/8 bg-white/[0.025] px-4 py-3'
     : 'rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-left';
 
   return (
-    <div data-testid="listing-status-card" className={`${wrapper} ${className}`}>
+    <div data-testid={testId} className={`${wrapper} ${className}`}>
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-            <span className={`relative inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${meta.cls}`}>
-              <Icon name={meta.icon} className="h-3 w-3" /> {meta.label}
-              {unread ? <span aria-hidden="true" className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">{unread}</span> : null}
+        <div className="min-w-0 sm:flex-1">
+          <div className="flex items-start gap-3">
+            <span aria-hidden="true" className={`flex h-9 w-9 flex-none items-center justify-center rounded-full border ${meta.cls}`}>
+              <Icon name={meta.icon} className="h-4 w-4" />
             </span>
-            {listing?.ownershipVerified ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-brand-teal/25 bg-brand-teal/10 px-2.5 py-1 text-[11px] font-semibold text-brand-teal-3">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-white">
+                {meta.label}
+                {unread ? <span aria-hidden="true" className="dz-count bg-rose-500 text-white">{unread}</span> : null}
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-gray-300">{line}</p>
+            </div>
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 empty:hidden">
+            {flatmate?.idVerified ? (
+              <span data-testid="id-verified-chip" className="dz-tag border border-brand-teal/25 bg-brand-teal/10 font-semibold text-brand-teal-3">
+                <Icon name="shield-check" className="h-3 w-3" /> {tr(t, 'dash.idBadge.verified', 'ID verified')}
+              </span>
+            ) : null}
+            {listing?.ownershipVerified && !flatmate?.badge ? (
+              <span className="dz-tag border border-brand-teal/25 bg-brand-teal/10 font-semibold text-brand-teal-3">
                 <Icon name="shield-check" className="h-3 w-3" /> {badgeLabel}
               </span>
             ) : seeksOwnershipBadge(listing) ? (
-              <span data-testid="badge-under-review" className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-300">
+              <span data-testid="badge-under-review" className="dz-tag border border-amber-500/20 bg-amber-500/10 font-semibold text-amber-300">
                 <Icon name="clock" className="h-3 w-3" /> {tr(t, statusKey('badgeUnderReview'), 'Badge under review')}
               </span>
             ) : listing?.ownershipDeclinedReason ? (
-              <span data-testid="badge-declined" title={listing.ownershipDeclinedReason} className="inline-flex items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-300">
+              <span data-testid="badge-declined" title={listing.ownershipDeclinedReason} className="dz-tag border border-rose-500/20 bg-rose-500/10 font-semibold text-rose-300">
                 <Icon name="alert-circle" className="h-3 w-3" /> {tr(t, statusKey('badgeDeclined'), 'Badge not granted')}
               </span>
             ) : null}
-            <p className="text-xs leading-relaxed text-gray-300">{line}</p>
           </div>
-          {TRACKED_STATES.has(meta.state) ? <ProgressTracker progress={listing?.progress} ownerView className="mt-2" /> : null}
+          {TRACKED_STATES.has(meta.state) ? (
+            <ProgressTracker progress={listing?.progress} ownerView className="mt-2.5"
+              rejectedLabel={mayResubmit(meta.state, review) ? tr(t, statusKey('status.changesNeeded'), 'Changes needed') : meta.label} />
+          ) : null}
           {onOpenReview && review?.lastMessage ? (
-            <button type="button" onClick={onOpenReview} data-testid="support-thread-link" className="mt-1 inline-flex min-h-[32px] items-center gap-1 text-xs font-semibold text-brand-teal-3 hover:underline">
-              <Icon name="message-square" className="h-3.5 w-3.5" /> {tr(t, statusKey('actions.supportMessages'), 'Messages from Draazy Support')}
+            <button type="button" onClick={onOpenReview} data-testid="support-thread-link" className="tap-coarse mt-2.5 flex min-h-[44px] w-full items-center gap-2 rounded-lg border border-brand-teal/25 bg-brand-teal/10 px-3 text-left text-xs font-semibold text-brand-teal-3 transition-colors hover:bg-brand-teal/20 sm:w-auto">
+              <Icon name="message-square" className="h-4 w-4 flex-none" aria-hidden="true" />
+              <span className="flex-1">{tr(t, statusKey('actions.supportMessages'), 'Messages from Draazy Support')}</span>
+              <Icon name="chevron-right" className="h-4 w-4 flex-none" aria-hidden="true" />
             </button>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-1 sm:shrink-0">
-          <Action action={action} />
-          {reportWrong ? <Action action={reportWrong} secondary /> : null}
+        <div className={`flex ${flatmate ? '' : 'flex-wrap '}items-center gap-2 empty:hidden sm:shrink-0`}>
+          {action ? <ListingStatusAction action={action} /> : null}
+          {getBadge ? <ListingStatusAction action={getBadge} secondary /> : null}
+          {reportWrong ? <ListingStatusAction action={reportWrong} secondary /> : null}
         </div>
       </div>
     </div>

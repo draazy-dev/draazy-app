@@ -11,6 +11,7 @@ import {
 } from './notificationModel.js';
 
 const LONG_PRESS_MS = 520;
+const MAX_STAGGER_S = 0.3;
 
 export default function NotificationRow({
   item,
@@ -21,11 +22,12 @@ export default function NotificationRow({
   swipeable = false,
   compact = false,
   delay = 0,
+  fallbackHref,
 }) {
   const { t } = useTranslation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const timer = useRef(null);
-  const href = safeNotificationLink(item.link);
+  const href = safeNotificationLink(item.link, fallbackHref);
   const meta = TYPE_META[item.type] || TYPE_META.system;
   const title = notificationTitle(item);
   const context = item.desc || '';
@@ -79,8 +81,8 @@ export default function NotificationRow({
       <div
         {...pressHandlers}
         data-id={item.id}
-        className={`notif rounded-2xl flex items-stretch reveal${item.read ? '' : ' unread'}`}
-        style={{ animationDelay: `${delay}s`, touchAction: swipeable ? 'pan-y' : undefined }}
+        className={`notif rounded-2xl flex items-stretch list-reveal${item.read ? '' : ' unread'}`}
+        style={{ animationDelay: `${Math.min(delay, MAX_STAGGER_S)}s`, touchAction: swipeable ? 'pan-y' : undefined }}
       >
         <Link to={href} onClick={open} className={`min-w-0 flex-1 flex items-center gap-3 ${compact ? 'px-3 py-2.5' : 'px-3.5 py-3'}`}>
           <span className={`grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl ${meta.bgCls}`}>
@@ -110,9 +112,9 @@ export default function NotificationRow({
         )}
       </div>
       {sheetOpen && (
-        <div className="fixed inset-0 z-[1700] flex items-end px-4 pb-[calc(1rem+var(--dz-safe-b))] pt-20 sm:hidden">
-          <button type="button" aria-label="Close notification actions" className="absolute inset-0 bg-black/40" onClick={() => setSheetOpen(false)} />
-          <div className="dz-action-sheet relative mx-auto mt-auto max-w-sm rounded-3xl border border-white/10 bg-ink-card p-2 shadow-2xl shadow-black/50">
+        <>
+          <button type="button" aria-label="Close notification actions" className="dz-dropdown__scrim" onClick={() => setSheetOpen(false)} />
+          <div className="dz-action-sheet bg-ink-card p-2">
             {!item.read && (
               <button type="button" onClick={markRead} className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-4 text-left text-sm font-semibold text-gray-100 hover:bg-white/5">
                 <Icon name="check-check" className="h-4 w-4 text-teal-300" /> {t('notifications.markRead')}
@@ -124,7 +126,7 @@ export default function NotificationRow({
               </button>
             )}
           </div>
-        </div>
+        </>
       )}
     </>
   );

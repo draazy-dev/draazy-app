@@ -15,10 +15,10 @@ import Badge from '../../components/ui/Badge.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, Cell, Chips, ClearFilters, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
+  BTN, CHIP, CHIP_TONE, Cell, Chips, ClearFilters, DATE_CHIPS, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
-/* The server's `TicketStatuses` vocabulary (incl. `waiting`, `closed`); `PATCH /tickets/{id}` 400s on `done`. */
 const STATUS_TABS = [
   { key: 'open', label: 'Open' },
   { key: 'in-progress', label: 'In progress' },
@@ -32,7 +32,6 @@ const LABEL = {
   urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low',
 };
 const label = (v) => LABEL[v] || v || '';
-/* `urgent` is in `TicketPriorities`; omit it here and an urgent ticket is unfilterable. */
 const PRIORITY_CHIPS = [
   { value: '', label: 'All' },
   { value: 'urgent', label: 'Urgent' },
@@ -43,7 +42,6 @@ const PRIORITY_CHIPS = [
 const MODAL_STATUS_OPTS = STATUS_TABS.filter((s) => s.key !== 'all').map((s) => ({ value: s.key, label: LABEL[s.key] }));
 const NOTE = 'Customer tickets for this desk. Claim one to own it, Start when you begin, Resolve when it is done.';
 
-/* Counts come from the summary and the list is server-paged, so a page of rows never stands in for the desk. */
 const PAGE_SIZE = 10;
 const EXPORT_SIZE = 100;
 const SUMMARY_KEY = { open: 'open', 'in-progress': 'inProgress', waiting: 'waiting', resolved: 'resolved', closed: 'closed', all: 'all' };
@@ -51,12 +49,9 @@ const SUMMARY_KEY = { open: 'open', 'in-progress': 'inProgress', waiting: 'waiti
 const asDate = (ms) => (ms ? new Date(ms).toISOString().slice(0, 10) : '');
 const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 
-/* `service` is an ops annotation and null on every ticket a customer raised, so `subject` (the words
-   they typed) is the fallback name — and the search corpus below uses the same value. */
 const titleOf = (t) => t.service || t.subject || '';
 
 function openDays(t) {
-  // `createdAt` is epoch milliseconds; anything else would silently hide every age chip.
   if (!t.createdAt) return null;
   const days = Math.floor((Date.now() - t.createdAt) / 86400000);
   return Number.isNaN(days) ? null : days;
@@ -75,7 +70,6 @@ function AgeChip({ ticket }) {
   );
 }
 
-/** A desk's customer tickets. `embedded` renders the board alone, inside a service desk's own tabs. */
 export default function AdminServices({ desk, embedded = false, idPrefix = 'queue' }) {
   const { toast } = useToast();
   const { optionEnabled, loading: flagsLoading } = useAdminFlags();
@@ -92,8 +86,9 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
   const [q, setQ] = useState('');
   const [fStat, setFStat] = useState('open');
   const [fPrio, setFPrio] = useState('');
+  const [days, setDays] = useState('');
   const [page, setPage] = useState(1);
-  const filterKey = `${fStat}|${fPrio}|${q}`;
+  const filterKey = `${fStat}|${fPrio}|${days}|${q}`;
   const [pageKey, setPageKey] = useState(filterKey);
   if (pageKey !== filterKey) {
     setPageKey(filterKey);
@@ -107,15 +102,15 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
 
   const filters = useCallback(() => ({
     team: desk, status: fStat === 'all' ? undefined : fStat, priority: fPrio || undefined, q: q.trim() || undefined,
-  }), [desk, fStat, fPrio, q]);
+    days: days || undefined,
+  }), [desk, fStat, fPrio, days, q]);
 
   useEffect(() => {
     let alive = true;
     const timer = setTimeout(() => {
       listTicketQueue({ ...filters(), page: page - 1, size: PAGE_SIZE })
         .then((res) => { if (alive) { setResult(res); setLoadError(''); } })
-        // Not an empty board: an unread failure rendered as "nothing to do" is how a desk goes home early.
-        .catch((e) => { if (alive) setLoadError(e?.message || 'The service requests could not be read.'); });
+        .catch((e) => { if (alive) setLoadError(userMessage(e, 'The service requests could not be read.')); });
     }, q.trim() ? 300 : 0);
     return () => {
       alive = false;
@@ -133,7 +128,6 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
 
   useEffect(() => {
     let alive = true;
-    // The directory maps "Priya" to the id `TicketUpdate.assigneeId` takes; desk staff can only claim for self.
     if (role !== 'staff') listAssignees().then((list) => { if (alive) setStaff(list); }, () => {});
     return () => {
       alive = false;
@@ -149,7 +143,6 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
     setOpenId(t.id);
   }, []);
 
-  // ?open=<id> opens that ticket once per mount, so it does not re-open while the param clears.
   const deepLinkId = useRef(null);
   useEffect(() => {
     const tid = searchParams.get('open');
@@ -191,12 +184,10 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
         res.items.map((t) => [t.id, titleOf(t), DESK_LABEL[t.desk] || t.desk, t.customer, t.mobile, t.detail, t.priority, t.assignedTo || '', t.status, asDate(t.createdAt)]),
       );
     } catch (e) {
-      toast(e?.message || 'The export could not be read.', 'error');
+      toast(userMessage(e, 'The export could not be read.'), 'error');
     }
   };
 
-  /* Claim and move are two calls because they are two decisions, and the server may refuse the move.
-     Assigning first means a refused move still leaves the ticket owned by someone. */
   const startTicket = async (t) => {
     try {
       const first = t.assignedTo ? null : deskStaff(t.desk)[0];
@@ -204,7 +195,7 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
       await setTicketStatus(t.id, 'in-progress');
       toast('Marked in progress');
     } catch (e) {
-      toast(e?.message || 'That request could not be started.', 'error');
+      toast(userMessage(e, 'That request could not be started.'), 'error');
     }
     reload();
   };
@@ -214,7 +205,7 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
       await claimTicket(t.id, user?.id);
       toast('Assigned to you');
     } catch (e) {
-      toast(e?.message || 'That request could not be claimed.', 'error');
+      toast(userMessage(e, 'That request could not be claimed.'), 'error');
     }
     reload();
   };
@@ -224,7 +215,7 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
       await setTicketStatus(t.id, 'resolved');
       toast('Request resolved');
     } catch (e) {
-      toast(e?.message || 'That request could not be resolved.', 'error');
+      toast(userMessage(e, 'That request could not be resolved.'), 'error');
     }
     reload();
   };
@@ -248,8 +239,6 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
   const saveTicket = async () => {
     if (!active) return;
     try {
-      /* Three calls, ordered to leave the least damage if one fails: assignment, then the status the
-         server may refuse, then the note — an append, so a colleague's note saved in between survives. */
       if (form.assigneeId && form.assigneeId !== '__keep__') await claimTicket(active.id, form.assigneeId);
       if (form.status && form.status !== active.status) await setTicketStatus(active.id, form.status);
       const note = form.note.trim();
@@ -258,10 +247,9 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
       reload();
       toast('Request updated');
     } catch (e) {
-      toast(e?.message || 'That request could not be updated.', 'error');
+      toast(userMessage(e, 'That request could not be updated.'), 'error');
     }
   };
-  // Standalone notices keep the page header so an operator can tell which desk they landed on.
   const notice = (body) => {
     const box = <div className="flex flex-col items-center justify-center py-20 text-center">{body}</div>;
     return embedded ? box : (
@@ -309,8 +297,6 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
     </>
   );
 
-  /* Values are user ids, not names — two colleagues called Priya are not the same person. The blank
-     option is "leave as it is", not "unassign", which has its own sentinel on the server. */
   const staffOpts = active
     ? [{ value: '', label: '— Leave unchanged —' }, ...deskStaff(active.desk).map((s) => ({ value: s.id, label: s.name }))]
     : [{ value: '', label: '— Leave unchanged —' }];
@@ -343,7 +329,8 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
           ) : null}
           <SearchBox value={q} onChange={setQ} placeholder="Search id, customer, detail…" label="Search tickets" />
           <Chips label="Priority" options={PRIORITY_CHIPS} value={fPrio} onChange={setFPrio} />
-          {q || fPrio ? <ClearFilters onClick={() => { setQ(''); setFPrio(''); }} /> : null}
+          <Chips label="Date" options={DATE_CHIPS} value={days} onChange={setDays} />
+          {q || fPrio || days ? <ClearFilters onClick={() => { setQ(''); setFPrio(''); setDays(''); }} /> : null}
           <div className="ml-auto flex items-center gap-2">
             <button type="button" onClick={doExport} className={BTN.ghost}>
               <Download className="h-3.5 w-3.5" /> Export CSV

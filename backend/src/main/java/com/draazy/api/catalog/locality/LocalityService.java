@@ -1,5 +1,6 @@
 package com.draazy.api.catalog.locality;
 
+import com.draazy.api.catalog.property.Freshness;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.audit.AuditService;
@@ -16,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class LocalityService {
-
     private final LocalityRepository localities;
     private final PropertyRepository properties;
     private final LocalityMapper localityMapper;
@@ -31,15 +31,6 @@ public class LocalityService {
     }
 
     @Transactional(readOnly = true)
-    public List<LocalityResponse> list() {
-        Map<String, LocalityStats> stats = statsBySlug(null);
-        return localities.findDirectory(PropertyStatus.APPROVED).stream()
-                .map(l -> localityMapper.toResponse(l, stats.getOrDefault(l.getSlug(), LocalityStats.NONE)))
-                .toList();
-    }
-
-    /** Every row, retired ones included, so an area retired with no listings can still be restored. */
-    @Transactional(readOnly = true)
     public List<LocalityAdminRow> adminList() {
         Map<String, LocalityStats> stats = statsBySlug(null);
         return localities.findAll(Sort.by("name")).stream()
@@ -47,7 +38,6 @@ public class LocalityService {
                 .toList();
     }
 
-    /** Retiring only closes the area to new listings: live listings and the area's page stay. */
     @Transactional
     public LocalityAdminRow retire(String slug, AuthPrincipal actor) {
         Locality locality = localities.findById(slug).orElseThrow(() -> NotFoundException.of("Locality"));
@@ -74,7 +64,6 @@ public class LocalityService {
         return new LocalityAdminRow(l.getSlug(), l.getName(), l.getLat(), l.getLng(), l.isArchived(), stats.live());
     }
 
-    /** Non-live localities still resolve: their page renders, and indexability follows the live count. */
     @Transactional(readOnly = true)
     public LocalityResponse get(String slug) {
         Locality locality = localities.findById(slug).orElseThrow(() -> NotFoundException.of("Locality"));
@@ -82,7 +71,6 @@ public class LocalityService {
                 statsBySlug(slug).getOrDefault(slug, LocalityStats.NONE));
     }
 
-    /** Asking sale rate per sq ft from live listings; empty below three samples. */
     @Transactional(readOnly = true)
     public Optional<Long> marketRate(String slug) {
         return Optional.ofNullable(statsBySlug(slug).getOrDefault(slug, LocalityStats.NONE).ratePerSqft());
@@ -90,7 +78,8 @@ public class LocalityService {
 
     private Map<String, LocalityStats> statsBySlug(String slug) {
         Map<String, LocalityStats> out = new HashMap<>();
-        for (Object[] row : properties.liveLocalityStats(PropertyStatus.APPROVED, slug)) {
+        for (Object[] row : properties.liveLocalityStats(PropertyStatus.APPROVED, slug,
+                Freshness.dormantCutoff(Instant.now()))) {
             out.put((String) row[0], LocalityStats.of(row));
         }
         return out;

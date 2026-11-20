@@ -9,10 +9,7 @@ import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** A Postgres advisory lock per job, held in one open transaction for the whole run: one instance runs it.
- * Transaction-scoped so a transaction-mode pooler (DB_URL on :6543) keeps the run pinned to one backend. */
 final class JobLock {
-
     private static final Logger log = LoggerFactory.getLogger(JobLock.class);
 
     private final DataSource dataSource;
@@ -21,7 +18,6 @@ final class JobLock {
         this.dataSource = dataSource;
     }
 
-    /** The held lock, or empty when another instance holds it or the database cannot be asked. */
     Optional<Held> tryAcquire(String job) {
         Connection connection = null;
         try {
@@ -64,7 +60,6 @@ final class JobLock {
     }
 
     static final class Held implements AutoCloseable {
-
         private final Connection connection;
 
         private Held(Connection connection) {

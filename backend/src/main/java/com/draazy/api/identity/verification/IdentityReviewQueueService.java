@@ -1,5 +1,6 @@
 package com.draazy.api.identity.verification;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.identity.user.User;
@@ -24,8 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class IdentityReviewQueueService {
 
-    static final String QA = "qa";
     static final String DECIDED = "decided";
+    static final String APPEAL = "appeal";
 
     static final Duration OVERDUE_AFTER = Duration.ofHours(48);
 
@@ -36,20 +37,22 @@ public class IdentityReviewQueueService {
     private static final char ESCAPE = '\\';
 
     public record Filters(String status, String q, String docType, String claim, boolean overdue,
-            String outcome, String sort) {
+            String outcome, String sort, Integer days) {
     }
 
-    public record Summary(long pending, long overdue, long mine, long qa, long decided) {
+    public record Summary(long pending, long overdue, long mine, long decided, long appeals) {
     }
 
     private final IdentityVerificationRepository verifications;
     private final IdentityReviewReadService read;
+    private final IdentityAppealRepository appeals;
     private final Clock clock;
 
     public IdentityReviewQueueService(IdentityVerificationRepository verifications,
-            IdentityReviewReadService read, Clock clock) {
+            IdentityReviewReadService read, IdentityAppealRepository appeals, Clock clock) {
         this.verifications = verifications;
         this.read = read;
+        this.appeals = appeals;
         this.clock = clock;
     }
 
@@ -65,7 +68,8 @@ public class IdentityReviewQueueService {
         Instant now = Instant.now(clock);
         UUID me = actor == null ? new UUID(0, 0) : actor.userId();
         var c = verifications.summaryCounts(now.minus(OVERDUE_AFTER), now.minus(IdentityReviewClaimService.CLAIM_TTL), me);
-        return new Summary(c.getPending(), c.getOverdue(), c.getMine(), c.getQa(), c.getDecided());
+        return new Summary(c.getPending(), c.getOverdue(), c.getMine(), c.getDecided(),
+                appeals.countByStatus(IdentityAppeal.OPEN));
     }
 
     private static void validate(Filters f) {
@@ -84,12 +88,17 @@ public class IdentityReviewQueueService {
     }
 
     private Specification<IdentityVerification> spec(AuthPrincipal actor, Filters f) {
+        Instant since = PlatformTime.sinceOrNull(f.days());
         Specification<IdentityVerification> base = switch (f.status() == null ? "" : f.status()) {
             case "" -> Specification.not(statusIs(VerificationStatuses.WITHDRAWN));
-            case QA -> qaOpen(actor);
+            case APPEAL -> appealOpen(since);
             case DECIDED -> decided(f.outcome());
             default -> statusIs(f.status());
         };
+        if (since != null && !APPEAL.equals(f.status())) {
+            String column = submittedColumn(f.status()) ? "submittedAt" : "decidedAt";
+            base = base.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get(column), since));
+        }
         if (f.docType() != null) {
             base = base.and((root, query, cb) -> cb.equal(root.get("docType"), f.docType()));
         }
@@ -105,15 +114,15 @@ public class IdentityReviewQueueService {
 
     private static Sort order(Filters f) {
         String status = f.status() == null ? "" : f.status();
-        String column = switch (status) {
-            case VerificationStatuses.PENDING, "" -> "submittedAt";
-            case QA -> "qaSampledAt";
-            default -> "decidedAt";
-        };
-        boolean oldestByDefault = VerificationStatuses.PENDING.equals(status) || QA.equals(status);
+        String column = submittedColumn(status) ? "submittedAt" : "decidedAt";
+        boolean oldestByDefault = VerificationStatuses.PENDING.equals(status) || APPEAL.equals(status);
         boolean oldest = f.sort() == null ? oldestByDefault : "oldest".equals(f.sort());
         Sort.Direction dir = oldest ? Sort.Direction.ASC : Sort.Direction.DESC;
         return Sort.by(new Sort.Order(dir, column).nullsLast(), new Sort.Order(dir, "id"));
+    }
+
+    private static boolean submittedColumn(String status) {
+        return status == null || status.isEmpty() || VerificationStatuses.PENDING.equals(status);
     }
 
     private static Specification<IdentityVerification> statusIs(String status) {
@@ -126,15 +135,15 @@ public class IdentityReviewQueueService {
                 : statusIs(outcome);
     }
 
-    private static Specification<IdentityVerification> qaOpen(AuthPrincipal actor) {
-        UUID me = actor == null ? null : actor.userId();
-        return (root, query, cb) -> cb.and(
-                cb.equal(root.get("status"), VerificationStatuses.VERIFIED),
-                cb.isNotNull(root.get("qaSampledAt")),
-                cb.isNull(root.get("qaReviewedAt")),
-                me == null
-                        ? cb.conjunction()
-                        : cb.or(cb.isNull(root.get("reviewerId")), cb.notEqual(root.get("reviewerId"), me)));
+    private static Specification<IdentityVerification> appealOpen(Instant since) {
+        return (root, query, cb) -> {
+            Subquery<UUID> open = query.subquery(UUID.class);
+            Root<IdentityAppeal> a = open.from(IdentityAppeal.class);
+            var raised = cb.equal(a.get("status"), IdentityAppeal.OPEN);
+            open.select(a.get("verificationId")).where(since == null ? raised
+                    : cb.and(raised, cb.greaterThanOrEqualTo(a.get("createdAt"), since)));
+            return cb.and(cb.equal(root.get("status"), VerificationStatuses.REJECTED), root.get("id").in(open));
+        };
     }
 
     private Specification<IdentityVerification> overdue() {

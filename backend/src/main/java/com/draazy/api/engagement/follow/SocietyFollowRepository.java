@@ -11,12 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-/** Bare {@link Repository}: {@code JpaRepository}'s findAll()/delete() would silently hit the societies table.
- * Follows are hard-deleted: a preference, not a business record. */
+// Bare Repository: JpaRepository's findAll()/delete() would silently hit the societies table.
 public interface SocietyFollowRepository extends Repository<Society, UUID> {
-
-    /** Slices ids here, with an explicit {@code countQuery}, so {@code findAllById} loads one page.
-     * A follow of a merged-away society reads as its survivor, once. */
     @Query(value = """
             select coalesce(s.merged_into, s.id) from society_follows f join societies s on s.id = f.society_id
             where f.user_id = :userId group by 1 order by max(f.created_at) desc""",
@@ -26,7 +22,6 @@ public interface SocietyFollowRepository extends Repository<Society, UUID> {
             nativeQuery = true)
     Page<UUID> findFollowedSocietyIds(@Param("userId") UUID userId, Pageable pageable);
 
-    /** Followers still owed this alert: not the owner, nobody with match alerts off, nobody already told. */
     @Query(value = """
             select distinct f.user_id from society_follows f
             left join notification_preferences np on np.user_id = f.user_id
@@ -39,13 +34,11 @@ public interface SocietyFollowRepository extends Repository<Society, UUID> {
             @Param("excludedUserId") UUID excludedUserId, @Param("type") String type,
             @Param("link") String link);
 
-    /** Idempotent follow (D8.10). Returns 1 if inserted, 0 if already following. */
     @Modifying
     @Query(value = "insert into society_follows (user_id, society_id) values (:userId, :societyId) on conflict do nothing",
             nativeQuery = true)
     int insertIfAbsent(@Param("userId") UUID userId, @Param("societyId") UUID societyId);
 
-    /** Hard delete. Returns 0 if nothing existed — controller answers 204 either way. */
     @Modifying
     @Query(value = "delete from society_follows where user_id = :userId and society_id = :societyId",
             nativeQuery = true)

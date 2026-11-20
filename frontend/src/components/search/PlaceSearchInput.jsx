@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import PoweredByGoogle from '../ui/PoweredByGoogle.jsx';
 import { fetchPlaceDetails, fetchSuggestions, newAutocompleteSession } from '../../lib/places.js';
+import { userMessage } from '../../lib/userMessage.js';
+import { isImeComposing } from '../../lib/isImeComposing.js';
 
 const DEBOUNCE_MS = 220;
 
@@ -12,8 +14,6 @@ async function resolvePoint(s) {
   return { near: `${d.lat.toFixed(4)},${d.lng.toFixed(4)}`, label: d.name || s.mainText };
 }
 
-/* Inline suggestions under the field. Searches Google Places by default; `search` / `resolve` swap the source,
-   and an Error thrown by `resolve` has its message shown to the user. */
 export default function PlaceSearchInput({ label = '', onPick, onClear, bias = null, search, resolve = resolvePoint, clearOnPick = false, placeholder, ariaLabel }) {
   const { t } = useTranslation();
   const listId = useId();
@@ -30,7 +30,6 @@ export default function PlaceSearchInput({ label = '', onPick, onClear, bias = n
   const pickedTextRef = useRef(label);
   const boxRef = useRef(null);
 
-  // A value set elsewhere (URL, home search, Clear) replaces whatever was typed.
   if (shownLabel !== label) {
     setShownLabel(label);
     setQuery(label);
@@ -73,7 +72,7 @@ export default function PlaceSearchInput({ label = '', onPick, onClear, bias = n
     setBusy(true);
     let value = null;
     let failure = '';
-    try { value = await resolve(s); } catch (e) { failure = e?.message || ''; }
+    try { value = await resolve(s); } catch (e) { failure = userMessage(e, ''); }
     if (id !== pickRef.current) return;
     setBusy(false);
     sessionRef.current = null;
@@ -106,7 +105,7 @@ export default function PlaceSearchInput({ label = '', onPick, onClear, bias = n
     if (!open || !suggestions.length) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => (i + 1) % suggestions.length); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => (i <= 0 ? suggestions.length - 1 : i - 1)); }
-    else if (e.key === 'Enter') { e.preventDefault(); choose(suggestions[Math.max(active, 0)]); }
+    else if (e.key === 'Enter') { if (!isImeComposing(e)) { e.preventDefault(); choose(suggestions[Math.max(active, 0)]); } }
     else if (e.key === 'Escape') setOpen(false);
   };
 

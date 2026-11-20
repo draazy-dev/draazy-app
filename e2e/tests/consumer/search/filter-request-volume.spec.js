@@ -1,4 +1,5 @@
 import { test, expect } from '../../../fixtures/live.js';
+import { settle } from '../../../helpers/settle.js';
 
 /* A range reports every step of a drag and each one became a `GET /properties` (239 per gesture);
  * `useCommitOnRelease` lifts the value on release. Desktop sidebar only — the drawer shares it. */
@@ -12,7 +13,7 @@ async function openListings(page, url) {
   const first = page.waitForResponse((res) => res.request().method() === 'GET' && /\/properties(\?|$)/.test(res.url()));
   await page.goto(url);
   await first;
-  await page.waitForLoadState('networkidle').catch(() => {});
+  await settle(page).catch(() => {});
 }
 
 /** Count `GET /properties` searches from now on; returns a live counter and a reset. */

@@ -6,16 +6,19 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface PropertyReviewRepository extends JpaRepository<PropertyReview, UUID> {
-
-    /** {@code property_id} is UNIQUE, so a listing has at most one open case file. */
     Optional<PropertyReview> findByPropertyId(UUID propertyId);
 
-    // Transaction-level lock prevents two inserts for the same case file.
+    Optional<PropertyReview> findByFlatmatePostId(UUID postId);
+
+    @EntityGraph(attributePaths = "messages")
+    List<PropertyReview> findByFlatmatePostIdIn(Collection<UUID> postIds);
+
     @Query(value = """
             select 1 from (
               select pg_advisory_xact_lock(hashtextextended(cast(:propertyId as text), 0))

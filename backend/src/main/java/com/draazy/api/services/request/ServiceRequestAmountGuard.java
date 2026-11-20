@@ -11,10 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/** A paid callback whose sum or currency is not the order's is not settled; admins refund it from the gateway. */
 @Component
 class ServiceRequestAmountGuard {
-
     private static final Logger log = LoggerFactory.getLogger(ServiceRequestAmountGuard.class);
 
     private static final String CURRENCY = "INR";
@@ -29,7 +27,6 @@ class ServiceRequestAmountGuard {
         this.notifier = notifier;
     }
 
-    /** An absent amount or currency is not a mismatch; the audit entry and the admin notice are once per order. */
     boolean refuses(String orderId, UUID requestId, Long expected, BigDecimal paid, String currency) {
         boolean wrongCurrency = currency != null && !currency.isBlank() && !CURRENCY.equalsIgnoreCase(currency);
         boolean wrongAmount = paid != null && expected != null && paid.compareTo(BigDecimal.valueOf(expected)) != 0;

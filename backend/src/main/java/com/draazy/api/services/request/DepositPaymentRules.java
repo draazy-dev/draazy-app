@@ -7,10 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-// How the refundable deposit reached the licensor, as the IGR portal asks for it. Mirrors
-// DEPOSIT_PAY_FIELDS in the wizard's constants.js.
 final class DepositPaymentRules {
-
     static final int MAX_PAYMENTS = 10;
     static final int MAX_TEXT = 80;
 
@@ -26,13 +23,11 @@ final class DepositPaymentRules {
     private DepositPaymentRules() {
     }
 
-    // A bank reference on a row whose mode carries one — the only place a 12-digit run may be a UTR.
     static boolean isPaymentReference(Object row) {
         return row instanceof Map<?, ?> map && REQUIRED.getOrDefault(String.valueOf(map.get("mode")), List.of()).contains("ref")
                 && map.get("ref") instanceof String ref && REF.matcher(ref).matches();
     }
 
-    // Presence is the wizard's rule; requests filed before this section existed carry no rows.
     static void check(Map<String, Object> terms, LocalDate today, List<String> problems) {
         Object raw = terms.get("depositPayments");
         if (raw == null) {

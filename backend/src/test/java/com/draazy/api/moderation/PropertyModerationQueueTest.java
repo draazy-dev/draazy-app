@@ -18,17 +18,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-// Public and owner listing routes cannot expose an unapproved stranger's id,
-// so the moderation queue needs its own reachable read.
 @DisplayName("Moderation — the listing queue is reachable")
 class PropertyModerationQueueTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
     PropertyRepository properties;
 
-    /** Audit rows commit through REQUIRES_NEW, so a rollback does not take them with it. */
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
         jdbc.update("delete from audit_log where entity = 'property'");
@@ -57,12 +53,10 @@ class PropertyModerationQueueTest extends AbstractApiTest {
         p.setArea(new BigDecimal("950"));
         p.setStatus(status);
 
-        // Filed, so queue tests do not fail on locality approval.
         p.setLocalitySlug("baner");
         return properties.saveAndFlush(p);
     }
 
-    // The whole point: the backlog is visible.
     private void tickChecklist(Property p, User staff) throws Exception {
         mvc.perform(post("/properties/" + p.getId() + "/verification/start")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
@@ -100,8 +94,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
 
-    // On the public search a `status` param can only narrow within approved, so `status=pending` yields an empty page.
-    // Here it must widen.
     @Test
     @DisplayName("the status filter widens here and narrows on the public search")
     void statusFilterWidens() throws Exception {
@@ -122,7 +114,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
-    // `archived` is tri-state; omitted means the ops screen shows all listings.
     @Test
     @DisplayName("archived is tri-state — both, only-archived, only-live")
     void archivedIsTriState() throws Exception {
@@ -147,8 +138,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].id").value(live.getId().toString()));
     }
 
-    // Stays-live rechecks remain approved and unarchived,
-    // so only this tri-state filter can surface them to ops.
     @Test
     @DisplayName("recheck is tri-state — the stays-live queue, its complement, and both")
     void recheckIsTriState() throws Exception {
@@ -176,14 +165,10 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(quiet.getId().toString()))
 
-                // NON_NULL: nothing queued, so the two re-check fields are absent rather than
-                // present-and-empty. A client cannot mistake "clean" for "queued at the epoch".
                 .andExpect(jsonPath("$.content[0].recheckRequestedAt").doesNotExist())
                 .andExpect(jsonPath("$.content[0].recheckPending").value(false));
     }
 
-    // Unfiltered queue clients need the archived value,
-    // not a hard-coded `false`, to distinguish rows.
     @Test
     @DisplayName("a badge-only request sits in the badge queue, not the re-check queue, and sorts by age")
     void badgeRequestsHaveTheirOwnQueue() throws Exception {
@@ -247,7 +232,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].archived").value(false));
     }
 
-    /** Free text is the facet ops actually uses; it must reach unapproved rows like the rest. */
     @Test
     @DisplayName("free-text search reaches unapproved listings")
     void freeTextReachesUnapprovedRows() throws Exception {
@@ -262,7 +246,24 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].id").value(wanted.getId().toString()));
     }
 
-    // An ordinary account reaching it would be a disclosure, not a UI bug.
+    @Test
+    @DisplayName("free-text search matches the short listing code in either case")
+    void freeTextMatchesShortCode() throws Exception {
+        User owner = user("9850000040", "owner");
+        User staff = user("9850000041", "staff");
+        Property coded = listing(owner, "Coded flat", PropertyStatus.PENDING);
+        coded.setSlug("p5013");
+        properties.saveAndFlush(coded);
+        listing(owner, "Other flat", PropertyStatus.PENDING);
+
+        for (String q : new String[] {"p5013", "P5013", "5013"}) {
+            mvc.perform(get("/admin/properties").param("q", q)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].id").value(coded.getId().toString()));
+        }
+    }
+
     @Test
     @DisplayName("an ordinary user cannot read the queue")
     void seekersAreForbidden() throws Exception {
@@ -272,14 +273,12 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** And an anonymous caller must not even get as far as the role check. */
     @Test
     @DisplayName("an anonymous caller is unauthorized")
     void anonymousIsUnauthorized() throws Exception {
         mvc.perform(get("/admin/properties")).andExpect(status().isUnauthorized());
     }
 
-    // The assertion is deliberately equality against the seeded number rather than "does not contain X".
     @Test
     @DisplayName("owner contact is revealed in the queue, because the desk phones owners")
     void ownerContactIsRevealed() throws Exception {
@@ -292,7 +291,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].owner.mobile").value("9850000012"));
     }
 
-    // Each half existed before; only together are they a moderation system.
     @Test
     @DisplayName("a listing found in the queue can be approved and then appears publicly")
     void queueAndDecisionCloseTheLoop() throws Exception {
@@ -316,7 +314,6 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
 
-    // Flagging removes a listing from public search; the queue is where it resurfaces.
     @Test
     @DisplayName("a flagged listing leaves public search and is findable in the queue")
     void flaggedListingsAreFindable() throws Exception {
@@ -339,4 +336,60 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(jsonPath("$.flagReason").value("duplicate photos"));
     }
-}
+
+    private static final java.time.Instant YESTERDAY_LATE = java.time.LocalDate.now(com.draazy.api.common.PlatformTime.IST)
+            .atStartOfDay(com.draazy.api.common.PlatformTime.IST).toInstant().minus(1, java.time.temporal.ChronoUnit.MINUTES);
+
+    private void stamp(Property p, String column, java.time.Instant at) {
+        jdbc.update("update properties set " + column + " = ? where id = ?", java.sql.Timestamp.from(at), p.getId());
+    }
+
+    private java.util.List<String> titles(User staff, String... params) throws Exception {
+        var req = get("/admin/properties").header(HttpHeaders.AUTHORIZATION, bearer(staff)).param("q", "Datechip");
+        for (int i = 0; i < params.length; i += 2) req = req.param(params[i], params[i + 1]);
+        String body = mvc.perform(req).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return com.jayway.jsonpath.JsonPath.read(body, "$.content[*].title");
+    }
+
+    @Test
+    @DisplayName("days filters the queue by creation time in IST calendar days")
+    void daysFiltersByCreatedAt() throws Exception {
+        User owner = user("9871501001", "owner");
+        User staff = user("9871501002", "staff");
+        listing(owner, "Datechip today", PropertyStatus.PENDING);
+        stamp(listing(owner, "Datechip yesterday", PropertyStatus.PENDING), "created_at", YESTERDAY_LATE);
+
+        org.assertj.core.api.Assertions.assertThat(titles(staff)).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "days", "1")).containsExactly("Datechip today");
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "days", "7")).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("days filters the re-check tab by when the re-check was requested, not by creation")
+    void daysFiltersRecheckByRequestTime() throws Exception {
+        User owner = user("9871501003", "owner");
+        User staff = user("9871501004", "staff");
+        Property fresh = listing(owner, "Datechip fresh recheck", PropertyStatus.APPROVED);
+        Property old = listing(owner, "Datechip old recheck", PropertyStatus.APPROVED);
+        stamp(fresh, "recheck_requested_at", java.time.Instant.now());
+        stamp(old, "recheck_requested_at", YESTERDAY_LATE);
+
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "recheck", "true", "days", "1"))
+                .containsExactly("Datechip fresh recheck");
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "recheck", "true", "days", "7")).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("days filters the badge tab by when the badge was requested, not by creation")
+    void daysFiltersBadgeByRequestTime() throws Exception {
+        User owner = user("9871501005", "owner");
+        User staff = user("9871501006", "staff");
+        Property fresh = listing(owner, "Datechip fresh badge", PropertyStatus.APPROVED);
+        Property old = listing(owner, "Datechip old badge", PropertyStatus.APPROVED);
+        stamp(fresh, "ownership_requested_at", java.time.Instant.now());
+        stamp(old, "ownership_requested_at", YESTERDAY_LATE);
+
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "badge", "true", "days", "1"))
+                .containsExactly("Datechip fresh badge");
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "badge", "true", "days", "7")).hasSize(2);
+    }}

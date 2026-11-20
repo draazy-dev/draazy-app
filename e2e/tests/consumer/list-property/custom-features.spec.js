@@ -17,6 +17,16 @@ async function menuOpen(page) {
   await expect(page.locator('.dz-dropdown__menu.is-portal-open')).toBeVisible();
 }
 
+// Chrome ignores `keyCode` in KeyboardEventInit, so Safari's post-compositionend Enter (isComposing
+// false, keyCode 229) has to be faked with a getter.
+async function composingEnter(input, { safari = false } = {}) {
+  await input.evaluate((el, asSafari) => {
+    const ev = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true, isComposing: !asSafari });
+    if (asSafari) Object.defineProperty(ev, 'keyCode', { get: () => 229 });
+    el.dispatchEvent(ev);
+  }, safari);
+}
+
 async function pickType(page, label) {
   await page.locator('[data-err="propertyType"]').click();
   await menuOpen(page);
@@ -52,13 +62,14 @@ test('Furniture picker: titled by what the owner declares, tiles are keyboard-op
   const picker = page.getByTestId('in-flat-features');
 
   await test.step('one in-flat picker for every furnishing, titled by what the owner is declaring', async () => {
-    await expect(picker.getByText("What's already fitted?")).toBeVisible();
-    await expect(picker.locator('.furn-tile', { hasText: 'Modular Kitchen' })).toBeVisible();
-
-    await page.getByText('Furnishing Status').locator('..').getByText('Furnished', { exact: true }).click();
+    const furnishing = (label) => page.getByText('Furnishing Status').locator('..').getByText(label, { exact: true });
     await expect(picker.getByText("What's included?")).toBeVisible();
     await expect(picker.locator('.furn-tile', { hasText: 'Modular Kitchen' })).toBeVisible();
-    await page.getByText('Furnishing Status').locator('..').getByText('Furnished', { exact: true }).click();
+
+    await furnishing('Unfurnished').click();
+    await expect(picker.getByText("What's already fitted?")).toBeVisible();
+    await expect(picker.locator('.furn-tile', { hasText: 'Modular Kitchen' })).toBeVisible();
+    await furnishing('Furnished').click();
     await expect(picker.getByText("What's included?")).toBeVisible();
     await expect(picker.locator('.furn-tile', { hasText: 'Modular Kitchen' })).toBeVisible();
   });
@@ -116,10 +127,31 @@ test('Furniture picker: titled by what the owner declares, tiles are keyboard-op
   });
 });
 
+test('Furniture: the Enter that confirms an IME candidate does not add the half-typed item', async ({ page }) => {
+  await gotoForm(page);
+  await pickType(page, 'Flat / Apartment');
+  const input = page.getByLabel('Add a custom furniture item');
+  const custom = page.locator('.furn-tile[data-custom="true"]');
+
+  await input.fill('अलमारी');
+  await composingEnter(input);
+  await composingEnter(input, { safari: true });
+  await expect(input).toHaveValue('अलमारी');
+  await expect(custom).toHaveCount(0);
+
+  await input.press('Enter');
+  await expect(custom.filter({ hasText: 'अलमारी' })).toHaveCount(1);
+});
+
 test('Amenities: a user can add a custom amenity not in our list', async ({ page }) => {
   await toUploadsFlat(page);
 
   const input = page.getByLabel('Add a custom amenity');
+  await input.fill('झूला');
+  await composingEnter(input, { safari: true });
+  await expect(page.locator('.furn-tile[data-custom="true"]')).toHaveCount(0);
+  await input.fill('');
+
   await input.fill('EV Charging');
   await input.press('Enter');
 

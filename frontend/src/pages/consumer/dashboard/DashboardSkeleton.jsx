@@ -1,9 +1,6 @@
-/* The route is code-split, and the app-wide `min-h-[60vh]` spinner is a height the dashboard never has — the chunk
-   landing shoves the page down mid-click. */
 export default function DashboardSkeleton() {
   return (
     <div
-      /* One live region for the whole route. */
       className="pt-6 lg:pt-8 pb-20 min-h-[100dvh]"
       role="status"
       aria-live="polite"
@@ -11,19 +8,15 @@ export default function DashboardSkeleton() {
       data-testid="dashboard-skeleton"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Greeting, then the activity strapline — the reading order of the real header. */}
         <div className="mb-6">
           <div className="h-8 sm:h-9 w-56 skeleton rounded" />
           <div className="h-4 w-64 skeleton rounded mt-2" />
         </div>
-        {/* Mobile section switcher. */}
-
         <div className="lg:hidden mb-5">
           <div className="h-[52px] w-full skeleton rounded-2xl" />
         </div>
 
         <div className="lg:grid lg:grid-cols-[260px_1fr] lg:gap-6">
-          {/* Sidebar — desktop only, mirroring DashboardSidebar's own `hidden lg:block`. */}
           <aside className="hidden lg:block">
             <div className="glass-card rounded-2xl p-4">
               <div className="flex items-center gap-3 px-2 pb-4 mb-3 border-b border-white/8">
@@ -38,8 +31,6 @@ export default function DashboardSkeleton() {
               </div>
             </div>
           </aside>
-          {/* Which panel is unknown until the chunk resolves, so this is the shared floor every tab starts with. */}
-
           <section className="space-y-4">
             <div className="h-6 w-40 skeleton rounded" />
             <div className="h-40 skeleton rounded-2xl" />

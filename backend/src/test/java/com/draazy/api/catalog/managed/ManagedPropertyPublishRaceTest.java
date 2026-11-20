@@ -2,13 +2,14 @@ package com.draazy.api.catalog.managed;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.draazy.api.catalog.listing.ListingCreate;
+import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.Races;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.stream.Collectors;
+import java.util.Objects;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,12 +17,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import tools.jackson.databind.ObjectMapper;
 
-// Not on AbstractApiTest: its rollback hides commits, and a publish race only exists across commits.
 @SpringBootTest
 @DisplayName("Concurrent publishes of one managed record")
 class ManagedPropertyPublishRaceTest {
-
     private static final int RACERS = 6;
 
     private static final String OWNER_MOBILE = "9876000431";
@@ -31,6 +31,7 @@ class ManagedPropertyPublishRaceTest {
     @Autowired ManagedPropertyService service;
     @Autowired UserRepository users;
     @Autowired JdbcTemplate jdbc;
+    @Autowired ObjectMapper json;
 
     private User owner;
 
@@ -55,27 +56,29 @@ class ManagedPropertyPublishRaceTest {
         String ownerIds = "(select id from users where mobile = ?)";
         jdbc.update("delete from managed_properties where owner_id in " + ownerIds, OWNER_MOBILE);
         jdbc.update("delete from properties where owner_id in " + ownerIds, OWNER_MOBILE);
+        jdbc.update("delete from notifications where user_id in " + ownerIds, OWNER_MOBILE);
         jdbc.update("delete from users where mobile = ?", OWNER_MOBILE);
         jdbc.update("delete from localities where slug = 'publishracetown'");
     }
 
     @Test
-    @DisplayName("create exactly one marketplace listing and all callers see it")
+    @DisplayName("create exactly one marketplace listing; every other caller is told it is already listed")
     void concurrentPublishesCreateOneListing() {
         ManagedPropertyDto record = service.register(owner.getId(), new ManagedPropertyCreateRequest(
                 null, "rent", "Flat", null, 25000L, LOCALITY, null, null, null, null, null,
-                null, null, null, null, null, null));
-        List<ManagedPropertyDto> results = new CopyOnWriteArrayList<>();
+                null, null, null, null, null, null, null));
+        ListingCreate body = json.readValue("""
+                {"title":"Race flat","deal":"rent","propertyType":"apartment","price":25000,
+                 "locality":"%s","city":"Pune","images":["/api/dev/storage/public/photos/%s/%s"]}
+                """.formatted(LOCALITY, owner.getId(), UUID.randomUUID()), ListingCreate.class);
 
         List<Throwable> outcomes = Races.run(RACERS,
-                index -> results.add(service.publish(owner.getId(), record.id())));
+                index -> service.publishWith(owner.getId(), record.id(), body));
 
-        assertThat(outcomes).as("a loser returns the winner's listing, never an error").containsOnlyNulls();
+        assertThat(outcomes.stream().filter(Objects::isNull)).as("outcomes %s", outcomes).hasSize(1);
+        assertThat(outcomes.stream().filter(Objects::nonNull)).allMatch(ConflictException.class::isInstance);
         Integer listings = jdbc.queryForObject(
                 "select count(*) from properties where owner_id = ?", Integer.class, owner.getId());
         assertThat(listings).isEqualTo(1);
-        Set<String> linked = results.stream()
-                .map(ManagedPropertyDto::publishedListingId).collect(Collectors.toSet());
-        assertThat(linked).hasSize(1).doesNotContainNull();
     }
 }

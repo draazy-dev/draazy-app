@@ -9,11 +9,8 @@ import { clampNearRadius, nearMaxFor } from '../../../../lib/nearParams.js';
 export default function NearAPlaceSection({ f, set, localities }) {
   const { t } = useTranslation();
   const nearMode = f.nearMode || 'km';
-  // The slider reports every step of a drag; hold the in-flight radius here and lift it when the
-  // value settles, so every read-out below tracks the thumb rather than freezing mid-drag.
   const [liveRadius, setLiveRadius, radiusCommit] = useCommitOnRelease(f.nearRadius, (v) => set({ nearRadius: v }));
   const nearMax = nearMaxFor(nearMode);
-  /* `null` means "not being typed in", so the field shows the committed radius. */
   const [radiusDraft, setRadiusDraft] = useState(null);
   const onRadiusType = useCallback((e) => {
     const raw = e.target.value;
@@ -24,12 +21,8 @@ export default function NearAPlaceSection({ f, set, localities }) {
   const onRadiusSettle = useCallback((e) => {
     const raw = e.target.value;
     setRadiusDraft(null);
-    // A field left blank keeps the radius already in effect rather than snapping to the minimum:
-    // deleting the text is how you start retyping, not a request to search one kilometre.
     if (raw !== '') set({ nearRadius: clampNearRadius(raw, nearMax) });
   }, [nearMax, set]);
-  // Biases the live Near-a-Place search toward the area being looked in. The city hard-fence in
-  // fetchSuggestions still applies, so a bias can only rank results, never leak them out.
   const nearBias = useMemo(() => {
     const pts = localities.filter((l) => f.localities.has(l.slug) && l.lat != null && l.lng != null);
     if (!pts.length) return null;
@@ -42,8 +35,6 @@ export default function NearAPlaceSection({ f, set, localities }) {
   const onPlacePick = ({ near, label }) => set({ near, nearLabel: label });
   const onPlaceClear = () => set({ near: '', nearLabel: '' });
 
-  // Reveal the radius controls once, when a place first appears — not on every re-pick. Scroll the
-  // panel's OWN container: scrolling the window jumps the whole page.
   const nearPanelRef = useRef(null);
   const hadNearRef = useRef(!!f.near);
   useEffect(() => {
@@ -89,7 +80,6 @@ export default function NearAPlaceSection({ f, set, localities }) {
               </div>
 
               <div className="flex items-baseline justify-center gap-1.5">
-                {/* Lifted on release, not per step — a whole drag is one search otherwise. */}
                 <input
                   type="number"
                   min={1}

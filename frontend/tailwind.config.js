@@ -1,4 +1,3 @@
-/* Colour values live in src/styles/theme.css; this file only names them. */
 const v = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 const SHADES = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950'];
 const ACCENTS = ['teal', 'emerald', 'green', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'pink', 'rose', 'red', 'orange', 'amber', 'yellow'];
@@ -26,19 +25,15 @@ const colors = {
   cta: { btn: v('cta-btn'), 'btn-text': v('cta-btn-text') },
 };
 
-/* Mid-tone text darkens in light mode for contrast; the same shade as a fill does not. */
 const textColors = {
   ...Object.fromEntries(ACCENTS.map((hue) => [hue, { 500: v(`dz-t-${hue}-500`) }])),
   brand: { teal: v('dz-t-teal-500'), 'teal-2': v('dz-t-teal-500') },
 };
 
-/* `border-white/10` is a hairline in either theme: theme.css raises --dz-line-boost in light mode. */
 const line = { white: 'rgb(var(--dz-c-white) / calc(<alpha-value> * var(--dz-line-boost)))' };
 
-/** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
-  /* Without hover-only media a touch browser keeps the hover state after tap, so a tapped card stays lifted. */
   future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {

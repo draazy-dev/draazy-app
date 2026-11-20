@@ -12,34 +12,28 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class PlatformSettings {
-
     private static final Logger log = LoggerFactory.getLogger(PlatformSettings.class);
 
-    /** The seeded key holding the fee block (see {@code R__DML_seed_reference_data.sql}). */
     public static final String FEES_KEY = "fees";
 
-    /** The seeded key holding the feature-toggle block, the same one {@code GET /bootstrap} publishes. */
     static final String FLAGS_KEY = "flags";
 
-    /** Owner contacts a caller with no subscription may open, before any referral bonus. */
     private static final long DEFAULT_FREE_CONTACT_LIMIT = 15L;
 
-    // Ceiling on the contact numbers.
-    // Past a thousand means "no limit"; that belongs in `plans.unlimited_contacts`.
     private static final long MAX_CONTACT_GRANT = 1_000L;
 
     public record Bound(long fallback, long min, long max) {
     }
 
-    // Every referral and Featured number an admin may set; an out-of-range stored value reads as the fallback.
     public static final Map<String, Bound> FEE_BOUNDS = Map.ofEntries(
             Map.entry("featuredDays", new Bound(7, 1, 90)),
-            Map.entry("referralContactBonus", new Bound(15, 0, MAX_CONTACT_GRANT)),
             Map.entry("referralSeekerBonusContacts", new Bound(5, 0, MAX_CONTACT_GRANT)),
             Map.entry("referralOwnerFeaturedDays", new Bound(14, 1, 90)),
-            Map.entry("referralOwnerRewardAgreements", new Bound(1, 0, 10)),
-            Map.entry("referralQualifyPerMonth", new Bound(10, 1, 1_000)),
-            Map.entry("referralQualifyPerYear", new Bound(50, 1, 10_000)),
+            Map.entry("referralAgreementDiscountPercent", new Bound(50, 1, 100)),
+            Map.entry("referralInvitesPerDay", new Bound(10, 1, 100)),
+            Map.entry("referralRedeemFailuresPerDay", new Bound(5, 1, 50)),
+            Map.entry("referralQualifyPerMonth", new Bound(3, 1, 1_000)),
+            Map.entry("referralQualifyPerYear", new Bound(10, 1, 10_000)),
             Map.entry("referralHoldDays", new Bound(7, 1, 60)),
             Map.entry("referralClawbackDays", new Bound(30, 1, 365)),
             Map.entry("referralVelocityPerDay", new Bound(5, 1, 1_000)),
@@ -58,19 +52,20 @@ public class PlatformSettings {
     public record GrievanceOfficer(String name, String email) {
     }
 
-    // The product prices, in whole rupees.
-    // Defaults match a healthy install so broken rows fail instead of changing prices.
     private static final long DEFAULT_LISTING_PASS = 999L;
 
+    private static final long DEFAULT_LISTING_PASS_BUY = 1_999L;
+
     private static final long DEFAULT_CONTACT_PACK = 199L;
+
+    private static final long DEFAULT_CONTACT_PACK_BUY = 399L;
 
     private static final long DEFAULT_RENT_AGREEMENT_PLATFORM = 499L;
 
     public static final int MAX_PRICE = 100_000;
 
-    // An out-of-range price falls back to its default here, so the admin write must refuse one.
-    public static final List<String> PRICE_FIELDS = List.of("listingPass", "contactPack",
-            "rentAgreementPlatform");
+    public static final List<String> PRICE_FIELDS = List.of("listingPass", "listingPassBuy", "contactPack",
+            "contactPackBuy", "rentAgreementPlatform");
 
     public static final String LISTINGS_KEY = "listings";
 
@@ -103,8 +98,20 @@ public class PlatformSettings {
         return wholeNumber(FEES_KEY, "listingPass", DEFAULT_LISTING_PASS, MAX_PRICE);
     }
 
+    public long listingPassBuy() {
+        return wholeNumber(FEES_KEY, "listingPassBuy", DEFAULT_LISTING_PASS_BUY, MAX_PRICE);
+    }
+
+    public long listingPass(String deal) {
+        return "buy".equals(deal) ? listingPassBuy() : listingPass();
+    }
+
     public long contactPack() {
         return wholeNumber(FEES_KEY, "contactPack", DEFAULT_CONTACT_PACK, MAX_PRICE);
+    }
+
+    public long contactPackBuy() {
+        return wholeNumber(FEES_KEY, "contactPackBuy", DEFAULT_CONTACT_PACK_BUY, MAX_PRICE);
     }
 
     public long rentAgreementPlatform() {
@@ -121,10 +128,6 @@ public class PlatformSettings {
         return fee("featuredDays");
     }
 
-    public long referralContactBonus() {
-        return fee("referralContactBonus");
-    }
-
     public long referralSeekerBonusContacts() {
         return fee("referralSeekerBonusContacts");
     }
@@ -133,8 +136,16 @@ public class PlatformSettings {
         return fee("referralOwnerFeaturedDays");
     }
 
-    public long referralOwnerRewardAgreements() {
-        return fee("referralOwnerRewardAgreements");
+    public long referralAgreementDiscountPercent() {
+        return fee("referralAgreementDiscountPercent");
+    }
+
+    public long referralInvitesPerDay() {
+        return fee("referralInvitesPerDay");
+    }
+
+    public long referralRedeemFailuresPerDay() {
+        return fee("referralRedeemFailuresPerDay");
     }
 
     public long referralQualifyPerMonth() {
@@ -242,7 +253,6 @@ public class PlatformSettings {
         return flag(FLAGS_KEY, "maintenanceMode", false);
     }
 
-    // Read past the cache: these are kill switches, and one must bite on the next request.
     private boolean flag(String key, String field, boolean whenUndecided) {
         Optional<Setting> row = settings.findById(key);
         if (row.isEmpty()) {

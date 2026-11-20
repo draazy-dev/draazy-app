@@ -38,11 +38,16 @@ class FlatmateRoomPhotoSourcesTest extends AbstractApiTest {
 
     private static String room(String... photos) {
         return """
-                {"bhk":"2","roomType":"Private room","attachedBath":"attached","furnishing":"semi",
+                {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                  "locality":"Baner","society":"Source Heights","rentShare":15000,"deposit":30000,
                  "availableFrom":"2026-09-01","lookingFor":"any","foodPref":"any","hostRole":"owner",
-                 "photos":["%s"],"note":"Sunny room."}
-                """.formatted(String.join("\",\"", photos));
+                 "photos":["%s"],"note":"Sunny room.",%s,%s}
+                """.formatted(String.join("\",\"", photos), FlatmateRoomFixture.BASICS,
+                FlatmateRoomFixture.DETAILS);
+    }
+
+    private static String[] uploads(User h) {
+        return new String[] {UploadedPhotos.of(h.getId()), UploadedPhotos.of(h.getId()), UploadedPhotos.of(h.getId())};
     }
 
     private ResultActions create(User h, String body) throws Exception {
@@ -61,16 +66,18 @@ class FlatmateRoomPhotoSourcesTest extends AbstractApiTest {
         User h = host("9861540001");
         User other = host("9861540002");
 
-        create(h, room(UploadedPhotos.of(h.getId()))).andExpect(status().isCreated());
-        create(h, room(FOREIGN)).andExpect(status().isUnprocessableEntity());
-        create(h, room(UploadedPhotos.of(other.getId()))).andExpect(status().isUnprocessableEntity());
+        create(h, room(uploads(h))).andExpect(status().isCreated());
+        create(h, room(FOREIGN, UploadedPhotos.of(h.getId()), UploadedPhotos.of(h.getId())))
+                .andExpect(status().isUnprocessableEntity());
+        create(h, room(UploadedPhotos.of(other.getId()), UploadedPhotos.of(h.getId()), UploadedPhotos.of(h.getId())))
+                .andExpect(status().isUnprocessableEntity());
     }
 
     @Test
     @DisplayName("an edit may keep a photo the room already had, but may not add a foreign one")
     void anEditKeepsWhatItHadButAddsOnlyUploads() throws Exception {
         User h = host("9861540003");
-        create(h, room(UploadedPhotos.of(h.getId()))).andExpect(status().isCreated());
+        create(h, room(uploads(h))).andExpect(status().isCreated());
         FlatmateRoom saved = rooms.findAll().stream()
                 .filter(r -> r.getHostId().equals(h.getId())).findFirst().orElseThrow();
         String legacy = "https://images.unsplash.com/photo-legacy.jpg";

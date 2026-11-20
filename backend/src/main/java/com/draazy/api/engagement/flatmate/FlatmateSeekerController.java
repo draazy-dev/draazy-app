@@ -1,5 +1,8 @@
 package com.draazy.api.engagement.flatmate;
 
+import static com.draazy.api.engagement.flatmate.FlatmateVocabulary.NO_CONTACT;
+
+import com.draazy.api.catalog.listing.NoContactDetails;
 import com.draazy.api.common.web.PageResponse;
 import com.draazy.api.common.web.Pageables;
 import com.draazy.api.common.web.Routes;
@@ -25,10 +28,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Only buyers/owners create seeker ads because the writer is the person who will live there. */
 @RestController
 public class FlatmateSeekerController {
-
     private final FlatmateSeekerService service;
 
     public FlatmateSeekerController(FlatmateSeekerService service) {
@@ -55,9 +56,9 @@ public class FlatmateSeekerController {
         service.delete(principal, id);
     }
 
-    /** No response body; echoing the message would invite clients to render a thread. */
     @PostMapping(Routes.Flatmates.POST_INTEREST)
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public void interest(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @Valid @RequestBody(required = false) InterestRequest body) {
         service.express(principal, id,
@@ -65,20 +66,17 @@ public class FlatmateSeekerController {
                 body == null ? null : body.message());
     }
 
-    /** No role guard: this is scoped to the caller's own seeker post. */
     @GetMapping(Routes.Flatmates.MY_POSTS)
     public PageResponse<FlatmateSeekerPostDto> myPosts(@CurrentUser AuthPrincipal principal,
             @PageableDefault(size = 20) Pageable pageable) {
         return PageResponse.of(service.myPosts(principal, Pageables.unsorted(pageable)), dto -> dto);
     }
 
-    /** The edit form's single read. 404 for another author's post, so an id leaks nothing about who owns it. */
     @GetMapping(Routes.Flatmates.MY_POST_BY_ID)
     public FlatmateSeekerPostDto myPost(@CurrentUser AuthPrincipal principal, @PathVariable UUID id) {
         return service.myPost(principal, id);
     }
 
-    /** Inbox is paged because rows are created by strangers answering the ad. */
     @GetMapping(Routes.Flatmates.MY_REQUESTS)
     public PageResponse<FlatmateRequestDto> inbox(@CurrentUser AuthPrincipal principal,
             @RequestParam(required = false) String status,
@@ -93,7 +91,6 @@ public class FlatmateSeekerController {
         return service.decide(principal, id, body.decision());
     }
 
-    /** No role guard; scope is the caller's own rows and order is fixed server-side. */
     @GetMapping(Routes.Flatmates.MY_INTERESTS)
     public PageResponse<FlatmateRequestDto> outbox(@CurrentUser AuthPrincipal principal,
             @RequestParam(required = false) String status,
@@ -107,7 +104,6 @@ public class FlatmateSeekerController {
         return service.outboxKeys(principal);
     }
 
-    /** 204 with no body because withdrawal is a command, not a deleted-row read. */
     @DeleteMapping(Routes.Flatmates.INTEREST_BY_TARGET)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void withdraw(@CurrentUser AuthPrincipal principal,
@@ -115,7 +111,8 @@ public class FlatmateSeekerController {
         service.withdraw(principal, kind, id);
     }
 
-    public record InterestRequest(String share, @Size(max = 4000) String message) {
+    public record InterestRequest(String share,
+            @Size(max = 4000) @NoContactDetails(message = NO_CONTACT) String message, String gender) {
     }
 
     public record DecisionRequest(@NotBlank String decision) {

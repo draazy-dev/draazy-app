@@ -3,7 +3,6 @@ package com.draazy.api.documents.agreement;
 import java.time.LocalDate;
 import java.util.Objects;
 
-/** Contract schema {@code RentAgreement}. */
 public record RentAgreementDto(
         String id,
         String propertyId,
@@ -16,7 +15,6 @@ public record RentAgreementDto(
         String documentUrl,
         String serviceRequestId,
         LocalDate endDate) {
-
     static RentAgreementDto of(RentAgreement a, String documentUrl) {
         return new RentAgreementDto(a.getId().toString(), a.getPropertyId().toString(),
                 a.getTenantMobile(), a.getRent(), a.getDeposit(), a.getStartDate(),

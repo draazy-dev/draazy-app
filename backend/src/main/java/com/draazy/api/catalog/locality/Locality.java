@@ -8,12 +8,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import lombok.Getter;
 
-/** Slug is the stable identity; names are display text and not unique. */
 @Entity
 @Table(name = "localities")
 @Getter
 public class Locality {
-
     @Id
     @Column(name = "slug", nullable = false, updatable = false)
     private String slug;
@@ -24,7 +22,6 @@ public class Locality {
     @Column(name = "city", nullable = false)
     private String city;
 
-    /** Average asking rent per sq ft. {@code numeric}, so {@link BigDecimal} — never a float. */
     @Column(name = "avg_rent_psf")
     private BigDecimal avgRentPsf;
 
@@ -40,7 +37,6 @@ public class Locality {
     @Column(name = "demand")
     private Integer demand;
 
-    /** {@code Buy} / {@code Rent} / {@code Both} — constrained by the column, not by an enum here. */
     @Column(name = "focus")
     private String focus;
 
@@ -50,7 +46,6 @@ public class Locality {
     @Column(name = "lng")
     private Double lng;
 
-    /** Curation flag — an inactive locality must not be a resolution target for new listings. */
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
@@ -61,14 +56,12 @@ public class Locality {
     private Instant archivedAt;
 
     protected Locality() {
-        // JPA
     }
 
     public boolean isArchived() {
         return archivedAt != null;
     }
 
-    /** Active + archived marks an admin-closed row; adopt only revives inactive (dormant seed) rows. */
     public void retire(Instant at) {
         archivedAt = at;
         active = true;

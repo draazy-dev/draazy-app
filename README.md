@@ -6,8 +6,8 @@ See [`docs/LOCAL_DEV.md`](./docs/LOCAL_DEV.md).
 
 ## Documentation
 
-Full system design and per-feature specs live in [`docs/`](./docs/README.md) — the authoritative
-reference for building the backend. Start there:
+System design and per-feature specs live in [`docs/`](./docs/README.md), the authoritative
+backend reference:
 
 - [`docs/system/platform-architecture.md`](./docs/system/platform-architecture.md) — context, tech stack, components, ADRs.
 - [`docs/system/frontend-data-seam.md`](./docs/system/frontend-data-seam.md) — how the UI reaches the API.
@@ -30,8 +30,8 @@ npm run dev      # http://localhost:5173
   messages, settings, analytics, …). These ARE the test data.
 - **Regenerate:** `npm run seed` runs `scripts/generate-seed.mjs` (deterministic seeded RNG,
   same algorithm as the original prototype) and rewrites every JSON file + `src/data/db.json`.
-- **Runtime:** the app reads the live Spring Boot API through `src/services/*`, which resolves
-  every domain to an `http` provider under `src/services/providers/http/`.
+- **Runtime:** `src/services/*` resolves every domain to an `http` provider under
+  `src/services/providers/http/`.
 
 ## Auth
 
@@ -67,6 +67,6 @@ scripts/generate-seed.mjs
   Agreement, Legal, Interior, Packers, Valuation; plus a Referrals fraud-review queue.
 
 No stub routes remain (only the 404 catch-all). Every admin/ops/consumer route is verified headless
-with zero console errors. The Spring Boot backend is live and the browser reaches it through the
-seam described in [`docs/system/frontend-data-seam.md`](./docs/system/frontend-data-seam.md); the
-society-SaaS product gap is the remaining scope.
+with zero console errors. The Spring Boot backend is live, reached through the seam in
+[`docs/system/frontend-data-seam.md`](./docs/system/frontend-data-seam.md); the society-SaaS
+product gap is the remaining scope.

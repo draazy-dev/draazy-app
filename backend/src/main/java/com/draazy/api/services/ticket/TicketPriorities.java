@@ -2,9 +2,7 @@ package com.draazy.api.services.ticket;
 
 import java.util.Set;
 
-/** The {@code tickets.priority} vocabulary (V7 CHECK). */
 public final class TicketPriorities {
-
     private TicketPriorities() {
     }
 

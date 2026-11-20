@@ -4,8 +4,6 @@ export const Card = ({ children, className = '', id }) => (
   <div id={id} className={'glass-card rounded-2xl ' + className}>{children}</div>
 );
 
-// Currency inputs follow the app standard (see TenantProfile): a ₹ prefix with a
-// grouped, digits-only value so amounts read the same everywhere.
 export const onlyDigits = (v) => String(v ?? '').replace(/\D/g, '').slice(0, 12);
 export const grpINR = (v) => (v === '' || v == null ? '' : Number(String(v).replace(/\D/g, '') || 0).toLocaleString('en-IN'));
 

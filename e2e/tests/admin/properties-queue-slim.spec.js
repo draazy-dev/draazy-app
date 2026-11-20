@@ -66,7 +66,9 @@ test('opening the review modal is one detail read and one write; panels load whe
   // StrictMode double-invokes the open effect in dev;
   // the contract is one merged write per invocation, never an open plus a read.
   expect(seen(new RegExp(`^POST /properties/${listing.id}/verification\\?markRead=true$`)).length).toBeGreaterThanOrEqual(1);
-  expect(seen(new RegExp(`^POST /properties/${listing.id}/verification`))).toHaveLength(seen(/markRead=true/).length);
+  expect(seen(new RegExp(`^POST /properties/${listing.id}/verification(\\?|$)`))).toHaveLength(seen(/markRead=true/).length);
+  expect(seen(new RegExp(`^POST /properties/${listing.id}/verification/start$`)).length, 'a pending case starts its review')
+    .toBeGreaterThanOrEqual(1);
   expect(seen(/verification\/read/), 'the read receipt rides the open').toHaveLength(0);
   expect(seen(/\/outreach|message-templates|ownership/), 'collapsed panels stay quiet').toHaveLength(0);
   await expect.poll(() => seen(/^GET \/admin\/notes\//).length, 'only the decision note history, for its count').toBe(1);

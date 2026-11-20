@@ -1,15 +1,9 @@
-/* Auth pages (sign in / sign up / staff login): split-screen OTP login. Tier 1, imported from components/auth/AuthShell.jsx. Ported verbatim from index.css, where it sat under the "Listings page" heading. NOTE: the .otp-* box styles stay global in index.css \u2014 OtpBoxes.jsx is shared with list-property, not just auth. */
-
-/* ── Auth pages (sign in / sign up): split-screen OTP login (ports signin/signup.html) ── */
-/* The left half is painted over by .auth-left; this gradient only shows through the right (form) column. */
 .auth-page {
   position: relative;
   background: radial-gradient(125% 120% at 84% 14%, rgb(var(--dz-c-slate-800)) 0%, rgb(var(--dz-c-slate-900)) 44%, rgb(var(--dz-c-gray-900)) 72%, var(--brand-dark) 100%);
 }
 
 @media (min-width: 1024px) {
-
-  /* Soft teal aura behind the form card so the right half reads as lit, not empty. */
   .auth-page::after {
     content: '';
     position: absolute;
@@ -148,26 +142,6 @@
 .auth-page .country-prefix {
   background: rgb(var(--dz-c-white) / .08);
 }
-
-/* .otp-* box styles live in index.css (global, shared via OtpBoxes.jsx). */
-
-.auth-page .send-otp-btn {
-  background: linear-gradient(135deg, rgb(var(--dz-c-teal-500) / .15), rgb(var(--dz-c-indigo-600) / .15));
-  border: 1px solid rgb(var(--dz-c-teal-500) / .3);
-  transition: all .3s cubic-bezier(.4, 0, .2, 1);
-}
-
-.auth-page .send-otp-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgb(var(--dz-c-teal-500) / .25), rgb(var(--dz-c-indigo-600) / .25));
-  border-color: rgb(var(--dz-c-teal-500) / .5);
-  transform: translateY(-1px);
-}
-
-.auth-page .send-otp-btn:disabled {
-  opacity: .5;
-  cursor: not-allowed;
-}
-
 .auth-page .role-chip {
   cursor: pointer;
   transition: all .3s cubic-bezier(.4, 0, .2, 1);
@@ -175,9 +149,11 @@
   background: rgb(var(--dz-c-white) / .03);
 }
 
-.auth-page .role-chip:hover {
-  border-color: rgb(var(--dz-c-teal-500) / .4);
-  background: rgb(var(--dz-c-teal-500) / .06);
+@media (hover: hover) {
+  .auth-page .role-chip:hover {
+    border-color: rgb(var(--dz-c-teal-500) / .4);
+    background: rgb(var(--dz-c-teal-500) / .06);
+  }
 }
 
 .auth-page .role-chip.selected {
@@ -225,8 +201,6 @@
     transform: translate(-4%, 3%) scale(1.06);
   }
 }
-
-/* drop-shadow, not box-shadow: the badge is a bare mark, so box-shadow would halo its rectangular bounding box. */
 .auth-page .auth-brand-badge {
   filter: drop-shadow(0 6px 16px rgb(var(--dz-c-teal-500) / .55)) drop-shadow(0 0 3px rgb(var(--dz-c-teal-400) / .35));
 }
@@ -258,9 +232,6 @@
 }
 
 @media (max-width: 1023px) {
-
-  /* Lit "console" card: translucent gradient fill, teal drop-glow, and a 1px
-     gradient ring that catches light on the top-left edge. */
   .auth-page .auth-card {
     position: relative;
     background: linear-gradient(180deg, rgb(var(--dz-c-white) / .07), rgb(var(--dz-c-white) / .022));

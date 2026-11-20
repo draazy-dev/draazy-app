@@ -10,9 +10,11 @@ import MapGate from './MapGate.jsx';
 import Select from '../../../components/ui/Select.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import Pager from '../../../components/ui/Pager.jsx';
+import ActiveFilterChips from '../../../components/ui/ActiveFilterChips.jsx';
 import useBackToClose from '../../../hooks/useBackToClose.js';
 import { flatmatesUrl } from './matchers.js';
 import { RANGE, rangeChanged } from '../../../lib/listings/filterState.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 
 const PropertyMap = lazy(() => import('../../../components/property/PropertyMap.jsx'));
 const MapDetailPanel = lazy(() => import('../../../components/property/MapDetailPanel.jsx'));
@@ -23,8 +25,6 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
   const mapCapped = view === 'map' && !mapGated && total > results.length;
   const resultsMapStyle = { height: 'clamp(320px, calc(100dvh - var(--dz-nav-h) - 11rem), 72dvh)', minHeight: 320 };
   useBackToClose(view === 'map' && !!activeProperty, onCloseProperty, { key: '__dzMapDetail' });
-  // Offer to relax whichever narrowing filters are actually active, so a dead-end search has a
-  // one-tap path back to results rather than only "clear everything".
   const isRent = f.deal === 'rent';
   const broadeners = [];
   if (f.localities.size) broadeners.push({ id: 'loc', label: t('listings.broadenAllLocalities'), apply: () => set({ localities: new Set() }) });
@@ -33,12 +33,15 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
   if (f.bhk.size) broadeners.push({ id: 'bhk', label: t('listings.broadenAnyBhk'), apply: () => set({ bhk: new Set() }) });
   if (f.types.size) broadeners.push({ id: 'type', label: t('listings.broadenAnyType'), apply: () => set({ types: new Set(), commercialTypes: new Set() }) });
 
+  const views = [['grid', 'layout-grid', 'gridView'], ['list', 'list', 'listView'], ...(flagEnabled('mapSearch') ? [['map', 'map', 'mapView']] : [])];
   const viewToggles = (
-    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-      <span className="text-sm text-gray-400 mr-0.5 sm:mr-1">{t('listings.viewLabel')}</span>
-      <button onClick={() => setView('grid')} aria-pressed={view === 'grid'} aria-label={t('listings.gridView')} className={'view-btn w-11 h-11 sm:w-10 sm:h-10 rounded-lg border border-white/10 flex items-center justify-center t-all' + (view === 'grid' ? ' active' : ' text-gray-500')} title={t('listings.gridView')}><Icon name="layout-grid" className="w-4 h-4" /></button>
-      <button onClick={() => setView('list')} aria-pressed={view === 'list'} aria-label={t('listings.listView')} className={'view-btn w-11 h-11 sm:w-10 sm:h-10 rounded-lg border border-white/10 flex items-center justify-center t-all' + (view === 'list' ? ' active' : ' text-gray-500')} title={t('listings.listView')}><Icon name="list" className="w-4 h-4" /></button>
-      {flagEnabled('mapSearch') && <button onClick={() => setView('map')} aria-pressed={view === 'map'} aria-label={t('listings.mapView')} className={'view-btn w-11 h-11 sm:w-10 sm:h-10 rounded-lg border border-white/10 flex items-center justify-center t-all' + (view === 'map' ? ' active' : ' text-gray-500')} title={t('listings.mapView')}><Icon name="map" className="w-4 h-4" /></button>}
+    <div className="flex items-center gap-2 shrink-0">
+      <span className="hidden sm:inline text-sm text-gray-400">{t('listings.viewLabel')}</span>
+      <div className="dz-segmented" role="group" aria-label={t('listings.viewLabel')}>
+        {views.map(([id, icon, key]) => (
+          <button key={id} type="button" onClick={() => setView(id)} aria-pressed={view === id} aria-label={t(`listings.${key}`)} title={t(`listings.${key}`)}><Icon name={icon} /></button>
+        ))}
+      </div>
     </div>
   );
 
@@ -59,15 +62,12 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
     />
   );
 
-  /* `aria-busy` tells a screen reader the number is being updated. */
-  const countLine = loaded ? (
+  const countLine = mapGated ? null : loaded ? (
     <p className="text-gray-400 text-sm" aria-busy={searching ? 'true' : undefined}>{t('listings.showing')} <span className="text-teal-400 font-semibold">{count}</span> {t('listings.propertyNoun', { count })}
       {verifiedCount > 0 ? <span className="text-emerald-300/90"> · <Icon name="shield-check" className="w-3.5 h-3.5 inline-block -mt-0.5" /> {t('listings.verifiedCount', { count: verifiedCount })}</span> : null}
       {unstatedCount > 0 ? <span className="text-amber-300/90"> · <Icon name="info" className="w-3.5 h-3.5 inline-block -mt-0.5" /> {t('listings.unstatedCount', { count: unstatedCount })}</span> : null}
     </p>
   ) : loadFailed ? (
-    /* "Showing 0 properties" is a claim about Pune's inventory, and after a failed read a false
-     * one — say nothing about the count; the card below says what happened. */
     <p className="text-gray-400 text-sm">{t('listings.countUnavailable')}</p>
   ) : (
     <p className="text-gray-400 text-sm inline-flex items-center gap-2" aria-live="polite">
@@ -81,24 +81,22 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                 <div className="flex gap-2" role="search">
                   <div className="flex-1 relative">
                     <Icon name="sparkles" className="w-4 h-4 text-teal-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input type="text" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) smartSearch(); }} enterKeyHint="search" aria-label={t('listings.smartSearch')} placeholder={f.deal === 'rent' ? t('listings.smartPlaceholderRent') : t('listings.smartPlaceholderBuy')} className="lst-search-field w-full pl-9 pr-[88px] sm:pr-3 h-11 sm:h-10 rounded-full glass border border-white/10 text-sm text-white placeholder-gray-500 focus:border-teal-400/50 outline-none bg-white/5" />
+                    <input type="text" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !isImeComposing(e)) smartSearch(); }} enterKeyHint="search" aria-label={t('listings.smartSearch')} placeholder={f.deal === 'rent' ? t('listings.smartPlaceholderRent') : t('listings.smartPlaceholderBuy')} className="lst-search-field w-full pl-9 pr-[88px] sm:pr-3 h-11 sm:h-10 rounded-full glass border border-white/10 text-sm text-white placeholder-gray-500 focus:border-teal-400/50 outline-none bg-white/5" />
 
-                    {/* `search-submit-shape.spec.js` pins its diameter to `barH - 8`. */}
                     <div className="sm:hidden absolute inset-y-0 right-1 flex items-center gap-1">
-                      <button type="button" onClick={saveSearch} disabled={savingSearch} aria-busy={savingSearch || undefined} aria-label={t('listings.saveSearch')} className="lst-search-bell w-11 self-stretch flex items-center justify-center text-gray-400 hover:text-teal-300 disabled:opacity-50 disabled:pointer-events-none t-all"><Icon name={savingSearch ? 'loader' : 'bell-plus'} className={'w-4 h-4' + (savingSearch ? ' animate-spin' : '')} /></button>
+                      <button type="button" onClick={saveSearch} disabled={savingSearch} aria-busy={savingSearch || undefined} aria-label={t('listings.alertMe')} className="lst-search-bell w-11 self-stretch flex items-center justify-center text-gray-400 hover:text-teal-300 disabled:opacity-50 disabled:pointer-events-none t-all"><Icon name={savingSearch ? 'loader' : 'bell-plus'} className={'w-4 h-4' + (savingSearch ? ' animate-spin' : '')} /></button>
                       <button type="button" onClick={smartSearch} aria-label={t('listings.smartSearch')} className="lst-search-go tap-extend relative w-9 h-9 rounded-full btn-primary flex items-center justify-center"><Icon name="search" className="w-4 h-4" /></button>
                     </div>
                   </div>
                   <div className="hidden sm:flex gap-2">
                     <Button onClick={smartSearch} variant="primary" icon="search">{t('listings.smartSearch')}</Button>
-                    <Button onClick={saveSearch} variant="secondary" icon="bell-plus" loading={savingSearch} aria-label={t('listings.saveSearch')}><span className="hidden sm:inline">{t('listings.saveSearch')}</span></Button>
+                    <Button onClick={saveSearch} variant="secondary" icon="bell-plus" loading={savingSearch} aria-label={t('listings.alertMe')}><span className="hidden sm:inline">{t('listings.alertMe')}</span></Button>
                   </div>
                 </div>
               </div>
 
               <div className="sm:hidden mb-2 list-reveal" style={{ animationDelay: '180ms' }}>{countLine}</div>
 
-              {/* `.dz-docks-under-nav` sets the offset below lg (tracks the hide-on-scroll bar); no `top-*`. */}
               <div className="dz-docks-under-nav sm:hidden sticky z-30 -mx-4 mb-3.5 px-4 py-2 flex items-center justify-between gap-2 bg-ink/85 backdrop-blur border-b border-white/5">
                 {viewToggles}
                 {sortSelect}
@@ -112,24 +110,15 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                 </div>
               </div>
 
-              {activeChips.length ? (
-                <div className="flex flex-wrap items-center gap-2 mb-6 list-reveal" style={{ animationDelay: '200ms' }}>
-                  <span className="text-xs text-gray-500 mr-0.5">{t('listings.activeFilters')}</span>
-                  {activeChips.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={c.remove}
-                      aria-label={t('listings.removeFilter', { label: c.label })}
-                      className="af-chip inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full bg-teal-500/12 border border-teal-400/30 text-teal-200 text-xs font-medium hover:bg-teal-500/20 hover:border-teal-400/50 t-all"
-                    >
-                      {c.label}
-                      <Icon name="x" className="w-3 h-3" />
-                    </button>
-                  ))}
-                  <button type="button" onClick={clearAll} className="af-clear-all text-xs font-medium text-gray-400 hover:text-white underline underline-offset-2 ml-1">{t('listings.clearAllLower')}</button>
-                </div>
-              ) : null}
+              <ActiveFilterChips
+                chips={activeChips}
+                onClearAll={clearAll}
+                heading={t('listings.activeFilters')}
+                removeLabel={(label) => t('listings.removeFilter', { label })}
+                clearAllLabel={t('listings.clearAllLower')}
+                className="list-reveal"
+                style={{ animationDelay: '200ms' }}
+              />
 
               {f.deal === 'rent' && f.types.has('flatmates') ? (
                 <Link to={flatmatesUrl(f, locNameBySlug)} className="flex items-center gap-4 mb-6 rounded-2xl border border-teal-500/25 bg-gradient-to-r from-teal-500/10 to-teal-400/5 px-5 py-4 hover:border-teal-400/50 transition-all group">
@@ -164,6 +153,16 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
               {view === 'map' && flagEnabled('mapSearch') ? (
                 mapGated ? (
                   <MapGate localities={localities} f={f} set={set} locNameBySlug={locNameBySlug} maxAreas={mapMaxAreas} setView={setView} suggestedLocalities={suggestedMapLocalities} onAddLocality={onAddLocality} />
+                ) : loaded && !searching && !loadFailed && count === 0 ? (
+                  <div className="glass rounded-2xl px-5 py-8 sm:p-12 text-center" data-testid="map-empty">
+                    <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3"><Icon name="map-pin" className="w-6 h-6 text-gray-500" /></div>
+                    <p className="text-white font-semibold mb-1">{t('listings.mapEmptyTitle')}</p>
+                    <p className="text-gray-500 text-sm mb-5">{t('listings.mapEmptyText')}</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <Button icon="map-pin" onClick={() => set({ localities: new Set() })}>{t('listings.changeAreas')}</Button>
+                      <Button variant="secondary" icon="x-circle" onClick={clearAll}>{t('listings.clearAllFiltersBtn')}</Button>
+                    </div>
+                  </div>
                 ) : (
                   <>
                     {mapCapped && (
@@ -176,11 +175,9 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                       </div>
                     )}
 
-                    {/* `data-no-ptr` opts the map out of pull-to-refresh: it is not an overflow scroller, so a
-                       downward pan would otherwise arm the pull and refetch. */}
                     <div data-no-ptr>
                       <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="w-8 h-8 border-2 border-teal-400/30 border-t-teal-400 rounded-full animate-spin" /></div>}>
-                        <PropertyMap properties={results} locName={locNameBySlug} focus={mapFocus} activeId={activeId} onSelect={onSelectProperty} wrapStyle={resultsMapStyle} gestureHandling="greedy" />
+                        <PropertyMap properties={results} locName={locNameBySlug} focus={mapFocus} activeId={activeId} onSelect={onSelectProperty} wrapStyle={resultsMapStyle} gestureHandling="greedy" unavailableAction={{ label: t('listings.mapShowList'), onClick: () => setView('list') }} />
                       </Suspense>
                     </div>
                     {activeProperty ? (
@@ -204,8 +201,6 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                   </>
                 )
               ) : loadFailed ? (
-                /* A search that could not run must not look like one that found nothing: the
-                 * empty state below would send the user to widen a budget never applied. */
                 <LoadError message={t('listings.loadError')} error={loadError} onRetry={onRetryLoad} className="glass rounded-2xl px-5 py-8 sm:p-12" />
               ) : !loaded ? (
                 <div className={view === 'list' ? 'flex flex-col gap-4' : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6'}>
@@ -229,15 +224,13 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                   {broadeners.length ? (
                     <div className="flex flex-wrap items-center justify-center gap-2 mb-4 sm:mb-5">
                       {broadeners.map((b) => (
-                        <button key={b.id} type="button" onClick={b.apply} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/5 border border-white/10 text-sm font-medium text-gray-200 hover:border-teal-400/40 hover:text-white hover:bg-teal-500/10 transition-all">
-                          <Icon name="plus-circle" className="w-4 h-4 text-teal-400" /> {b.label}
+                        <button key={b.id} type="button" onClick={b.apply} className="dz-chip">
+                          <Icon name="plus-circle" className="text-teal-400" /> {b.label}
                         </button>
                       ))}
                     </div>
                   ) : null}
-                  <div>
-                    <button onClick={clearAll} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-500/10 border border-teal-400/30 text-teal-300 text-sm font-medium hover:bg-teal-500/20 transition-all"><Icon name="x-circle" className="w-4 h-4" /> {t('listings.clearAllFiltersBtn')}</button>
-                  </div>
+                  <Button variant="secondary" icon="x-circle" onClick={clearAll}>{t('listings.clearAllFiltersBtn')}</Button>
                   <NotifyMeCard filters={f} locNameBySlug={locNameBySlug} toast={toast} />
                 </div>
               ) : (
@@ -253,7 +246,6 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
 
               {view !== 'map' && <Pager page={page} pageCount={pageCount} onGoTo={goToPage} />}
 
-              {/* Puts filtering in the thumb arc without moving the top controls bar. */}
               <button
                 type="button"
                 ref={filterTriggerRef}
@@ -264,7 +256,7 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                 <Icon name="sliders-horizontal" className="w-[18px] h-[18px] text-teal-300" />
                 {t('listings.filters')}
                 {activeChips.length ? (
-                  <span className="filter-fab__count inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold leading-none">{activeChips.length}</span>
+                  <span className="filter-fab__count dz-count">{activeChips.length}</span>
                 ) : null}
               </button>
             </div>

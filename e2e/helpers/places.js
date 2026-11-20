@@ -12,8 +12,8 @@ export async function mintOriginOf(request, name) {
 export const stubPlaceId = (label, idPrefix = 'stub-') => `${idPrefix}${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 
 export async function stubGooglePlaces(page, {
-  lat = 18.5975, lng = 73.7701, locality = 'Wakad', pincode = '411057',
-  types = ['premise'], idPrefix = 'stub-', empty = false,
+  lat = 18.5975, lng = 73.7701, locality = 'Wakad', pincode = '411057', street = '',
+  types = ['premise'], idPrefix = 'stub-', empty = false, stalled = false,
 } = {}) {
   await page.waitForFunction(() => !!window.google?.maps?.importLibrary, null, { timeout: 20000 });
   await page.evaluate(async (o) => {
@@ -26,6 +26,7 @@ export async function stubGooglePlaces(page, {
       addressComponents: [
         { types: ['postal_code'], longText: o.pincode },
         { types: ['sublocality_level_1', 'sublocality', 'political'], longText: o.locality },
+        ...(o.street ? [{ types: ['route'], longText: o.street }] : []),
       ],
       location: { lat: () => o.lat, lng: () => o.lng },
       displayName: label,
@@ -46,12 +47,13 @@ export async function stubGooglePlaces(page, {
         AutocompleteSuggestion: {
           fetchAutocompleteSuggestions: async ({ input }) => {
             (window.__placesQueries = window.__placesQueries || []).push(input);
+            if (o.stalled) return new Promise(() => {});
             return { suggestions: o.empty ? [] : [{ placePrediction: prediction(input) }] };
           },
         },
       }
       : realImport(name));
-  }, { lat, lng, locality, pincode, types, idPrefix, empty });
+  }, { lat, lng, locality, pincode, street, types, idPrefix, empty, stalled });
 }
 
 // A pin no other test uses, so the pick is never offered an "Is it one of these?" prompt.

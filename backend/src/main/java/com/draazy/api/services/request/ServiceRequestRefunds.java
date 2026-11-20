@@ -8,8 +8,11 @@ import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.trust.Notifier;
+import com.draazy.api.identity.user.User;
+import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.provider.PaymentGateway;
 import com.draazy.api.security.AuthPrincipal;
+import com.draazy.api.security.Roles;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,16 +23,14 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Refunds are open until GRAS duty is paid.
-// After duty, only service fee and lower-amendment overpay remain refundable.
 @Service
 public class ServiceRequestRefunds {
-
     private static final Logger log = LoggerFactory.getLogger(ServiceRequestRefunds.class);
 
     private static final int TEXT_MAX = 300;
@@ -37,6 +38,8 @@ public class ServiceRequestRefunds {
     private static final Set<String> GATEWAY_REFUSED = Set.of("CANCELLED", "FAILED");
 
     private static final String GATEWAY_SETTLED = "SUCCESS";
+
+    private static final String OUTSIDE_ACTOR = "Payment gateway";
 
     private static final Pattern GATEWAY_REFUND_ID = Pattern.compile("rf_([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})");
 
@@ -50,11 +53,13 @@ public class ServiceRequestRefunds {
     private final AuditService audit;
     private final Notifier notifier;
     private final CreditNotes creditNotes;
+    private final UserRepository users;
 
     public ServiceRequestRefunds(ServiceRequestService requests, ServiceRequestRepository requestRows,
             ServiceRequestRefundRepository refunds, ServiceRequestAmendmentRepository amendments,
             ServiceRequestEventRepository events, ServiceRequestRegistrationRepository registrations,
-            PaymentGateway gateway, AuditService audit, Notifier notifier, CreditNotes creditNotes) {
+            PaymentGateway gateway, AuditService audit, Notifier notifier, CreditNotes creditNotes,
+            UserRepository users) {
         this.requests = requests;
         this.requestRows = requestRows;
         this.refunds = refunds;
@@ -65,18 +70,17 @@ public class ServiceRequestRefunds {
         this.audit = audit;
         this.notifier = notifier;
         this.creditNotes = creditNotes;
+        this.users = users;
     }
 
     public record RefundSummaryDto(long paid, long refunded, long refundableBeforeDuty,
-            long refundableAfterDuty, boolean dutyPaidOnRecord, List<Item> refunds) {
-
+            long refundableAfterDuty, boolean dutyPaidOnRecord, boolean canDecide, List<Item> refunds) {
         public record Item(String id, long amount, String status, boolean dutyPaid, String grn,
                 String reason, String requestedBy, String decidedBy, String decisionNote,
                 String gatewayRefundId, Instant requestedAt, Instant decidedAt, boolean mine) {
         }
     }
 
-    // A gateway order and what it took; a refund draws on one order only.
     private record Leg(String orderId, long amount) {
     }
 
@@ -107,16 +111,46 @@ public class ServiceRequestRefunds {
                 leg.orderId(), amount, dutyPaid, grn, why, caller.userId()));
         audit.record(caller, "service-request.refund-requested", "service_request", id,
                 "refund", refund.getId().toString(), "amount", amount, "dutyPaid", dutyPaid, "reason", why);
+        alertManagers(caller, request, amount, requests.displayName(caller.userId()) + " asked for it: " + why);
         return summaryOf(caller, request);
+    }
+
+    @Transactional
+    long raiseOnCancel(AuthPrincipal caller, ServiceRequest cancelled, String reason) {
+        if (!ServiceRequestTypes.RENT_AGREEMENT.equals(cancelled.getType())
+                || !events.existsByRequestIdAndEvent(cancelled.getId(), "payment.received")) {
+            return 0;
+        }
+        ServiceRequest request = locked(cancelled.getId());
+        Optional<ServiceRequestRefund> waiting = refunds.findOpenForUpdate(request.getId());
+        if (waiting.isPresent()) {
+            return waiting.get().getAmount();
+        }
+        Optional<String> grn = registeredGrn(request);
+        List<ServiceRequestRefund> history = refunds.findByServiceRequestIdOrderByCreatedAtDesc(request.getId());
+        long amount = Math.min(refundable(request, history, grn.isPresent()), largestLeft(request, history));
+        if (amount < 1) {
+            return 0;
+        }
+        String why = "Cancelled by the desk: " + reason;
+        why = why.length() > TEXT_MAX ? why.substring(0, TEXT_MAX) : why;
+        Leg leg = leg(request, history, amount, grn.isPresent());
+        ServiceRequestRefund refund = refunds.saveAndFlush(new ServiceRequestRefund(request.getId(),
+                leg.orderId(), amount, grn.isPresent(), grn.orElse(null), why, caller.userId()));
+        audit.record(caller, "service-request.refund-requested", "service_request", request.getId().toString(),
+                "refund", refund.getId().toString(), "amount", amount, "dutyPaid", grn.isPresent(),
+                "reason", why, "trigger", "cancel");
+        alertManagers(caller, request, amount, requests.displayName(caller.userId()) + " cancelled the request: " + reason);
+        return amount;
     }
 
     @Transactional
     public RefundSummaryDto approve(AuthPrincipal caller, String id, String refundId, String note) {
         ServiceRequest request = locked(rentAgreement(caller, id).getId());
-        ServiceRequestRefund refund = open(request, refundId);
-        if (caller.userId().equals(refund.getRequestedBy())) {
-            throw new ForbiddenException("You asked for this refund, so a colleague has to approve it.");
+        if (!decides(caller)) {
+            throw new ForbiddenException("Only a manager can approve a refund.");
         }
+        ServiceRequestRefund refund = open(request, refundId);
         List<ServiceRequestRefund> others = refunds.findByServiceRequestIdOrderByCreatedAtDesc(request.getId()).stream().filter(r -> r != refund).toList();
         boolean dutyPaid = refund.isDutyPaid() || registeredGrn(request).isPresent();
         if (!refund.getOrderId().equals(leg(request, others, refund.getAmount(), dutyPaid).orderId())) {
@@ -133,17 +167,16 @@ public class ServiceRequestRefunds {
             throw unrecorded;
         }
         requests.record(request, "refund.approved", requests.displayName(caller.userId()));
-        cancelWhenFullyRefunded(request, caller);
+        cancelWhenFullyRefunded(request, caller.userId(), requests.displayName(caller.userId()));
         audit.record(caller, "service-request.refund-approved", "service_request", id,
                 "refund", refundId, "amount", refund.getAmount(), "gatewayRefund", gatewayRef);
-        notifier.notify(request.getRequesterId(), "service.refund-approved",
+        notifier.notify(request.payerOf(refund.getOrderId()), "service.refund-approved",
                 Notifier.rupees(refund.getAmount()) + " refund on its way",
                 "It goes back to the card or account you paid with. Banks usually take 5\u20137 working days.",
                 ServiceRequestTypes.pageFor(request.getType()));
         return summaryOf(caller, request);
     }
 
-    /** Applies the gateway's refund status callback; false when the refund id is not one of ours. */
     @Transactional
     public boolean applyWebhookOutcome(String merchantRefundId, String providerStatus) {
         UUID refundId = refundIdOf(merchantRefundId);
@@ -156,8 +189,7 @@ public class ServiceRequestRefunds {
             return true;
         }
         if (GATEWAY_SETTLED.equals(providerStatus)) {
-            // Only the platform fee is Draazy's; stamp duty and registration are passed through.
-            creditNotes.issue(request.getRequesterId(), CreditNotes.SERVICE_REQUEST_REFUND, refund.getId(),
+            creditNotes.issue(request.payerOf(refund.getOrderId()), CreditNotes.SERVICE_REQUEST_REFUND, refund.getId(),
                     refund.getOrderId(), refund.getAmount(), Instant.now());
             return true;
         }
@@ -174,8 +206,38 @@ public class ServiceRequestRefunds {
         if (refund.getRequestedBy() != null) {
             notifier.notify(refund.getRequestedBy(), "service.refund-failed",
                     Notifier.rupees(refund.getAmount()) + " refund did not go through",
-                    "The payment gateway cancelled it. It can be requested again.", "/ops/drafting-desk");
+                    "The payment gateway cancelled it. It can be requested again.",
+                    ServiceRequestTypes.deskFor(request));
         }
+        return true;
+    }
+
+    @Transactional
+    public boolean applyOutsideRefund(String orderId, String gatewayRefund, long amount) {
+        UUID requestId = orderId == null ? null : requestRows.findByPaymentRef(orderId).map(ServiceRequest::getId)
+                .or(() -> amendments.findByPaymentRefForUpdate(orderId).map(ServiceRequestAmendment::getServiceRequestId))
+                .orElse(null);
+        if (requestId == null) {
+            return false;
+        }
+        ServiceRequest request = locked(requestId);
+        if (gatewayRefund == null || refunds.existsByGatewayRefundId(gatewayRefund)) {
+            return true;
+        }
+        ServiceRequestRefund refund = new ServiceRequestRefund(request.getId(), orderId, amount, false, null,
+                "Refunded on the payment gateway dashboard", null);
+        refund.approve(gatewayRefund, null, null);
+        refunds.saveAndFlush(refund);
+        creditNotes.issue(request.payerOf(orderId), CreditNotes.SERVICE_REQUEST_REFUND, refund.getId(), orderId,
+                amount, Instant.now());
+        requests.record(request, "refund.approved", OUTSIDE_ACTOR);
+        cancelWhenFullyRefunded(request, null, OUTSIDE_ACTOR);
+        audit.record("system", "admin", "service-request.refund-outside", "service_request",
+                request.getId().toString(), Map.of("order", orderId, "amount", amount, "gatewayRefund", gatewayRefund));
+        notifier.notify(request.payerOf(orderId), "service.refund-approved",
+                Notifier.rupees(amount) + " refund on its way",
+                "It goes back to the card or account you paid with. Banks usually take 5\u20137 working days.",
+                ServiceRequestTypes.pageFor(request.getType()));
         return true;
     }
 
@@ -183,6 +245,13 @@ public class ServiceRequestRefunds {
     public RefundSummaryDto reject(AuthPrincipal caller, String id, String refundId, String note) {
         ServiceRequest request = locked(rentAgreement(caller, id).getId());
         ServiceRequestRefund refund = open(request, refundId);
+        boolean withdraws = caller.userId().equals(refund.getRequestedBy())
+                && request.getStatus() != ServiceRequestStatus.CANCELLED;
+        if (!decides(caller) && !withdraws) {
+            throw new ForbiddenException(request.getStatus() == ServiceRequestStatus.CANCELLED
+                    ? "The customer was told this refund is coming, so only a manager can refuse it."
+                    : "Only a manager can refuse a refund. You can withdraw one you asked for.");
+        }
         refund.reject(caller.userId(), text(note, "Say why the refund is refused"));
         refunds.saveAndFlush(refund);
         audit.record(caller, "service-request.refund-rejected", "service_request", id,
@@ -190,19 +259,19 @@ public class ServiceRequestRefunds {
         return summaryOf(caller, request);
     }
 
-    // The refund that took everything back leaves nothing to deliver, so the request ends with it.
-    private void cancelWhenFullyRefunded(ServiceRequest request, AuthPrincipal caller) {
+    private void cancelWhenFullyRefunded(ServiceRequest request, UUID actor, String actorName) {
         if (refunds.approvedTotal(request.getId()) < paid(request)
                 || !request.getStatus().canTransitionTo(ServiceRequestStatus.CANCELLED)) {
             return;
         }
         requests.transition(request, ServiceRequestStatus.CANCELLED);
         amendments.findOpenForUpdate(request.getId())
-                .ifPresent(open -> open.close(ServiceRequestAmendment.WITHDRAWN, caller.userId(), Instant.now()));
-        requests.record(request, "refund.cancelled-request", requests.displayName(caller.userId()));
-        notifier.notify(request.getRequesterId(), "service.refund-cancelled",
-                "Request cancelled", "Everything you paid is being refunded, so this request is closed.",
-                ServiceRequestTypes.pageFor(request.getType()));
+                .ifPresent(open -> open.close(ServiceRequestAmendment.WITHDRAWN, actor, Instant.now()));
+        requests.record(request, "refund.cancelled-request", actorName);
+        Stream.of(request.getRequesterId(), request.payer()).distinct().forEach(person -> notifier.notify(person,
+                "service.refund-cancelled", "Request cancelled",
+                "Everything paid on it is being refunded, so this request is closed.",
+                ServiceRequestTypes.pageFor(request.getType())));
     }
 
     private static UUID refundIdOf(String merchantRefundId) {
@@ -228,8 +297,7 @@ public class ServiceRequestRefunds {
             throw new ValidationException("At most \u20b9" + ceiling + " can be refunded"
                     + (dutyPaid ? " once the stamp duty is paid: the statutory charges are spent." : "."));
         }
-        Map<String, Long> taken = approved(history).stream().collect(Collectors.groupingBy(ServiceRequestRefund::getOrderId,
-                        Collectors.summingLong(ServiceRequestRefund::getAmount)));
+        Map<String, Long> taken = taken(history);
         long largest = 0;
         for (Leg leg : legs(request)) {
             long left = leg.amount() - taken.getOrDefault(leg.orderId(), 0L);
@@ -242,6 +310,28 @@ public class ServiceRequestRefunds {
                 + largest + " now and the rest as a second refund.");
     }
 
+    private long largestLeft(ServiceRequest request, List<ServiceRequestRefund> history) {
+        Map<String, Long> taken = taken(history);
+        return legs(request).stream().mapToLong(l -> l.amount() - taken.getOrDefault(l.orderId(), 0L)).max().orElse(0);
+    }
+
+    private static Map<String, Long> taken(List<ServiceRequestRefund> history) {
+        return approved(history).stream().collect(Collectors.groupingBy(ServiceRequestRefund::getOrderId,
+                Collectors.summingLong(ServiceRequestRefund::getAmount)));
+    }
+
+    private static boolean decides(AuthPrincipal caller) {
+        return Roles.Wire.ADMIN.equals(caller.role()) || Roles.Wire.MANAGER.equals(caller.role());
+    }
+
+    private void alertManagers(AuthPrincipal caller, ServiceRequest request, long amount, String body) {
+        String title = Notifier.rupees(amount) + " refund waiting for approval";
+        Stream.concat(users.findLiveByRole(Roles.Wire.MANAGER).stream(), users.findLiveByRole(Roles.Wire.ADMIN).stream())
+                .map(User::getId).filter(u -> !u.equals(caller.userId())).distinct()
+                .forEach(u -> notifier.notify(u, "service.refund-requested", title, body,
+                        ServiceRequestTypes.deskFor(request)));
+    }
+
     private long refundable(ServiceRequest request, List<ServiceRequestRefund> history, boolean dutyPaid) {
         long spent = 0;
         if (dutyPaid) {
@@ -251,7 +341,6 @@ public class ServiceRequestRefunds {
         return Math.max(0, paid(request) - refunded(history) - spent);
     }
 
-    // The first checkout, then each paid top-up; amount is their sum, so the first is the rest.
     private List<Leg> legs(ServiceRequest request) {
         List<Leg> topUps = amendments.findByServiceRequestIdAndPaymentRefNotNull(request.getId()).stream()
                 .filter(a -> a.delta() > 0 && (ServiceRequestAmendment.APPLIED.equals(a.getStatus()) || a.getPaidAt() != null))
@@ -289,7 +378,11 @@ public class ServiceRequestRefunds {
     }
 
     private ServiceRequestRefund open(ServiceRequest request, String refundId) {
-        return refunds.findOpenForUpdate(request.getId()).filter(r -> r.getId().toString().equals(refundId)).orElseThrow(() -> NotFoundException.of("Open refund"));
+        return refunds.findOpenForUpdate(request.getId()).filter(r -> r.getId().toString().equals(refundId))
+                .orElseThrow(() -> refunds.findByServiceRequestIdOrderByCreatedAtDesc(request.getId()).stream()
+                        .filter(r -> r.getId().toString().equals(refundId)).findFirst()
+                        .<RuntimeException>map(r -> new ConflictException("This refund is already " + r.getStatus() + "."))
+                        .orElseGet(() -> NotFoundException.of("Refund")));
     }
 
     private ServiceRequest locked(UUID requestId) {
@@ -303,7 +396,7 @@ public class ServiceRequestRefunds {
         return new RefundSummaryDto(paidOnRecord ? paid(request) : 0, refunded(history),
                 paidOnRecord ? refundable(request, history, registered) : 0,
                 paidOnRecord ? refundable(request, history, true) : 0,
-                registered,
+                registered, decides(caller),
                 history.stream().map(r -> new RefundSummaryDto.Item(r.getId().toString(), r.getAmount(),
                         r.getStatus(), r.isDutyPaid(), r.getGrn(), r.getReason(), name(r.getRequestedBy()),
                         name(r.getDecidedBy()), r.getDecisionNote(), r.getGatewayRefundId(), r.getCreatedAt(),

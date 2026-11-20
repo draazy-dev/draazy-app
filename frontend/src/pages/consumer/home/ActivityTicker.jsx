@@ -1,16 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import Icon from '../../../components/Icon.jsx';
 
-/* Trust-proof "live activity" ticker. Rotates short, believable proof-of-life
-   lines to reinforce the verified / zero-brokerage positioning. Purely cosmetic
-   (seeded copy, not real events) and reduced-motion safe — when the user prefers
-   reduced motion it shows a single static line and never cycles. */
 const ITEMS = [
-  { icon: 'shield-check', text: 'New listing from a Verified owner in Hinjawadi', color: 'text-emerald-300' },
+  { icon: 'shield-check', text: 'New listing from a KYC-done owner in Hinjawadi', color: 'text-emerald-300' },
   { icon: 'heart', text: 'Someone just saved a 2 BHK in Baner', color: 'text-rose-300' },
   { icon: 'hand-coins', text: 'Zero-brokerage deal closed in Wakad', color: 'text-teal-300' },
   { icon: 'calendar-check', text: 'Visit scheduled for a 3 BHK in Kothrud', color: 'text-teal-300' },
-  { icon: 'badge-check', text: 'Owner verified in Viman Nagar', color: 'text-amber-300' },
+  { icon: 'badge-check', text: 'Owner got KYC done in Viman Nagar', color: 'text-amber-300' },
   { icon: 'home', text: 'New flat listed in Koregaon Park', color: 'text-emerald-300' },
 ];
 
@@ -21,13 +17,13 @@ export default function ActivityTicker() {
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (media.matches) return undefined; // static line, no cycling
+    if (media.matches) return undefined;
 
     const id = setInterval(() => {
-      setShow(false); // fade out
+      setShow(false);
       const t = setTimeout(() => {
         setI((n) => (n + 1) % ITEMS.length);
-        setShow(true); // fade in next
+        setShow(true);
       }, 320);
       timers.current.push(t);
     }, 3600);
@@ -42,7 +38,7 @@ export default function ActivityTicker() {
   const item = ITEMS[i];
   return (
     <div className="hero-ticker flex justify-center mt-4 sm:mt-6" aria-live="off">
-      <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm max-w-full">
+      <div className="dz-tag gap-2.5 bg-white/5 border border-white/10 backdrop-blur-sm max-w-full">
         <span className="relative flex h-2 w-2 shrink-0">
           <span className="ticker-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400/70" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />

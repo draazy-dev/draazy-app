@@ -1,5 +1,6 @@
 import { expect, test, ACTORS } from '../fixtures/live.js';
 import { signedInAs, authHeaders, API } from '../helpers/liveAuth.js';
+import { gotoSettled } from '../helpers/settle.js';
 
 // Two years back on the 1st, so `monthsPaid` is large, stable and never straddles a month end.
 const LEASE_START = (() => {
@@ -41,7 +42,7 @@ test.describe('Rent Wallet — live', () => {
     test.skip(existing.length > 0, 'a rental already exists for this actor; the empty state cannot be observed');
 
     await signedInAs(page, ACTORS.tenant);
-    await page.goto('/dashboard#finances', { waitUntil: 'networkidle' });
+    await gotoSettled(page, '/dashboard#finances');
 
     await expect(page.getByText('Add the home you rent')).toBeVisible({ timeout: 15000 });
     // This affordance navigates tenants without rentals to the rent catalogue.
@@ -53,7 +54,7 @@ test.describe('Rent Wallet — live', () => {
     await withRental(request, async (rental, headers) => {
       const open = async () => {
         await signedInAs(page, ACTORS.tenant);
-        await page.goto('/dashboard#finances', { waitUntil: 'networkidle' });
+        await gotoSettled(page, '/dashboard#finances');
       };
 
       await test.step('the totals on screen are the server’s derivation', async () => {
@@ -95,6 +96,7 @@ test.describe('Rent Wallet — live', () => {
         await page.locator('input[type="number"]').first().fill('600000');
         await expect(page.getByText('HRA exemption (Section 10(13A))')).toBeVisible();
         await expect(page.getByText('Estimated tax you save')).toBeVisible();
+        await expect(page.getByRole('link', { name: 'Make rent receipts' })).toHaveAttribute('href', '/tools/rent-receipt-generator');
       });
 
       await test.step('the rental can be edited from the wallet itself', async () => {

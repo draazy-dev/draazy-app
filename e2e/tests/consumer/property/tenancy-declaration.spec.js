@@ -1,6 +1,7 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile, signedInAs, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 const created = new Set();
 
@@ -44,7 +45,7 @@ async function listing() {
 }
 
 async function open(page, ref) {
-  await page.goto(`/property/${ref}?tab=amenities`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${ref}?tab=amenities`);
   await page.evaluate(() => document.querySelectorAll('.reveal,.fade-up,.fade-in').forEach((el) => el.classList.add('visible')));
   await expect(page.getByRole('heading', { name: /ratings/i })).toBeVisible({ timeout: 20000 });
 }

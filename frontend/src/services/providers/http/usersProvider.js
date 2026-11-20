@@ -1,6 +1,5 @@
 import { get, patch, unwrapPage } from '../../http.js';
 
-/** `status` values the contract's `GET /users` accepts. Anything else is a 422 from the server. */
 const WIRE_STATUSES = new Set(['active', 'suspended', 'archived']);
 
 const toRow = (u) => ({
@@ -11,17 +10,15 @@ const toRow = (u) => ({
   city: u?.city || '',
   listings: u?.listingsCount ?? 0,
   joinedAt: u?.joinedAt || u?.createdAt || null,
-  status: u?.status,
+  status: u?.archived ? 'archived' : u?.status,
   verified: Boolean(u?.verified),
   badgeSource: u?.badgeSource || null,
   flagged: Boolean(u?.flagged),
   flagReason: u?.flagReason || '',
-  archived: u?.status === 'archived',
+  archived: Boolean(u?.archived),
 });
 
-/** One page of the directory. `archived` and `status` are separate query parameters because they are separate
- * columns: sending a status without pinning `archived=false` returns archived rows too. */
-export async function listUsers({ role, customers, status, q, page = 0, size = 20, counts } = {}) {
+export async function listUsers({ role, customers, status, q, days, page = 0, size = 20, counts } = {}) {
   const archived = status === 'archived';
   const res = await get('/users', {
     page,
@@ -30,6 +27,7 @@ export async function listUsers({ role, customers, status, q, page = 0, size = 2
     role: role || undefined,
     customers: customers || undefined,
     q: q || undefined,
+    days: days || undefined,
     status: !archived && WIRE_STATUSES.has(status) ? status : undefined,
     counts: counts || undefined,
   });
@@ -37,8 +35,6 @@ export async function listUsers({ role, customers, status, q, page = 0, size = 2
   return { ...wrapped, counts: res?.counts, items: wrapped.items.map(toRow) };
 }
 
-/** The activity modal, returned exactly as the server sends it: the console builds each line's sentence from `kind`
- * through its own translation files, which is why no wording arrives. */
 export async function getUserTimeline(id) {
   const rows = await get(`/users/${encodeURIComponent(id)}/timeline`);
   return Array.isArray(rows) ? rows : [];
@@ -56,7 +52,6 @@ export async function setUserStatus(id, action, reason) {
   return patch(`${base}/reactivate`);
 }
 
-/** Raise or lower the review flag. 422 when raising one without a reason. */
 export async function setUserFlag(id, flagged, reason) {
   const updated = await patch(`/users/${encodeURIComponent(id)}/flag`, { flagged, reason });
   return toRow(updated);

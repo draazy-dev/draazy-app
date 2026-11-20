@@ -1,89 +1,13 @@
-import { useState } from 'react';
 import { Link } from 'react-router';
-import { Archive, ExternalLink, Flag, MapPin, Save, XCircle } from 'lucide-react';
+import { Archive, ExternalLink, Flag, MapPin, XCircle } from 'lucide-react';
 import { classNames } from '../../../lib/format.js';
 import { fmtINR } from '../../../lib/format.js';
 import Modal from '../../../components/ui/Modal.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
-import Select from '../../../components/ui/Select.jsx';
-import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import InternalNote from '../../../components/ui/InternalNote.jsx';
-import { EDIT_DEAL_OPTS, EDIT_STATUS_OPTS, dealLabel, perSqftLabel, liveHref, detailKvs, fmtAgo, statusLabel } from './constants.js';
+import { dealLabel, perSqftLabel, liveHref, detailKvs, fmtAgo, statusLabel } from './constants.js';
 import { REVIEW_REASONS, ownerMessagePreview } from './reviewReasons.js';
 
-export function PropertyEditModal({ edit, setEdit, onClose, onSubmit, saving, canSetStatus }) {
-  const [picking, setPicking] = useState(false);
-  if (!edit) return null;
-  const rejected = edit._ref?.status === 'rejected';
-  return (
-    <Modal
-      open={!!edit}
-      onClose={onClose}
-      title="Edit listing"
-      size="lg"
-      footer={
-        <>
-          <button type="button" onClick={onClose} disabled={saving} className="dz-btn dz-btn-ghost">Cancel</button>
-          <button type="button" onClick={onSubmit} disabled={saving || picking} className="dz-btn dz-btn-primary disabled:opacity-40"><Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save changes'}</button>
-        </>
-      }
-    >
-      <div className="space-y-3">
-        <label className="block text-sm">
-          <span className="mb-1 block text-gray-300">Title <span className="text-rose-400">*</span></span>
-          <input value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} className="dz-input" />
-        </label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            <span className="mb-1 block text-gray-300">Price ({'\u20B9'}) <span className="text-rose-400">*</span></span>
-            <input type="number" min="0" value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value })} className="dz-input" />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-gray-300">Built-up area (sq.ft)</span>
-            <input type="number" min="0" value={edit.area} onChange={(e) => setEdit({ ...edit, area: e.target.value })} className="dz-input" />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-gray-300">Configuration (BHK)</span>
-            {/* Numeric like Price and Area; free text published values the listing form never offers. */}
-            <input type="number" min="0" step="1" value={edit.bhk} onChange={(e) => setEdit({ ...edit, bhk: e.target.value })} className="dz-input" />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-gray-300">Property type</span>
-            <input value={edit.type} onChange={(e) => setEdit({ ...edit, type: e.target.value })} className="dz-input" />
-          </label>
-          <div className="block text-sm">
-            <span className="mb-1 block text-gray-300">Locality <span className="text-rose-400">*</span></span>
-            <LocalitySelect
-              value={edit.locality}
-              onChange={(v) => setEdit({ ...edit, locality: v, localitySlug: '' })}
-              onSelect={(sel) => setEdit({ ...edit, locality: sel.name, localitySlug: sel.slug || '' })}
-              onBusyChange={setPicking}
-              placeholder="Select locality"
-              ariaLabel="Locality"
-              className="w-full"
-            />
-          </div>
-          <label className="block text-sm">
-            <span className="mb-1 block text-gray-300">Deal</span>
-            <Select value={edit.deal} onChange={(v) => setEdit({ ...edit, deal: v })} options={EDIT_DEAL_OPTS} ariaLabel="Deal" />
-          </label>
-        </div>
-        {canSetStatus ? (
-          <label className="block text-sm">
-            <span className="mb-1 block text-gray-300">Status</span>
-            {rejected ? (
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gray-300">
-                {statusLabel(edit.status)} — use Request reopen in the review panel to reverse a final rejection.
-              </div>
-            ) : (
-              <Select value={edit.status} onChange={(v) => setEdit({ ...edit, status: v })} options={EDIT_STATUS_OPTS} ariaLabel="Status" />
-            )}
-          </label>
-        ) : null}
-      </div>
-    </Modal>
-  );
-}
 export function PropertyFlagModal({ flagFor, setFlagFor, flagReason, setFlagReason, internalNote, setInternalNote, onSubmit }) {
   return (
     <Modal
@@ -93,7 +17,7 @@ export function PropertyFlagModal({ flagFor, setFlagFor, flagReason, setFlagReas
       footer={
         <>
           <button onClick={() => setFlagFor(null)} className="dz-btn dz-btn-ghost">Cancel</button>
-          <button onClick={onSubmit} className="dz-btn dz-btn-danger"><Flag className="h-4 w-4" /> Flag listing</button>
+          <button onClick={onSubmit} disabled={!flagReason.trim()} className="dz-btn dz-btn-danger disabled:opacity-50"><Flag className="h-4 w-4" /> Flag listing</button>
         </>
       }
     >
@@ -155,9 +79,9 @@ export function PropertyViewModal({ view, setView }) {
               <div className="text-lg font-extrabold text-white">{view.title}</div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge status={view.status}>{statusLabel(view.status)}</Badge>
-                <span className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-gray-300">{dealLabel(view.deal)}</span>
-                {view.featured ? <span className="rounded-full border border-teal-400/30 bg-teal-500/15 px-2.5 py-0.5 text-xs text-teal-300">{'\u2605'} Featured</span> : null}
-                {view.real ? <span className="rounded-full border border-teal-400/30 bg-teal-500/15 px-2.5 py-0.5 text-xs text-teal-300">Live user post</span> : null}
+                <span className="dz-tag border border-white/10 text-gray-300">{dealLabel(view.deal)}</span>
+                {view.featured ? <span className="dz-tag border border-teal-400/30 bg-teal-500/15 text-teal-300">{'\u2605'} Featured</span> : null}
+                {view.real ? <span className="dz-tag border border-teal-400/30 bg-teal-500/15 text-teal-300">Live user post</span> : null}
               </div>
               <div className="mt-2 flex items-center gap-1 text-sm text-gray-300">
                 <MapPin className="h-3.5 w-3.5" /> {view.locality} {'\u00B7'} {view.bhk || '\u2014'} {'\u00B7'} {view.type}
@@ -188,7 +112,7 @@ function ReasonPicker({ decision = 'reject', reasonCode, setReasonCode, note, se
       <div className="flex flex-wrap gap-2">
         {REVIEW_REASONS.map((reason) => (
           <button key={reason.code} type="button" onClick={() => setReasonCode(reason.code)}
-            className={classNames('rounded-full border px-3 py-1.5 text-xs font-semibold transition', reasonCode === reason.code
+            className={classNames('dz-chip border', reasonCode === reason.code
               ? 'border-brand-teal bg-brand-teal text-ink'
               : 'border-white/10 bg-white/[0.03] text-gray-300 hover:border-white/20')}>
             {reason.label}

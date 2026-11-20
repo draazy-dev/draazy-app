@@ -5,6 +5,14 @@ export const istInDays = (days = 0) => new Date(Date.now() + IST_OFFSET_MS + day
 
 export const istToday = () => istInDays(0);
 
+export const istFirstOfNextMonth = () => {
+  const [year, month] = istToday().split('-').map(Number);
+  return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+};
+
+// Mirrors the server's AvailableOn.bucketOf, so a chip whose distance varies by day still has a fixed expectation.
+export const bucketOf = (iso) => (iso <= istToday() ? 'now' : iso <= istInDays(15) ? '15' : iso <= istInDays(30) ? '30' : null);
+
 export const displayDate = (iso) => iso.split('-').reverse().join('/');
 
 // "27 Oct" — the same formula as the app's availability label.

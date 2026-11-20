@@ -17,11 +17,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-// Desk check for registered-copy tenancy rows.
-// It stays here because operator permission is a service-desk decision.
 @RestController
 public class RentAgreementDeskController {
-
     private static final String SERVICES_READ = "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN
             + "') and " + BackOfficePermissions.REQUIRE_SERVICES_READ;
 

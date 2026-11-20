@@ -9,14 +9,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
-// Customer and queue lists are separate to avoid nullable requester scope leaks.
 public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, UUID> {
-
-    // Only accepted parties can see co-filled requests; invites alone are requester claims.
     @Query("""
             select r from ServiceRequest r
             where (r.requesterId = :requesterId
@@ -27,6 +25,9 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
               and (:type is null or r.type = :type)
               and (:status is null or r.status = :status)
               and (:ticketId is null or r.ticketId = :ticketId)
+              and not exists (select 1 from ServiceRequestDismissal d
+                              where d.requestId = r.id
+                                and d.userId = :requesterId)
             order by r.createdAt desc
             """)
     Page<ServiceRequest> findForRequester(@Param("requesterId") UUID requesterId,
@@ -35,7 +36,6 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             @Param("ticketId") UUID ticketId,
             Pageable pageable);
 
-    // Single-row form of requester/accepted-party scope behind visible().
     @Query("""
             select count(r) > 0 from ServiceRequest r
             where r.id = :id
@@ -54,12 +54,28 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             """)
     Optional<ServiceRequest> findByIdForUpdate(@Param("id") UUID id);
 
-    // Serialises one user's credit spends; a row lock on the request alone cannot,
-    // as each spend is on a different request.
+    @Modifying
+    @Query(value = """
+            insert into service_request_dismissals (request_id, user_id)
+            values (:id, :userId)
+            on conflict (request_id, user_id) do nothing
+            """, nativeQuery = true)
+    void dismiss(@Param("id") UUID id, @Param("userId") UUID userId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            with messages as (delete from service_request_messages where request_id = :id),
+                 timeline as (delete from service_request_timeline where request_id = :id),
+                 parties as (delete from service_request_parties where request_id = :id),
+                 approvals as (delete from service_request_draft_approvals where request_id = :id),
+                 checks as (delete from service_request_draft_checks where request_id = :id)
+            delete from service_requests where id = :id
+            """, nativeQuery = true)
+    void purge(@Param("id") UUID id);
+
     @Query(value = "select id from users where id = :id for update", nativeQuery = true)
     Optional<UUID> lockUser(@Param("id") UUID id);
 
-    // Cancelled requests release their credit, so only live and delivered ones are counted.
     @Query("""
             select count(r) from ServiceRequest r
             where r.requesterId = :userId
@@ -68,8 +84,6 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             """)
     long countReferralCreditsHeld(@Param("userId") UUID userId);
 
-    // Awaiting-payment requests are excluded: ops does not work a rent agreement nobody has paid for.
-    // Teams are resolved by the service from the caller, never taken from ?team= as-is.
     @Query("""
             select r from ServiceRequest r
             where r.status <> com.draazy.api.services.request.ServiceRequestStatus.AWAITING_PAYMENT
@@ -89,13 +103,15 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
                             or (r.status = com.draazy.api.services.request.ServiceRequestStatus.CHANGES_REQUESTED
                                 and r.statusChangedAt < :revisionBy)
                             or (r.status = com.draazy.api.services.request.ServiceRequestStatus.APPROVED
-                                and r.statusChangedAt < :registrationBy))))
+                                and r.statusChangedAt < :registrationBy)))
+                   and r.id not in :waitingIds)
               and (:prefix is null
                    or (:requestId is not null and r.id = :requestId)
                    or exists (select 1 from User u
                               where u.id = r.requesterId
                                 and (lower(u.name) like :prefix escape '\\'
                                      or u.mobile like :prefix escape '\\')))
+              and r.createdAt >= :since
             order by r.createdAt desc
             """)
     Page<ServiceRequest> findForQueue(@Param("allTeams") boolean allTeams,
@@ -112,8 +128,10 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             @Param("draftBy") Instant draftBy,
             @Param("revisionBy") Instant revisionBy,
             @Param("registrationBy") Instant registrationBy,
+            @Param("waitingIds") List<UUID> waitingIds,
             @Param("prefix") String prefix,
             @Param("requestId") UUID requestId,
+            @Param("since") Instant since,
             Pageable pageable);
 
     @Query("""
@@ -160,25 +178,43 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             @Param("revisionBy") Instant revisionBy,
             @Param("registrationBy") Instant registrationBy);
 
+    @Query(value = """
+            select r.* from service_requests r
+            where (:allTeams = true or r.team in (:teams))
+              and r.type = 'rent-agreement'
+              and ((r.status = 'new' and r.status_changed_at < :pickupBy)
+                   or (r.status in ('assigned', 'in-progress') and r.status_changed_at < :draftBy))
+              and r.details -> '_state' ->> 'tenantMode' = 'invite'
+              and coalesce(r.details -> '_state' ->> 'ownerMode', '') <> 'invite'
+            """, nativeQuery = true)
+    List<ServiceRequest> findTenantInvitesBeforeDraft(@Param("allTeams") boolean allTeams,
+            @Param("teams") List<String> teams,
+            @Param("pickupBy") Instant pickupBy,
+            @Param("draftBy") Instant draftBy);
+
     interface StatusTotal {
         ServiceRequestStatus getStatus();
 
         Long getTotal();
     }
 
-    // Optional is enforced by uq_service_requests_ticket partial unique index.
-    Optional<ServiceRequest> findByTicketId(UUID ticketId);
-
-    // The request behind a Cashfree order, so the payment webhook can settle it.
     Optional<ServiceRequest> findByPaymentRef(String paymentRef);
 
-    // Fast path only: concurrent creates can both count zero before inserting.
-    long countByRequesterIdAndTypeAndStatus(UUID requesterId, String type,
-            ServiceRequestStatus status);
+    @Query(value = """
+            select count(*) from service_requests r
+            where r.requester_id = :requesterId and r.type = :type and r.status = 'awaiting-payment'
+              and coalesce(rent_agreement_flat_key(r.details), '') = :flat
+            """, nativeQuery = true)
+    long countOpenUnpaidOnFlat(@Param("requesterId") UUID requesterId, @Param("type") String type,
+            @Param("flat") String flat);
 
-    List<ServiceRequest> findByRequesterIdAndTypeAndPaymentRefNotNull(UUID requesterId, String type);
+    @Query("""
+            select r from ServiceRequest r
+            where r.type = :type and r.paymentRef is not null
+              and (r.requesterId = :userId or r.payerId = :userId)
+            """)
+    List<ServiceRequest> findWithOrderInvolving(@Param("userId") UUID userId, @Param("type") String type);
 
-    // Awaiting-payment with stale update means no settled money arrived yet.
     @Query("""
             select r from ServiceRequest r
             where r.status = :status

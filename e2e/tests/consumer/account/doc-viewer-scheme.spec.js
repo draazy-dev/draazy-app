@@ -1,5 +1,6 @@
 import { test, expect } from '../../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile, signedInAs, letterTag } from '../../../helpers/liveAuth.js';
+import { newListing } from '../../../helpers/monetisation.js';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL9QQAAAABJRU5ErkJggg==', 'base64');
 const createdDocumentIds = new Set();
@@ -16,12 +17,12 @@ async function actor(name) {
   return { mobile, headers };
 }
 
-async function upload(headers, { name, type, bytes }) {
+async function upload(headers, vault, category, { name, type, bytes }) {
   const form = new FormData();
-  form.append('category', 'Aadhaar Card');
+  form.append('category', category);
   form.append('file', new Blob([bytes], { type }), name);
   const { 'content-type': _jsonContentType, ...multipartHeaders } = headers;
-  const response = await fetch(`${API}/me/documents/personal`, {
+  const response = await fetch(`${API}/me/documents/${vault}`, {
     method: 'POST',
     headers: multipartHeaders,
     body: form,
@@ -31,12 +32,12 @@ async function upload(headers, { name, type, bytes }) {
 }
 
 test.afterEach(async () => {
-  for (const { mobile, id } of createdDocumentIds) {
-    const response = await fetch(`${API}/me/documents/personal/${id}`, {
+  for (const { mobile, vault, id } of createdDocumentIds) {
+    const response = await fetch(`${API}/me/documents/${vault}/${id}`, {
       method: 'DELETE',
       headers: await authHeaders(mobile),
     });
-    expect(response.status, `cleaning up personal document ${id}`).toBe(204);
+    expect(response.status, `cleaning up document ${id}`).toBe(204);
   }
   createdDocumentIds.clear();
 });
@@ -45,8 +46,9 @@ test.describe('Document viewer — live storage and content rules', () => {
   test('a stored PNG opens through the vetted viewer URL, an HTML upload is refused, and the viewer guard never opens an active data URL', async ({ page, context }) => {
     await test.step('a server-stored PNG opens through the vetted viewer URL', async () => {
       const owner = await actor(`Zztest Document Viewer ${letterTag()}`);
-      const uploaded = await upload(owner.headers, {
-        name: 'identity.png',
+      const { id: propertyId } = await newListing(owner.mobile, { title: 'Viewer flat' });
+      const uploaded = await upload(owner.headers, propertyId, 'Sale Deed', {
+        name: 'sale-deed.png',
         type: 'image/png',
         bytes: PNG,
       });
@@ -54,11 +56,11 @@ test.describe('Document viewer — live storage and content rules', () => {
       expect(uploaded.body, 'the upload response is metadata; the file is signed on open').not.toHaveProperty('url');
       const signed = await fetch(`${API}/me/documents/${uploaded.body.id}/url`, { headers: owner.headers });
       expect((await signed.json()).url, 'the minted URL is hosted, not a browser data URL').not.toMatch(/^data:/);
-      createdDocumentIds.add({ mobile: owner.mobile, id: uploaded.body.id });
+      createdDocumentIds.add({ mobile: owner.mobile, vault: propertyId, id: uploaded.body.id });
 
       await signedInAs(page, owner.mobile);
       await page.goto('/dashboard#documents');
-      await expect(page.getByText('identity.png')).toBeVisible();
+      await expect(page.getByText('sale-deed.png')).toBeVisible();
 
       const [viewer] = await Promise.all([
         context.waitForEvent('page'),
@@ -75,7 +77,7 @@ test.describe('Document viewer — live storage and content rules', () => {
       expect(before.status, 'reading the empty personal vault').toBe(200);
       const initial = await before.json();
 
-      const rejected = await upload(owner.headers, {
+      const rejected = await upload(owner.headers, 'personal', 'Rent agreement', {
         name: 'unsafe.html',
         type: 'text/html',
         bytes: Buffer.from('<script>window.pwned = true</script>'),

@@ -28,8 +28,6 @@ export function SimilarProperties({ p }) {
     return () => { alive = false; };
   }, [near, p.id, p.uuid, p.deal, p.localitySlug, p.bhkNum, p.price, p.lat, p.lng]);
 
-  // This section mounts asynchronously (after the parent's scroll-reveal observer
-  // has already scanned the page), so reveal it directly once the cards render.
   useEffect(() => {
     if (items.length && secRef.current) secRef.current.classList.add('visible');
   }, [items]);
@@ -49,7 +47,7 @@ export function SimilarProperties({ p }) {
               <Link key={x.id} to={propertyHref(x)} className="property-card group rounded-2xl overflow-hidden block">
                 <div className="card-img relative h-48">
                   <PropertyImage src={x.image} sizes={CARD_SIZES} alt={x.title} loading="lazy" className="w-full h-full object-cover" />
-                  <div className="absolute top-3 left-3">{x.ownerVerified ? <span className="tag tag-teal text-xs">{t('property.similarVerified')}</span> : x.rera ? <span className="tag tag-coral text-xs">RERA</span> : <span className="tag tag-indigo text-xs">{t('property.similarPremium')}</span>}</div>
+                  <div className="absolute top-3 left-3">{x.ownerVerified ? <span className="tag tag-teal text-xs">{t('property.similarVerified')}</span> : x.rera ? <span className="tag tag-coral text-xs">{t('listings.reraBadge')}</span> : <span className="tag tag-indigo text-xs">{t('property.similarPremium')}</span>}</div>
                 </div>
                 <div className="p-5">
                   <h3 className="font-bold text-white text-lg mb-1 group-hover:text-brand-teal-3 transition-smooth truncate">{x.title}</h3>

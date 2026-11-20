@@ -8,9 +8,12 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.Notifier;
+import com.draazy.api.common.trust.RequestSource;
+import com.draazy.api.common.trust.WithdrawnCooldown;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -18,10 +21,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Group applications are not requests: a host binds the whole group to a listing. */
 @Service
 public class FlatmateApplicationService {
-
     private static final String CLOSED_TO_GROUPS =
             "This flat has already been given to a group and is closed to new group applications.";
 
@@ -31,43 +32,43 @@ public class FlatmateApplicationService {
     private final GroupApplicationHydrator hydrator;
     private final Notifier notifier;
     private final RateLimitLock locks;
+    private final FlatmateReviewStatuses reviewStatuses;
 
     public FlatmateApplicationService(FlatmateGroupApplicationRepository applications,
             FlatmateGroupRepository groups, PropertyRepository properties,
             GroupApplicationHydrator hydrator, Notifier notifier,
-            RateLimitLock locks) {
+            RateLimitLock locks, FlatmateReviewStatuses reviewStatuses) {
         this.applications = applications;
         this.groups = groups;
         this.properties = properties;
         this.hydrator = hydrator;
         this.notifier = notifier;
         this.locks = locks;
+        this.reviewStatuses = reviewStatuses;
     }
 
-    /** Host view: the card draws the moderation state and the seats; the edit form reads the one group it opens. */
     @Transactional(readOnly = true)
     public Page<FlatmateGroupCard> myGroups(AuthPrincipal caller, Pageable pageable) {
-        return groups.findMine(caller.userId(), pageable).map(FlatmateApplicationService::card);
+        Page<FlatmateGroup> page = groups.findMine(caller.userId(), pageable);
+        Map<UUID, String> verdicts = reviewStatuses.forGroups(page.getContent());
+        return page.map(group -> card(group, verdicts.get(group.getId())));
     }
 
-    private static FlatmateGroupCard card(FlatmateGroup group) {
+    private static FlatmateGroupCard card(FlatmateGroup group, String reviewStatus) {
         List<String> localities = group.isHunting() && !group.getLocalities().isEmpty()
                 ? List.copyOf(group.getLocalities())
                 : group.getLocality() == null ? List.of() : List.of(group.getLocality());
         return new FlatmateGroupCard(group.getId(), group.getTitle(), group.getLocality(), localities,
                 group.getRent(), group.getSeatsTotal(), group.openSeats(), group.getMembers().size(),
-                group.getPropertyId(), group.getModStatus(), group.getCreatedAt());
+                group.getPropertyId(), group.getModStatus(), group.getCreatedAt(), group.getHostRole(),
+                group.isHunting(), group.getVerificationTier(), reviewStatus);
     }
 
-    /** Host-only: applying binds every group member to a flat and rent. */
     @Transactional
     public GroupApplicationDto apply(AuthPrincipal caller, UUID groupId, UUID listingId) {
         FlatmateGroup group = groups.findById(groupId)
+                .filter(g -> g.getHostId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Flatmate group"));
-        if (!group.getHostId().equals(caller.userId())) {
-            throw new BadRequestException(
-                    "Only the person who started this group can apply it to a flat.");
-        }
         if (!group.isVisible()) {
             throw new BadRequestException(
                     "This group is not live yet, so it cannot apply to a flat.");
@@ -85,29 +86,38 @@ public class FlatmateApplicationService {
             throw new BadRequestException("This is your own listing.");
         }
         locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_LISTING_DECISION, listingId.toString());
-        if (applications.existsByListingIdAndGroupId(listingId, groupId)) {
+        FlatmateGroupApplication earlier = applications.findByListingIdAndGroupId(listingId, groupId).orElse(null);
+        if (earlier != null && !RequestSource.WITHDRAWN.equals(earlier.getStatus())) {
             throw new ConflictException(
                     "Your group has already applied to this flat — the owner has it.");
+        }
+        if (earlier != null && WithdrawnCooldown.active(earlier.getDecidedAt(), Instant.now())) {
+            throw WithdrawnCooldown.refusal(earlier.getDecidedAt());
         }
         if (applications.existsByListingIdAndStatusAndModStatusIn(listingId,
                 FlatmateVocabulary.STATUS_ACCEPTED, FlatmateVocabulary.MOD_PUBLIC)) {
             throw new ConflictException(CLOSED_TO_GROUPS);
         }
 
-        FlatmateGroupApplication saved = applications.saveAndFlush(
-                new FlatmateGroupApplication(listingId, groupId, caller.userId()));
+        FlatmateGroupApplication saved;
+        if (earlier == null) {
+            saved = applications.saveAndFlush(new FlatmateGroupApplication(listingId, groupId, caller.userId()));
+        } else {
+            earlier.reopen(caller.userId());
+            saved = applications.saveAndFlush(earlier);
+            applications.restartClock(saved.getId());
+        }
 
         if (listing.getOwner() != null) {
             notifier.notify(listing.getOwner().getId(), "flatmate.groupApplication.received",
                     "A group applied to your flat",
                     group.getTitle() + " would like to rent " + listing.getTitle() + ".",
-                    "/dashboard");
+                    Notifier.REQUEST_INBOX);
         }
 
         return hydrator.hydrateOne(saved);
     }
 
-    /** Scope by owned listing ids because the application row has no owner column. */
     @Transactional(readOnly = true)
     public Page<GroupApplicationDto> inbox(AuthPrincipal caller, Pageable pageable) {
         List<UUID> listingIds = properties.findIdsByOwnerId(caller.userId());
@@ -121,7 +131,6 @@ public class FlatmateApplicationService {
                 page.getTotalElements());
     }
 
-    /** Stranger ids return 404, not 403, so application ids do not become existence oracles. */
     @Transactional
     public GroupApplicationDto decide(AuthPrincipal caller, UUID applicationId, String status) {
         String verdict = FlatmateVocabulary.require(
@@ -136,6 +145,9 @@ public class FlatmateApplicationService {
 
         locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_LISTING_DECISION,
                 listing.getId().toString());
+        if (!applications.existsByIdAndModStatusIn(application.getId(), FlatmateVocabulary.MOD_PUBLIC)) {
+            throw new ConflictException("This application was taken down by our team.");
+        }
         if (verdict.equals(application.getStatus())) {
             return hydrator.hydrateOne(application);
         }
@@ -144,6 +156,9 @@ public class FlatmateApplicationService {
         }
 
         boolean accepting = FlatmateVocabulary.STATUS_ACCEPTED.equals(verdict);
+        if (accepting && groups.lockVisible(application.getGroupId()).isEmpty()) {
+            throw new ConflictException("This group is not live right now, so it cannot be accepted.");
+        }
         if (accepting && applications.existsByListingIdAndStatusAndModStatusInAndIdNot(listing.getId(),
                 FlatmateVocabulary.STATUS_ACCEPTED, FlatmateVocabulary.MOD_PUBLIC, application.getId())) {
             throw new ConflictException(CLOSED_TO_GROUPS);

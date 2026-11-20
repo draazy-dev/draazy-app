@@ -41,22 +41,17 @@ const SectionHead = ({ icon, iconCls = 'text-teal-400', title, sub, action }) =>
     {action}
   </div>
 );
-/* Persist the tenant's basic-salary input so the HRA saver stays populated across visits (a small stickiness touch;
-   no PII leaves the device). */
 
 const basisSalaryKey = (mob) => 'dzHraBasic:' + (mob || 'anon');
-/* Rent Wallet — the tenant view of Finances. */
 
 export default function TenantFinancesTab({ user, toast }) {
   const { t, i18n } = useTranslation();
   const mob = user?.mobile || '';
   const [idx, setIdx] = useState(0);
-  /* One caller-scoped read. */
 
   const [rentals, setRentals] = useState([]);
   const [status, setStatus] = useState('loading');
   const [editing, setEditing] = useState(null);
-  /* A read token, bumped on every request and on unmount. */
 
   const gen = useRef(0);
   const reload = useCallback(async () => {
@@ -65,8 +60,6 @@ export default function TenantFinancesTab({ user, toast }) {
       const rows = await myRentals();
       if (gen.current !== mine) return;
       setRentals(rows);
-      // Keep the selection inside the list rather than letting a shorter list silently fall back
-      // to row 0, which would leave Remove pointed at a rental the user did not choose.
       setIdx((i) => Math.min(i, Math.max(0, rows.length - 1)));
       setStatus('ready');
     } catch {
@@ -77,8 +70,6 @@ export default function TenantFinancesTab({ user, toast }) {
   useEffect(() => {
     setStatus('loading');
     setIdx(0);
-    // Bumping the token on the way out cancels anything still in flight for the previous account. Aliased because the
-    // lint rule assumes a ref holds a DOM node whose identity goes stale; this one holds a counter.
     reload();
     const token = gen;
     return () => { token.current++; };
@@ -87,7 +78,6 @@ export default function TenantFinancesTab({ user, toast }) {
   const loaded = status !== 'loading';
   const rental = rentals[idx] || null;
   const deposit = useMemo(() => depositInfo(rental), [rental]);
-  // HRA saver inputs (basic salary annual + tax slab). Pune is a non-metro (40%).
 
   const [basic, setBasic] = useState(() => { try { return localStorage.getItem(basisSalaryKey(mob)) || ''; } catch { return ''; } });
   const [slab, setSlab] = useState('0.2');
@@ -131,7 +121,6 @@ export default function TenantFinancesTab({ user, toast }) {
       </div>
     );
   }
-  /* Empty state — nothing recorded yet. */
 
   if (loaded && !rental && !editing) {
     return (
@@ -175,7 +164,6 @@ export default function TenantFinancesTab({ user, toast }) {
   if (!rental) return <div className="space-y-6"><Hero /></div>;
 
   const monthlyRent = Number(rental.monthlyRent) || 0;
-  // Reverse an EMI (₹868/lakh at 8.5% for 20y) to the home price whose EMI ≈ your rent.
   const buyPrice = monthlyRent ? Math.round((monthlyRent / 868) * 100000) : 0;
 
   return (
@@ -186,7 +174,7 @@ export default function TenantFinancesTab({ user, toast }) {
         {rentals.length > 1 && (
           <HScroll wrapClassName="-mx-1 flex-1" className="flex gap-1.5 px-1">
             {rentals.map((x, i) => (
-              <button key={x.id} onClick={() => setIdx(i)} className={'inline-flex min-h-[40px] items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-sm font-medium transition ' + (i === idx ? 'border-brand-teal/30 bg-brand-teal/15 text-brand-teal' : 'border-transparent bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white')}>
+              <button key={x.id} onClick={() => setIdx(i)} className={'h-btn inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 text-sm font-medium transition ' + (i === idx ? 'border-brand-teal/30 bg-brand-teal/15 text-brand-teal' : 'border-transparent bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white')}>
                 <Icon name="house" className="w-4 h-4" /> {x.address}
               </button>
             ))}
@@ -196,7 +184,6 @@ export default function TenantFinancesTab({ user, toast }) {
           <Icon name="plus" className="w-4 h-4" /> {t('wallet.addRental')}
         </button>
       </div>
-      {/* The recorded rental itself — stated plainly as the tenant's own entry. */}
 
       <Card className="p-5">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -220,7 +207,6 @@ export default function TenantFinancesTab({ user, toast }) {
           </div>
         </div>
       </Card>
-      {/* KPI stats */}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Stat icon="receipt-indian-rupee" bg="bg-teal-400/15" fg="text-teal-400" value={fmtINR(rental.fyPaid)} label={t('wallet.rentPaidFy', { fy: fyLabel() })} />
@@ -244,15 +230,12 @@ export default function TenantFinancesTab({ user, toast }) {
         <p className="text-gray-400 text-sm">{t('wallet.passportSoonBody')}</p>
       </Card>
 
-        {/* HRA Tax Saver */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-6">
           <SectionHead icon="piggy-bank" iconCls="text-brand-teal-3" title={t('wallet.hraTitle')} sub={t('wallet.hraSub')} />
           <div className="grid grid-cols-2 gap-3 mb-4">
             <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('wallet.annualBasic')}</span>
               <input type="number" inputMode="numeric" value={basic} onChange={(e) => setBasic(e.target.value)} placeholder="₹" className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" />
-            {/* A div, not a label: Select renders a <button>, and a wrapping label does not give a button its
-               accessible name. */}
             </label>
             <div className="text-sm"><span className="mb-1.5 block text-gray-400">{t('wallet.taxSlab')}</span>
               <Select ariaLabel={t('wallet.taxSlab')} value={slab} onChange={setSlab} options={[{ value: '0.05', label: '5%' }, { value: '0.1', label: '10%' }, { value: '0.2', label: '20%' }, { value: '0.3', label: '30%' }]} className="w-full" />
@@ -269,8 +252,8 @@ export default function TenantFinancesTab({ user, toast }) {
           ) : (
             <p className="text-gray-500 text-sm">{t('wallet.addSalaryPrompt')}</p>
           )}
+          <Link to="/tools/rent-receipt-generator" className="dz-control dz-control--ghost px-3 text-xs gap-1.5 mt-4"><Icon name="receipt" className="w-4 h-4" /> {t('wallet.makeReceipts')}</Link>
         </Card>
-        {/* Deposit tracker */}
 
         <Card className="p-6">
           <SectionHead icon="landmark" iconCls="text-amber-400" title={t('wallet.depositTitle')} sub={t('wallet.depositSub')} />
@@ -289,7 +272,6 @@ export default function TenantFinancesTab({ user, toast }) {
           )}
         </Card>
       </div>
-      {/* Rent vs Buy nudge */}
 
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -317,7 +299,7 @@ function Hero() {
   return (
     <div className="glass-card rounded-2xl p-6">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-teal-1/15 border border-brand-teal-2/25 text-brand-teal-3 text-xs font-medium"><Icon name="wallet" className="w-3.5 h-3.5" /> {t('wallet.forTenants')}</span>
+        <span className="dz-tag bg-brand-teal-1/15 border border-brand-teal-2/25 text-brand-teal-3 font-medium"><Icon name="wallet" className="w-3.5 h-3.5" /> {t('wallet.forTenants')}</span>
       </div>
       <h1 className="text-xl sm:text-2xl font-bold text-white">{t('wallet.title')}</h1>
       <p className="text-gray-400 text-sm mt-1.5 max-w-2xl">{t('wallet.intro')}</p>
@@ -341,7 +323,6 @@ const Field = ({ label, hint, children }) => (
 );
 
 const input = 'field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm';
-/* Record or edit a home the tenant already rents. */
 
 function RentalForm({ initial, onCancel, onDone, onError }) {
   const { t } = useTranslation();

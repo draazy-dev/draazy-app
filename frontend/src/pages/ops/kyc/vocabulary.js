@@ -1,3 +1,4 @@
+import { userMessage } from '../../../lib/userMessage.js';
 export const DOC_LABELS = {
   aadhaar: 'Aadhaar',
   pan: 'PAN',
@@ -15,8 +16,6 @@ export const DOC_OPTIONS = [
   { value: 'driving_licence', label: 'DL' },
 ];
 
-/* What a reviewer must see with their own eyes before approving. Approve stays locked until every
-   line is ticked — the server cannot check a photo, so this list is the human half of the gate. */
 export const CHECKLISTS = {
   aadhaar: ['Name matches the card', 'DOB or birth year matches', 'Photo matches the selfie', 'Not a masked or photocopied Aadhaar'],
   pan: ['Name matches exactly', 'DOB matches', 'PAN number is clear and unedited', 'Photo or signature supports the holder'],
@@ -48,13 +47,11 @@ export const POSE_LABELS = {
 export const STATUS_LABELS = { pending: 'Pending', verified: 'Verified', rejected: 'Rejected', revoked: 'Revoked' };
 
 export const CLAIM_HOLD_LIMIT = 3;
-/* OVERDUE_HOURS must match IdentityReviewQueueService.OVERDUE_AFTER, which filters "Overdue" server-side. */
 export const WARN_HOURS = 24;
 export const OVERDUE_HOURS = 48;
 
 const ERROR_MESSAGES = {
   identity_case_claim_limit: `You already hold ${CLAIM_HOLD_LIMIT} cases — release one first.`,
-  identity_qa_open: 'This sampled approval is still awaiting QA review.',
   identity_pose_unconfirmed: 'Confirm the requested pose before approving.',
 };
 
@@ -63,7 +60,7 @@ export const reasonLabel = (value) => REJECTION_LABELS[value] || String(value ||
 export const dateLabel = (value) => (value ? new Date(value).toLocaleString() : '—');
 export const sameId = (a, b) => Boolean(a && b && String(a) === String(b));
 export const errorCode = (error) => String(error?.code || '').toLowerCase();
-export const errorMessage = (error, fallback) => ERROR_MESSAGES[errorCode(error)] || error?.message || fallback;
+export const errorMessage = (error, fallback) => ERROR_MESSAGES[errorCode(error)] || userMessage(error, fallback);
 
 export function normalizedName(value) {
   return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -76,8 +73,3 @@ export function elapsed(at) {
   const tone = hours >= OVERDUE_HOURS ? 'breach' : hours >= WARN_HOURS ? 'warn' : 'ok';
   return { text, tone };
 }
-
-export const isOpenQa = (detail) => detail?.status === 'verified' && Boolean(detail?.awaitingQa);
-
-// The server withholds the sample date from the approver alone (maker-checker).
-export const isOwnQaApproval = (detail) => isOpenQa(detail) && !detail.qaSampledAt;

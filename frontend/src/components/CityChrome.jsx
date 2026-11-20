@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useLocation } from 'react-router';
-import { X } from 'lucide-react';
 import { useCity } from '../context/CityContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import MobileField from './MobileField.jsx';
-import useScrollLock from '../hooks/useScrollLock.js';
+import TurnstileWidget from './security/TurnstileWidget.jsx';
+import { useTurnstile } from './security/useTurnstile.js';
+import Modal from './ui/Modal.jsx';
 
-/* The +91 prefix only comes off a number longer than ten digits: a real mobile can begin 91. */
 const digits = (s) => String(s || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
 
 export default function CityChrome() {
@@ -32,7 +32,6 @@ export default function CityChrome() {
     try {
       sessionStorage.setItem('pncBarX', city);
     } catch {
-      /* ignore */
     }
     setDismissed(city);
   };
@@ -41,8 +40,6 @@ export default function CityChrome() {
     <>
       {showBar ? (
         <div className="fixed left-1/2 -translate-x-1/2 bottom-[calc(var(--dz-bottom-inset)+18px)] z-[1200] w-[min(680px,calc(100%-24px))]">
-          {/* Phones stack (copy row, then a full-width button row) because the copy
-              collapsed to a 1-word column when everything shared one flex line. */}
           <div className="relative flex flex-col gap-2.5 rounded-2xl border border-white/12 bg-ink-card/95 px-4 py-3 pr-10 shadow-2xl shadow-black/50 backdrop-blur sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:pr-4">
             <div className="flex items-start gap-2.5 sm:flex-1 sm:min-w-0 sm:items-center">
               <span className="text-lg leading-none">🚧</span>
@@ -54,9 +51,11 @@ export default function CityChrome() {
               <button onClick={() => openWaitlist(city)} className="btn btn-primary btn-sm flex-1 sm:flex-none">
                 Join the waitlist
               </button>
-              <button onClick={() => setCity('Pune')} className="btn btn-secondary btn-sm flex-1 sm:flex-none">
-                Switch to Pune
-              </button>
+              {city !== 'Pune' ? (
+                <button onClick={() => setCity('Pune')} className="btn btn-secondary btn-sm flex-1 sm:flex-none">
+                  Switch to Pune
+                </button>
+              ) : null}
             </div>
             <button
               onClick={dismiss}
@@ -74,13 +73,9 @@ export default function CityChrome() {
           modal={modal}
           user={user}
           onClose={closeModal}
-          /* The ask is a `POST /cities/waitlist`, so the success toast has to wait for it.
-             Rejecting leaves the modal open with the form still filled. */
           onSubmit={async (payload, msg) => {
             await requestCity(payload);
             closeModal();
-            // Only relocate when they're stranded on a city that isn't live. Liveness is re-read
-            // here: a `draazy-settings-change` arriving mid-POST can launch this very city.
             if (!isLive(city)) setCity('Pune');
             toast(msg, 'success');
           }}
@@ -93,23 +88,13 @@ export default function CityChrome() {
 function CityModal({ modal, user, onClose, onSubmit }) {
   const isWaitlist = modal.type === 'waitlist';
   const cityName = modal.city;
-  /* No `name` field: `requestCity` never forwarded it, `CityWaitlistCreateRequest` has no such
-     property and `city_waitlist` has no column. */
   const [form, setForm] = useState({ city: '', mobile: digits(user?.mobile), email: user?.email || '' });
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const turnstile = useTurnstile();
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
-  /* Every way out is sealed while the POST is in flight: `onSubmit` closes over `CityChrome`,
-     which does not unmount with the modal, so a mid-flight close still ran the continuation. */
   const requestClose = useCallback(() => { if (!busy) onClose(); }, [busy, onClose]);
-
-  useScrollLock();
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && requestClose();
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [requestClose]);
 
   const submit = async () => {
     if (busy) return;
@@ -117,22 +102,16 @@ function CityModal({ modal, user, onClose, onSubmit }) {
     if (!isWaitlist && !target) { setErr('Enter a city name'); return; }
     const mob = digits(form.mobile);
     if (!/^[6-9]\d{9}$/.test(mob)) { setErr('Enter a valid 10-digit mobile number'); return; }
-    /* Scoped to the waitlist branch, the only branch with an email field: unscoped, the request
-       modal would send a seeded address the shopper was never shown, and could refuse on it. */
     const email = isWaitlist ? form.email.trim() : '';
-    /* Checked here because the server's `@Email` refuses the whole request and the only message
-       this modal can render for a 400 is a generic "try again", which would loop. */
     if (email && !/^\S+@\S+\.\S+$/.test(email)) { setErr('Enter a valid email address, or leave it blank'); return; }
     setErr('');
     setBusy(true);
     try {
-      await onSubmit(
-        { city: target, mobile: mob, email },
+      await turnstile.withToken((tok) => onSubmit(
+        { city: target, mobile: mob, email, turnstileToken: tok },
         isWaitlist ? `You're on the ${target} waitlist 🎉` : `Thanks! We've noted your request for ${target}`,
-      );
+      ));
     } catch {
-      /* The modal stays open on the same form. `setBusy(false)` runs on both paths; on the
-         success path this component is unmounting, where React 19 drops the update silently. */
       setErr("We couldn't record that just now. Please try again.");
     } finally {
       setBusy(false);
@@ -142,47 +121,41 @@ function CityModal({ modal, user, onClose, onSubmit }) {
   const fld = 'w-full rounded-[11px] border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white outline-none focus:border-brand-teal focus:ring-2 focus:ring-brand-teal/20';
 
   return (
-    <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4" onMouseDown={(e) => e.target === e.currentTarget && requestClose()}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      <div className="relative w-full max-w-[440px] overflow-hidden rounded-[20px] border border-white/12 bg-ink-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-white/8 px-[18px] py-4">
-          <h3 className="text-base font-bold text-white">{isWaitlist ? `Join the ${cityName} waitlist` : 'Request your city'}</h3>
-          <button onClick={requestClose} disabled={busy} aria-label="Close" className="text-gray-400 hover:text-white"><X className="h-5 w-5" /></button>
-        </div>
-        <div className="px-[18px] py-4">
-          <p className="mb-3.5 text-[13px] leading-relaxed text-gray-400">
-            {isWaitlist ? (
-              <>We're launching in <b className="text-brand-teal">{cityName}</b> soon. Join the waitlist and we'll notify you the moment we go live.</>
-            ) : (
-              <>Tell us where you'd like Draazy next. The most-requested cities jump our expansion queue.</>
-            )}
-          </p>
-          {!isWaitlist ? (
-            <label className="mb-3 block text-[12.5px] font-semibold text-gray-300">Which city?
-              {/* `maxLength` mirrors `CityWaitlistCreateRequest`'s `@Size(max = 120)` — free text
-                against a server bound is an unwinnable retry the error message can't name. */}
-            <input value={form.city} onChange={(e) => set('city', e.target.value)} maxLength={120} className={fld + ' mt-1.5'} placeholder="City name" />
-            </label>
-          ) : null}
-          <label className="mb-3 block text-[12.5px] font-semibold text-gray-300">Mobile number
-            <MobileField value={form.mobile} onChange={(v) => set('mobile', v)} className="mt-1.5" />
-          </label>
-          {isWaitlist ? (
-            <label className="mb-1 block text-[12.5px] font-semibold text-gray-300">Email (optional)
-              <input value={form.email} onChange={(e) => set('email', e.target.value)} className={fld + ' mt-1.5'} placeholder="you@example.com" />
-            </label>
-          ) : null}
-          {/* `role="alert"` because this message arrives *after* an await, with focus parked on a
-             button that has gone quiet, so it would otherwise never be announced. */}
-          {err ? <p role="alert" className="mt-1 text-xs text-rose-300">{err}</p> : null}
-        </div>
-        <div className="flex justify-end gap-2.5 border-t border-white/8 px-[18px] py-3">
+    <Modal
+      open
+      onClose={requestClose}
+      title={isWaitlist ? `Join the ${cityName} waitlist` : 'Request your city'}
+      footer={(
+        <>
           <button onClick={requestClose} disabled={busy} className="btn btn-secondary">Cancel</button>
           <button onClick={submit} disabled={busy} aria-busy={busy} className="btn btn-primary">
             {busy ? 'Sending…' : isWaitlist ? 'Notify me when live' : 'Request city'}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    >
+      <p className="mb-3.5 text-[13px] leading-relaxed text-gray-400">
+        {isWaitlist ? (
+          <>We're launching in <b className="text-brand-teal">{cityName}</b> soon. Join the waitlist and we'll notify you the moment we go live.</>
+        ) : (
+          <>Tell us where you'd like Draazy next. The most-requested cities jump our expansion queue.</>
+        )}
+      </p>
+      {!isWaitlist ? (
+        <label className="mb-3 block text-[12.5px] font-semibold text-gray-300">Which city?
+        <input value={form.city} onChange={(e) => set('city', e.target.value)} maxLength={120} className={fld + ' mt-1.5'} placeholder="City name" />
+        </label>
+      ) : null}
+      <label className="mb-3 block text-[12.5px] font-semibold text-gray-300">Mobile number
+        <MobileField value={form.mobile} onChange={(v) => set('mobile', v)} className="mt-1.5" />
+      </label>
+      {isWaitlist ? (
+        <label className="mb-1 block text-[12.5px] font-semibold text-gray-300">Email (optional)
+          <input value={form.email} onChange={(e) => set('email', e.target.value)} className={fld + ' mt-1.5'} placeholder="you@example.com" />
+        </label>
+      ) : null}
+      <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="mt-2 flex justify-center" />
+      {err ? <p role="alert" className="mt-1 text-xs text-rose-300">{err}</p> : null}
+    </Modal>
   );
 }

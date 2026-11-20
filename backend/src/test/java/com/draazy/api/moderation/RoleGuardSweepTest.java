@@ -21,11 +21,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-// Enumerates the guarded back-office surface and asserts 403 for a buyer — catches missing
-// guards that per-endpoint happy-path tests cannot see. Fictional ids by design: auth precedes lookup.
 @DisplayName("Moderation — the trust boundary holds against an ordinary user")
 class RoleGuardSweepTest extends AbstractApiTest {
-
     private static final String ANY_ID = "11111111-1111-1111-1111-111111111111";
 
     @Autowired
@@ -55,6 +52,8 @@ class RoleGuardSweepTest extends AbstractApiTest {
                 new Guarded(HttpMethod.DELETE, id(Routes.Moderation.PROPERTY_FLAG), "staff"),
                 new Guarded(HttpMethod.POST, id(Routes.Moderation.VERIFICATION_DECISION), "staff"),
                 new Guarded(HttpMethod.PATCH, id(Routes.Moderation.VERIFICATION_CHECKLIST), "staff"),
+                new Guarded(HttpMethod.POST, id(Routes.Moderation.PROPERTY_PHOTO_TAKEDOWN), "staff"),
+                new Guarded(HttpMethod.POST, id(Routes.Moderation.PROPERTY_RERA_CHECK), "staff"),
 
                 new Guarded(HttpMethod.GET, Routes.Moderation.REPORTS, "staff"),
                 new Guarded(HttpMethod.PATCH, id(Routes.Moderation.REPORT_BY_ID), "staff"),
@@ -86,7 +85,6 @@ class RoleGuardSweepTest extends AbstractApiTest {
         assertThat(status).as("%s must refuse a buyer with 403", route).isEqualTo(403);
     }
 
-    // Privilege-escalation guard: staff must not mint admins or read the audit log.
     @ParameterizedTest(name = "staff refused: {0}")
     @MethodSource("adminOnlyRoutes")
     @DisplayName("staff cannot escalate privilege or read the record of admin action")
@@ -96,7 +94,6 @@ class RoleGuardSweepTest extends AbstractApiTest {
         assertThat(status).as("%s must refuse staff with 403", route).isEqualTo(403);
     }
 
-    // Non-vacuity check: staff must get past the guard (fails on merits, not 403) or the sweep proves nothing.
     @ParameterizedTest(name = "staff admitted: {0}")
     @MethodSource("staffAllowedRoutes")
     @DisplayName("the guard admits the right role — the sweep is not passing vacuously")
@@ -137,8 +134,6 @@ class RoleGuardSweepTest extends AbstractApiTest {
         return builder;
     }
 
-    // Bodies must satisfy @NotBlank/validation: Spring binds and validates before @PreAuthorize runs,
-    // so a required-field route with a stub body 422s instead of 403 and fails the sweep.
     private static String bodyFor(String path) {
         if (path.startsWith("/admin/notes")) {
             return "{\"text\":\"Guard probe\"}";
@@ -154,6 +149,12 @@ class RoleGuardSweepTest extends AbstractApiTest {
         }
         if (path.endsWith("/checklist")) {
             return "{\"item\":\"Photos are real and match the listing\",\"pass\":true}";
+        }
+        if (path.endsWith("/photos/takedown")) {
+            return "{\"photo\":\"probe\",\"reason\":\"other\"}";
+        }
+        if (path.endsWith("/rera-check")) {
+            return "{\"result\":\"verified\"}";
         }
         if (path.equals(Routes.Users.STAFF)) {
             return "{\"name\":\"Probe\",\"mobile\":\"9123456780\","

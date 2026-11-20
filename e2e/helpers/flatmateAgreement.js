@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { API } from './liveAuth.js';
+import { API, fileIdentityCaseAs, uniqueMobile } from './liveAuth.js';
 
 const AGREEMENT_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 const AGREEMENT_PNG = Buffer.from(AGREEMENT_PNG_BASE64, 'base64');
@@ -24,6 +24,7 @@ export async function uploadAgreementDocument(auth, { api = API } = {}) {
 }
 
 export async function tenantRoomAgreement(auth, opts = {}) {
+  await fileIdentityCaseAs(authorizationOf(auth), { api: opts.api ?? API, allowExisting: true });
   const doc = opts.document ?? (await uploadAgreementDocument(auth, opts));
   return {
     agreementDeclared: true,
@@ -35,5 +36,13 @@ export async function tenantRoomAgreement(auth, opts = {}) {
       dataUrl: `data:image/png;base64,${AGREEMENT_PNG_BASE64}`,
     },
     ownerConsent: true,
+    ownerConsentMobile: opts.ownerConsentMobile ?? uniqueMobile(),
   };
 }
+
+const isoDaysFromNow = (days) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+
+/** Both dates, so one body approves a rent agreement or a light bill alike. */
+export const badgeChecks = () => ({
+  nameMatches: true, addressMatches: true, validTill: isoDaysFromNow(200), issuedOn: isoDaysFromNow(-10),
+});

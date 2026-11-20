@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import Modal from '../ui/Modal.jsx';
@@ -7,12 +7,12 @@ import DateField from '../ui/DateField.jsx';
 import TimeField from '../ui/TimeField.jsx';
 import { parseWhen, formatWhen, slotFromParts, todayIso } from '../../lib/visitWhen.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useAppFlags } from '../../context/AppFlagsContext.jsx';
+import { useOpenChat } from '../../lib/useOpenChat.js';
+import { openLeadRequestConversation } from '../../services/conversationService.js';
 import { isVisitHost } from '../../pages/consumer/dashboard/dashboardData.js';
 
 const isPastSlot = (date, time) => new Date(slotFromParts(date, time)) <= new Date();
-
-/* Intl ships month and weekday names for hi and mr, so the calendar chrome reads in the visitor's language without a
-   hand-maintained table to drift. */
 
 const calMonths = (locale) => {
   const f = new Intl.DateTimeFormat(locale, { month: 'long' });
@@ -49,14 +49,12 @@ const STATUS_CLS = {
 const STATUS_KEYS = { scheduled: 'visits.stScheduled', confirmed: 'visits.stConfirmed', completed: 'visits.stCompleted', cancelled: 'visits.stCancelled', 'no-show': 'visits.stNoShow' };
 
 const StatusBadge = ({ status, t }) => (
-  <span className={'text-[11px] px-2 py-0.5 rounded-full font-semibold ' + (STATUS_CLS[status] || 'bg-white/10 text-gray-300')}>{STATUS_KEYS[status] ? t(STATUS_KEYS[status]) : status}</span>
+  <span className={'dz-tag font-semibold ' + (STATUS_CLS[status] || 'bg-white/10 text-gray-300')}>{STATUS_KEYS[status] ? t(STATUS_KEYS[status]) : status}</span>
 );
 
 const btnConfirm = 'px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/25 flex items-center gap-1';
 const btnCancel = 'px-2.5 py-1.5 rounded-lg bg-rose-500/15 text-rose-300 text-xs font-semibold hover:bg-rose-500/25 flex items-center gap-1';
 const btnGhost = 'px-2.5 py-1.5 rounded-lg bg-white/5 text-gray-300 text-xs font-semibold hover:bg-white/10 flex items-center gap-1';
-// Status → calendar colours (chip background + legend/dot). Scheduled uses amber (matching the "Awaiting
-// confirmation" badge) so it reads clearly apart from the emerald "Confirmed / visited" family.
 
 const visitChip = (status) =>
   status === 'completed' ? { chip: 'bg-emerald-500/15 text-emerald-200', dot: 'bg-emerald-400' }
@@ -68,41 +66,43 @@ const LegendDot = ({ cls, label }) => (
   <span className="inline-flex items-center gap-1.5 text-gray-400"><span className={'w-2 h-2 rounded-full ' + cls} />{label}</span>
 );
 
-const waDigits = (m) => (m || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
-const isFullMobile = (m) => waDigits(m).length === 10;
-const btnWhatsapp = 'px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/25 flex items-center gap-1';
+const isFullMobile = (m) => (m || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').length === 10;
+const btnChat = 'px-2.5 py-1.5 rounded-lg bg-teal-500/15 text-teal-300 text-xs font-semibold hover:bg-teal-500/25 flex items-center gap-1';
 
-function visitWaMessage(v, dateStr, timeLabel, t) {
+function visitChatMessage(v, dateStr, timeLabel, t) {
   const listing = (v.listing || t('visits.propertyFallback')).split(' in ')[0];
-  // Built as whole sentences per status: word order differs across languages, so
-  // stitching fragments would read as broken Hindi/Marathi.
   const when = [dateStr && t('visits.whenOn', { date: dateStr }), timeLabel && t('visits.whenAt', { time: timeLabel })].filter(Boolean).join(' ');
   const name = v.visitorName || t('visits.thereFallback');
-  if (v.status === 'confirmed') return t('visits.waConfirmed', { name, listing, when });
-  if (v.status === 'cancelled' || v.status === 'no-show') return t('visits.waCancelled', { name, listing, when });
-  return t('visits.waPending', { name, listing, when });
+  if (v.status === 'confirmed') return t('visits.chatConfirmed', { name, listing, when });
+  if (v.status === 'cancelled' || v.status === 'no-show') return t('visits.chatCancelled', { name, listing, when });
+  return t('visits.chatPending', { name, listing, when });
 }
-
-const waHref = (mobile, text) => `https://wa.me/91${waDigits(mobile)}?text=${encodeURIComponent(text)}`;
 
 export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const { flagEnabled } = useAppFlags();
+  const chatEnabled = flagEnabled('inAppMessaging');
+  const openChat = useOpenChat(toast);
+  const navigate = useNavigate();
   const locale = i18n.language;
   const CAL_MONTHS = useMemo(() => calMonths(locale), [locale]);
   const CAL_DAYS = useMemo(() => calDays(locale), [locale]);
-  // Render straight from the `visits` prop (the single source in Dashboard) so confirm/cancel/reschedule/visited
-  // persist and stay in sync with the leads badge + Action Center.
   const visitList = useMemo(() => visits || [], [visits]);
 
   const updateVisit = async (id, status) => {
     const ok = await onUpdate?.(id, { status });
     if (!ok) return;
-    const msg = status === 'confirmed' ? t('visits.confirmedToast') : status === 'cancelled' ? t('visits.cancelledToast') : status === 'completed' ? t('visits.visitedToast') : t('visits.updatedToast');
+    const msg = status === 'confirmed' ? t('visits.confirmedToast') : status === 'cancelled' ? t('visits.cancelledToast') : status === 'completed' ? t('visits.visitedToast') : status === 'no-show' ? t('visits.noShowToast') : t('visits.updatedToast');
     toast(msg, 'success');
+    if (status !== 'confirmed' || !chatEnabled) return;
+    try {
+      const conv = await openLeadRequestConversation('visit', id);
+      navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
+    } catch {
+      toast(t('visits.chatOpenFailed'), 'error');
+    }
   };
-  // Reschedule uses the shared Modal + a date field, then rewrites the visit's
-  // date and returns it to "scheduled" so the other party re-confirms the slot.
 
   const [reschedule, setReschedule] = useState(null);
   const [reDate, setReDate] = useState('');
@@ -120,8 +120,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
   const saveReschedule = async () => {
     if (!reschedule || !reDate || !reTime || isPastSlot(reDate, reTime)) return;
     const id = reschedule.id;
-    // Keep the visit's mode and fold date + time back
-    // into one `when` string that parseWhen can read, so the chosen slot persists.
     const mode = parseWhen(reschedule.when).mode || 'in-person';
     const ok = await onUpdate?.(id, { when: formatWhen(reDate, reTime, mode), status: 'scheduled' });
     if (!ok) return;
@@ -178,7 +176,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
     if (diff === 1) return t('visits.tomorrow');
     return '';
   };
-  // ─── One actionable upcoming-visit row (confirm / reschedule / cancel / mark visited) ───
 
   const UpcomingRow = ({ v }) => {
     const p = parsed.get(v.id) || {};
@@ -193,7 +190,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
         <div className="w-10 h-10 rounded-xl bg-teal-500/15 flex items-center justify-center flex-shrink-0"><Icon name="calendar-clock" className="w-5 h-5 text-teal-400" /></div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-white text-sm font-medium truncate">{v.listing}</p>
+            <p className="text-white text-sm font-medium truncate">{v.listing || t('visits.propertyFallback')}</p>
             <StatusBadge status={v.status} t={t} />
           </div>
           <p className="text-gray-500 text-xs mt-0.5 flex items-center gap-1.5 flex-wrap">
@@ -202,27 +199,27 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
             <span className={tag ? 'text-teal-300 font-semibold' : ''}>{tag || dateStr}</span>
             {p.timeLabel && <><span>·</span><span>{p.timeLabel}</span></>}
           </p>
-        {/* Action buttons meet the 44px tap-target minimum on phones (the same standard as CallBtn/WhatsAppBtn) then
-           relax to their compact size from `sm` up, so the desktop row stays exactly as before. */}
+          {v.note ? <p className="text-gray-400 text-xs mt-1 break-words">“{v.note}”</p> : null}
         </div>
         <div className="flex items-center gap-1.5 flex-wrap [&>*]:min-h-[44px] sm:[&>*]:min-h-0">
           {(() => {
-            if (!hostedByMe) return null;
+            if (!hostedByMe || !chatEnabled) return null;
             const target = v.visitorMobile;
             if (!isFullMobile(target)) return null;
-            const text = visitWaMessage(v, tag || dateStr, p.timeLabel, t);
+            const greeting = visitChatMessage(v, tag || dateStr, p.timeLabel, t);
             return (
-              <a href={waHref(target, text)} target="_blank" rel="noopener noreferrer" className={btnWhatsapp} aria-label={t('visits.waVisitor', { name: v.visitorName || t('visits.visitorFallback') })}>
-                <Icon name="message-circle" className="w-3.5 h-3.5" /> {t('visits.whatsapp')}
-              </a>
+              <button type="button" onClick={() => openChat({ mobile: target, propertyId: v.listingId, greeting })} className={btnChat} aria-label={t('visits.chatVisitor', { name: v.visitorName || t('visits.visitorFallback') })}>
+                <Icon name="message-circle" className="w-3.5 h-3.5" /> {t('visits.chat')}
+              </button>
             );
           })()}
           {v.status === 'scheduled' && hostedByMe && <button onClick={() => updateVisit(v.id, 'confirmed')} className={btnConfirm}><Icon name="check" className="w-3.5 h-3.5" /> {t('visits.confirm')}</button>}
           {v.status === 'scheduled' && !hostedByMe && <span className="inline-flex min-h-[44px] items-center rounded-lg bg-amber-500/15 px-2.5 py-1.5 text-xs font-semibold text-amber-300">{t('visits.awaitingOwner')}</span>}
           {v.status === 'confirmed' && hostedByMe && isPast && <button onClick={() => updateVisit(v.id, 'completed')} className={btnConfirm}><Icon name="check-circle" className="w-3.5 h-3.5" /> {t('visits.markVisited')}</button>}
+          {v.status === 'confirmed' && hostedByMe && isPast && <button onClick={() => updateVisit(v.id, 'no-show')} className={btnCancel}><Icon name="x-circle" className="w-3.5 h-3.5" /> {t('visits.markNoShow')}</button>}
           <button onClick={() => openReschedule(v)} className={btnGhost}><Icon name="calendar" className="w-3.5 h-3.5" /> {t('visits.reschedule')}</button>
           <button onClick={() => updateVisit(v.id, 'cancelled')} className={btnCancel}><Icon name="x" className="w-3.5 h-3.5" /> {t('visits.cancel')}</button>
-          <Link to={`/property/${v.listingId}`} className={btnGhost}><Icon name="arrow-right" className="w-3.5 h-3.5" /> {t('visits.property')}</Link>
+          <Link to={`/property/${v.propertySlug || v.listingId}`} className={btnGhost}><Icon name="arrow-right" className="w-3.5 h-3.5" /> {t('visits.property')}</Link>
         </div>
       </div>
     );
@@ -263,10 +260,10 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
               <div key={v.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                 <div className={`w-10 h-10 rounded-xl ${iconCls.includes('emerald') ? 'bg-emerald-500/15' : 'bg-rose-500/15'} flex items-center justify-center flex-shrink-0`}><Icon name={icon} className={`w-5 h-5 ${iconCls}`} /></div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{v.listing}</p>
+                  <p className="text-white text-sm font-medium truncate">{v.listing || t('visits.propertyFallback')}</p>
                   <p className="text-gray-500 text-xs">{isVisitHost(v, user?.id) ? v.visitorName : t('visits.yourVisit')} · {dateStr}</p>
                 </div>
-                <Link to={`/property/${v.listingId}`} className="text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 font-semibold hover:bg-white/10">{t('visits.viewProperty')}</Link>
+                <Link to={`/property/${v.propertySlug || v.listingId}`} className="text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 font-semibold hover:bg-white/10">{t('visits.viewProperty')}</Link>
               </div>
             );
           })}
@@ -274,7 +271,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
       </Card>
     ) : null
   );
-  /* A JSX value, not a nested `const RescheduleModal = () => (…)` component. */
 
   const rescheduleModal = (
     <Modal
@@ -309,24 +305,10 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
           />
           {rePast ? <p id="re-past-hint" role="alert" className="text-xs text-rose-300">{t('visits.pastSlot')}</p> : null}
           <p className="text-xs text-gray-500">{isVisitHost(reschedule, user?.id) ? t('visits.reconfirmVisitor') : t('visits.reconfirmOwner')}</p>
-          {(() => {
-            if (!isVisitHost(reschedule, user?.id)) return null;
-            const target = reschedule.visitorMobile;
-            if (!isFullMobile(target) || !reDate || !reTime) return null;
-            const label = new Date(reDate + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' });
-            const listing = (reschedule.listing || t('visits.propertyFallback')).split(' in ')[0];
-            const text = t('visits.waReschedOwner', { name: reschedule.visitorName || t('visits.thereFallback'), listing, date: label, time: reTime });
-            return (
-              <a href={waHref(target, text)} target="_blank" rel="noopener noreferrer" className={btnWhatsapp + ' w-full justify-center'}>
-                <Icon name="message-circle" className="w-3.5 h-3.5" /> {t('visits.notifyWa')}
-              </a>
-            );
-          })()}
         </div>
       ) : null}
     </Modal>
   );
-  // Empty state — a user with zero visits of any kind.
 
   if (visitList.length === 0) {
     return (
@@ -343,7 +325,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
       </div>
     );
   }
-  // ─── WEEK VIEW (per-day agenda — real slot time when known, else "Time TBD") ───
 
   if (weekView) {
     const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekView); d.setDate(weekView.getDate() + i); return d; });
@@ -370,7 +351,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
                 <div key={d.toISOString()} className={'rounded-xl border p-3 min-h-[110px] ' + (isToday ? 'border-teal-400/40 bg-teal-500/[0.06]' : 'border-white/[0.06] bg-white/[0.02]')}>
                   <div className="flex items-center justify-between mb-2">
                     <p className={'text-xs font-semibold ' + (isToday ? 'text-teal-300' : 'text-gray-300')}>{CAL_DAYS[d.getDay()]} {d.getDate()}</p>
-                    {dayVisits.length > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-gray-400 font-semibold">{dayVisits.length}</span>}
+                    {dayVisits.length > 0 && <span className="dz-count bg-white/5 text-gray-400">{dayVisits.length}</span>}
                   </div>
                   {dayVisits.length === 0 ? (
                     <p className="text-[11px] text-gray-600">{t('visits.noVisits')}</p>
@@ -380,8 +361,8 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
                         const p = parsed.get(v.id) || {};
                         const colors = v.status === 'completed' ? 'bg-emerald-500/15 text-emerald-200 border-emerald-400/30' : (v.status === 'cancelled' || v.status === 'no-show') ? 'bg-rose-500/12 text-rose-300 border-rose-400/25' : v.status === 'confirmed' ? 'bg-emerald-500/12 text-emerald-200 border-emerald-400/25' : 'bg-amber-500/12 text-amber-200 border-amber-400/25';
                         return (
-                          <Link key={v.id} to={`/property/${v.listingId}`} className={'block rounded-lg border px-2 py-1.5 ' + colors}>
-                            <p className="text-[11px] font-bold truncate leading-tight">{v.listing.split(' in ')[0]}</p>
+                          <Link key={v.id} to={`/property/${v.propertySlug || v.listingId}`} className={'block rounded-lg border px-2 py-1.5 ' + colors}>
+                            <p className="text-[11px] font-bold truncate leading-tight">{(v.listing || t('visits.propertyFallback')).split(' in ')[0]}</p>
                             <p className="text-[10px] opacity-80 truncate">{p.timeLabel || t('visits.timeTbd')} · {isVisitHost(v, user?.id) ? v.visitorName : t('visits.you')}</p>
                           </Link>
                         );
@@ -397,7 +378,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
       </div>
     );
   }
-  // ─── MONTH VIEW ───
 
   return (
     <div className="space-y-6">
@@ -421,7 +401,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
         </div>
 
         <div className="rounded-xl overflow-hidden ring-1 ring-white/[0.06] bg-black/20">
-          {/* Weekday header — teal-tinted band, no hard white grid lines */}
           <div className="grid grid-cols-7 bg-gradient-to-b from-teal-500/[0.16] to-teal-500/[0.05] border-b border-teal-400/10">
             {CAL_DAYS.map((d, idx) => {
               const weekend = idx === 0 || idx === 6;
@@ -432,7 +411,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
               );
             })}
           </div>
-          {/* Day grid — one uniform whisper-soft hairline (white/[0.04]) replaces the old stacked borders */}
 
           <div className="grid grid-cols-7">
             {Array.from({ length: firstDay }).map((_, i) => <div key={'e' + i} className="min-h-[76px] border-b border-r border-white/[0.04] bg-white/[0.008]" />)}
@@ -449,7 +427,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
                     {dayVisits.slice(0, 2).map((v) => {
                       const { chip, dot } = visitChip(v.status);
                       return (
-                        <div key={v.id} className={'flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight ' + chip}>
+                        <div key={v.id} className={'dz-tag flex font-medium ' + chip}>
                           <span className={'w-1.5 h-1.5 rounded-full flex-shrink-0 ' + dot} />
                           <span className="truncate">{v.listing.split(' in ')[0]}</span>
                         </div>

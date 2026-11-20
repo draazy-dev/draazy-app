@@ -24,7 +24,7 @@ const facets = (over = {}) => ({
   sharing: '',
   attachedBath: false,
   verifiedOnly: false,
-  habits: [],
+  vibe: [],
   ...over,
 });
 

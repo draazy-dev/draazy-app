@@ -27,8 +27,6 @@ export default function HelpCategory() {
   const articles = allArticles.filter((a) => a.category === category.id);
   const siblings = categories.filter((c) => c.section === category.section && c.id !== category.id);
 
-  // Staff runbooks stay out of the index: a crawler has no staff session, so the
-  // category is a real URL with nothing behind it for the public.
   return (
     <HelpLayout
       title={category.title}
@@ -75,7 +73,7 @@ export default function HelpCategory() {
               <Link
                 key={c.id}
                 to={`/help/c/${c.id}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-gray-400 transition-colors hover:border-teal-400/40 hover:text-teal-300"
+                className="dz-chip border border-white/10 bg-white/[0.03] text-gray-400 hover:border-teal-400/40 hover:text-teal-300"
               >
                 <Icon name={c.icon} className="w-3.5 h-3.5" /> {c.title}
               </Link>

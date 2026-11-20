@@ -18,8 +18,6 @@ export default function ListPropertyModals({ ctx }) {
 
   return (
     <>
-      {/* Duplicate-property guard — this owner already has this exact unit (same electricity meter /
-         society+unit+pincode) listed, so we stop the second post and point them to the one they already have. */}
       <Modal
         open={showResetConfirm}
         onClose={() => setShowResetConfirm(false)}
@@ -37,7 +35,7 @@ export default function ListPropertyModals({ ctx }) {
             <button
               type="button"
               onClick={confirmReset}
-              className="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm inline-flex items-center gap-2 transition-colors"
+              className="h-btn px-5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm inline-flex items-center gap-2 transition-colors"
             >
               <RotateCcw className="w-4 h-4" /> {t('listProperty.startOver')}
             </button>

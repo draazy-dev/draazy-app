@@ -38,9 +38,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
-/** Contract + behaviour proof for the finance ledger, through the real filter chain on Flyway'd Postgres. */
 class FinanceEndpointsTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired JwtService jwtService;
     @Autowired UserRepository users;
@@ -49,9 +47,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
     @Autowired EntityManager em;
     @Autowired @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping handlerMapping;
 
-    // ---- helpers ----
-
-    /** Flush first: {@code save()} only queues the insert, so a {@link JdbcTemplate} read would see nothing. */
     private void flush() {
         em.flush();
     }
@@ -76,7 +71,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
         return "/me/finances/" + p.getId() + "/transactions";
     }
 
-    /** Post a transaction and return its id, using the same extraction idiom as the deals tests. */
     private String addTxn(User owner, Property p, String body) throws Exception {
         MvcResult result = mvc.perform(post(txnPath(p))
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -92,10 +86,7 @@ class FinanceEndpointsTest extends AbstractApiTest {
         return today.toString();
     }
 
-    /** The service's today (India's, not the host's): bare {@code LocalDate.now()} is off 5.5h daily on UTC. */
     private static final LocalDate today = LocalDate.now(PlatformTime.IST);
-
-    // ---- 1: a ledger row round-trips with money intact ----
 
     @Test
     void addTransaction_returns201_andRoundTripsWholeRupees() throws Exception {
@@ -112,15 +103,11 @@ class FinanceEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.type").value(TransactionTypes.INCOME))
                 .andExpect(jsonPath("$.propertyId").value(p.getId().toString()));
 
-        // Money is bigint end to end: read it from the column rather than the JSON, so a float
-        // anywhere in the stack would show up here as a changed value.
         flush();
         Long stored = jdbc.queryForObject(
                 "select amount from transactions where property_id = ?", Long.class, p.getId());
         assertThat(stored).isEqualTo(2_500_000L);
     }
-
-    // ---- 2: another owner's ledger is 404, never 403 ----
 
     @ParameterizedTest(name = "{0} {1} for a non-owner is 404, not 403")
     @CsvSource({"GET,/transactions", "POST,/transactions", "GET,/overview"})
@@ -140,8 +127,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
         mvc.perform(request).andExpect(status().isNotFound());
     }
 
-    // ---- 3: a malformed property id is 404, not 400 ----
-
     @Test
     void malformedPropertyId_returns404() throws Exception {
         User owner = user("9821100006");
@@ -151,7 +136,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-
     @Test
     void updateTransaction_absentFieldsAreLeftAlone() throws Exception {
         User owner = user("9821100007");
@@ -159,7 +143,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
         String id = addTxn(owner, p, "{\"type\":\"expense\",\"category\":\"Repairs\","
                 + "\"amount\":500000,\"date\":\"" + today() + "\",\"note\":\"Plumbing\"}");
 
-        // Only the amount: PATCH must be a genuine partial update, not a PUT that requires type, amount and date.
         mvc.perform(patch(txnPath(p) + "/" + id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -183,8 +166,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-    // ---- 5: delete is soft — gone from the ledger and the totals, still in the table ----
-
     @Test
     void deleteTransaction_isSoftAndLeavesTheAggregates() throws Exception {
         User owner = user("9821100009");
@@ -200,8 +181,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(0));
 
-        // The row survives — an owner reconciling against a bank statement must still be able to
-        // answer "where did that go", which a hard delete makes impossible.
         flush();
         Integer rows = jdbc.queryForObject(
                 "select count(*) from transactions where id = ?", Integer.class, UUID.fromString(id));
@@ -210,15 +189,12 @@ class FinanceEndpointsTest extends AbstractApiTest {
                 "select archived from transactions where id = ?", Boolean.class, UUID.fromString(id));
         assertThat(archived).isTrue();
 
-        // ...and must not still be counted.
         mvc.perform(get("/me/finances/" + p.getId() + "/summary")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.income").value(0));
     }
 
-
-    /** "This quarter" and "This year" must narrow the window rather than silently returning all-time. */
     @Test
     void summary_quarterAndYear_areRealWindowsNotAllTime() throws Exception {
         User owner = user("9821100012");
@@ -247,21 +223,16 @@ class FinanceEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest());
     }
 
-
     @Test
     void summary_occupancyRate_isNullWhenNeverLet() throws Exception {
         User owner = user("9821100014");
         Property p = listing(owner);
 
-        // 0.0 would assert "vacant the whole window" about a flat that was never let at all — a
-        // different and false claim.
         mvc.perform(get("/me/finances/" + p.getId() + "/summary")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.occupancyRate").doesNotExist());
     }
-
-    // ---- 8: the basis upserts rather than accumulating rows ----
 
     @Test
     void basis_putThenGet_roundTripsAndUpserts() throws Exception {
@@ -287,14 +258,11 @@ class FinanceEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.basis.purchasePrice").value(9000000));
 
-        // property_id is the primary key, so a second PUT cannot mean a second basis.
         flush();
         Integer rows = jdbc.queryForObject(
                 "select count(*) from ownership_basis where property_id = ?", Integer.class, p.getId());
         assertThat(rows).isEqualTo(1);
     }
-
-    // ---- 9: dues project recurring rows forward; one-off rows never appear ----
 
     @Test
     void dues_projectRecurringRowsOnly() throws Exception {
@@ -314,7 +282,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.dues[0].daysUntil").exists());
     }
 
-
     @Test
     void overview_returnsNullBasisUntilRecorded() throws Exception {
         User owner = user("9821100019");
@@ -328,8 +295,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.cashflow.length()").value(12));
     }
 
-    // ---- 10: cashflow rejects an out-of-range window ----
-
     @Test
     void cashflow_rejectsAnOutOfRangeWindow() throws Exception {
         User owner = user("9821100020");
@@ -339,8 +304,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isBadRequest());
     }
-
-    // ---- 11: the ledger is per-property, not per-owner ----
 
     @Test
     void listTransactions_isScopedToOneProperty() throws Exception {
@@ -358,10 +321,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].amount").value(111));
     }
 
-    // ---- 11b: the ledger is paged, and a hostile page size is clamped ----
-
-    /** Ledgers are paged: the response is a {@code PageEnvelope} and an absurd {@code size} is clamped. The
-     * undeclared {@code sort} must be dropped, or it 500s as an unknown query property. */
     @Test
     void listTransactions_isPagedAndClampsPageSize() throws Exception {
         User owner = user("9821100031");
@@ -386,7 +345,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content.length()").value(2));
     }
 
-    // ---- 12: an unauthenticated caller gets 401, not a ledger ----
     @Test
     void ledgerRequiresAuthentication() throws Exception {
         User owner = user("9821100022");
@@ -395,8 +353,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
         mvc.perform(get(txnPath(p)))
                 .andExpect(status().isUnauthorized());
     }
-
-    // ---- 13: an unknown transaction type is rejected, not stored ----
 
     @Test
     void addTransaction_rejectsAnUnknownType() throws Exception {
@@ -409,8 +365,6 @@ class FinanceEndpointsTest extends AbstractApiTest {
                         .content("{\"type\":\"refund\",\"amount\":100,\"date\":\"" + today() + "\"}"))
                 .andExpect(status().isBadRequest());
     }
-
-    // ---- 14: route-constant ↔ handler-mapping agreement ----
 
     @Test
     void everyFinanceRouteConstantIsServedByAController() {

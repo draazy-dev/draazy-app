@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import NativeSelect from '../../../../components/ui/NativeSelect.jsx';
 import LocalitySelect from '../../../../components/ui/LocalitySelect.jsx';
@@ -6,20 +7,42 @@ import FieldError from '../../../../components/ui/FieldError.jsx';
 import Field from '../../../../components/ui/Field.jsx';
 import { Link } from 'react-router';
 import SocietySelect from '../../list-property/SocietySelect.jsx';
+import { activeLocality, societyLocalityName } from '../../list-property/useListingLocation.js';
 import { cleanText } from '../../list-property/sanitize.js';
-import { AREA_BASES, AREA_UNITS, COMMERCIAL_ROUTE, MAX_FLOOR, RESIDENTIAL_PROPERTY_TYPES } from './constants.js';
+import { COMMERCIAL_ROUTE, MAX_FLOOR, RESIDENTIAL_PROPERTY_TYPES } from './constants.js';
 import IgrPropertyFields from './IgrPropertyFields.jsx';
+import AreaField from './AreaField.jsx';
 
-export default function StepProperty({ step, prop, setP, setProp, setSelectedPropertyId, pickListing, myProperties = [], errors = {}, fc, clearErr, onLocalityBusy }) {
+export default function StepProperty({ step, prop, setP, setProp, setSelectedPropertyId, pickListing, myProperties = [], readOnly = false, errors = {}, fc, clearErr, onLocalityBusy }) {
   const { t } = useTranslation();
   const clearPropertyBinding = () => setSelectedPropertyId(null);
-  const onSociety = (picked) => {
+  const societyPickSeq = useRef(0);
+  const localityPickedAt = useRef(-1);
+  const onSociety = async (picked) => {
     const name = picked?.name || '';
     if (name !== prop.society) clearPropertyBinding();
-    setProp((p) => ({ ...p, society: name, societyId: picked?.id || '', societyNotOnMaps: !!picked?.notOnMaps }));
-    clearErr('society');
+    const pincode = picked?.pincode;
+    setProp((p) => ({ ...p, society: name, societyId: picked?.id || '', societyNotOnMaps: !!picked?.notOnMaps, ...(pincode ? { pincode } : {}) }));
+    ['society', ...(pincode ? ['pincode'] : [])].forEach(clearErr);
+    const seq = ++societyPickSeq.current;
+    if (!picked?.id) {
+      onLocalityBusy?.(false);
+      return;
+    }
+    onLocalityBusy?.(true);
+    try {
+      const { name: localityName, slug } = await societyLocalityName(picked, Number(picked.lat ?? NaN), Number(picked.lng ?? NaN));
+      const hit = await activeLocality(localityName, slug);
+      if (!hit || seq !== societyPickSeq.current || localityPickedAt.current === seq) return;
+      setProp((p) => ({ ...p, locality: hit.name }));
+      clearErr('locality');
+    } catch {
+    } finally {
+      if (seq === societyPickSeq.current) onLocalityBusy?.(false);
+    }
   };
   const onLocality = (name) => {
+    localityPickedAt.current = societyPickSeq.current;
     if (name !== prop.locality) clearPropertyBinding();
     setP('locality', name);
     clearErr('locality');
@@ -34,6 +57,21 @@ export default function StepProperty({ step, prop, setP, setProp, setSelectedPro
       <h2 className="text-xl font-bold text-white mb-1">{t('services.ra.property.title')}</h2>
       <p className="text-gray-500 text-sm mb-6">{t('services.ra.property.subtitle')}</p>
       {(() => {
+        if (readOnly) {
+          const address = [prop.flatNo, prop.society].filter(Boolean).join(', ');
+          if (!address) return null;
+          const where = [prop.propType, [prop.locality, prop.pincode].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+          return (
+            <div className="mb-6 flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/4" data-testid="ra-property-summary">
+              <Icon name="building-2" className="w-4 h-4 text-teal-400 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[11px] text-gray-500">{t('services.ra.property.agreementFor')}</p>
+                <p className="text-sm font-semibold text-white truncate">{address}</p>
+                {where && <p className="text-xs text-gray-400 truncate">{where}</p>}
+              </div>
+            </div>
+          );
+        }
         const myListings = myProperties.filter((l) => l.deal === 'rent' || l.deal === 'buy');
         if (!myListings.length) return null;
         return (
@@ -60,50 +98,35 @@ export default function StepProperty({ step, prop, setP, setProp, setSelectedPro
           <Link to={COMMERCIAL_ROUTE} className="text-teal-400 font-semibold hover:underline">{t('services.ra.property.commercialCta')}</Link>
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-5">
+      <div className="mb-5">
         <Field label={t('services.ra.property.propertyType')} error={errors.propType && t('services.ra.property.propTypeErr')}>
           <NativeSelect value={prop.propType} onChange={(e) => { setP('propType', e.target.value); clearErr('propType'); }} className={fc('propType')}>
             {errors.propType && <option value={prop.propType} disabled>{prop.propType}</option>}
             {RESIDENTIAL_PROPERTY_TYPES.map((o) => <option key={o}>{o}</option>)}
           </NativeSelect>
         </Field>
-        <Field label={t('services.ra.property.furnishing')}>
-          <NativeSelect value={prop.furnish} onChange={(e) => setP('furnish', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm">
-            {['Unfurnished', 'Semi-Furnished', 'Furnished'].map((o) => <option key={o}>{o}</option>)}
-          </NativeSelect>
-        </Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
-          <Field label={t('services.ra.property.flatNo')} required error={errors.flatNo && t('services.ra.property.flatNoErr')}><input value={prop.flatNo} onChange={(e) => { clearPropertyBinding(); setP('flatNo', e.target.value); clearErr('flatNo'); }} className={fc('flatNo')} placeholder={t('services.ra.property.flatNoPlaceholder')} /></Field>
+          <Field label={t('services.ra.property.flatNo')} required error={errors.flatNo && t('services.ra.property.flatNoErr')}><input maxLength={40} value={prop.flatNo} onChange={(e) => { clearPropertyBinding(); setP('flatNo', e.target.value); clearErr('flatNo'); }} className={fc('flatNo')} placeholder={t('services.ra.property.flatNoPlaceholder')} /></Field>
           <Field label={t('services.ra.property.society')} required error={errors.society && t('services.ra.property.societyErr')}><SocietySelect value={prop.societyId} name={prop.societyNotOnMaps ? '' : prop.society} notOnMaps={!!prop.societyNotOnMaps} onChange={onSociety} localityLabel={prop.locality} inputClassName={fc('society')} invalid={!!errors.society} placeholder={t('services.ra.property.societyPlaceholder')} />{prop.societyNotOnMaps ? <input value={prop.society || ''} maxLength={60} onChange={(e) => { clearPropertyBinding(); setP('society', cleanText(e.target.value)); clearErr('society'); }} className="field w-full px-4 py-3 rounded-xl text-white text-sm mt-2" aria-label={t('services.ra.property.buildingText')} placeholder={t('services.ra.property.buildingText')} /> : null}</Field>
           <Field label={t('services.ra.property.locality')} required error={errors.locality && t('services.ra.property.localityErr')}><LocalitySelect value={prop.locality} onChange={onLocality} onSelect={onLocalityPicked} onBusyChange={onLocalityBusy} dataErr="locality" invalid={!!errors.locality} placeholder={t('services.ra.property.localityPlaceholder')} ariaLabel={t('services.ra.property.locality')} className="w-full" /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t('services.ra.property.city')}><input value={prop.city} onChange={(e) => { clearPropertyBinding(); setP('city', e.target.value); }} className="field w-full px-4 py-3 rounded-xl text-white text-sm" /></Field>
+          <Field label={t('services.ra.property.city')} required error={errors.city && t('services.ra.property.cityErr')}><input maxLength={40} value={prop.city} onChange={(e) => { clearPropertyBinding(); setP('city', e.target.value); clearErr('city'); }} className={fc('city')} /></Field>
           <Field label={t('services.ra.property.pincode')} required error={errors.pincode && (errors.pincode === 'state' ? t('services.ra.property.pincodeState') : t('services.ra.property.pincodeErr'))}><input inputMode="numeric" maxLength={6} value={prop.pincode} onChange={(e) => { clearPropertyBinding(); setP('pincode', e.target.value.replace(/\D/g, '')); clearErr('pincode'); }} className={fc('pincode')} placeholder={t('services.ra.property.pincodePlaceholder')} /></Field>
         </div>
       </div>
       <div className="mb-5" data-err="gramPanchayat" role="group" aria-label={t('services.ra.property.gramPanchayat')} aria-describedby={errors.gramPanchayat ? 'ra-gram-err' : undefined}>
         <label className="lbl req">{t('services.ra.property.gramPanchayat')}</label>
         <div className="grid grid-cols-2 gap-3">
-          {[true, false].map((v) => <button type="button" key={String(v)} onClick={() => { setP('gramPanchayat', v); clearErr('gramPanchayat'); }} aria-pressed={prop.gramPanchayat === v} data-testid={v ? 'ra-gram-yes' : 'ra-gram-no'} className={'opt-pill rounded-xl px-4 py-3 text-sm font-medium text-center ' + (prop.gramPanchayat === v ? 'sel' : 'text-gray-400')}>{t(v ? 'services.ra.property.gramPanchayatYes' : 'services.ra.property.gramPanchayatNo')}</button>)}
+          {[true, false].map((v) => <button type="button" key={String(v)} onClick={() => { setP('gramPanchayat', v); clearErr('gramPanchayat'); }} aria-pressed={prop.gramPanchayat === v} data-testid={v ? 'ra-gram-yes' : 'ra-gram-no'} className={'h-btn inline-flex items-center justify-center opt-pill rounded-xl px-4 text-sm font-medium text-center ' + (prop.gramPanchayat === v ? 'sel' : 'text-gray-400')}>{t(v ? 'services.ra.property.gramPanchayatYes' : 'services.ra.property.gramPanchayatNo')}</button>)}
         </div>
         <FieldError id="ra-gram-err" alert={false} show={!!errors.gramPanchayat}>{t('services.ra.property.gramPanchayatErr')}</FieldError>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-5">
-        <Field label={t('services.ra.property.area')} required error={errors.area && t('services.ra.property.areaErr')}><input inputMode="decimal" value={prop.area} onChange={(e) => { setP('area', e.target.value.replace(/[^\d.]/g, '')); clearErr('area'); }} className={fc('area')} placeholder={t('services.ra.property.areaPlaceholder')} /></Field>
-        <Field label={t('services.ra.property.areaBasis')}>
-          <NativeSelect value={prop.areaBasis} title={t('services.ra.property.areaBasis')} onChange={(e) => setP('areaBasis', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm">
-            {AREA_BASES.map((v) => <option key={v} value={v}>{t(`services.ra.property.areaBasisOpt.${v}`)}</option>)}
-          </NativeSelect>
-        </Field>
-        <Field label={t('services.ra.property.areaUnit')}>
-          <NativeSelect value={prop.areaUnit} title={t('services.ra.property.areaUnit')} onChange={(e) => setP('areaUnit', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm">
-            {AREA_UNITS.map((v) => <option key={v} value={v}>{t(`services.ra.property.areaUnitOpt.${v}`)}</option>)}
-          </NativeSelect>
-        </Field>
+      <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3 sm:gap-4 mb-5">
+        <AreaField t={t} label={t('services.ra.property.area')} required error={errors.area && t('services.ra.property.areaErr')} inputClassName={fc('area')} value={prop.area} onChange={(v) => { setP('area', v); clearErr('area'); }} placeholder={t('services.ra.property.areaPlaceholder')} unit={prop.areaUnit} onUnit={(v) => setP('areaUnit', v)} unitTitle={t('services.ra.property.areaUnit')} />
         <Field label={t('services.ra.property.floor')} error={errors.floor && t('services.ra.property.floorErr', { max: MAX_FLOOR })}><input inputMode="numeric" value={prop.floor} onChange={(e) => { setP('floor', e.target.value.replace(/\D/g, '')); clearErr('floor'); }} className={fc('floor')} placeholder={t('services.ra.property.floorPlaceholder')} /></Field>
       </div>
-      <IgrPropertyFields t={t} prop={prop} setP={setP} setProp={setProp} errors={errors} clearErr={clearErr} clearPropertyBinding={clearPropertyBinding} />
+      <IgrPropertyFields t={t} prop={prop} setP={setP} errors={errors} clearErr={clearErr} clearPropertyBinding={clearPropertyBinding} />
     </div>
   );
 }

@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const track = flatmateCleanup(test);
 
@@ -11,16 +14,14 @@ async function hostsPost(token, locality) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
-      name: 'Expiry Seeker',
       gender: 'female',
       age: 26,
       occupation: 'Engineer',
       budget: 18000,
       localities: [locality],
-      moveIn: '2026-12-01',
+      moveIn: MOVE_IN,
       flatPref: 'women',
       roomPref: 'private',
-      tags: ['Vegetarian'],
       note: 'Expiry coverage',
     }),
   });
@@ -33,7 +34,7 @@ async function hostsPost(token, locality) {
 test.describe('LIVE: flatmate post expiry', () => {
   test('an expired post shows as Expired on the dashboard and Renew puts it back', async ({ page }) => {
     const mobile = uniqueMobile();
-    const { accessToken } = await apiLogin(mobile);
+    const { accessToken } = await apiLogin(mobile, { name: 'Expiry Seeker' });
     await hostsPost(accessToken, 'Baner');
     await signedInAs(page, mobile);
 
@@ -53,7 +54,7 @@ test.describe('LIVE: flatmate post expiry', () => {
     });
 
     await page.goto('/dashboard#listings');
-    const card = page.locator('div.rounded-xl', { hasText: 'Looking to share — Baner' }).last();
+    const card = page.getByTestId('owner-listing-card').filter({ hasText: 'Looking to share — Baner' }).last();
     await expect(card.getByText('Expired', { exact: true })).toBeVisible({ timeout: 20_000 });
 
     const renew = page.waitForResponse((r) => r.url().includes('/renew') && r.request().method() === 'POST');
@@ -67,7 +68,7 @@ test.describe('LIVE: flatmate post expiry', () => {
 
   test('a post reads its moderation state, not a hard-coded Live', async ({ page }) => {
     const mobile = uniqueMobile();
-    const { accessToken } = await apiLogin(mobile);
+    const { accessToken } = await apiLogin(mobile, { name: 'Expiry Seeker' });
     await hostsPost(accessToken, 'Aundh');
     await signedInAs(page, mobile);
 
@@ -86,7 +87,7 @@ test.describe('LIVE: flatmate post expiry', () => {
     });
 
     await page.goto('/dashboard#listings');
-    const card = page.locator('div.rounded-xl', { hasText: 'Looking to share — Aundh' }).last();
+    const card = page.getByTestId('owner-listing-card').filter({ hasText: 'Looking to share — Aundh' }).last();
     await expect(card.getByText('Not approved', { exact: true })).toBeVisible({ timeout: 20_000 });
     await expect(card.getByText('Live', { exact: true })).toBeHidden();
   });

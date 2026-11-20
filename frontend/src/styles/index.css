@@ -1,96 +1,81 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* ===== Draazy design tokens ===== */
-/* Colours live in theme.css; this block holds sizing and type only. */
 :root {
-  /* Noto sits AFTER Outfit so the browser falls through per character and only Devanagari
-     codepoints reach it; Noto first would restyle the entire English site. */
   --font-sans: 'Outfit', 'Noto Sans Devanagari', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --section-gap: 2.5rem;
   --section-gap-lg: 4rem;
   --radius: 1rem;
-
-  /* Control sizing scale: every interactive control shares one height for visual rhythm. */
   --control-h: 40px;
   --control-font: 0.875rem;
-  /* 14px — text-sm */
   --control-weight: 400;
-  /* regular for inputs/dropdowns */
   --control-weight-action: 600;
-  /* semibold for action buttons/pills */
   --control-radius: 10px;
-  /* rounded square for most controls */
   --control-radius-pill: 9999px;
-  /* pill — reserved for search tabs, nav CTAs */
   --control-px: 1rem;
-  /* 16px horizontal padding */
-
-  /* Button tiers. md aligns to --control-h for rhythm with inputs; lg is for hero + prominent
-     mobile CTAs, sm for dense toolbars. */
   --btn-h: var(--control-h);
-  /* 40px — md */
   --btn-h-sm: 32px;
   --btn-h-lg: 48px;
   --btn-radius: var(--control-radius);
-
-  /* Mobile bottom-chrome system: nothing bottom-anchored hardcodes a bottom-*, and every fixed
-     layer takes a rung off the ladder in docs/system/design-system.md (Bottom chrome). */
+  --dz-icon-btn: 36px;
+  --dz-chip-h: 32px;
+  --dz-chip-sm-h: 24px;
+  --dz-tag-h: 24px;
+  --dz-count-h: 20px;
   --dz-safe-b: env(safe-area-inset-bottom, 0px);
   --dz-bottom-nav-h: 56px;
-  /* The bar floats, so --dz-bottom-inset is derived from its height PLUS this gap; changing the
-     float here moves every bottom-anchored widget with it. */
   --dz-bottom-nav-gap: 12px;
-  /* max(), not a sum: the float gap and the home-indicator inset are the same thing, so adding them
-     double-counts; one token because the bar's own bottom must agree with it. */
   --dz-bottom-nav-offset: max(var(--dz-bottom-nav-gap), var(--dz-safe-b));
   --dz-bottom-inset: var(--dz-safe-b);
   --dz-cookie-banner-h: 0px;
-
-  /* Top chrome, mirroring the bottom system. --dz-nav-h is the ONLY place the bar height is
-     written down, so everything derived from it resizes together. See docs/system/design-system.md - Top chrome. */
   --dz-nav-h: 58px;
   --dz-top-inset: var(--dz-nav-h);
-
-  /* Drawn height of the top bar's pills on a phone - under the 44px tap floor on purpose; the
-     target is restored by .tap-extend, not by painting a bigger box. */
   --dz-nav-pill-h: 40px;
   --dz-nav-icon-box: 32px;
+  --dz-float-edge: 12px;
+  --dz-float-radius: 24px;
+  --dz-float-top: calc(var(--dz-safe-t, 0px) + min(7.5rem, 16dvh));
+  --dz-float-bottom: calc(var(--dz-safe-b) + var(--dz-float-edge));
+  --dz-float-bg: radial-gradient(60% 64px at 50% 0, rgb(var(--dz-c-teal-500) / 0.15), transparent),
+    rgb(var(--dz-c-ink-card) / 0.95);
+  --dz-float-shadow: 0 25px 50px -12px rgb(var(--dz-c-black) / 0.6), 0 0 0 1px rgb(var(--dz-c-white) / 0.06);
+  --dz-float-scrim: rgb(var(--dz-c-black) / 0.35);
+}
+@media (max-width: 1023.98px) {
+  :root:has(.has-bottom-nav) {
+    --dz-float-bottom: calc(var(--dz-bottom-nav-h) + var(--dz-bottom-nav-offset) + var(--dz-float-edge));
+  }
+}
+
+@keyframes dzFloatIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @media (min-width: 768px) {
   :root { --dz-nav-h: 72px; }
 }
-
-/* The bar's real height, driven by the token rather than by utility classes on the
-   element — see --dz-nav-h above. */
 .dz-topbar__row { height: var(--dz-nav-h); }
-
-/* Top-bar controls carry .tap-extend and NOT .tap-target: the two set the same property and
-   .tap-target is declared later, so pairing them silently reinstates the painted 44px box. */
 @media (max-width: 639.98px) {
   .dz-topbar__pill { height: var(--dz-nav-pill-h); }
-
-  /* Square controls keep .tap-target rather than .tap-extend: their box is already invisible
-     chrome around a drawn tile, so the hit area can just stay 44px. */
   .dz-topbar__icon-box {
     height: var(--dz-nav-icon-box);
     width: var(--dz-nav-icon-box);
   }
 }
-
-/* Hide-on-scroll top bar. Navbar.jsx toggles the class unconditionally to stay resize-safe;
-   every rule reacting to it lives in here, so desktop is inert structurally, not by promise. */
 @media (max-width: 1023.98px) {
   .dz-topbar { transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1); }
 
   .dz-nav-hidden { --dz-top-inset: 0px; }
 
   .dz-nav-hidden .dz-topbar { transform: translateY(-100%); }
-
-  /* Declared after @tailwind utilities, so it wins over the element's own top-[var(--dz-nav-h)]
-     below lg while leaving that utility to own desktop untouched. */
   .dz-docks-under-nav {
     top: var(--dz-top-inset);
     transition: top 220ms cubic-bezier(0.32, 0.72, 0, 1);
@@ -102,18 +87,10 @@
   .dz-topbar,
   .dz-docks-under-nav { transition: none; }
 }
-
-/* Set by ConsumerLayout on routes that mount the mobile bottom nav. The nav is lg:hidden, so the
-   inset resets above lg and every calc() built on it collapses to a plain offset. */
 .has-bottom-nav {
   --dz-bottom-inset: calc(var(--dz-bottom-nav-h) + var(--dz-bottom-nav-offset));
-  /* Reserving the inset on the wrapper keeps the last card / footer of every consumer page clear
-     of the bar: one rule, no per-page padding. */
   padding-bottom: calc(var(--dz-bottom-inset) + var(--dz-cookie-banner-h));
 }
-
-/* The cookie banner is fixed above the bottom chrome. Reserving its real rendered height on the
-   layout wrapper lets the footer scroll above it instead of becoming the covered last screenful. */
 .consumer-layout { padding-bottom: var(--dz-cookie-banner-h); }
 
 .consumer-layout.has-bottom-nav { padding-bottom: calc(var(--dz-bottom-inset) + var(--dz-cookie-banner-h)); }
@@ -121,14 +98,24 @@
 @media (min-width: 1024px) {
   .has-bottom-nav { --dz-bottom-inset: var(--dz-safe-b); }
 }
-
-/* Full-bleed routes keep the inset *token* but not the reservation: the tab bar is a capsule
-   floating over the media, so reserving the strip drew a dead band across every reel. */
 .consumer-layout.has-bottom-nav.route-fullbleed { padding-bottom: 0; }
+@property --dz-nav-i {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 2;
+}
 
-/* Floating "liquid glass" tab bar - an edge-to-edge bar reads as a wall, a detached capsule reads
-   as a control sitting on the page. Material and tint rationale: docs/system/design-system.md - Bottom chrome. */
+@property --dz-notch-y {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: -40px;
+}
+
 .dz-bottom-nav {
+  --dz-bubble: 40px;
+  --dz-lift: 10px;
+  --dz-icon-lift: -9px;
+  --dz-slot-x: calc(6px + (100% - 12px) * (var(--dz-nav-i) + 0.5) / 5);
   position: fixed;
   left: calc(env(safe-area-inset-left, 0px) + 12px);
   right: calc(env(safe-area-inset-right, 0px) + 12px);
@@ -138,138 +125,136 @@
   align-items: stretch;
   height: var(--dz-bottom-nav-h);
   padding: 0 6px;
-  border-radius: 999px;
-  /* Tinted with the app's own indigo/teal, not neutral grey, and the alphas are set by the worst
-     case: a gallery or reel can put near-white imagery directly behind the bar. */
-  background: var(--bottom-nav-bg);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid rgb(var(--dz-c-white) / calc(0.14 * var(--dz-line-boost)));
-  box-shadow: var(--bottom-nav-shadow), inset 0 1px 0 rgb(var(--dz-c-white) / 0.18);
+  border-radius: 12px;
+  transition:
+    --dz-nav-i 520ms cubic-bezier(0.65, 0, 0.35, 1),
+    --dz-notch-y 300ms cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* Without backdrop-filter a translucent fill is just unreadable text over content, so those
-   browsers get an opaque capsule. Firefox on Android and older WebViews land here. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .dz-bottom-nav { background: var(--bottom-nav-solid); }
-}
-
-/* Geometry is set inline by BottomNav.jsx from the measured slot; how it looks and moves lives
-   here. Sliding says the five tabs are one control; transform/width keeps it on the compositor. */
-.dz-bottom-nav__indicator {
+.dz-bottom-nav.has-active { --dz-notch-y: 0px; }
+.dz-bottom-nav__bg {
   position: absolute;
-  top: 6px;
-  bottom: 6px;
-  left: 0;
-  border-radius: 999px;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
   pointer-events: none;
-  background: linear-gradient(180deg, rgb(var(--dz-c-teal-400) / 0.24), rgb(var(--dz-c-teal-500) / 0.10));
-  border: 1px solid rgb(var(--dz-c-teal-400) / 0.32);
-  box-shadow: inset 0 1px 0 rgb(var(--dz-c-white) / 0.16);
-  will-change: transform;
+  filter: drop-shadow(0 10px 22px rgb(var(--dz-c-black) / 0.45)) drop-shadow(0 0 0.5px rgb(var(--dz-c-pure-white) / 0.35));
 }
 
-/* Added one paint after the first measurement: until then the indicator must be able to jump to
-   its measured slot without animating, or every page load slides it in from the left edge. */
-.dz-bottom-nav__indicator.is-animated { transition:
-    transform 340ms cubic-bezier(0.32, 0.72, 0, 1),
-    width 340ms cubic-bezier(0.32, 0.72, 0, 1),
-    opacity 180ms linear; }
-
-/* The slide is decorative: it only re-states where the user already is. Cutting it is
-   free, so the whole travel goes and only the fade survives. */
-@media (prefers-reduced-motion: reduce) {
-  .dz-bottom-nav__indicator.is-animated { transition: opacity 180ms linear; }
+html.light .dz-bottom-nav__bg {
+  filter: drop-shadow(0 10px 22px rgb(var(--dz-c-white) / 0.14)) drop-shadow(0 0 0.5px rgb(var(--dz-c-white) / 0.4));
+}
+.dz-bottom-nav__bg::before {
+  --dz-notch-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='120'%3E%3Cpath d='M0 0H4A10 10 0 0 1 14 10A26 26 0 0 0 66 10A10 10 0 0 1 76 0H80V120H0Z'/%3E%3C/svg%3E")
+      calc(-34px + (100% + 68px) * (var(--dz-nav-i) + 0.5) / 5) var(--dz-notch-y) / 80px 120px no-repeat,
+    linear-gradient(
+      to right,
+      rgb(var(--dz-c-black)) calc(var(--dz-slot-x) - 39px),
+      transparent calc(var(--dz-slot-x) - 39px) calc(var(--dz-slot-x) + 39px),
+      rgb(var(--dz-c-black)) calc(var(--dz-slot-x) + 39px)
+    );
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--bottom-nav-solid);
+  -webkit-mask: var(--dz-notch-mask);
+  mask: var(--dz-notch-mask);
 }
 
-/* The raised centre breaks the capsule's top edge on purpose - that overlap is what makes Post
-   read as the primary act rather than the third of five tabs. */
-.dz-bottom-nav__fab {
-  margin-top: -14px;
-  box-shadow: 0 6px 18px rgb(var(--dz-c-teal-600) / 0.45);
+.dz-bottom-nav__bubble {
+  position: absolute;
+  top: calc(-1 * var(--dz-lift));
+  left: calc(var(--dz-slot-x) - var(--dz-bubble) / 2);
+  width: var(--dz-bubble);
+  height: var(--dz-bubble);
+  border-radius: 50%;
+  pointer-events: none;
+  background: linear-gradient(145deg, rgb(var(--dz-c-teal-500)), rgb(var(--dz-c-teal-600)));
+  box-shadow: 0 3px 6px -2px rgb(var(--dz-c-teal-600) / 0.5);
+  transform: scale(0);
+  transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Height owned by the token: --dz-bottom-nav-h is what --dz-bottom-inset reserves against, so a
-   hardcoded height here would desync every bottom-anchored widget the moment the bar resized. */
+.dz-bottom-nav.has-active .dz-bottom-nav__bubble { transform: scale(1); }
 .dz-bottom-nav__tab {
   height: var(--dz-bottom-nav-h);
-  /* A floating control that does not move under the finger reads as a picture of a button; the
-     dip is the confirmation, and transform costs no layout. */
+  color: rgb(var(--dz-c-gray-300));
   transition: transform 140ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .dz-bottom-nav__tab:active { transform: scale(0.93); }
 
-@media (prefers-reduced-motion: reduce) {
-  .dz-bottom-nav__tab { transition: none; }
+html.light .dz-bottom-nav__tab { color: rgb(var(--dz-c-gray-500)); }
 
-  .dz-bottom-nav__tab:active { transform: none; }
+.dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-300)); }
+
+html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
+
+.dz-bottom-nav__icon {
+  display: grid;
+  place-items: center;
+  transition: transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1), color 200ms linear;
 }
 
-/* In rem so the label honours the OS font-size setting - a px label is immune to dynamic type,
-   which reads as safe but is the accessibility failure. The overflow guard makes scaling safe. */
+.dz-bottom-nav__tab.is-active .dz-bottom-nav__icon {
+  transform: translateY(var(--dz-icon-lift));
+  color: rgb(var(--dz-c-pure-white));
+}
 .dz-bottom-nav__label {
   font-size: 0.75rem;
   letter-spacing: 0.01em;
-  /* Not leading-none: line-height 1 is shorter than ascent+descent, so the box clips glyph
-     extents once the label scales. 1.3 clears the full extent and still fits inside the bar. */
   line-height: 1.3;
   max-width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  transition: transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+.dz-bottom-nav__tab.is-active .dz-bottom-nav__label { transform: translateY(5px); }
 
-/* Landscape phones are a height budget, not a width one; guarded three ways so no desktop or
-   landscape tablet can match. Overriding the token is enough. See docs/system/design-system.md - Landscape phones. */
+@media (prefers-reduced-motion: reduce) {
+  .dz-bottom-nav,
+  .dz-bottom-nav__bubble,
+  .dz-bottom-nav__tab,
+  .dz-bottom-nav__icon,
+  .dz-bottom-nav__label { transition: none; }
+
+  .dz-bottom-nav__tab:active { transform: none; }
+}
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023.98px) {
   :root {
     --dz-nav-h: 47px;
     --dz-bottom-nav-h: 44px;
   }
+  .dz-bottom-nav {
+    --dz-bubble: 36px;
+    --dz-lift: -4px;
+    --dz-icon-lift: 0px;
+  }
 
-  /* Icon-only: the tab keeps its accessible name via aria-label, so hiding the visible text
-     costs a screen reader nothing. */
+  .dz-bottom-nav.has-active { --dz-notch-y: -40px; }
   .dz-bottom-nav__label { display: none; }
-
-  .dz-bottom-nav__tab {
-    justify-content: center;
-    /* Clears the Post tab's baseline-matching bottom padding, which only exists to
-       line its label up with the others — and the labels are gone here. */
-    padding-bottom: 0;
-  }
-
-  /* The raised centre circle overhangs the capsule by 14px; on a 44px bar that overhang
-     would collide with page content, so it drops to the bar's own height and sits flush. */
-  .dz-bottom-nav__fab {
-    height: 40px;
-    width: 40px;
-    margin-top: 0;
-  }
-
-  .dz-bottom-nav__fab svg {
-    height: 22px;
-    width: 22px;
-  }
 }
-
-/* viewport-fit=cover lets full-bleed fixed bars run under a rotated phone's notch, so anything
-   pinned edge-to-edge must inset from it. Positioning, not padding, so padding utilities survive. */
 .dz-safe-x {
   left: env(safe-area-inset-left, 0px);
   right: env(safe-area-inset-right, 0px);
 }
-
-/* Tap-target floor (WCAG 2.5.8): grows the hit area without touching the glyph. Deliberately does
-   NOT set display, so Tailwind's hidden/lg:hidden on the same element still win. */
 .tap-target {
   min-width: 44px;
   min-height: 44px;
 }
-
-/* Same 44px floor for controls whose *drawn* size is load-bearing: a transparent centred
-   ::before carries the target so the glyph stays as designed. Needs a positioning context. */
+@media (pointer: coarse) {
+  .tap-coarse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
 .tap-extend::before {
   content: '';
   position: absolute;
@@ -279,9 +264,6 @@
   height: 44px;
   transform: translate(-50%, -50%);
 }
-
-/* Below sm the drawn square shrinks and .tap-extend keeps the target. A 32px box plus the row's
-   12px gap puts adjacent centres exactly 44px apart - do not shrink the gap on its own. */
 @media (max-width: 639.98px) {
   .dz-topbar__action {
     min-width: 0;
@@ -291,16 +273,11 @@
     padding: 0;
   }
 }
-
-/* Nothing may be reachable ONLY via :hover - on a touch screen that state never fires, so the
-   content is simply invisible. Keyed on the capability so a touch laptop is handled too. */
 @media (hover: none) {
   .reveal-on-hover {
     opacity: 1 !important;
     transform: none !important;
   }
-
-  /* Chrome's tap flash is suppressed globally, so touch needs an explicit pressed response. */
   a:active,
   button:not(:disabled):active,
   [role="button"]:active,
@@ -308,21 +285,18 @@
   [role="tab"]:active,
   summary:active { opacity: 0.72; }
 }
-
-/* Below 640px the default (40px) and compact (32px) buttons both fail the 44px touch minimum.
-   All .btn sizing flows through these vars, so the whole mobile ramp is this override. */
 @media (max-width: 639px) {
   :root {
     --btn-h: 44px;
-    /* .btn-sm holds 44px too: "Request number" - the button the whole contact funnel narrows to -
-       is a .btn-sm. Compact on a phone means narrower or quieter, not shorter than a fingertip. */
     --btn-h-sm: 44px;
     --btn-h-lg: 48px;
-
-    /* Same argument for every non-button control: --control-h drives the dropdown trigger, its
-       options and the shared field heights, so ramping the variable fixes them all at once. */
     --control-h: 44px;
   }
+}
+@layer utilities {
+  .h-btn { height: var(--btn-h); }
+  .h-btn-sm { height: var(--btn-h-sm); }
+  .h-btn-lg { height: var(--btn-h-lg); }
 }
 
 .section-y {
@@ -340,9 +314,6 @@
   padding-top: var(--section-gap-lg);
   padding-bottom: var(--section-gap-lg);
 }
-
-/* Mobile vertical rhythm. Two knobs, not per-component tuning; desktop keeps its numbers because
-   the block is max-width scoped. See docs/system/design-system.md - Mobile vertical rhythm and type. */
 @media (max-width: 639.98px) {
   :root {
     --section-gap: 1.75rem;
@@ -350,17 +321,12 @@
   }
 
   .section-head { margin-bottom: var(--section-head-gap); }
-
-  /* For sections that hard-code their own padding (they need a different desktop value), this
-     pulls the mobile half back onto the scale without touching the desktop utility. */
   .section-y-m {
     padding-top: var(--section-gap);
     padding-bottom: var(--section-gap);
   }
 }
 
-/* ── Design Language: Reusable control classes ──
-   Use these classes for any interactive control to maintain consistent sizing. */
 .dz-control {
   height: var(--control-h);
   display: inline-flex;
@@ -377,7 +343,9 @@
   cursor: pointer;
 }
 
-.dz-control:hover { background: var(--control-bg-hover); }
+@media (hover: hover) {
+  .dz-control:hover { background: var(--control-bg-hover); }
+}
 
 .dz-control.active,
 .dz-control[aria-pressed="true"] {
@@ -393,7 +361,9 @@
   color: rgb(var(--dz-c-pure-white));
 }
 
-.dz-control--action:hover { filter: brightness(1.08); }
+@media (hover: hover) {
+  .dz-control--action:hover { filter: brightness(1.08); }
+}
 
 .dz-control--ghost {
   background: transparent;
@@ -401,26 +371,20 @@
   color: var(--text-muted);
 }
 
-.dz-control--ghost:hover {
-  background: var(--control-bg-hover);
-  color: rgb(var(--dz-c-white));
+@media (hover: hover) {
+  .dz-control--ghost:hover {
+    background: var(--control-bg-hover);
+    color: rgb(var(--dz-c-white));
+  }
 }
 
-/* ===== Base ===== */
-/* box-sizing handled by Tailwind Preflight; margin/padding reset removed to avoid double-reset conflicts */
 html {
   scroll-behavior: smooth;
   overflow-x: clip;
-  /* Keeps centred content from jumping when overlays remove the classic scrollbar track. */
   scrollbar-gutter: stable;
-  /* Blocks browser pull-to-refresh so route-owned refresh affordances do not double-fire. */
   overscroll-behavior-y: contain;
-  /* Touch laptops can report hover, so this cannot sit under a hover/media query. */
   -webkit-tap-highlight-color: transparent;
-  /* iOS inflates text in landscape, overriding the mobile type ramp at the end of this file. */
   -webkit-text-size-adjust: 100%;
-  /* UA chrome — scrollbars, <select> popups, date and autofill dropdowns — follows this, not the
-     page colours; `html.light` flips it in tailwind.config.js. */
   color-scheme: dark;
 }
 
@@ -430,32 +394,20 @@ body {
   color: var(--text);
   overflow-x: clip;
 }
-
-/* Dark ink on a light page reads thinner than light ink on dark. A hairline stroke in the text's own
-   colour thickens glyphs without changing their metrics, so nothing re-wraps the way a weight bump would. */
 html.light body { -webkit-text-stroke-width: 0.25px; }
 html.light .theme-dark { -webkit-text-stroke-width: 0; }
 html.light svg.lucide[stroke-width="2"] { stroke-width: 2.5; }
-
-/* The app ships its own reduce-motion switch and does not seed it from the OS, so honouring
-   only the media query leaves the people who found the setting still getting the animation. */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
 
 html.dz-reduce-motion { scroll-behavior: auto; }
-
-/* iOS Safari still holds `click` for the double-tap-zoom window on some elements; declaring that
-   the element never zooms makes the tap fire on contact instead of ~300ms later. */
 a,
 button,
 [role="button"],
 [role="tab"],
 summary,
 label { touch-action: manipulation; }
-
-/* A long press on a control must not raise the selection handles or the link callout. `a` is
-   deliberately absent: links wrap card titles and addresses, which are content a user copies. */
 button,
 [role="button"],
 [role="tab"],
@@ -473,8 +425,6 @@ textarea,
   -webkit-user-select: text;
   -webkit-touch-callout: default;
 }
-
-/* Keep browser autofill from repainting fields in its own colours. */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
@@ -484,14 +434,10 @@ input:-webkit-autofill:focus {
   transition: background-color 5000s ease-in-out 0s;
 }
 
-/* ── Heading balance — prevents orphaned words on all headings ── */
 h1,
 h2,
 h3,
 h4 { text-wrap: balance; }
-
-/* Radius hierarchy: pill is reserved for nav CTAs, hero search tabs and filter chips; cards,
-   modals and forms use --radius; inner elements use 8px. */
 .btn-teal,
 .btn-outline,
 .dz-btn { border-radius: 10px !important; }
@@ -499,25 +445,21 @@ h4 { text-wrap: balance; }
 .badge-verified,
 .badge-rera { border-radius: 6px !important; }
 
-/* Keep pills for: nav Post Property, Sign In, hero Buy/Rent tabs, popular-locality chips */
 .search-tab,
 .loc-chip { border-radius: var(--control-radius-pill) !important; }
 
-/* ── Tabular figures on all price and stat numbers ── */
 .price-marker,
 .rd-val,
 .rd-val-lg,
 .dz-lb-caption,
 [class*="font-extrabold"] { font-variant-numeric: tabular-nums; }
 
-/* ── Active/press feedback on all interactive controls ── */
 button:active:not(:disabled),
 a[role="button"]:active { transform: scale(0.97) translateY(1px); }
 
 .dz-control--action:active { transform: scale(0.97) translateY(1px) !important; }
 
 @media (hover: hover) {
-  /* Gated on hover so touch devices do not keep the last tapped card raised. */
   .property-card:hover {
     transform: translateY(-6px);
     box-shadow: 0 12px 40px rgb(var(--dz-c-teal-600) / 0.12), 0 4px 16px rgb(var(--dz-c-ink) / 0.5) !important;
@@ -534,7 +476,6 @@ a[role="button"]:active { transform: scale(0.97) translateY(1px); }
   }
 }
 
-/* ── Section subtext max-width — prevents lines stretching too wide ── */
 .section-desc { max-width: 60ch; }
 
 ::-webkit-scrollbar { width: 6px; }
@@ -545,24 +486,15 @@ a[role="button"]:active { transform: scale(0.97) translateY(1px); }
   background: var(--teal-1);
   border-radius: 999px;
 }
-
-/* Never show a horizontal scrollbar app-wide: horizontal regions pan by swipe/drag. :horizontal
-   leaves the themed vertical bars alone. */
 ::-webkit-scrollbar:horizontal {
   display: none;
   height: 0;
 }
-
-/* Reserve a stable gutter and float a transparent-track thumb so it never overlaps the rounded
-   tile edge; auto-hidden so hovering an adjacent card never surfaces a teal bar. */
 .filter-scroll {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
-
-/* Only inside the drawer, which is modal. The same element is the desktop sidebar, where
-   reaching the end of the list should go on scrolling the page behind it. */
 .filter-panel .filter-scroll { overscroll-behavior: contain; }
 
 .filter-scroll:focus-within { scrollbar-color: rgb(var(--dz-c-teal-500) / 0.45) transparent; }
@@ -590,7 +522,6 @@ a[role="button"]:active { transform: scale(0.97) translateY(1px); }
   .filter-scroll:hover::-webkit-scrollbar-thumb:hover { background: rgb(var(--dz-c-teal-500) / 0.7); }
 }
 
-/* ── Hero gradient animation ── */
 @keyframes heroGradient {
   0% { background-position: 0% 50%; }
 
@@ -611,8 +542,6 @@ a[role="button"]:active { transform: scale(0.97) translateY(1px); }
 }
 
 html.light .hero-scrim { display: none; }
-
-/* Light theme: soft drifting glows that fade into the page, so there is no seam above Featured. */
 html.light .hero-bg {
   background: none;
   animation: none;
@@ -620,14 +549,11 @@ html.light .hero-bg {
 }
 
 html.light .hero-bg .shape { display: none; }
-
-/* The gradient-clipped words carry island classes that keep their bright dark-mode stops. */
 html.light .hero-bg .hero-noun [aria-hidden] { background: none; color: rgb(var(--dz-c-teal-700)); }
 html.light .hero-bg .hero-city { background: none; color: rgb(var(--dz-c-orange-700)); }
 html.light .hero-bg .hero-ticker > div { background: rgb(var(--dz-c-pure-white)); box-shadow: var(--tile-shadow); }
 
 .hero-mist { display: none; }
-/* Teal-500 / orange-500 because html.light inverts the 50-400 shades to dark ones. */
 html.light .hero-mist {
   display: block;
   position: absolute;
@@ -650,7 +576,6 @@ html.light .hero-mist {
 }
 html.dz-reduce-motion .hero-mist { animation: none; }
 
-/* ── Floating shapes ── */
 @keyframes float1 {
 
   0%,
@@ -733,7 +658,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   animation: float2 16s ease-in-out infinite reverse;
 }
 
-/* ── Staggered hero text (compressed: search widget usable well under ~0.6s) ── */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -789,7 +713,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.36s forwards;
 }
 
-/* ── Hero trust-proof ticker ── */
 .hero-ticker {
   opacity: 0;
   animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.74s forwards;
@@ -806,7 +729,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 
 .ticker-ping { animation: tickerPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite; }
 
-/* ── Scroll reveal ── */
 .reveal {
   opacity: 0;
   transform: translateY(36px);
@@ -818,7 +740,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   transform: translateY(0);
 }
 
-/* ── Card image zoom ── */
 .card-img-wrap { overflow: hidden; }
 
 .card-img-wrap img { transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1); }
@@ -827,7 +748,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   .property-card:hover .card-img-wrap img { transform: scale(1.08); }
 }
 
-/* ── Heart animation ── */
 @keyframes heartPop {
   0% { transform: scale(1); }
 
@@ -838,9 +758,8 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   100% { transform: scale(1); }
 }
 
-.heart-pop { animation: heartPop 0.4s ease; }
-
-/* Bare save heart over a photo: no chip behind it, so the shadow carries the contrast. */
+.heart-pop,
+.dz-cta-pop { animation: heartPop 0.4s ease; }
 .heart-on-photo {
   color: rgb(var(--dz-c-pure-white));
   filter: drop-shadow(0 1px 2px rgb(var(--dz-c-black) / 0.6));
@@ -860,7 +779,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 
 .badge-verified-icon svg { width: 24px; height: 24px; }
 
-/* ── Glow hover for category cards ── */
 .cat-card { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease; }
 
 @media (hover: hover) {
@@ -869,9 +787,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
     box-shadow: 0 0 30px rgb(var(--dz-c-indigo-600) / 0.25), 0 8px 32px rgb(var(--dz-c-black) / 0.4);
   }
 }
-
-/* Edge fades hinting the category strip scrolls; each shows only when there is more that way.
-   pointer-events:none so scrolling and card clicks pass straight through. */
 .cat-fade {
   position: absolute;
   top: 0;
@@ -891,7 +806,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   background: linear-gradient(to right, var(--brand-dark), transparent);
 }
 
-/* ── Property card lift + off-screen rendering optimization ── */
 .property-card {
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
   content-visibility: auto;
@@ -903,7 +817,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   contain-intrinsic-size: 0 320px;
 }
 
-/* ── CTA floating shapes ── */
 @keyframes ctaFloat1 {
 
   0%,
@@ -920,15 +833,17 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   50% { transform: translate(-15px, 15px); }
 }
 
-/* ── Glass (with fallback for browsers without backdrop-filter support) ── */
+.cta-float-1 { animation: ctaFloat1 8s ease-in-out infinite; }
+.cta-float-2 { animation: ctaFloat2 6s ease-in-out infinite; }
+.cta-float-3 { animation: ctaFloat1 10s ease-in-out infinite reverse; }
+.cta-float-4 { animation: ctaFloat2 12s ease-in-out infinite; }
+
 .glass {
   background: var(--glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgb(var(--dz-c-white) / calc(0.08 * var(--dz-line-boost)));
 }
-
-/* In the components layer so ring-* utilities, which also paint box-shadow, still win. */
 @layer components {
   .glass, .glass-card, .dz-card { box-shadow: var(--tile-shadow); }
 }
@@ -948,15 +863,11 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   .glass-card { background: rgb(var(--dz-c-ink-2) / 0.94); }
 }
 
-/* Opaque dropdown surface */
 .search-dropdown {
   background: var(--brand-card);
   border: 1px solid rgb(var(--dz-c-white) / calc(0.14 * var(--dz-line-boost)));
   box-shadow: 0 24px 60px rgb(var(--dz-c-black) / 0.5), inset 0 1px 0 rgb(var(--dz-c-white) / 0.06);
 }
-
-/* Always-shown themed scrollbar with a stable gutter, so all three hero search dropdowns behave
-   alike and long Type / BHK / locality lists never run off-screen on mobile. */
 .search-dd-scroll {
   overflow-y: scroll;
   overflow-x: hidden;
@@ -979,10 +890,9 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   border-radius: 999px;
 }
 
-.search-dd-scroll::-webkit-scrollbar-thumb:hover { background: rgb(var(--dz-c-teal-500) / 0.95); }
-
-/* Shared option row for the Type / BHK dropdowns, on the app-standard option metrics so every
-   value across the hero search matches the rest of the app. */
+@media (hover: hover) {
+  .search-dd-scroll::-webkit-scrollbar-thumb:hover { background: rgb(var(--dz-c-teal-500) / 0.95); }
+}
 .search-dd-opt {
   display: flex;
   align-items: center;
@@ -1000,10 +910,12 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   cursor: pointer;
 }
 
-.search-dd-opt:hover {
-  background: var(--dd-option-hover);
-  color: rgb(var(--dz-c-white));
-  transform: translateX(var(--dd-option-slide));
+@media (hover: hover) {
+  .search-dd-opt:hover {
+    background: var(--dd-option-hover);
+    color: rgb(var(--dz-c-white));
+    transform: translateX(var(--dd-option-slide));
+  }
 }
 
 .loc-chip {
@@ -1031,9 +943,11 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   flex-shrink: 0;
 }
 
-.loc-chip button:hover {
-  background: rgb(var(--dz-c-white) / 0.18);
-  color: rgb(var(--dz-c-white));
+@media (hover: hover) {
+  .loc-chip button:hover {
+    background: rgb(var(--dz-c-white) / 0.18);
+    color: rgb(var(--dz-c-white));
+  }
 }
 
 .loc-sugg {
@@ -1054,11 +968,18 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   white-space: nowrap;
 }
 
-.loc-sugg:hover,
 .loc-sugg.active {
   background: var(--dd-option-hover);
   color: rgb(var(--dz-c-white));
   transform: translateX(var(--dd-option-slide));
+}
+
+@media (hover: hover) {
+  .loc-sugg:hover {
+    background: var(--dd-option-hover);
+    color: rgb(var(--dz-c-white));
+    transform: translateX(var(--dd-option-slide));
+  }
 }
 
 .loc-sugg .add {
@@ -1075,9 +996,11 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   transition: all .2s ease;
 }
 
-.loc-sugg:hover .add {
-  background: var(--teal-2);
-  color: rgb(var(--dz-c-emerald-950));
+@media (hover: hover) {
+  .loc-sugg:hover .add {
+    background: var(--teal-2);
+    color: rgb(var(--dz-c-emerald-950));
+  }
 }
 
 .loc-sugg.active .add {
@@ -1126,14 +1049,23 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 
 .loc-sugg--empty .truncate { color: rgb(var(--dz-c-slate-400)); }
 
-.loc-sugg:hover .loc-sugg-count,
 .loc-sugg.active .loc-sugg-count { color: rgb(var(--dz-c-teal-200)); }
 
-.loc-sugg--empty:hover .loc-sugg-count,
+@media (hover: hover) {
+  .loc-sugg:hover .loc-sugg-count { color: rgb(var(--dz-c-teal-200)); }
+}
+
 .loc-sugg--empty.active .loc-sugg-count { color: rgb(var(--dz-c-slate-400)); }
 
-.loc-sugg:hover .loc-sugg-kind,
+@media (hover: hover) {
+  .loc-sugg--empty:hover .loc-sugg-count { color: rgb(var(--dz-c-slate-400)); }
+}
+
 .loc-sugg.active .loc-sugg-kind { color: rgb(var(--dz-c-slate-400)); }
+
+@media (hover: hover) {
+  .loc-sugg:hover .loc-sugg-kind { color: rgb(var(--dz-c-slate-400)); }
+}
 
 .loc-sugg--stack {
   height: auto;
@@ -1149,11 +1081,11 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   color: rgb(var(--dz-c-slate-500));
 }
 
-.loc-sugg:hover .loc-sugg-sub,
 .loc-sugg.active .loc-sugg-sub { color: rgb(var(--dz-c-slate-400)); }
 
-/* "Powered by Google" attribution mark, required by Places ToS off-map. The letter colours are
-   Google's fixed brand palette and are applied inline; only layout/typography is themed here. */
+@media (hover: hover) {
+  .loc-sugg:hover .loc-sugg-sub { color: rgb(var(--dz-c-slate-400)); }
+}
 .pbg {
   display: flex;
   align-items: center;
@@ -1176,8 +1108,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   letter-spacing: -0.02em;
   line-height: 1;
 }
-
-/* Attribution footer inside the shared dz-dropdown menu (Select / MultiSelect). */
 .dz-dropdown__attrib {
   margin-top: 2px;
   padding-top: 2px;
@@ -1185,8 +1115,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 }
 
 .dz-dropdown__attrib .pbg { justify-content: flex-start; }
-
-/* Attribution footer inside the hero locality dropdown — kept last, bottom-left, out of focus. */
 .loc-attrib {
   margin-top: 2px;
   padding-top: 3px;
@@ -1210,24 +1138,18 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   z-index: 10;
 }
 
-/* ── Category scroll hide scrollbar ── */
 .cat-scroll::-webkit-scrollbar { display: none; }
 
 .cat-scroll {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-
-/* Generic scrollbar-hide utility (e.g. the mobile navbar's inline primary nav). */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-
-/* HScroll edge-fade affordance — the touch-first "there's more this way" cue used
-   app-wide on tab bars, chip rows and card rails. */
 .hscroll-fade {
   position: absolute;
   top: 0;
@@ -1240,27 +1162,21 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 .hscroll-fade--left { left: 0; }
 
 .hscroll-fade--right { right: 0; }
-
-/* `overflow-x: auto` forces the other axis to `auto`, so a rail overhanging by a pixel drags vertically under a
-   thumb. Not `touch-action: pan-x` — that discards vertical gestures instead of passing them up the page. */
 @media (pointer: coarse) and (max-width: 639.98px) {
   .hscroll-row:not([data-axis-free]) {
     overflow-y: hidden;
   }
 }
 
-/* ── Pill active ── */
 .pill-active {
   background: var(--brand-gradient);
   color: rgb(var(--dz-c-pure-white));
 }
 
-/* ── Sleek hover for search button (no gimmicky pulse) ── */
 @media (hover: hover) {
   .search-btn:hover { box-shadow: 0 6px 20px rgb(var(--dz-c-teal-600) / 0.28); }
 }
 
-/* Feature card glow */
 .feature-card { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease; }
 
 @media (hover: hover) {
@@ -1270,7 +1186,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   }
 }
 
-/* FAQ */
 details.faq { transition: border-color .2s ease; }
 
 details.faq[open] { border-color: rgb(var(--dz-c-teal-500) / .35); }
@@ -1281,16 +1196,8 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
 
 .faq-ico { transition: transform .2s ease; }
 
-/* ===== Listings page ===== */
 .t-all { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-
-/* .card-img is shared with property SimilarProperties.jsx, so it stays global. */
-
 .card-img { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
-
-/* .bhk-pill and .deal-tab rules deleted (dead code, no usages in src/). */
-
-/* .toggle-ui/.toggle-cb, .view-btn, collapsible .fg-* filter groups moved to styles/routes/listings.css (Tier 1). */
 
 #listingsMap { z-index: 1; }
 
@@ -1318,9 +1225,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   border: 5px solid transparent;
   border-top-color: var(--coral-1);
 }
-
-/* .filter-overlay/.filter-panel and .filter-fab* are shared by listings and flatmates, so they stay global. */
-
 .filter-overlay {
   position: fixed;
   inset: 0;
@@ -1337,8 +1241,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   pointer-events: auto;
 }
 
-.filter-panel__grabber { display: none; }
-
 .filter-panel {
   position: fixed;
   top: 0;
@@ -1352,37 +1254,54 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overflow-y: auto;
   overflow-x: hidden;
-  /* The drawer is modal, so reaching the end of the filter list must not hand the scroll to the
-     results page behind it. */
   overscroll-behavior: contain;
 }
 
 .filter-panel.open { transform: translateX(0); }
-
 @media (max-width: 1023.98px) {
-  .filter-panel {
-    top: auto;
-    right: 0;
-    width: 100%;
-    max-width: none;
-    height: min(90dvh, calc(100dvh - var(--dz-safe-t, 0px) - .5rem));
-    max-height: min(90dvh, calc(100dvh - var(--dz-safe-t, 0px) - .5rem));
-    border-radius: 24px 24px 0 0;
-    transform: translateY(100%);
-    overflow: hidden;
+  .filter-overlay {
+    background: var(--dz-float-scrim);
+    backdrop-filter: none;
   }
 
-  .filter-panel.open { transform: translateY(0); }
+  .filter-panel {
+    top: var(--dz-float-top);
+    left: calc(env(safe-area-inset-left, 0px) + var(--dz-float-edge));
+    bottom: var(--dz-float-bottom);
+    width: min(30rem, calc(100% - 2 * var(--dz-float-edge) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    max-width: none;
+    height: auto;
+    border-radius: var(--dz-float-radius);
+    background: var(--dz-float-bg);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    box-shadow: var(--dz-float-shadow);
+    overflow: hidden;
+    transform-origin: 0 100%;
+    transform: translateY(16px) scale(0.96);
+    opacity: 0;
+    visibility: hidden;
+    transition: transform .3s cubic-bezier(.32, .72, 0, 1), opacity .2s ease-out, visibility 0s linear .3s;
+  }
 
-  .filter-panel__grabber {
-    display: block;
-    width: 44px;
-    height: 5px;
-    margin: 10px auto 0;
-    border-radius: 999px;
-    background: rgb(var(--dz-c-white) / .22);
+  .filter-panel.open {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .filter-panel__badge {
+    display: flex;
     flex: 0 0 auto;
-    touch-action: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    color: rgb(var(--dz-c-white));
+    background: linear-gradient(135deg, rgb(var(--dz-c-teal-600)), rgb(var(--dz-c-teal-500)));
+    box-shadow: 0 8px 16px rgb(var(--dz-c-teal-500) / 0.3);
   }
 
   .filter-panel__drag-zone {
@@ -1392,27 +1311,32 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   .filter-panel .filter-scroll {
     -webkit-overflow-scrolling: touch;
   }
+}
+.scroll-rail {
+  display: none;
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  bottom: 8px;
+  width: 4px;
+  border-radius: 999px;
+  background: rgb(var(--dz-c-white) / 0.08);
+  pointer-events: none;
+}
 
-  .af-chip {
-    min-height: 44px;
-    padding-inline: .875rem .75rem;
-  }
+.scroll-rail > span {
+  display: block;
+  width: 100%;
+  border-radius: inherit;
+  background: rgb(var(--dz-c-teal-500) / 0.6);
+}
 
-  .af-chip:active {
-    transform: scale(.98);
-  }
+@media (max-width: 1023.98px) {
+  .scroll-rail:not([hidden]) { display: block; }
 
-  .af-chip svg {
-    width: 1rem;
-    height: 1rem;
-  }
+  .scroll-rail-body { scrollbar-width: none; }
 
-  .af-clear-all {
-    display: inline-flex;
-    min-height: 44px;
-    align-items: center;
-    padding-inline: .25rem;
-  }
+  .scroll-rail-body::-webkit-scrollbar { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1421,14 +1345,8 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     transition: none;
   }
 }
-
-/* The mobile filters control uses a glass surface because it overlays unpredictable listing imagery.
-  Teal marks filter state without competing with the primary Post action. */
 .filter-fab {
-  /* Aligns the filter control with the bottom nav to keep their capsule edges coherent. */
   left: calc(env(safe-area-inset-left, 0px) + 12px);
-  /* Keeps the filter control above the cookie banner, which otherwise intercepts guest taps.
-    The cookie-banner height is 0px when hidden, preserving the normal nav inset. */
   bottom: calc(var(--dz-bottom-inset) + var(--dz-cookie-banner-h) + 0.75rem);
   background: var(--bottom-nav-bg);
   backdrop-filter: blur(28px) saturate(180%);
@@ -1444,9 +1362,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     0 6px 16px rgb(var(--dz-c-black) / 0.45),
     inset 0 1px 0 rgb(var(--dz-c-white) / 0.12);
 }
-
-/* The press scale is pure feedback flourish; the shadow drop already reports the
-   tap, so the movement is the only part worth cutting. */
 @media (prefers-reduced-motion: reduce) {
 
   .filter-fab,
@@ -1456,23 +1371,14 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   }
 
 }
-
-/* Same fallback the bottom nav takes: without backdrop-filter a translucent fill is unreadable
-   text over content, so those browsers get an opaque capsule. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .filter-fab {
     background: var(--bottom-nav-solid);
   }
 }
-
-/* Filters are on. The capsule earns a teal edge only now, because only now does
-   it carry state the user needs to catch from the corner of their eye. */
 .filter-fab.is-active {
   border-color: rgb(var(--dz-c-teal-400) / 0.42);
 }
-
-/* Solid teal on glass — the one saturated element, so the eye lands on how many
-   filters are applied before it reads the word. */
 .filter-fab__count {
   background: rgb(var(--dz-c-teal-400));
   color: rgb(var(--dz-c-gray-900));
@@ -1489,9 +1395,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   transform: translateY(0);
 }
 
-/* .sort-dropdown and .near-select rules deleted (dead code, no usages in src/). */
-
-/* ── Native <select> themed via @layer to avoid !important conflicts with Tailwind ── */
 @layer components {
   select {
     -webkit-appearance: none;
@@ -1505,7 +1408,9 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     cursor: pointer;
   }
 
-  select:hover { background-image: var(--select-chevron-active); }
+  @media (hover: hover) {
+    select:hover { background-image: var(--select-chevron-active); }
+  }
 
   select:focus,
   select:focus-visible {
@@ -1532,7 +1437,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     font-style: normal;
   }
 
-  /* Legal/policy page prose */
   .legal-prose {
     font-size: 0.875rem;
     line-height: 1.7;
@@ -1580,9 +1484,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   .legal-toc summary::-webkit-details-marker { display: none; }
 
   .legal-toc-caret { transition: transform 0.2s ease; }
-
-  /* Prose for the HTML compiled from src/content/help/**.md. Kept separate from .legal-prose:
-     docs need a wider element vocabulary (tables, code, callouts) and a larger reading size. */
   .doc-prose {
     font-size: 0.9375rem;
     line-height: 1.75;
@@ -1638,7 +1539,9 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     text-underline-offset: 2px;
   }
 
-  .doc-prose a:hover { text-decoration-thickness: 2px; }
+  @media (hover: hover) {
+    .doc-prose a:hover { text-decoration-thickness: 2px; }
+  }
 
   .doc-prose strong {
     color: rgb(var(--dz-c-slate-200));
@@ -1684,9 +1587,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     border-top: 1px solid rgb(var(--dz-c-white) / calc(0.08 * var(--dz-line-boost)));
     margin: 2.25rem 0;
   }
-
-  /* Tables scroll horizontally rather than forcing the article column wider - a 5-column
-     comparison table is unavoidable in docs and must not break the phone layout. */
   .doc-prose table {
     display: block;
     width: 100%;
@@ -1713,8 +1613,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   @media (min-width: 768px) {
     .doc-prose table { white-space: normal; }
   }
-
-  /* Callouts — emitted by the Markdown compiler from `> [!NOTE]` blockquotes. */
   .doc-prose .doc-callout {
     border: 1px solid rgb(var(--dz-c-white) / calc(0.1 * var(--dz-line-boost)));
     border-left-width: 3px;
@@ -1775,9 +1673,6 @@ select option:checked {
 }
 
 
-/* .page-btn/.page-btn:hover moved to styles/routes/filters.css (Tier 1, shared by both routes). */
-
-/* Skeleton shimmer (listing load transition) */
 .skeleton {
   position: relative;
   overflow: hidden;
@@ -1792,21 +1687,21 @@ select option:checked {
   background: linear-gradient(90deg, transparent, rgb(var(--dz-c-white) / 0.08), transparent);
   animation: dzShimmer 1.4s ease-in-out infinite;
 }
-
-/* The shimmer is an INFINITE loop, and a loading state is when someone who asked for less motion
-   is least able to look away. Kept beside the animation, not in the allowlist 3,500 lines down. */
 @media (prefers-reduced-motion: reduce) {
-  .skeleton::after { animation: none; }
+  .skeleton::after,
+  .animate-pulse {
+    animation: none !important;
+  }
 }
 
-html.dz-reduce-motion .skeleton::after { animation: none; }
+html.dz-reduce-motion .skeleton::after,
+html.dz-reduce-motion .animate-pulse {
+  animation: none !important;
+}
 
 @keyframes dzShimmer {
   100% { transform: translateX(100%); }
 }
-
-/* It enters on a state change the user did not ask for, so the entrance is a single short settle.
-   Both opt-outs are honoured here, beside the animation, for the same reason the shimmer's are. */
 .dz-connectivity-card {
   animation: dzConnectivityIn 200ms cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -1828,9 +1723,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     transform: none;
   }
 }
-
-/* Staggered entrance for listing sections + cards. A keyframe rather than a toggled class, so it
-   never fights React re-renders. */
 @keyframes dzListReveal {
   from {
     opacity: 0;
@@ -1856,15 +1748,11 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 }
 
 
-/* OTP box styles — global (used on signin, signup, staff-login, list-property) */
 .otp-container {
   display: flex;
   gap: 10px;
   justify-content: center;
 }
-
-/* Boxes flex-fill their row (capped at 48px) so 6 inputs never overflow a
-   narrow auth card on 360/414px phones — no horizontal scroll. */
 .otp-box {
   flex: 1 1 0;
   min-width: 0;
@@ -1902,11 +1790,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   box-shadow: 0 0 0 3px rgb(var(--dz-c-red-500) / .15);
 }
 
-/* .auth-page OTP button + role chips + mobile edge-lit theme moved to styles/routes/auth.css (Tier 1). */
-
-/* .page-btn.active moved to styles/routes/filters.css; .badge-* moved to styles/routes/listings.css (Tier 1). */
-
-/* List view card (redesigned row) — ported from listings.html */
 .list-card { display: block; }
 
 .list-card .lr {
@@ -1967,7 +1850,9 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   white-space: nowrap;
 }
 
-.list-card:hover .lr-cta { gap: 7px; }
+@media (hover: hover) {
+  .list-card:hover .lr-cta { gap: 7px; }
+}
 
 @media (max-width: 768px) {
   .list-card .lr { flex-direction: column; }
@@ -1993,7 +1878,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   }
 }
 
-/* ===== Property page ===== */
 .transition-smooth { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 
 .fade-in {
@@ -2012,6 +1896,7 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  -webkit-text-stroke-width: 0;
 }
 
 .main-image-wrapper {
@@ -2046,9 +1931,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 
   .thumbnail:hover img { transform: scale(1.1); }
 }
-
-/* Chip used in list context — rent inventory, tenant list, price insights and the
-   similar-property cards. Stays boxed; only the property-header rail below opts out. */
 .tag {
   background: rgb(var(--dz-c-white) / 0.06);
   border: 1px solid rgb(var(--dz-c-white) / calc(0.1 * var(--dz-line-boost)));
@@ -2064,19 +1946,12 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 @media (hover: hover) and (pointer: fine) {
   .tag:hover { background: rgb(var(--dz-c-white) / 0.12); }
 }
-
-/* ONE tile, not N badges: these phrases answer a single question, and boxing each separately
-   turned one answer into four tappable-looking buttons. Packed, not stretched across tracks. */
 .tag-strip {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  column-gap: 1.5rem;
+  column-gap: 1.25rem;
   row-gap: 0.6rem;
-  background: rgb(var(--dz-c-white) / 0.03);
-  border: 1px solid rgb(var(--dz-c-white) / calc(0.08 * var(--dz-line-boost)));
-  border-radius: 0.75rem;
-  padding: 0.8rem 0.95rem;
 }
 
 .tag-strip .tag {
@@ -2090,8 +1965,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   font-size: 0.8125rem;
   font-weight: 500;
   letter-spacing: 0;
-  /* Beats `.tag-emerald` on specificity on purpose: the label stays neutral so the
-     icon is the only thing saying "verified". */
   color: rgb(var(--dz-c-slate-300));
   cursor: help;
   transition: color 0.2s ease;
@@ -2110,8 +1983,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 }
 
 .tag-strip .tag-emerald svg { color: rgb(var(--dz-c-emerald-400)); }
-
-/* No box of its own to outline, so the focus ring supplies one. */
 .tag-strip .tag:focus-visible {
   outline: 2px solid rgb(var(--dz-c-teal-400) / 0.65);
   outline-offset: 3px;
@@ -2163,8 +2034,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   gap: 0.7rem;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
-
-/* → moved to styles/components/buttons.css (Tier 0 — shared, loaded from main.jsx) */
 
 .icon-btn {
   width: 48px;
@@ -2218,57 +2087,12 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     transform: translateY(-2px);
   }
 }
-
-/* Phone density pass: at 390px a tile's border, radius and padding cost more of the line than the value in
-   it, so every group flattens to one hairline ledger. Declared after @tailwind utilities so it wins. */
+.dz-ph-facts [data-tip] {
+  cursor: help;
+  text-decoration: underline dotted rgb(var(--dz-c-teal-300) / 0.55);
+  text-underline-offset: 3px;
+}
 @media (max-width: 639.98px) {
-  /* Views, shortlists and quality score are social proof rather than facts a buyer decides on, so they sit
-     past the fold. Ordered, not moved: the DOM stays the desktop one and every selector keeps working. */
-  .dz-ph-main {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .dz-stat-social,
-  .dz-ph-main>.dz-ph-activity { order: 1; }
-
-  /* A flex item stretches, which would blow the two rounded pills out to the full column. */
-  .dz-ph-main>.dz-ph-pill { align-self: flex-start; }
-
-  .dz-stat-grid {
-    display: contents;
-    border: 0;
-  }
-
-  .dz-stat-facts,
-  .dz-stat-social {
-    display: block;
-    border-top: 1px solid rgb(var(--dz-c-white) / calc(0.07 * var(--dz-line-boost)));
-  }
-
-  /* A buy priced per guntha renders no facts tile at all, and the empty wrapper would still paint its rule
-     — a hairline with nothing under it directly beneath the freshness pill. */
-  .dz-stat-facts:empty { border-top: 0; }
-
-  .dz-stat-facts>*,
-  .dz-stat-social>* {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.6rem 0;
-    border: 0;
-    border-bottom: 1px solid rgb(var(--dz-c-white) / calc(0.07 * var(--dz-line-boost)));
-    border-radius: 0;
-    background: none;
-  }
-
-  .dz-stat-facts>*>:first-child,
-  .dz-stat-social>*>:first-child { margin-bottom: 0; }
-
-  .dz-stat-facts>*>:last-child,
-  .dz-stat-social>*>:last-child { flex-shrink: 0; }
-
   .dz-property :is(.detail-card, .amenity-card, .highlight-pill) {
     padding: 0.75rem 0;
     border: 0;
@@ -2276,31 +2100,19 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     border-radius: 0;
     background: none;
   }
-
-  /* The glyph still earns its place as a scanning anchor; its 32px chip does not. */
   .dz-property :is(.detail-card, .amenity-card, .highlight-pill)>span:first-child {
     width: 1.25rem;
     height: 1.25rem;
     border-radius: 0;
     background: none;
   }
-
-  /* A `.detail-card` that `Tip` adopted is tap-activatable, and the flatten above removed the border that
-     carried that hint. Restored on the label alone, so the row stays a ledger line. */
   .dz-property .detail-card[data-tip] p:first-child {
     display: inline-block;
     text-decoration: underline dotted rgb(var(--dz-c-teal-300) / 0.55);
     text-underline-offset: 3px;
   }
-
-  /* The ring inherits the unflattened tile's radius and would draw a rounded box around a square row.
-     Confined to these three classes: `Tip` also wraps `rounded-full` chips, where a square ring is wrong. */
   .dz-property :is(.detail-card, .amenity-card, .highlight-pill)[data-tip]:focus-visible { border-radius: 0; }
-
-  /* `:not(button)` — the report/re-verify row is the one control here, and stripping its box would leave a
-     tap target with no affordance. Its height comes from `min-h-[44px]`, not from the box. */
-  .dz-assured-list>*:not(button),
-  .dz-share-split>* {
+  .dz-assured-list>*:not(button) {
     padding: 0.35rem 0;
     border: 0;
     border-radius: 0;
@@ -2310,12 +2122,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   }
 }
 
-@media (min-width: 640px) {
-  .dz-stat-facts,
-  .dz-stat-social { display: contents; }
-}
-
-/* Property lightbox & virtual tour modal (ported from property.html) */
 .dz-lightbox {
   position: fixed;
   inset: 0;
@@ -2327,8 +2133,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   justify-content: center;
   gap: 0.5rem;
   padding: calc(env(safe-area-inset-top, 0px) + 1rem) calc(env(safe-area-inset-right, 0px) + 1rem) calc(env(safe-area-inset-bottom, 0px) + 1rem) calc(env(safe-area-inset-left, 0px) + 1rem);
-  /* Hand-rolled overlays lack <Modal>'s scroll lock, so block page drag behind the photo. Pinch stays allowed
-     here, not on the img: touch-action intersects down the tree, so `none` on this box would cancel it below. */
   touch-action: pinch-zoom;
   animation: dzLbFade 0.25s ease;
 }
@@ -2348,10 +2152,7 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 }
 
 .dz-lightbox img {
-  /* The overlay padding already accounts for safe areas, so 100% is safer than viewport width. */
   max-width: 100%;
-  /* dvh, not vh: vh is the viewport with the URL bar collapsed, so on load the photo plus its
-     caption stood taller than the screen actually showing them. */
   max-height: 82dvh;
   border-radius: 1rem;
   box-shadow: 0 30px 80px rgb(var(--dz-c-black) / 0.6);
@@ -2366,7 +2167,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 
 .dz-lb-close {
   position: absolute;
-  /* Safe-area padding on the overlay does not move an absolutely positioned child. */
   top: calc(env(safe-area-inset-top, 0px) + 1.25rem);
   right: calc(env(safe-area-inset-right, 0px) + 1.25rem);
   width: 44px;
@@ -2394,9 +2194,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   border: 1px solid rgb(var(--dz-c-white) / calc(0.15 * var(--dz-line-boost)));
   transition: all 0.2s ease;
 }
-
-/* Same call the hero makes one level up: swipe already works here, and two unshrinkable 48px
-   arrows beside a full-width photo do not fit a 390px screen in the first place. */
 @media (pointer: coarse) {
   .dz-lb-nav { display: none; }
 }
@@ -2410,7 +2207,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   }
 }
 
-/* Property insight bars, rent-detail cells, modals, sticky CTA */
 .insight-bar {
   height: 8px;
   border-radius: 9999px;
@@ -2424,9 +2220,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   border-radius: 9999px;
   background: linear-gradient(90deg, var(--teal-1), var(--teal-2));
 }
-
-/* 3D extruded bar for CSS mini-charts: front face is the element's own background, depth via
-   --b3-d, face colours via --b3-top/--b3-side. Matches the Chart.js bar3d look. */
 .bar3d {
   position: relative;
   --b3-d: 6px;
@@ -2509,7 +2302,7 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 .dz-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 1500;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2551,69 +2344,46 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     color: rgb(var(--dz-c-white));
   }
 }
-
-/* Every consumer overlay shares .dz-modal-backdrop/.dz-modal, so this one block turns all centred dialogs
-   into bottom sheets. */
 @media (max-width: 639.98px) {
   .dz-modal-backdrop {
     align-items: flex-end;
-    padding: 0;
+    padding: var(--dz-float-top) var(--dz-float-edge) var(--dz-float-bottom);
+    background: var(--dz-float-scrim);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   .dz-modal {
     max-width: none;
-    max-height: 88dvh;
-    /* Square off the edge that now meets the screen bottom. */
-    border-radius: 1.25rem 1.25rem 0 0;
-    border-bottom: 0;
-    padding: 0.75rem 1rem calc(1.25rem + var(--dz-safe-b));
-    animation: dzSheetUp 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height: 100%;
+    border: 0;
+    border-radius: var(--dz-float-radius);
+    background: var(--dz-float-bg);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    box-shadow: var(--dz-float-shadow);
+    padding: 1rem;
+    animation: dzFloatIn 0.24s cubic-bezier(0.32, 0.72, 0, 1);
   }
-
-  /* Grab handle: the platform signal that a surface is a dismissible sheet. */
-  .dz-modal::before {
-    content: '';
-    display: block;
-    width: 2.25rem;
-    height: 0.25rem;
-    margin: 0 auto 0.75rem;
-    border-radius: 9999px;
-    background: rgb(var(--dz-c-white) / 0.18);
-  }
-
-  /* 36px close button fails the touch minimum; grow the hit area, not the glyph. */
   .dz-modal-x {
     width: 44px;
     height: 44px;
   }
 }
 
-@keyframes dzSheetUp {
-  from { transform: translateY(100%); }
-
-  to { transform: none; }
-}
-
 .dz-sticky-cta {
   position: fixed;
   left: 0;
   right: 0;
-  /* Docks above whatever bottom chrome is already claiming space (mobile bottom nav).
-     Resolves to 0 on desktop, i.e. today's `bottom: 0`. */
   bottom: var(--dz-bottom-inset);
   z-index: 60;
   display: flex;
   gap: 0.6rem;
-  /* Left/right insets matter in landscape on notched devices now that the document
-     is viewport-fit=cover; the bottom inset is already carried by --dz-bottom-inset. */
   padding: 0.7rem calc(1rem + env(safe-area-inset-right, 0px)) 0.7rem calc(1rem + env(safe-area-inset-left, 0px));
   background: rgb(var(--dz-c-ink) / 0.92);
   backdrop-filter: blur(16px);
   border-top: 1px solid rgb(var(--dz-c-white) / calc(0.08 * var(--dz-line-boost)));
 }
-
-/* Step actions stay in flow at the end of the step on every breakpoint, so nothing floats over the fields.
-   Compact and right-aligned — within a right thumb's arc — while keeping the 44px touch height. */
 @media (max-width: 1023.98px) {
   .lp-step-actions {
     position: static;
@@ -2629,16 +2399,11 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     backdrop-filter: none;
     box-shadow: none;
   }
-
-  /* Trim the box; the 44px min-height on each button keeps the touch target. */
   .lp-step-actions>button {
     flex: 0 0 auto;
     width: auto;
     padding: 0.5rem 1.1rem;
   }
-
-  /* With the keyboard up the auth primary action is pushed below the fold, on the one screen
-     where dropping the user costs most. Auth never mounts the bottom nav, so no double count. */
   .dz-auth-submit {
     position: sticky;
     bottom: calc(var(--dz-bottom-inset) + 0.75rem);
@@ -2646,8 +2411,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   }
 }
 
-/* ===== Owner page ===== */
-/* Surfaces moved to styles/components/surfaces.css (Tier 0, loaded from main.jsx). */
 
 .prop-row {
   background: rgb(var(--dz-c-white) / .04);
@@ -2674,11 +2437,10 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   transition: transform .15s;
 }
 
-.star-pick i:hover,
-.star-pick button:hover { transform: scale(1.2); }
-
-/* Tailwind's preflight sets `color: inherit` on form elements, so a `.field` with no colour utility renders
-   white on white. Emitted from @layer components so the ~35 fields bringing their own utilities still win. */
+@media (hover: hover) {
+  .star-pick i:hover,
+  .star-pick button:hover { transform: scale(1.2); }
+}
 @layer components {
   .field {
     background: rgb(var(--dz-c-white) / .04);
@@ -2693,7 +2455,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   outline: none;
 }
 
-/* Shared inline validation (React port of validation.js PNValidate) */
 .dz-invalid,
 .dz-invalid:focus {
   border-color: rgb(var(--dz-c-red-400)) !important;
@@ -2702,7 +2463,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 
 .dz-shake { animation: dzShake .38s ease; }
 
-/* One-place styling for the inline required-field message (FieldError component). */
 .dz-field-error {
   color: rgb(var(--dz-c-red-400));
   font-size: .75rem;
@@ -2729,7 +2489,9 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   transition: all .2s ease;
 }
 
-.ro-opt:hover { background: rgb(var(--dz-c-white) / .04); }
+@media (hover: hover) {
+  .ro-opt:hover { background: rgb(var(--dz-c-white) / .04); }
+}
 
 .ro-opt.sel {
   border-color: rgb(var(--dz-c-rose-500) / .5);
@@ -2745,9 +2507,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   box-shadow: inset 0 0 0 3px rgb(var(--dz-c-ink-2));
 }
 
-/* Route-only styles live in styles/routes/{compare,services-hub,list-property}.css. */
-
-/* ===== Service landing pages ===== */
 .svc {
   background: rgb(var(--dz-c-white) / .04);
   border: 1px solid rgb(var(--dz-c-white) / calc(.06 * var(--dz-line-boost)));
@@ -2775,9 +2534,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 .faq-item.open .faq-chev { transform: rotate(180deg); }
 
 .faq-chev { transition: transform .3s ease; }
-
-/* The card sits over the bright teal hero gradient, which washed the translucent controls teal
-   and hid the select placeholders. One legible surface for every control in the form. */
 .svc-quote { background: rgb(var(--dz-c-ink) / .72); }
 
 .svc-quote .field,
@@ -2795,9 +2551,11 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 
 .svc-quote .dz-dropdown__value.is-placeholder { color: rgb(var(--dz-c-gray-400)); }
 
-.svc-quote .dz-dropdown__trigger:hover {
-  background: rgb(var(--dz-c-slate-950) / .62);
-  border-color: rgb(var(--dz-c-white) / calc(.24 * var(--dz-line-boost)));
+@media (hover: hover) {
+  .svc-quote .dz-dropdown__trigger:hover {
+    background: rgb(var(--dz-c-slate-950) / .62);
+    border-color: rgb(var(--dz-c-white) / calc(.24 * var(--dz-line-boost)));
+  }
 }
 
 .svc-quote .dz-dropdown.is-open>.dz-dropdown__trigger {
@@ -2805,7 +2563,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   box-shadow: 0 0 0 3px rgb(var(--dz-c-teal-500) / .15);
 }
 
-/* Interior page: image tiles + before/after slider */
 .tile {
   cursor: pointer;
   transition: transform .35s cubic-bezier(.4, 0, .2, 1), box-shadow .35s;
@@ -2879,7 +2636,10 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 .ba-tag {
   position: absolute;
   top: 12px;
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  height: var(--dz-tag-h);
+  padding: 0 10px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
@@ -2887,8 +2647,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   backdrop-filter: blur(4px);
 }
 
-/* → moved to styles/routes/rent-agreement.css (loaded with its route chunk) */
-/* Notifications page */
 .notif {
   background: rgb(var(--dz-c-white) / .04);
   border: 1px solid rgb(var(--dz-c-white) / calc(.06 * var(--dz-line-boost)));
@@ -2908,6 +2666,10 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 }
 
 .notif.unread { border-left: 3px solid var(--teal-2); }
+.notif.list-reveal {
+  opacity: 1;
+  animation-fill-mode: backwards;
+}
 
 .seg {
   height: var(--control-h);
@@ -2925,18 +2687,12 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   border-color: var(--control-border-active);
   color: rgb(var(--dz-c-teal-300));
 }
-
-/* .seg is already 44px tall on a phone but nothing held its width: the icon-only variants came
-   out 34px wide, stacked in a column at a card corner where a miss lands on the neighbour. */
 @media (pointer: coarse) {
   .seg {
     min-width: var(--control-h);
     justify-content: center;
   }
 }
-
-/* Rent/Buy intent switch on the listings page — brand-gradient active pill,
-   concentric inner buttons (matches the List|Map .sf-seg pattern). */
 .deal-seg-btn { transition: color .2s ease, background .2s ease, box-shadow .2s ease; }
 
 .deal-seg-btn.is-active {
@@ -2945,7 +2701,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   box-shadow: 0 2px 10px rgb(var(--dz-c-teal-500) / .25);
 }
 
-/* Plans / Refer pages */
 .plan-pop {
   border-color: rgb(var(--dz-c-teal-500) / .5) !important;
   box-shadow: 0 0 40px rgb(var(--dz-c-teal-500) / .12);
@@ -2958,7 +2713,6 @@ details>summary::-webkit-details-marker { display: none; }
 details[open] .faq-chevron { transform: rotate(180deg); }
 
 
-/* Tenant profile + Checkout */
 .fld {
   width: 100%;
   border-radius: .6rem;
@@ -2981,32 +2735,12 @@ label.lbl {
   margin-bottom: .3rem;
 }
 
-.method {
-  border: 1px solid rgb(var(--dz-c-white) / calc(.1 * var(--dz-line-boost)));
-  background: rgb(var(--dz-c-white) / .04);
-  border-radius: .85rem;
-  padding: .85rem 1rem;
-  cursor: pointer;
-  transition: all .2s;
-}
-
-.method:hover { border-color: rgb(var(--dz-c-white) / .2); }
-
-.method.active {
-  border-color: rgb(var(--dz-c-teal-500) / .6);
-  background: rgb(var(--dz-c-teal-500) / .12);
-}
-
-/* Schedule-visit picks */
 .pick {
   border: 1px solid rgb(var(--dz-c-white) / calc(.1 * var(--dz-line-boost)));
   background: rgb(var(--dz-c-white) / .03);
   transition: all .25s ease;
   cursor: pointer;
 }
-
-/* Gated for the same reason as .thumbnail:hover — the teal this paints is a paler version of the
-   one .pick.sel paints, so on touch the last-tapped option looks half-chosen until another is. */
 @media (hover: hover) and (pointer: fine) {
   .pick:hover { border-color: rgb(var(--dz-c-teal-500) / .4); }
 }
@@ -3017,7 +2751,6 @@ label.lbl {
   box-shadow: 0 0 0 3px rgb(var(--dz-c-teal-500) / .12);
 }
 
-/* Society page */
 .soc-page .tag {
   font-size: 11px;
   font-weight: 600;
@@ -3033,7 +2766,6 @@ label.lbl {
 
 .soc-page .star { color: rgb(var(--dz-c-amber-500)); }
 
-/* → moved to styles/routes/reels.css (loaded with its route chunk) */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -3045,10 +2777,7 @@ label.lbl {
   white-space: nowrap;
   border: 0;
 }
-/* → moved to styles/routes/reels.css (loaded with its route chunk) */
-/* Saved / shortlist page moved to styles/routes/saved.css (Tier 1). */
 
-/* Pay rent tabs */
 .tabbtn {
   padding: .6rem 1rem;
   border-radius: .75rem;
@@ -3062,7 +2791,6 @@ label.lbl {
   color: rgb(var(--dz-c-teal-300));
 }
 
-/* Property-detail section tabs — left-aligned underline style */
 .dz-detail-tab {
   display: inline-flex;
   align-items: center;
@@ -3087,7 +2815,6 @@ label.lbl {
   border-bottom-color: var(--teal-2);
 }
 
-/* Option info tooltips (<Tip/>) — hover/focus/tap a tile to learn what it means */
 [data-tip] { cursor: help; }
 
 [data-tip]:focus-visible {
@@ -3138,12 +2865,6 @@ label.lbl {
 @media (prefers-reduced-motion: reduce) {
   .dz-tip { animation: none; }
 }
-
-/* Locality insights page moved to styles/routes/locality.css (Tier 1). */
-
-/* Route-only map styles live in styles/routes/{property-map,flatmates}.css. */
-/* AdvancedMarkers reuse the .price-marker / .map-pin DOM above, so only Google's default
-   InfoWindow chrome is stripped here, to let our dark popup cards fill it edge-to-edge. */
 .gm-style .gm-style-iw.gm-style-iw-c {
   padding: 0 !important;
   background: var(--brand-card);
@@ -3165,23 +2886,11 @@ label.lbl {
 .gm-style .dz-gm-iw-prop .dz-mp-card { width: 268px; }
 
 .gm-style .dz-gm-iw-share .dz-sp { width: 252px; }
-
-/* On cloud-styled (mapId) maps the fullscreenControl:false option is ignored, so the button is
-   stripped here. mapTypeControl / streetViewControl are honoured via <Map> props. */
 .gm-style .gm-fullscreen-control { display: none !important; }
-
-/* View-documents secure viewer moved to styles/routes/view-documents.css (Tier 1). */
-
-/* Route-only chat styles live in styles/routes/messages.css. */
-/* Mobile: Messages is a native, full-screen chat - drop the marketing footer and floating
-   assistant, run edge-to-edge, and fill the viewport so the composer pins to the screen bottom. */
 @media (max-width: 767px) {
 
   .route-messages>footer,
   .route-messages>.dz-assistant-slot { display: none; }
-
-  /* Focused mobile auth funnel (/signin, /signup, /staff-login): drop the marketing
-     footer + floating assistant so nothing overlaps the form CTA. Desktop keeps both. */
   .route-auth>footer,
   .route-auth>.dz-assistant-slot { display: none; }
 
@@ -3196,18 +2905,14 @@ label.lbl {
   }
 
   .messages-page .pc-wrap {
-    height: calc(100dvh - var(--dz-nav-h)) !important;
+    height: calc(100dvh - var(--dz-nav-h) - var(--dz-bottom-inset)) !important;
     border-radius: 0;
     border-left: 0;
     border-right: 0;
     box-shadow: none;
   }
-
-  /* A touch more headroom for message bubbles on small screens. */
   .messages-page .pc-msgs { padding: 14px 14px 6px; }
 }
-
-/* → moved to styles/routes/flatmates.css (loaded with its route chunk) */
 
 .sf-modal {
   position: fixed;
@@ -3216,14 +2921,34 @@ label.lbl {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  /* dvh plus the indicator inset keeps the bottom action row out from under mobile browser chrome. */
   padding: 5dvh 1rem calc(5dvh + var(--dz-safe-b));
   background: rgb(var(--dz-c-gray-950) / .7);
   backdrop-filter: blur(6px);
   overflow-y: auto;
-  /* This element is the scroller, and it is modal: reaching the end of the form must not hand the
-     gesture to the results page behind it. Same rule .filter-panel carries. */
   overscroll-behavior: contain;
+}
+
+@media (max-width: 639.98px) {
+  .sf-modal {
+    align-items: flex-end;
+    padding: var(--dz-float-top) var(--dz-float-edge) var(--dz-float-bottom);
+    background: var(--dz-float-scrim);
+    backdrop-filter: none;
+    overflow: hidden;
+  }
+
+  .sf-modal > [role="dialog"] {
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 0;
+    border-radius: var(--dz-float-radius);
+    background: var(--dz-float-bg);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    box-shadow: var(--dz-float-shadow);
+    animation: dzFloatIn 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+  }
 }
 
 .map-pin {
@@ -3243,7 +2968,6 @@ label.lbl {
   cursor: pointer;
 }
 
-/* .dz-btn / .dz-btn-* are folded into the button system above; only the input helper remains. */
 .dz-input {
   width: 100%;
   height: var(--control-h);
@@ -3272,36 +2996,29 @@ textarea.dz-input { height: auto; padding: .625rem 1rem; line-height: 1.5; }
   background: var(--glass);
 }
 
-/* Modal panel — solid dark bg so content is always readable over any page */
 .dz-modal-panel {
   background: rgb(var(--dz-c-ink-card));
   box-shadow: 0 24px 80px rgb(var(--dz-c-black) / 0.6), 0 0 0 1px rgb(var(--dz-c-white) / 0.06) inset;
 }
-
-/* Sheet affordance for the shared <Modal> below 640px. Layout is handled by Tailwind classes in
-   Modal.jsx; this only adds the grab handle and the slide-up, both mobile-only. */
 @media (max-width: 639.98px) {
-  .dz-modal-sheet { animation: dzSheetUp 0.24s cubic-bezier(0.32, 0.72, 0, 1); }
-
-  .dz-modal-sheet::before {
-    content: '';
-    flex: 0 0 auto;
-    width: 2.25rem;
-    height: 0.25rem;
-    margin: 0.5rem auto 0;
-    border-radius: 9999px;
-    background: rgb(var(--dz-c-white) / 0.18);
+  .dz-modal-sheet {
+    border: 0;
+    background: var(--dz-float-bg);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    box-shadow: var(--dz-float-shadow);
+    animation: dzFloatIn 0.24s cubic-bezier(0.32, 0.72, 0, 1);
   }
+
+  .dz-float-scrim { background: var(--dz-float-scrim); }
 }
 
-/* ===== Reduced motion: cut decorative animation, keep the half that reports state ===== */
 @media (prefers-reduced-motion: reduce) {
 
-  /* Sheets: keep the position change, drop the slide-up */
   .dz-modal,
-  .dz-modal-sheet { animation: none; }
+  .dz-modal-sheet,
+  .sf-modal > [role="dialog"] { animation: none; }
 
-  /* Hero */
   .hero-bg { animation: none; }
 
   .shape,
@@ -3324,42 +3041,41 @@ textarea.dz-input { height: auto; padding: .625rem 1rem; line-height: 1.5; }
 
   .ticker-ping { animation: none; }
 
-  /* Cards & interactions */
-  .heart-pop { animation: none; }
+  .heart-pop,
+  .dz-cta-pop { animation: none; }
 
   .property-card,
   .cat-card { transition: none; }
 
   .card-img-wrap img { transition: none; }
 
-  .property-card:hover,
-  .cat-card:hover { transform: none; }
+  @media (hover: hover) {
+    .property-card:hover,
+    .cat-card:hover { transform: none; }
+  }
 
-  /* CTA floating shapes */
-  [class*="ctaFloat"] { animation: none; }
+  [class*="ctaFloat"],
+  [class*="cta-float"],
+  .animate-pulse,
+  [class*="animate-pulse"] {
+    animation: none !important;
+  }
 
-  /* Scroll reveal — show immediately */
   .reveal {
     opacity: 1;
     transform: none;
     transition: none;
   }
 
-  /* Listings stagger */
   .list-reveal {
     animation: none;
     opacity: 1;
   }
 
-  /* Services card pop */
   .svc-pop { animation: none; }
 
-  /* General transitions — keep colors but disable motion */
   .t-all { transition: color 0.2s, background-color 0.2s, border-color 0.2s; }
 }
-
-/* User-toggled "Reduce motion" (Settings ▸ Appearance). Mirrors the OS-level
-   reduced-motion rules above so users can opt in regardless of system settings. */
 html.dz-reduce-motion .hero-bg,
 html.dz-reduce-motion .shape,
 html.dz-reduce-motion .shape-1,
@@ -3369,8 +3085,14 @@ html.dz-reduce-motion .shape-4,
 html.dz-reduce-motion .shape-5,
 html.dz-reduce-motion .ticker-ping,
 html.dz-reduce-motion .heart-pop,
+html.dz-reduce-motion .dz-cta-pop,
 html.dz-reduce-motion .svc-pop,
-html.dz-reduce-motion [class*="ctaFloat"] { animation: none; }
+html.dz-reduce-motion [class*="ctaFloat"],
+html.dz-reduce-motion [class*="cta-float"],
+html.dz-reduce-motion .animate-pulse,
+html.dz-reduce-motion [class*="animate-pulse"] {
+  animation: none !important;
+}
 
 html.dz-reduce-motion .hero-word,
 html.dz-reduce-motion .hero-sub,
@@ -3387,8 +3109,10 @@ html.dz-reduce-motion .property-card,
 html.dz-reduce-motion .cat-card,
 html.dz-reduce-motion .card-img-wrap img { transition: none; }
 
-html.dz-reduce-motion .property-card:hover,
-html.dz-reduce-motion .cat-card:hover { transform: none; }
+@media (hover: hover) {
+  html.dz-reduce-motion .property-card:hover,
+  html.dz-reduce-motion .cat-card:hover { transform: none; }
+}
 
 html.dz-reduce-motion .reveal {
   opacity: 1;
@@ -3401,9 +3125,6 @@ html.dz-reduce-motion .list-reveal {
   opacity: 1;
 }
 
-/* ===== View Transitions (React Router v7) ===== */
-
-/* Default cross-fade for route changes — fast and subtle */
 ::view-transition-old(root) { animation: 150ms ease-out both fade-out; }
 
 ::view-transition-new(root) { animation: 200ms ease-in both fade-in; }
@@ -3415,27 +3136,18 @@ html.dz-reduce-motion .list-reveal {
 @keyframes fade-in {
   from { opacity: 0; }
 }
-
-/* Shared element morph: property card image → property hero image.
-   The browser automatically morphs elements with matching view-transition-name. */
 ::view-transition-old(property-hero-*),
 ::view-transition-new(property-hero-*) {
   animation-duration: 280ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
-
-/* Keep the image visible during transition (no fade, just morph position/size) */
 ::view-transition-image-pair(property-hero-*) { isolation: auto; }
 
-/* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
 
   ::view-transition-old(root),
   ::view-transition-new(root) { animation: none; }
 }
-
-/* The .price-marker.is-active rule below intentionally stays here: it is not .dz-mdp-scoped. */
-/* Active marker highlight on the map */
 .price-marker.is-active {
   background: rgb(var(--dz-c-pure-white));
   color: rgb(var(--dz-c-emerald-950));
@@ -3446,9 +3158,6 @@ html.dz-reduce-motion .list-reveal {
 }
 
 .price-marker.is-active::after { border-top-color: rgb(var(--dz-c-pure-white)); }
-
-/* Mobile space optimization: headings scale down 20%, scoped to heading elements so numeric
-   price/stat spans reusing the same text-* utilities keep their emphasis. */
 @media (max-width: 639.98px) {
   .consumer-main :is(h1, h2, h3) {
     line-height: 1.15;
@@ -3457,42 +3166,30 @@ html.dz-reduce-motion .list-reveal {
 
   .consumer-main :is(h1, h2, h3).text-7xl { font-size: 3.6rem; }
 
-  /* 4.5  -> 3.6  */
   .consumer-main :is(h1, h2, h3).text-6xl { font-size: 3rem; }
 
-  /* 3.75 -> 3.0  */
   .consumer-main :is(h1, h2, h3).text-5xl { font-size: 2.4rem; }
 
-  /* 3.0  -> 2.4  */
   .consumer-main :is(h1, h2, h3).text-4xl { font-size: 1.8rem; }
 
-  /* 2.25 -> 1.8  */
   .consumer-main :is(h1, h2, h3).text-3xl { font-size: 1.5rem; }
 
-  /* 1.875 -> 1.5 */
   .consumer-main :is(h1, h2, h3).text-2xl { font-size: 1.2rem; }
 
-  /* 1.5  -> 1.2  */
   .consumer-main :is(h1, h2, h3).text-xl { font-size: 1rem; }
 
-  /* 1.25 -> 1.0  */
 }
-
-/* Touch browsers zoom into any editable field under 16px on focus, forcing a pinch back out.
-   !important is needed to beat the class-scoped rules (.pc-input, .pc-search input, etc.). */
 @media (pointer: coarse) {
 
   input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]),
   select,
   textarea { font-size: 16px !important; }
+  input::placeholder,
+  textarea::placeholder { font-size: 14px; }
 }
-
-/* useKeyboardOpen: the soft keyboard is up, so bottom-pinned chrome would sit on top of the field being typed in. */
 .dz-kbd-open [data-kbd-hide] { display: none !important; }
-/* ===== Mobile bottom-chrome consumers (see the --dz-bottom-inset block near the top) ===== */
-
-/* Appended to <body>, so it cannot read the inset .has-bottom-nav sets on the layout wrapper and
-   rebuilds it from the same tokens. Rung 90: it reports state, so it must not outrank a dialog. */
+.dz-kbd-open .route-messages.has-bottom-nav { --dz-bottom-inset: var(--dz-safe-b); }
+html[data-scroll-locked] .dz-assistant-layer:not(.dz-assistant-layer--open) { display: none !important; }
 .dz-autosave-flash {
   position: fixed;
   left: calc(env(safe-area-inset-left, 0px) + 16px);
@@ -3522,9 +3219,6 @@ html.dz-reduce-motion .list-reveal {
 }
 
 .dz-autosave-flash.is-on { opacity: 1; }
-
-/* Below lg the tab bar owns the bottom edge. The two routes that do not mount it (messages,
-   auth) pin their own control to that edge, which this clears just the same. */
 @media (max-width: 1023.98px) {
   .dz-autosave-flash { bottom: calc(var(--dz-bottom-nav-h) + var(--dz-bottom-nav-offset) + 16px); }
 }
@@ -3532,18 +3226,12 @@ html.dz-reduce-motion .list-reveal {
 @media (prefers-reduced-motion: reduce) {
   .dz-autosave-flash { transition: none; }
 }
-
-/* The "add area" chip only reads as an ADD affordance once it fills teal on hover, which never
-   fires on touch - so give it the filled treatment permanently where hover does not exist. */
 @media (hover: none) {
   .loc-sugg .add {
     background: var(--teal-2);
     color: rgb(var(--dz-c-emerald-950));
   }
 }
-
-/* HScroll arrow buttons are 36px - under the touch minimum - and redundant next to native swipe
-   plus the edge fade. Removed on coarse pointers rather than grown. */
 @media (pointer: coarse) {
   .hscroll-arrow { display: none; }
 }

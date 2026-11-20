@@ -12,10 +12,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** {@code POST /client-errors}: the browser's crash report. Anonymous allowed, write-only, always 204. */
 @RestController
 public class ClientErrorController {
-
     private final ClientErrorService service;
 
     public ClientErrorController(ClientErrorService service) {

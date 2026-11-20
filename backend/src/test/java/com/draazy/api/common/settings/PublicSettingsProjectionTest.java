@@ -13,9 +13,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.test.web.servlet.ResultActions;
 
-/** Written as absences, because the mistake caught is widening a section into "the public settings". */
 class PublicSettingsProjectionTest extends AbstractApiTest {
-
     @ParameterizedTest(name = "{0}")
     @MethodSource("projections")
     void nothingButItsOwnBlockIsPublished(String section, String[] absentKeys) throws Exception {

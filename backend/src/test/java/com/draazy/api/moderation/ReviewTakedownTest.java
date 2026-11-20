@@ -24,12 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
-/** Rejecting a review must remove it from the page and from the score in one write: if the aggregate stopped
- * filtering on status = 'published', a removed review would silently keep dragging the rating down. */
 @DisplayName("Review takedown — the page and the score move together")
 class ReviewTakedownTest extends AbstractApiTest {
-
-    /** Seeded by {@code R__DML_seed_reference_data.sql}; addressable by slug per {@code ReviewTargetKey}. */
     private static final String SOCIETY_SLUG = "skyline-heights-baner";
 
     @Autowired
@@ -37,7 +33,6 @@ class ReviewTakedownTest extends AbstractApiTest {
     @Autowired
     ReviewRepository reviews;
 
-    /** Audit writes are {@code REQUIRES_NEW}, so they outlive this test's rollback — see below. */
     private final List<String> createdActors = new ArrayList<>();
 
     @AfterEach
@@ -77,7 +72,6 @@ class ReviewTakedownTest extends AbstractApiTest {
         review(society, glowing.getId(), 5);
         Review toReject = review(society, damaging.getId(), 1);
 
-        // Before: both reviews are public, and both are in the average.
         mvc.perform(get("/reviews/society/" + SOCIETY_SLUG))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(2));
@@ -92,7 +86,6 @@ class ReviewTakedownTest extends AbstractApiTest {
                 .content("{\"status\":\"rejected\",\"reason\":\"defamatory\"}"))
                 .andExpect(status().isOk());
 
-        // After: gone from the page AND gone from the score. Either one alone is not a takedown.
         mvc.perform(get("/reviews/society/" + SOCIETY_SLUG))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1));
@@ -101,8 +94,6 @@ class ReviewTakedownTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.reviewCount").value(1))
                 .andExpect(jsonPath("$.avgRating").value(5.0));
 
-        // The row is still there. A takedown is a state change, not a delete: the report that
-        // triggered it, and the audit entry naming the moderator, both point at this id.
         assertThat(reviews.findById(toReject.getId()))
                 .get()
                 .extracting(Review::getStatus)

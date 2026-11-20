@@ -1,0 +1,58 @@
+REEL 01 / CLIP 1 of 3 - HOOK
+============================
+JOB ID ............. r01-c1
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 360p (draft; upscale the approved take to 720p for 0 credits)
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+CHARACTER CHIPS .... @Ishaan   (each [@Name] token in the prompt becomes a chip)
+EXTRA INGREDIENTS .. ishaan-room
+START FRAME ........ none
+USE IN EDIT ........ the full 8 s (0.0-8.0 s of the reel); add the phone-buzz SFX at about 7.6 s, leading into clip 2's call
+NOTE ............... never fix a take with Flow's "edit" box: it keeps the source length and lost the context (take 3).
+
+PROMPT START
+Vertical 9:16 smartphone selfie video, a close-up from a phone held at arm's length, framing [@Ishaan]
+Ishaan from mid-chest up in his rented room in Wakad, Pune (the attached room image), in the evening, with a white shelf
+lit by a thin indigo (#4F46E5) LED strip softly out of focus behind him. He talks to the lens like venting
+to a friend, with dry, exasperated disbelief: raised eyebrows, a wry unamused look. Not laughing, not
+grinning, not sad. He speaks three connected sentences in one natural flow, each spoken exactly once,
+nothing repeated, no other words.
+0.3-3.0 s, matter-of-fact: "Kal maine sirf ek flat pe enquiry ki thi, bas ek."
+3.0-6.0 s, eyebrows up in disbelief: "Aur aaj subah se barah brokers ke call aa chuke hain."
+6.2-7.6 s, a slow shake of the head: "Aur yeh ginti abhi ruki nahi hai."
+7.6-8.0 s: silent, lips closed, an unimpressed look into the lens.
+
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking
+casual Hinglish with a natural Indian accent, clearly male and mid-pitched, conversational and fluent,
+with a dry, exasperated tone.
+
+Lighting and colour: a warm ceiling bulb from above-left, a soft indigo glow behind him, a subtle cool
+teal tint in the shadows, true warm skin tones. Authentic Instagram UGC, natural skin texture, no beauty
+filter.
+
+Audio: quiet room tone. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
+PROMPT END
+
+ACCEPT CHECK, VISUAL (Claude: screenshot the player at 1 s, 4 s and 7 s)
+  [ ] 9:16 portrait; no burned-in subtitles, captions, text, logos or watermark
+  [ ] Ishaan matches @Ishaan: teal hoodie, taper fade, light stubble, clear skin with no moles
+  [ ] framing like test take 4 (3f1741fb): no phone or hand holding a phone in frame; never a sad face
+  [ ] the action in the prompt happens, in order, and nothing extra happens
+
+ACCEPT CHECK, AUDIO (the user listens; Claude cannot judge audio)
+  [ ] every line spoken once, in order, with no added words
+  [ ] lip-sync is tight and the Hinglish sounds natural, not translated
+  [ ] the voice matches the character's saved voice; no music
+
+IF REJECTED (one automatic retry; after a second failure, stop and ask the user)
+  - words dropped, added or swapped: regenerate unchanged once
+  - a Hindi word mispronounced: write only that word in Devanagari inside the quotes
+  - burned-in text: add "Absolutely no text of any kind appears on screen." as the first line
+  - face or outfit drift: check the chip is a real chip (not plain text) and regenerate
+  - lip-sync poor twice: ask the user before trying Veo 3.1 Fast (720p, costs more, no saved voice)

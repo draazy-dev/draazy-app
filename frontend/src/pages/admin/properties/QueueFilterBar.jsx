@@ -1,6 +1,6 @@
 import { classNames } from '../../../lib/format.js';
 import Select from '../../../components/ui/Select.jsx';
-import { Chips, ClearFilters, PageNav, SearchBox } from '../../../components/admin/WorkQueue.jsx';
+import { Chips, ClearFilters, DATE_CHIPS, PageNav, SearchBox } from '../../../components/admin/WorkQueue.jsx';
 import { STATUS_OPTS } from './constants.js';
 
 const PROGRESS_CHIPS = [
@@ -12,15 +12,10 @@ const PROGRESS_CHIPS = [
 ];
 const DEAL_CHIPS = [{ value: '', label: 'All' }, { value: 'buy', label: 'Buy' }, { value: 'rent', label: 'Rent' }];
 const SOURCE_CHIPS = [{ value: '', label: 'Any source' }, { value: 'owner', label: 'Owner' }, { value: 'staff', label: 'Staff posted' }];
-const SORT_CHIPS = [{ value: 'oldest', label: 'Oldest' }, { value: 'newest', label: 'Newest' }];
+export const EMPTY_FILTERS = { q: '', deal: '', progress: '', status: '', source: '', featured: false, days: '' };
 
-export const EMPTY_FILTERS = { q: '', deal: '', progress: '', status: '', source: '', featured: false, sort: 'oldest' };
-export const ALL_TAB_DEFAULTS = { ...EMPTY_FILTERS, sort: 'newest' };
-
-/** The one filter bar every queue tab shares: what to look at on the left, where you are on the right. */
 export default function QueueFilterBar({ tab, filters, onChange, onClear, paging }) {
-  const defaults = tab === 'all' ? ALL_TAB_DEFAULTS : EMPTY_FILTERS;
-  const dirty = Object.keys(defaults).some((k) => filters[k] !== defaults[k]);
+  const dirty = Object.keys(EMPTY_FILTERS).some((k) => filters[k] !== EMPTY_FILTERS[k]);
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-white/10 p-3">
       <SearchBox value={filters.q} onChange={(q) => onChange({ q })} placeholder="Title, owner, mobile or ID" />
@@ -42,7 +37,7 @@ export default function QueueFilterBar({ tab, filters, onChange, onClear, paging
           </button>
         </>
       ) : null}
-      <Chips label="Sort" options={SORT_CHIPS} value={filters.sort} onChange={(sort) => onChange({ sort })} />
+      <Chips label="Date" options={DATE_CHIPS} value={filters.days} onChange={(days) => onChange({ days })} />
       {dirty ? <ClearFilters onClick={onClear} /> : null}
       <div className="ml-auto">
         <PageNav {...paging} />

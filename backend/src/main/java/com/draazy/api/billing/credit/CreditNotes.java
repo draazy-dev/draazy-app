@@ -6,10 +6,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Issues the credit note for a refund the gateway confirmed. One per refund, numbered per financial year. */
 @Service
 public class CreditNotes {
-
     public static final String SUBSCRIPTION = "subscription";
 
     public static final String SERVICE_REQUEST_REFUND = "service_request_refund";
@@ -24,7 +22,6 @@ public class CreditNotes {
         this.documents = documents;
     }
 
-    /** A credit note must cite an invoice, so an order that was never invoiced gets none. */
     @Transactional
     public Optional<CreditNote> issue(UUID userId, String sourceType, UUID sourceId, String orderRef, long amount,
             Instant now) {

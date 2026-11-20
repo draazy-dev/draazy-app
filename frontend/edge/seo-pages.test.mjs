@@ -1,4 +1,3 @@
-// node edge/seo-pages.test.mjs
 import assert from 'node:assert/strict';
 import { edgePage, propertyPage, propertySitemapRow, sitemapXml, societyPage, SECURITY_HEADERS } from './seo-pages.mjs';
 import { listingHead, propertyHref, propertyKey, propertyPath } from '../src/lib/listingSeo.js';
@@ -15,7 +14,6 @@ const P = {
 const PATH = `/property/2-bhk-apartment-for-rent-baner-${ID}`;
 const ldOf = (html) => JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
 
-// URLs
 assert.equal(propertyPath({ id: ID, bhk: 2, type: 'Apartment', deal: 'rent', locality: 'Baner' }), PATH);
 assert.equal(propertyPath({ id: ID.toUpperCase(), bhk: 0, type: 'Independent House', deal: 'buy', locality: 'Viman Nagar' }), `/property/1-rk-independent-house-for-sale-viman-nagar-${ID}`);
 assert.equal(propertyPath({ id: ID, bhk: null, type: 'Open Plot', deal: 'buy', locality: 'Wagholi' }), `/property/open-plot-for-sale-wagholi-${ID}`);
@@ -29,12 +27,19 @@ assert.equal(propertyKey('2bhk-baner-legacy'), '2bhk-baner-legacy');
 assert.equal(listingHead({ ...P, type: P.propertyType }).title, '2 BHK Apartment for Rent in Baner, Pune: ₹32,000/month | Draazy');
 assert.equal(listingHead({ ...P, type: P.propertyType }).description, '2 BHK Apartment for Rent in Baner, Pune: 950 sq.ft. at ₹32,000/month. Contact the owner directly on Draazy, with no brokerage.');
 
-// Property page
 assert.deepEqual(propertyPage(SHELL, P, { pathname: `/property/${ID}`, search: '?tab=amenities' }), { status: 301, location: `${PATH}?tab=amenities` });
 const live = propertyPage(SHELL, P, { pathname: PATH });
 assert.equal(live.status, 200);
 assert.ok(live.html.includes(`<link data-shell="" rel="canonical" href="https://draazy.com${PATH}" />`));
 assert.ok(live.html.includes('<meta property="og:image" content="https://images.unsplash.com/a.jpg" />'));
+assert.ok(live.html.includes('<link rel="preload" as="image" href="https://images.unsplash.com/a.jpg" fetchpriority="high" />'));
+const UP = 'https://media.draazy.com/photos/0123456789abcdef/3f2a9c1e-7b4d-4e8a-9f10-2c3d4e5f6a7b-0123456789abcdef';
+const uploaded = propertyPage(SHELL, { ...P, coverImage: 'https://images.unsplash.com/cover.jpg', images: [UP] }, { pathname: PATH }).html;
+assert.ok(uploaded.includes(`<link rel="preload" as="image" href="${UP}" imagesrcset="${UP}.w480.webp 480w, ${UP}.w960.webp 960w, ${UP} 2560w" imagesizes="(max-width: 639px) 100vw, 60vw" fetchpriority="high" />`), 'preloads the gallery first slide, not the cover');
+assert.ok(!propertyPage(SHELL, { ...P, coverImage: null, images: ['photos/x/y'] }, { pathname: PATH }).html.includes('rel="preload"'), 'no preload for a non-https first slide');
+const photoless = propertyPage(SHELL, { ...P, coverImage: null, images: [] }, { pathname: PATH }).html;
+assert.ok(photoless.includes('<meta property="og:image" content="https://draazy.com/og/listing/rent-flat.jpg" />'), 'no photo: the share card names the type and deal');
+assert.ok(photoless.includes('<meta property="og:image:alt" content="2 BHK Apartment for Rent in Baner" />'));
 assert.ok(!live.html.includes('noindex'));
 assert.ok(!live.html.includes('<script>alert(1)'), 'listing text is escaped in body and JSON-LD');
 assert.ok(live.html.includes('<h1 class="mt-4 text-3xl font-extrabold leading-tight text-white sm:text-4xl">2 BHK Apartment for Rent in Baner</h1>'));
@@ -56,24 +61,22 @@ assert.ok(rented.html.includes('<meta data-shell="" name="robots" content="noind
 assert.equal(ldOf(rented.html)['@graph'][0].offers.availability, 'https://schema.org/SoldOut');
 assert.ok(rented.html.includes('no longer available'));
 
-// Society page
 const S = { slug: 'green-acres-baner', name: 'Green Acres', builder: 'Kolte Patil', localitySlug: 'baner', year: 2015, towers: 4, units: 320, amenities: ['pool'], listingCount: 3, forRent: 2, forSale: 1, homes: [{ id: ID, title: '2 BHK for rent' }] };
 assert.deepEqual(societyPage(SHELL, S, { slug: 'old-name' }), { status: 301, location: '/society/green-acres-baner' });
 const soc = societyPage(SHELL, S, { slug: S.slug });
 assert.ok(soc.html.includes('<title data-shell="Draazy">Green Acres, Baner, Pune: Homes, Amenities &amp; Reviews | Draazy</title>'));
 assert.ok(soc.html.includes('Green Acres in Baner, Pune by Kolte Patil, built in 2015. 2 homes for rent and 1 home for sale from owners, with no brokerage.'));
 assert.ok(!soc.html.includes('noindex'));
+assert.ok(soc.html.includes('<meta property="og:image" content="https://draazy.com/og/page/society.jpg" />'));
 assert.equal(ldOf(soc.html)['@graph'][0]['@type'], 'ApartmentComplex');
 const thin = societyPage(SHELL, { slug: 'x', name: 'X', localitySlug: 'baner', listingCount: 0, homes: [] }, { slug: 'x' });
 assert.ok(thin.html.includes('<meta data-shell="" name="robots" content="noindex" />'));
 assert.ok(thin.html.includes('Facts, amenities and resident reviews on Draazy.'));
 
-// Sitemaps
 assert.deepEqual(propertySitemapRow({ ...P, propertyType: 'Apartment' }), [PATH, '2026-10-01']);
 assert.equal(propertySitemapRow({ ...P, dealStatus: 'closed' }), null);
 assert.ok(sitemapXml([[PATH, '2026-10-01'], ['/society/a&b', null]]).includes(`<url><loc>https://draazy.com${PATH}</loc><lastmod>2026-10-01</lastmod></url>\n  <url><loc>https://draazy.com/society/a&amp;b</loc></url>`));
 
-// Handler flow: API 404 → real 404, API down → bare shell 200, both with the security headers.
 const env = { API_ORIGIN: 'https://api.example.com', ORIGIN_SHARED_SECRET: 's', INDEX_LISTINGS: 'true', ASSETS: { fetch: async () => new Response(SHELL) } };
 const request = new Request(`https://draazy.com${PATH}`, { headers: { 'CF-Connecting-IP': '1.2.3.4' } });
 const realFetch = globalThis.fetch;

@@ -1,6 +1,4 @@
 
-/** Route pattern to display name. Kept client-side so a rename never relabels stored history; an unmapped
- * pattern renders as its raw path so a gap is visibly unfinished. */
 const PAGE_LABELS = {
   '/': 'Home',
   '/listings': 'Listings',

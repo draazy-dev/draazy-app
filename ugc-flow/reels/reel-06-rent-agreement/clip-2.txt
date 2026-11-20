@@ -1,0 +1,50 @@
+REEL 06 / CLIP 2 of 3 - THE HASSLE
+==================================
+JOB ID ............. r06-c2
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r06-c1 approved by the user AND r06-anchor saved
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 720p (user-approved; download "720p Original size")
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+  Cost shown ....... 12 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @Ishaan   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r06-set (image) + r06-anchor (saved frame of the approved clip 1)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 7.7-15.4 s)
+
+PROMPT START
+Vertical 9:16 smartphone selfie video, a close-up from a phone held at arm's length at eye level, framing
+[@Ishaan] Ishaan from mid-chest up in the centre of the frame. Both his hands are out of frame. The
+camera distance and angle stay the same for the whole clip.
+
+Set (the attached set image r06-set; the same in every clip of this reel): Ishaan sits on a light-grey fabric sofa still wrapped in clear plastic film, in the living room of the modern 1BHK he has just moved into, in a new building in Pune, on a weekday night, in the middle of unpacking. On the left side of the frame, a small round wooden side table with a switched-on table lamp with a warm linen shade and, behind it, a large window with a sheer white curtain and distant lit apartment towers at night. On the right side of the frame, a stack of three plain brown cardboard moving boxes. Behind him, a smooth warm-white wall. More plain brown boxes are scattered on the floor around the sofa. Clean, new and modern: no posters, no papers, no screens, no labels or writing on any box, nothing readable anywhere. The background stays exactly the same for the whole clip. Match the attached reference frame exactly: the same camera distance and
+angle, the same background with every object in the same place, the same light and colour grade.
+
+Ishaan wears exactly the same teal pullover hoodie as his character image, closed all the way up to the neck: a pullover with no zip and no opening at the front, two white drawstrings hanging down, only a thin edge of white tee collar visible at the neckline. Clear, even skin with no moles, beauty marks or dark spots, taper fade, light stubble. The hoodie stays closed for the whole clip.
+
+He talks to the lens with dry, wry humour, counting off the hassles: a relaxed face and a small knowing
+half-smile after each line. Not laughing, not grinning, never sad, tired or frowning. Each line is spoken exactly
+once, nothing repeated, no other words.
+0.3-3.4 s, flatly: "Upar se biometric ke liye, phir se unke office ka ek aur chakkar."
+3.8-7.3 s, slower: "Har mahine rent, aur expiry se pehle renewal, sab khud yaad rakho."
+7.3-8.0 s: silent, lips closed, a slow blink and a wry half-smile into the lens.
+
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking casual Hinglish
+with a natural Indian accent, clearly male and mid-pitched, conversational and fluent.
+
+Lighting and colour: night, not daytime: the window is dark with distant city lights and the table lamp is on. Warm table-lamp glow from the left mixed with soft warm ceiling downlights, true skin tones. Authentic Instagram UGC shot on a phone, natural skin texture, no beauty filter.
+
+Audio: quiet indoor room tone, faint distant city traffic outside the window. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
+PROMPT END
+
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match r06-anchor side by side: lit table lamp with a warm linen shade on a round wooden side table + night window with a sheer white curtain on the LEFT; stack of three plain brown boxes on the RIGHT; plastic-wrapped light-grey sofa against a warm-white wall behind; boxes scattered on the floor; nothing readable
+  [ ] no papers, screens or readable text anywhere
+
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

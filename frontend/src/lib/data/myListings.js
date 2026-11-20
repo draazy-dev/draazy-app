@@ -4,9 +4,22 @@ import { myFlatmateGroups, myFlatmatePosts, myFlatmateRooms } from '../../servic
 const SHARE_REQ_IMG = 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&q=80';
 const FLATMATE_GROUP_IMG = 'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&q=80';
 
-// Flatmate moderation states (FlatmateVocabulary.MOD_STATUS) onto the listing card's status vocabulary.
-const CARD_STATUS = { live: 'approved', approved: 'approved', pending: 'pending', flagged: 'pending', removed: 'rejected', rejected: 'rejected', expired: 'expired' };
+const CARD_STATUS = { live: 'approved', approved: 'approved', pending: 'pending', needs_info: 'pending', flagged: 'pending', removed: 'rejected', rejected: 'rejected', expired: 'expired' };
 const cardStatus = (modStatus) => CARD_STATUS[modStatus] || 'pending';
+
+export const flatmateKindOf = (l) => (l?.flatmateGroup ? 'group' : l?.flatmatePost ? 'post' : l?.flatmate ? 'room' : null);
+
+export function flatmateCaseKey(l) {
+  const kind = flatmateKindOf(l);
+  return kind ? `fm:${kind}:${l.id}` : null;
+}
+
+export function parseFlatmateCaseKey(key) {
+  const m = /^fm:(room|group|post):(.+)$/.exec(String(key || ''));
+  return m ? { kind: m[1], id: m[2] } : null;
+}
+
+const propertyVerified = (tier, reviewStatus) => tier === 'owner' || (tier === 'tenant' && reviewStatus === 'approved');
 
 export function flatmatePostToListing(r) {
   const locality = (r.localities && r.localities[0]) || 'Pune';
@@ -29,7 +42,6 @@ export function flatmatePostToListing(r) {
   };
 }
 
-/** The caller's own seeker posts, scoped by the provider rather than by browser data. */
 export async function getMyFlatmatePosts() {
   const page = await myFlatmatePosts({ size: 100 });
   return page.items.map(flatmatePostToListing);
@@ -50,19 +62,21 @@ export function flatmateGroupToListing(g) {
     real: true,
     flatmate: true,
     flatmateGroup: true,
+    hostRole: g.hostRole,
+    hunting: g.hunting,
+    verificationTier: g.verificationTier,
+    reviewStatus: g.reviewStatus,
+    ownershipVerified: !g.hunting && propertyVerified(g.verificationTier, g.reviewStatus),
     type: 'Flatmate group',
     createdAt: g.createdAt,
   };
 }
 
-/** The caller's own groups, including moderation-hidden rows. */
 export async function getMyFlatmateGroups() {
   const page = await myFlatmateGroups({ size: 100 });
   return page.items.map(flatmateGroupToListing);
 }
 
-/* A room is already a live view model. This small adapter only gives the dashboard its shared
-   card shape; it never reads or writes browser storage. */
 export function roomToListing(room) {
   const image = room.cover || null;
   const locality = room.locality || room.localities?.[0] || 'Pune';
@@ -79,24 +93,25 @@ export function roomToListing(room) {
     real: true,
     flatmate: true,
     propertyId: room.propertyId || null,
+    hostRole: room.hostRole,
+    verificationTier: room.verificationTier,
+    reviewStatus: room.reviewStatus,
+    ownershipVerified: propertyVerified(room.verificationTier, room.reviewStatus),
     occupants: room.occupants || 0,
     type: 'Flatmate',
     createdAt: room.createdAt,
   };
 }
 
-/** The caller's own rooms, including moderation-hidden rows. */
 export async function getMyRooms() {
   const page = await myFlatmateRooms({ size: 100 });
   return page.items.map(roomToListing);
 }
 
-/* The rows with the room rows swapped, in the order `loadMyListings` builds them. */
 export function withRooms(rows, rooms) {
   return [...rows.filter((l) => l.flatmatePost), ...rows.filter((l) => l.flatmateGroup), ...rooms, ...rows.filter((l) => !l.flatmate)];
 }
 
-/* Combined "My Listings": the owner's property listings plus their flatmate posts. */
 export async function loadMyListings(user) {
   const [mine, rooms, flatmatePosts, flatmateGroups] = await Promise.all([
     myListings(user),
@@ -104,6 +119,5 @@ export async function loadMyListings(user) {
     getMyFlatmatePosts(),
     getMyFlatmateGroups(),
   ]);
-  /* Drop archived rows for this combined panel; the seam must keep returning the owner's full file. */
-  return [...flatmatePosts, ...flatmateGroups, ...rooms, ...mine.filter((l) => !l.archived)];
+  return [...flatmatePosts, ...flatmateGroups, ...rooms, ...mine.filter((l) => !l.archived || l.archivedNote)];
 }

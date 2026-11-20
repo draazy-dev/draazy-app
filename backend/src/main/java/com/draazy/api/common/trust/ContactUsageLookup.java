@@ -4,9 +4,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** When did this caller open each owner contact? Read from {@code contact_requests}, so it cannot drift. */
 public interface ContactUsageLookup {
+    List<ContactUse> contactUses(UUID userId);
 
-    /** Oldest first; empty for a caller who never asked or does not exist. */
-    List<Instant> contactTimes(UUID userId);
+    default List<Instant> contactTimes(UUID userId) {
+        return contactUses(userId).stream().map(ContactUse::at).toList();
+    }
 }

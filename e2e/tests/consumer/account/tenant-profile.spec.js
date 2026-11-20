@@ -72,6 +72,36 @@ test.describe('Tenant profile — live API', () => {
     expect(await stored.json()).toMatchObject({ name: 'Persisted Tenant', occupation: 'Engineer' });
   });
 
+  test('saves "Who will live here?" as the server code and shows the label again after reload', async ({ page, request }) => {
+    await newTenant(page, request, 'Live Occupants');
+    await openProfile(page);
+
+    await page.getByRole('button', { name: 'Select', exact: true }).click();
+    await page.getByRole('option', { name: 'Bachelor (Male)' }).click();
+    const saved = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === '/api/me/tenant-profile' && response.request().method() === 'PUT',
+    );
+    await page.getByRole('button', { name: /Save profile/i }).click();
+    const response = await saved;
+    expect(response.status()).toBe(200);
+    expect(response.request().postDataJSON().occupants).toBe('bachelor_male');
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Bachelor (Male)' })).toBeVisible();
+  });
+
+  test('the About box stops at the server limit and the page promises a tenant badge, not a buyer one', async ({ page, request }) => {
+    await newTenant(page, request, 'Live About Limit');
+    await openProfile(page);
+
+    await page.locator('#tp-about').fill('x'.repeat(2500));
+    await expect(page.locator('#tp-about')).toHaveValue('x'.repeat(2000));
+    await expect(page.getByText('2000/2000')).toBeVisible();
+    await page.getByRole('button', { name: /Save profile/i }).click();
+    await expect(page.getByRole('button', { name: /Browse rentals/i })).toBeVisible();
+    await expect(page.getByText(/Serious Buyer/)).toHaveCount(0);
+  });
+
   test('shows the published score checklist as fields are completed', async ({ page, request }) => {
     await newTenant(page, request, 'Live Checklist');
     await openProfile(page);

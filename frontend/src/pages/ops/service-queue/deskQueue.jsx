@@ -1,20 +1,39 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { Clock } from 'lucide-react';
-import { listServiceRequestQueue } from '../../../services/serviceRequestService.js';
+import { getServiceRequest, listServiceRequestQueue } from '../../../services/serviceRequestService.js';
 import { classNames, fmtNum } from '../../../lib/format.js';
+import { useToast } from '../../../context/ToastContext.jsx';
 
-// Mirrors the server's IN_PROGRESS_STATUSES, so a tab lists exactly what its queue-summary count tallies.
+export function useLinkedCase(open) {
+  const { toast } = useToast();
+  const [params, setParams] = useSearchParams();
+  const id = params.get('request');
+  useEffect(() => {
+    if (!id) return undefined;
+    let live = true;
+    const settle = (request) => {
+      if (!live) return;
+      if (request) open(request);
+      else toast('That case could not be opened. It may have moved to another desk.', 'error');
+      setParams((p) => { const next = new URLSearchParams(p); next.delete('request'); return next; }, { replace: true });
+    };
+    getServiceRequest(id).then(settle, () => settle(null));
+    return () => { live = false; };
+  }, [id, open, setParams, toast]);
+}
+
 const DESK_TURN = 'assigned,in-progress,changes-requested,approved';
 
 export const stageTabs = (noun) => [
   { key: 'pickup', label: 'To pick up', query: { status: 'new' }, count: (s) => s.toPickUp, empty: 'Nothing waiting to be picked up.' },
-  { key: 'mine', label: `My ${noun}s`, query: { mine: true, status: `${DESK_TURN},draft-shared` }, count: (s) => s.mine, empty: `You hold no open ${noun}s.` },
+  { key: 'mine', label: `My ${noun}s`, query: { mine: true, status: `${DESK_TURN},draft-shared,action-required` }, count: (s) => s.mine, empty: `You hold no open ${noun}s.` },
   { key: 'progress', label: 'In progress', query: { status: DESK_TURN }, count: (s) => s.inProgress, empty: `No ${noun} is waiting on the desk.` },
-  { key: 'customer', label: 'With customer', query: { status: 'draft-shared' }, count: (s) => s.withCustomer, empty: 'No draft is out with a customer.' },
-  { key: 'closed', label: 'Closed', query: { status: 'completed,cancelled' }, count: (s) => s.closed, empty: `No closed ${noun}s yet.` },
+  { key: 'customer', label: 'With customer', query: { status: 'draft-shared,action-required' }, count: (s) => s.withCustomer, empty: 'Nothing is waiting on a customer.' },
+  { key: 'closed', label: 'Closed', query: { status: 'completed' }, count: (s) => s.closed, empty: `No completed ${noun}s yet.` },
+  { key: 'cancelled', label: 'Cancelled', query: { status: 'cancelled' }, count: (s) => s.cancelled, empty: `No cancelled or withdrawn ${noun}s.` },
 ];
 
-// `stale` keeps the last page on screen but inert until the newer query answers.
 export function useQueue(query, reloadToken) {
   const key = JSON.stringify(query);
   const [state, setState] = useState({ page: null, failed: false, key: null });

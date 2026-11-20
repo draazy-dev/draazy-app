@@ -28,11 +28,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ServiceRequestDraftApprovals {
-
     static final String METHOD_IN_APP = "in_app";
     static final String METHOD_OTP = "otp";
 
     private final ServiceRequestDraftApprovalRepository approvals;
+    private final ServiceRequestRepository requestRows;
     private final ServiceRequestPartyRepository parties;
     private final DocumentRepository documents;
     private final UserRepository users;
@@ -40,9 +40,10 @@ public class ServiceRequestDraftApprovals {
     private final AuditService audit;
 
     ServiceRequestDraftApprovals(ServiceRequestDraftApprovalRepository approvals,
-            ServiceRequestPartyRepository parties, DocumentRepository documents, UserRepository users,
+            ServiceRequestRepository requestRows, ServiceRequestPartyRepository parties, DocumentRepository documents, UserRepository users,
             OtpService otp, AuditService audit) {
         this.approvals = approvals;
+        this.requestRows = requestRows;
         this.parties = parties;
         this.documents = documents;
         this.users = users;
@@ -52,6 +53,13 @@ public class ServiceRequestDraftApprovals {
 
     int currentVersion(ServiceRequest request) {
         return Math.toIntExact(documents.countByServiceRequestIdAndCategory(request.getId(), "draft"));
+    }
+
+    void requireOutForReview(ServiceRequest request) {
+        if (request.getStatus() != ServiceRequestStatus.DRAFT_SHARED) {
+            throw new ConflictException("There is no draft awaiting your decision \u2014 this request is "
+                    + request.getStatus() + ".");
+        }
     }
 
     List<RequiredApproval> required(ServiceRequest request) {
@@ -106,16 +114,31 @@ public class ServiceRequestDraftApprovals {
         return required(request).stream().anyMatch(p -> METHOD_IN_APP.equals(p.method()) && caller.userId().equals(p.userId()));
     }
 
+    boolean approvedBy(AuthPrincipal caller, ServiceRequest request) {
+        RequiredApproval party = inAppParty(caller, request);
+        return party != null && approvals.findByRequestIdAndDraftVersionAndPartyKey(
+                        request.getId(), currentVersion(request), party.key())
+                .map(r -> r.getApprovedAt() != null).orElse(false);
+    }
+
     @Transactional(noRollbackFor = {OtpSender.DeliveryFailedException.class,
             UnauthorizedException.class, RateLimitedException.class})
-    public boolean confirmOtp(AuthPrincipal caller, ServiceRequest request, String partyKey, String code) {
+    public boolean confirmOtp(AuthPrincipal caller, ServiceRequest visible, String partyKey, String code) {
+        boolean sending = code == null || code.isBlank();
+        ServiceRequest request = sending ? visible : requestRows.findByIdForUpdate(visible.getId()).orElseThrow();
         if (!caller.userId().equals(request.getRequesterId())) {
             throw new ForbiddenException("Only the requester can collect an inline party's draft approval.");
         }
+        requireOutForReview(request);
         RequiredApproval party = required(request).stream().filter(p -> p.key().equals(partyKey) && METHOD_OTP.equals(p.method())).findFirst().orElseThrow(() -> new BadRequestException("Choose an inline party awaiting OTP approval."));
         String mobile = party.mobile();
-        if (code == null || code.isBlank()) {
-            otp.sendCode(mobile, purpose(request, party.key()), caller.userId());
+        if (sending) {
+            String purpose = purpose(request, party.key());
+            otp.sendCode(mobile, purpose, caller.userId());
+            if (!purpose.equals(purpose(request, party.key()))) {
+                throw new ConflictException(
+                        "The draft changed while the code was being sent. Open the new draft first.");
+            }
             return false;
         }
         otp.verifyCode(mobile, code.strip(), purpose(request, party.key()));
@@ -130,7 +153,8 @@ public class ServiceRequestDraftApprovals {
         return otp.resendCooldownSeconds();
     }
 
-    ServiceRequestDto.DraftApproval summary(ServiceRequest request, List<ServiceRequestDraftApproval> rows) {
+    ServiceRequestDto.DraftApproval summary(ServiceRequest request, List<ServiceRequestDraftApproval> rows,
+            AuthPrincipal viewer) {
         List<RequiredApproval> required = required(request);
         if (required.isEmpty()) {
             return null;
@@ -144,13 +168,14 @@ public class ServiceRequestDraftApprovals {
                             p.mobile() == null ? null : MobileMask.mask(p.mobile()),
                             row != null && row.getOpenedAt() != null,
                             row != null && row.getApprovedAt() != null,
-                            row == null ? null : row.getApprovedAt());
+                            row == null ? null : row.getApprovedAt(),
+                            METHOD_IN_APP.equals(p.method()) && viewer.userId().equals(p.userId()));
                 }).toList();
         long approved = parties.stream().filter(ServiceRequestDto.DraftApprovalParty::approved).count();
         return new ServiceRequestDto.DraftApproval(version, (int) approved, parties.size(), parties);
     }
 
-    private boolean complete(ServiceRequest request) {
+    boolean complete(ServiceRequest request) {
         int version = currentVersion(request);
         List<String> approvedKeys = approvals.findByRequestIdAndDraftVersion(request.getId(), version).stream().filter(a -> a.getApprovedAt() != null).map(ServiceRequestDraftApproval::getPartyKey).toList();
         return required(request).stream().allMatch(p -> approvedKeys.contains(p.key()));
@@ -172,7 +197,7 @@ public class ServiceRequestDraftApprovals {
         Map<String, Object> state = ServiceRequestPricing.childObject(
                 request.getDetails() == null ? Map.of() : request.getDetails(), "_state");
         String requesterSide = requesterSide(request, state);
-        List<ServiceRequestParty> acceptedParties = parties.findByRequestId(request.getId()).stream().filter(p -> p.getUserId() != null && CoFillParties.ACCEPTED.equals(p.getStatus())).toList();
+        List<ServiceRequestParty> acceptedParties = CoFillParties.joined(parties.findByRequestId(request.getId())).toList();
         List<RequiredApproval> out = new ArrayList<>();
         if ("tenant".equals(requesterSide)) {
             addInline(out, "owner", 0, "Licensor", ServiceRequestPricing.childObject(state, "owner"),

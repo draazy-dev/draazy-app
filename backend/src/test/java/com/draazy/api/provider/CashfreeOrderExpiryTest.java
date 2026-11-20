@@ -6,24 +6,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.draazy.api.common.payments.CheckoutTtl;
 import com.draazy.api.provider.cashfree.CashfreeProperties;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** A missing outbound vendor field is invisible until a customer outlasts the TTL and pays a row the sweep
- * already retired (for rent, a double charge), so the payload is asserted directly. */
 @DisplayName("D169 — the Cashfree order carries an expiry derived from the shared TTL")
 class CashfreeOrderExpiryTest {
-
     private static final Instant NOW = Instant.parse("2026-03-14T09:30:00Z");
 
-    /** Stated rather than read from the package-private {@code CheckoutTtl.DEFAULT_MINUTES}. */
     private static final CheckoutTtl TTL = new CheckoutTtl(45);
 
-    /** An absent key makes Cashfree apply its account default (days); compared against the TTL object's
-     * own answer so a second hard-coded number fails too. */
     @Test
     @DisplayName("the expiry is the shared TTL's look-forward, not a number of its own")
     void theExpiryComesFromTheSharedTtl() {
@@ -33,25 +28,21 @@ class CashfreeOrderExpiryTest {
         assertThat(sent).isEqualTo(TTL.expiryFrom(NOW));
     }
 
-    /** Stated on the provider side too: this is the window a reader of this package sees. */
     @Test
     @DisplayName("the order stops being payable when the sweep would retire the row")
     void theTwoWindowsCloseTogether() {
         Instant sent = Instant.from(
                 DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse((String) body().get("order_expiry_time")));
 
-        // The row created at NOW is swept once the cutoff has moved past it.
         assertThat(TTL.cutoffFrom(sent)).isEqualTo(NOW);
     }
 
-    /** Literal, not round-trip: a format Cashfree refuses would round-trip perfectly. */
     @Test
     @DisplayName("the expiry is ISO-8601 UTC at seconds precision")
     void theExpiryIsFormattedForTheVendor() {
         assertThat(body().get("order_expiry_time")).isEqualTo("2026-03-14T10:15:00Z");
     }
 
-    /** {@code Instant.now()} carries nanoseconds in production, so this is the real path. */
     @Test
     @DisplayName("sub-second precision is truncated rather than sent")
     void nanosecondsAreTruncated() {
@@ -61,7 +52,17 @@ class CashfreeOrderExpiryTest {
         assertThat(body.get("order_expiry_time")).isEqualTo("2026-03-14T10:15:00Z");
     }
 
-    /** Adding a field must not have dropped or renamed one — nothing else covers this payload. */
+    @Test
+    @DisplayName("the shortest allowed TTL still sends an expiry Cashfree accepts")
+    void theClampedFloorClearsTheVendorMinimum() {
+        Instant now = Instant.parse("2026-03-14T09:30:00.999Z");
+        Instant arrivesAtVendor = now.plusSeconds(10);
+        Map<String, Object> body = CashfreePaymentGateway.orderRequest(order(new CheckoutTtl(0).expiryFrom(now), null));
+        Instant sent = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse((String) body.get("order_expiry_time")));
+
+        assertThat(sent).isAfter(arrivesAtVendor.plus(Duration.ofMinutes(15)));
+    }
+
     @Test
     @DisplayName("the fields the order already needed are still there")
     void theExistingFieldsSurvive() {
@@ -75,8 +76,6 @@ class CashfreeOrderExpiryTest {
                 .isEqualTo(Map.of("customer_id", "cust_1", "customer_phone", "9800000000"));
     }
 
-    /** Absent must stay absent: the vendor may reject a blank value, but reads an omitted key as
-     * "use the dashboard endpoint", which is how every deployment runs. */
     @Test
     @DisplayName("notify_url is omitted when unconfigured and sent when set")
     void theNotifyUrlIsOptional() {
@@ -91,15 +90,24 @@ class CashfreeOrderExpiryTest {
                 Map.of("notify_url", "https://tunnel.example/webhooks/cashfree/payment"));
     }
 
-    /** The test above bypasses the guard with a raw string, so without this one it is unexecuted code;
-     * direct construction is sound since the constructor dereferences no collaborator. */
+    @Test
+    @DisplayName("return_url rides in order_meta beside notify_url")
+    void theReturnUrlIsSentWhenGiven() {
+        Map<String, Object> body = CashfreePaymentGateway.orderRequest(order(TTL.expiryFrom(NOW),
+                "https://tunnel.example/hook", "https://draazy.com/checkout?order_id={order_id}"));
+
+        assertThat(body.get("order_meta")).isEqualTo(Map.of(
+                "notify_url", "https://tunnel.example/hook",
+                "return_url", "https://draazy.com/checkout?order_id={order_id}"));
+    }
+
     @Test
     @DisplayName("a notify url that is not absolute https refuses to start")
     void aBadNotifyUrlIsABootFailure() {
         for (String rejected : new String[] {
-                "http://tunnel.example/hook",  // cleartext settlement data
-                "/webhooks/cashfree/payment",  // relative: no host to post to
-                "https:///hook",               // https, but still no host
+                "http://tunnel.example/hook",
+                "/webhooks/cashfree/payment",
+                "https:///hook",
                 "not a url"}) {
             assertThatThrownBy(() -> gatewayWithNotifyUrl(rejected))
                     .as("notify url %s", rejected)
@@ -108,8 +116,6 @@ class CashfreeOrderExpiryTest {
         }
     }
 
-    /** Blank is the deployed default ("use the dashboard endpoint") and the scheme is case-insensitive
-     * per RFC 3986; a guard meant to catch a typo must not invent one. */
     @Test
     @DisplayName("blank, absent and upper-case https all start cleanly")
     void agoodNotifyUrlIsAccepted() {
@@ -124,7 +130,7 @@ class CashfreeOrderExpiryTest {
 
     private static CashfreePaymentGateway gatewayWithNotifyUrl(String notifyUrl) {
         return new CashfreePaymentGateway(null, TTL,
-                new CashfreeProperties(true, null, null, null, notifyUrl), null);
+                new CashfreeProperties(true, null, null, null, notifyUrl), null, "https://draazy.com");
     }
 
     private static Map<String, Object> body() {
@@ -132,7 +138,11 @@ class CashfreeOrderExpiryTest {
     }
 
     private static CashfreePaymentGateway.OrderSpec order(Instant expiresAt, String notifyUrl) {
+        return order(expiresAt, notifyUrl, null);
+    }
+
+    private static CashfreePaymentGateway.OrderSpec order(Instant expiresAt, String notifyUrl, String returnUrl) {
         return new CashfreePaymentGateway.OrderSpec("dz_1", 2499L, "sub_1",
-                new PaymentGateway.Customer("cust_1", "9800000000"), expiresAt, notifyUrl);
+                new PaymentGateway.Customer("cust_1", "9800000000"), expiresAt, notifyUrl, returnUrl);
     }
 }

@@ -1,39 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Search, Bell, Building2, User, Wrench, ShieldCheck, LayoutDashboard, BarChart3, MessageSquare, FileText, Flag, LifeBuoy, Users, Settings, IndianRupee, Gift, Compass, BookOpen, Undo2 } from 'lucide-react';
+import { Search, Bell, Building2, User, Wrench, ShieldCheck, LayoutDashboard, BarChart3, MessageSquare, FileText, Flag, LifeBuoy, Users, Settings, IndianRupee, Gift, Compass, BookOpen, Undo2, PhoneCall } from 'lucide-react';
 import { lookupForModeration } from '../../services/propertyService.js';
 import { listUsers } from '../../services/usersService.js';
 import { adminBell } from '../../services/analyticsService.js';
 import { useAdminFlags } from '../../context/AdminFlagsContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { useHelpTree } from '../../lib/useHelp.js';
+import { useHelpIndex } from '../../lib/useHelp.js';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import { listNotifications, markAllRead, markRead } from '../../services/notificationService.js';
-import { safeNotificationLink } from '../notifications/notificationModel.js';
+import { safeNotificationLink, TYPE_META } from '../notifications/notificationModel.js';
+import Icon from '../Icon.jsx';
 import { SERVICE_DESKS, canOpenPath, hasPermission, portalPath, runbooksFor, ticketPath } from '../../lib/adminModules.js';
-/** Rows shown per data category. The chip beside it carries the size of the whole match. */
+import { isImeComposing } from '../../lib/isImeComposing.js';
 
 const RESULT_CAP = 6;
-/** Rows shown per queue in the bell, on the same split: heading counts, list samples. */
-
-/** One request per pause in typing rather than one per keystroke. */
 
 const DEBOUNCE_MS = 200;
 const BELL_REFRESH_MS = 90_000;
-/** "a", "a and b", "a, b and c" — so the notices below read as sentences rather than lists. */
 
 const prose = (words) =>
   words.length < 2 ? (words[0] || '') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
 
 const SEARCH_PLACEHOLDER = 'Search pages, features, listings and people...';
-/* `term` is what the rows in here answer, which is not always what is in the field: it is how the render knows
-   whether it is holding this search's results or the previous one's. */
 
 const NO_RESULTS = { term: '', listings: [], listingsTotal: 0, users: [], usersTotal: 0, failed: [] };
 const NOTHING = { items: [], total: 0 };
 
 const NAV_INDEX_FULL = [
   { label: 'Dashboard', keywords: 'dashboard home overview', path: '/admin', icon: LayoutDashboard, flag: null },
+  { label: 'Notifications', keywords: 'notifications alerts escalations sla reminders inbox bell', path: '/admin/notifications', icon: Bell, flag: null },
   { label: 'Analytics', keywords: 'analytics stats chart graph', path: '/admin/analytics', icon: BarChart3, flag: 'analytics' },
   { label: 'Properties', keywords: 'properties listings homes flats apartments manage', path: '/admin/properties', icon: Building2, flag: null },
   { label: 'Users', keywords: 'users people accounts customers owners tenants members', path: '/admin/users', icon: Users, flag: null },
@@ -49,6 +45,7 @@ const NAV_INDEX_FULL = [
   { label: 'Integrations', keywords: 'integrations email whatsapp otp payments cashfree zoho webhook delivery failures providers', path: '/admin/integrations', icon: Settings, flag: null },
   { label: 'Referrals', keywords: 'referrals ops refer bonus', path: '/admin/referrals', icon: Gift, flag: null },
   { label: 'Refunds', keywords: 'refunds refund money back credit note dispute chargeback pass pack', path: '/admin/refunds', icon: Undo2, flag: null },
+  { label: 'Leads', keywords: 'leads crm follow up call whatsapp prospects sales conversion pipeline unassigned claim', path: '/admin/leads', icon: PhoneCall, flag: null },
   { label: 'Runbooks', keywords: 'help runbook runbooks docs documentation guide guides knowledge base handbook playbook ops internal how to checklist', path: '/admin/runbooks', icon: BookOpen, flag: null },
 ];
 
@@ -73,9 +70,8 @@ const FEATURES_INDEX = [
   { label: 'Deals', keywords: 'deals closed gmv transactions negotiation', path: '/admin/enquiries?tab=deals', parent: 'Enquiries', flag: null },
   { label: 'Conversion Funnel', keywords: 'funnel conversion pipeline enquiry visit deal time drop-off', path: '/admin/enquiries?tab=funnel', parent: 'Enquiries', flag: null },
 
-  { label: 'Revenue Charts', keywords: 'revenue charts mrr subscriptions services featured', path: '/admin/finance', parent: 'Finance', flag: 'finance' },
-  { label: 'Transactions', keywords: 'transactions ledger payments billing invoices', path: '/admin/finance', parent: 'Finance', flag: 'finance' },
-  { label: 'Financial Models', keywords: 'models subscription payout calculations', path: '/admin/finance', parent: 'Finance', flag: 'finance' },
+  { label: 'Revenue', keywords: 'revenue charts mrr subscriptions services refunds net collected plans', path: '/admin/finance', parent: 'Finance', flag: 'finance' },
+  { label: 'Transactions', keywords: 'transactions ledger payments billing invoices credit notes refunds', path: '/admin/finance?tab=transactions', parent: 'Finance', flag: 'finance' },
 
   { label: 'FAQs', keywords: 'faqs frequently asked questions help', path: '/admin/content', parent: 'Content', flag: 'content.enabled' },
 
@@ -95,7 +91,6 @@ const FEATURES_INDEX = [
   { label: 'Areas', keywords: 'areas localities locality retire restore registry community', path: '/admin/places?tab=areas', parent: 'Places', flag: null },
   { label: 'Duplicate Societies', keywords: 'society candidates merge duplicate minted community', path: '/admin/places?tab=duplicates', parent: 'Places', flag: null },
   { label: 'Society Details', keywords: 'society directory catalogue edit registration conveyance maintenance', path: '/admin/places?tab=societies', parent: 'Places', flag: null },
-  /* Three Dashboard entries stood here — Smart Alerts, SLA Health and Daily Scorecard. */
 
   { label: 'Team Performance', keywords: 'staff kpi performance metrics summary leaderboard turnaround', path: '/admin/staff-activity?tab=performance', parent: 'Team Activity', flag: null },
 
@@ -104,6 +99,8 @@ const FEATURES_INDEX = [
 
   { label: 'Product Changelog', keywords: 'changelog release notes shipped whats new version updates', path: '/help/changelog', parent: 'Runbooks', flag: null },
 ];
+
+const userPath = (u) => (u.role === 'owner' || u.role === 'buyer' ? '/admin/users' : '/admin/team');
 
 function useOutside(refs, onOutside, active) {
   useEffect(() => {
@@ -115,7 +112,6 @@ function useOutside(refs, onOutside, active) {
     return () => document.removeEventListener('mousedown', onDown);
   }, [refs, onOutside, active]);
 }
-/* Fixed, because all four are answerable on every deployment now. */
 
 const FILTER_CHIPS = [
   { key: 'all', label: 'All' },
@@ -123,7 +119,6 @@ const FILTER_CHIPS = [
   { key: 'listings', label: 'Listings' },
   { key: 'users', label: 'People' },
 ];
-/** Listing moderation statuses, which are the only ones this palette renders now. */
 
 function StatusPill({ status }) {
   const colors = {
@@ -133,13 +128,12 @@ function StatusPill({ status }) {
     archived: 'bg-white/10 text-gray-400',
   };
   return (
-    <span className={'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ' + (colors[status] || 'bg-white/10 text-gray-400')}>
+    <span className={'dz-tag font-semibold ' + (colors[status] || 'bg-white/10 text-gray-400')}>
       {status}
     </span>
   );
 }
 
-// A section the caller may read but the server left out is dark, never zero; a failed read darkens all of them.
 function toNotif(bell, canReadProperties, canReadTickets) {
   const pending = bell?.pendingListings;
   const open = bell?.openTickets;
@@ -180,7 +174,7 @@ export default function AdminTopbarTools() {
     [tabEnabled, user],
   );
 
-  const { articles } = useHelpTree();
+  const { articles } = useHelpIndex();
   const FEATURES = useMemo(() => {
     const runbooks = runbooksFor(articles, user)
       .map((a) => ({ label: a.title, keywords: `${a.summary} runbook internal ops`, path: `/admin/runbooks/${a.slug}`, parent: 'Runbooks', flag: null }));
@@ -202,7 +196,6 @@ export default function AdminTopbarTools() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
-  /* Pages and features only. */
 
   const nav = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -216,22 +209,17 @@ export default function AdminTopbarTools() {
       : [];
     return { pages: pages.slice(0, 4), features: features.slice(0, 8), pageCount: pages.length, featureCount: features.length };
   }, [q, filter, NAV_INDEX, FEATURES]);
-  /* Listings and people, over the seam. */
 
   const [remote, setRemote] = useState(NO_RESULTS);
 
   useEffect(() => {
     const term = q.trim();
-    /* Re-armed on every run rather than only cleared on teardown: a ref initialised once outside the effect stays
-       `false` after StrictMode's mount/unmount/mount and swallows every result for the rest of the session. */
     if (term.length < 2) { setRemote(NO_RESULTS); return undefined; }
     let live = true;
     const timer = setTimeout(async () => {
       const [listings, people] = await Promise.allSettled([
         canReadProperties ? lookupForModeration(term, { size: RESULT_CAP }) : NOTHING,
         canReadUsers ? listUsers({ q: term, page: 0, size: RESULT_CAP }) : NOTHING,
-      // Two guards, not one: `live` drops a response whose search has been superseded, and the
-      // debounce above means the superseded one usually never left.
       ]);
       if (!live) return;
       setRemote({
@@ -239,7 +227,6 @@ export default function AdminTopbarTools() {
         listings: listings.status === 'fulfilled' ? (listings.value.items || []) : [],
         listingsTotal: listings.status === 'fulfilled' ? (listings.value.total || 0) : 0,
         users: people.status === 'fulfilled' ? (people.value.items || []) : [],
-        /* Named, never silently empty. */
         usersTotal: people.status === 'fulfilled' ? (people.value.total || 0) : 0,
         failed: [
           ...(listings.status === 'rejected' ? ['listings'] : []),
@@ -252,16 +239,12 @@ export default function AdminTopbarTools() {
 
   const results = useMemo(() => {
     if (!nav) return null;
-    // Only this search's rows count. Between keystrokes `remote` still holds the previous term's,
-    // and rendering those under the new one is how a palette shows a listing that does not match.
     const fresh = remote.term === q.trim();
     const wants = (key) => fresh && (filter === 'all' || filter === key);
     const listings = wants('listings') ? remote.listings : [];
     const users = wants('users') ? remote.users : [];
     const counts = {
       features: nav.pageCount + nav.featureCount,
-      // The whole match, from the server, not `items.length` — the chip is a count of what exists,
-      // and the list below it is capped at six.
       listings: wants('listings') ? remote.listingsTotal : 0,
       users: wants('users') ? remote.usersTotal : 0,
     };
@@ -273,15 +256,34 @@ export default function AdminTopbarTools() {
       counts,
       total: counts.features + counts.listings + counts.users,
       failed: fresh ? remote.failed : [],
-      // Distinguishes "nothing matched" from "the answer is still coming", which otherwise look
-      // identical and one of which is a lie.
       awaiting: !fresh,
     };
   }, [nav, remote, q, filter]);
 
+  const rows = useMemo(() => {
+    if (!results) return [];
+    return [
+      ...results.pages.map((p) => ({ key: 'p' + p.path, path: p.path })),
+      ...results.features.map((f) => ({ key: 'f' + f.path + f.label, path: f.path })),
+      ...results.listings.map((l) => ({ key: 'l' + l.id, path: '/admin/properties?review=' + l.id })),
+      ...results.users.map((u) => ({ key: 'u' + u.id, path: userPath(u) })),
+    ];
+  }, [results]);
+  const [activeKey, setActiveKey] = useState(null);
+  const active = rows.find((r) => r.key === activeKey) || rows[0];
+  const rowCls = (key) => 'flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5' + (active?.key === key ? ' bg-white/10' : '');
+  const onSearchKey = (e) => {
+    if (!searchOpen || !rows.length) return;
+    if (e.key === 'Enter') { if (!isImeComposing(e)) { e.preventDefault(); go(active.path); } return; }
+    const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const at = rows.indexOf(active);
+    setActiveKey(rows[(at + step + rows.length) % rows.length].key);
+  };
+
   const [notif, setNotif] = useState({ pending: [], pendingTotal: 0, open: [], openTotal: 0, replied: [], repliedTotal: 0, blind: [], total: 0 });
 
-  // Read on mount, on open, and on a slow timer while the tab is visible; a route change does not refetch.
   const readBell = useCallback(() => {
     const settle = (bell) => setNotif(toNotif(bell, canReadProperties, canReadTickets));
     adminBell().then(settle, () => settle(null));
@@ -299,24 +301,23 @@ export default function AdminTopbarTools() {
   useEffect(() => {
     if (!notifOpen) return undefined;
     let live = true;
-    listNotifications({ page: 0, size: 20 })
-      .then((page) => { if (live) setMine(page.items.filter((n) => !n.read).slice(0, 5)); })
+    const rank = (n) => (n.type === 'escalation' ? 0 : 1);
+    listNotifications({ page: 0, size: 50, read: false })
+      .then((page) => { if (live) setMine([...page.items].sort((a, b) => rank(a) - rank(b) || b.at - a.at).slice(0, 5)); })
       .catch(() => { if (live) setMine([]); });
     return () => { live = false; };
   }, [notifOpen, unread]);
 
-  // Queues are standing work, not news: only unread notifications and owner replies light the dot.
   const unseen = unread + notif.repliedTotal;
   const go = (path) => { setSearchOpen(false); setPhoneSearch(false); setNotifOpen(false); setQ(''); navigate(portalPath(user, path)); };
   const openMine = (n) => {
     markRead(n.id).catch(() => {}).finally(refreshUnread);
-    go(safeNotificationLink(n.link));
+    go(safeNotificationLink(n.link, '/admin/notifications'));
   };
   const readAll = () => { markAllRead().catch(() => {}).finally(refreshUnread); };
   const roleIcon = (role) => (role === 'staff' ? Wrench : role === 'owner' ? ShieldCheck : User);
 
   return (
-      /* Global search */
     <div className="flex items-center gap-3 flex-1 ml-2">
       <div className="relative flex-1 max-w-md" ref={searchRef}>
         <div className={(phoneSearch ? 'flex' : 'hidden') + ' items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.06] px-3.5 py-2 sm:flex hover:border-white/20 focus-within:border-teal-500/40 focus-within:bg-white/[0.08] transition-all'}>
@@ -326,11 +327,12 @@ export default function AdminTopbarTools() {
             value={q}
             onChange={(e) => { setQ(e.target.value); setSearchOpen(e.target.value.trim().length >= 2); }}
             onFocus={() => { if (q.trim().length >= 2) setSearchOpen(true); }}
+            onKeyDown={onSearchKey}
             placeholder={SEARCH_PLACEHOLDER}
             className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none"
             aria-label="Global search"
           />
-          <kbd className="hidden lg:inline-flex items-center rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">Ctrl+K</kbd>
+          <kbd className="hidden lg:inline-flex items-center rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">Ctrl+K</kbd>
         </div>
           <button onClick={() => setPhoneSearch(true)} className={(phoneSearch ? 'hidden' : 'grid') + ' h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:text-white sm:hidden'} aria-label="Search">
           <Search className="h-4 w-4" />
@@ -351,7 +353,6 @@ export default function AdminTopbarTools() {
             </div>
 
             <div className="overflow-y-auto p-2 flex-1">
-              {/* "No matches" is an answer; it must not show before both listing and people searches settle. */}
               {results.total === 0 ? (
                 <div className="px-3 py-6 text-center text-sm text-gray-500">
                   {results.awaiting ? 'Searching listings and people…' : 'No matches found'}
@@ -362,7 +363,7 @@ export default function AdminTopbarTools() {
                     <>
                       <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Pages</div>
                       {results.pages.map((p) => { const PI = p.icon; return (
-                        <button key={p.path} onClick={() => go(p.path)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                        <button key={p.path} onClick={() => go(p.path)} className={rowCls('p' + p.path)}>
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal-500/15 text-teal-300"><PI className="h-4 w-4" /></span>
                           <span className="min-w-0"><span className="block truncate text-sm text-white">{p.label}</span><span className="block truncate text-xs text-gray-400">{p.path}</span></span>
                         </button>
@@ -373,7 +374,7 @@ export default function AdminTopbarTools() {
                     <>
                       <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Features ({results.features.length})</div>
                       {results.features.map((f) => (
-                        <button key={f.path + f.label} onClick={() => go(f.path)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                        <button key={f.path + f.label} onClick={() => go(f.path)} className={rowCls('f' + f.path + f.label)}>
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-violet-500/15 text-violet-300"><Compass className="h-4 w-4" /></span>
                           <span className="min-w-0"><span className="block truncate text-sm text-white">{f.label}</span><span className="block truncate text-xs text-gray-400">{f.parent} &middot; {f.path}</span></span>
                         </button>
@@ -384,9 +385,9 @@ export default function AdminTopbarTools() {
                     <>
                       <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Listings ({results.counts.listings})</div>
                       {results.listings.map((l) => (
-                        <button key={l.id} onClick={() => go('/admin/properties?review=' + l.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                        <button key={l.id} onClick={() => go('/admin/properties?review=' + l.id)} className={rowCls('l' + l.id)}>
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal-500/15 text-teal-300"><Building2 className="h-4 w-4" /></span>
-                          <span className="min-w-0 flex-1"><span className="block truncate text-sm text-white">{l.title}</span><span className="block truncate text-xs text-gray-400">{l.locality} &middot; {l.owner}</span></span>
+                          <span className="min-w-0 flex-1"><span className="block truncate text-sm text-white">{l.title}</span><span className="block truncate text-xs text-gray-400">{l.locality} &middot; {l.owner}{l.ownerMobile ? <> &middot; {l.ownerMobile}</> : null}</span></span>
                           <StatusPill status={l.status} />
                         </button>
                       ))}
@@ -396,7 +397,7 @@ export default function AdminTopbarTools() {
                     <>
                       <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">People ({results.counts.users})</div>
                       {results.users.map((u) => { const RI = roleIcon(u.role); return (
-                        <button key={u.id} onClick={() => go(u.role === 'owner' || u.role === 'buyer' ? '/admin/users' : '/admin/team')} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                        <button key={u.id} onClick={() => go(userPath(u))} className={rowCls('u' + u.id)}>
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300"><RI className="h-4 w-4" /></span>
                           <span className="min-w-0 flex-1"><span className="block truncate text-sm text-white">{u.name}</span><span className="block truncate text-xs text-gray-400">{u.role} &middot; {u.mobile}</span></span>
                           {u.verified && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-teal-400" />}
@@ -406,8 +407,6 @@ export default function AdminTopbarTools() {
                   )}
                 </>
               )}
-            {/* Outside the scroll area on purpose: an operator who typed a colleague's name and got a short list has
-               to be able to read that a desk refused without scrolling to it. */}
             </div>
             {results.failed.length > 0 && (
               <div data-testid="palette-partial" className="shrink-0 border-t border-white/10 px-3 py-2.5 text-[11px] leading-relaxed text-amber-200/80">
@@ -424,10 +423,14 @@ export default function AdminTopbarTools() {
       <div className="relative" ref={notifRef}>
         <button onClick={() => setNotifOpen((o) => !o)} className="tap-extend relative grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:text-white" aria-label="Notifications" title={unseen > 0 ? `${unseen} unread` : 'Notifications'}>
           <Bell className="h-4 w-4" />
-          {unseen > 0 && <span data-testid="notif-unread-dot" className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-400" />}
+          {unseen > 0 && (
+            <span data-testid="notif-unread-dot" className="absolute -right-1.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
+              {unseen > 99 ? '99+' : unseen}
+            </span>
+          )}
         </button>
         {notifOpen && (
-          <div data-testid="admin-notifications" className="absolute right-0 z-40 mt-2 w-80 overflow-y-auto rounded-2xl border border-white/10 bg-ink-2 p-2 shadow-2xl" style={{ maxHeight: '70vh' }}>
+          <div data-testid="admin-notifications" className="absolute right-0 z-40 mt-2 w-80 overflow-y-auto rounded-2xl border border-white/10 bg-ink-2 p-2 shadow-2xl max-sm:fixed max-sm:inset-x-3 max-sm:top-14 max-sm:z-[60] max-sm:mt-0 max-sm:w-auto" style={{ maxHeight: '70vh' }}>
             {notif.total === 0 && notif.blind.length === 0 && unread === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-gray-500">All caught up.</div>
             ) : (
@@ -438,12 +441,15 @@ export default function AdminTopbarTools() {
                       <span>For you ({unread})</span>
                       <button onClick={readAll} className="normal-case tracking-normal text-teal-300 hover:text-teal-200">Mark all read</button>
                     </div>
-                    {mine.map((n) => (
-                      <button key={n.id} onClick={() => openMine(n)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
-                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-rose-500/15 text-rose-300"><Bell className="h-4 w-4" /></span>
-                        <span className="min-w-0"><span className="block truncate text-sm text-white">{n.title}</span><span className="block truncate text-xs text-gray-400">{n.desc}</span></span>
-                      </button>
-                    ))}
+                    {mine.map((n) => {
+                      const meta = TYPE_META[n.type] || TYPE_META.system;
+                      return (
+                        <button key={n.id} onClick={() => openMine(n)} data-type={n.type} className={'flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5' + (n.type === 'escalation' ? ' border border-rose-400/30 bg-rose-500/[0.06]' : '')}>
+                          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${meta.bgCls}`}><Icon name={meta.icon} className={`h-4 w-4 ${meta.iconCls}`} /></span>
+                          <span className="min-w-0"><span className="block truncate text-sm text-white">{n.title}</span><span className="block truncate text-xs text-gray-400">{n.desc}</span></span>
+                        </button>
+                      );
+                    })}
                   </>
                 )}
                 {notif.replied.length > 0 && (
@@ -463,7 +469,7 @@ export default function AdminTopbarTools() {
                     {notif.pending.map((l) => (
                       <button key={l.id} onClick={() => go('/admin/properties')} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
                         <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal-500/15 text-teal-300"><Building2 className="h-4 w-4" /></span>
-                        <span className="min-w-0"><span className="block truncate text-sm text-white">{l.title}</span><span className="block truncate text-xs text-gray-400">{l.locality} &middot; {l.owner}</span></span>
+                        <span className="min-w-0"><span className="block truncate text-sm text-white">{l.title}</span><span className="block truncate text-xs text-gray-400">{l.locality} &middot; {l.owner}{l.ownerMobile ? <> &middot; {l.ownerMobile}</> : null}</span></span>
                       </button>
                     ))}
                   </>
@@ -494,6 +500,9 @@ export default function AdminTopbarTools() {
                 )}
               </>
             )}
+            <button onClick={() => go('/admin/notifications')} className="mt-1 flex min-h-[44px] w-full items-center justify-center rounded-xl border-t border-white/10 text-sm font-semibold text-teal-300 hover:bg-white/5">
+              View all notifications
+            </button>
           </div>
         )}
       </div>

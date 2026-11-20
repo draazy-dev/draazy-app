@@ -1,23 +1,4 @@
 #!/usr/bin/env node
-/**
- * rename-brand.mjs — one-shot, guarded rename of the app's brand name.
- *
- * Why this exists: the brand ("Draazy") is hardcoded in ~140 files. When the
- * name is finalized, run this once instead of hand-editing every file.
- *
- * Safety rules (the important part):
- *   - Only the FULL brand tokens are replaced: `Draazy`, `draazy`, and the
- *     domain `draazy.com`. The bare city name `Pune` is NEVER matched, so
- *     real-place references ("areas of Pune") stay intact.
- *   - Replacements run most-specific-first (domain, then Name, then slug) so an
- *     email like hello@draazy.com rewrites cleanly.
- *   - Dry-run by default. Nothing is written unless you pass --apply.
- *   - Generated caches, deps and build output are excluded.
- *
- * Usage:
- *   npm run rename:brand -- --check     # preview counts, writes nothing (default)
- *   npm run rename:brand -- --apply     # perform the rename
- */
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join, extname, relative, dirname } from 'node:path';
@@ -28,9 +9,8 @@ const ROOT = join(__dirname, '..');
 
 const args = process.argv.slice(2);
 const APPLY = args.includes('--apply');
-const CHECK = args.includes('--check') || !APPLY; // default = dry run
+const CHECK = args.includes('--check') || !APPLY;
 
-// --- Load & validate config -------------------------------------------------
 const cfgPath = join(ROOT, 'brand.config.json');
 let cfg;
 try {
@@ -63,19 +43,15 @@ if (newSlug !== newSlug.toLowerCase()) {
   process.exit(1);
 }
 
-// --- What we walk / skip ----------------------------------------------------
-// Include the app source plus a few root files that carry the brand.
 const INCLUDE_ROOTS = ['src', 'index.html', 'package.json', 'README.md'];
 const EXCLUDE_DIRS = new Set(['node_modules', 'dist', 'target', 'test-results', 'playwright-report', '.git', 'graphify-out']);
 const TEXT_EXT = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.json', '.css', '.html', '.md', '.txt', '.svg']);
 
-// Replacements, ordered most-specific first so later, broader tokens can't
-// clobber a match the earlier rule already handled.
 const REPLACEMENTS = [
-  { from: oldDomain, to: newDomain },                                   // draazy.com -> newdomain
-  { from: oldName, to: newName },                                       // Draazy     -> NewName
-  { from: oldName.toUpperCase(), to: newName.toUpperCase() },           // DRAAZY     -> NEWNAME
-  { from: oldSlug, to: newSlug },                                       // draazy     -> newslug
+  { from: oldDomain, to: newDomain },
+  { from: oldName, to: newName },
+  { from: oldName.toUpperCase(), to: newName.toUpperCase() },
+  { from: oldSlug, to: newSlug },
 ];
 
 function walk(path, out) {
@@ -96,7 +72,6 @@ for (const rootEntry of INCLUDE_ROOTS) {
   try {
     walk(p, files);
   } catch {
-    // Missing optional file (e.g. README.md) is fine.
   }
 }
 
@@ -115,7 +90,6 @@ function countAndReplace(text) {
   return { result, total };
 }
 
-// --- Run --------------------------------------------------------------------
 let filesChanged = 0;
 let totalHits = 0;
 const perFile = [];
@@ -131,7 +105,6 @@ for (const file of files) {
   }
 }
 
-// --- Report -----------------------------------------------------------------
 perFile.sort((a, b) => b.total - a.total);
 const mode = APPLY ? 'APPLIED' : 'DRY RUN (no files written)';
 

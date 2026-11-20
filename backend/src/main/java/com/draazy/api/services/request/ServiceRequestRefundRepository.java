@@ -1,6 +1,7 @@
 package com.draazy.api.services.request;
 
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,4 +20,8 @@ public interface ServiceRequestRefundRepository extends JpaRepository<ServiceReq
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from ServiceRequestRefund r where r.serviceRequestId = :requestId and r.status = 'requested'")
     Optional<ServiceRequestRefund> findOpenForUpdate(@Param("requestId") UUID requestId);
+
+    boolean existsByGatewayRefundId(String gatewayRefundId);
+
+    long countByStatusIn(Collection<String> statuses);
 }

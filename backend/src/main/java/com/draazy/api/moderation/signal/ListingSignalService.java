@@ -56,7 +56,7 @@ public class ListingSignalService {
         }
 
         Set<UUID> photoMatches = photoMatches(ids);
-        Set<UUID> conflicts = conflictListings(ids);
+        Set<UUID> conflicts = conflictListings(ids, photoMatches);
         Set<UUID> copiedDescriptions = copiedDescriptions(ids);
         Set<UUID> manySocietyOwners = manySocietyOwners(ownerIds);
         Set<UUID> manyLocalityOwners = manyLocalityOwners(ownerIds);
@@ -93,16 +93,6 @@ public class ListingSignalService {
         return out;
     }
 
-    @Transactional(readOnly = true)
-    public boolean hasHardSignal(UUID propertyId) {
-        Property property = em.find(Property.class, propertyId);
-        if (property == null) {
-            return false;
-        }
-        ListingSignals listingSignals = forProperties(List.of(property)).getOrDefault(propertyId, ListingSignals.NONE);
-        return listingSignals.hardBlock() || listingSignals.conflict();
-    }
-
     private Set<UUID> photoMatches(List<UUID> ids) {
         Query query = em.createNativeQuery("""
                 select mh.property_id, mh.hash, oh.hash
@@ -123,8 +113,8 @@ public class ListingSignalService {
         return matchedByHash(query);
     }
 
-    private Set<UUID> conflictListings(List<UUID> ids) {
-        Set<UUID> out = new HashSet<>();
+    private Set<UUID> conflictListings(List<UUID> ids, Set<UUID> photoMatches) {
+        Set<UUID> out = new HashSet<>(photoMatches);
         Query doorway = em.createNativeQuery("""
                 select distinct mp.id
                 from properties mp
@@ -145,7 +135,6 @@ public class ListingSignalService {
         for (Object row : doorway.getResultList()) {
             out.add((UUID) row);
         }
-        out.addAll(photoMatches(ids));
         return out;
     }
 

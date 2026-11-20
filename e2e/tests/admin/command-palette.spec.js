@@ -1,6 +1,7 @@
 // The admin Ctrl+K palette and the bell, against the live API.
 import { test, expect, ACTORS, STAFF } from '../../fixtures/live.js';
 import { API, authHeaders, uploadedListingPhotos, uniqueMobile, letterTag } from '../../helpers/liveAuth.js';
+import { rejectListingWithFetch } from '../../helpers/moderation.js';
 
 const UNIQUE_PAGE_TERM = 'Referrals';
 
@@ -62,11 +63,7 @@ test.afterEach(async () => {
   if (!created.size) return;
   const headers = await authHeaders(ACTORS.admin);
   for (const id of created) {
-    await api('PATCH', `/properties/${id}/status`, headers, {
-      status: 'rejected',
-      reasonCode: 'other',
-      reason: 'Zztest cleanup \u2014 synthetic command-palette fixture',
-    });
+    await rejectListingWithFetch(id, headers, { reasonCode: 'other', reason: 'Zztest cleanup \u2014 synthetic command-palette fixture' });
   }
   created.clear();
 });
@@ -90,6 +87,25 @@ test('on a phone the search icon reveals the box and the palette answers', async
   await expect(page.getByLabel('Global search')).toBeFocused();
   await search(page, UNIQUE_PAGE_TERM);
   await expect(chip(page, 'All')).toHaveText('All (1)');
+});
+
+test('Enter opens the first result and the arrow keys move the highlight', async ({ page, login }) => {
+  await login.asAdmin();
+  await openAdmin(page);
+  await search(page, UNIQUE_PAGE_TERM);
+  await page.getByLabel('Global search').press('Enter');
+  await expect(page).toHaveURL(/\/admin\/referrals/);
+
+  await openAdmin(page);
+  await search(page, 'Refunds');
+  const highlighted = palette(page).locator('button.bg-white\\/10');
+  await expect(highlighted).toHaveCount(1);
+  const first = await highlighted.innerText();
+  await page.getByLabel('Global search').press('ArrowDown');
+  await expect(highlighted).toHaveCount(1);
+  expect(await highlighted.innerText()).not.toBe(first);
+  await page.getByLabel('Global search').press('ArrowUp');
+  expect(await highlighted.innerText()).toBe(first);
 });
 
 test('Ctrl+K opens the palette, page results navigate, Escape clears the term, and only the four categories are offered', async ({ page, login, consoleErrors }) => {
@@ -248,7 +264,6 @@ test("a manager's staff change reaches the admin's own bell under For you, and o
   expect(consoleErrors).toHaveLength(0);
 });
 
-// The two below came off `admin/command-palette.spec.js` when that file was retired.
 const ALL_CHIPS = ['All', 'Features', 'Listings', 'People'];
 
 // These endpoints cannot search, so filtering here would only filter the current page.

@@ -10,12 +10,10 @@ import lombok.Getter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/** Natural key: a user has exactly one preferences row, and missing rows mean defaults. */
 @Entity
 @Table(name = "notification_preferences")
 @Getter
 public class NotificationPreference {
-
     @Id
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
@@ -44,6 +42,9 @@ public class NotificationPreference {
     @Column(name = "language", nullable = false)
     private String language = "en";
 
+    @Column(name = "marketing_consent_at")
+    private Instant marketingConsentAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -53,16 +54,20 @@ public class NotificationPreference {
     private Instant updatedAt;
 
     protected NotificationPreference() {
-        // JPA
     }
 
     public NotificationPreference(UUID userId) {
         this.userId = userId;
     }
 
-    /** Whole-document write because the endpoint is a {@code PUT}. */
     void replace(boolean email, boolean sms, boolean whatsapp, boolean matchAlerts,
-            boolean quietHoursEnabled, String quietStart, String quietEnd, String language) {
+            boolean quietHoursEnabled, String quietStart, String quietEnd, String language,
+            boolean marketingCalls) {
+        if (!marketingCalls) {
+            this.marketingConsentAt = null;
+        } else if (this.marketingConsentAt == null) {
+            this.marketingConsentAt = Instant.now();
+        }
         this.email = email;
         this.sms = sms;
         this.whatsapp = whatsapp;

@@ -24,10 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/** {@code GET /admin/analytics/funnel}. Other suites leave rows behind, so every count is a delta. */
 @DisplayName("/admin/analytics/funnel — weekly marketplace stages")
 class AdminFunnelAnalyticsTest extends AbstractApiTest {
-
     private static final List<String> STAGES = List.of("posted", "approved", "contacts", "visits", "deals");
 
     @Autowired UserRepository users;
@@ -99,13 +97,10 @@ class AdminFunnelAnalyticsTest extends AbstractApiTest {
 
         UUID live = listing("01", postedAgo, false);
         decide(live, "approved", decidedAgo);
-        // A re-approval and a rejection are not new approvals.
         decide(live, "approved", decidedAgo - 1);
         UUID rejected = listing("02", postedAgo, false);
         decide(rejected, "rejected", decidedAgo);
-        // Archived listings are junk, not supply.
         listing("03", postedAgo, true);
-        // The console's case-file approval audits a verification decision, not a status change.
         verify(listing("04", postedAgo, false), "approve", decidedAgo);
         verify(rejected, "reject", decidedAgo);
         verify(live, "approve", decidedAgo - 2);
@@ -117,7 +112,6 @@ class AdminFunnelAnalyticsTest extends AbstractApiTest {
                 + "values (?, ?, now(), now() - make_interval(days => ?))", live, seeker, visitAgo);
         jdbc.update("insert into deals (property_id, deal, status, closed_at) "
                 + "values (?, 'rent', 'closed', now() - make_interval(days => ?))", live, dealAgo);
-        // An open deal has not converted.
         jdbc.update("insert into deals (property_id, deal, status) values (?, 'rent', 'active')", rejected);
 
         String after = report(90);

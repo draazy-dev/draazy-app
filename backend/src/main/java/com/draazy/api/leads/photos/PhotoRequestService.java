@@ -8,6 +8,7 @@ import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.common.trust.WithdrawnCooldown;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Instant;
 import java.util.List;
@@ -21,11 +22,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// The lightest gate on the platform, deliberately.
-// Contact-gate prerequisites do not apply because photo requests reveal no phone number.
 @Service
 public class PhotoRequestService {
-
     private final PhotoRequestRepository photoRequests;
     private final PropertyRepository properties;
     private final UserRepository users;
@@ -51,18 +49,36 @@ public class PhotoRequestService {
         }
 
         return photoRequests.findByRequesterIdAndPropertyId(requesterId, property.getId())
-                .map(existing -> new PhotoRequestCreateResponse(false, project(existing, property)))
+                .map(existing -> reAsk(existing, property))
                 .orElseGet(() -> {
                     PhotoRequest saved =
                             photoRequests.save(new PhotoRequest(property.getId(), requesterId));
-                    if (owner != null) {
-                        notifier.notify(owner.getId(), "photo.requested",
-                                "Someone wants more photos",
-                                "A buyer asked for more photos of " + property.getTitle() + ".",
-                                "/dashboard#leads");
-                    }
+                    announceToOwner(owner, property);
                     return new PhotoRequestCreateResponse(true, project(saved, property));
                 });
+    }
+
+    private PhotoRequestCreateResponse reAsk(PhotoRequest existing, Property property) {
+        if (!PhotoRequestStatuses.WITHDRAWN.equals(existing.getStatus())) {
+            return new PhotoRequestCreateResponse(false, project(existing, property));
+        }
+        if (WithdrawnCooldown.active(existing.getUpdatedAt(), Instant.now())) {
+            throw WithdrawnCooldown.refusal(existing.getUpdatedAt());
+        }
+        existing.reopen();
+        PhotoRequest reopened = photoRequests.saveAndFlush(existing);
+        photoRequests.restartClock(reopened.getId());
+        announceToOwner(property.getOwner(), property);
+        return new PhotoRequestCreateResponse(true, project(reopened, property));
+    }
+
+    private void announceToOwner(User owner, Property property) {
+        if (owner != null) {
+            notifier.notify(owner.getId(), "photo.requested",
+                    "Someone wants more photos",
+                    "A buyer asked for more photos of " + property.getTitle() + ".",
+                    Notifier.REQUEST_INBOX);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -72,7 +88,8 @@ public class PhotoRequestService {
             return Page.empty(pageable);
         }
         Page<PhotoRequest> rows =
-                photoRequests.findByPropertyIdInOrderByCreatedAtDesc(ownedPropertyIds, pageable);
+                photoRequests.findByPropertyIdInAndStatusNotOrderByCreatedAtDesc(
+                        ownedPropertyIds, PhotoRequestStatuses.WITHDRAWN, pageable);
         return rows.map(projector(rows.getContent()));
     }
 
@@ -82,7 +99,7 @@ public class PhotoRequestService {
             throw new BadRequestException("decision must be one of: %s, %s."
                     .formatted(PhotoRequestStatuses.RESOLVED, PhotoRequestStatuses.DECLINED));
         }
-        PhotoRequest row = photoRequests.findById(requestId)
+        PhotoRequest row = photoRequests.lockById(requestId)
                 .orElseThrow(() -> NotFoundException.of("Photo request"));
         Property property = properties.findById(row.getPropertyId())
                 .orElseThrow(() -> NotFoundException.of("Photo request"));
@@ -94,7 +111,7 @@ public class PhotoRequestService {
         if (decision.equals(before)) {
             return project(row, property);
         }
-        if (PhotoRequestStatuses.isTerminal(before)) {
+        if (!PhotoRequestStatuses.PENDING.equals(before)) {
             return project(row, property);
         }
         row.decide(decision, Instant.now());
@@ -103,8 +120,6 @@ public class PhotoRequestService {
         return answer;
     }
 
-    // Photo decisions are visible on the listing, so both outcomes are announced.
-    // Contact declines stay silent because a terminal no is not actionable.
     private void announce(UUID requesterId, String decision, PhotoRequestResponse answer) {
         String link = "/property/"
                 + (answer.propertySlug() != null ? answer.propertySlug() : answer.propertyId());
@@ -139,7 +154,6 @@ public class PhotoRequestService {
                 propertiesById.get(row.getPropertyId()), usersById.get(row.getRequesterId()));
     }
 
-    /** Resolve a path token that may be a UUID or a slug — the same either/or the detail endpoint accepts. */
     private Property resolve(String idOrSlug) {
         return Ids.parseUuid(idOrSlug)
                 .flatMap(properties::findById)

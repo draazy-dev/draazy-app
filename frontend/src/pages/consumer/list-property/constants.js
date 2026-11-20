@@ -17,7 +17,6 @@ export const ageOptions = [
   { value: '15+', label: '15+ years' },
 ];
 export const ownershipOptions = ['Freehold', 'Leasehold', 'Co-operative Society', 'Power of Attorney'];
-/* Commercial branch only — a flat is never held this way. */
 export const commercialOwnershipOptions = [...ownershipOptions, 'MIDC / Industrial Lease'];
 export const floorOptions = ['Ground', ...Array.from({ length: 50 }, (_, i) => String(i + 1))];
 export const totalFloorsOptions = Array.from({ length: 50 }, (_, i) => String(i + 1));
@@ -45,8 +44,6 @@ export const commercialNoticeOptions = [
   { value: '3', label: '3 months' }, { value: '6', label: '6 months' },
 ];
 
-/* A plot or farm is let by the year, never on the 11-month tenancy the Rent Act shapes a flat's
- * lease around. */
 export const landAgreementOptions = [
   { value: '12', label: '1 year' }, { value: '36', label: '3 years' },
   { value: '60', label: '5 years' }, { value: '108', label: '9 years' },
@@ -66,8 +63,6 @@ export const LEASE_DEFAULTS = {
   land: { agreementDuration: '12', lockIn: '0', noticePeriod: '1' },
 };
 
-/* Shared with the desk console so the same owner is never quoted different norms for the same
- * property. */
 export const DEPOSIT_MONTHS = {
   residential: [2, 3], commercial: [3, 4], land: [6, 12],
 };
@@ -103,7 +98,6 @@ export const withInFlatAsFurniture = (listing) => {
     furniture: [...new Set([...(listing.furniture || []), ...moved.map((a) => LEGACY_IN_FLAT_AMENITIES[a])])],
   };
 };
-export const lifestyleTags = ['Non-smoker', 'Early riser', 'Night owl', 'Pet-friendly', 'Working professional', 'Student', 'Fitness', 'Vegetarian'];
 
 const lightBillDoc = (deal) => ({
   key: 'Electricity Bill',
@@ -171,22 +165,17 @@ export const PROPERTY_TYPES = [
   { value: 'farmland', label: 'Farm Land' },
 ];
 
-/* Co-working is absent because it is transacted per seat per month and this wizard collects one
- * lump rent. */
 export const COMMERCIAL_SUBTYPES = [
   { value: 'office', label: 'Office Space' },
+  { value: 'coworking', label: 'Co-working Space' },
   { value: 'shop', label: 'Shop / Showroom' },
   { value: 'retail', label: 'Retail / Mall Unit' },
   { value: 'warehouse', label: 'Warehouse / Godown' },
   { value: 'industrial', label: 'Industrial / Factory' },
 ];
 
-const RETIRED_COMMERCIAL_SUBTYPES = [{ value: 'coworking', label: 'Co-working Space' }];
-export const commercialSubtypeOptions = (current) => {
-  const retired = RETIRED_COMMERCIAL_SUBTYPES.find((s) => s.value === current);
-  return retired ? [...COMMERCIAL_SUBTYPES, retired] : COMMERCIAL_SUBTYPES;
-};
-export const commercialLabelOf = (value) => commercialSubtypeOptions(value).find((s) => s.value === value)?.label || '';
+export const commercialSubtypeOptions = () => COMMERCIAL_SUBTYPES;
+export const commercialLabelOf = (value) => COMMERCIAL_SUBTYPES.find((s) => s.value === value)?.label || '';
 
 export const TYPE_CONFIG = {
   flat: { group: 'residential', house: false },
@@ -201,10 +190,9 @@ export const groupOf = (t) => TYPE_CONFIG[t]?.group || 'residential';
 export const isResidentialType = (t) => groupOf(t) === 'residential';
 export const isCommercialType = (t) => groupOf(t) === 'commercial';
 export const isLandType = (t) => groupOf(t) === 'land';
+export const copyContextOf = (t) => (isLandType(t) ? 'land' : isCommercialType(t) ? 'space' : undefined);
 export const isHouseType = (t) => !!TYPE_CONFIG[t]?.house;
 
-/* The flatmate wizard's home-type pills, as one `[propertyType, label]` list because the two are halves of a single
-   answer and the server stores both. */
 export const HOME_TYPE_PILLS = [
   ['flat', 'Flat'],
   ['independent', 'Independent House'],
@@ -215,21 +203,14 @@ export const homeTypeLabelFor = (t) => HOME_TYPE_PILLS.find(([pt]) => pt === t)?
 
 export const leaseKindOf = (t) => (isCommercialType(t) ? 'commercial' : isLandType(t) ? 'land' : 'residential');
 
-export const NONRES = ['commercial', 'openplot', 'farmland', 'plot'];
-
 export const shellOptions = [['bareShell', 'Bare Shell'], ['warmShell', 'Warm Shell'], ['furnished', 'Furnished']];
 export const washroomOptions = ['1', '2', '3', '4+'];
-/* The full set the server's `ListingFormDetails` accepts. */
-export const suitableForTags = ['Office', 'Retail', 'Restaurant', 'Clinic', 'Showroom', 'Warehouse', 'Bank / ATM', 'Gym / Studio'];
-/* "Residential" alone cannot distinguish an R1 plot from an R2 one — a difference of FSI and
- * permitted height, which is why a buyer asks. */
 export const plotZoneOptions = [
   'Residential (R1)', 'Residential (R2)', 'Commercial (C-1)', 'Industrial (I-1)',
   'Public / Semi-public', 'Mixed-Use', 'Agriculture Zone', 'Green Zone / No-Development Zone',
 ];
 export const openSidesOptions = ['1', '2', '3', '4'];
 
-/* `plotZone` is the owner's label; `landUse` is the column the Land-use filter reads. */
 const LAND_USE_BY_ZONE = {
   'Residential (R1)': 'residential', 'Residential (R2)': 'residential',
   'Commercial (C-1)': 'commercial', 'Industrial (I-1)': 'industrial',
@@ -253,8 +234,6 @@ export const defaultAreaUnitFor = (propertyType) => (
   TYPE_CONFIG[propertyType]?.land === 'farm' ? 'guntha' : 'sqft'
 );
 
-/* Bounds per unit, because the number means nothing without one: a floor of 1 on Acre refuses
- * most farm inventory and a ceiling of 1,000,000 on Acre accepts a district. */
 const NON_LAND_AREA_RANGE = [1, 1000000];
 const AREA_RANGE_BY_UNIT = {
   sqft: [100, 1000000],
@@ -276,8 +255,6 @@ export const naStatusOptions = [
   { value: 'sanctioned', label: 'NA order sanctioned' },
 ];
 
-/* Every parcel has a 7/12; what decides whether a buyer needs a title search is the Other
- * Rights column. */
 export const otherRightsOptions = [
   { value: 'clear', label: 'Clear — no entries in Other Rights' },
   { value: 'mortgage', label: 'Mortgage / bank charge entered' },
@@ -287,7 +264,6 @@ export const otherRightsOptions = [
   { value: 'unknown', label: 'Not checked yet' },
 ];
 
-/* A buyer who discovers this at the sub-registrar has lost the deal and the deposit. */
 export const buyerEligibilityOptions = [
   { value: 'agriculturist', label: 'Agriculturist buyer only' },
   { value: 'permission', label: 'Non-agriculturist buyer — needs s.63(1A) Collector permission' },
@@ -298,15 +274,11 @@ export const buyerEligibilityOptions = [
 export const commercialProfileOf = (subtype) => {
   if (subtype === 'shop' || subtype === 'retail') return 'retail';
   if (subtype === 'warehouse' || subtype === 'industrial') return 'industrial';
-  /* Not-yet-picked is its own answer: every lookup below is keyed on the profile, so defaulting to 'workspace' offers
-     a warehouse owner office fixtures before they have chosen anything. */
   return subtype ? 'workspace' : null;
 };
 
 const NO_OPTIONS = [];
 
-/* Scoped by the same three profiles as commercialProfileOf so a warehouse never offers
- * "Reception". */
 export const COMMERCIAL_FIXTURES = {
   workspace: ['Server / UPS Room', 'Meeting Cabins', 'Reception Area', 'Conference Room', 'False Ceiling', 'Central AC'],
   retail: ['Main-Road Frontage', 'Display Windows', 'Rolling Shutter', 'Signage Space', 'Mezzanine Floor', 'Customer Washroom'],
@@ -315,8 +287,6 @@ export const COMMERCIAL_FIXTURES = {
 
 export const fixturesFor = (subtype) => COMMERCIAL_FIXTURES[commercialProfileOf(subtype)] ?? NO_OPTIONS;
 
-/* The businesses each profile can actually house, drawn from `suitableForTags` so every offered
- * value stays inside the server's own set. */
 const COMMERCIAL_SUITABLE_FOR = {
   workspace: ['Office', 'Clinic', 'Bank / ATM'],
   retail: ['Retail', 'Showroom', 'Restaurant', 'Clinic', 'Gym / Studio', 'Bank / ATM'],
@@ -324,7 +294,6 @@ const COMMERCIAL_SUITABLE_FOR = {
 };
 export const suitableForFor = (subtype) => COMMERCIAL_SUITABLE_FOR[commercialProfileOf(subtype)] ?? NO_OPTIONS;
 
-/* Physical specs scoped per use-profile so a shop is never asked its floor load. */
 const COMMERCIAL_SPECS = {
   workspace: [{ key: 'seatCount', unit: '', ph: 'eg40', max: 4 }],
   retail: [{ key: 'frontage', unit: 'ft', ph: 'eg30', max: 4 }],
@@ -336,20 +305,14 @@ const COMMERCIAL_SPECS = {
   ],
 };
 export const commercialSpecsFor = (subtype) => COMMERCIAL_SPECS[commercialProfileOf(subtype)] ?? NO_OPTIONS;
-/* Every spec key across every profile: what a type switch has to clear, and what the write
- * spreads onto the wire. */
 export const COMMERCIAL_SPEC_KEYS = Object.values(COMMERCIAL_SPECS).flat().map((s) => s.key);
 
 export const fitOutOptions = [
   { value: '0', label: 'None' }, { value: '1', label: '1 month' }, { value: '2', label: '2 months' },
   { value: '3', label: '3 months' }, { value: '6', label: '6 months' },
 ];
-/* A leased asset is bought for its yield, so the buyer needs the rent in place and the date the
- * lease runs to; a vacant one is bought for its use. */
 export const tenancyStatusOptions = [['vacant', 'Vacant'], ['leased', 'Leased / Tenanted']];
 
-/* Resolve a stored subtype value OR its display label (seed listings persist only the label in
- * `type`) to a use-profile — with a keyword fallback for legacy strings. */
 export const commercialProfileFromType = (valueOrLabel) => {
   if (!valueOrLabel) return 'workspace';
   const byValue = COMMERCIAL_SUBTYPES.find((s) => s.value === valueOrLabel);
@@ -362,13 +325,13 @@ export const commercialProfileFromType = (valueOrLabel) => {
   return 'workspace';
 };
 
-export const commercialSaleDocs = [
+const commercialSaleDocs = [
   ...badgeDocsFor('buy'),
   { key: 'Occupancy Certificate', label: 'Occupancy / Completion Certificate', cta: 'Upload OC' },
   { key: 'Sanctioned Building Plan', label: 'Sanctioned Building Plan', cta: 'Upload Approved Plan' },
   { key: 'Fire NOC', label: 'Fire / Trade NOC', cta: 'Upload NOC', hint: 'Required for most commercial usage — reassures serious tenants and buyers.' },
 ];
-export const commercialRentDocs = [
+const commercialRentDocs = [
   ...badgeDocsFor('rent'),
   { key: 'Fire NOC', label: 'Fire / Trade NOC', cta: 'Upload NOC', hint: 'Supporting compliance records for business tenants.' },
 ];
@@ -376,18 +339,16 @@ const commercialProfileDocs = {
   workspace: { buy: [], rent: [] },
   retail: {
     buy: [{ key: 'Shop Act License', label: 'Shop Act (Gumasta) License', cta: 'Upload Shop Act License', hint: 'Maharashtra trade licence for a retail establishment.' }],
-    rent: [{ key: 'Shop Act License', label: 'Shop Act License (optional)', cta: 'Upload Shop Act License', hint: 'Speeds up a retail tenant’s own licensing.' }],
+    rent: [{ key: 'Shop Act License', label: 'Shop Act License', cta: 'Upload Shop Act License', hint: 'Speeds up a retail tenant’s own licensing.' }],
   },
   industrial: {
     buy: [
       { key: 'MPCB Consent', label: 'MPCB (Pollution) Consent', cta: 'Upload MPCB Consent', hint: 'Consent to Operate from the Maharashtra Pollution Control Board.' },
       { key: 'Factory License', label: 'Factory License', cta: 'Upload Factory License', hint: 'Required to run a manufacturing / industrial unit.' },
     ],
-    rent: [{ key: 'MPCB Consent', label: 'MPCB Consent (optional)', cta: 'Upload MPCB Consent', hint: 'Reassures manufacturing tenants the site is compliant.' }],
+    rent: [{ key: 'MPCB Consent', label: 'MPCB Consent', cta: 'Upload MPCB Consent', hint: 'Reassures manufacturing tenants the site is compliant.' }],
   },
 };
-/* The NA Order slot is on all four land sets because the conversion question is asked of both
- * branches in both deals. */
 const naOrderDoc = { key: 'NA Order', label: 'NA Order / Zone Certificate', cta: 'Upload NA Order', hint: 'Confirms the plot is sanctioned for non-agricultural use.' };
 export const plotSaleDocs = [
   ...badgeDocsFor('buy', 'openplot'),
@@ -406,7 +367,7 @@ export const farmSaleDocs = [
 ];
 export const farmRentDocs = [
   ...badgeDocsFor('rent', 'farmland'),
-  { key: 'Land Revenue Receipt', label: 'Land Revenue / Tax Receipt (optional)', cta: 'Upload Revenue Receipt' },
+  { key: 'Land Revenue Receipt', label: 'Land Revenue / Tax Receipt', cta: 'Upload Revenue Receipt' },
   naOrderDoc,
 ];
 
@@ -421,8 +382,6 @@ export const docsFor = (deal, propertyType, commercialType) => {
   return rentDocs;
 };
 
-/* Not merely a label: tagging a photo with it is how an owner states "this is my unit's plan",
- * and `submit.js` reads it into `floorPlan`. */
 export const FLOOR_PLAN_CATEGORY = 'Floor Plan';
 const RESIDENTIAL_PHOTO_CATS = ['Living Room', 'Kitchen', 'Bedroom', 'Bathroom', 'Balcony', 'Exterior / Building', FLOOR_PLAN_CATEGORY, 'Other'];
 const COMMERCIAL_PHOTO_CATS = {
@@ -437,8 +396,6 @@ const COMMERCIAL_KEY_CATS = {
 };
 const PLOT_PHOTO_CATS = ['Front / Entrance', 'Road / Access', 'Corner / Boundary', 'Surroundings', 'Layout Plan', 'Other'];
 const FARM_PHOTO_CATS = ['Front / Entrance', 'Road / Access', 'Water Source', 'Boundary', 'Surroundings', 'Layout Plan', 'Other'];
-/* "Surroundings" is excluded: it is the one land category that can be shot without standing on the land, and a parcel
-   is bought on where its edges run, not on a photograph of the horizon. */
 const PLOT_KEY_CATS = ['Corner / Boundary', 'Layout Plan', 'Road / Access'];
 const FARM_KEY_CATS = ['Boundary', 'Layout Plan', 'Road / Access'];
 
@@ -453,7 +410,7 @@ export const keyPhotoCategoriesFor = (propertyType, commercialType) => {
   return ['Living Room', 'Kitchen', 'Bedroom', 'Bathroom'];
 };
 
-export const MIN_PUBLISH_PHOTOS = 1;
+export const MIN_PUBLISH_PHOTOS = 3;
 export const MIN_PUBLISH_KEY_CATEGORIES = 2;
 export const STRONG_PHOTO_COUNT = 5;
 

@@ -1,5 +1,3 @@
-/* Titles and slugs without the Markdown bodies, so home and property pages can link to posts
-   at a few hundred bytes. */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseFrontmatter } from './vite-plugin-help-content.mjs';

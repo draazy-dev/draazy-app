@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { focusFlatmateMap, mintLocality, uniqueLocalityName } from '../../../helpers/locality.js';
 
-/* Map view gates on a "Focus your map" picker; a ?near=lat,lng&nearr=km deep link self-focuses it and
+/* Map view gates on a "Focus your map" locality search; a ?near=lat,lng&nearr=km deep link self-focuses it and
    narrows posts to the radius deterministically, with no live Places call. */
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
@@ -11,20 +12,27 @@ test('map view opens on the focus gate, picking an area unlocks the bubbles, and
 
   await test.step('map view opens on the focus gate, not the bubble map', async () => {
     await expect(page.getByRole('heading', { name: /Focus your map/i })).toBeVisible();
-    await expect(page.locator('.map-pin')).toHaveCount(0);
+    await expect(page.locator('[data-fm-pin]')).toHaveCount(0);
   });
 
-  await test.step('picking a focus area unlocks the bubble map', async () => {
-    await page.locator('[data-sf-area]').first().waitFor({ timeout: 20000 });
-    await page.locator('[data-sf-area]').first().click();
-    await expect(page.locator('.map-pin').first()).toBeVisible({ timeout: 20000 });
+  await test.step('searching a focus area and showing the map unlocks the bubbles', async () => {
+    const show = page.getByRole('button', { name: 'Show Map view' });
+    await expect(show, 'nothing picked yet').toBeDisabled();
+    await focusFlatmateMap(page, ['Baner']);
+    await expect(page.locator('[data-fm-pin]').first()).toBeVisible({ timeout: 20000 });
   });
 
   await test.step('switching tabs re-gates the map', async () => {
     // Still in map view, but a new tab starts unfocused — the gate returns.
-    await page.getByRole('button', { name: /Team up/i }).first().click();
+    await page.locator('button[data-tab="people"]').click();
     await expect(page.getByRole('heading', { name: /Focus your map/i })).toBeVisible();
-    await expect(page.locator('.map-pin')).toHaveCount(0);
+    await expect(page.locator('[data-fm-pin]')).toHaveCount(0);
+  });
+
+  await test.step('a picked area chip shows the locality name alone, with no post count beside it', async () => {
+    await page.getByPlaceholder('Search any Pune locality').fill('Baner');
+    await page.getByRole('option', { name: /^Baner/ }).first().click({ timeout: 15000 });
+    await expect(page.locator('[data-sf-area="Baner"]')).toHaveText('Baner');
   });
 });
 test('a Near-a-Place radius deep link narrows the list to nearby posts', async ({ page }) => {
@@ -45,6 +53,26 @@ test('a proximity deep link self-focuses the map (no gate)', async ({ page }) =>
   await page.goto(`${BASE}/flatmates?view=flatmates&near=18.559,73.776&nearlabel=Baner&nearr=5`);
   await page.getByRole('button', { name: 'Map' }).click();
   // Near is set, so the map opens straight to bubbles — no focus gate.
-  await expect(page.locator('.map-pin').first()).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('[data-fm-pin]').first()).toBeVisible({ timeout: 20000 });
   await expect(page.getByRole('heading', { name: /Focus your map/i })).toHaveCount(0);
+});
+
+test('a map focused on an area with no posts offers to change the areas', async ({ page }) => {
+  const { name } = await mintLocality(uniqueLocalityName('Zzempty Flat'));
+  await page.goto(`${BASE}/flatmates?view=flatmates`);
+  await page.getByRole('button', { name: 'Map' }).click();
+  await focusFlatmateMap(page, [name]);
+  await expect(page.getByText('No flatmates in the focused areas')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Change areas' }).click();
+  await expect(page.getByRole('heading', { name: /Focus your map/i })).toBeVisible();
+  await expect(page.getByPlaceholder('Search any Pune locality')).toBeVisible();
+});
+
+test('a near-a-place map with nothing nearby offers to change the place', async ({ page }) => {
+  await page.goto(`${BASE}/flatmates?view=flatmates&near=19.9,75.3&nearlabel=Nowhere&nearr=1`);
+  await page.getByRole('button', { name: 'Map' }).click();
+  await expect(page.getByText('No flatmates near Nowhere')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Change place' }).click();
+  await expect(page.getByRole('heading', { name: /Focus your map/i })).toBeVisible();
+  await expect(page).not.toHaveURL(/[?&]near=/);
 });

@@ -129,6 +129,8 @@ test.describe('Notification types - live API', () => {
       offers.push(made.body);
     }
     expect(await rowsOf(owner, 'offer.received', buyers), 'one offer.received per offer').toHaveLength(3);
+    expect((await rowsOf(owner, 'offer.received', buyers)).map((r) => r.link), 'the owner answers from the requests inbox')
+      .toEqual(Array(3).fill('/dashboard?tab=leads&box=received'));
 
     const [accepted, declined, countered] = offers;
     const answer = (offer, body) => api('POST', `/offers/${offer.id}/respond`, owner.headers, body);
@@ -146,6 +148,7 @@ test.describe('Notification types - live API', () => {
     const back = await api('POST', `/offers/${countered.id}/respond`, buyers[2].headers, { action: 'counter', counterAmount: 25000 });
     expect(back.status, 'the buyer counters back').toBe(200);
     expect(await rowsOf(owner, 'offer.countered', buyers), 'the owner is told of the buyer counter').toHaveLength(1);
+    expect((await rowsOf(owner, 'offer.countered', buyers))[0].link).toBe('/dashboard?tab=leads&box=received');
     expect(await rowsOf(buyers[2], 'offer.countered', [owner]), 'the buyer is not re-told of their own counter').toHaveLength(1);
   });
 
@@ -199,14 +202,18 @@ test.describe('Notification types - live API', () => {
     await page.goto('/notifications');
     await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible();
 
+    const titles = {};
     for (const type of ['contact.received', 'photo.requested', 'offer.received', 'visit.requested']) {
       const [row] = await rowsOf(owner, type, [buyer]);
       expect(row, `${type} reached the owner`).toBeTruthy();
+      titles[type] = row.title;
     }
     await expect(page.locator('.notif', { hasText: 'New visit request' })).toBeVisible();
     await expect(page.locator('.notif', { hasText: 'New offer on' })).toBeVisible();
-    // A contact request and a photo request are both enquiries on one link, so the inbox folds them into one row.
-    await expect(page.locator('.notif', { hasText: '2 new enquiries' })).toBeVisible();
+    // Contact and photo requests share the request-inbox link, but each keeps its own row.
+    await expect(page.locator('.notif', { hasText: titles['contact.received'] })).toBeVisible();
+    await expect(page.locator('.notif', { hasText: titles['photo.requested'] })).toBeVisible();
+    await expect(page.locator('.notif', { hasText: '2 new enquiries' })).toHaveCount(0);
     expect(warnings, 'a server type missing from notificationMapper renders as a grey system row').toEqual([]);
   });
 });

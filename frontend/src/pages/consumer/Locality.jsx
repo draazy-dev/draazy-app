@@ -4,10 +4,10 @@ import { Trans, useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import Byline from '../../components/Byline.jsx';
 import { useScrollReveal } from '../../lib/useScrollReveal.js';
-import { useSignInGate } from '../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../lib/useSignInGate.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
-import { createEntityReview, getEntityReviewSummary, listEntityReviews } from '../../services/reviewService.js';
+import { createEntityReview, deleteReview, getEntityReviewSummary, listEntityReviews, reviewRefusal, updateReview } from '../../services/reviewService.js';
 import { useSavedSearchCreate } from '../../context/SavedSearchContext.jsx';
 import { getLocality } from '../../services/localityService.js';
 import { listSocietiesPage } from '../../services/societyService.js';
@@ -51,7 +51,6 @@ export default function Locality() {
   const loc = status === 'ready' ? load.data : null;
   const guide = guides.find((g) => g.slug === slug);
 
-  // A written guide is real content even before the area has listings, so it lifts the noindex.
   const noindex = !guide && (status === 'missing' || (!!loc && !loc.indexable));
   useEffect(() => {
     if (!noindex) return undefined;
@@ -82,16 +81,21 @@ export default function Locality() {
   }, [loc]);
 
   const [reviews, setReviews] = useState([]);
-  /* `'error'` keeps a failed read from rendering as "no reviews yet", which would say something false. */
   const [summary, setSummary] = useState(null);
   const [revText, setRevText] = useState('');
   const [pick, setPick] = useState(5);
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
   const locSlug = loc?.slug;
   useEffect(() => {
     if (!locSlug) return undefined;
     let alive = true;
     setReviews([]);
     setSummary(null);
+    setEditing(false);
+    setBusy(false);
+    setRevText('');
+    setPick(5);
     listEntityReviews('locality', locSlug)
       .then((res) => { if (alive) setReviews(res.items); })
       .catch(() => { if (alive) setReviews([]); });
@@ -103,27 +107,40 @@ export default function Locality() {
 
   const postReview = (e) => {
     e.preventDefault();
-    // `signInPath` reads `window.location` at call time, so capture it before any async hop.
-    const back = window.location.pathname + window.location.search;
-    if (!isIn) { sendToSignIn('review', back); return; }
-    createEntityReview('locality', locSlug, { rating: pick, text: revText.trim() })
+    const again = replay(e);
+    if (!isIn) { sendToSignIn('review', undefined, again); return; }
+    const review = { rating: pick, text: revText.trim() };
+    setBusy(true);
+    (editing ? updateReview(myReview.id, review) : createEntityReview('locality', locSlug, review))
       .then((saved) => {
-        if (saved === 'login') { sendToSignIn('review', back); return null; }
-        return Promise.all([listEntityReviews('locality', locSlug), getEntityReviewSummary('locality', locSlug)]);
+        if (saved === 'login') { sendToSignIn('review', undefined, again); return; }
+        return reloadReviews().then(() => { resetComposer(); toast(t(editing ? 'common.reviewUpdated' : 'locality.reviewThanks')); });
       })
-      .then((res) => {
-        if (!res) return;
-        setReviews(res[0].items);
-        setSummary(res[1]);
-        setRevText(''); setPick(5); toast(t('locality.reviewThanks'));
-      })
-      .catch(() => toast(t('locality.reviewFailed'), 'error'));
+      .catch((err) => toast(reviewRefusal(err, t) || t('locality.reviewFailed'), 'error'))
+      .finally(() => setBusy(false));
+  };
+
+  const myReview = reviews.find((r) => r.mine);
+  const reloadReviews = () => Promise.all([listEntityReviews('locality', locSlug), getEntityReviewSummary('locality', locSlug)])
+    .then(([list, sum]) => { setReviews(list.items); setSummary(sum); });
+  const resetComposer = () => { setRevText(''); setPick(5); setEditing(false); };
+  const editMine = () => { setPick(myReview.rating); setRevText(myReview.text); setEditing(true); };
+  const deleteMine = () => {
+    if (!window.confirm(t('common.deleteReviewConfirm'))) return;
+    setBusy(true);
+    deleteReview(myReview.id)
+      .then(() => reloadReviews().then(() => { resetComposer(); toast(t('common.reviewDeleted')); }))
+      .catch(() => toast(t('common.reviewDeleteFailed'), 'error'))
+      .finally(() => setBusy(false));
   };
 
   const setLocalityAlert = () => {
-    if (!isIn) { sendToSignIn('alerts'); return; }
-    createSavedSearch(buildAlertRecord({ deal: 'rent', localities: [locSlug] }, { [locSlug]: name }));
-    toast(t('locality.alertOn', { name }));
+    const createAlert = () => {
+      createSavedSearch(buildAlertRecord({ deal: 'rent', localities: [locSlug] }, { [locSlug]: name }));
+      toast(t('locality.alertOn', { name }));
+    };
+    if (!isIn) { sendToSignIn('alerts', undefined, createAlert); return; }
+    createAlert();
   };
 
   if (!loc && !guide) {
@@ -136,7 +153,7 @@ export default function Locality() {
             <div className="glass-card rounded-2xl p-6 text-center mt-10" data-testid="locality-unavailable">
               <p className="text-white font-semibold">{status === 'missing' ? t('locality.notFound') : t('locality.loadFailed')}</p>
               <div className="flex justify-center gap-3 mt-4">
-                {status === 'error' ? <button type="button" onClick={() => setAttempt((n) => n + 1)} className="px-5 py-3 rounded-xl text-gray-200 text-sm font-semibold border border-white/10 hover:bg-white/5">{t('locality.retry')}</button> : null}
+                {status === 'error' ? <button type="button" onClick={() => setAttempt((n) => n + 1)} className="h-btn inline-flex items-center justify-center px-5 rounded-xl text-gray-200 text-sm font-semibold border border-white/10 hover:bg-white/5">{t('locality.retry')}</button> : null}
                 <Link to="/listings" className="btn-teal px-5 py-3 rounded-xl text-white text-sm font-semibold">{t('locality.browseAll')}</Link>
               </div>
             </div>
@@ -178,7 +195,7 @@ export default function Locality() {
 
           {loc ? (
             <>
-              <div className="reveal"><InventoryBar inv={{ count: loc.liveListings, from: loc.fromPrice }} activeName={name} slug={loc.slug} /></div>
+              <div className="reveal"><InventoryBar loc={loc} activeName={name} /></div>
               {stats.length ? (
                 <div className="grid grid-cols-2 gap-3 sm:gap-4" data-testid="locality-stats">
                   {stats.map((s) => (
@@ -210,7 +227,7 @@ export default function Locality() {
             <>
               <MapCard key={loc.slug} slug={loc.slug} activeName={name} activeCoords={loc.lat != null && loc.lng != null ? [loc.lat, loc.lng] : null} />
               <SocietiesBlock localSocieties={societies} activeName={name} activeSlug={loc.slug} />
-              <ReviewsBlock activeName={name} locReviews={reviews} summary={summary === 'error' ? null : summary} summaryFailed={summary === 'error'} onSubmit={postReview} revText={revText} setRevText={setRevText} pick={pick} setPick={setPick} />
+              <ReviewsBlock activeName={name} locReviews={reviews} summary={summary === 'error' ? null : summary} summaryFailed={summary === 'error'} onSubmit={postReview} revText={revText} setRevText={setRevText} pick={pick} setPick={setPick} editing={editing} busy={busy} onEdit={editMine} onDelete={deleteMine} onCancel={resetComposer} />
             </>
           )}
 

@@ -1,25 +1,26 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router';
+import { useSearchParams, useNavigate, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useScrollReveal } from '../../../../lib/useScrollReveal.js';
-import { useSignInGate } from '../../../../lib/useSignInGate.js';
+import { useLatest, useSignInGate } from '../../../../lib/useSignInGate.js';
 import { useAuth } from '../../../../context/AuthContext.jsx';
 import { usePricing } from '../../../../context/PricingContext.jsx';
 import { useToast } from '../../../../context/ToastContext.jsx';
 import { inviteRouteFor, isActive } from '../../../../lib/serviceRequestStatus.js';
 import { listDocuments, uploadDocument } from '../../../../services/documentService.js';
+import { REVISIT_READ } from '../../../../services/http.js';
 import { useFormDraft } from '../../../../lib/hooks.js';
-import { OWNER_DOCS, OWNER_VAULT_CAT, LAST_PUBLIC_STEP, MAX_LICENSORS, MAX_TENANTS, DECLARATION_VERSION } from './constants.js';
-import { digits, num, rentForTerm, emptyTenant, emptyProp, emptyOwner, emptyCoOwner, emptyInvite, emptyTerms, emptyWit, DETAILS_MAX_CHARS, detailsChars, largestFreeTextField, redactIdentityNumbers, hasIdentityNumbers, identityReminderFields, missingIdentityReminderFields, identityParties, fillBlanks, namesOtherFlat, filingKey, listingAnswers, readSavedKyc } from './helpers.js';
+import { OWNER_DOCS, OWNER_VAULT_CAT, LAST_PUBLIC_STEP, MAX_LICENSORS, MAX_TENANTS, DECLARATION_VERSION, REVIEW_STEP } from './constants.js';
+import { digits, num, rentForTerm, emptyTenant, emptyProp, emptyOwner, emptyCoOwner, emptyInvite, emptyTerms, DETAILS_MAX_CHARS, detailsChars, largestFreeTextField, redactIdentityNumbers, hasIdentityNumbers, identityReminderFields, missingIdentityReminderFields, identityParties, fillBlanks, namesOtherFlat, filingKey, listingAnswers, readSavedKyc } from './helpers.js';
 import { docReady, stepErrors as formStepErrors, startDateBounds } from './validation.js';
-import { collectDocs as collectFormDocs, draftDocRefs, removeIndexedDocs, slotForCategory } from './documents.js';
+import { collectDocs as collectFormDocs, draftDocRefs, filedDocSlots, removeIndexedDocs } from './documents.js';
 import { useRaFurniture } from './useRaFurniture.js';
 import { useRaPayment } from './useRaPayment.js';
 import { useEntitlements } from '../../property/useEntitlements.js';
 import { getDealFees } from '../../../../services/feesService.js';
 import { leaveLicenceStamp } from '../../../../lib/toolCalc.js';
 import { myListing, myListings } from '../../../../services/propertyService.js';
-import { rentAgreementRenewal } from '../../../../services/rentService.js';
+import { rentAgreementRenewal, rentAgreementHomeRenewal } from '../../../../services/rentService.js';
 import {
   addServiceRequestDoc,
   addServiceRequestDocFromVault,
@@ -33,17 +34,32 @@ import {
   listServiceRequests,
   openServiceRequestCheckout,
   recordServiceRequestIdentities,
+  readMaskedServiceRequestIdentities,
   submitServiceRequestPartyDetails,
+  updateServiceRequestDetails,
   withdrawServiceRequestParty,
 } from '../../../../services/serviceRequestService.js';
-// Where the wizard autosaves. Named because two things have to agree on it: the autosave itself and
-// the purge that cleans entries written before the identity numbers were kept out of it.
+import { userMessage } from '../../../../lib/userMessage.js';
 
 const DRAFT_KEY = 'dzDraft:rentAgreement';
 
-const withDefaults = (base, saved) => ({ ...base, ...(saved || {}) });
+const withDefaults = (base, saved) => Object.fromEntries(Object.entries(base).map(([k, v]) => [k, saved?.[k] === undefined ? v : saved[k]]));
 
 const invitedRole = (s) => (s?.ownerMode === 'invite' ? 'owner' : s?.tenantMode === 'invite' ? 'tenant' : null);
+
+const heldCoFill = (r) => !invitedRole(r?.details?._state) && (r?.parties || []).some((p) => p?.status === 'accepted');
+
+const partyNames = (s) => ({
+  'owner-0': s?.owner?.oName,
+  ...Object.fromEntries((s?.coOwners || []).map((c, i) => [`owner-${i + 1}`, c?.name])),
+  ...Object.fromEntries((s?.tenants || []).map((t, i) => [`tenant-${i}`, t?.name])),
+});
+const sameName = (a, b) => String(a || '').trim().replace(/\s+/g, ' ').toLowerCase() === String(b || '').trim().replace(/\s+/g, ' ').toLowerCase();
+// The server drops a recorded PAN once its party is renamed, so it only counts as on file under the original name.
+const stillHeld = (masked, state) => {
+  const names = partyNames(state);
+  return Object.fromEntries(Object.entries(masked).filter(([k, v]) => !v.name || sameName(v.name, names[k])));
+};
 
 export function useRentAgreement() {
   const rootRef = useScrollReveal();
@@ -52,73 +68,62 @@ export function useRentAgreement() {
   const { toast } = useToast();
   const { fee } = usePricing();
   const formRef = useRef(null);
-  const { mountedRef, paymentPending, paymentConfirming, payAndConfirm, resetPayment } = useRaPayment({ tr, toast });
+  const { mountedRef, paymentPending, paymentConfirming, paymentNotCompleted, payAndConfirm, resetPayment } = useRaPayment({ tr, toast });
+  const paymentOutcome = paymentPending ? 'pending' : paymentNotCompleted ? 'notCompleted' : null;
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const routeState = useLocation().state;
+  const openedToView = !!routeState?.raView;
   const sendToSignIn = useSignInGate();
 
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState({});
   const [done, setDone] = useState(false);
-  /* A request already filed whose identities, papers or checkout step failed. */
-  // Submission is a round-trip plus a lazily-imported SDK, so the button stays clickable for a
-  // visible beat. Without this guard a second click issues a second payment session.
   const [submitting, setSubmitting] = useState(false);
   const [pendingRequestId, setPendingRequestId] = useState(null);
   const [restoredIdentityFields, setRestoredIdentityFields] = useState([]);
   const filedRef = useRef(null);
   const uploadedRef = useRef(new Map());
   const [openFaq, setOpenFaq] = useState(-1);
-  // After submission the owner's create-wizard is locked (the submitted request is the legal source
-  // of truth); `startNew` bypasses that lock for a separate agreement on a different property.
   const [startNew, setStartNew] = useState(false);
 
-  // Invite mode
   const [mode, setMode] = useState('owner');
   const [inviteCtx, setInviteCtx] = useState(null);
   const { entitlements, refresh: refreshEntitlements } = useEntitlements(isIn && !inviteCtx);
-  const referralCredit = (entitlements?.agreements?.remaining ?? 0) >= 1;
+  const discountPercent = entitlements?.agreements?.discountPercent ?? 0;
+  const referralCredit = (entitlements?.agreements?.remaining ?? 0) >= 1 && discountPercent > 0;
   const [inviteError, setInviteError] = useState(null);
-  /* The owner's own listings, for the "pick one of your properties" shortcut and the `?listing=` prefill. */
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
   const [myProperties, setMyProperties] = useState([]);
+  const [listingRefused, setListingRefused] = useState(false);
   useEffect(() => {
     if (!isIn) { setMyProperties([]); return undefined; }
     let alive = true;
-    myListings(user)
+    myListings(user, REVISIT_READ)
       .then((rows) => { if (alive) setMyProperties(Array.isArray(rows) ? rows : []); })
       .catch(() => { if (alive) setMyProperties([]); });
     return () => { alive = false; };
   }, [isIn, user]);
   const [inviteResult, setInviteResult] = useState(null);
   const [copied, setCopied] = useState(false);
-  // Step 1 — Property
 
   const [prop, setProp] = useState(emptyProp());
-  // Step 2 — Licensors: `owner` is licensor 0, `coOwners` licensors 1..n. Their doc slots share
-  // `ownerDocs` (`o-*` for the owner, `c{i}-*` per co-owner).
 
   const [owner, setOwner] = useState(emptyOwner(isIn, user));
   const [coOwners, setCoOwners] = useState([]);
   const [ownerDocs, setOwnerDocs] = useState({});
   const [ownerMode, setOwnerMode] = useState('fill');
-  // Step 3 — Tenant
 
   const [tenantMode, setTenantMode] = useState('fill');
   const [tenants, setTenants] = useState([emptyTenant()]);
   const [tenantDocs, setTenantDocs] = useState({});
   const [invite, setInvite] = useState(emptyInvite());
-  // Step 4 — Terms
 
   const [terms, setTerms] = useState(emptyTerms());
   const [maint, setMaint] = useState('Tenant');
   const regArea = prop.gramPanchayat ? 'rural' : 'urban';
   const { furnItems, setFurnItems, custom, setCustom, isChecked, toggleFurn, bumpQty, removeFurn, addCustom, furnitureText } = useRaFurniture();
   const [clauses, setClauses] = useState('');
-  // Step 5 — Witnesses
-
-  const [wit, setWit] = useState(emptyWit());
-  // Step 6 — Review
 
   const [declare, setDeclare] = useState(false);
 
@@ -128,32 +133,26 @@ export function useRentAgreement() {
   const setTenant = (i, k, v) => setTenants((arr) => arr.map((t, idx) => (idx === i ? { ...t, [k]: v } : t)));
   const setCoOwner = (i, k, v) => setCoOwners((arr) => arr.map((c, idx) => (idx === i ? { ...c, [k]: v } : c)));
   const clearErr = (k) => setErrors((e) => (e[k] ? { ...e, [k]: false } : e));
-  // ── Form state capture for autosave & co-fill ──
 
   const captureFormState = () => ({
     step,
-    prop, terms, maint, regArea, furnItems, clauses, wit, declare,
+    prop, terms, maint, regArea, furnItems, clauses, declare,
     ...(ownerMode === 'invite'
       ? { owner: { ...emptyOwner(false), oMobile: digits(invite.invMobile).slice(-10) }, coOwners: [] }
       : { owner, coOwners }),
-    // The invitee files their own police record; a blank one would fail the server's workplace rule.
     tenants: tenantMode === 'invite' ? tenants.map(({ police: _police, ...invited }) => invited) : tenants,
     tenantMode, ownerMode, invite, selectedPropertyId,
-  /* The same capture minus the statutory identity numbers, for anything that outlives this tab (the co-fill payload
-     and the autosave) — see `docs/flows/consumer/rent-agreement.md` § 5.9. */
   });
   const captureShareableState = () => {
     const { selectedPropertyId: _selectedPropertyId, ...state } = captureFormState();
     return redactIdentityNumbers(state);
   };
-  // Merged over the blank shapes: drafts saved before a field existed must not leave it undefined.
 
   const applyFormState = (s) => {
     if (!s || typeof s !== 'object') return;
-    if (typeof s.step === 'number') setStep(s.step);
+    if (typeof s.step === 'number') setStep(Math.min(s.step, REVIEW_STEP));
     if (s.prop) {
       const restored = withDefaults(emptyProp(), s.prop);
-      if (!Array.isArray(s.prop.propertyAttributes) && s.prop.surveyNo) restored.propertyAttributes = [{ kind: 'Survey No.', number: s.prop.surveyNo }];
       setProp(restored);
     }
     if (s.selectedPropertyId) setSelectedPropertyId(s.selectedPropertyId);
@@ -166,7 +165,6 @@ export function useRentAgreement() {
     if (s.maint) setMaint(s.maint);
     if (s.furnItems) setFurnItems(s.furnItems);
     if (s.clauses != null) setClauses(s.clauses);
-    if (s.wit) setWit(withDefaults(emptyWit(), s.wit));
     if (s.declare != null) setDeclare(s.declare);
     if (s.tenants) setTenants(s.tenants.map((t) => withDefaults(emptyTenant(), t)));
     if (s.tenantMode === 'invite' && s.invite?.invMobile && !(s.tenants || []).some((t) => digits(t.mobile))) {
@@ -184,24 +182,37 @@ export function useRentAgreement() {
       setTenantDocs(restore(s.docRefs.tenant));
     }
   };
-  // Once submitted, details are locked (the request is the legal drafting basis). Read from the
-  // server: a browser-store read would let the owner pay for the same agreement twice after a reload.
 
   const [activeRequests, setActiveRequests] = useState([]);
   const [requestsNonce, setRequestsNonce] = useState(0);
   useEffect(() => {
     if (!isIn || !user?.mobile) { setActiveRequests([]); return undefined; }
     let alive = true;
-    listServiceRequests('rental')
+    listServiceRequests('rental', requestsNonce ? undefined : REVISIT_READ)
       .then((rs) => { if (alive) setActiveRequests((rs || []).filter((r) => isActive(r.status))); })
       .catch(() => { if (alive) setActiveRequests([]); });
     return () => { alive = false; };
   }, [isIn, user, done, requestsNonce]);
+  const returnedFromGateway = useRef(searchParams.has('order_id'));
+  useEffect(() => {
+    if (!returnedFromGateway.current) return;
+    returnedFromGateway.current = false;
+    setSearchParams((cur) => {
+      const rest = new URLSearchParams(cur);
+      rest.delete('order_id');
+      return rest;
+    }, { replace: true });
+    toast(tr('services.ra.pay.returned'), 'info');
+    for (const ms of [3000, 10000, 30000]) setTimeout(() => setRequestsNonce((n) => n + 1), ms);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- consume the gateway return once
+  }, []);
+  const ownRequests = activeRequests.filter((r) => !r.myPartyId);
   const locked = mode === 'owner' && !done && !startNew && activeRequests.length > 0;
+  const joinedOnly = ownRequests.length === 0;
 
   const stalledInvite = (() => {
     const side = (r, role) => (r.parties || []).filter((p) => p?.role === role);
-    const r = activeRequests.find((x) => {
+    const r = ownRequests.find((x) => {
       const role = invitedRole(x.details?._state);
       if (!role) return false;
       if (role !== 'tenant') return !side(x, role).some((p) => p.status === 'invited' || p.status === 'accepted');
@@ -242,22 +253,29 @@ export function useRentAgreement() {
     }
   };
 
-  const payable = stalledInvite ? null : activeRequests.find((r) => r.status === 'awaiting_payment' && Number(r.amount) > 0
-    && !(r.parties || []).some((p) => p.status === 'invited')) || null;
+  const tenantFillsLater = (r) => invitedRole(r.details?._state) === 'tenant';
+  const payables = [
+    ...ownRequests.filter((r) => r.status === 'awaiting_payment' && Number(r.amount) > 0
+      && invitedRole(r.details?._state) !== 'owner'
+      && (tenantFillsLater(r) || (r.id !== stalledInvite?.requestId && !(r.parties || []).some((p) => p.status === 'invited')))),
+    ...activeRequests.filter((r) => r.myPartyId && r.payableByMe),
+  ];
+  const payable = payables[0] || null;
   const [paying, setPaying] = useState(false);
   const payingRef = useRef(false);
-  const payFiled = async () => {
-    if (payingRef.current || !payable) return;
+  const payFiled = async (request = payable) => {
+    if (payingRef.current || !request) return;
     payingRef.current = true;
     setPaying(true);
     try {
-      const checkout = await openServiceRequestCheckout(payable.id, DECLARATION_VERSION);
-      const status = await payAndConfirm(checkout, referralCredit ? null : Number(payable.amount) || null);
+      const checkout = await openServiceRequestCheckout(request.id, DECLARATION_VERSION);
+      const status = await payAndConfirm(checkout, Number(request.amount) || null);
       if (mountedRef.current && status === 'cancelled') toast(tr('services.ra.checkoutFailed'), 'error');
       else if (mountedRef.current && status && status !== 'awaiting_payment') toast(tr('services.ra.pay.paid'), 'success');
     } catch (err) {
       console.error('Rent Agreement checkout refused', err?.status);
-      if (mountedRef.current) toast(err?.status === 409 && err?.message ? tr('services.ra.checkoutIncomplete', { detail: err.message }) : tr('services.ra.checkoutFailed'), 'error');
+      const detail = err?.status === 409 ? userMessage(err, '') : '';
+      if (mountedRef.current) toast(detail ? tr('services.ra.checkoutIncomplete', { detail }) : tr('services.ra.checkoutFailed'), 'error');
     } finally {
       payingRef.current = false;
       refreshEntitlements();
@@ -266,25 +284,43 @@ export function useRentAgreement() {
   };
 
   const liveParty = (r, role) => (r.parties || []).some((p) => p?.role === role && (p.status === 'invited' || p.status === 'accepted'));
-  const continuable = activeRequests.find((r) => r.status === 'awaiting_payment' && !r.paymentSessionId && r.details?._state
-    && (invitedRole(r.details._state) ? liveParty(r, invitedRole(r.details._state)) : !(r.parties || []).length)) || null;
+  const continuable = ownRequests.find((r) => r.status === 'awaiting_payment' && !r.paymentSessionId && r.details?._state
+    && (invitedRole(r.details._state) ? liveParty(r, invitedRole(r.details._state)) : heldCoFill(r) || !(r.parties || []).length)) || null;
   const topUpRef = useRef(null);
   const topUpBaselineRef = useRef(null);
+  const [coFilledRole, setCoFilledRole] = useState(null);
+  const [maskedIds, setMaskedIds] = useState({});
+  const maskedForRef = useRef(null);
+  const loadMaskedIds = (id, state) => {
+    maskedForRef.current = id;
+    const current = () => mountedRef.current && maskedForRef.current === id;
+    const names = state ? partyNames(state) : {};
+    return readMaskedServiceRequestIdentities(id)
+      .then((ids) => {
+        if (current()) setMaskedIds(Object.fromEntries(Object.entries(ids || {}).map(([k, v]) => [k, names[k] ? { ...v, name: names[k] } : v])));
+      })
+      .catch(() => { if (current()) toast(tr('services.ra.maskedIdsFailed'), 'error'); });
+  };
   const answersKey = () => filingKey({ ...captureShareableState(), step: 0 });
+  const restoreFiledDocs = (request) => {
+    const filed = filedDocSlots(request);
+    const fill = (add) => (cur) => ({ ...cur, ...Object.fromEntries(Object.entries(add).filter(([k]) => !cur[k]?.dataUrl)) });
+    setOwnerDocs(fill(filed.owner));
+    setTenantDocs(fill(filed.tenant));
+  };
   useEffect(() => {
     if (topUpRef.current && topUpBaselineRef.current == null) topUpBaselineRef.current = answersKey();
   });
   const continueFiled = () => {
     if (!continuable) return;
-    if (!restored) applyFormState(continuable.details._state);
-    const filed = { owner: {}, tenant: {} };
-    for (const doc of continuable.docs || []) {
-      const slot = slotForCategory(doc.category);
-      if (slot) filed[slot.side][slot.key] = { fileName: doc.fileName, filedOn: continuable.id };
-    }
-    const fill = (add) => (cur) => ({ ...cur, ...Object.fromEntries(Object.entries(add).filter(([k]) => !cur[k]?.dataUrl)) });
-    setOwnerDocs(fill(filed.owner));
-    setTenantDocs(fill(filed.tenant));
+    if (heldCoFill(continuable)) { holdFiled(continuable); return; }
+    const role = invitedRole(continuable.details._state);
+    if (!restored || role) applyFormState(continuable.details._state);
+    const coFilled = role && (continuable.parties || []).some((p) => p?.role === role && p.status === 'accepted') ? role : null;
+    setCoFilledRole(coFilled);
+    setMaskedIds({});
+    loadMaskedIds(continuable.id, continuable.details._state);
+    restoreFiledDocs(continuable);
     if (invitedRole(continuable.details._state)) {
       topUpRef.current = continuable;
       topUpBaselineRef.current = null;
@@ -295,7 +331,79 @@ export function useRentAgreement() {
     setStartNew(true);
   };
 
-  // Begin a fresh agreement for a different property: clear the saved draft and reset every field.
+  const [viewingFiled, setViewingFiled] = useState(null);
+  const [editingFiled, setEditingFiled] = useState(null);
+  const [inviteEditing, setInviteEditing] = useState(false);
+  const canView = (r) => (r.myPartyId ? r.editableByMe || !!r.details?._state : r.mySideSubmitted && !!r.details?._state);
+  const viewOwnFiled = (r) => {
+    if (!r?.details?._state) return;
+    applyFormState(r.details._state);
+    setCoFilledRole(invitedRole(r.details._state));
+    setMaskedIds({});
+    loadMaskedIds(r.id, r.details._state);
+    setOwnerDocs({});
+    setTenantDocs({});
+    restoreFiledDocs(r);
+    filedRef.current = null;
+    setSelectedPropertyId(r.propertyId || null);
+    setErrors({});
+    setEditingFiled(null);
+    setViewingFiled(r);
+    setStep(0);
+    setStartNew(true);
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const viewSubmitted = (r) => {
+    if (r?.myPartyId) navigate(inviteRouteFor({ id: r.myPartyId, requestId: r.id }), { state: { raView: true } });
+    else viewOwnFiled(r);
+  };
+  const holdFiled = (r) => {
+    viewOwnFiled(r);
+    setViewingFiled(null);
+    setEditingFiled(r);
+  };
+  const heldId = routeState?.raHold;
+  useEffect(() => {
+    const r = heldId && ownRequests.find((x) => x.id === heldId && heldCoFill(x));
+    if (!r) return;
+    const kyc = readSavedKyc(user?.mobile) || {};
+    holdFiled(r);
+    setOwner((o) => ({ ...fillBlanks(o, { oName: user?.name || kyc.name, oDob: kyc.dob, oAge: kyc.age }), oMobile: digits(user?.mobile).slice(-10) }));
+    navigate('/services/rent-agreement', { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume the hand-over once, when the request list arrives
+  }, [heldId, activeRequests]);
+  const editSubmitted = () => {
+    if (mode === 'invite') {
+      setInviteEditing(true);
+      setStep(inviteCtx?.invite?.toRole === 'owner' ? 1 : 2);
+      return;
+    }
+    if (!viewingFiled?.editableByMe) return;
+    setEditingFiled(viewingFiled);
+    setViewingFiled(null);
+  };
+  const closeFiled = () => {
+    if (mode === 'invite') {
+      navigate('/services/rent-agreement');
+      return;
+    }
+    startNewAgreement();
+    setStartNew(false);
+  };
+  const discardEdits = () => {
+    if (mode === 'invite') {
+      if (inviteCtx?.req?.details?._state) applyFormState(inviteCtx.req.details._state);
+      setInviteEditing(false);
+      setErrors({});
+      setStep(0);
+      return;
+    }
+    if (editingFiled) viewOwnFiled(editingFiled);
+    else closeFiled();
+  };
+  const viewOnly = !done && (mode === 'invite' ? !!inviteCtx && !inviteEditing && (!!inviteCtx.req?.mySideSubmitted || openedToView) : !!viewingFiled);
+  const viewedRequest = viewOnly ? (mode === 'invite' ? inviteCtx.req : viewingFiled) : null;
+
   const startNewAgreement = () => {
     clearDraft();
     setStep(0);
@@ -316,26 +424,24 @@ export function useRentAgreement() {
     setFurnItems([]);
     setCustom({ name: '', qty: 1 });
     setClauses('');
-    setWit(emptyWit());
     setDeclare(false);
     setInviteResult(null);
     setCopied(false);
     setOpenFaq(-1);
-    // These belong to the attempt being abandoned. Left set, the "could not confirm your payment"
-    // panel reappears over a fresh agreement that has not been submitted, let alone paid for.
     resetPayment();
     setPendingRequestId(null);
     filedRef.current = null;
     topUpRef.current = null;
     topUpBaselineRef.current = null;
+    setCoFilledRole(null);
+    setMaskedIds({});
+    maskedForRef.current = null;
     uploadedRef.current = new Map();
+    setEditingFiled(null);
+    setViewingFiled(null);
     setStartNew(true);
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-  // ── Draft autosave/restore ──
-
-  // Purges identity numbers from a pre-existing draft. **Must stay above the `useFormDraft` call**
-  // — see `docs/flows/consumer/rent-agreement.md` § 5.9 for the ordering and why it runs on read.
 
   useEffect(() => {
     try {
@@ -350,8 +456,6 @@ export function useRentAgreement() {
     } catch {}
   }, []);
 
-  // `useFormDraft` restores via a functional updater — resolve it against live state before
-  // dispatching, otherwise the whole draft is dropped. Saved from the *shareable* capture (§ 5.9).
   const form = {
     ...captureShareableState(),
     identityReminders: identityReminderFields(captureFormState()),
@@ -362,86 +466,78 @@ export function useRentAgreement() {
     setRestoredIdentityFields(Array.isArray(next?.identityReminders) ? next.identityReminders : []);
     applyFormState(next);
   };
-  const { restored, clear: clearDraft, flush: flushDraft, startFresh } = useFormDraft(DRAFT_KEY, form, restoreFormState, { enabled: mode === 'owner' && !done, ignore: ['oName', 'oMobile', 'step'] });
-    /* `gated` represents resolved signed-out owner mode, distinct from pending authentication. */
+  const { restored, clear: clearDraft, flush: flushDraft, startFresh } = useFormDraft(DRAFT_KEY, form, restoreFormState, { enabled: mode === 'owner' && !done && !viewingFiled && !editingFiled, ignore: ['oName', 'oMobile', 'step'] });
 
   const gated = mode === 'owner' && !loading && !isIn;
-    /* Flush the debounced owner draft before navigation so recent input survives sign-in. */
 
-  const gateToSignIn = () => {
+  const gateToSignIn = (resume) => {
     flushDraft();
-    sendToSignIn('services');
+    sendToSignIn('services', undefined, resume);
   };
-    /* Signed-out owners remain on public steps even when restored drafts name a later step. */
 
   useLayoutEffect(() => {
     if (!gated) return;
     if (step > LAST_PUBLIC_STEP) setStep(LAST_PUBLIC_STEP);
   }, [gated, step]);
-  // ── Owner KYC autofill ──
-  // Deliberately carries no PAN or Aadhaar — see `persistOwnerKYC` — so the owner retypes those.
 
   useEffect(() => {
     if (mode !== 'owner' || !isIn) return;
     const kyc = readSavedKyc(user?.mobile);
     if (kyc) {
-      // Purge on read: rewriting the entry here is the only moment the app is guaranteed to touch
-      // this key, so a write-only fix would leave every existing browser exposed.
-      setOwner((o) => ({ ...o, oName: o.oName || kyc.name || '', oMother: o.oMother || kyc.mother || '', oDob: o.oDob || kyc.dob || '', oAlias: o.oAlias || kyc.alias || '', oAge: o.oAge || kyc.age || '', oGender: o.oGender || kyc.gender || '', oOccupation: o.oOccupation || kyc.occupation || '', oMobile: o.oMobile || kyc.mobile || '', oEmail: o.oEmail || kyc.email || '', oAddr: o.oAddr || kyc.addr || '' }));
+      setOwner((o) => ({ ...o, oName: o.oName || kyc.name || '', oDob: o.oDob || kyc.dob || '', oAge: o.oAge || kyc.age || '', oMobile: o.oMobile || kyc.mobile || '' }));
     } else {
       setOwner((o) => ({ ...o, oName: o.oName || user?.name || '', oMobile: o.oMobile || user?.mobile || '' }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- seed owner only when mode/sign-in flips
   }, [mode, isIn]);
-  /* `pan` and `aadhaar` are deliberately excluded and must stay excluded: this key is plain JSON on `localStorage`,
-     never expired, and Aadhaar is not ours to retain (Aadhaar Act s.29). */
 
   const persistOwnerKYC = () => {
     if (mode !== 'owner' || ownerMode === 'invite' || !isIn) return;
     try {
       const mob = digits(owner.oMobile || user?.mobile || '');
       if (!mob) return;
-      localStorage.setItem('draazyOwnerKYC:' + mob, JSON.stringify({ name: owner.oName, mother: owner.oMother, dob: owner.oDob, alias: owner.oAlias, age: owner.oAge, gender: owner.oGender, occupation: owner.oOccupation, email: owner.oEmail, addr: owner.oAddr, mobile: owner.oMobile, savedAt: Date.now() }));
+      localStorage.setItem('draazyOwnerKYC:' + mob, JSON.stringify({ name: owner.oName, dob: owner.oDob, age: owner.oAge, mobile: owner.oMobile, savedAt: Date.now() }));
     } catch {}
   };
-  /* Prefills document slots the owner already keeps in the vault. */
 
-  const vaultEnabled = mode === 'owner' && isIn && !!user?.mobile;
+  const urlListing = listingRefused ? null : searchParams.get('listing') || searchParams.get('flat');
+  const requestPropertyId = selectedPropertyId
+    || myProperties.find((row) => row.id === urlListing || row.slug === urlListing)?.uuid
+    || null;
+  // Index II is filed from the request's own property vault, so it must be the property submit sends.
+  const vaultPropertyId = mode === 'owner' && isIn && user?.mobile ? requestPropertyId : null;
+  const vaultEnabled = !!vaultPropertyId;
   useEffect(() => {
     if (!vaultEnabled) return;
     let cancelled = false;
     (async () => {
-      // A vault read must never cost the owner the wizard: an unreachable or empty vault means
-      // "no prefill", not a broken step.
-      const personal = await listDocuments(user.mobile, 'personal').catch(() => null);
-      if (cancelled || !personal) return;
-      const held = new Set(personal.map((d) => String(d.id)));
+      const vault = await listDocuments(user.mobile, vaultPropertyId, REVISIT_READ).catch(() => null);
+      if (cancelled || !vault) return;
+      const held = new Set(vault.map((d) => String(d.id)));
       setOwnerDocs((cur) => {
         const next = { ...cur };
         OWNER_DOCS.forEach(([, k]) => {
           const d = next[k];
           if (d?.vaultDocId && !d.dataUrl && !held.has(String(d.vaultDocId))) next[k] = { fileName: d.fileName, reattach: true };
           if (docReady(next[k])) return;
-          const hit = personal.find((row) => row.category === OWNER_VAULT_CAT[k] && row.id);
+          const hit = vault.find((row) => row.category === OWNER_VAULT_CAT[k] && row.id);
           if (hit) next[k] = { fileName: hit.name, mime: hit.mime, vaultDocId: hit.id, fromVault: true };
         });
         return next;
       });
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh vault only when it becomes available
-  }, [vaultEnabled]);
-  /* Saves a freshly uploaded owner doc back to the vault for reuse, skipping vault-sourced picks, over-size files and
-     duplicates. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh only when the property's vault changes
+  }, [vaultPropertyId]);
 
   const saveOwnerDocToVault = async (k, d, file) => {
     if (!vaultEnabled || !d?.dataUrl || d.fromVault || !file) return;
     const cat = OWNER_VAULT_CAT[k];
     if (!cat) return;
     try {
-      const existing = await listDocuments(user.mobile, 'personal');
+      const existing = await listDocuments(user.mobile, vaultPropertyId, REVISIT_READ);
       const saved = existing.find((x) => x.category === cat && x.name === d.fileName)
-        || await uploadDocument(user.mobile, 'personal', { category: cat, file });
+        || await uploadDocument(user.mobile, vaultPropertyId, { category: cat, file });
       if (!saved?.id || !mountedRef.current) return;
       setOwnerDocs((s) => (s[k]?.dataUrl === d.dataUrl ? { ...s, [k]: { ...s[k], vaultDocId: saved.id } } : s));
     } catch {}
@@ -456,8 +552,6 @@ export function useRentAgreement() {
     getDealFees('rent')
       .then((f) => {
         if (!alive) return;
-        // No published row is not an empty row: falling through to `ready` with `null` would render
-        // a confident ₹0 for a price nobody published.
         setFeeRow(f || null);
         setFeeStatus(f ? 'ready' : 'error');
       })
@@ -473,33 +567,31 @@ export function useRentAgreement() {
   const cost = useMemo(() => {
     const rent = num(terms.rent), dep = num(terms.deposit), nr = num(terms.nrDeposit);
     const months = parseInt(terms.months, 10) || 11;
-    // Rent, deposit and term are the customer's own answers, not charges — they stay readable while
-    // the schedule is loading or unavailable. Only the money we would be taking goes blank.
     const answers = { rent, dep, months, status: feeStatus, retry: retryFees };
     if (feeStatus !== 'ready' || !feeRow) {
-      return { ...answers, stamp: null, reg: null, dhc: null, service: null, total: null, computed: [], notes: null };
+      return { ...answers, stamp: null, exactPaise: null, reg: null, dhc: null, service: null, total: null, computed: [], notes: null };
     }
     const years = Math.ceil(months / 12);
-    /* `stampDuty`/`registration` arrive `null` because neither is a flat figure; anything derived here lands in
-       `computed`, so the sidebar labels it an estimate. */
     const computed = [];
-    let stamp = feeRow.stampDuty;
-    if (stamp == null) { stamp = leaveLicenceStamp(rentForTerm(rent, months, terms.increment, terms.incrementEvery), nr, dep, years); computed.push('stamp'); }
+    let stamp = feeRow.stampDuty, exactPaise = null;
+    if (stamp == null) {
+      ({ stamp, exactPaise } = leaveLicenceStamp(rentForTerm(rent, months, terms.increment, terms.incrementEvery), nr, dep, years));
+      computed.push('stamp');
+    }
     let reg = feeRow.registration;
     if (reg == null) { reg = regArea === 'rural' ? 500 : 1000; computed.push('reg'); }
     const dhc = 300;
     const service = feeRow.platformFee;
-    const waived = referralCredit ? service : 0;
+    const waived = referralCredit ? Math.floor((service * discountPercent) / 100) : 0;
     return {
       ...answers,
-      stamp, reg, dhc, service, waived,
+      stamp, exactPaise, reg, dhc, service, waived, discountPercent,
       total: service + stamp + reg + dhc - waived,
       computed,
       notes: feeRow.notes || null,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- retryFees is a stable state increment
-  }, [terms.rent, terms.deposit, terms.nrDeposit, terms.months, terms.increment, terms.incrementEvery, regArea, feeStatus, feeRow, referralCredit]);
-  // Built outside `generate` so the size guard below measures the object that will be posted.
+  }, [terms.rent, terms.deposit, terms.nrDeposit, terms.months, terms.increment, terms.incrementEvery, regArea, feeStatus, feeRow, referralCredit, discountPercent]);
 
   const propertyLine = () =>[prop.flatNo, prop.society, prop.locality, prop.city].filter(Boolean).join(', ');
   const invitedLabel = () => 'Invited: ' + (invite.invName || '••••••' + digits(invite.invMobile).slice(-4)) + ' (pending)';
@@ -510,16 +602,15 @@ export function useRentAgreement() {
     startDate: terms.startDate, regArea: regArea === 'urban' ? 'Municipal / Urban' : 'Rural',
     _state: captureShareableState(),
   });
-  /* The server caps serialized `details` at `DETAILS_MAX_CHARS` and answers 400. */
 
   const detailsSize = detailsChars(buildDetails());
   const detailsTooLong = detailsSize > DETAILS_MAX_CHARS;
   const detailsWorstField = largestFreeTextField(captureShareableState());
 
   const inviteRole = inviteCtx?.invite?.toRole || null;
-  const formSnapshot = () => ({ mode, inviteRole, prop, owner, coOwners, ownerMode, tenantMode, tenants, invite, terms, wit, ownerDocs, tenantDocs });
+  const inviteAwaitingPayment = inviteCtx?.req?.status === 'awaiting_payment';
+  const formSnapshot = () => ({ mode, inviteRole, prop, owner, coOwners, ownerMode, tenantMode, tenants, invite, terms, ownerDocs, tenantDocs });
   const collectDocs = () => collectFormDocs(formSnapshot());
-  // ── Parties ──
 
   const addTenant = () => setTenants((arr) => (arr.length < MAX_TENANTS ? [...arr, emptyTenant()] : arr));
   const removeTenant = (i) => {
@@ -528,7 +619,6 @@ export function useRentAgreement() {
     setTenantDocs((d) => removeIndexedDocs(d, 't', i));
     setErrors({});
   };
-  // Joint owners all execute the deed, so the primary's capacity follows whether there are co-owners.
   const addCoOwner = () => {
     if (coOwners.length >= MAX_LICENSORS - 1) return;
     setCoOwners((arr) => [...arr, emptyCoOwner()]);
@@ -546,15 +636,15 @@ export function useRentAgreement() {
   useEffect(() => {
     const partyId = searchParams.get('party');
     const requestId = searchParams.get('request');
-    // Wait for a restore to settle before deciding: a signed-in party arriving on a cold tab has no
-    // cached user for a moment, and bouncing them would lose the invitation they followed.
     if (!partyId && !requestId) return;
     if (loading) return;
     if (!isIn || !user?.mobile) {
+      setInviteError({ kind: 'signin' });
       if (!signInSentRef.current) sendToSignIn('invite');
       signInSentRef.current = true;
       return;
     }
+    setInviteError((e) => (e?.kind === 'signin' ? null : e));
     let alive = true;
     (async () => {
       try {
@@ -568,18 +658,21 @@ export function useRentAgreement() {
         if (row && row.status === 'declined') {
           if (alive) setInviteError({ kind: 'expired' });
           return;
-        /* An accepted invitation leaves the pending list, so a reload finds no row. */
         }
         const reqId = row?.requestId || requestId;
         if (!reqId) {
           if (alive) setInviteError({ kind: 'expired' });
           return;
         }
-          /* Two accepts can race (StrictMode, or two tabs) and the loser is refused. */
         if (row && row.status !== 'accepted') {
           try {
             await decideServiceRequestInvite(row.id, 'accept');
-          } catch {}
+          } catch (err) {
+            if (err?.status === 409) {
+              if (alive) setInviteError({ kind: 'blocked', detail: userMessage(err, '') });
+              return;
+            }
+          }
         }
         const req = await getServiceRequest(reqId);
         if (!req) {
@@ -588,6 +681,10 @@ export function useRentAgreement() {
         }
         if (!alive) return;
         setInviteError(null);
+        if (!req.myPartyId && req.status === 'awaiting_payment' && heldCoFill(req)) {
+          navigate('/services/rent-agreement', { replace: true, state: { raHold: req.id } });
+          return;
+        }
         const partyRow = row || (req.parties || []).find((p) => p?.id === partyId);
         const role = partyRow?.role || 'tenant';
         const partyIndex = Number(partyRow?.partyIndex) || 0;
@@ -604,13 +701,15 @@ export function useRentAgreement() {
         });
         setMode('invite');
         if (req.details && req.details._state) applyFormState(req.details._state);
+        restoreFiledDocs(req);
+        loadMaskedIds(reqId);
         const kyc = readSavedKyc(user.mobile) || {};
         if (role === 'tenant') {
           setTenants((arr) => arr.map((item, idx) => (idx === partyIndex
-            ? fillBlanks(item || emptyTenant(), { name: user.name || kyc.name, mother: kyc.mother, dob: kyc.dob, alias: kyc.alias, mobile: digits(user.mobile).slice(-10), email: user.email || kyc.email, age: kyc.age, addr: kyc.addr })
+            ? fillBlanks(item || emptyTenant(), { name: user.name || kyc.name, dob: kyc.dob, mobile: digits(user.mobile).slice(-10), age: kyc.age })
             : item)));
         } else {
-          setOwner((o) => ({ ...fillBlanks(o, { oName: user.name || kyc.name, oMother: kyc.mother, oDob: kyc.dob, oAlias: kyc.alias, oEmail: user.email || kyc.email, oAge: kyc.age, oGender: kyc.gender, oOccupation: kyc.occupation, oAddr: kyc.addr }), oMobile: digits(user.mobile).slice(-10) }));
+          setOwner((o) => ({ ...fillBlanks(o, { oName: user.name || kyc.name, oDob: kyc.dob, oAge: kyc.age }), oMobile: digits(user.mobile).slice(-10) }));
         }
         setOwnerMode('fill');
         setTenantMode('fill');
@@ -620,18 +719,15 @@ export function useRentAgreement() {
       }
     })();
     return () => { alive = false; };
-    /* `sendToSignIn` is deliberately absent: its identity changes whenever `t` does, so listing it would re-run this
-       invite lookup on every language switch. */
     // eslint-disable-next-line react-hooks/exhaustive-deps -- invite URL should resolve once per signed-in user
   }, [searchParams, isIn, loading, user]);
-  // ── Pending co-fill invites for the signed-in user (banner outside the invite flow) ──
 
   const [myInvites, setMyInvites] = useState([]);
   useEffect(() => {
     if (mode === 'invite' || !isIn || !user?.mobile) { setMyInvites([]); return; }
     if (searchParams.get('party')) return;
     let alive = true;
-    listMyServiceRequestInvites()
+    listMyServiceRequestInvites(REVISIT_READ)
       .then((rows) => {
         if (!alive) return;
         setMyInvites((rows || []).filter((row) => row?.status === 'invited').map((row) => ({
@@ -646,10 +742,8 @@ export function useRentAgreement() {
     return () => { alive = false; };
   }, [mode, isIn, user, searchParams]);
 
-  // ── Property auto-fill from ?listing=<id> (or ?flat=<id> from a flatmate reissue) ──
   const listingPickRef = useRef(0);
   const propRef = useRef(prop);
-  const listingRefusedRef = useRef(false);
   useEffect(() => { propRef.current = prop; }, [prop]);
   const applyListing = async (l, { overwrite }) => {
     const id = l.uuid || l.id;
@@ -658,18 +752,17 @@ export function useRentAgreement() {
     if (!mountedRef.current || seq !== listingPickRef.current) return false;
     const { prop: answers, terms: termAnswers } = listingAnswers(full || l);
     if (!overwrite && namesOtherFlat(propRef.current, answers)) {
-      listingRefusedRef.current = true;
+      setListingRefused(true);
       toast(tr('services.ra.listingOtherFlat'), 'info');
       return false;
     }
     setSelectedPropertyId(id || null);
-    const { furnish, areaBasis, areaUnit, ...rest } = answers;
+    const { areaUnit, ...rest } = answers;
     const address = { flatNo: '', society: '', societyId: '', locality: '', pincode: '', area: '', floor: '' };
     const set = overwrite ? { ...address, ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v)) } : null;
     setProp((cur) => ({
       ...(set ? { ...cur, ...set } : fillBlanks(cur, rest)),
-      ...(furnish && (overwrite || !restored) ? { furnish } : {}),
-      ...(rest.area && (overwrite || !String(cur.area ?? '').trim()) ? { areaBasis, areaUnit } : {}),
+      ...(rest.area && (overwrite || !String(cur.area ?? '').trim()) ? { areaUnit } : {}),
     }));
     setTerms((cur) => fillBlanks(cur, termAnswers));
     ['flatNo', 'society', 'locality', 'pincode', 'area'].forEach(clearErr);
@@ -680,17 +773,12 @@ export function useRentAgreement() {
   const listingAppliedRef = useRef(null);
   useEffect(() => {
     if (mode === 'invite') return;
-    // The flatmate reissue CTA links here as `?flat=<listing-id>`, so accept `flat` as an alias
-    // for `listing` — a room's propertyId is its listing id.
     const reissue = searchParams.get('reissue') === '1';
     const listingId = searchParams.get('listing') || searchParams.get('flat');
-    /* Matched against the loaded rows on both `id` and `slug`: a listing created through the API has a null slug
-       until moderation names one, so the two are not interchangeable. */
     if (!listingId || listingAppliedRef.current === listingId) return;
     const l = myProperties.find((row) => row.id === listingId || row.slug === listingId);
     if (!l) return;
     // eslint-disable-next-line
-    // Prefill from listing
     listingAppliedRef.current = listingId;
     applyListing(l, { overwrite: false }).then((applied) => {
       if (applied && reissue) toast(tr('services.ra.reissueHint'));
@@ -698,14 +786,16 @@ export function useRentAgreement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- consume listing URL once without overwriting edits
   }, [searchParams, mode, myProperties]);
 
-  const renewId = searchParams.get('renew');
+  const renewHomeId = searchParams.get('renewHome');
+  const renewId = searchParams.get('renew') || renewHomeId;
   const renewAppliedRef = useRef(null);
   useEffect(() => {
     if (!renewId || mode === 'invite' || !isIn || renewAppliedRef.current === renewId) return;
     renewAppliedRef.current = renewId;
-    rentAgreementRenewal(renewId).catch(() => null).then((res) => {
+    (renewHomeId ? rentAgreementHomeRenewal(renewHomeId) : rentAgreementRenewal(renewId)).catch(() => null).then((res) => {
       if (!mountedRef.current) return;
       if (res) {
+        if (Object.keys(res.prop).length) setProp((cur) => fillBlanks(cur, res.prop));
         const tenantRows = res.tenants.filter((p) => p.name || digits(p.mobile)).slice(0, MAX_TENANTS);
         if (tenantRows.length) {
           setTenants(tenantRows.map((p) => ({ ...emptyTenant(), name: p.name, mobile: digits(p.mobile).slice(-10) })));
@@ -730,13 +820,14 @@ export function useRentAgreement() {
       setSearchParams((cur) => {
         const rest = new URLSearchParams(cur);
         rest.delete('renew');
+        rest.delete('renewHome');
         return rest;
       }, { replace: true });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- consume the renewal URL once without overwriting edits
   }, [renewId, mode, isIn]);
   const stepErrors = (s) => formStepErrors(s, {
-    ...formSnapshot(), listed: !!selectedPropertyId, selfMobile: mode === 'invite' ? undefined : user?.mobile,
+    ...formSnapshot(), listed: !!selectedPropertyId, selfMobile: mode === 'invite' ? undefined : user?.mobile, held: stillHeld(maskedIds, { owner, coOwners, tenants }),
   });
   const [liveStep, setLiveStep] = useState(null);
   const [errorFocus, setErrorFocus] = useState(0);
@@ -745,7 +836,7 @@ export function useRentAgreement() {
     if (liveStep === null || liveStep !== step) return;
     setErrors(stepErrors(step));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- errors recompute from the listed form slices
-  }, [prop, owner, coOwners, ownerMode, tenantMode, tenants, invite, terms, wit, ownerDocs, tenantDocs]);
+  }, [prop, owner, coOwners, ownerMode, tenantMode, tenants, invite, terms, ownerDocs, tenantDocs]);
   useEffect(() => {
     if (!errorFocus) return;
     const el = formRef.current?.querySelector('.step-panel.active .err, .step-panel.active .dz-invalid, .step-panel.active [aria-invalid="true"]');
@@ -761,13 +852,11 @@ export function useRentAgreement() {
     return true;
   };
   const next = () => {
-     /* Validate before sign-in navigation so restored drafts return to a valid step. */
+    if (viewOnly) { setStep((s) => Math.min(REVIEW_STEP, s + 1)); scrollTop(); return; }
     if (!validateStep(step)) return;
-    if (gated && step >= LAST_PUBLIC_STEP) { gateToSignIn(); return; }
-    // Warned at each transition, not only at the end: the limit is on the whole form, so naming the
-    // offending field here puts it beside the control that has to shrink.
+    if (gated && step >= LAST_PUBLIC_STEP) { gateToSignIn(() => latestStep.current.next()); return; }
     if (detailsTooLong) toast(tr('services.ra.detailsTooLong', { field: tr(detailsWorstField.label), over: detailsSize - DETAILS_MAX_CHARS }), 'error');
-    setStep((s) => Math.min(5, s + 1));
+    setStep((s) => Math.min(REVIEW_STEP, s + 1));
     scrollTop();
   };
   const prev = () => { setStep((s) => Math.max(0, s - 1)); scrollTop(); };
@@ -784,7 +873,6 @@ export function useRentAgreement() {
       toast(tr('services.ra.invite.copyFail'), 'error');
     }
   };
-  /* Takes an unanswered invitation back (V107). */
 
   const [withdrawing, setWithdrawing] = useState(false);
   const withdrawInvite = async () => {
@@ -794,6 +882,9 @@ export function useRentAgreement() {
       await withdrawServiceRequestParty(inviteResult.requestId, inviteResult.partyId);
       if (!mountedRef.current) return;
       setInviteResult(null);
+      setDone(false);
+      setStartNew(false);
+      setRequestsNonce((n) => n + 1);
       toast(tr('services.ra.invite.withdrawn'), 'success');
     } catch (err) {
       console.error('Rent Agreement invite withdraw failed', err?.status || err?.message);
@@ -809,7 +900,6 @@ export function useRentAgreement() {
     setTenantDocs(release);
   };
 
-  // A retry skips papers that already landed on this request; a replaced file in the same slot is sent.
   const uploadDocs = async (requestId, docs) => {
     let ok = true;
     let stale = false;
@@ -832,7 +922,6 @@ export function useRentAgreement() {
     if (stale) { releaseFiled(); return 'reattach'; }
     return ok;
   };
-  // Never log the payload of an identities call: its body is a set of Aadhaar numbers.
 
   const handOff = async (requestId, parties, docs) => {
     let identitiesError = null;
@@ -840,7 +929,6 @@ export function useRentAgreement() {
       await recordServiceRequestIdentities(requestId, parties);
     } catch (err) {
       console.error('Rent Agreement identity hand-off failed', err?.status || err?.message);
-      // Formats are checked before submit, so a 422 here is a number another party (often a co-filler) already holds.
       identitiesError = err?.status === 422 ? 'services.ra.identitiesDuplicate' : 'services.ra.identitiesRetry';
     }
     const docsOk = await uploadDocs(requestId, docs);
@@ -849,24 +937,27 @@ export function useRentAgreement() {
     if (!docsOk) return tr('services.ra.docsRetry');
     return null;
   };
-  /* After the create: identities, papers, checkout. */
 
-  const finishOwnerRequest = async (requestId, docs) => {
-    const handOffFailure = await handOff(requestId, identityParties({ owner, coOwners, tenants, wit }), docs);
-    if (handOffFailure) return handOffFailure;
+  const checkoutFiled = async (requestId) => {
     let checkout;
     try {
       checkout = await openServiceRequestCheckout(requestId, DECLARATION_VERSION);
     } catch (err) {
       console.error('Rent Agreement checkout refused', err?.status);
-      return err?.status === 409 && err?.message ? tr('services.ra.checkoutIncomplete', { detail: err.message }) : tr('services.ra.checkoutFailed');
+      const detail = err?.status === 409 ? userMessage(err, '') : '';
+      return detail ? tr('services.ra.checkoutIncomplete', { detail }) : tr('services.ra.checkoutFailed');
     }
-    await payAndConfirm(checkout, referralCredit ? null : cost.total);
+    await payAndConfirm(checkout, cost.total);
     refreshEntitlements();
     return null;
   };
 
-  const shareInvite = (request, role, inviteMobile) => {
+  const finishOwnerRequest = async (requestId, docs) => {
+    const handOffFailure = await handOff(requestId, identityParties({ owner, coOwners, tenants }), docs);
+    return handOffFailure || checkoutFiled(requestId);
+  };
+
+  const shareInvite = (request, role, inviteMobile, queued) => {
     const party = (request?.parties || []).find((p) => p?.role === role && p?.status === 'invited')
       || (request?.parties || [])[0]
       || null;
@@ -874,8 +965,6 @@ export function useRentAgreement() {
     const invitePath = inviteRouteFor({ id: party?.id, requestId: request?.id });
     const link = new URL(invitePath, window.location.origin).toString();
     const signupLink = new URL(`/signup?next=${encodeURIComponent(invitePath)}`, window.location.origin).toString();
-    /* The invitee is told by the server: `CoFillParties.invite` raises `service.party-invited` through the `Notifier`
-       port, the only place quiet hours and preferences are applied. */
     const inviter = role === 'owner' ? tenants[0]?.name?.trim() || user?.name || 'Your tenant' : owner.oName || user?.name || 'Your owner';
     const text = `Hi${invite.invName ? ' ' + invite.invName : ''}, ${inviter} invited you to complete your rent-agreement details on Draazy${property ? ` for ${property}` : ''}. Please sign in (or create an account) first, then open this invite: ${link}\n\nSign up: ${signupLink}`;
     setInviteResult({
@@ -883,18 +972,22 @@ export function useRentAgreement() {
       toMobile: inviteMobile,
       link,
       waLink: `https://wa.me/91${inviteMobile}?text=${encodeURIComponent(text)}`,
-      // Two different waits (V107): a `pending` party is a number nobody has signed up to, so
-      // "ask them to create an account" is the advice; otherwise the account just hasn't answered.
       requestId: request?.id || null,
       partyId: party?.id || null,
       pending: !!party?.pending,
       maskedMobile: party?.mobile || null,
+      queued: !!queued,
     });
   };
 
   const settleFiled = () => {
     filedRef.current = null;
     setPendingRequestId(null);
+  };
+
+  const requestCancelled = (id) => {
+    if (filedRef.current?.request?.id === id) settleFiled();
+    setRequestsNonce((n) => n + 1);
   };
 
   const fileRequest = async (key, create, docs) => {
@@ -922,7 +1015,20 @@ export function useRentAgreement() {
       ? tenants.map((row, i) => ({ row, i, mobile: digits(row.mobile) })).filter((row) => row.mobile)
       : [];
     const inviteMobile = invitingRole === 'tenant' ? tenantInvites[0]?.mobile : digits(invite.invMobile);
-    const ownParties = invitingRole === 'owner' ? { tenants, wit } : invitingRole === 'tenant' ? { owner, coOwners, wit } : { owner, coOwners, tenants, wit };
+    const ownParties = invitingRole === 'owner' ? { tenants } : invitingRole === 'tenant' ? { owner, coOwners } : { owner, coOwners, tenants };
+    if (editingFiled) {
+      const unpaid = editingFiled.status === 'awaiting_payment';
+      await updateServiceRequestDetails(editingFiled.id, details);
+      const failure = await handOff(editingFiled.id, identityParties(ownParties), docs)
+        || (unpaid ? await checkoutFiled(editingFiled.id) : null);
+      if (!mountedRef.current) return false;
+      if (failure) { toast(failure, 'error'); return false; }
+      if (unpaid) { setEditingFiled(null); return true; }
+      toast(tr('services.ra.summary.saved'), 'success');
+      closeFiled();
+      setRequestsNonce((n) => n + 1);
+      return false;
+    }
     if (topUpRef.current) {
       const request = topUpRef.current;
       if (answersKey() !== topUpBaselineRef.current) {
@@ -934,6 +1040,8 @@ export function useRentAgreement() {
       if (failure) { toast(failure, 'error'); return false; }
       topUpRef.current = null;
       topUpBaselineRef.current = null;
+      setCoFilledRole(null);
+      setMaskedIds({});
       releaseFiled();
       settleFiled();
       clearDraft();
@@ -944,7 +1052,6 @@ export function useRentAgreement() {
     }
     if (invitingRole && inviteMobile) {
       const request = await fileRequest(JSON.stringify({ details, propertyId, inviteMobile }),
-      // Only the requester may hand off their own side, so it happens while their session owns it.
         () => createCoFillServiceRequest({ request: { type: 'rental', details, propertyId }, role: invitingRole, mobile: inviteMobile }), docs);
       if (!request) return false;
       let invitedRequest = request;
@@ -960,10 +1067,14 @@ export function useRentAgreement() {
         return false;
       }
       settleFiled();
-      shareInvite(invitedRequest, invitingRole, inviteMobile);
+      shareInvite(invitedRequest, invitingRole, inviteMobile,
+        (request.parties || []).some((p) => p?.whatsappQueued));
+      if (invitingRole === 'tenant') {
+        const payFailure = await checkoutFiled(request.id);
+        if (payFailure && mountedRef.current) toast(payFailure, 'error');
+      }
       return true;
     }
-    /* No admin lead ticket is raised: an unpaid request is invisible to the ops queue by design (§ 5.10). */
     const key = filingKey({ details, propertyId });
     const request = await fileRequest(key,
       () => createServiceRequestLive({ type: 'rental', service: 'Rent Agreement', customer: { name: details.ownerName }, details, propertyId }), docs);
@@ -993,16 +1104,14 @@ export function useRentAgreement() {
   };
 
   const generate = async () => {
-    // Hold while auth is unresolved; an expired session goes through `gateToSignIn` to keep the draft.
     if (submitting || done) return;
     if (loading) return;
-    if (!isIn) { gateToSignIn(); return; }
-    for (let s = 0; s <= 4; s++) {
+    if (!isIn) { gateToSignIn(() => latestStep.current.generate()); return; }
+    for (let s = 0; s < REVIEW_STEP; s++) {
       const e = stepErrors(s);
       if (Object.keys(e).length) { setStep(s); flagErrors(s, e); toast(tr('services.ra.validationRequired'), 'error'); return; }
     }
     if (!declare) { toast(tr('services.ra.declarationRequired'), 'error'); return; }
-    // Refuse before the server does, and name the field that has to shrink.
     if (detailsTooLong) {
       setStep(detailsWorstField.step);
       toast(tr('services.ra.detailsTooLong', { field: tr(detailsWorstField.label), over: detailsSize - DETAILS_MAX_CHARS }), 'error');
@@ -1010,10 +1119,7 @@ export function useRentAgreement() {
       return;
     }
     const details = buildDetails();
-    const propertyReference = listingRefusedRef.current ? null : searchParams.get('listing') || searchParams.get('flat');
-    const propertyId = selectedPropertyId
-      || myProperties.find((row) => row.id === propertyReference || row.slug === propertyReference)?.uuid
-      || undefined;
+    const propertyId = requestPropertyId || undefined;
 
     setSubmitting(true);
     let finished = false;
@@ -1023,14 +1129,12 @@ export function useRentAgreement() {
       if (finished && mode === 'owner') clearDraft();
     } catch (err) {
       console.error('Rent Agreement submit failed', err?.status || err?.message);
-      // A 422 names the rule the server enforces (`RentAgreementDetailsRules`); say which.
-      if (mountedRef.current) toast(err?.status === 422 && err?.message ? tr('services.ra.detailsRejected', { detail: err.message }) : tr('services.ra.saveError'), 'error');
+      const refusal = userMessage(err, '');
+      if (mountedRef.current) toast(err?.status === 409 && refusal ? refusal : err?.status === 422 && refusal ? tr('services.ra.detailsRejected', { detail: refusal }) : tr('services.ra.saveError'), 'error');
       return;
     } finally {
       if (mountedRef.current) setSubmitting(false);
     }
-    // The checkout modal can stay open long enough for the customer to navigate away; scrolling a
-    // page they already left is a visible artefact rather than a harmless no-op.
 
     if (!finished || !mountedRef.current) return;
     setDone(true);
@@ -1044,7 +1148,7 @@ export function useRentAgreement() {
     setTenantMode('fill');
     const self = digits(user?.mobile || '').slice(-10);
     if (!self || tenants.some((row) => digits(row.mobile).slice(-10) === self)) return;
-    setTenants((arr) => [fillBlanks(arr[0] || emptyTenant(), { name: user?.name, mobile: self, email: user?.email }), ...arr.slice(1)]);
+    setTenants((arr) => [fillBlanks(arr[0] || emptyTenant(), { name: user?.name, mobile: self }), ...arr.slice(1)]);
   };
 
   const fc = (k) => 'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors[k] ? ' err' : '');
@@ -1056,9 +1160,11 @@ export function useRentAgreement() {
   const identityReminders = {
     owner: missingIdentityFields.filter((field) => field.step === 'owner').map(labelIdentityReminder),
     tenant: missingIdentityFields.filter((field) => field.step === 'tenant').map(labelIdentityReminder),
-    witness: missingIdentityFields.filter((field) => field.step === 'witness').map(labelIdentityReminder),
     review: missingIdentityFields.map(labelIdentityReminder),
   };
+  const latestStep = useLatest({ next, generate });
+  const editingSubmitted = !!editingFiled || (mode === 'invite' && inviteEditing && !!inviteCtx?.req?.mySideSubmitted);
+  const holdingUnpaid = editingFiled?.status === 'awaiting_payment';
 
   return {
     rootRef, formRef, tr, isIn, user, navigate,
@@ -1067,16 +1173,18 @@ export function useRentAgreement() {
     withdrawInvite, withdrawing,
     prop, setP, setProp, selectedPropertyId, setSelectedPropertyId, myProperties, pickListing,
     owner, setO, coOwners, setCoOwner, addCoOwner, removeCoOwner, ownerDocs, setOwnerDocs, vaultEnabled, saveOwnerDocToVault,
-    ownerMode, chooseOwnerMode, inviteRole,
+    ownerMode, chooseOwnerMode, inviteRole, inviteAwaitingPayment,
     tenantMode, setTenantMode, tenants, setTenant, addTenant, removeTenant, tenantDocs, setTenantDocs, invite, setInvite,
     terms, setT, startBounds, maint, setMaint, regArea, furnItems, custom, setCustom, clauses, setClauses,
     isChecked, toggleFurn, bumpQty, removeFurn, addCustom, furnitureText,
-    wit, setWit,
-    declare, setDeclare, generate, submitting, pendingRequestId, paymentPending, paymentConfirming,
-    clearErr, fc, cost, locked, gated, startNewAgreement, restored, startFresh, myInvites,
+    declare, setDeclare, generate, submitting, pendingRequestId, paymentOutcome, paymentConfirming,
+    clearErr, fc, cost, locked, joinedOnly, gated, startNewAgreement, restored, startFresh, myInvites,
     identityReminders,
-    stalledInvite, recoverInvite, recovering, payable, payFiled, paying, continuable, continueFiled,
+    stalledInvite, recoverInvite, recovering, payable, payables, payFiled, paying, continuable, continueFiled, coFilledRole, maskedIds: stillHeld(maskedIds, { owner, coOwners, tenants }),
+    continuableHeld: heldCoFill(continuable),
+    requestCancelled,
+    viewOnly, viewedRequest, viewSubmitted, canView, editSubmitted, discardEdits, closeFiled, editingSubmitted, holdingUnpaid,
     detailsSize, detailsMax: DETAILS_MAX_CHARS, detailsTooLong, detailsWorstField,
-    copyInviteLink, next, prev,
+    copyInviteLink, next, prev, signInToInvite: () => sendToSignIn('invite'),
   };
 }

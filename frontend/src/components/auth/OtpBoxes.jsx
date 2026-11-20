@@ -17,7 +17,6 @@ export default function OtpBoxes({ value = '', onChange, error, id, autoFocus = 
     if (ch && idx < 5) refs.current[idx + 1]?.focus();
   };
 
-  // iOS/Android SMS autofill dumps the whole code into one box, and some IMEs deliver several digits.
   const onInput = (idx, raw) => {
     const digits = raw.replace(/\D/g, '');
     if (digits.length >= 6) {

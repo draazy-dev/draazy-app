@@ -19,6 +19,7 @@ const E2E_FULL = new Set([
   'e2e/playwright.nobackend.config.js',
   'e2e/global-setup.live.js',
   'e2e/no-backend-specs.js',
+  'e2e/maps-specs.js',
   'e2e/package.json',
   'e2e/package-lock.json',
   'e2e/scripts/reset-e2e-db.sql',

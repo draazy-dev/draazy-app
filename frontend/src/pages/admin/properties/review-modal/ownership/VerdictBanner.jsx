@@ -8,7 +8,6 @@ const TONE = {
   ready: { box: 'border-teal-400/30 bg-teal-500/10', icon: 'text-teal-300' },
 };
 
-/* The missing list carries the id the disabled Grant button describes itself by. */
 export default function VerdictBanner({ verification, panelId }) {
   const blocked = verification.missingKinds.length > 0;
   const state = verification.verified ? 'verified' : blocked ? 'blocked' : 'ready';
@@ -29,7 +28,7 @@ export default function VerdictBanner({ verification, panelId }) {
       {blocked ? (
         <ul id={missingEvidenceId(panelId)} aria-label="Missing evidence" className="flex flex-wrap gap-1.5">
           {verification.missingKinds.map((kind) => (
-            <li key={kind} className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-100">
+            <li key={kind} className="dz-tag border border-amber-400/30 bg-amber-500/10 font-medium text-amber-100">
               {KIND_LABELS[kind] || kind}
             </li>
           ))}

@@ -1,6 +1,5 @@
-import { test, expect, ACTORS } from '../../../fixtures/live.js';
+import { test, expect } from '../../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile } from '../../../helpers/liveAuth.js';
-import { rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 /** The record is created in wire vocabulary so the page renders only if toManaged() maps it; 80% = 4 of 5
  * checklist items (no docs). A throwaway owner avoids relying on unpublished seeded managed-property counts. */
@@ -58,7 +57,13 @@ test.describe('Property passport — /owner-hub/property/:id', () => {
 
     // Server-owned state, rendered as the visibility chip + the CTA that acts on it.
     await expect(page.getByText('Private', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Publish as listing/i })).toBeVisible();
+    await expect(page.getByTestId('passport-publish')).toHaveText(/Add photos & publish/);
+    await expect(page.getByTestId('passport-agreement-verified'), 'not from a rent agreement').toHaveCount(0);
+
+    const facts = page.getByTestId('passport-facts');
+    await expect(facts).toContainText('For rent');
+    await expect(facts).toContainText('950 sq.ft.');
+    await expect(facts).toContainText('Vacant');
 
     // The derived number. 4 of 5 checklist items — docs is the missing one, and a record created a
     // moment ago genuinely has no documents, so this is the honest value rather than a fixture.
@@ -101,24 +106,33 @@ test.describe('Property passport — /owner-hub/property/:id', () => {
     await expect(page.getByText('2 BHK Flat in Baner')).toHaveCount(0);
   });
 
-  test('publishing asks the server once: no pre-read of the record, and the answer redraws the page', async ({ page, login }) => {
+  test('publishing opens the post form prefilled from the record and never lists it without the wizard', async ({ page, login }) => {
     const { id, headers } = await ownerWithPassport(page, login);
     await page.goto(`/owner-hub/property/${id}`);
     await expect(page.getByRole('heading', { name: '2 BHK Flat in Baner' })).toBeVisible();
-    await page.waitForTimeout(1000);
 
-    const calls = [];
-    page.on('request', (r) => { if (r.url().includes('/api/')) calls.push(`${r.method()} ${new URL(r.url()).pathname}`); });
-    await page.getByRole('button', { name: /Publish as listing/i }).click();
-    await page.waitForTimeout(2000);
+    const writes = [];
+    page.on('request', (r) => { if (r.url().includes('/api/') && r.method() !== 'GET') writes.push(`${r.method()} ${new URL(r.url()).pathname}`); });
+    await page.getByTestId('passport-publish').click();
+    await expect(page).toHaveURL(new RegExp(`/list-property\\?deal=rent&home=${id}`));
+    await expect(page.locator('[data-err="bhk"] .radio-pill.selected')).toHaveText(/2/);
+    expect(writes.filter((w) => w.includes('/managed-properties/')), 'nothing is listed until the form is submitted').toEqual([]);
 
-    const managed = calls.filter((c) => c.includes(`/api/me/managed-properties/${id}`));
-    expect(managed).toEqual([`POST /api/me/managed-properties/${id}/publish`]);
-
+    const oneClick = await fetch(`${API}/me/managed-properties/${id}/publish`, { method: 'POST', headers });
+    expect([404, 405], 'the one-click publish endpoint is gone').toContain(oneClick.status);
     const record = await (await fetch(`${API}/me/managed-properties/${id}`, { headers })).json();
-    if (record.publishedListingId) {
-      const rejected = await rejectListingWithFetch(record.publishedListingId, await authHeaders(ACTORS.admin), { reason: 'Zztest cleanup - passport publish' });
-      expect(rejected.status).toBe(200);
-    }
+    expect(record.publishedListingId ?? null).toBeNull();
+  });
+
+  test('the dashboard card links to the details page and to the prefilled post form', async ({ page, login }) => {
+    const { id } = await ownerWithPassport(page, login);
+    await page.goto('/dashboard?tab=properties');
+    const card = page.getByTestId('private-listing-card').filter({ hasText: '2 BHK Flat in Baner' });
+    await expect(card).toBeVisible({ timeout: 20_000 });
+    await expect(card).toContainText('950 sq.ft.');
+    await expect(card.getByRole('link', { name: 'Add photos & publish' })).toHaveAttribute('href', `/list-property?deal=rent&home=${id}`);
+    await card.getByRole('link', { name: 'View details' }).click();
+    await expect(page).toHaveURL(new RegExp(`/owner-hub/property/${id}$`));
+    await expect(page.getByTestId('passport-facts')).toBeVisible();
   });
 });

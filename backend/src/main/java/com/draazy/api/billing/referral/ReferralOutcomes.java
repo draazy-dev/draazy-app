@@ -9,10 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
-/** Applies an automatic decision: status move, friend's Featured window, system audit row and referrer notice. */
 @Component
 class ReferralOutcomes {
-
     private static final String REFER_LINK = "/refer";
 
     private final ReferralRepository referrals;
@@ -34,25 +32,26 @@ class ReferralOutcomes {
         referral.autoGrant(sentence);
         grantFeatured(referral);
         record(referral, "qualified");
+        tellReferrer(referral, "Your friend joined Draazy", earnedNotice());
     }
 
     void held(Referral referral, Instant until, String sentence) {
         referral.autoHold(until, sentence);
-        grantFeatured(referral);
         record(referral, "held");
+        tellReferrer(referral, "We're checking a referral",
+                "Your friend joined Draazy. We're doing a quick check, and you'll hear from us within "
+                        + settings.referralHoldDays() + " days.");
     }
 
     void released(Referral referral, String sentence) {
         referral.autoGrant(sentence);
+        grantFeatured(referral);
         record(referral, "released");
+        tellReferrer(referral, "Your friend joined Draazy", earnedNotice());
     }
 
     void rejected(Referral referral, String reason, String sentence, String notice) {
-        boolean wasHeld = ReferralStatuses.HELD.equals(referral.getStatus());
         referral.autoReject(reason, sentence);
-        if (wasHeld) {
-            clearFeatured(referral);
-        }
         record(referral, "rejected");
         tellReferrer(referral, "Referral could not be verified", notice);
     }
@@ -65,7 +64,18 @@ class ReferralOutcomes {
                 "A referral reward was withdrawn because " + because + ". Contact support if you think this is wrong.");
     }
 
-    // Staff overrides move the status by hand; the friend's Featured window follows the new status.
+    void decidedByStaff(Referral referral) {
+        syncFeatured(referral);
+        switch (referral.getStatus()) {
+            case ReferralStatuses.REWARDED -> tellReferrer(referral, "Your friend joined Draazy", earnedNotice());
+            case ReferralStatuses.REJECTED -> tellReferrer(referral, "Referral could not be verified",
+                    "A referral did not count after review. Contact support if you think this is wrong.");
+            case ReferralStatuses.CLAWED_BACK -> tellReferrer(referral, "Referral reward withdrawn",
+                    "A referral reward was withdrawn after review. Contact support if you think this is wrong.");
+            default -> { }
+        }
+    }
+
     void syncFeatured(Referral referral) {
         if (ReferralStatuses.isGranting(referral.getStatus())) {
             grantFeatured(referral);
@@ -95,6 +105,12 @@ class ReferralOutcomes {
         detail.put("reason", referral.getAutoReason());
         audit.record(ReferralStatuses.SYSTEM, "admin", "referral.auto." + outcome, "referral",
                 referral.getId().toString(), detail);
+    }
+
+    private String earnedNotice() {
+        return "Your friend joined. You've earned " + settings.referralAgreementDiscountPercent()
+                + "% off the service fee on your next rent agreement. You can use it once you and your friend"
+                + " have both finished KYC.";
     }
 
     private void tellReferrer(Referral referral, String title, String body) {

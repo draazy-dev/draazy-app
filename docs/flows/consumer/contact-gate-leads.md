@@ -5,7 +5,7 @@
 > mobile OTP) under the **badge-not-gate** model — **no identity verification is required to
 > contact an owner** (ADR-019; see [`../../system/platform-architecture.md`](../../system/platform-architecture.md) §6.4
 > and [`../../system/platform-architecture.md`](../../system/platform-architecture.md) §5.6).
-> **Status:** documented from React source · re-synced to ADR-019 (badge-not-gate) - **Primary role(s):** buyer/tenant (maker), owner (checker)
+> **Primary role(s):** buyer/tenant (maker), owner (checker)
 
 ---
 
@@ -15,24 +15,24 @@
 - **Job-to-be-done (buyer):** "Get the owner's number / start a chat about this listing." **(owner):**
   "Only share my number with people I approve (and optionally only Verified-badge users), and manage
   every incoming request in one inbox."
-- **Why it matters:** this is the conversion event of the whole product - the zero-brokerage promise
-  is "connect directly with owners." The gate that protects owner privacy and lead quality is the
-  **request → owner-approval + conditional reveal** model — **not** an identity wall; the
-  lead inbox is the owner's CRM.
+- **Why it matters:** the conversion event of the product (the zero-brokerage promise is "connect
+  directly with owners"). The gate protecting owner privacy and lead quality is the **request →
+  owner-approval + conditional reveal** model — **not** an identity wall; the lead inbox is the owner's CRM.
 
 ## 2. Entry points
-- **Buyer side (create a request):** the property detail page - `ContactBox.jsx` ("Request number")
-  and `ContactOwnerModal.jsx` ("Send enquiry"), and the sticky mobile CTA + map detail panel. Route:
-  `/property/:id`.
+- **Buyer side (create a request):** the property detail page (`/property/:id`) - `ContactBox.jsx`
+  ("Request number") and `ContactOwnerModal.jsx` ("Send enquiry"), and the sticky mobile CTA + map
+  detail panel.
 - **Opt-in Verified-badge hand-off:** `src/components/auth/VerifyIdentityRedirect.jsx` — mounted
   **only** when an owner accepts "verified contacts only". It renders nothing of its own: it sends the
   requester to `/verify-identity`, where they photograph a document and record a live selfie for a
-  reviewer. It is a badge earn, not a gate.
-- **Owner side (triage leads):** dashboard Enquiries/Leads tab -
-  `src/pages/consumer/dashboard/EnquiriesPanel.jsx` + `LeadSheet.jsx`, fed by
-  `useDashboardData.js`. Route: `/dashboard` (owner view), `ProtectedRoute`.
-- **Core logic:** `src/lib/contact.js`, `src/lib/store/listings.js` (opt-in Verified-badge helpers),
-  `src/services/contactService.js`, `src/services/providers/mock/contactProvider.js`.
+  reviewer. A badge earn, not a gate.
+- **Owner side (triage leads):** Dashboard → Requests (`?tab=leads`) -
+  `src/pages/consumer/requests/RequestsPanel.jsx` + `dashboard/LeadSheet.jsx`, fed by `/me/requests`;
+  contact, flatmate and group requests also appear as request threads in Messages
+  (`messages/useRequestThreads.js`, `RequestThread.jsx`). Route: `/dashboard`, `ProtectedRoute`.
+- **Core logic:** server-enforced behind `src/services/contactService.js`
+  (`providers/http/contactProvider.js`); `src/lib/contact.js` holds only the phone masking/format helpers.
 
 ## 3. Actors & roles
 - **Maker = buyer/tenant** (signed in at **L1** — mobile OTP; no badge needed) requests the number
@@ -44,74 +44,57 @@
 
 ## 4. Entities touched
 - [`contact_requests`](../../system/data-model.md) - created by the buyer, decided by the owner.
-  Runtime store, key `draazyContactReq:<ownerDigits>` (shared with the HTML prototype).
 - [`identity_verifications`](../../system/data-model.md) - read **only** as the opt-in Verified
-  badge, and used solely by the owner "verified contacts only" path; written when a **staff reviewer
-  approves** a submitted document + selfie (key `draazyIdentity:<mobile>`, `{ verified: true, … }`).
-  It is **never** a prerequisite for the contact gate itself.
+  badge, used solely by the owner "verified contacts only" path; written when a **staff reviewer
+  approves** a submitted document + selfie. **Never** a prerequisite for the contact gate itself.
 - [`enquiries`](../../system/data-model.md) - the owner's "Enquiries" tab is **seed-only** today
   (`src/data/enquiries.json`); the buyer contact flow does **not** create rows here (see edge cases).
-- Owner privacy prefs (`dzOwnerPrefs:<mobile>`, `hideNumber`) and lead annotations
+- Owner privacy prefs (`hideNumber`) and lead annotations
   (`leadNotes`, private note + follow-up date) are read/written on the owner side.
 
 ## 5. Business rules & logic  *(the meat)*
 
-### The contact gate (from `src/lib/contact.js`)
+### The contact gate (`POST /contacts/request`)
 Under **ADR-019 (badge-not-gate)** contact is **L1-only**: the sole floor is being signed in
-(mobile-OTP). There is **no identity gate** on contacting an owner. The real "gate" is the
-**request → owner-approval + conditional reveal** model, plus one narrow opt-in exception.
+(mobile-OTP); **no identity gate**. The real "gate" is the **request → owner-approval + conditional
+reveal** model, plus one narrow opt-in exception.
 
-**Floor - signed in (L1).**
-`requestContact(ownerMobile, propId)`:
-- Returns `'login'` if no signed-in user (the UI prompts sign-in). This is the only hard prerequisite
-  to create a request.
+**Floor - signed in (L1).** `requestContact(propertyId, message)` needs a signed-in user (the UI
+prompts sign-in); the only hard prerequisite to create a request.
 
 **Narrow exception - owner "verified contacts only" (opt-in badge, L2).**
-- If, and only if, the owner has opted into `verifiedContactOnly` (`ownerVerifiedOnly(ownerMobile)`)
-  **and** the requester lacks the Verified badge (`isViewerVerified` reads `draazyIdentity:<buyerDigits>`),
-  `requestContact` returns `'verification_required'`.
+- If, and only if, the owner has opted into `verifiedContactOnly` **and** the requester lacks the
+  Verified badge, the request is refused with `verification_required`.
 - The UI (`ContactBox.request` / `ContactOwnerModal.request`) then mounts `VerifyIdentityRedirect`,
   which hands the requester to `/verify-identity` — **one document, one selfie, checked by a person
   on our team** — and resumes the request once the badge is issued. This is the **sole** path that
   turns a contact request into `verification_required`.
-- **Not the norm:** for the vast majority of listings (no `verifiedContactOnly` pref) any signed-in
-  user reaches the owner-approval step directly. Verification is a **badge, never a wall** — and no
-  verification nudge precedes this value moment.
-- **Asynchronous by design:** submitting is not passing. `POST /me/verification/identity` answers
-  **202** and a reviewer decides later, so the resumed request may be minutes or hours away. The UI
-  must not promise an instant unlock.
+- **Not the norm:** for the vast majority of listings any signed-in user reaches the owner-approval
+  step directly. Verification is a **badge, never a wall**, and no verification nudge precedes this
+  value moment.
+- **Asynchronous by design:** `POST /me/verification/identity` answers **202** and a reviewer decides
+  later (minutes or hours). The UI must not promise an instant unlock.
 
-**Owner approval (maker-checker).**
-Once past the floor (and the exception, if any), `requestContact`:
+**Owner approval (maker-checker).** Once past the floor (and the exception, if any), `requestContact`:
 - If a request already exists for this buyer+property, returns its current `status` (idempotent).
-- Otherwise unshifts a new record and returns `'pending'`:
-  ```
-  { id: 'c'+Date.now(), propId, buyerName, buyerMobile: <digits>, status: 'pending', requestedAt: Date.now() }
-  ```
-- The owner's number stays **masked** (`maskPhone` -> `+91 98xxx xxxx02`) until approved.
-- If a request already exists for this buyer+property, returns its current `status` (idempotent).
-- Otherwise unshifts a new record and returns `'pending'`:
-  ```
-  { id: 'c'+Date.now(), propId, buyerName, buyerMobile: <digits>, status: 'pending', requestedAt: Date.now() }
-  ```
+- Otherwise creates a `pending` request.
 - The owner's number stays **masked** (`maskPhone` -> `+91 98xxx xxxx02`) until approved.
 
 ### The quota, which is a second gate and is the server's (D31b)
-Being signed in gets you *to* the request; it does not get you an unlimited number of them. The free
-tier is **15 owner contacts** (`settings.fees.freeContactLimit`), the three priced plans are
-unlimited (`plans.unlimited_contacts`, V91), and a qualified referral adds 15 more.
+Being signed in gets you *to* the request, not unlimited requests. Allowances (free tier
+`settings.fees.freeContactLimit` = 15, packs, legacy `plans.unlimited_contacts` plans, friend gift) and
+the `GET /me/entitlements` → `contacts` shape are in
+[`plans-billing-refer.md`](plans-billing-refer.md) §5 "Entitlements / gating".
 
 - **The refusal is a response, not a pre-check.** `POST /contacts/request` returns **422
   `contact_quota_exhausted`**; `ContactBox` and `ContactOwnerModal` open `ContactsExhaustedModal` on
-  that error code. They deliberately do **not** read the remaining count and skip the request — that
-  was the old behaviour (`canRevealContact()` in `lib/store/contactQuota.js`, evaluated before any
-  network call), and it put the limit in the place with the least reason to respect it.
+  that error code. They deliberately do **not** read the remaining count and skip the request (the
+  old `canRevealContact()` in `lib/store/contactQuota.js` put the limit where it was least respected).
 - **What a contact costs.** `used` is `count(contact_requests where requester = me)`, so the price is
-  paid on the transition to a new row and nothing else: a repeat press on the same listing is the
-  same door and is free, a refused press is free, and an owner's approval or decline changes nothing.
-- **Reading the balance.** `GET /me/entitlements` → `{ contacts: { unlimited, used, allowance,
-  remaining, referralBonus }, listings: { … } }`. `allowance` and `remaining` are **`null`** when
-  `unlimited` — branch on the flag, never on `remaining > 0`.
+  paid on the transition to a new row only: a repeat press on the same listing is free, a refused
+  press is free, and an owner's approval or decline changes nothing.
+- **Reading the balance.** `allowance` and `remaining` are **`null`** when `unlimited` — branch on the
+  flag, never on `remaining > 0`.
 
 ### Status model (`contactStatus`)
 `'owner' | 'approved' | 'pending' | 'declined' | 'none'`:
@@ -122,48 +105,44 @@ unlimited (`plans.unlimited_contacts`, V91), and a qualified referral adds 15 mo
 - `none` - no request yet.
 
 ### Reveal rule (`ContactBox` / `ContactOwnerModal`)
-Old claim: "the server never sends the owner's number to a buyer, approved or not." User decision
-2026-10-03 reversed that. The rule is:
+User decision 2026-10-03: the server may send an approved requester the owner's real number.
 `revealed = status === 'owner' || (status === 'approved' && ownerHidesNumber === false)`.
 - **Owner's number:** an approved requester sees the owner's real mobile unless the owner has
   `users.hide_number = true`. Pending, declined, none and anonymous stay masked.
 - **Requester's number:** the owner sees the approved requester's real mobile in the lead inbox and
   in the listing chat. The masked `requester.mobile` stays as the list-safe display string.
 
-Approved listing chats now have a real-time layer: `/messages/stream` sends id-only `message`,
+Approved listing chats have a real-time layer: `/messages/stream` sends id-only `message`,
 `read`, `delivered`, `typing` and `presence` invalidations, and clients refetch the thread. The same stream
 carries a `notification` event that refreshes the bell's count (cross-cutting.md §7). Read receipts and
 online/last-seen are reciprocal privacy features (`shareReadReceipts`, `shareActivityStatus`); if
 either participant turns one off, that surface is hidden while delivery still records normally.
 
-### Owner decision (`setContactStatus`)
-- `setContactStatus(ownerMobile, reqId, 'approved'|'declined')` flips the stored request's `status`.
+### Owner decision (`respondToContactRequest`)
+- `respondToContactRequest(reqId, 'approved'|'declined')` decides the request.
 - On the dashboard, `decideContact(reqId, decision)` (in `useDashboardData.js`) sends the decision,
   toasts only once the write succeeded ("Accepted — you can chat now and see their number." /
   "Request declined."), then re-reads the inbox. Double taps are ignored while the write is in flight.
   The server audits the decision; a repeat of the same decision is a no-op 200, a different one 409,
   and a request left pending for 30 days reads as `expired` and can no longer be answered.
-- `pendingContactCount(ownerMobile)` powers the owner's "waiting on you" badge.
 
 ### The enquiry variant (`ContactOwnerModal.sendEnquiry`)
-- "Send enquiry" is also "contacting the owner", so like the number request it is **L1-only** (any
-  signed-in user; no badge). If `inAppMessaging` is on it `queueOwnerChat(p, { firstMessage })`
-  (a real chat request the owner accepts in Messages); if off it just toasts "enquiry sent". It does
-  **not** create a `contact_request` or an `enquiries` row.
+- "Send enquiry" is also "contacting the owner", so **L1-only** (no badge). If `inAppMessaging` is on
+  it `queueOwnerChat(p, { firstMessage })` (a real chat request the owner accepts in Messages); if off
+  it just toasts "enquiry sent". It does **not** create a `contact_request` or an `enquiries` row.
 
-### Owner lead inbox (`EnquiriesPanel.jsx`)
-- Aggregates several request types into one normalized **lead descriptor** and a priority queue
-  (attention-first, then longest-waiting):
-  - **Contact requests** (`contact_requests`) - "wants to contact you", Accept / Decline; accepting
-    reveals the buyer's mobile to the owner for Call/WhatsApp.
-  - **Photo requests**, **Document requests** (grouped per buyer+property; grant/decline all),
-    **Flatmate requests** (accept/decline), and **Enquiries** (seed).
-- **Triage math:** `waitingOnYou` = pending contacts + pending flatmates + photo reqs + pending doc
-  groups; `totalLeads` = all requests + enquiries; oldest-waiting age drives an urgency chip and a
-  "reply within an hour" nudge. Per-row `waitPill`: `>=24h`/`>=1h` -> hot, fresh -> "new".
-- **LeadSheet.jsx:** per-lead detail with a private note and a follow-up date
-  (`leadNotes` / `getLeadAnnotations` / `setLeadAnnotation`, keyed by owner mobile + stable lead id),
-  plus Approve/Decline, the type's primary action, and Call/WhatsApp when a mobile is available.
+### Owner lead inbox (`requests/RequestsPanel.jsx`)
+- One list per user over both `/me/requests` boxes (kinds `contact`, `visit`, `photo`, `flatmate`,
+  `group`, `document`), filtered by type tabs; each card is marked Received or Sent. Received cards
+  carry Accept / Decline, then stay for 90 days once decided with Open chat (accepted contact or
+  flatmate request) and Clear; Sent cards carry Remind / Withdraw, then Clear (and Open chat for an
+  accepted contact or flatmate request).
+  - Approving a contact request opens the chat with the buyer; the number shows in that chat.
+  - Contact, flatmate and group requests also show in Messages as locked request threads with the same
+    actions and, for a listing, its photo panel. No conversation exists until acceptance, so the
+    contact gate is unchanged.
+- **LeadSheet.jsx:** a received card's private note and follow-up date (`/me/lead-notes`, keyed by
+  `requestMeta.leadKey`).
 
 ### Owner-side record shape (number request)
 Stored under the owner's key; each item: `{ id, propId, buyerName, buyerMobile, status, requestedAt }`.
@@ -173,8 +152,8 @@ The buyer's mobile is only surfaced to the owner for Call/WhatsApp **after** app
 ## 6. Maker-checker / approval
 - **Yes - this is a canonical maker-checker.** Maker = buyer (creates a `pending` request), Checker =
   owner (approves/declines). On approval chat unlocks, the buyer's number is shown to the owner,
-  and the owner number is visible to the buyer unless hidden. On decline nothing unlocks. Reject is not resubmit-locked - a buyer's
-  existing record simply returns its status. Defined once in
+  and the owner number is visible to the buyer unless hidden. On decline nothing unlocks. Reject is not
+  resubmit-locked - a buyer's existing record simply returns its status. Defined once in
   [`../../system/cross-cutting.md`](../../system/cross-cutting.md) (section 2, and the contact row in
   the table in 2.4; the gate itself in section 3).
 
@@ -207,9 +186,9 @@ Contact request (per buyer+property):
   JPEG/PNG (8 MB max) with an optional caption; the server strips EXIF/GPS and applies the same
   phone/email masking to captions that text messages use.
 - **Enquiries tab is seed-only:** `useDashboardData` loads `listEnquiries().slice(0, 8)` from
-  `src/data/enquiries.json`; those rows are **not** owner-scoped and are **not** produced by the live
-  buyer contact/enquiry flow. Real buyer intent today materialises as **contact_requests** (and chat
-  requests), not `enquiries`. This is a notable gap to close server-side.
+  `src/data/enquiries.json`; those rows are **not** owner-scoped and **not** produced by the live
+  buyer contact/enquiry flow. Real buyer intent materialises as **contact_requests** (and chat
+  requests), not `enquiries`. A notable gap to close server-side.
 - **Cross-prototype storage:** the `draazyContactReq:<ownerDigits>` key is shared with the HTML
   prototype, so requests must stay compatible.
 - **`pn:store` event:** owner-pref changes dispatch a `pn:store` CustomEvent so open tabs re-render
@@ -246,13 +225,11 @@ badge was earned would 403 someone who is in fact verified.
 
 ### API surface
 Both `/contacts` routes are authenticated by the default-deny posture in `SecurityConfig` - the
-contract's `401` is that filter-chain response, not a check in the controller. There is no
-`@PreAuthorize` role guard, and that is correct rather than an oversight: the spec carries no
-`x-roles` on these operations and any signed-in user may ask for contact, so a role restriction
-would block the common case of an owner enquiring about somebody else's listing. Identity always
-comes from `AuthPrincipal`, never from the body. `requestContact` answers `200` rather than
-`201` because the contract models it as "tell me where I now stand" and a repeat call is
-idempotent.
+contract's `401` is that filter-chain response, not a controller check. There is no `@PreAuthorize`
+role guard, deliberately: the spec carries no `x-roles` on these operations and any signed-in user may ask
+for contact (a role restriction would block an owner enquiring about somebody else's listing). Identity
+always comes from `AuthPrincipal`, never from the body. `requestContact` answers `200` rather than
+`201` because the contract models it as "tell me where I now stand" and a repeat call is idempotent.
 
 ### Cross-context reads
 The service reads `catalog.property` and `identity.user` repositories directly.
@@ -272,42 +249,36 @@ that *is* inverted is the security-critical one: `catalog` reaches this feature 
    creating one spends an owner contact, which can run out.
 
 **Idempotent by design.** Re-requesting returns the current state rather than inserting a second row,
-so a double-tap cannot flood an owner's inbox and, more importantly, cannot reset a `declined`
-request back to `pending`, which would turn "no" into a retry loop. Two genuinely concurrent taps
-can both miss the read, so `uq_contact_requests_requester_property` is the real guarantee and the
-loser of the race simply re-reads the winner's row.
+so a double-tap cannot flood an owner's inbox or reset a `declined` request back to `pending` (which
+would turn "no" into a retry loop). Two genuinely concurrent taps can both miss the read, so
+`uq_contact_requests_requester_property` is the real guarantee and the loser re-reads the winner's row.
 
-**The quota is checked last, and only on the insert branch.** Order matters twice over. An owner
-looking at their own listing never spends a contact, because outcome 1 returns before the check. A
-caller re-reading a conversation they already opened never spends one either, because the
-existing-row probe short-circuits: running out of contacts stops you approaching a *new* owner, it
-does not close doors you already walked through. That is also what makes idempotency survive the
-quota.
+**The quota is checked last, and only on the insert branch.** An owner looking at their own listing
+never spends a contact (outcome 1 returns first). A caller re-reading a conversation they already
+opened never spends one either (the existing-row probe short-circuits): running out of contacts stops you
+approaching a *new* owner, it does not close doors already walked through. That is also what makes
+idempotency survive the quota.
 
-**The quota counts rows rather than reading a stored balance**, which is what makes it safe under
-concurrency without a lock: the count and the spend are the same fact, and the unique constraint
-settles a tie by failing the loser's insert. Two simultaneous requests against two *different*
-listings could both pass a check at the last contact and both insert - one contact over. Accepted
-knowingly: the remedy is a lock on every contact request, out of all proportion to the harm. The
-refusal message names the two ways out, because a refusal that does not is a dead end.
+**The quota counts rows rather than reading a stored balance**, which makes it safe under concurrency
+without a lock: the count and the spend are the same fact, and the unique constraint settles a tie by
+failing the loser's insert. Two simultaneous requests against two *different* listings could both pass
+a check at the last contact and both insert - one contact over. Accepted knowingly: a lock on every
+contact request is out of all proportion to the harm. The refusal message names the two ways out.
 
 ### Owner inbox
-Strictly owner-scoped: the id set comes from `properties.owner_id`, so a caller can never see a
-request against someone else's listing, and an owner with no listings gets an empty array without a
-second query. N+1-safe at three queries - listing ids, requests, requesters - regardless of inbox
-size, and the verified badge on each party is one more query for the whole page.
+Strictly owner-scoped: the id set comes from `properties.owner_id`, so a caller never sees a request
+against someone else's listing, and an owner with no listings gets an empty array without a second
+query. N+1-safe at three queries - listing ids, requests, requesters - regardless of inbox size, and the
+verified badge on each party is one more query for the whole page.
 
-
-`respondContactRequest` enforces owner scope by lookup, not by a check after the fact: the row is
-only accepted once `properties.findByIdAndOwner_Id` confirms the caller owns the listing it points
-at. A request belonging to another owner is a `404`, never a `403` - we do not confirm that
-someone else's lead exists. Both end states are terminal, so an owner cannot revoke a reveal the
-buyer has already seen. Approval notifies the buyer inside the same transaction; a decline stays
-silent on purpose.
+`respondContactRequest` enforces owner scope by lookup: the row is only accepted once
+`properties.findByIdAndOwner_Id` confirms the caller owns the listing it points at. A request belonging
+to another owner is a `404`, never a `403` (we do not confirm that someone else's lead exists). Both end
+states are terminal, so an owner cannot revoke a reveal the buyer has already seen. Approval notifies
+the buyer inside the same transaction; a decline stays silent on purpose.
 
 ### Reveal policy
-Old D5 claim: "An owner's raw number is never revealed to another viewer." User decision
-2026-10-03 reversed it. A non-owner viewer sees the owner's raw mobile only when all three are true:
+User decision 2026-10-03: a non-owner viewer sees the owner's raw mobile only when all three are true:
 the viewer has an `approved` contact request on that listing, the listing owner is the counterparty,
 and `users.hide_number` is false. Everyone else receives the masked form; owners always see their
 own number. `verificationRequired` is false for the owner of the listing, whatever their own

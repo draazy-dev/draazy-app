@@ -33,6 +33,9 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
     @Autowired
     UserRepository users;
 
+    @Autowired
+    jakarta.persistence.EntityManager em;
+
     private final List<String> createdActors = new ArrayList<>();
     private int nextMobile = 1;
 
@@ -60,14 +63,13 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Team up in Baner","locality":"Baner","policy":"%s",
-                                 "rent":30000,"seats":3,"seatsOpen":2,"name":"Host"}
-                                """.formatted(policy)))
+                        .content(FlatmateGroupFixture.hunting("Team up in Baner", "Baner", policy)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        em.flush();
         jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", id);
+        em.clear();
         return id;
     }
 
@@ -81,9 +83,19 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
         return mvc.perform(post(Routes.Flatmates.GROUP_JOIN, groupId)
                 .header(HttpHeaders.AUTHORIZATION, bearer(who))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"));
+                .content("{\"gender\":\"female\"}"));
     }
 
+    private void accept(String groupId, User requester) throws Exception {
+        String requestId = jdbc.queryForObject("select id::text from flatmate_requests "
+                + "where target_id = ?::uuid and requester_id = ?::uuid", String.class, groupId,
+                requester.getId().toString());
+        mvc.perform(patch(Routes.Flatmates.MY_REQUEST_BY_ID, requestId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(hostOf(groupId)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"accepted\"}"))
+                .andExpect(status().isOk());
+    }
     private ResultActions leave(String groupId, User who) throws Exception {
         return mvc.perform(delete(Routes.Flatmates.GROUP_MEMBERSHIP, groupId)
                 .header(HttpHeaders.AUTHORIZATION, bearer(who)));
@@ -129,6 +141,7 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
         User seeker = user("Leaver");
         String first = group("any");
         join(first, seeker).andExpect(status().isCreated());
+        accept(first, seeker);
         join(group("any"), seeker).andExpect(status().isCreated());
         assertThat(count("select seats_open from flatmate_groups where id = ?::uuid", first))
                 .isEqualTo(1);
@@ -160,7 +173,9 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
     @DisplayName("an admin lowering the limit is re-checked when the host accepts")
     void acceptRechecksTheLimit() throws Exception {
         User seeker = user("Waiting");
-        join(group("any"), seeker).andExpect(status().isCreated());
+        String open = group("any");
+        join(open, seeker).andExpect(status().isCreated());
+        accept(open, seeker);
         String gated = group("women");
         join(gated, seeker).andExpect(status().isCreated());
         String requestId = jdbc.queryForObject("select id::text from flatmate_requests "

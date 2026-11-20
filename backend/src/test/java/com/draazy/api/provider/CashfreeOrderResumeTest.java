@@ -6,10 +6,8 @@ import com.draazy.api.provider.CashfreePaymentGateway.OrderResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-// A resumed checkout must never hand out a session for an order that can no longer be paid.
 @DisplayName("A closed Cashfree checkout is resumed only while its order is ACTIVE")
 class CashfreeOrderResumeTest {
-
     @Test
     @DisplayName("an ACTIVE order yields its session")
     void activeOrderResumes() {

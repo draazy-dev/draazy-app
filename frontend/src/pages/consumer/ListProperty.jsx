@@ -1,4 +1,4 @@
-import { Sparkles, CheckCircle2, LayoutDashboard } from 'lucide-react';
+import { Sparkles, CheckCircle2, LayoutDashboard, BadgeCheck } from 'lucide-react';
 import { useSearchParams, Link } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
 import { usePricing } from '../../context/PricingContext';
@@ -6,6 +6,7 @@ import '../../styles/routes/list-property.css';
 import useListProperty from './list-property/useListProperty';
 import ListPropertyModals from './list-property/ListPropertyModals';
 import ProgressMeter from './list-property/ProgressMeter.jsx';
+import { copyContextOf } from './list-property/constants.js';
 import StepNav, { LISTING_STEPS } from './list-property/StepNav.jsx';
 import EditPolicyBanner from './list-property/EditPolicyBanner.jsx';
 import PropertyDetailsStep from './list-property/PropertyDetailsStep.jsx';
@@ -16,13 +17,15 @@ import FlatmateFlow from './list-property/FlatmateFlow.jsx';
 import PostSuccessSplitNudge from './list-property/PostSuccessSplitNudge.jsx';
 import InlineOtpSheet from '../../components/auth/InlineOtpSheet.jsx';
 import ListingStatusCard from '../../components/listing/ListingStatusCard.jsx';
+import PassValueLine from '../../components/billing/PassValueLine.jsx';
+import { passPriceKey, passSlug } from '../../lib/dealPlans.js';
 
 const ListPropertyForm = () => {
   const vm = useListProperty();
   const { fee } = usePricing();
   const {
-    t, navigate, showSuccess, isFlatmateMode, editId, editRoomId, editApproved, editChanges,
-    postedListing, savedListingStatus, editReady, editLoading, editLoadError, retryEditLoad, legacyAddress,
+    t, navigate, showSuccess, isFlatmateMode, flatmateMode, editId, editRoomId, editApproved, editChanges, claimMode,
+    postedListing, postedRoom, savedListingStatus, editReady, editLoading, editLoadError, retryEditLoad, legacyAddress,
     authPromptOpen, closeAuthPrompt,
     progressState, passListingId,
     activeListingCount, listingLimit, quotaFull, currentStep, setCurrentStep,
@@ -91,7 +94,6 @@ const ListPropertyForm = () => {
                       : t('listProperty.success.editReviewBody'))
               : t('listProperty.success.newBody')}
           </p>
-            {/* Verification is optional and offered only after a new property is posted. */}
           {!isFlatmateMode && (
             <ListingStatusCard
               listing={successListing}
@@ -104,9 +106,19 @@ const ListPropertyForm = () => {
           )}
           {passListingId && !isFlatmateMode && !editId && (
             <div className="mb-6 rounded-xl border border-amber-400/30 bg-amber-400/5 p-4 text-left">
-              <p className="text-sm text-amber-100">{t('listProperty.success.passNote', { price: fee('listingPass') })}</p>
-              <Link to={`/checkout?plan=listing-pass&property=${encodeURIComponent(passListingId)}`} className="btn-teal mt-3 inline-flex min-h-[44px] items-center justify-center px-5 py-2.5 rounded-xl text-white font-semibold text-sm">
-                {t('listProperty.success.passCta', { price: fee('listingPass') })}
+              <p className="text-sm text-amber-100">{t('listProperty.success.passNote', { price: fee(passPriceKey(form.deal)) })}</p>
+              <Link to={`/checkout?plan=${passSlug(form.deal)}&property=${encodeURIComponent(passListingId)}`} className="btn-teal mt-3 inline-flex min-h-[44px] items-center justify-center px-5 py-2.5 rounded-xl text-white font-semibold text-sm">
+                {t('listProperty.success.passCta', { price: fee(passPriceKey(form.deal)) })}
+              </Link>
+              <PassValueLine deal={form.deal} className="mt-2 text-xs text-amber-100/80" />
+            </div>
+          )}
+          {isFlatmateMode && postedRoom?.id && postedRoom.hostRole === 'tenant' && !postedRoom.agreementDeclared && (
+            <div className="mb-6 rounded-xl border border-teal-400/30 bg-teal-400/5 p-4 text-left" data-testid="room-agreement-nudge">
+              <p className="text-sm font-semibold text-white">{t('listProperty.success.agreementTitle')}</p>
+              <p className="mt-1 text-xs text-gray-400">{t('listProperty.success.agreementBody')}</p>
+              <Link to={`/dashboard?tab=documents&room=${encodeURIComponent(postedRoom.id)}`} className="btn-teal mt-3 inline-flex min-h-[44px] items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold text-sm">
+                <BadgeCheck className="w-4 h-4" /> {t('listProperty.success.agreementCta')}
               </Link>
             </div>
           )}
@@ -120,8 +132,6 @@ const ListPropertyForm = () => {
               </button>
             )}
           </div>
-          {/* A rent listing can also be let one room at a time. */}
-
           {postedListing && <PostSuccessSplitNudge listing={postedListing} />}
         </div>
       </div>
@@ -131,8 +141,6 @@ const ListPropertyForm = () => {
   return (
     <div className="lp-page min-h-[100dvh] pb-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
-        {/* Keep the first form field above the fold on small phones. */}
-
         <div className="text-center mb-5 sm:mb-10">
           <div className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-sm font-medium mb-5">
             <Sparkles className="w-4 h-4" /> {t('listProperty.page.badge')}
@@ -148,26 +156,29 @@ const ListPropertyForm = () => {
           done={progressState.done}
           total={progressState.total}
           nudge={progressState.nudge}
+          context={copyContextOf(form.propertyType)}
         />
 
         {listingLimit != null && !editId && !isFlatmateMode && (
           <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-semibold text-gray-300">
             <p>{t('listProperty.quota.entry', { count: listingLimit, used: activeListingCount, allowance: listingLimit })}</p>
-            {quotaFull && <p className="mt-1 font-normal text-amber-200">{t('listProperty.success.passNote', { price: fee('listingPass') })}</p>}
+            {quotaFull && <p className="mt-1 font-normal text-amber-200">{t('listProperty.success.passNote', { price: fee(passPriceKey(form.deal)) })}</p>}
           </div>
         )}
 
-        {editId && <EditPolicyBanner approved={editApproved} changes={editChanges} />}
+        {claimMode ? (
+          <p data-testid="claim-banner" className="mb-4 rounded-xl border border-amber-400/30 bg-amber-400/5 px-4 py-3 text-sm text-amber-100">
+            {t('listProperty.claim.banner')}
+          </p>
+        ) : editId && <EditPolicyBanner approved={editApproved} changes={editChanges} />}
 
             <StepNav current={currentStep} steps={LISTING_STEPS} onJump={jumpTo} />
-            {/* Narrow mobile gutters leave room for paired fields. */}
-
             <div className="glass-card rounded-2xl px-3 py-6 sm:p-8 lg:p-10" data-testid="listing-wizard">
 
               {(currentStep === 1) && (
                 <PropertyDetailsStep
-                  allowFlatmate={!editId && !editRoomId}
-                  lockDeal={!!editRoomId}
+                  allowFlatmate={!editId && !flatmateMode}
+                  lockDeal={!!editRoomId || (flatmateMode && !editId)}
                   form={form}
                   set={set}
                   onPropertyType={changePropertyType}
@@ -182,7 +193,6 @@ const ListPropertyForm = () => {
                   isHouse={isHouse}
                   toggleInArray={toggleInArray}
                   nextStep={nextStep}
-                  money={money}
                   onReset={openResetConfirm}
                 />
               )}
@@ -253,6 +263,7 @@ const ListPropertyForm = () => {
                   onJump={jumpTo}
                   needsAuthForMedia={needsAuthForMedia}
                   onRequireAuth={requestAuthPrompt}
+                  claimMode={claimMode}
                 />
               )}
 
@@ -261,7 +272,6 @@ const ListPropertyForm = () => {
                   form={form}
                   set={set}
                   errors={errors}
-                  money={money}
                   photos={photos}
                   handlePhotoUpload={handlePhotoUpload}
                   removePhoto={removePhoto}
@@ -271,15 +281,15 @@ const ListPropertyForm = () => {
                   mediaStatus={mediaStatus}
                   prevStep={prevStep}
                   nextStep={nextStep}
+                  money={money}
                   submitFlatmate={submitFlatmate}
                   isEditing={!!editRoomId}
                   onReset={openResetConfirm}
-                  mapSearch={mapSearch}
-                  onMapSearchChange={onMapSearchChange}
-                  runMapSearch={runMapSearch}
-                  mapSearchStatus={mapSearchStatus}
-                  onAreaSelect={onAreaSelect}
                   onSocietyPick={onSocietyPick}
+                  societyFillNotice={societyFillNotice}
+                  canUseCurrentLocation={canUseCurrentLocation}
+                  useCurrentLocation={useCurrentLocation}
+                  currentLocationStatus={currentLocationStatus}
                   geoFillStatus={geoFillStatus}
                   flyTo={flyTo}
                   onLocalityChange={onLocalityChange}
@@ -303,8 +313,6 @@ const ListPropertyForm = () => {
     </div>
   );
 };
-// Remount per owner/listing so pending uploads, geocodes and draft timers cannot cross editors.
-
 const ListProperty = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();

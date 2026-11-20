@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import { excerptFor } from '../../lib/help.js';
 import { useHelpSearch } from '../../lib/useHelp.js';
-/* Enter goes to the full results page rather than staying in the dropdown, so a query is always shareable as a URL. */
 
 export default function HelpSearch({ variant = 'bar', initialQuery = '' }) {
   const { t } = useTranslation();
@@ -24,8 +23,6 @@ export default function HelpSearch({ variant = 'bar', initialQuery = '' }) {
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
-  // "/" focuses search from anywhere in the help centre, the convention every
-  // docs site uses. Ignored while the user is typing in another field.
 
   useEffect(() => {
     const onKey = (e) => {

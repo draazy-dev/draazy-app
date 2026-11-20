@@ -5,8 +5,8 @@ category: search-visits
 audience: tenant
 order: 4
 featured: true
-updated: 2026-10-13
-summary: How to book a site visit, what to check when you are there, and what to do if the owner does not turn up.
+updated: 2026-11-06
+summary: How to book a site visit, track or move it, what to check when you are there, and what to do if the owner does not turn up.
 tags: [visit, viewing, checklist]
 ---
 
@@ -14,11 +14,11 @@ tags: [visit, viewing, checklist]
 
 From any property page, tap **Schedule a Visit**. Visits are in person only. Choose a date and a time, add an optional note, and tap **Confirm Visit**. You need to be signed in, and the owner sees the name on your profile. Dates are forward-only; you cannot book yesterday.
 
-The owner is notified and has to confirm the slot. Until they do, your visit reads **Awaiting confirmation**. Track everything under **Dashboard → Visits**.
+The owner is notified and has to confirm the slot. Until they do, your visit reads **Awaiting confirmation**. Track everything under **Dashboard → Visits**. The same visit also shows in **Dashboard → Requests** (Visits tab) as "Visit · {slot}". There you can **Remind** the owner or **Withdraw** the request while it is pending. When the owner confirms, the status reads **Confirmed** and **Message** opens a chat with them. After the day, the owner marks it **Visited** or **No-show**.
 
-A visit uses one owner contact from the same allowance as a contact request. It is free if you have already contacted that owner about the listing, or already booked a visit there. Cancelling before the owner confirms gives the contact back; once they confirm, it stays used, as an approved contact request does. A visit the owner has not answered keeps holding a contact until you cancel it. You can only have **one live request per property**; if you already have one, manage or move that visit from your dashboard instead of sending a duplicate.
+A visit uses one owner contact from the same allowance as a contact request. It is free if you have already contacted that owner about the listing, or already booked a visit there. Cancelling before the owner confirms gives the contact back; once they confirm, it stays used, as an approved contact request does. A visit the owner has not answered keeps holding a contact until you cancel it. You can only have **one live request per property**; if you already have one, manage or move that visit from your dashboard instead of sending a duplicate. If you cancel a visit, you can book that property again after 24 hours.
 
-If either side reschedules, the visit goes back to awaiting confirmation so both sides re-agree on the new slot. Cancel anything you no longer want; owners see your history.
+To move a visit, tap **Reschedule** on it in **Dashboard → Visits**, pick a new date and time and tap **Save new slot**. If either side reschedules, the visit goes back to **Awaiting confirmation** so both sides re-agree on the new slot. Cancel anything you no longer want; owners see your history.
 
 > [!NOTE]
 > A visit the owner marks as completed is what unlocks your **Visited** review on that listing. Reviews are gated on a visit the owner confirmed actually happened, which is why a booked-but-unconfirmed visit does not unlock one.
@@ -60,9 +60,10 @@ If either side reschedules, the visit goes back to awaiting confirmation so both
 
 ## If the owner does not show up
 
-Only the owner can mark a confirmed visit as a no-show; you can only cancel. If the owner does not turn up, or marks you a no-show when you were there, raise it with [Support](/support) with the listing and the slot.
+Only the owner can mark a confirmed visit as a no-show; you can only cancel. If the owner does not turn up, or marks you a no-show when you were there, open [Messages](/messages), pick **Draazy support**, choose the listing under **About** and mention the slot.
 
 ## Related
 
 - [Contacting owners](/help/a/contacting-owners)
+- [Offers and closing the deal](/help/a/offers-and-closing)
 - [Deposits, rent and what is negotiable](/help/a/deposits-and-rent)

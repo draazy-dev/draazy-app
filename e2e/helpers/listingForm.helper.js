@@ -1,10 +1,12 @@
 import { expect } from '@playwright/test';
 
 export const LIST_PROPERTY_DRAFT_KEY = 'dzDraft:list-property:v3';
-export const LIST_PROPERTY_DRAFT_PREFIX = 'dzDraft:list-property';
 
-export const readListPropertyDraft = (page) => page.evaluate(
-  (key) => localStorage.getItem(key), LIST_PROPERTY_DRAFT_KEY);
+/* A signed-in owner's draft lives under `<key>:<ownerId>`; read it, else the signed-out slot. */
+export const readListPropertyDraft = (page) => page.evaluate((key) => {
+  const own = Object.keys(localStorage).find((k) => k.startsWith(`${key}:`));
+  return localStorage.getItem(own ?? key);
+}, LIST_PROPERTY_DRAFT_KEY);
 
 export async function pickDeal(page, deal = 'buy') {
   const label = deal === 'rent' ? 'Rent' : 'Sale';

@@ -2,7 +2,7 @@ import { test, expect } from '../../../fixtures/live.js';
 import { signedInAsNew } from '../../../helpers/liveAuth.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { pickFloors, readListPropertyDraft, LIST_PROPERTY_DRAFT_KEY } from '../../../helpers/listingForm.helper.js';
-import { uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
+import { PHOTO_PNG, uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { fillSociety } from '../../../helpers/places.js';
 import { pickLocality } from '../../../helpers/locality.js';
 
@@ -94,6 +94,7 @@ test('uploaded photos and the current step restore after reload', async ({ page 
       body: JSON.stringify({ url: `https://cdn.example.test/list-property-${photoId}.jpg` }),
     });
   });
+  await page.route('https://cdn.example.test/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PHOTO_PNG }));
   await gotoFlow(page);
   await completeToPhotos(page);
   await uploadPublishablePhotos(page);
@@ -104,6 +105,48 @@ test('uploaded photos and the current step restore after reload', async ({ page 
   await expect(page.getByRole('heading', { name: /Photos & description/i })).toBeVisible({ timeout: 20000 });
   await expect(page.locator('[data-err="photos"] img')).toHaveCount(3);
   await expect.poll(() => new URL(page.url()).searchParams.get('step')).toBe('4');
+});
+
+test('a restored draft drops a photo the server has since deleted and asks for it again', async ({ page }) => {
+  let photoId = 0;
+  await page.route('**/api/me/photos', async (route) => {
+    photoId += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ url: `https://cdn.example.test/swept-${photoId}.jpg` }),
+    });
+  });
+  let swept = false;
+  let flaky = 0;
+  await page.route('https://cdn.example.test/**', (route) => {
+    if (flaky > 0 && route.request().url().endsWith('/swept-1.jpg')) {
+      flaky -= 1;
+      return route.abort('connectionreset');
+    }
+    return swept && route.request().url().endsWith('/swept-2.jpg')
+      ? route.fulfill({ status: 404, body: '' })
+      : route.fulfill({ status: 200, contentType: 'image/png', body: PHOTO_PNG });
+  });
+  await gotoFlow(page);
+  await completeToPhotos(page);
+  await uploadPublishablePhotos(page);
+  await expect.poll(() => readListPropertyDraft(page)).toContain('swept-3.jpg');
+
+  flaky = 1;
+  await page.reload();
+  const photos = page.locator('[data-err="photos"]');
+  await expect.poll(() => flaky).toBe(0);
+  // Outlasts the probe's retry, which is what would drop the photo.
+  await page.waitForTimeout(3000);
+  await expect(photos.locator('img'), 'a photo that failed to load once is kept').toHaveCount(3);
+  await expect(photos.getByText('A saved photo expired. Add it again.')).toHaveCount(0);
+
+  swept = true;
+  await page.reload();
+  await expect(photos.locator('img')).toHaveCount(2, { timeout: 20000 });
+  await expect(photos.getByText('A saved photo expired. Add it again.')).toBeVisible();
+  await expect.poll(() => readListPropertyDraft(page)).not.toContain('swept-2.jpg');
 });
 
 test('browser Back returns to the previous wizard step, and submitting without durable photo URLs does not add Unsplash fallbacks', async ({ page }) => {

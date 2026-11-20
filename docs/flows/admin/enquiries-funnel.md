@@ -10,9 +10,8 @@
 - **Persona:** an operations / growth lead watching demand health and conversion.
 - **Job-to-be-done:** "Track incoming leads, move them through their stages, and see how many
   enquiries become visits and deals - and where the revenue comes from."
-- **Why it matters:** this is the funnel view of the whole marketplace - top-of-funnel demand
-  (enquiries) through the mid-funnel (visits) to the bottom (closed deals / GMV). It quantifies the
-  conversion that [`property-verification.md`](./property-verification.md) supply feeds.
+- **Why it matters:** the funnel view of the whole marketplace - top (enquiries), mid (visits), bottom
+  (closed deals / GMV). It quantifies the conversion that [`property-verification.md`](./property-verification.md) supply feeds.
 
 ## 2. Entry points
 - **Routes:** `/admin/enquiries`. Tabs: `enquiries`, `visits`, `deals`, `funnel`.
@@ -42,23 +41,20 @@
 
 ### 5.1 Loading & tab data
 `reload()` fetches `listEnquiries()` always, and `listVisits()` / `listDeals()` only when their flags
-are enabled — all three through `services/enquiryBoardService.js` since D25, so the screen runs over
-`GET /admin/{enquiries,visits,deals}`. The
-active tab picks the base list; `rows` applies status filter, type filter (`deal`, deals only), free-
+are enabled — all via `services/enquiryBoardService.js` (D25), i.e. `GET /admin/{enquiries,visits,deals}`.
+The active tab picks the base list; `rows` applies status filter, type filter (`deal`, deals only), free-
 text search (`JSON.stringify(r).includes(q)`), and a date-range cutoff over `at`/`when`.
 
-**Contact numbers arrive masked** (`98XXXXX210`). See 5.4a.
+**Contact numbers arrive in full**, as on every back-office surface. See 5.4a.
 
-The enquiry **type** filter is gone. It labelled every enquiry `contact`, `chat` or `call`;
-only `contact` is a row in a table, chats are private to their participants, and the platform
-places no calls — so the picker offered a vocabulary with one
-real value. Deals keep their `buy`/`rent` type filter, which is a column.
+There is no enquiry **type** filter: only `contact` is a row in a table, chats are private to
+their participants, and the platform places no calls. Deals keep their `buy`/`rent` type filter (a column).
 
 ### 5.2 KPIs
 `kpis` memo:
 - **Enquiries** = total enquiry count.
 - **Awaiting owner** = enquiries with `status === 'pending'`, counted through `AWAITING_STATUSES`.
-  The tile is labelled *Awaiting owner* rather than *Open leads* because `pending` means awaiting the
+  Labelled *Awaiting owner* rather than *Open leads* because `pending` means awaiting the
   **owner's** decision, and the only moves out of it (`approved`, `declined`) are the owner's, not
   this desk's.
 - **Site visits** = visit count.
@@ -67,8 +63,7 @@ real value. Deals keep their `buy`/`rent` type filter, which is a column.
 ### 5.3 Funnel stages & status vocab
 `enquiries/constants.js` carries the status vocabulary the console filters on:
 - **Enquiry `status`:** contract `pending | approved | declined`. Type (`kind`) is retired — see 5.1.
-- **Visit `status`:** contract `scheduled | confirmed | completed | cancelled | no-show`; the console
-  previously offered only three of those.
+- **Visit `status`:** contract `scheduled | confirmed | completed | cancelled | no-show`.
 - **Deal `status`:** contract `active | reserved | closed`.
 
 ### 5.4 Row actions (state transitions)
@@ -81,33 +76,24 @@ The board is **read-only on the server**.
 | enquiries | Mark responded | status `pending` | an internal note on the listing |
 | deals | View | - | read-only detail modal |
 
-"Mark responded" exists because the *intent* is real — an operator wants to
-record that they acted — but the mechanism changed: `addNote('listing', propertyId, …)` through the
-`note` domain, rather than a status field on a conversation the platform is not party to and the two
-participants cannot see.
+"Mark responded" records that an operator acted, via `addNote('listing', propertyId, …)` through the
+`note` domain, not a status field on a conversation the platform is not party to.
 
-### 5.4a The audited reveal (D25)
-A per-row Unlock button calls `GET /admin/{enquiries,visits,deals}/{id}`, which returns the same row
-with the one contact number readable and writes an `audit_log` entry **before** answering.
+### 5.4a The audited detail (D25)
+**View** calls `GET /admin/{enquiries,visits,deals}/{id}`, which returns the same row and writes an
+`audit_log` entry **before** answering. The list already carries the full number; browsing it
+writes no audit row.
 
-- **A detail read, never `?reveal=true` on the list.** A parameter makes bulk disclosure a single
-  request and reduces the audit trail to "somebody looked at forty numbers".
-- **Admin-only on the existing `enquiries:read` atom** — the role term is raised, the atom is not
-  duplicated, matching `UserAdminController.TIMELINE_READ`. A staffer therefore reads the board and
-  cannot open a row. (They never see the button: the whole admin console is admin-only at the
-  router, so the split is asserted at the API in `EnquiryBoardEndpointsTest`.)
+- **Same `enquiries:read` atom** as the list, so any staffer who reads the board can open a row.
 - **The audit row stores the masked number**, so the log is not a second copy of the secret. On the
   deals route it also records `source: off-platform | account`, because a counterparty mobile may
   have been typed by an owner closing privately and belong to nobody with an account here.
-- The reply replaces the row in place, so the CSV export — which writes whatever is in memory — can
-  only ever carry numbers an operator deliberately opened, one audited click at a time.
 
 ### 5.5 Assignment (current state)
 - The admin enquiries desk has **no assignee field today** - enquiries/visits are triaged by status,
-  not routed to a named owner within this page. This is an honest gap to close server-side.
-- The nearest existing "assignment"-like feature is the **owner-side** lead desk
-  (`src/lib/leadNotes.js`): per-lead private `note` + `followUpAt`, keyed by owner digits in
-  `draazyLeadNotes:<ownerDigits>`. That is a consumer/owner CRM affordance, not admin routing.
+  not routed to a named owner. A gap to close server-side.
+- The nearest feature is the **owner-side** lead desk (`src/lib/leadNotes.js`): per-lead private `note` +
+  `followUpAt`, keyed by owner digits in `draazyLeadNotes:<ownerDigits>`. An owner CRM affordance, not admin routing.
 - Service tickets (a different flow) carry a `team`; enquiries do not. A future backend should add
   `assignedTo` / `owner` to enquiries for a real lead-assignment funnel.
 
@@ -117,19 +103,15 @@ Computed client-side over the (deal + date) filtered sets:
 - **Rates:** `enqToVisit = round(visit/enq * 100)`, `visitToDeal = round(deal/visit * 100)`,
   `enqToDeal = round(deal/enq * 100)`; each guards divide-by-zero (0 when denominator is 0).
 - **Revenue per enquiry** = `round(dealGMV / enqCount)`.
-- **Locality breakdown:** rows carry the listing's real `locality` since D25. It used to be parsed
-  out of the listing *title* with `split(' in ')[1]`, which worked on seeded titles shaped
-  "2 BHK in Kothrud" and returned "Unknown" for every real listing — so the table was a ranking of
-  one bucket. The title split survives only as a fallback for rows with no locality field.
-  Rows aggregate enquiries/visits/deals/GMV and a per-locality conversion %, sorted by enquiries,
-  top 10.
-- **Filters:** deal (`buy`/`rent`) and a date-range cutoff (`inRange`). The `|| item.kind ===` arm
-  is gone with `kind`: it matched nothing on live data.
+- **Locality breakdown:** rows carry the listing's real `locality` (D25). The old `split(' in ')[1]` title
+  parse (works only on seeded titles like "2 BHK in Kothrud") survives only as a fallback for rows with no
+  locality field. Rows aggregate enquiries/visits/deals/GMV and a per-locality conversion %, sorted by enquiries, top 10.
+- **Filters:** deal (`buy`/`rent`) and a date-range cutoff (`inRange`).
 
 ### 5.7 What MUST move server-side
 - Funnel aggregation, conversion rates, GMV, and locality rollups (currently recomputed in the browser
-  over full in-memory lists — the http provider asks for one 200-row page so the numbers are at least
-  over the whole board rather than over a page of twenty).
+  over full in-memory lists — the http provider asks for one 200-row page, so numbers cover the whole
+  board rather than a page of twenty).
 - Lead assignment/routing (not modeled yet).
 - ~~The fragile locality parse~~ — done in D25; rows carry `locality` from the listing.
 
@@ -137,7 +119,7 @@ Computed client-side over the (deal + date) filtered sets:
 - **Applicable: no** for the admin funnel itself - enquiry/visit status updates are single-actor
   operational tracking, not a propose/approve gate.
 - The upstream **visit request** is a maker-checker elsewhere (buyer proposes a slot, owner confirms /
-  cancels via `PATCH /visit-requests/:id/status`); by the time a visit appears in this admin desk it
+  cancels via `PATCH /visit-requests/:id/status`); by the time a visit appears in this desk it
   is already a confirmed record the operator maintains. See
   [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2 for the shared pattern and
   [`../consumer/schedule-visit.md`](../consumer/schedule-visit.md) for the maker-checker on visits.
@@ -145,7 +127,7 @@ Computed client-side over the (deal + date) filtered sets:
 ## 7. State machine
 - **Enquiry:** `pending -> approved | declined`, both terminal and both the **owner's** move, not
   this desk's. The legacy `new -> open -> responded -> closed` chain was a browser-store invention
-  the API never emitted; its options selected nothing and have been dropped from the picker.
+  the API never emitted; it is dropped from the picker.
 - **Visit:** `scheduled -> completed | cancelled`; reschedule updates `when` and keeps it
   `scheduled`. `completed`/`cancelled` are terminal (no further actions).
 - **Deal:** `in_progress -> closed` (read-only here; closed deals feed GMV and the funnel).

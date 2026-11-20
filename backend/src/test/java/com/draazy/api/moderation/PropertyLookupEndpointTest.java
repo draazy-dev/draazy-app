@@ -32,7 +32,7 @@ class PropertyLookupEndpointTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("a hit carries six fields and the owner's name, not the owner's contact details")
+    @DisplayName("a hit carries six fields, the owner's name and full mobile")
     void hitIsSlim() throws Exception {
         User owner = person("9855200001", Roles.Wire.OWNER, "Lookup Owner");
         Property p = new Property(owner, "Zanzibar lookup fixture", "rent", "apartment", 25000L, "Kothrud", "Pune");
@@ -45,6 +45,7 @@ class PropertyLookupEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Zanzibar lookup fixture"))
                 .andExpect(jsonPath("$.content[0].owner").value("Lookup Owner"))
+                .andExpect(jsonPath("$.content[0].ownerMobile").value("9855200001"))
                 .andExpect(jsonPath("$.content[0].status").value("pending"))
                 .andExpect(jsonPath("$.content[0].id").exists())
                 .andExpect(jsonPath("$.content[0].price").doesNotExist())

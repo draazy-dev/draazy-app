@@ -27,14 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-// Role guards cannot express conversation access; participant checks do.
 @RestController
 @Validated
 public class ConversationsController {
-
     private final ConversationService service;
 
-    // Opening a thread has separate trust rules from carrying one on.
     private final ConversationOpeningService opening;
 
     public ConversationsController(ConversationService service, ConversationOpeningService opening) {
@@ -144,6 +141,12 @@ public class ConversationsController {
     public ConversationDto openForFlatmateRequest(@CurrentUser AuthPrincipal principal,
             @PathVariable String requestId) {
         return opening.openForFlatmateRequest(principal, requestId);
+    }
+
+    @PostMapping(Routes.Conversations.LEAD_REQUEST)
+    public ConversationDto openForLeadRequest(@CurrentUser AuthPrincipal principal,
+            @PathVariable String kind, @PathVariable String requestId) {
+        return opening.openForLeadRequest(principal, kind, requestId);
     }
 
     public record MessageCreate(@NotBlank @Size(max = 4000) String body,

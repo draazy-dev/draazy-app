@@ -6,8 +6,6 @@ import {
   isLandType, landUseFor, DEPOSIT_MONTHS,
 } from '../../consumer/list-property/constants.js';
 
-/* Shared canonical option data, imported from the consumer "Post a property" flow
-   so the two forms can never drift apart. Re-exported for the wizard steps. */
 export {
   floorOptions, totalFloorsOptions,
   naStatusOptions, otherRightsOptions, buyerEligibilityOptions,
@@ -17,7 +15,6 @@ export {
 
 export const typeOptions = PROPERTY_TYPES;
 export const NONRES_TYPES = ['commercial', 'openplot', 'farmland'];
-/* Raw-land types have no built structure. */
 export const LAND_TYPES = ['openplot', 'farmland'];
 
 export const bhkOptions = [
@@ -26,28 +23,21 @@ export const bhkOptions = [
   { value: '5', label: '5+ BHK' },
 ];
 
-/* Furnishing keys match the consumer canonical (unfurnished / semi / furnished) so
-   an admin-posted listing is found under the same Furnishing filter. */
 export const furnishingOptions = [
   { value: 'unfurnished', label: 'Unfurnished' },
   { value: 'semi', label: 'Semi-Furnished' },
   { value: 'furnished', label: 'Furnished' },
 ];
 
-/* Commercial shell type (consumer stores tuples; expose {value,label}). */
 export const shellTypeOptions = shellOptions.map(([value, label]) => ({ value, label }));
 
-/* Mirrors the consumer inline options value-for-value so listings created either way filter identically. */
 export const possessionOptions = [
   { value: 'ready', label: 'Ready to Move' }, { value: 'new', label: 'New Launch' },
   { value: 'under', label: 'Under Construction' },
 ];
 
-/* localStorage key for the concierge draft (survives an accidental refresh mid-call). A draft stores its
-   step number, so the key changes whenever the steps are renumbered. */
 export const DRAFT_KEY = 'dz_pob_draft_v2';
 
-/* Mirrors the owner's own List Property rail (list-property/StepNav.jsx), so both flows read alike. */
 export const STEPS = [
   { id: 1, label: 'Details', icon: Home },
   { id: 2, label: 'Location', icon: MapPin },
@@ -56,7 +46,6 @@ export const STEPS = [
 ];
 export const LAST_STEP = STEPS.length;
 
-/* Only what is critical and unique to the property; the owner completes the rest after claiming. */
 export const INITIAL_FORM = {
   ownerName: '', ownerMobile: '', ownerNotes: '',
   deal: 'rent', propertyType: '', commercialType: '', bhk: '', carpetArea: '',

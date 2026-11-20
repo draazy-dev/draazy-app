@@ -6,18 +6,18 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.security.AuthPrincipal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Not the owner's update path, which re-derives tier, consent and agreement from the caller (here the moderator);
- * the edit is audited and does not send the post back for review. */
 @Service
 public class FlatmateModeratorEditService {
-
     private final FlatmateSeekerPostRepository posts;
     private final FlatmateRoomRepository rooms;
     private final FlatmateGroupRepository groups;
@@ -38,15 +38,49 @@ public class FlatmateModeratorEditService {
 
     @Transactional
     public void edit(AuthPrincipal caller, UUID id, FlatmateModeratorEdit body) {
-        String kind = posts.findById(id).map(p -> editPost(p, body))
-                .or(() -> rooms.findById(id).map(r -> editRoom(r, body)))
-                .or(() -> groups.findById(id).map(g -> editGroup(g, body)))
+        Edited edited = posts.findLockedById(id)
+                .map(p -> apply(caller, new UUID[] {p.getUserId()}, "flatmateSeekerPost",
+                        () -> snapshot(p.getTitle(), p.getNote(), p.getBudget(), null, p.getLocalities(), p.getMoveInAt()),
+                        () -> editPost(p, body)))
+                .or(() -> rooms.findLockedById(id)
+                        .map(r -> apply(caller, new UUID[] {r.getHostId()}, "flatmateRoom",
+                                () -> snapshot(r.getTitle(), r.getNote(), r.getBudget(), r.getDeposit(),
+                                        r.getLocalities(), r.getAvailableFrom()),
+                                () -> editRoom(r, body))))
+                .or(() -> groups.findLockedById(id)
+                        .map(g -> apply(caller, g.parties(), "flatmateGroup",
+                                () -> snapshot(g.getTitle(), g.getNote(), g.getRent(), g.getDeposit(),
+                                        g.getLocalities(), g.getMoveInBy()),
+                                () -> editGroup(g, body))))
                 .orElseThrow(() -> NotFoundException.of("Flatmate post"));
-        audit.record(caller, "flatmate.adminUpdate", kind, id.toString(),
-                "fields", changedFields(body));
+        audit.record(caller, "flatmate.adminUpdate", edited.kind(), id.toString(),
+                "fields", changedFields(body), "before", edited.before(), "after", edited.after());
     }
 
-    private String editPost(FlatmateSeekerPost post, FlatmateModeratorEdit body) {
+    private record Edited(String kind, Map<String, Object> before, Map<String, Object> after) {
+    }
+
+    private static Edited apply(AuthPrincipal caller, UUID[] parties, String kind,
+            Supplier<Map<String, Object>> snapshot, Runnable change) {
+        FlatmateModerationService.requireNotParty(caller, parties);
+        Map<String, Object> before = snapshot.get();
+        change.run();
+        return new Edited(kind, before, snapshot.get());
+    }
+
+    private static Map<String, Object> snapshot(String title, String note, Long rent, Long deposit,
+            List<String> localities, Object moveIn) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("title", title);
+        values.put("note", note);
+        values.put("rent", rent);
+        values.put("deposit", deposit);
+        values.put("localities", localities == null ? null : List.copyOf(localities));
+        values.put("moveIn", moveIn == null ? null : moveIn.toString());
+        return values;
+    }
+
+    private void editPost(FlatmateSeekerPost post, FlatmateModeratorEdit body) {
         refuse(body.deposit() != null, "A seeker post has no deposit.");
         if (body.title() != null) {
             post.setTitle(FlatmateVocabulary.blankToNull(body.title()));
@@ -68,10 +102,9 @@ public class FlatmateModeratorEditService {
             post.setMoveInAt(body.moveIn());
         }
         posts.saveAndFlush(post);
-        return "flatmateSeekerPost";
     }
 
-    private String editRoom(FlatmateRoom room, FlatmateModeratorEdit body) {
+    private void editRoom(FlatmateRoom room, FlatmateModeratorEdit body) {
         if (body.title() != null) {
             room.setTitle(FlatmateVocabulary.blankToNull(body.title()));
         }
@@ -102,10 +135,9 @@ public class FlatmateModeratorEditService {
             room.setAvailableFrom(body.moveIn());
         }
         rooms.saveAndFlush(room);
-        return "flatmateRoom";
     }
 
-    private String editGroup(FlatmateGroup group, FlatmateModeratorEdit body) {
+    private void editGroup(FlatmateGroup group, FlatmateModeratorEdit body) {
         if (body.title() != null) {
             String title = body.title().strip();
             refuse(title.length() < 3, "A group's title needs at least 3 characters.");
@@ -120,14 +152,13 @@ public class FlatmateModeratorEditService {
             group.setRent(body.rent());
         }
         if (body.deposit() != null) {
-            refuse(group.isHunting(), "A group still hunting for a flat has a deposit range, not a deposit.");
-            group.setDeposit(body.deposit());
+            throw new ValidationException("A group still hunting for a flat has a deposit range, not a deposit.");
         }
         if (body.localities() != null) {
             List<String> localities = localityBinding.canonicalNames(
                     FlatmateSeekerService.clean(body.localities()), group.getLocalities());
             refuse(localities.isEmpty(), "A group needs a locality.");
-            refuse(localities.size() > (group.isHunting() ? FlatmateGroupPreferences.MAX_LOCALITIES : 1),
+            refuse(localities.size() > FlatmateVocabulary.MAX_LOCALITIES,
                     "Too many localities for this group.");
             group.relocate(localities);
         }
@@ -136,15 +167,11 @@ public class FlatmateModeratorEditService {
                     new FlatmateGuardrails.Address(null, null, group.getLocality(), group.getTitle())));
         }
         if (body.moveIn() != null) {
-            refuse(!group.isHunting(), "Only a group hunting for a flat has a move-in date.");
             group.moveInBy(body.moveIn());
         }
         groups.saveAndFlush(group);
-        return "flatmateGroup";
     }
 
-    /** The duplicate/contested-address check matches on the stored fingerprint, so a corrected
-     * address must move it. A flat-bound fingerprint is kept: the flat, not the text, is the address. */
     private String refingerprint(String current, FlatmateGuardrails.Address address) {
         return current != null && current.startsWith(FlatmateGuardrails.PROPERTY_PREFIX)
                 ? current : guardrails.fingerprint(address);

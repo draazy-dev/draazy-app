@@ -3,9 +3,6 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
-/* Deliberately static: it calls nothing. Rent entered in Finances is a record of payments made elsewhere, never
-   claimed as collected by the platform. */
-
 const STEPS = [
   { icon: 'wallet', key: 'prCsStep1' },
   { icon: 'badge-indian-rupee', key: 'prCsStep2' },
@@ -25,22 +22,19 @@ export default function PayRentComingSoon() {
 
   return (
     <div className="pt-8 sm:pt-10 pb-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      {/* Hero */}
       <section className="glass rounded-2xl p-6 sm:p-8 mb-6 overflow-hidden relative">
         <span
           aria-hidden="true"
           className="pointer-events-none absolute -right-16 -top-16 w-52 h-52 rounded-full blur-3xl"
           style={{ background: 'rgb(var(--dz-c-teal-500) / .16)' }}
         />
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-400/15 border border-amber-400/25 text-amber-300 text-xs font-semibold">
+        <span className="dz-tag bg-amber-400/15 border border-amber-400/25 text-amber-300 font-semibold">
           <Icon name="calendar-clock" className="w-3.5 h-3.5" /> {tr('misc.prCsBadge')}
         </span>
         <h1 className="text-2xl sm:text-3xl font-extrabold mt-3 text-white">{tr('misc.prCsTitle')}</h1>
         <p className="text-gray-400 text-sm mt-2 max-w-2xl">{tr('misc.prCsSubtitle')}</p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          {/* No request, by design — so this cannot be a "notify me" button. Nothing would be
-              recorded and nobody would ever be told. It says what is coming instead. */}
           <button
             type="button"
             onClick={() => toast(tr('misc.prCsNotified'), 'success')}
@@ -50,14 +44,13 @@ export default function PayRentComingSoon() {
           </button>
           <Link
             to="/services/rent-agreement"
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10"
+            className="h-btn px-5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10"
           >
             <Icon name="file-signature" className="w-4 h-4 text-brand-teal-3" /> {tr('misc.prCsAgreement')}
           </Link>
         </div>
       </section>
 
-      {/* Signature: how it'll work — a quiet three-step rent journey */}
       <section className="glass rounded-2xl p-6 mb-6">
         <h2 className="font-bold text-white mb-5">{tr('misc.prCsHowTitle')}</h2>
         <ol className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-2">
@@ -77,7 +70,6 @@ export default function PayRentComingSoon() {
         </ol>
       </section>
 
-      {/* What's coming */}
       <section className="mb-6">
         <h2 className="font-bold text-white mb-3">{tr('misc.prCsWhatsComing')}</h2>
         <div className="grid sm:grid-cols-2 gap-3">
@@ -95,7 +87,6 @@ export default function PayRentComingSoon() {
         </div>
       </section>
 
-      {/* Meanwhile — what already works */}
       <section className="glass rounded-2xl p-6">
         <h2 className="font-bold text-white mb-1">{tr('misc.prCsMeanwhile')}</h2>
         <p className="text-gray-400 text-sm mb-4">{tr('misc.prCsMeanwhileBody')}</p>

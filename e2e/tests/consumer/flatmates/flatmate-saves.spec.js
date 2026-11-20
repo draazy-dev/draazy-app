@@ -1,9 +1,16 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, seedConsent, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, seedConsent, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -16,6 +23,7 @@ async function adminToken() {
 }
 
 async function publish(id) {
+  await tickDeskChecklist(API, id, auth(await adminToken()));
   const response = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(await adminToken()),
@@ -29,9 +37,10 @@ async function createRoom(token, body) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
+      ...(await roomBasics(token)),
       bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi',
-      locality: 'Baner', rentShare: 15000, deposit: 30000, availableFrom: '2026-12-01',
-      lookingFor: 'any', foodPref: 'any', photos: await uploadedListingPhotos(token),
+      locality: 'Baner', rentShare: 15000, deposit: 30000, availableFrom: MOVE_IN,
+      lookingFor: 'any', foodPref: 'any',
       ...(await tenantRoomAgreement(token)),
       ...(await withSocietyId(token, body)),
     }),
@@ -47,10 +56,10 @@ async function createGroup(token, body) {
   const response = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(token),
-    body: JSON.stringify({
-      locality: 'Baner', rent: 45000, seats: 3, seatsOpen: 1, policy: 'any', name: 'Saves Host',
+    body: JSON.stringify(huntingGroup({
+      locality: 'Baner', rent: 45000, deposit: 50000, seats: 3, seatsOpen: 1,       policy: 'any',
       ...body,
-    }),
+    })),
   });
   const group = await response.json();
   expect(response.status, JSON.stringify(group)).toBe(201);
@@ -73,7 +82,7 @@ async function openRooms(page) {
 
 async function openSavedFlatmates(page) {
   await page.goto(`${BASE}/saved`);
-  const tab = page.getByRole('button', { name: /^Rooms\b/ });
+  const tab = page.getByRole('button', { name: /^Flatmates\b/ });
   await expect(tab).toBeVisible({ timeout: 20_000 });
   await tab.click();
 }
@@ -165,7 +174,7 @@ test('the saved card shows what the room says today, not what it said when it wa
     headers: auth(hostAuth.accessToken),
     body: JSON.stringify({
       bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi',
-      locality: 'Baner', society, rentShare: 21000, deposit: 30000, availableFrom: '2026-12-01',
+      locality: 'Baner', society, rentShare: 21000, deposit: 30000, availableFrom: MOVE_IN,
       lookingFor: 'any', foodPref: 'any', photos: room.photos,
       ...(await tenantRoomAgreement(hostAuth.accessToken)),
     }),
@@ -191,7 +200,7 @@ test('unsaving removes the row on the server, not just from the local list', asy
   await openRooms(page);
   await cardFor(page, society).locator('.save-btn').click();
   await expect(cardFor(page, society).locator('.save-btn')).toHaveClass(/saved/, { timeout: 10_000 });
-  expect((await serverSaves(seekerAuth.accessToken)).totalElements).toBe(1);
+  await expect.poll(async () => (await serverSaves(seekerAuth.accessToken)).totalElements, { timeout: 10_000 }).toBe(1);
   // Toggling the same bookmark off must reach the server.
   await cardFor(page, society).locator('.save-btn').click();
   await expect(cardFor(page, society).locator('.save-btn')).not.toHaveClass(/saved/, { timeout: 10_000 });
@@ -208,19 +217,22 @@ test('unsaving removes the row on the server, not just from the local list', asy
 test('the shortlist holds rooms and groups together, newest save first', async ({ page }) => {
   const host = uniqueMobile();
   const seeker = uniqueMobile();
-  const hostAuth = await apiLogin(host);
+  const hostAuth = await apiLogin(host, { name: 'Saves Host' });
   const seekerAuth = await apiLogin(seeker);
   const society = `Zztest Mixed ${stamp()}`;
   const title = `Zztest Mixed group ${stamp()} in Baner`;
   const room = await createRoom(hostAuth.accessToken, { society });
-  const group = await createGroup(hostAuth.accessToken, { title });
+  const group = await createGroup(hostAuth.accessToken, {
+    title, hunting: true,
+    preferences: { localities: ['Baner'], rentMax: 45000, depositMax: 90000, gatedOnly: false, bachelors: false },
+  });
 
   await signedInAs(page, seeker);
   await openRooms(page);
   await cardFor(page, society).locator('.save-btn').click();
   await expect(cardFor(page, society).locator('.save-btn')).toHaveClass(/saved/, { timeout: 10_000 });
 
-  await page.goto(`${BASE}/flatmates?view=groups`);
+  await page.goto(`${BASE}/flatmates?view=teams`);
   const groupCard = page.locator('.sf-card').filter({ hasText: title }).first();
   await expect(groupCard).toBeVisible({ timeout: 20_000 });
   await groupCard.locator('.save-btn').click();
@@ -228,16 +240,17 @@ test('the shortlist holds rooms and groups together, newest save first', async (
   /* Heterogeneous and ordered, asserted on the wire because the two are one claim: the shortlist
      may point at three different tables and still has to come back in one list in one order. */
 
-  const saved = await serverSaves(seekerAuth.accessToken);
-  expect(saved.totalElements).toBe(2);
-  expect(saved.content.map((row) => row.id)).toEqual([group.id, room.id]);
+  await expect.poll(
+    async () => (await serverSaves(seekerAuth.accessToken)).content.map((row) => row.id),
+    { timeout: 10_000 },
+  ).toEqual([group.id, room.id]);
 
   await openSavedFlatmates(page);
   await expect(page.getByText(society, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(title, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
 });
 
-test('saving while signed out asks for identity instead of writing a bookmark nobody owns', async ({ page }) => {
+test('saving while signed out opens the sign-in sheet, then saves for the new account without leaving the board', async ({ page }) => {
   const host = uniqueMobile();
   const hostAuth = await apiLogin(host);
   const society = `Zztest Anon ${stamp()}`;
@@ -245,6 +258,19 @@ test('saving while signed out asks for identity instead of writing a bookmark no
 
   await seedConsent(page);
   await openRooms(page);
+  // The board rewrites the `rooms` alias to its default (no `view`) after a debounce.
+  await expect(page).toHaveURL(/\/flatmates$/);
+  const before = page.url();
   await cardFor(page, society).locator(".save-btn").click();
-  await expect(page).toHaveURL(/\/signin/, { timeout: 15_000 });
+  await expect(signInSheet(page)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('dialog', { name: /sign in to save this home/i })).toBeVisible();
+  await expect(page).toHaveURL(before);
+
+  const seeker = uniqueMobile();
+  await verifyInSheet(page, seeker);
+
+  await expect(page).toHaveURL(before);
+  await expect(cardFor(page, society).locator('.save-btn')).toHaveClass(/saved/, { timeout: 15_000 });
+  const { accessToken } = await apiLogin(seeker);
+  await expect.poll(async () => (await serverSaves(accessToken)).totalElements, { timeout: 15_000 }).toBe(1);
 });

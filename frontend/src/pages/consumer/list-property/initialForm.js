@@ -44,8 +44,6 @@ export const initialForm = {
   cornerPlot: false,
   boundaryWall: false,
   plotZone: '',
-  /* A boolean could not tell "still agricultural" from "never asked", and had no way at all to
-   * say deemed-NA. */
   naStatus: '',
   waterSource: '',
   electricity: false,
@@ -64,15 +62,11 @@ export const initialForm = {
   flatNumber: '',
   tower: '',
   society: '',
-  // Google-resolved society row; empty when none was picked.
   societyId: '',
-  // Frontend-only: the owner said the building is not on Google Maps. Never sent to the API.
   societyNotOnMaps: false,
   street: '',
   landmark: '',
   pincode: '',
-  // The electricity consumer number is unique per metered unit, so it is both the strongest dedup
-  // key and the fast-track to Verified Owner. Optional, and never shown to buyers.
   electricityConsumerNo: '',
   propLat: 18.5590,
   propLng: 73.7760,
@@ -80,8 +74,6 @@ export const initialForm = {
   price: '',
   priceNegotiable: false,
   transactionType: '',
-  /* Unanswered: this is the field the Ready-to-Move / Under-Construction facet is built from, so a pre-selected
-     default would make the required check unfailable and publish a claim as the owner's own. */
   construction: '',
   ownership: '',
   monthlyMaintenance: '',
@@ -89,8 +81,6 @@ export const initialForm = {
   loanAvailable: '',
   monthlyRent: '',
   deposit: '',
-  // Unstated. Defaulting to 'included' printed "Maintenance: Included" on the detail page of every
-  // rental whose owner never touched the control, beside the figures they did give.
   rentMaintMode: '',
   rentMaintenance: '',
   availableFrom: '',
@@ -110,13 +100,29 @@ export const initialForm = {
   roomType: '',
   rentShare: '',
   lookingFor: 'any',
-  lifestyle: [],
+  roomParking: '',
+  roomAmenities: [],
   note: '',
-  // Who is listing the room: an 'owner' lists their own flat, a 'tenant' is a sitting flatmate
-  // seeking a replacement and self-attests a registered agreement for Ops consent.
   hostRole: 'owner',
   agreementDeclared: false,
   agreementDoc: null,
   ownerConsentMobile: '',
   ownerConsent: false,
+  attachedPropertyId: '',
 };
+
+// Most common Pune choices, for new listings only: edits and prefills spread initialForm, so a default
+// there would silently invent facts on an existing listing.
+export const NEW_LISTING_DEFAULTS = {
+  deal: 'buy',
+  propertyType: 'flat',
+  bhk: '2',
+  bathrooms: '2',
+  parkingSpaces: '1',
+  furnishing: 'semi',
+  construction: 'ready',
+  rentMaintMode: 'included',
+  preferredTenants: ['anyone'],
+};
+
+export const newListingForm = { ...initialForm, ...NEW_LISTING_DEFAULTS };

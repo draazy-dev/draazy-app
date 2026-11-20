@@ -22,33 +22,25 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.AopTestUtils;
 
-/** The finance aggregates bucket by the Indian calendar, not the host's: the clock is pinned in UTC (01:30 IST on
- * 1 April) to reproduce the host config that put them a day, month or financial year behind. */
 class FinanceIstBoundaryTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
     @Autowired FinanceService financeService;
 
-    /** 01:30 IST on 1 April 2026 — still 31 March 2026 to a UTC host. */
     private static final Instant IST_NEW_FY_MIDNIGHT = Instant.parse("2026-03-31T20:00:00Z");
 
-    /** The date the service must derive. */
     private static final LocalDate FIRST_OF_NEW_FY = LocalDate.of(2026, 4, 1);
 
-    /** A row inside the FY that ends the instant above, and inside the previous calendar month. */
     private static final LocalDate LAST_FY = LocalDate.of(2026, 3, 20);
 
     private static final long NEW_FY_INCOME = 500_000L;
     private static final long LAST_FY_INCOME = 700_000L;
 
-    /** The service is a singleton, so a pinned clock left behind would follow every later test in this JVM. */
     @AfterEach
     void unpinClock() {
         target().useClock(null);
     }
 
-    /** The bean behind the proxy: a field set on the CGLIB subclass leaves the real target on the system clock. */
     private FinanceService target() {
         return AopTestUtils.getTargetObject(financeService);
     }
@@ -56,8 +48,6 @@ class FinanceIstBoundaryTest extends AbstractApiTest {
     private void pinToIstNewFinancialYear() {
         target().useClock(Clock.fixed(IST_NEW_FY_MIDNIGHT, ZoneOffset.UTC));
     }
-
-    // ---- fixture ----
 
     private User owner(String mobile) {
         User u = new User(mobile, "owner");
@@ -76,7 +66,6 @@ class FinanceIstBoundaryTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** Posted before the clock is pinned: {@code addTransaction} takes the date from the body, not the clock. */
     private void income(User owner, Property p, long amount, LocalDate date) throws Exception {
         mvc.perform(post("/me/finances/" + p.getId() + "/transactions")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -86,7 +75,6 @@ class FinanceIstBoundaryTest extends AbstractApiTest {
                 .andExpect(status().isCreated());
     }
 
-    /** One row either side of the FY boundary — 20 March 2026 and 1 April 2026. */
     private Property ledgerStraddlingTheFyBoundary(User owner) throws Exception {
         Property p = listing(owner);
         income(owner, p, LAST_FY_INCOME, LAST_FY);
@@ -94,9 +82,6 @@ class FinanceIstBoundaryTest extends AbstractApiTest {
         return p;
     }
 
-    // ---- 1: the financial year boundary ----
-
-    /** {@code period=year} starts 1 April (today, 01:30 IST); a UTC host would read 31 March, adding last FY. */
     @Test
     void summaryPeriodYear_startsOnTheIndianFyBoundary_notTheHostsPreviousDay() throws Exception {
         User owner = owner("9833100001");
@@ -104,7 +89,6 @@ class FinanceIstBoundaryTest extends AbstractApiTest {
 
         pinToIstNewFinancialYear();
 
-        // Both rows exist: without this the assertion below could pass on an empty ledger.
         mvc.perform(get("/me/finances/" + p.getId() + "/summary?period=all")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
@@ -116,9 +100,6 @@ class FinanceIstBoundaryTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.income").value(NEW_FY_INCOME));
     }
 
-    // ---- 2: the calendar month boundary ----
-
-    /** {@code period=month} must start on the 1st of the Indian month; a UTC host would open it on 1 March. */
     @Test
     void summaryPeriodMonth_startsOnTheIndianMonth_notTheHostsPreviousOne() throws Exception {
         User owner = owner("9833100002");
@@ -132,7 +113,6 @@ class FinanceIstBoundaryTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.income").value(NEW_FY_INCOME));
     }
 
-    /** {@code months=1} isolates the bucket the bug moves; the label is asserted too since the axis shows it. */
     @Test
     void cashflow_endsWithTheIndianMonth_notTheHostsPreviousOne() throws Exception {
         User owner = owner("9833100003");
@@ -148,9 +128,6 @@ class FinanceIstBoundaryTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.cashflow[0].income").value(NEW_FY_INCOME));
     }
 
-    // ---- 3: dues count days from the Indian date ----
-
-    /** A row anchored on the 1st is due today, not tomorrow; a UTC host would answer {@code daysUntil} 1. */
     @Test
     void dues_countDaysFromTheIndianDate_notTheHostsPreviousDay() throws Exception {
         User owner = owner("9833100004");

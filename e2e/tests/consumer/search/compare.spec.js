@@ -1,5 +1,5 @@
 import { test, expect } from '../../../fixtures/live.js';
-const A = 'p5013'; // 1 BHK Flat, Baner (buy)
+const A = 'p5013'; // 3 BHK Flat, Baner (buy)
 const B = 'p5121'; // 2 BHK Flat, Wakad (rent)
 // The global cookie-consent banner is also role="dialog"; seed consent so it never
 // overlays the comparison surface.
@@ -47,7 +47,7 @@ test.describe('Compare properties — /compare', () => {
     // row still quoting sq.ft. is the price one, suppressed for listings not measured in sq.ft.
     await expect(page.getByText('Area', { exact: true })).toBeVisible();
     await expect(page.getByText('Price / sq.ft.', { exact: true })).toBeVisible();
-    await expect(page.getByText('RERA Verified', { exact: true })).toBeVisible();
+    await expect(page.getByText('RERA shared', { exact: true })).toBeVisible();
     await expect(page.getByText('Amenities', { exact: true })).toBeVisible();
 
     await expect(page.getByRole('button', { name: 'Reset' })).toBeVisible();
@@ -89,6 +89,8 @@ test.describe('Compare properties — /compare', () => {
     await expect(addBtn).toBeVisible({ timeout: 10_000 });
     await addBtn.click();
     await expect(page.getByTitle('Remove from Compare', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Compare properties' }).first()).toContainText('1');
+    await expect(page.getByRole('link', { name: /View Compare|^View \d+$/ })).toHaveCount(0);
 
     await page.goto('/compare');
     await expect(page.getByRole('heading', { name: 'Compare properties' })).toBeVisible();

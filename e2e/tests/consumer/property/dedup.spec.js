@@ -1,11 +1,22 @@
 import { expect, test } from '../../../fixtures/live.js';
-import { API, authHeaders, storedPhotoUrl, uniqueMobile, uploadedListingPhotos, ownerIdOf } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { png } from '../../../helpers/listingPhotos.helper.js';
 
 
 const PHOTO = 'ffff0000ffff0000';
 const PHOTO_RECOMPRESSED = 'ffff0000ffff0003';
 
-const photoUrl = (hash, auth) => storedPhotoUrl(hash, ownerIdOf(auth));
+// Black/white 8×8 blocks whose server-side average hash is exactly `hex`, so the gallery holds a real file.
+const hashedPng = (hex) => {
+  const bits = BigInt(`0x${hex}`);
+  return png(64, 64, (x, y) => ((bits >> BigInt(63 - (Math.floor(y / 8) * 8 + Math.floor(x / 8)))) & 1n ? 255 : 0));
+};
+
+async function photoHashed(hex, headers) {
+  const [url] = await uploadedListingPhotos(headers, 1, { image: hashedPng(hex) });
+  expect(url).toMatch(new RegExp(`-${hex}$`));
+  return url;
+}
 
 async function api(method, path, headers, body) {
   const res = await fetch(`${API}${path}`, {
@@ -70,7 +81,7 @@ test.describe('LIVE — the cross-owner duplicate probe', () => {
     expect(opsView.body.messages[0].body).toContain('matches an active listing by another owner');
     expect(opsView.body.messages[0].body).toContain(firstId);
 
-    // Same route with the owner's token must 404, not return an empty visible case, and the owner's review inbox stays silent too.
+    // The owner's token must 404 rather than see an empty case, and their review inbox stays silent.
     expect((await caseFile(second.headers, secondId)).status).toBe(404);
     const inbox = await api('GET', '/me/property-reviews', second.headers);
     expect(inbox.status).toBe(200);
@@ -85,13 +96,13 @@ test.describe('LIVE — the cross-owner duplicate probe', () => {
     const firstId = await listing(first.headers, {
       locality: 'Kothrud',
       title: 'Bright 2BHK in Kothrud',
-      images: [photoUrl(PHOTO, first.headers)],
+      images: [await photoHashed(PHOTO, first.headers)],
     });
 
     const secondId = await listing(second.headers, {
       locality: 'Baner',
       title: 'Bright 2BHK in Baner',
-      images: [photoUrl(PHOTO_RECOMPRESSED, second.headers)],
+      images: [await photoHashed(PHOTO_RECOMPRESSED, second.headers)],
     });
 
     const opsView = await caseFile(admin, secondId);

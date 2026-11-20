@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import { CATEGORIES } from '../../../data/homeData.js';
 import { propertyCounts } from '../../../services/propertyService.js';
+import { flatmatePulse } from '../../../services/flatmateService.js';
 
 const formatCount = (value) => new Intl.NumberFormat('en-IN').format(value);
 
@@ -41,6 +42,7 @@ export default function Categories({ navigate }) {
   const { t } = useTranslation();
   const scrollRef = useRef(null);
   const [counts, setCounts] = useState(null);
+  const [flatmateCount, setFlatmateCount] = useState(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
   const [fadeLeft, setFadeLeft] = useState(false);
@@ -60,7 +62,20 @@ export default function Categories({ navigate }) {
     };
   }, []);
 
-  // Arrows track more-to-scroll; fades show only when a card is actually clipped by that edge.
+  useEffect(() => {
+    let live = true;
+    flatmatePulse()
+      .then((pulse) => {
+        if (live) setFlatmateCount(pulse?.tabs ? Object.values(pulse.tabs).reduce((sum, n) => sum + (n || 0), 0) : null);
+      })
+      .catch(() => {
+        if (live) setFlatmateCount(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
   const updateArrows = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -69,7 +84,7 @@ export default function Categories({ navigate }) {
     setCanNext(scrollLeft < scrollWidth - clientWidth - 4);
 
     const stripLeft = el.getBoundingClientRect().left;
-    const TH = 8; // ignore sub-pixel / near-aligned cards
+    const TH = 8;
     let leftCut = false;
     let rightCut = false;
     el.querySelectorAll('.cat-card').forEach((c) => {
@@ -97,10 +112,8 @@ export default function Categories({ navigate }) {
 
   useEffect(() => {
     updateArrows();
-  }, [counts, updateArrows]);
+  }, [counts, flatmateCount, updateArrows]);
 
-  // Advance ~80% of the visible width so a near-full page of tiles moves while
-  // one partial card stays visible as an anchor.
   const scrollByPage = (dir) => {
     const el = scrollRef.current;
     if (!el) return;
@@ -122,7 +135,6 @@ export default function Categories({ navigate }) {
   return (
     <section className="relative section-y">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* heading — left-aligned, paired with the scroll arrows + "view all" */}
         <div className="section-head flex items-end justify-between gap-3 sm:mb-3 reveal">
           <div className="min-w-0">
             <p className="text-teal-400 text-xs font-semibold tracking-widest uppercase mb-1.5">{t('home.categories.eyebrow')}</p>
@@ -137,12 +149,12 @@ export default function Categories({ navigate }) {
           </div>
         </div>
 
-        {/* pt-3 gives the -8px hover lift room: overflow-x-auto also clips vertical overflow. */}
         <div className="relative -mx-4 sm:-mx-6 lg:mx-0">
           <div ref={scrollRef} className="cat-scroll flex gap-3 overflow-x-auto pt-3 pb-3 px-4 sm:px-6 lg:px-0 scroll-px-4 sm:scroll-px-6 lg:scroll-px-0 reveal" style={{ scrollSnapType: 'x mandatory' }}>
             {CATEGORIES.map((c) => {
               const deal = dealFor(c, counts);
-              const count = countFor(c.types, deal, counts);
+              const flatmates = c.href === '/flatmates';
+              const count = flatmates ? flatmateCount : countFor(c.types, deal, counts);
               return (
                 <Link
                   key={c.title}
@@ -159,7 +171,7 @@ export default function Categories({ navigate }) {
                   <div className="text-left min-w-0">
                     <p className="font-semibold text-sm text-white leading-tight">{c.title}</p>
                     {count === null ? null : (
-                      <p className="text-xs mt-0.5 tabular-nums" style={{ color: `rgb(${c.tone})` }}>{formatCount(count)} {t('home.categories.properties')}</p>
+                      <p className="text-xs mt-0.5 tabular-nums" style={{ color: `rgb(${c.tone})` }}>{formatCount(count)} {t(flatmates ? 'home.categories.listings' : 'home.categories.properties')}</p>
                     )}
                   </div>
                 </Link>
@@ -170,10 +182,9 @@ export default function Categories({ navigate }) {
           <div className="cat-fade cat-fade--right" aria-hidden="true" style={{ opacity: fadeRight ? 1 : 0, transition: 'opacity .3s ease' }} />
         </div>
 
-        {/* The header "View All" is desktop-only to avoid crowding the heading, so mobile needs this path. */}
         <button
           onClick={() => navigate('/listings')}
-          className="sm:hidden mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-teal-400 hover:bg-white/10 hover:text-teal-300 transition-all"
+          className="h-btn sm:hidden mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 text-sm font-semibold text-teal-400 hover:bg-white/10 hover:text-teal-300 transition-all"
         >
           {t('home.categories.allListings')} <Icon name="arrow-right" className="w-4 h-4" />
         </button>

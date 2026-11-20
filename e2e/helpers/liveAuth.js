@@ -21,6 +21,8 @@ export function uniqueMobile() {
   return `97${String(lastIssued).slice(-8)}`;
 }
 
+export const shownMobile = (mobile) => String(mobile).replace(/^(\d{5})(\d{5})$/, '$1 $2');
+
 // Profile names are letters only (UserUpdate), so a unique suffix spells its digits a–j.
 export const letterTag = (value = uniqueMobile().slice(2)) =>
   String(value).replace(/\d/g, (d) => 'abcdefghij'[d]);
@@ -40,18 +42,32 @@ const LISTING_PNG = Buffer.from(
   'base64',
 );
 
-export async function uploadedListingPhotos(auth, count = 1, { api = API } = {}) {
+export async function uploadedListingPhotos(auth, count = 1, { api = API, image = LISTING_PNG } = {}) {
   const raw = typeof auth === 'string' ? auth : auth?.accessToken ?? auth?.authorization ?? auth?.Authorization ?? '';
   const authorization = /^Bearer\s/i.test(raw) ? raw : `Bearer ${raw}`;
   const urls = [];
   for (let i = 0; i < count; i += 1) {
     const form = new FormData();
-    form.set('file', new Blob([LISTING_PNG], { type: 'image/png' }), `listing-${i}.png`);
+    form.set('file', new Blob([image], { type: 'image/png' }), `listing-${i}.png`);
     const res = await fetch(`${api}/me/photos`, { method: 'POST', headers: { authorization }, body: form });
     if (res.status !== 201) throw new Error(`POST /me/photos failed: ${res.status} ${await res.text()}`);
     urls.push((await res.json()).url);
   }
   return urls;
+}
+
+/** Fills in what the desk leaves out of a rent Flat, so its owner may confirm it (`listing_incomplete` otherwise). */
+export async function completeStaffPostedListing(id, ownerHeaders, { api = API } = {}) {
+  const res = await fetch(`${api}/me/listings/${id}`, {
+    method: 'PATCH',
+    headers: ownerHeaders,
+    body: JSON.stringify({
+      carpetArea: 850, bathrooms: 2, floor: 3, totalFloors: 12, pincode: '411045', deposit: 100000,
+      availableOn: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+      images: await uploadedListingPhotos(ownerHeaders, 3, { api }),
+    }),
+  });
+  if (!res.ok) throw new Error(`PATCH /me/listings/${id} failed: ${res.status} ${await res.text()}`);
 }
 
 export const seedConsent = (page) => page.addInitScript(() => {
@@ -95,13 +111,8 @@ export async function signIn(page, mobile, { screen = 'consumer', next, search, 
   await completeProfileIfAsked(page, { away: form.away });
 
   if (settleAtHome && form.away.test(page.url())) {
-    const signedIn = await page.evaluate(() => {
-      try {
-        return Boolean(JSON.parse(localStorage.getItem('draazyTokens') || '{}').accessToken);
-      } catch {
-        return false;
-      }
-    });
+    // The readable session hint, not the token: the token is memory-only and `/src` is absent from the preview build.
+    const signedIn = await page.evaluate(() => /(^|; )(__Host-)?draazy_session=/.test(document.cookie));
     if (signedIn) {
       await page.goto('/');
       return;
@@ -155,10 +166,13 @@ export async function signedInAs(page, mobile) {
   if (saved && Date.now() - saved.at < SESSION_MAX_AGE_MS) {
     // Seed storage before boot so the session marker does not trigger an unnecessary refresh.
     await page.context().addCookies(saved.cookies);
+    // Init scripts re-run on every navigation; seed once, or a later sign-in on this page is overwritten.
     await page.addInitScript((snapshot) => {
+      if (window !== window.top || sessionStorage.getItem(snapshot.flag)) return;
       for (const [k, v] of Object.entries(snapshot.local)) localStorage.setItem(k, v);
       for (const [k, v] of Object.entries(snapshot.session)) sessionStorage.setItem(k, v);
-    }, { local: saved.local, session: saved.session });
+      sessionStorage.setItem(snapshot.flag, '1');
+    }, { local: saved.local, session: saved.session, flag: `e2e-seeded:${mobile}:${Date.now()}:${Math.random()}` });
     await page.goto('/');
     return;
   }
@@ -176,7 +190,7 @@ export async function signedInAs(page, mobile) {
 
 // Two calls are the contract: the first issues the OTP, the second redeems it. Back-office accounts
 // are refused there, so they take the password + authenticator route instead.
-export async function apiLogin(mobile, { api = API } = {}) {
+export async function apiLogin(mobile, { api = API, name } = {}) {
   const send = async (path, body) => {
     const res = await fetch(`${api}${path}`, {
       method: 'POST',
@@ -199,6 +213,16 @@ export async function apiLogin(mobile, { api = API } = {}) {
         ? ' - the server read this account and refused it; check `status` in the seed'
         : ' - is the backend running under BOTH the `dev` and `e2e` profiles?';
     throw new Error(`login ${mobile} failed (${status}): ${JSON.stringify(body)}${hint}`);
+  }
+  // Flatmate posts and groups take the poster's profile name, so a fresh account must have one.
+  if (name && !body.user?.name?.trim()) {
+    const profile = await fetch(`${api}/auth/me`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${body.accessToken}` },
+      body: JSON.stringify({ name }),
+    });
+    if (!profile.ok) throw new Error(`naming ${mobile} failed (${profile.status}): ${await profile.text()}`);
+    body.user = await profile.json();
   }
   return body;
 }
@@ -229,7 +253,7 @@ export async function identityChallengeToken(authorization, { api = API } = {}) 
   return (await res.json()).token;
 }
 
-// The new account's display name is always `Test Member`, so never assert on it.
+// The new account's display name is always `Test Member`.
 export async function signedInAsNew(page, { api = API } = {}) {
   const mobile = uniqueMobile();
   const session = await apiLogin(mobile, { api });
@@ -255,9 +279,18 @@ const TINY_PNG = Buffer.from(
 );
 
 // Two calls: the simulate endpoint 404s on an account with no pending case, so file one first.
-export async function grantIdentityBadge(mobile, { api = API } = {}) {
+export async function fileIdentityCase(mobile, { api = API } = {}) {
   const { authorization } = await authHeaders(mobile, { api });
+  await fileIdentityCaseAs(authorization, { api });
+  return authorization;
+}
 
+// `allowExisting` skips a verified account and accepts the 409 for one whose ID is already in review.
+export async function fileIdentityCaseAs(authorization, { api = API, allowExisting = false } = {}) {
+  if (allowExisting) {
+    const me = await fetch(`${api}/auth/me`, { headers: { authorization } });
+    if (me.ok && (await me.json()).verified) return;
+  }
   const form = new FormData();
   form.set('docType', 'pan');
   form.set('consent', 'true');
@@ -269,9 +302,13 @@ export async function grantIdentityBadge(mobile, { api = API } = {}) {
     headers: { authorization },
     body: form,
   });
-  if (!filed.ok) {
-    throw new Error(`filing an identity case failed for ${mobile}: ${filed.status} ${await filed.text()}`);
+  if (!filed.ok && !(allowExisting && filed.status === 409)) {
+    throw new Error(`filing an identity case failed: ${filed.status} ${await filed.text()}`);
   }
+}
+
+export async function grantIdentityBadge(mobile, { api = API } = {}) {
+  const authorization = await fileIdentityCase(mobile, { api });
 
   const res = await fetch(`${api}/me/verification/identity/simulate`, {
     method: 'POST',

@@ -50,6 +50,7 @@ class OwnershipBadgeRequestTest extends AbstractApiTest {
         u.setName("User " + mobile);
         u.setMobileVerified(true);
         if (Roles.Wire.STAFF.equals(role)) u.setTeam(Teams.RENTAL);
+        u.setVerified(Roles.Wire.OWNER.equals(role));
         User saved = users.saveAndFlush(u);
         if (Roles.Wire.STAFF.equals(role)) {
             jdbc.update("""

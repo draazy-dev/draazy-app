@@ -1,10 +1,3 @@
-/* Every t('a.b.c') in the app must resolve against the English bundle.
-   A missing key is silent at runtime — i18next renders the key itself — which is
-   how "home.flatmates.headingLead" shipped as visible copy on the home page after
-   the Share-a-Flat rename moved the JSX but not the JSON. Interpolated keys
-   cannot be checked statically and are skipped — the runtime guard for those is
-   the "no unresolved i18n keys" assertion in the home specs, which fails on any
-   visible text shaped like a key. */
 const fs = require('fs');
 const path = require('path');
 
@@ -30,10 +23,7 @@ const files = [];
 const missing = [];
 for (const file of files) {
   const src = fs.readFileSync(file, 'utf8');
-  // The trailing [,)] is what distinguishes a complete key argument from the
-  // literal half of a concatenation like t('a.b.' + kind), which is dynamic.
   for (const m of src.matchAll(/\b(?:t|tr)\(\s*'([a-zA-Z][\w.]*\.[\w.]+)'\s*[,)]/g)) {
-    // Plural and context suffixes are resolved by i18next at runtime.
     const key = m[1];
     if (has(key) || has(key + '_one') || has(key + '_other')) continue;
     missing.push(`${path.relative(root, file)}  ${key}`);

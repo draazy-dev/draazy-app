@@ -4,36 +4,24 @@ import { LayoutGrid } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { splitProperty } from '../../../services/flatmateService.js';
 import SplitFlatModal from '../flatmates/SplitFlatModal.jsx';
+import { userMessage } from '../../../lib/userMessage.js';
 
-/* Offered on the success screen of a brand-new RENT listing: the moment the
-   owner is already thinking about how to fill the flat is the cheapest moment to
-   ask whether they'd rather fill it one room at a time.
-
-   It's an offer, never a step — the listing is already live either way, and the
-   same action stays available later from My Listings. */
 export default function PostSuccessSplitNudge({ listing }) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState(false);
 
-  /* Through the seam, like the My Listings copy of this action.
-
-     The owner's identity comes off the token rather than being passed in from `useAuth`, which is
-     why this does not read the user at all: the server will not take a claimed `ownerMobile`, and
-     it is not a fact the client should be asserting. */
   const confirm = async ({ maxOccupants, rooms }) => {
     let created;
     try {
       created = await splitProperty(listing?.uuid || listing?.id, { maxOccupants, rooms });
     } catch (err) {
-      toast(err?.body?.error || err?.message || t('listProperty.split.failed'), 'error');
+      toast(userMessage(err, t('listProperty.split.failed')), 'error');
       return;
     }
     setOpen(false);
     setDone(true);
-    // A brand-new listing is always pending, so this path effectively always
-    // reports the unbadged state — which is the honest thing to say.
     const count = created?.rooms?.length || rooms.length;
     const unbadged = (created?.rooms || []).some((r) => !r.verified);
     toast(

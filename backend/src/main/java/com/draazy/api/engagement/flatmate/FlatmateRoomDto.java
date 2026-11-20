@@ -6,8 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Contract schema {@code FlatmateRoom}; {@code ownerMobile} is host-only. Rationale:
- * docs/flows/consumer/flatmates.md#supply-side-rationale-moved-from-backend-javadoc. */
 public record FlatmateRoomDto(
         UUID id,
         String type,
@@ -50,6 +48,8 @@ public record FlatmateRoomDto(
         String flatType,
         String homeTypeLabel,
         boolean gatedCommunity,
+        String parking,
+        List<String> amenities,
         String furnishing,
         String facing,
         String overlooking,
@@ -57,7 +57,6 @@ public record FlatmateRoomDto(
         LocalDate availableFrom,
         String gender,
         String food,
-        List<String> tags,
         String note,
         String cover,
         List<String> photos,
@@ -66,11 +65,13 @@ public record FlatmateRoomDto(
         String status,
         Instant createdAt,
         Host host) {
-
     public record Host(
             FlatmateRoomDetails details,
             Map<String, Object> agreementDoc,
             LocalDate agreementValidTill,
-            String ownerConsentMobile) {
+            String ownerConsentMobile,
+            UUID attachedPropertyId,
+            String reviewReason,
+            Boolean ownerConsentConfirmed) {
     }
 }

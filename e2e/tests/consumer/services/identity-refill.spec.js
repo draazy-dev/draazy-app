@@ -2,9 +2,10 @@
 import { execFileSync } from 'node:child_process';
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
-const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\13\\bin\\psql.exe';
+const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe';
 const OWNER = 'Asha Patil';
 const TENANT = 'Ria Sharma';
 
@@ -37,18 +38,19 @@ test.describe('Identity numbers after a retention purge (D282)', () => {
       details: { ownerName: OWNER, _state: { owner: { oName: OWNER, oMobile: mobile }, tenants: [{ name: TENANT }] } },
     });
     await ok('PUT', `/service-requests/${request.id}/identities`, customer, {
-      parties: [{ partyRole: 'owner', partyIndex: 0, partyName: OWNER, aadhaar: '211122223335' }],
+      parties: [{ partyRole: 'owner', partyIndex: 0, partyName: OWNER, pan: 'ABCDE1234F' }],
     });
     purge(request.id);
 
     await signedInAs(page, mobile);
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     const panel = page.getByTestId('identity-refill');
     await expect(panel).toBeVisible({ timeout: 15000 });
     await expect(panel).toContainText(OWNER);
     await expect(panel).toContainText(TENANT);
 
-    await panel.getByLabel(`Aadhaar of ${OWNER}`).fill('2111 2222 3335');
+    await expect(panel.getByLabel(/^Aadhaar of /), 'Aadhaar is collected at the doorstep, not here').toHaveCount(0);
+    await panel.getByLabel(`PAN of ${OWNER}`).fill('pqrsx6789k');
     await panel.getByLabel(`PAN of ${TENANT}`).fill('abcde1234f');
     await panel.getByRole('button', { name: 'Save numbers' }).click();
     await expect(panel).toBeHidden({ timeout: 15000 });

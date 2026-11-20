@@ -1,6 +1,5 @@
 package com.draazy.api.catalog.locality;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,13 +10,12 @@ import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
-import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-@DisplayName("Locality reads: listing-derived stats, indexability and the directory")
+@DisplayName("Locality reads: listing-derived stats and indexability")
 class LocalityReadEndpointsTest extends AbstractApiTest {
 
     @Autowired
@@ -123,7 +121,11 @@ class LocalityReadEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.archived").value(false))
                 .andExpect(jsonPath("$.avgRent").value(30000))
                 .andExpect(jsonPath("$.ratePerSqft").value(7000))
-                .andExpect(jsonPath("$.fromPrice").value(20000));
+                .andExpect(jsonPath("$.fromPrice").value(20000))
+                .andExpect(jsonPath("$.forSale").value(3))
+                .andExpect(jsonPath("$.forRent").value(3))
+                .andExpect(jsonPath("$.fromSale").value(6_000_000))
+                .andExpect(jsonPath("$.fromRent").value(20000));
     }
 
     @Test
@@ -178,30 +180,6 @@ class LocalityReadEndpointsTest extends AbstractApiTest {
     @DisplayName("an unknown slug is a 404")
     void unknownSlugIsNotFound() throws Exception {
         mvc.perform(get("/localities/zz-no-such-place")).andExpect(status().isNotFound());
-    }
-
-    @Test
-    @DisplayName("the directory lists active rows and retired rows that still have live listings, nothing else")
-    void directoryHidesRetiredRowsWithNothingLive() throws Exception {
-        locality("zz-dir-active", "Zz Dir Active", false);
-        locality("zz-dir-retired-empty", "Zz Dir Retired Empty", true);
-        locality("zz-dir-retired-live", "Zz Dir Retired Live", true);
-        live("zz-dir-retired-live", "rent", 20000, "800");
-        listing("zz-dir-retired-empty", "rent", "apartment", 20000, "800", PropertyStatus.PENDING, false);
-
-        String body = mvc.perform(get("/localities")).andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        assertThat(JsonPath.<java.util.List<String>>read(body, "$[?(@.slug=='zz-dir-active')].slug"))
-                .containsExactly("zz-dir-active");
-        assertThat(JsonPath.<java.util.List<String>>read(body, "$[?(@.slug=='zz-dir-retired-live')].slug"))
-                .containsExactly("zz-dir-retired-live");
-        assertThat(JsonPath.<java.util.List<String>>read(body, "$[?(@.slug=='zz-dir-retired-empty')].slug"))
-                .isEmpty();
-        assertThat(JsonPath.<java.util.List<Boolean>>read(body, "$[?(@.slug=='zz-dir-retired-live')].archived"))
-                .containsExactly(true);
-        assertThat(JsonPath.<java.util.List<Integer>>read(body, "$[?(@.slug=='zz-dir-active')].liveListings"))
-                .containsExactly(0);
     }
 
     @Test

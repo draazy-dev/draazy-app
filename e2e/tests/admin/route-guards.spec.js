@@ -12,7 +12,7 @@ const ROUTES = [
   { path: '/ops', heading: { name: 'My Dashboard' } },
   { path: '/ops/rent-agreement', heading: { name: 'Rent Agreement' } },
   { path: '/ops/referrals', heading: { name: 'Referral audit' } },
-  { path: '/ops/support', heading: { name: 'Support queue' } },
+  { path: '/ops/support', heading: { name: 'Support chats' } },
   { path: '/ops/drafting-desk', heading: { name: 'Property Valuation' } },
 ];
 

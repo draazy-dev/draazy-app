@@ -29,6 +29,11 @@ test.describe('POST /localities/resolve and GET /localities/search', () => {
     expect(malformed).toBeLessThan(500);
   });
 
+  test('a far corner of Pune district, outside the old city box, is accepted', async () => {
+    const res = await resolve({ placeId: `baramati-${Date.now().toString(36)}`, ...baner, name: uniqueLocalityName('Zztest Baramati'), lat: 18.15, lng: 74.58 });
+    expect(res.status).toBe(200);
+  });
+
   test('search answers with live rows in the summary shape, and nothing for an unknown name', async () => {
     const rows = await (await fetch(`${API}/localities/search?q=baner`)).json();
     expect(rows.map((r) => r.slug)).toContain('baner');

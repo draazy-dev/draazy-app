@@ -7,10 +7,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Must run in the caller's transaction so user flag and listing copies flip together. */
 @Component
 class OwnerBadgePropagator implements OwnerBadgeSink {
-
     private final PropertyRepository properties;
     private final List<VerifiedBadgeCopy> copies;
 

@@ -3,11 +3,17 @@ package com.draazy.api.billing.refund;
 import com.draazy.api.billing.credit.CreditNote;
 import com.draazy.api.billing.credit.CreditNoteRepository;
 import com.draazy.api.billing.credit.CreditNotes;
+import com.draazy.api.billing.credit.Invoice;
+import com.draazy.api.billing.credit.InvoiceRepository;
+import com.draazy.api.billing.credit.Invoices;
 import com.draazy.api.billing.plan.Plan;
 import com.draazy.api.billing.plan.PlanRepository;
 import com.draazy.api.billing.plan.Subscription;
 import com.draazy.api.billing.plan.SubscriptionRepository;
+import com.draazy.api.billing.plan.SubscriptionStatuses;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.BadRequestException;
+import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import java.time.Instant;
 import java.util.Collection;
@@ -26,23 +32,34 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The staff desk's read side: customer requests, the system's own refunds, and orders under dispute. */
 @Service
 public class RefundDesk {
-
-    /** Only the review queue carries signals: they replay a customer's history, which a decided row does not need. */
     public record Signals(long refunds12m, long linkedAccounts, long contactsUsed, long enquiries,
             boolean pausedDuringWindow) {
     }
 
-    public record Row(String id, String status, String kind, String label, String customerId, String customerName,
-            String orderRef, long amount, String basis, String customerReason, Instant requestedAt,
-            Instant decidedAt, String decisionReason, String propertyId, String creditNoteNo, Signals signals) {
+    public record Transaction(long paid, Instant paidAt, String orderStatus, String invoiceNo, String refundReason,
+            Long refundAmount, Instant refundDueAt, String refundState, Instant refundSettledAt, String gatewayRefund,
+            int refundAttempts, Instant refundTriedAt) {
     }
 
-    // What one page of rows needs, loaded once for the whole page.
-    private record Lookup(Map<UUID, Subscription> orders, Map<UUID, Plan> plans, Map<UUID, String> names,
-            Map<UUID, String> notes) {
+    public record Row(String id, String status, String kind, String label, String customerId, String customerName,
+            String customerMobile, String orderRef, long amount, String basis, String customerReason,
+            Instant requestedAt, Instant decidedAt, String decisionReason, String propertyId, String creditNoteNo,
+            Signals signals, Transaction transaction, String serviceRequestId) {
+    }
+
+    private record Lookup(Map<UUID, Subscription> orders, Map<UUID, Plan> plans, Map<UUID, User> people,
+            Map<UUID, String> notes, Map<UUID, Invoice> invoices) {
+        String name(UUID userId) {
+            User u = userId == null ? null : people.get(userId);
+            return u == null ? null : u.getName();
+        }
+
+        String mobile(UUID userId) {
+            User u = userId == null ? null : people.get(userId);
+            return u == null ? null : u.getMobile();
+        }
     }
 
     private final RefundRequestRepository requests;
@@ -51,35 +68,45 @@ public class RefundDesk {
     private final PlanRepository plans;
     private final UserRepository users;
     private final CreditNoteRepository creditNotes;
+    private final InvoiceRepository invoices;
     private final RefundAssessor assessor;
+    private final RentAgreementRefundSource rentAgreements;
 
     public RefundDesk(RefundRequestRepository requests, PaymentDisputeRepository disputes,
             SubscriptionRepository subscriptions, PlanRepository plans, UserRepository users,
-            CreditNoteRepository creditNotes, RefundAssessor assessor) {
+            CreditNoteRepository creditNotes, InvoiceRepository invoices, RefundAssessor assessor,
+            RentAgreementRefundSource rentAgreements) {
         this.requests = requests;
         this.disputes = disputes;
         this.subscriptions = subscriptions;
         this.plans = plans;
         this.users = users;
         this.creditNotes = creditNotes;
+        this.invoices = invoices;
         this.assessor = assessor;
+        this.rentAgreements = rentAgreements;
     }
 
     @Transactional(readOnly = true)
-    public Page<Row> list(String status, Pageable pageable) {
+    public Page<Row> list(String status, String feature, Integer days, Pageable pageable) {
         String filter = status == null || status.isBlank() ? RefundStatuses.PENDING_REVIEW : status;
         if (!RefundStatuses.DESK_FILTERS.contains(filter)) {
             throw new BadRequestException("status must be one of " + RefundStatuses.DESK_FILTERS.stream().sorted().toList());
         }
+        boolean passes = includes(feature, RefundStatuses.FEATURE_PASS);
+        Instant since = since(days);
+        if (!passes && (RefundStatuses.AUTO.equals(filter) || RefundStatuses.DISPUTED.equals(filter))) {
+            return Page.empty(pageable);
+        }
         return switch (filter) {
             case RefundStatuses.AUTO -> {
-                Page<Subscription> page = requests.findAutoRefunds(pageable);
+                Page<Subscription> page = requests.findAutoRefunds(since, pageable);
                 Lookup lookup = lookup(page.getContent().stream().map(Subscription::getId).toList(),
                         page.getContent().stream().map(Subscription::getUserId).toList());
                 yield page.map(order -> autoRow(order, lookup));
             }
             case RefundStatuses.DISPUTED -> {
-                Page<PaymentDispute> page = disputes.findByStatus(PaymentDispute.OPEN,
+                Page<PaymentDispute> page = disputes.findByStatusSince(PaymentDispute.OPEN, since,
                         PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
                                 Sort.by(Sort.Direction.DESC, "openedAt")));
                 Lookup lookup = lookup(page.getContent().stream().map(PaymentDispute::getSubscriptionId).toList(),
@@ -87,23 +114,52 @@ public class RefundDesk {
                 yield page.map(dispute -> disputeRow(dispute, lookup));
             }
             default -> {
-                Page<RefundRequest> page = requests.findByStatus(filter, PageRequest.of(pageable.getPageNumber(),
-                        pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt")));
-                Lookup lookup = lookup(page.getContent().stream().map(RefundRequest::getSubscriptionId).toList(),
-                        page.getContent().stream().map(RefundRequest::getUserId).toList());
-                yield page.map(request -> requestRow(request, lookup));
+                Page<RefundRequestRepository.DeskEntry> page = requests.findDeskEntries(passes, filter,
+                        includes(feature, RefundStatuses.KIND_RENT_AGREEMENT), rentAgreements.statusesFor(filter),
+                        since, PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
+                Map<UUID, RefundRequest> passRows = requests.findAllById(idsOf(page, RefundStatuses.FEATURE_PASS))
+                        .stream().collect(Collectors.toMap(RefundRequest::getId, Function.identity()));
+                Map<UUID, Row> rentAgreementRows = rentAgreements.rows(idsOf(page, RefundStatuses.KIND_RENT_AGREEMENT));
+                Lookup lookup = lookup(passRows.values().stream().map(RefundRequest::getSubscriptionId).toList(),
+                        passRows.values().stream().map(RefundRequest::getUserId).toList());
+                yield page.map(entry -> RefundStatuses.FEATURE_PASS.equals(entry.getKind())
+                        ? requestRow(passRows.get(entry.getId()), lookup) : rentAgreementRows.get(entry.getId()));
             }
         };
     }
 
+    private static List<UUID> idsOf(Page<RefundRequestRepository.DeskEntry> page, String kind) {
+        return page.getContent().stream().filter(entry -> kind.equals(entry.getKind()))
+                .map(RefundRequestRepository.DeskEntry::getId).toList();
+    }
+
+    private static boolean includes(String feature, String wanted) {
+        if (feature == null || feature.isBlank()) {
+            return true;
+        }
+        if (!RefundStatuses.FEATURES.contains(feature)) {
+            throw new BadRequestException("feature must be one of " + RefundStatuses.FEATURES.stream().sorted().toList());
+        }
+        return feature.equals(wanted);
+    }
+
+    private static Instant since(Integer days) {
+        Instant since = PlatformTime.sinceOrNull(days);
+        return since == null ? Instant.EPOCH : since;
+    }
+
     @Transactional(readOnly = true)
-    public Map<String, Long> counts() {
+    public Map<String, Long> counts(String feature) {
+        boolean passes = includes(feature, RefundStatuses.FEATURE_PASS);
+        boolean rentAgreementsToo = includes(feature, RefundStatuses.KIND_RENT_AGREEMENT);
         Map<String, Long> totals = new LinkedHashMap<>();
         for (String status : List.of(RefundStatuses.PENDING_REVIEW, RefundStatuses.APPROVED, RefundStatuses.REJECTED)) {
-            totals.put(status, requests.countByStatus(status));
+            totals.put(status, (passes ? requests.countByStatus(status) : 0)
+                    + (rentAgreementsToo ? rentAgreements.count(status) : 0));
         }
-        totals.put(RefundStatuses.AUTO, requests.findAutoRefunds(PageRequest.of(0, 1)).getTotalElements());
-        totals.put(RefundStatuses.DISPUTED, disputes.countByStatus(PaymentDispute.OPEN));
+        totals.put(RefundStatuses.AUTO, passes
+                ? requests.findAutoRefunds(Instant.EPOCH, PageRequest.of(0, 1)).getTotalElements() : 0);
+        totals.put(RefundStatuses.DISPUTED, passes ? disputes.countByStatus(PaymentDispute.OPEN) : 0);
         return totals;
     }
 
@@ -118,19 +174,49 @@ public class RefundDesk {
         Signals signals = RefundStatuses.PENDING_REVIEW.equals(request.getStatus())
                 ? signals(order, plan, request.getDeviceIdHash(), request.getCreatedAt()) : null;
         return new Row(request.getId().toString(), request.getStatus(), request.getKind(), plan.getName(),
-                request.getUserId().toString(), lookup.names().get(request.getUserId()), order.getPaymentRef(),
+                request.getUserId().toString(), lookup.name(request.getUserId()), lookup.mobile(request.getUserId()),
+                order.getPaymentRef(),
                 request.getAmount(), request.getBasis(), request.getCustomerReason(), request.getCreatedAt(),
                 request.getDecidedAt(), request.getDecisionReason(), idOf(order.getPropertyId()),
-                lookup.notes().get(order.getId()), signals);
+                lookup.notes().get(order.getId()), signals, transaction(order, lookup), null);
     }
 
     private Row autoRow(Subscription order, Lookup lookup) {
         Plan plan = lookup.plans().get(order.getPlanId());
         return new Row(order.getId().toString(), RefundStatuses.AUTO, RefundAssessor.kindOf(plan), plan.getName(),
-                order.getUserId().toString(), lookup.names().get(order.getUserId()), order.getPaymentRef(),
+                order.getUserId().toString(), lookup.name(order.getUserId()), lookup.mobile(order.getUserId()),
+                order.getPaymentRef(),
                 order.getRefundAmount() != null ? order.getRefundAmount() : order.getAmount(), null, null,
                 order.getRefundDueAt(), null, null, idOf(order.getPropertyId()), lookup.notes().get(order.getId()),
-                null);
+                null, transaction(order, lookup), null);
+    }
+
+    private static Transaction transaction(Subscription order, Lookup lookup) {
+        if (order == null) {
+            return null;
+        }
+        Invoice invoice = lookup.invoices().get(order.getId());
+        Instant paidAt = invoice != null ? invoice.getIssuedAt()
+                : SubscriptionStatuses.CANCELLED.equals(order.getStatus()) ? order.getRefundDueAt() : null;
+        boolean due = order.getRefundDueAt() != null;
+        return new Transaction(order.getAmount(), paidAt, order.getStatus(),
+                invoice == null ? null : invoice.getNumber(), order.getRefundReason(),
+                !due ? null : order.getRefundAmount() != null ? order.getRefundAmount() : order.getAmount(),
+                order.getRefundDueAt(), refundState(order), order.getRefundSettledAt(), order.getRefundRef(),
+                order.getRefundAttempts(), order.getRefundTriedAt());
+    }
+
+    private static String refundState(Subscription order) {
+        if (order.getRefundDueAt() == null) {
+            return null;
+        }
+        if (order.getRefundSettledAt() != null) {
+            return "confirmed";
+        }
+        if (order.getRefundRef() != null) {
+            return "sent";
+        }
+        return order.getRefundTriedAt() != null || order.getRefundAttempts() > 0 ? "retrying" : "queued";
     }
 
     private Row disputeRow(PaymentDispute dispute, Lookup lookup) {
@@ -140,10 +226,10 @@ public class RefundDesk {
         return new Row(dispute.getId().toString(), RefundStatuses.DISPUTED,
                 plan == null ? null : RefundAssessor.kindOf(plan),
                 plan == null ? null : plan.getName(), customer == null ? null : customer.toString(),
-                customer == null ? null : lookup.names().get(customer), dispute.getOrderRef(),
+                lookup.name(customer), lookup.mobile(customer), dispute.getOrderRef(),
                 dispute.getAmount() != null ? dispute.getAmount() : order == null ? 0L : order.getAmount(), null,
                 dispute.getReason(), dispute.getOpenedAt(), dispute.getClosedAt(), null,
-                order == null ? null : idOf(order.getPropertyId()), null, null);
+                order == null ? null : idOf(order.getPropertyId()), null, null, transaction(order, lookup), null);
     }
 
     private Signals signals(Subscription order, Plan plan, String device, Instant asOf) {
@@ -163,12 +249,14 @@ public class RefundDesk {
         List<UUID> planIds = orders.values().stream().map(Subscription::getPlanId).distinct().toList();
         Map<UUID, Plan> planById = plans.findAllById(planIds).stream()
                 .collect(Collectors.toMap(Plan::getId, Function.identity()));
-        Map<UUID, String> names = new HashMap<>();
+        Map<UUID, User> people = new HashMap<>();
         users.findAllById(userIds.stream().filter(Objects::nonNull).distinct().toList())
-                .forEach(u -> names.put(u.getId(), u.getName()));
+                .forEach(u -> people.put(u.getId(), u));
         Map<UUID, String> notes = creditNotes.findBySourceTypeAndSourceIdIn(CreditNotes.SUBSCRIPTION, ids).stream()
                 .collect(Collectors.toMap(CreditNote::getSourceId, CreditNote::getNumber, (a, b) -> a));
-        return new Lookup(orders, planById, names, notes);
+        Map<UUID, Invoice> invoiceById = invoices.findBySourceTypeAndSourceIdIn(Invoices.SUBSCRIPTION, ids).stream()
+                .collect(Collectors.toMap(Invoice::getSourceId, Function.identity(), (a, b) -> a));
+        return new Lookup(orders, planById, people, notes, invoiceById);
     }
 
     private static String idOf(UUID id) {

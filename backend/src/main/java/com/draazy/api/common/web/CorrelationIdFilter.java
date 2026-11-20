@@ -16,20 +16,20 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** Gives every request a correlation id (an inbound safe {@code X-Trace-Id} or a new UUID) in the MDC, echoed in the
- * response header, and logs one outcome line per request. Runs before Spring Security so 401/403 carry it too. */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class CorrelationIdFilter extends OncePerRequestFilter {
-
     private static final Logger log = LoggerFactory.getLogger(CorrelationIdFilter.class);
+
+    // One stable logger name so log alerts can watch refusals (401/403/429) across every route.
+    static final String SECURITY_LOGGER = "draazy.security";
+
+    private static final Logger securityLog = LoggerFactory.getLogger(SECURITY_LOGGER);
 
     private static final long SLOW_REQUEST_MS = 2_000;
 
-    /** Rejects CR/LF and exotic characters so a reflected header cannot split the response or forge a log line. */
     private static final Pattern SAFE_TRACE_ID = Pattern.compile("^[A-Za-z0-9_-]{1,128}$");
 
-    /** Reserved for scheduled runs; a caller sending it would file its errors under jobs. */
     private static final String JOB_TRACE_PREFIX = "job-";
 
     @Override
@@ -59,12 +59,23 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
         }
     }
 
-    // Never the query string, headers or body: a query can carry a share token.
     private static void logOutcome(HttpServletRequest request, int status, long millis) {
+        logSecurityEvent(request, status);
         if (status >= 500 || millis > SLOW_REQUEST_MS) {
             log.warn("{} {} -> {} in {} ms", request.getMethod(), request.getRequestURI(), status, millis);
         } else if (log.isDebugEnabled()) {
             log.debug("{} {} -> {} in {} ms", request.getMethod(), request.getRequestURI(), status, millis);
+        }
+    }
+
+    // 401 is routine (every expired access token earns one), so it stays below the WARN alert line.
+    private static void logSecurityEvent(HttpServletRequest request, int status) {
+        switch (status) {
+            case HttpServletResponse.SC_UNAUTHORIZED -> securityLog.info(
+                    "security_event status={} {} {}", status, request.getMethod(), request.getRequestURI());
+            case HttpServletResponse.SC_FORBIDDEN, 429 -> securityLog.warn(
+                    "security_event status={} {} {}", status, request.getMethod(), request.getRequestURI());
+            default -> { }
         }
     }
 }

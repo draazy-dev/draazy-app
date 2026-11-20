@@ -6,9 +6,6 @@ export const emiOf = (price) => {
   return '₹' + Math.round(e / 1000) + 'k/mo';
 };
 
-/* What remains here is presentation and navigation. Facet and type matching live in
-   `lib/listings/`, because both providers must produce the same view model. */
-
 export const tenantLabel = (t) => {
   if (!t || !t.length) return '';
   const fam = t.includes('family');
@@ -19,8 +16,6 @@ export const tenantLabel = (t) => {
   return 'Bachelors';
 };
 
-/* Deep-link from the Flatmates filter into the dedicated Flatmates finder,
-   carrying locality + gender preference (mirrors buildFlatmatesUrl in the HTML). */
 export function flatmatesUrl(f, locName) {
   const params = new URLSearchParams({ view: 'move-in' });
   const slug = [...f.localities][0];

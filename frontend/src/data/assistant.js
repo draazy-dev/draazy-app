@@ -1,18 +1,13 @@
-/* Knowledge base for "Draaz", the Draazy help assistant. Pure data; the matcher ranks entries by
-   keyword overlap. Action shape: { label, icon, to | ask, external? } — `external` hands off to the OS. */
-
 import { SUPPORT_PHONE, SUPPORT_TEL } from '../lib/supportContact.js';
+import { supportLink } from '../lib/supportLink.js';
 
 export const ASSISTANT = {
   name: 'Draaz',
   tagline: 'Draazy guide',
-  /* First bubble when the panel opens with an empty thread. */
   greeting:
     "Hi, I'm Draaz — your Draazy guide. I can show you how anything here works and take you straight to it. What are you looking to do?",
 };
 
-/* Top-of-panel chips: the highest-intent starting points. `ask` chips run the
-   text through the matcher; `nav` chips jump straight to a route. */
 export const QUICK_ACTIONS = [
   { label: 'Find a home', icon: 'search', kind: 'nav', to: '/listings' },
   { label: 'List my property', icon: 'plus-circle', kind: 'nav', to: '/list-property' },
@@ -20,12 +15,10 @@ export const QUICK_ACTIONS = [
   { label: 'Talk to a human', icon: 'headset', kind: 'ask', text: 'Talk to a human' },
 ];
 
-/* Human-support escalation — surfaced on every low-confidence answer so the
-   assistant is never a dead end. */
 export const ESCALATION = {
   intro: "Happy to hand you to a person. You can:",
   actions: [
-    { label: 'Raise a support ticket', to: '/support', icon: 'ticket-plus' },
+    { label: 'Chat with Draazy support', to: supportLink('general'), icon: 'message-square' },
     { label: 'Contact us', to: '/contact', icon: 'mail' },
     { label: `Call ${SUPPORT_PHONE}`, to: SUPPORT_TEL, icon: 'phone', external: true },
   ],
@@ -46,7 +39,7 @@ export const KB = [
     id: 'search',
     keywords: ['search', 'find', 'buy', 'rent', 'browse', 'listings', 'flats', 'apartment', 'home', 'house', 'property', 'smart', 'filter', 'filters', 'bhk', 'budget', 'locality', 'area', 'map'],
     q: 'How do I search for a property?',
-    a: "Open Listings and pick Buy or Rent. Type plain English like “2 BHK under 40k in Baner, ready to move” and we turn it into filters — or set BHK, budget, furnishing and possession yourself; each option shows how many homes match. On the map, focus up to 5 localities to see their pins. Your filters live in the link, so you can share or bookmark a search.",
+    a: "Open Listings and pick Buy or Rent. Type plain English like “2 BHK under 40k in Baner, ready to move” and we turn it into filters — or set BHK, budget, furnishing and possession yourself; each option shows how many homes match. On the map, focus up to 3 localities to see their pins. Your filters live in the link, so you can share or bookmark a search.",
     actions: [
       { label: 'Open Listings', to: '/listings', icon: 'search' },
       { label: 'View on map', to: '/listings?view=map', icon: 'map-pin' },
@@ -57,7 +50,7 @@ export const KB = [
     id: 'save-search',
     keywords: ['save', 'saved', 'search', 'alert', 'alerts', 'notify', 'notification', 'shortlist', 'favourite', 'favorite', 'wishlist', 'bookmark'],
     q: 'How do saved searches and alerts work?',
-    a: "Tap Save search on any Listings result and we'll tell you in the app when a new home matches — daily by default. When results are thin, the Create alert card does the same. Tap the heart on a property to shortlist it; everything you saved is under Saved. Flatmates and locality pages have their own alerts too. You can keep up to 10 saved searches and alerts, and you need to be signed in.",
+    a: "Tap Alert me on any Listings result, pick what you want to hear about, and we'll tell you in the app when a new home matches. When results are thin, the Create alert card does the same. Tap the heart on a property to shortlist it; everything you saved is under Saved. Flatmates and locality pages have their own alerts too. You can keep up to 10 saved searches and alerts, and you need to be signed in.",
     actions: [
       { label: 'Go to Saved', to: '/saved', icon: 'heart' },
       { label: 'Notifications', to: '/notifications', icon: 'bell' },
@@ -78,7 +71,7 @@ export const KB = [
     id: 'verification',
     keywords: ['verify', 'verified', 'verification', 'trust', 'genuine', 'fake', 'scam', 'safe', 'aadhaar', 'pan', 'badge', 'document', 'authentic', 'rera', 'selfie', 'kyc'],
     q: 'How are owners and listings verified?',
-    a: "Every listing is checked by our team before it goes live: real photos, not a duplicate, details that add up. Owners can also earn a Verified property badge with an ownership proof such as an electricity bill or society share certificate; changing the address, society or price later removes it until it's re-checked. Anyone can get the ID verified badge by photographing a government ID with a live selfie — a person on our team decides, never a machine, and the images are deleted 7 days after the decision. Badges are optional trust signals, never a requirement to browse, post or contact.",
+    a: "Every listing is checked by our team before it goes live: real photos, not a duplicate, details that add up. Owners can also earn a Verified property badge with an ownership proof such as an electricity bill or society share certificate; changing the address, society or price later removes it until it's re-checked. Anyone can get the KYC done badge by photographing a government ID with a live selfie — a person on our team decides, never a machine, and the images are deleted 7 days after the decision. Badges are optional trust signals, never a requirement to browse, post or contact.",
     actions: [
       { label: 'Verify identity', to: '/verify-identity', icon: 'shield-check' },
       { label: 'How verification works', to: '/how-verification-works', icon: 'shield-check' },
@@ -101,7 +94,7 @@ export const KB = [
     keywords: ['compare', 'comparison', 'versus', 'vs', 'side', 'difference'],
     q: 'Can I compare properties?',
     a: "Yes. Tap the compare icon on any listing card to add it, then open Compare to see price, area, BHK, furnishing and amenities side by side.",
-    actions: [{ label: 'Open Compare', to: '/compare', icon: 'git-compare' }],
+    actions: [{ label: 'Open Compare', to: '/compare', icon: 'scale' }],
   },
   {
     id: 'list-property',
@@ -124,7 +117,7 @@ export const KB = [
     id: 'plans',
     keywords: ['plan', 'plans', 'price', 'pricing', 'paid', 'premium', 'subscription', 'cost', 'upgrade', 'package', 'contact pack', 'pass'],
     q: 'What costs money on Draazy?',
-    a: "Only three things: a Contact Pack (15 owner contacts for 30 days), a Listing Pass for each extra live listing beyond your one free listing (60 days), and a rent agreement. None renews by itself. Everything else, including enquiries, the verified badge and flatmate posts, is free. Compare current prices on the Plans page.",
+    a: "Only three things: a Contact Pack (15 contacts for 30 days on rent listings at ₹199, or for 60 days on sale listings at ₹399), a Listing Pass for each extra live listing beyond your one free listing (₹999 for 60 days on rent, ₹1,999 for 90 days on sale), and a rent agreement. None renews by itself. Everything else, including enquiries, the verified badge and flatmate posts, is free. Compare current prices on the Plans page.",
     actions: [{ label: 'View Plans', to: '/plans', icon: 'badge-check' }],
   },
   {
@@ -227,7 +220,7 @@ export const KB = [
     id: 'refer',
     keywords: ['refer', 'referral', 'invite', 'friend', 'reward', 'earn', 'bonus'],
     q: 'Is there a referral programme?',
-    a: "Yes — share your link from the Refer page. A referral counts once your friend qualifies — for an owner, when their first listing is verified. Refer an owner and you both get a reward when their first listing is verified: they get longer Featured placement, you get a free rent agreement. Refer a friend looking for a home and they get extra free contacts, you get owner contacts. The Refer page shows the current numbers; some referrals are checked briefly before the reward lands. Rewards are non-cash.",
+    a: "Yes. Open the Refer page and type your friend's mobile number. Draazy sends them your invite on WhatsApp. If it can't, your own WhatsApp opens with the message ready. When your friend gets going, you get 50% off the Draazy service fee of your next rent agreement. You can use it once you and your friend have both done KYC, and it comes off by itself at checkout. Stamp duty and registration charges are not discounted. Your friend gets a welcome gift too: extra free contacts, or Featured days for an owner. Some rewards are checked for a few days first. Up to 3 rewards a month and 10 a year. Rewards are non-cash.",
     actions: [{ label: 'Refer & earn', to: '/refer', icon: 'gift' }],
   },
   {
@@ -249,7 +242,7 @@ export const KB = [
     id: 'owner-requests',
     keywords: ['requests', 'leads', 'enquiries', 'enquiry', 'tenants', 'buyers', 'accept', 'decline', 'interested', 'approve', 'hide', 'privacy', 'serious'],
     q: 'I am an owner — how do I handle contact requests?',
-    a: "Number, photo, document and flatmate requests all wait in your Dashboard under Requests, and anything urgent also shows in the Action Center on Home. Open one to accept or decline it; a verified tick tells you the team has checked that person's ID. Once you accept a number request, Call and WhatsApp buttons appear — or keep your number private in Settings and talk only in Messages. Offers and finalize requests show on your listing.",
+    a: "Number, photo, document and flatmate requests all wait in your Dashboard under Requests, and anything urgent also shows in the Action Center on Home. Open one to accept or decline it; a verified tick tells you the team has checked that person's ID. Once you accept a number request, Call and Chat buttons appear — or keep your number private in Settings and talk only in Messages. Offers and finalize requests show on your listing.",
     actions: [
       { label: 'My requests', to: '/dashboard#leads', icon: 'inbox' },
       { label: 'My messages', to: '/messages', icon: 'message-circle' },
@@ -295,23 +288,21 @@ export const KB = [
     id: 'whats-new',
     keywords: ['whats', 'latest', 'changelog', 'release', 'version', 'changed', 'features'],
     q: "What's new on Draazy?",
-    a: "The latest release (1.9.0, October 2026) made light mode the default, simplified the locality and near-a-place search, added locality guides with a Pune map and the Pune blog, and made listing location society-first. The changelog lists every release.",
+    a: "The latest release (1.13.0, November 2026) made referrals simpler: invite a friend by mobile number on WhatsApp and get 50% off your next rent agreement fee. The changelog lists every release.",
     actions: [{ label: "See what's new", to: '/help/changelog', icon: 'sparkles' }],
   },
   {
     id: 'support',
     keywords: ['support', 'help', 'human', 'agent', 'talk', 'contact', 'ticket', 'complaint', 'issue', 'problem', 'stuck', 'call', 'reach', 'someone'],
     q: 'How do I reach a human / get support?',
-    a: "Raise a support ticket and track every reply, browse the Help Centre, or contact us directly. Our support team is available 9 AM – 8 PM, Monday to Saturday.",
+    a: "Chat with Draazy support in Messages and pick the property, post or payment it's about, browse the Help Centre, or contact us directly. Our support team is available 9 AM – 8 PM, Monday to Saturday.",
     actions: [
-      { label: 'Raise a ticket', to: '/support', icon: 'ticket-plus' },
+      { label: 'Chat with support', to: supportLink('general'), icon: 'message-square' },
       { label: 'Help Centre', to: '/help', icon: 'book-open' },
     ],
   },
 ];
 
-/* Per-route follow-up suggestions: KB ids surfaced as chips when the panel opens
-   on that page, so the assistant is context-aware. Matched by path prefix. */
 export const ROUTE_SUGGESTIONS = {
   '/listings': ['search', 'save-search', 'contact-gate', 'compare'],
   '/property': ['contact-gate', 'schedule-visit', 'offers', 'report'],

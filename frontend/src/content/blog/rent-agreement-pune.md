@@ -2,7 +2,7 @@
 title: "Rent agreement in Pune: registration, stamp duty & documents"
 description: Why every rental agreement in Pune must be registered, how stamp duty is calculated, which documents you need and how to register online without a broker.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-06
 author: Draazy Team
 topic: renting
 tags: [rent agreement, leave and licence, stamp duty, Pune, tenants, owners]
@@ -57,7 +57,7 @@ An 11-month agreement for a 2 BHK in Wakad:
 | **Total value** | **₹2,85,000** |
 | **Stamp duty at 0.25%** | **₹712.50 before rounding** |
 
-The amount payable is rounded up, so use the stamp duty calculator on the IGR Maharashtra website, or our [rent agreement cost calculator](/tools/rent-agreement-cost-pune), for the exact figure.
+The amount payable is rounded to the nearest rupee, so use the stamp duty calculator on the IGR Maharashtra website, or our [rent agreement cost calculator](/tools/rent-agreement-cost-pune), for the exact figure.
 
 On top of stamp duty there is a **registration fee**: ₹1,000 for property within municipal limits (PMC and PCMC) and ₹500 in rural areas. A doorstep or online service provider will charge a separate service fee.
 
@@ -70,17 +70,19 @@ Keep these ready before you start. Scans or clear photos are enough for online r
 
 **Owner (licensor)**
 
-- Aadhaar card and PAN card
+- PAN number
 - Proof of ownership — the Index II, sale deed or a recent property tax bill
+- Aadhaar and its registered mobile, for the OTP at the doorstep visit
 
 **Tenant (licensee)**
 
-- Aadhaar card and PAN card
+- PAN number
 - Current address proof if it differs from Aadhaar
+- Aadhaar and its registered mobile, for the OTP at the doorstep visit
 
-**Two witnesses**
+**Witnesses**
 
-- Aadhaar card for each. Witnesses also go through Aadhaar verification.
+- The registration needs two witnesses. With Draazy you don't send their details: our team records them at the doorstep visit.
 
 ## Registering online, step by step
 
@@ -106,7 +108,7 @@ Most rent disputes in Pune come from terms nobody wrote down. Settle these first
 
 ## Don't forget police verification
 
-Pune Police require owners to submit their tenant's details. It is a separate step from registering the agreement, and skipping it can lead to police action against the owner. Our guide to [tenant police verification in Pune](/blog/tenant-police-verification-pune) explains how to do it online.
+Pune Police require owners to submit their tenant's details. Registering the agreement online on the IGR portal also shares the tenant's details with the police, which is how Draazy's [rent agreement service](/services/rent-agreement) covers it. The police order is a separate duty from registration, and Pune Police still ask owners to use their own online systems too. Skipping it can lead to police action against the owner. Our guide to [tenant police verification in Pune](/blog/tenant-police-verification-pune) explains how to do it online.
 
 ## Skip the broker for this too
 

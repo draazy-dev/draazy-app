@@ -17,19 +17,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Why these cannot be unit tests. {@link GlobalExceptionHandlerTest} already proves each handler maps its exception
-// to the right envelope.
 @DisplayName("Error envelope — protocol refusals are the caller's fault, not a 500")
 class ErrorEnvelopeWebTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
-    // The regression this pins is not the status — a malformed body was always a 400 — but the body.
     @Test
     @DisplayName("a wrong verb on a real route is 405 with an Allow header, not 500")
     void wrongVerbIs405() throws Exception {
@@ -66,6 +63,16 @@ class ErrorEnvelopeWebTest extends AbstractApiTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value(ErrorCodes.NOT_FOUND))
                 .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(strings = {"%s", "50%", "ZAP%n%s%n%s"})
+    @DisplayName("a stray % in sort is 400, not 500")
+    void undecodableSortIs400(String sort) throws Exception {
+        mvc.perform(get("/flatmates/feed").param("tab", "move-in").param("sort", sort))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(ErrorCodes.BAD_REQUEST))
+                .andExpect(jsonPath("$.message").value("Invalid or missing request parameter: sort"));
     }
 
     @ParameterizedTest(name = "{0}")

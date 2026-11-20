@@ -8,8 +8,10 @@ import { slotFromParts, todayIso } from '../../../lib/visitWhen.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import useScrollLock from '../../../hooks/useScrollLock.js';
+import useModalDialog from '../../../hooks/useModalDialog.js';
 import { scheduleVisit } from '../../../services/visitService.js';
 import { track } from '../../../lib/pmf.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const nextDayIso = () => {
   const d = new Date();
@@ -17,7 +19,7 @@ const nextDayIso = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
+export function ScheduleVisitModal({ p, isIn, onClose }) {
   const { t } = useTranslation();
   const { isIn: authIn, loading: authLoading } = useAuth();
   const sendToSignIn = useSignInGate();
@@ -40,11 +42,7 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
     if (sendToSignIn('schedule', returnPath)) onClose();
   }, [authLoading, onClose, returnPath, sendToSignIn, signedIn]);
 
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const panelRef = useModalDialog(true, onClose);
 
   const submit = async () => {
     if (busy) return;
@@ -70,7 +68,6 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
       });
       setDone(true);
       track('visit_requested', { id: p?.id });
-      toast(t('property.visitRequestedToast'), 'success');
     } catch (e) {
       if (e?.status === 401) {
         if (sendToSignIn('schedule', returnPath)) {
@@ -83,22 +80,21 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
         setQuotaOpen(true);
         return;
       }
-      const expected = e?.code === 'contact_pending_limit' || e?.status === 409;
       const message = e?.code === 'contact_pending_limit' ? t('property.contactPendingLimit')
+        : e?.code === 'recently_withdrawn' ? (userMessage(e, t('property.recentlyWithdrawn')))
         : e?.status === 409 ? t('property.visitAlreadyBooked') : t('property.visitRequestFailed');
       setError(message);
-      toast(message, expected ? 'info' : 'error');
     } finally {
       if (keepMounted) setBusy(false);
     }
   };
 
   if (!authLoading && !signedIn) return null;
-  if (quotaOpen) return <ContactsExhaustedModal onClose={onClose} />;
+  if (quotaOpen) return <ContactsExhaustedModal deal={p?.deal} onClose={onClose} />;
 
   return (
     <div className="dz-modal-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="dz-modal" role="dialog" aria-modal="true" aria-label={t('property.scheduleVisit')} style={{ maxWidth: 600 }}>
+      <div ref={panelRef} tabIndex={-1} className="dz-modal outline-none" role="dialog" aria-modal="true" aria-label={t('property.scheduleVisit')} style={{ maxWidth: 600 }}>
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h3 className="text-lg font-bold text-white">{t('property.scheduleVisit')}</h3>
@@ -130,7 +126,7 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
                 <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} placeholder={t('property.anyRequirements')} className="field w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 resize-none" />
               </div>
             </div>
-            {error ? <p className="mb-3 rounded-xl border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</p> : null}
+            {error ? <p role="alert" className="mb-3 rounded-xl border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</p> : null}
             <button type="button" onClick={submit} disabled={busy || past} aria-describedby={past ? 'visit-past-hint' : undefined} className="btn-teal w-full min-h-[44px] flex items-center justify-center gap-2 px-4 disabled:opacity-60"><Icon name="calendar-check" className="w-4 h-4" /> {t('property.confirmVisit')}</button>
           </>
         )}

@@ -1,5 +1,5 @@
 import { test, expect } from '../../../fixtures/live.js';
-import { LIST_PROPERTY_DRAFT_KEY } from '../../../helpers/listingForm.helper.js';
+import { readListPropertyDraft } from '../../../helpers/listingForm.helper.js';
 import { PHOTO_PNG, openPhotoStep as openPhotos, png } from '../../../helpers/listingPhotos.helper.js';
 
 const SMALL_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4AWJiYGD4D8IgBpBmYAAAAAD//7vS9wEAAAAGSURBVAMAGDACA6ybwrYAAAAASUVORK5CYII=', 'base64');
@@ -53,25 +53,30 @@ test.describe('list property photo UX', () => {
         await expect(photos.locator('img')).toHaveCount(4);
         await expect(photos).toHaveAttribute('aria-busy', 'false');
         await expect(photos.getByRole('button', { name: /^move photo/i })).toHaveCount(0);
+        // Upload ids follow network arrival order, not tile order.
+        const [, second, , fourth] = await photos.locator('img').evaluateAll((els) => els.map((el) => el.getAttribute('src')));
         await photos.getByRole('button', { name: /set as cover/i }).nth(1).click();
-        await expect(photos.locator('img').first()).toHaveAttribute('src', /photo-3\.jpg/);
+        await expect(photos.locator('img').first()).toHaveAttribute('src', second);
 
         const tiles = photos.getByRole('group', { name: /^Photo \d of 4$/ });
         await tiles.first().focus();
         await page.keyboard.press('Space');
         await page.keyboard.press('ArrowRight');
         await page.keyboard.press('Space');
-        await expect(photos.locator('img').nth(1)).toHaveAttribute('src', /photo-3\.jpg/);
+        await expect(photos.locator('img').nth(1)).toHaveAttribute('src', second);
 
+        // The keyboard drop animates the tiles; measuring mid-animation drags from stale coordinates.
+        await expect.poll(() => tiles.evaluateAll((els) => els.every((el) => !el.style.transform && !el.style.transition)))
+          .toBe(true);
         const from = await tiles.nth(3).boundingBox();
         const to = await tiles.first().boundingBox();
         await page.mouse.move(from.x + from.width / 2, from.y + 30);
         await page.mouse.down();
         await page.mouse.move(to.x + to.width / 2, to.y + 30, { steps: 12 });
         await page.mouse.up();
-        await expect(photos.locator('img').first()).toHaveAttribute('src', /photo-4\.jpg/);
-        await expect(photos.locator('img').nth(2)).toHaveAttribute('src', /photo-3\.jpg/);
-        const draft = await page.evaluate((key) => localStorage.getItem(key), LIST_PROPERTY_DRAFT_KEY);
+        await expect(photos.locator('img').first()).toHaveAttribute('src', fourth);
+        await expect(photos.locator('img').nth(2)).toHaveAttribute('src', second);
+        const draft = await readListPropertyDraft(page);
         expect(draft ?? '').not.toContain('data:');
     });
 
@@ -84,15 +89,28 @@ test.describe('list property photo UX', () => {
       await expect(photos.locator('.dz-dd-photocat .dz-dropdown__trigger').first()).toHaveText('Balcony');
     });
 
-    await test.step('shows a per-photo resolution error and retry affordance', async () => {
+    await test.step('shows a per-photo resolution error and offers no retry for a photo that can never pass', async () => {
         await photos.locator('input[type="file"]').first().setInputFiles({
           name: 'tiny.png',
           mimeType: 'image/png',
           buffer: SMALL_PNG,
         });
         await expect(photos).toContainText(/480 px/);
-        await expect(photos.getByRole('button', { name: /retry/i })).toBeVisible();
+        await expect(photos.getByRole('button', { name: /retry/i })).toHaveCount(0);
     });
+  });
+
+  test('a photo dropped on the upload box is added like a picked one', async ({ page }) => {
+    await openPhotos(page);
+    const photos = page.locator('[data-err="photos"]');
+    const transfer = await page.evaluateHandle((b64) => {
+      const data = new DataTransfer();
+      data.items.add(new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], 'dropped.png', { type: 'image/png' }));
+      return data;
+    }, PHOTO_PNG.toString('base64'));
+    await photos.locator('label.upload-zone').dispatchEvent('drop', { dataTransfer: transfer });
+    await expect(photos.locator('.grid img')).toHaveCount(1);
+    await expect(photos).toContainText('1 / 10 photos');
   });
 
   test('follows the limit the server publishes rather than a bundled number', async ({ page }) => {

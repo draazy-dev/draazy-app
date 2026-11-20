@@ -21,8 +21,6 @@ import org.springframework.test.web.servlet.ResultActions;
 
 @DisplayName("The subscriptionPlans kill switch refuses new purchases at the server")
 class PurchasesPausedTest extends AbstractApiTest {
-
-    /** Seeded by {@code R__DML_seed_reference_data.sql}; priced, so a purchase opens a gateway order. */
     private static final String PACK = "b1000000-0000-4000-8000-000000000006";
 
     @Autowired UserRepository users;
@@ -63,7 +61,6 @@ class PurchasesPausedTest extends AbstractApiTest {
         assertThat(subscriptions.findAll()).noneMatch(s -> s.getUserId().equals(u.getId()));
     }
 
-    /** Counterweight: without it, a gate that refused everyone would pass the test above. */
     @Test
     void switchingItBackOnSellsAgain() throws Exception {
         User u = owner("9855509002");

@@ -1,15 +1,21 @@
 // Every fixture is minted through the consumer path, because the seed's five flatmate rows are all already `approved`.
 import { ACTORS, expect, test } from '../../fixtures/live.js';
-import { API, E2E_OTP, apiLogin, authHeaders, uniqueMobile, uploadedListingPhotos } from '../../helpers/liveAuth.js';
+import { API, E2E_OTP, apiLogin, authHeaders, grantIdentityBadge, uniqueMobile, uploadedListingPhotos } from '../../helpers/liveAuth.js';
 import { tenantRoomAgreement } from '../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../helpers/roomWizard.js';
 import { withSocietyId } from '../../helpers/liveSociety.js';
 import { pickLocalitiesIn } from '../../helpers/locality.js';
+import { sql } from '../../helpers/monetisation.js';
+import { tickDeskChecklist } from '../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../helpers/flatmateGroup.js';
+import { istInDays } from '../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const STAFF = '9733798115';
 
 // One host per test: the anti-broker cap counts non-owner-tier supply per host.
 const HOSTS = {
-  verifyApprove: { mobile: '9700000003', name: 'Arjun Rao' },
   verifyReject: { mobile: '9712728163', name: 'Aditya Iyer' },
   publish: { mobile: '9240355264', name: 'Aarav Reddy' },
   remove: { mobile: '9253229149', name: 'Pooja Shah' },
@@ -55,8 +61,10 @@ async function seedTenantRoom(host, society, agreementDoc = undefined, extra = {
   const { accessToken } = await apiLogin(host.mobile);
   const ownerConsentMobile = await consentTo(accessToken, society);
   const agreement = await tenantRoomAgreement(accessToken);
-  const photos = await uploadedListingPhotos(accessToken);
+  const basics = await roomBasics(accessToken);
+  const { photos } = basics;
   const room = await post('/flatmates/rooms', accessToken, {
+    ...basics,
     bhk: '2',
     roomType: 'Private room',
     attachedBath: 'attached',
@@ -65,7 +73,7 @@ async function seedTenantRoom(host, society, agreementDoc = undefined, extra = {
     ...(await withSocietyId(accessToken, { society })),
     rentShare: 15000,
     deposit: 30000,
-    availableFrom: '2026-12-01',
+    availableFrom: MOVE_IN,
     lookingFor: 'any',
     foodPref: 'any',
     photos,
@@ -76,18 +84,17 @@ async function seedTenantRoom(host, society, agreementDoc = undefined, extra = {
     ...extra,
     ownerConsentMobile,
   });
-  return { room, accessToken, photos };
+  return { room, accessToken, photos, ownerConsentMobile };
 }
 
 async function seedSeekerPost(host, freeText) {
-  const { accessToken } = await apiLogin(host.mobile);
+  const { accessToken } = await apiLogin(host.mobile, { name: host.name });
   const created = await post('/flatmates/posts', accessToken, {
-    name: host.name,
     age: 27,
     occupation: 'Engineer',
     budget: 16000,
     localities: ['Kothrud'],
-    moveIn: '2026-12-01',
+    moveIn: MOVE_IN,
     // The moderation board's "What they typed" column. Everything below matches on this, because
     // it is the field a moderator is actually reading.
     note: freeText,
@@ -97,20 +104,20 @@ async function seedSeekerPost(host, freeText) {
 
 // A visible group, plus an application to a seeded rental listing.
 async function seedApplication(host, title) {
-  const { accessToken } = await apiLogin(host.mobile);
-  const group = await post('/flatmates/groups', accessToken, {
+  const { accessToken } = await apiLogin(host.mobile, { name: host.name });
+  const group = await post('/flatmates/groups', accessToken, huntingGroup({
     title,
     locality: 'Kothrud',
     policy: 'any',
     rent: 45000,
+    deposit: 50000,
     seats: 3,
     seatsOpen: 1,
-    name: host.name,
-    role: 'tenant',
-  });
+  }));
 
   // Use the desk decision route because groups must pass moderation before applying.
   const { accessToken: staffToken } = await apiLogin(STAFF);
+  await tickDeskChecklist(API, group.id, auth(staffToken));
   const publish = await fetch(`${API}/admin/flatmates/${group.id}/moderation`, {
     method: 'PATCH',
     headers: auth(staffToken),
@@ -151,16 +158,18 @@ async function openDesk(page, login) {
 }
 
 test.describe('Ops → flatmate desk (live)', () => {
-  test('the desk has three status tabs and no board switcher, type tabs narrow the queue, and the queue can be searched, sorted and cut by date', async ({ page, login }) => {
-    await test.step('one Pending tab, three tabs in all — no board switcher', async () => {
+  test('the desk has four status tabs and no board switcher, type tabs narrow the queue, and the queue is newest first, searchable and cut by date', async ({ page, login }) => {
+    await test.step('one Pending tab, four tabs in all — no board switcher', async () => {
       await openDesk(page, login);
       const tabs = page.getByRole('tablist', { name: 'Flatmate queues' }).getByRole('tab');
-      await expect(tabs).toHaveCount(3);
+      await expect(tabs).toHaveCount(4);
       await expect(tabs.nth(0)).toContainText('Pending');
-      await expect(tabs.nth(1)).toHaveText(/^Published\d*$/);
-      await expect(tabs.nth(2)).toHaveText(/^Hidden & removed\d*$/);
+      await expect(tabs.nth(1)).toHaveText(/^Badge requests\d*$/);
+      await expect(tabs.nth(2)).toHaveText(/^Published\d*$/);
+      await expect(tabs.nth(3)).toHaveText(/^Hidden & removed\d*$/);
       await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
       await expect(page.getByTestId('fm-count-pending')).toHaveText(/^\d+\+?$/);
+      await expect(page.getByTestId('fm-count-badge')).toHaveText(/^\d+\+?$/);
       await expect(page.getByRole('group', { name: 'Flatmate boards' })).toHaveCount(0);
     });
     await test.step('type tabs under each status narrow the queue to rooms, groups (applications included) or seeker posts', async () => {
@@ -195,7 +204,7 @@ test.describe('Ops → flatmate desk (live)', () => {
       await openTab(page, 'Published');
       await expect(page.getByRole('group', { name: 'Post type' }).getByRole('button', { name: 'Group', exact: true })).toHaveAttribute('aria-pressed', 'true');
     });
-    await test.step('the queue can be searched, sorted and cut by date like the property queues', async () => {
+    await test.step('the queue is newest first with no sort toggle, and can be searched and cut by date', async () => {
       const tag = `Sort probe ${stamp()}`;
       await seedSeekerPost({ mobile: uniqueMobile(), name: 'Sort One' }, `${tag} first`);
       await seedSeekerPost({ mobile: uniqueMobile(), name: 'Sort Two' }, `${tag} second`);
@@ -205,10 +214,10 @@ test.describe('Ops → flatmate desk (live)', () => {
       const cards = page.getByTestId('flatmate-queue-card');
       await expect(cards).toHaveCount(2);
       await expect(page.getByRole('status').filter({ hasText: 'items' })).toHaveText('2 items');
-      await expect(cards.first()).toContainText(`${tag} first`);
-
-      await page.getByRole('group', { name: 'Sort' }).getByRole('button', { name: 'Newest' }).click();
       await expect(cards.first()).toContainText(`${tag} second`);
+      await expect(cards.first().getByTestId('activity-stamp')).toHaveText(/^\d{1,2} [A-Z][a-z]{2,3} \d{4}, \d{1,2}:\d{2}\s(AM|PM)$/);
+      await expect(cards.first().locator('dt', { hasText: 'Created' })).toBeVisible();
+      await expect(page.getByRole('group', { name: 'Sort' })).toHaveCount(0);
 
       await page.getByRole('group', { name: 'Posted' }).getByRole('button', { name: 'Today', exact: true }).click();
       await expect(cards).toHaveCount(2);
@@ -219,8 +228,9 @@ test.describe('Ops → flatmate desk (live)', () => {
     });
   });
 
-  test('a tenant room waits in Pending for both its publish and its badge, decided separately', async ({ page, login }) => {
-    const host = HOSTS.verifyApprove;
+  test('a tenant room waits in Pending for its publish and in Badge requests for its badge, decided separately', async ({ page, login }) => {
+    const host = { mobile: uniqueMobile(), name: 'Arjun Rao' };
+    await grantIdentityBadge(host.mobile);
     // Rows are found by the society name, not the host's.
     const society = `Verify Heights ${stamp()}`;
     const { room } = await seedTenantRoom(host, society);
@@ -232,22 +242,46 @@ test.describe('Ops → flatmate desk (live)', () => {
     expect(await onPublicBoard()).toBe(false);
     await openDesk(page, login);
 
-    await expect(cardFor(page, society)).toContainText('Badge claim · tenant');
     await expect(cardFor(page, society)).toContainText('Awaiting publish');
+    await expect(cardFor(page, society)).not.toContainText('Verified property');
+
+    await openTab(page, 'Badge requests');
+    await expect(cardFor(page, society)).toContainText('Verified property · tenant evidence');
+    await expect(cardFor(page, society)).not.toContainText('Awaiting publish');
 
     let dialog = await review(page, society);
-    await expect(dialog.locator('.flatmate-badge-section')).toContainText('tenant-tier claim');
-    await expect(dialog.locator('.flatmate-badge-section')).toContainText(host.mobile);
+    await expect(dialog.getByTestId('badge-request-banner')).toContainText('Host is seeking the Verified property badge');
+    const badge = dialog.locator('.flatmate-badge-section');
+    await expect(badge).toContainText('Verified property · tenant evidence');
+    await expect(badge).toContainText(host.mobile);
+    await expect(badge.getByTestId('host-id-verified')).toBeVisible();
 
-    await dialog.locator('.approve-review-btn').click();
-    await expect(dialog.locator('.flatmate-badge-section')).toContainText('approved');
+    const approve = dialog.locator('.approve-review-btn');
+    await expect(approve, 'every check must be ticked before the badge can be granted').toBeDisabled();
+    await badge.getByTestId('check-name').check();
+    await badge.getByTestId('check-address').check();
+    await expect(approve).toBeDisabled();
+    await badge.getByTestId('check-date').fill(new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA'));
+    await expect(badge, 'an agreement that has already ended cannot back a badge').toContainText('Agreement has already ended.');
+    await expect(approve).toBeDisabled();
+    await badge.getByTestId('check-date').fill(new Date(Date.now() + 200 * 86_400_000).toLocaleDateString('en-CA'));
+    await approve.click();
+    await expect(badge).toContainText('approved');
+    await expect(badge).toContainText('Name Yes · Address Yes');
+    await expect(dialog.getByTestId('badge-request-banner')).toHaveCount(0);
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
 
+    await expect(card(page, society)).toHaveCount(0);
+    await openTab(page, 'Pending');
     await expect(cardFor(page, society)).toContainText('Awaiting publish');
-    await expect(cardFor(page, society)).not.toContainText('Badge claim');
     expect(await onPublicBoard()).toBe(false);
 
     dialog = await review(page, society);
+    await expect(dialog.getByRole('button', { name: 'Publish' }), 'a room needs its three desk ticks before Publish').toBeDisabled();
+    for (const tick of await dialog.getByTestId('flatmate-checklist-item').all()) {
+      await tick.click();
+      await expect(tick).toBeChecked();
+    }
     await dialog.getByRole('button', { name: 'Publish' }).click();
     await expect(dialog).toHaveCount(0);
 
@@ -272,16 +306,63 @@ test.describe('Ops → flatmate desk (live)', () => {
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
 
     await expect(cardFor(page, society)).toContainText('Awaiting publish');
-    await expect(cardFor(page, society)).not.toContainText('Badge claim');
+    await expect(cardFor(page, society)).not.toContainText('Verified property');
     dialog = await review(page, society);
     await expect(dialog.locator('.flatmate-badge-section')).toContainText('different flat');
+  });
+
+  test('a light bill from the host vault opens through an audited link, needs a recent bill date, and a granted badge can be revoked', async ({ page, login }) => {
+    const host = { mobile: uniqueMobile(), name: 'Bill Host' };
+    await grantIdentityBadge(host.mobile);
+    const society = `Bill Court ${stamp()}`;
+    const { room, accessToken, ownerConsentMobile } = await seedTenantRoom(host, society, undefined, { agreementDeclared: false, agreementDoc: null });
+    await apiLogin(ownerConsentMobile, { name: 'Sunita Owner' });
+    const form = new FormData();
+    form.set('category', 'Electricity Bill');
+    form.set('file', new Blob([Buffer.from(AGREEMENT_PDF.split(',')[1], 'base64')], { type: 'application/pdf' }), 'bill.pdf');
+    const uploaded = await fetch(`${API}/me/documents/personal`, { method: 'POST', headers: { authorization: `Bearer ${accessToken}` }, body: form });
+    expect(uploaded.status, await uploaded.clone().text()).toBe(201);
+    await post(`/flatmates/rooms/${room.id}/badge-request`, accessToken, { agreementDoc: { id: (await uploaded.json()).id } });
+
+    await openDesk(page, login);
+    const dialog = await review(page, society);
+    const badge = dialog.locator('.flatmate-badge-section');
+    const opened = page.waitForResponse((r) => r.url().endsWith('/document-url'));
+    const popup = page.waitForEvent('popup');
+    await badge.getByTestId('view-review-document').click();
+    expect((await opened).status(), 'staff read the vault file through the signed, audited link').toBe(200);
+    await (await popup).close();
+    await expect(badge).toContainText('Bill is in the owner’s name');
+    await expect(badge.getByTestId('owner-consent-account'), 'the desk sees who holds the consent number').toContainText(`Sunita Owner ${ownerConsentMobile}`);
+    await expect(badge).toContainText(`The consent OTP went to Sunita Owner (${ownerConsentMobile})`);
+
+    await badge.getByTestId('check-name').check();
+    await badge.getByTestId('check-address').check();
+    await badge.getByTestId('check-date').fill(new Date(Date.now() - 120 * 86_400_000).toLocaleDateString('en-CA'));
+    await expect(badge).toContainText('Bill must be from the last 90 days.');
+    await expect(dialog.locator('.approve-review-btn')).toBeDisabled();
+    await badge.getByTestId('check-date').fill(new Date(Date.now() - 10 * 86_400_000).toLocaleDateString('en-CA'));
+    await dialog.locator('.approve-review-btn').click();
+    await expect(badge).toContainText('approved');
+
+    await dialog.locator('.revoke-review-btn').click();
+    await expect(dialog.getByRole('button', { name: 'Confirm revoke' })).toBeDisabled();
+    await dialog.getByPlaceholder('Reason for revoking').fill('The owner says the tenancy ended.');
+    const revoked = page.waitForResponse((r) => r.url().endsWith('/revoke') && r.request().method() === 'POST');
+    await dialog.getByRole('button', { name: 'Confirm revoke' }).click();
+    expect((await revoked).ok()).toBe(true);
+    await expect(badge.getByText('Rejected because')).toBeVisible();
+    await expect(badge).toContainText('tenancy ended');
+    const after = await fetch(`${API}/flatmates/rooms/${room.id}`, { headers: auth(accessToken) }).then((r) => r.json());
+    expect(after.item.verificationTier, 'a revoked badge leaves the room unbadged').not.toBe('tenant');
   });
 
   test('a room the host deletes leaves Pending, badge claim and all', async ({ page, login }) => {
     const society = `Withdrawn Court ${stamp()}`;
     const { room, accessToken } = await seedTenantRoom({ mobile: uniqueMobile() }, society);
     await openDesk(page, login);
-    await expect(cardFor(page, society)).toContainText('Badge claim · tenant');
+    await openTab(page, 'Badge requests');
+    await expect(cardFor(page, society)).toContainText('Verified property · tenant evidence');
 
     const del = await fetch(`${API}/flatmates/rooms/${room.id}`, { method: 'DELETE', headers: auth(accessToken) });
     expect(del.ok).toBe(true);
@@ -289,6 +370,32 @@ test.describe('Ops → flatmate desk (live)', () => {
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Flatmate Moderation' })).toBeVisible();
     await expect(card(page, society)).toHaveCount(0);
+    await openTab(page, 'Badge requests');
+    await expect(card(page, society)).toHaveCount(0);
+  });
+
+  test('a tenant host’s Verified property claim is a Badge requests card with a count, absent from Pending, and its popup names the request', async ({ page, login }) => {
+    const host = { mobile: uniqueMobile(), name: 'Badge Request Host' };
+    await grantIdentityBadge(host.mobile);
+    const society = `Claim Tower ${stamp()}`;
+    await seedTenantRoom(host, society);
+    await openDesk(page, login);
+
+    await expect(page.getByTestId('fm-count-badge')).toHaveText(/^[1-9]\d*\+?$/);
+    await expect(cardFor(page, society)).toContainText('Awaiting publish');
+    await expect(cardFor(page, society)).not.toContainText('Verified property');
+
+    await openTab(page, 'Badge requests');
+    await expect(page.getByText(/hosts asking for the Verified property badge.*Oldest first/)).toBeVisible();
+    await expect(cardFor(page, society)).toContainText('Verified property · tenant evidence');
+    await expect(cardFor(page, society)).not.toContainText('Awaiting publish');
+
+    const dialog = await review(page, society);
+    const banner = dialog.getByTestId('badge-request-banner');
+    await expect(banner).toContainText('Host is seeking the Verified property badge');
+    await expect(banner).toContainText('Tenant host');
+    await expect(banner).toContainText(/Requested (just now|\d+m ago|\d+h ago)/);
+    await expect(dialog.locator('.flatmate-badge-section')).toContainText('Verified property badge');
   });
 
   test('a new seeker post is live at once, and waits on Pending as not yet reviewed until a moderator looks', async ({ page, login }) => {
@@ -302,15 +409,16 @@ test.describe('Ops → flatmate desk (live)', () => {
     await expect(cardFor(page, marker)).toContainText('Live · not yet reviewed');
 
     const dialog = await review(page, marker);
-    await expect(dialog).toContainText('Engineer');
     await expect(dialog).toContainText('16,000');
+    await dialog.getByRole('tab', { name: 'Details' }).click();
+    await expect(dialog).toContainText('Engineer');
     await expect(dialog.locator('.flatmate-mod-recheck')).toContainText('new post');
     await dialog.getByRole('button', { name: 'Looks fine' }).click();
     await expect(dialog).toHaveCount(0);
     await expect(card(page, marker)).toHaveCount(0);
   });
 
-  test('removing a post takes an optional note, and the free text is never truncated', async ({ page, login }) => {
+  test('removing a post needs a note, and the free text is never truncated', async ({ page, login }) => {
     const marker = `Contact 99999 in the free text ${stamp()}`;
     await seedSeekerPost(HOSTS.remove, marker);
     await openDesk(page, login);
@@ -318,13 +426,37 @@ test.describe('Ops → flatmate desk (live)', () => {
     const dialog = await review(page, marker);
     await expect(dialog.locator('.flatmate-mod-text')).toHaveText(marker);
 
-    await dialog.getByPlaceholder('Internal note (optional)').fill('Phone number in the free text.');
+    await expect(dialog.getByRole('button', { name: 'Remove' })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'Hide for review' })).toBeDisabled();
+    await dialog.getByLabel('Internal note', { exact: true }).fill('Phone number in the free text.');
     await dialog.getByRole('button', { name: 'Remove' }).click();
     await expect(dialog).toHaveCount(0);
 
     await expect(card(page, marker)).toHaveCount(0);
     await openTab(page, 'Hidden & removed');
     await expect(cardFor(page, marker)).toContainText('removed');
+
+    const removed = await review(page, marker);
+    await expect(removed.getByRole('button', { name: 'Publish' })).toBeDisabled();
+  });
+
+  test('an expired post can only be removed from the desk, with a note', async ({ page, login }) => {
+    const marker = `Expired on the desk ${stamp()}`;
+    const { created } = await seedSeekerPost({ mobile: uniqueMobile(), name: 'Old Post' }, marker);
+    sql(`update flatmate_seeker_posts set mod_status = 'expired', expired_from = mod_status where id = '${created.id}'`);
+    await openDesk(page, login);
+    await openTab(page, 'Hidden & removed');
+
+    const dialog = await review(page, marker);
+    await expect(dialog.locator('.flatmate-decision-section')).toContainText('only the host\'s renewal brings it back');
+    for (const name of ['Publish', 'Hide for review', 'Looks fine']) {
+      await expect(dialog.getByRole('button', { name })).toHaveCount(0);
+    }
+    await expect(dialog.getByRole('button', { name: 'Remove' })).toBeDisabled();
+    await dialog.getByLabel('Internal note', { exact: true }).fill('Reported after it lapsed.');
+    await dialog.getByRole('button', { name: 'Remove' }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(sql(`select mod_status from flatmate_seeker_posts where id = '${created.id}'`)).toBe('removed');
   });
 
   test('the desk corrects a post\'s core fields in place', async ({ page, login }) => {
@@ -362,7 +494,7 @@ test.describe('Ops → flatmate desk (live)', () => {
     await expect(dialog).toContainText('Per head');
     await expect(dialog).toContainText('Owner: pending');
 
-    await dialog.getByPlaceholder('Internal note (optional)').fill('Group members look duplicated.');
+    await dialog.getByLabel('Internal note', { exact: true }).fill('Group members look duplicated.');
     await dialog.getByRole('button', { name: 'Hide for review' }).click();
     await expect(dialog).toHaveCount(0);
 
@@ -382,6 +514,7 @@ test.describe('Ops → flatmate desk (live)', () => {
     // Publish first so the edit is to something already visible.
     const { accessToken: staffToken } = await apiLogin(STAFF);
     for (const id of [swapRoom.id, quietRoom.id]) {
+      await tickDeskChecklist(API, id, auth(staffToken));
       const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
         method: 'PATCH',
         headers: auth(staffToken),
@@ -391,6 +524,7 @@ test.describe('Ops → flatmate desk (live)', () => {
     }
 
     const body = async (token, society, overrides) => ({
+      ...(await roomBasics(token, { photos: 0 })),
       bhk: '2',
       roomType: 'Private room',
       attachedBath: 'attached',
@@ -399,7 +533,7 @@ test.describe('Ops → flatmate desk (live)', () => {
       society,
       rentShare: 15000,
       deposit: 30000,
-      availableFrom: '2026-12-01',
+      availableFrom: MOVE_IN,
       lookingFor: 'any',
       foodPref: 'any',
       photos: quietPhotos,
@@ -428,7 +562,7 @@ test.describe('Ops → flatmate desk (live)', () => {
     await openDesk(page, login);
 
     await expect(cardFor(page, swapped)).toContainText('Edited since review');
-    await expect(cardFor(page, quiet)).not.toContainText('Edited since review');
+    await expect(card(page, quiet)).toHaveCount(0);
 
     const dialog = await review(page, swapped);
     await expect(dialog.locator('.flatmate-mod-recheck')).toContainText('photos');
@@ -436,7 +570,7 @@ test.describe('Ops → flatmate desk (live)', () => {
 
     await dialog.getByRole('button', { name: 'Looks fine' }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(cardFor(page, swapped)).not.toContainText('Edited since review');
+    await expect(card(page, swapped)).toHaveCount(0);
   });
 
   test('the uploaded agreement opens in a new tab, and uploaded photos show on the popup', async ({ page, login }) => {
@@ -450,13 +584,20 @@ test.describe('Ops → flatmate desk (live)', () => {
     });
 
     await openDesk(page, login);
+    const row = cardFor(page, withDoc);
+    await expect(row.locator('.lr-img img'), 'the card shows the first photo like a Properties tile').toHaveAttribute('src', UPLOADED);
+    await expect(row).toContainText('₹15,000/mo');
     const dialog = await review(page, withDoc);
-    await expect(dialog.locator('.flatmate-mod-photos img')).toHaveAttribute('src', UPLOADED);
-    const downloaded = new Promise((resolve) => {
-      page.context().once('page', (tab) => tab.once('download', (d) => resolve(d.url())));
-    });
+    await expect(dialog.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+    await expect(dialog.getByRole('complementary', { name: 'Decision' }).locator('.flatmate-badge-section')).toBeVisible();
+    await expect(dialog.locator('.flatmate-mod-photos img').first()).toHaveAttribute('src', UPLOADED);
+    const opened = page.waitForResponse((r) => r.url().endsWith('/document-url'));
+    const popup = page.waitForEvent('popup');
+    const file = page.context().waitForEvent('response', (r) => r.url().includes('/storage/'));
     await dialog.getByRole('button', { name: 'View agreement' }).click();
-    expect(await downloaded).toMatch(/^blob:http/);
+    expect((await opened).status(), 'the agreement opens through the signed, audited vault link').toBe(200);
+    expect((await file).headers()['content-type'], 'the vault file opens, not the PDF bytes the host sent inline').toBe('image/png');
+    await (await popup).close();
   });
 
   // This redirect guard protects the desk when the flatmates module is off.

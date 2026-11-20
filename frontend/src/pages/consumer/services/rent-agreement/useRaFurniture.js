@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import { FURN_PRESETS } from './constants.js';
 
-// Furniture inventory for the rent-agreement Terms step. Owns furnItems/custom
-// state plus the add/toggle/quantity handlers; furnItems is surfaced back to the
-// container so captureFormState/applyFormState can persist it in the draft.
 export function useRaFurniture() {
   const [furnItems, setFurnItems] = useState([]);
   const [custom, setCustom] = useState({ name: '', qty: 1 });
@@ -18,7 +15,7 @@ export function useRaFurniture() {
   const addCustom = () => {
     const name = custom.name.trim();
     if (!name) return;
-    const qty = Math.max(1, parseInt(custom.qty, 10) || 1);
+    const qty = Math.min(99, Math.max(1, parseInt(custom.qty, 10) || 1));
     setFurnItems((arr) => {
       const ex = arr.find((f) => f.name.toLowerCase() === name.toLowerCase());
       if (ex) return arr.map((f) => (f === ex ? { ...f, qty: f.qty + qty } : f));

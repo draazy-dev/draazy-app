@@ -1,17 +1,4 @@
-/**
- * End-to-end smoke of the API-polish pass, against a running backend and a real Postgres.
- *
- * Signs in for real (OTP read from the backend console log, exactly as a developer does), then
- * exercises the endpoints this pass added or changed shape on. The backend's own 733 tests run
- * through MockMvc, which stands in for the servlet container — so they cannot see the context path,
- * cannot see the security filter chain ordering the same way, and cannot catch a Flyway state that
- * only exists on a long-lived database. This can.
- *
- *   node backend/tools/live-probe.mjs [base] [otp-log]
- *   node backend/tools/live-probe.mjs http://localhost:8081/api %TEMP%\dz-replay.log
- *
- * The base must include `/api` — this talks to the backend directly, with no Vite proxy in front.
- */
+// Usage: node backend/tools/live-probe.mjs [base, including /api] [otp-log]
 import fs from 'node:fs';
 
 const BASE = process.argv[2] || 'http://localhost:8081/api';
@@ -35,7 +22,7 @@ async function call(method, path, { token, body } = {}) {
   const res = await fetch(BASE + path, { method, headers, body });
   const text = await res.text();
   let parsed = null;
-  try { parsed = JSON.parse(text); } catch { /* not json */ }
+  try { parsed = JSON.parse(text); } catch { }
   return { status: res.status, text, json: parsed, allow: res.headers.get('allow') };
 }
 
@@ -45,7 +32,6 @@ function latestOtp(mobile) {
   return lines.length ? (lines[lines.length - 1].match(/code=(\d+)/)?.[1] ?? null) : null;
 }
 
-// ---------------------------------------------------------------- auth
 const before = latestOtp(MOBILE);
 const start = await call('POST', '/auth/login', { body: JSON.stringify({ mobile: MOBILE }) });
 check('POST /auth/login sends an OTP', start.status === 200 || start.status === 202,
@@ -69,7 +55,6 @@ check('POST /auth/login verifies the OTP and returns a token', !!token,
   `${verify.status} ${token ? 'token received' : verify.text.slice(0, 140)}`);
 if (!token) process.exit(1);
 
-// ---------------------------------------------------- the error-handling fixes
 const wrongVerb = await call('DELETE', '/properties', { token });
 check('405 on a wrong verb, with an Allow header  [was 500 + stacktrace]',
   wrongVerb.status === 405 && !!wrongVerb.allow,
@@ -82,7 +67,6 @@ check('400 on an untypeable param — names the param, not its Java type',
     && !/Integer|java\./.test(badType.json?.message ?? ''),
   `${badType.status} ${badType.text.slice(0, 140)}`);
 
-// ------------------------------------------------------------ new endpoints
 const created = await call('POST', '/me/saved-searches',
   { token, body: JSON.stringify({ name: 'E2E', query: '2bhk baner' }) });
 const searchId = created.json?.id;
@@ -111,7 +95,6 @@ check('GET /properties/{id}/rooms is public and served  [NEW — was spec-only, 
   rooms.status === 200 && Array.isArray(rooms.json),
   `${rooms.status} ${rooms.text.slice(0, 90)}`);
 
-// --------------------------------------------------------- the shape changes
 const saved = await call('GET', '/me/saved', { token });
 check('GET /me/saved returns a paged envelope  [SHAPE CHANGE]',
   saved.status === 200 && Array.isArray(saved.json?.content)

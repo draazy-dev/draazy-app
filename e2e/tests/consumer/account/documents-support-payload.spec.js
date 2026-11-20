@@ -79,6 +79,6 @@ test('the support list is one summary per ticket with no thread and no author id
   expect(detail.messages).toHaveLength(1);
   expect(detail.messages[0]).not.toHaveProperty('authorId');
 
-  await page.goto('/support');
-  await expect(page.getByText('Payload guard')).toBeVisible();
+  await page.goto('/messages?support=general');
+  await expect(page.getByTestId('support-thread')).toContainText('x'.repeat(300));
 });

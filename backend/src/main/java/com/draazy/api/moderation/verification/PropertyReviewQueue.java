@@ -14,10 +14,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Browsing case files, not working one; role checks happen at the controller boundary.
 @Service
 public class PropertyReviewQueue {
-
     private final PropertyReviewRepository reviews;
     private final PropertyRepository properties;
 
@@ -26,7 +24,6 @@ public class PropertyReviewQueue {
         this.properties = properties;
     }
 
-    // Owner messages the desk has not read; the queue is shared, not per-reader.
     @Transactional(readOnly = true)
     public Page<PropertyReviewSummary> awaitingReplies(Pageable pageable) {
         Page<PropertyReview> page = reviews.findAllAwaitingStaff(pageable);
@@ -34,7 +31,6 @@ public class PropertyReviewQueue {
         return page.map(review -> toSummary(review, listings.get(review.getPropertyId())));
     }
 
-    /** Which of these listings have an owner message the desk has not read. */
     @Transactional(readOnly = true)
     public Set<UUID> awaitingStaff(java.util.Collection<UUID> propertyIds) {
         return propertyIds.isEmpty() ? Set.of()
@@ -70,7 +66,6 @@ public class PropertyReviewQueue {
                         .thenComparing(ReviewMessage::getId)).orElse(null);
     }
 
-    // One query for the page avoids resolving owners inside the map.
     private Map<UUID, Property> propertiesOf(List<PropertyReview> page) {
         List<UUID> ids = page.stream().map(PropertyReview::getPropertyId).toList();
         if (ids.isEmpty()) {

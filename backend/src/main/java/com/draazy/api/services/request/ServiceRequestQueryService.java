@@ -1,5 +1,6 @@
 package com.draazy.api.services.request;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.web.Ids;
@@ -25,17 +26,20 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ServiceRequestQueryService {
-
     private final ServiceRequestRepository requests;
     private final ServiceRequestMapper mapper;
     private final AccountPermissions accountPermissions;
     private final TicketService tickets;
     private final ServiceRequestQueueRows rows;
+    private final RentAgreementReadiness readiness;
 
+    // An empty NOT IN list can render as "in (null)" and drop every row.
+    private static final List<UUID> NO_IDS = List.of(new UUID(0, 0));
     private static final Set<ServiceRequestStatus> MINE_STATUSES = EnumSet.of(
             ServiceRequestStatus.ASSIGNED,
             ServiceRequestStatus.IN_PROGRESS,
             ServiceRequestStatus.DRAFT_SHARED,
+            ServiceRequestStatus.ACTION_REQUIRED,
             ServiceRequestStatus.CHANGES_REQUESTED,
             ServiceRequestStatus.APPROVED);
 
@@ -47,15 +51,15 @@ public class ServiceRequestQueryService {
 
     public ServiceRequestQueryService(ServiceRequestRepository requests,
             ServiceRequestMapper mapper, AccountPermissions accountPermissions, TicketService tickets,
-            ServiceRequestQueueRows rows) {
+            ServiceRequestQueueRows rows, RentAgreementReadiness readiness) {
         this.requests = requests;
         this.mapper = mapper;
         this.accountPermissions = accountPermissions;
         this.tickets = tickets;
         this.rows = rows;
+        this.readiness = readiness;
     }
 
-    // Scope comes only from principal role; clients cannot set or remove requester scope.
     @Transactional(readOnly = true)
     public Page<ServiceRequestDto> list(AuthPrincipal caller, String type, String status, String team,
             String ticketId, boolean unassigned, boolean overdue, boolean mine, String q, Pageable pageable) {
@@ -71,7 +75,7 @@ public class ServiceRequestQueryService {
 
         Page<ServiceRequest> page = isOps(caller)
                 ? queuePage(caller, team, typeFilter, statusValue, ticket, unassigned, overdue, mine, prefix,
-                        requestId, pageable)
+                        requestId, null, pageable)
                 : requests.findForRequester(caller.userId(), typeFilter, singleStatus(statusValue), ticket,
                         pageable);
 
@@ -79,10 +83,9 @@ public class ServiceRequestQueryService {
         return new PageImpl<>(content, page.getPageable(), page.getTotalElements());
     }
 
-    // The desk's rows: the same scope and filters as `list`, projected to what a row draws.
     @Transactional(readOnly = true)
     public Page<ServiceRequestQueueRow> queue(AuthPrincipal caller, String type, String status, String team,
-            String ticketId, boolean unassigned, boolean overdue, boolean mine, String q, Pageable pageable) {
+            String ticketId, boolean unassigned, boolean overdue, boolean mine, String q, Integer days, Pageable pageable) {
         String ticketFilter = blankToNull(ticketId);
         UUID ticket = ticketFilter == null ? null : Ids.parseUuid(ticketFilter).orElseThrow(() -> new BadRequestException("ticketId must be a valid id"));
         String term = blankToNull(q);
@@ -90,18 +93,18 @@ public class ServiceRequestQueryService {
         String prefix = term == null ? null : anchoredPrefix(term);
 
         Page<ServiceRequest> page = queuePage(caller, team, blankToNull(type), blankToNull(status), ticket,
-                unassigned, overdue, mine, prefix, requestId, pageable);
+                unassigned, overdue, mine, prefix, requestId, PlatformTime.sinceOrNull(days), pageable);
         return new PageImpl<>(rows.of(page.getContent(), caller), page.getPageable(), page.getTotalElements());
     }
 
     private Page<ServiceRequest> queuePage(AuthPrincipal caller, String team, String typeFilter,
             String statusValue, UUID ticket, boolean unassigned, boolean overdue, boolean mine, String prefix,
-            UUID requestId, Pageable pageable) {
+            UUID requestId, Instant since, Pageable pageable) {
         Instant now = Instant.now();
         return findForQueue(caller, team, typeFilter, statusFilters(statusValue), ticket, unassigned, overdue, mine,
                 now.minus(RentAgreementSla.PICKUP), now.minus(RentAgreementSla.FIRST_DRAFT),
                 now.minus(RentAgreementSla.REVISION), now.minus(RentAgreementSla.REGISTRATION),
-                prefix, requestId, pageable);
+                prefix, requestId, since, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -116,14 +119,16 @@ public class ServiceRequestQueryService {
                 List.copyOf(MINE_STATUSES));
         long overdue = requests.countOverdueForQueue(scope.allTeams(), scope.teams(),
                 now.minus(RentAgreementSla.PICKUP), now.minus(RentAgreementSla.FIRST_DRAFT),
-                now.minus(RentAgreementSla.REVISION), now.minus(RentAgreementSla.REGISTRATION));
+                now.minus(RentAgreementSla.REVISION), now.minus(RentAgreementSla.REGISTRATION))
+                - waitingOnTenant(scope, now).size();
         return new ServiceQueueSummary(
                 count(byStatus, ServiceRequestStatus.NEW),
                 mine,
                 sum(byStatus, IN_PROGRESS_STATUSES),
-                count(byStatus, ServiceRequestStatus.DRAFT_SHARED),
-                count(byStatus, ServiceRequestStatus.COMPLETED)
-                        + count(byStatus, ServiceRequestStatus.CANCELLED),
+                count(byStatus, ServiceRequestStatus.DRAFT_SHARED)
+                        + count(byStatus, ServiceRequestStatus.ACTION_REQUIRED),
+                count(byStatus, ServiceRequestStatus.COMPLETED),
+                count(byStatus, ServiceRequestStatus.CANCELLED),
                 overdue,
                 accountPermissions.granted(caller, BackOfficePermissions.TICKETS_READ)
                         ? tickets.countOpen(caller, team) : null);
@@ -132,13 +137,34 @@ public class ServiceRequestQueryService {
     private Page<ServiceRequest> findForQueue(AuthPrincipal caller, String team, String typeFilter,
             List<ServiceRequestStatus> statusFilters, UUID ticket, boolean unassigned, boolean overdue, boolean mine,
             Instant pickupBy, Instant draftBy, Instant revisionBy, Instant registrationBy,
-            String prefix, UUID requestId, Pageable pageable) {
+            String prefix, UUID requestId, Instant since, Pageable pageable) {
         QueueScope scope = queueScope(caller, team);
         boolean anyStatus = statusFilters.isEmpty();
+        List<UUID> waitingIds = overdue ? waitingOnTenant(scope, pickupBy, draftBy) : List.of();
         return requests.findForQueue(scope.allTeams(), scope.teams(), typeFilter, anyStatus,
                 anyStatus ? List.copyOf(EnumSet.allOf(ServiceRequestStatus.class)) : statusFilters, ticket,
                 unassigned, mine, caller.userId(), overdue, pickupBy, draftBy, revisionBy,
-                registrationBy, prefix, requestId, pageable);
+                registrationBy, waitingIds.isEmpty() ? NO_IDS : waitingIds, prefix, requestId,
+                since == null ? Instant.EPOCH : since, pageable);
+    }
+
+    /** Rent agreements whose SLA clock is stopped because a paid invite still waits on the tenant. */
+    @Transactional(readOnly = true)
+    public Set<UUID> waitingOnTenant() {
+        Instant now = Instant.now();
+        return Set.copyOf(waitingOnTenant(new QueueScope(true, List.of("__none__")), now, now));
+    }
+
+    private List<UUID> waitingOnTenant(QueueScope scope, Instant now) {
+        return waitingOnTenant(scope, now.minus(RentAgreementSla.PICKUP), now.minus(RentAgreementSla.FIRST_DRAFT));
+    }
+
+    // The SLA clock stops while a paid invite waits on the tenant, and that test lives in Java, not SQL.
+    private List<UUID> waitingOnTenant(QueueScope scope, Instant pickupBy, Instant draftBy) {
+        return requests.findTenantInvitesBeforeDraft(scope.allTeams(), scope.teams(), pickupBy, draftBy).stream()
+                .filter(readiness::waitingOnTenant)
+                .map(ServiceRequest::getId)
+                .toList();
     }
 
     private QueueScope queueScope(AuthPrincipal caller, String team) {
@@ -182,7 +208,6 @@ public class ServiceRequestQueryService {
     private record QueueScope(boolean allTeams, List<String> teams) {
     }
 
-    // An unescaped % would slip the caller's own wildcard past the anchor and scan every user.
     private static String anchoredPrefix(String term) {
         return LikePatterns.escape(term.toLowerCase(Locale.ROOT)) + "%";
     }

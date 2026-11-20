@@ -3,6 +3,7 @@ package com.draazy.api.provider.push;
 import com.draazy.api.provider.PushPayloads;
 import com.draazy.api.provider.PushSender;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
@@ -24,12 +25,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-/** Selected when a VAPID private key is configured; otherwise {@code LoggingPushSender} is wired
- * and nothing leaves the process. */
 @Component
 @ConditionalOnExpression("!'${draazy.providers.push.vapid-private-key:}'.isBlank()")
 class WebPushSender implements PushSender {
-
     private static final Logger log = LoggerFactory.getLogger(WebPushSender.class);
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
@@ -84,7 +82,15 @@ class WebPushSender implements PushSender {
         } catch (IllegalArgumentException e) {
             return false;
         }
-        if (!endpointPolicy.test(uri)) {
+        boolean allowed;
+        try {
+            allowed = endpointPolicy.test(uri);
+        } catch (UncheckedIOException unresolved) {
+            // A DNS miss is not proof the subscription is dead, so skip this push but keep it.
+            log.warn("Push to {} skipped: host did not resolve", uri.getHost());
+            return true;
+        }
+        if (!allowed) {
             log.warn("Push endpoint rejected: not a public https URL");
             return false;
         }
@@ -129,7 +135,7 @@ class WebPushSender implements PushSender {
         return "vapid t=" + WebPushCrypto.vapidJwt(privateKey, audience, subject, expires) + ", k=" + publicKey;
     }
 
-    // The endpoint is client-supplied and this server POSTs to it.
+    // http.send resolves the host again; the JVM's positive DNS cache (30 s) hands it the address vetted here.
     static boolean isPublicHttps(URI uri) {
         if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null
                 || (uri.getPort() != -1 && uri.getPort() != 443)) {
@@ -143,13 +149,11 @@ class WebPushSender implements PushSender {
                 }
             }
         } catch (UnknownHostException e) {
-            return true;
+            throw new UncheckedIOException(e);
         }
         return true;
     }
 
-    // Ranges the JDK predicates miss: 0.0.0.0/8, carrier-grade NAT (cloud metadata lives there on some
-    // providers), benchmarking, IPv6 unique-local and the NAT64 prefix.
     private static boolean isReserved(InetAddress address) {
         byte[] b = address.getAddress();
         if (b.length == 4) {

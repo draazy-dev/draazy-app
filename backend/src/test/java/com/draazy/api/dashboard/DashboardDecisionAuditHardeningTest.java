@@ -122,8 +122,7 @@ class DashboardDecisionAuditHardeningTest extends AbstractApiTest {
         User buyer = user("9822400032", Roles.Wire.BUYER);
         Property p = listing(owner, "Photo audit flat");
         askPhoto(buyer, p);
-        String reqId = photoRequests.findByPropertyIdInOrderByCreatedAtDesc(
-                List.of(p.getId()), PageRequest.of(0, 1)).getContent().getFirst().getId().toString();
+        String reqId = photoRequests.findByRequesterIdAndPropertyId(buyer.getId(), p.getId()).orElseThrow().getId().toString();
 
         mvc.perform(photoDecision(otherOwner, reqId, PhotoRequestStatuses.RESOLVED))
                 .andExpect(status().isNotFound());

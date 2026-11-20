@@ -13,14 +13,12 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Table(name = "internal_notes")
 @Getter
 public class InternalNote extends BaseEntity {
-
     @Column(name = "entity_type", nullable = false, updatable = false)
     private String entityType;
 
     @Column(name = "entity_id", nullable = false, updatable = false)
     private String entityId;
 
-    /** Server-resolved from the JWT principal. Never read from the request body. */
     @Column(name = "author_id", nullable = false, updatable = false)
     private UUID authorId;
 
@@ -35,7 +33,6 @@ public class InternalNote extends BaseEntity {
     private Instant updatedAt;
 
     protected InternalNote() {
-
     }
 
     public InternalNote(String entityType, String entityId, UUID authorId, String action,

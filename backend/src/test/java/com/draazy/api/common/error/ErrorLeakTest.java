@@ -17,12 +17,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
-// Raw sockets, not MockMvc or HttpClient: these requests are refused by Tomcat or the Spring Security firewall
-// before GlobalExceptionHandler, and a real client would normalise them before they are sent.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DisplayName("Error leak baseline — container-level refusals name no internals")
 class ErrorLeakTest {
-
     private static final Pattern LEAK = Pattern.compile(
             "(?i)exception|\\bat [a-z]+\\.[a-z]|org\\.(springframework|hibernate|postgresql|apache)|"
                     + "com\\.draazy|sqlstate|\\.java:|stack ?trace|apache tomcat|tomcat/\\d|jakarta\\.");
@@ -62,8 +59,6 @@ class ErrorLeakTest {
         assertThat(LEAK.matcher(response).find()).as(response).isFalse();
     }
 
-    // Spring Security refuses without an exception, so the probes above stay green even with detail on;
-    // the only way to leak is a profile file switching it on, and that is what this catches.
     @Test
     @DisplayName("no profile file turns error detail on")
     void noProfileEnablesErrorDetail() throws Exception {

@@ -8,18 +8,14 @@ import com.draazy.api.common.trust.RegisteredTenancyLookup;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Trust claims that stopped being true without anybody writing anything. Sweeps rather than hooks,
- * because each fact decays silently and no write site exists to hang a guard on. */
 @Service
 public class FlatmateTrustReconciler {
-
     private final FlatmateReviewRepository reviews;
     private final FlatmateRoomRepository rooms;
     private final FlatmateGroupRepository groups;
@@ -43,8 +39,6 @@ public class FlatmateTrustReconciler {
         this.notifier = notifier;
     }
 
-    /** {@code deriveTier} runs only on a host-initiated write, so without this pass an owner-tier
-     * badge outlives the listing approval that earned it. Demotion mirrors its own fallback. */
     @Transactional
     public int reconcileOwnerTier() {
         List<FlatmateRoom> staleRooms = rooms.findOwnerTierClaims().stream()
@@ -66,7 +60,6 @@ public class FlatmateTrustReconciler {
         return staleRooms.size() + staleGroups.size();
     }
 
-    // An expired post renews to the status it lapsed from, so a lapsed live one must also come back via review.
     private void holdForReview(FlatmateSupplyPost post, UUID hostId, String link) {
         boolean live = FlatmateVocabulary.MOD_LIVE.equals(post.getModStatus());
         if (live || post.getExpiry().holdForReview()) {
@@ -80,12 +73,11 @@ public class FlatmateTrustReconciler {
         }
     }
 
-    /** {@code deriveTier}'s conditions minus ownership — the fingerprint records the flat, not who
-     * held it. An unparseable or dangling id fails closed. */
     private boolean listingStands(String fingerprint) {
         return Ids.parseUuid(fingerprint.substring(FlatmateGuardrails.PROPERTY_PREFIX.length()))
                 .flatMap(properties::findById)
                 .filter(p -> PropertyStatus.APPROVED.equals(p.getStatus()) && !p.isArchived())
+                .filter(Property::isOwnershipVerified)
                 .isPresent();
     }
 
@@ -93,38 +85,43 @@ public class FlatmateTrustReconciler {
         return agreementDeclared ? FlatmateVocabulary.TIER_TENANT : FlatmateVocabulary.TIER_IDENTITY;
     }
 
-    /** The verdict is rewritten rather than the tier alone: the badge is derived from tier plus this
-     * row's standing verdict, so an {@code approved} row behind a demoted post contradicts itself. */
     @Transactional
     public int reconcileAgreementExpiry() {
-        List<FlatmateReview> lapsed = reviews.findLapsedApprovals(LocalDate.now());
-        for (FlatmateReview review : lapsed) {
+        List<FlatmateReview> lapsed = new ArrayList<>();
+        for (FlatmateReview review : reviews.findLapsedApprovals(FlatmateReviewChecks.today())) {
+            badges.lockWithPost(review);
+            if (!FlatmateVocabulary.STATUS_APPROVED.equals(review.getStatus())) {
+                continue;
+            }
             review.expire(review.getAgreement().getValidTill());
             badges.apply(review, false);
             notifier.notify(review.getHostId(), "flatmate.review.expired",
                     "Your flatmate verification has expired",
                     review.getReason(), FlatmateLinks.of(review));
+            lapsed.add(review);
         }
         reviews.saveAllAndFlush(lapsed);
         return lapsed.size();
     }
 
-    /** Polled because a second desk operator marks registration; owner OTP consent remains required. */
     @Transactional
     public int reconcileDraazyAgreements() {
         List<FlatmateReview> decided = new ArrayList<>();
         for (FlatmateReview review : reviews.findConsentedTenantBacklog()) {
-
-            // The same gate a moderator would face, plus the expiry a standing badge is swept for.
-            if (!review.badgeable() || review.getAgreement().expiredOn(LocalDate.now())) {
+            if (!review.badgeable() || review.getAgreement().expiredOn(FlatmateReviewChecks.today())) {
+                continue;
+            }
+            badges.lockWithPost(review);
+            if (!FlatmateVocabulary.STATUS_PENDING.equals(review.getStatus()) || !review.badgeable()) {
                 continue;
             }
             UUID propertyId = propertyBehind(review);
             if (propertyId == null) {
                 continue;
             }
-            String mobile = users.findById(review.getHostId()).map(User::getMobile).orElse(null);
-            if (mobile == null || !agreements.hasRegisteredTenancy(propertyId, mobile)) {
+            User host = users.findById(review.getHostId()).orElse(null);
+            if (host == null || !host.isVerified() || host.getMobile() == null
+                    || !agreements.hasRegisteredTenancy(propertyId, host.getMobile())) {
                 continue;
             }
             review.decide(FlatmateVocabulary.STATUS_APPROVED,
@@ -132,7 +129,7 @@ public class FlatmateTrustReconciler {
                             + " flat.", null);
             badges.apply(review, true);
             notifier.notify(review.getHostId(), "flatmate.review.approved",
-                    "Your flatmate post is Tenant-verified",
+                    "Your flatmate post is now a Verified property",
                     "We matched it to the rent agreement we registered for you, so there was"
                             + " nothing left for our team to check.", FlatmateLinks.of(review));
             decided.add(review);
@@ -141,15 +138,12 @@ public class FlatmateTrustReconciler {
         return decided.size();
     }
 
-    /** The flat a queued review is about, or null when the post was never linked to one. */
     private UUID propertyBehind(FlatmateReview review) {
         UUID claimed = review.getTenancyPropertyId();
         if (claimed == null) {
             return null;
         }
 
-        // The id is the host's own claim and nothing upstream verified it, so it is matched against
-        // the post: exactly on society when both name one, else coarsely on locality.
         Property property = properties.findById(claimed).orElse(null);
         if (property == null) {
             return null;
@@ -163,8 +157,6 @@ public class FlatmateTrustReconciler {
         return posted != null && posted.equalsIgnoreCase(claimedLocality) ? claimed : null;
     }
 
-    /** A room carries its own society; a group has none of its own and takes its parent listing's,
-     * so a group with no listing falls back to the locality check. */
     private UUID postedSocietyId(FlatmateReview review) {
         if (review.getRoomId() != null) {
             return rooms.findById(review.getRoomId()).map(FlatmateRoom::getSocietyId).orElse(null);
@@ -176,7 +168,6 @@ public class FlatmateTrustReconciler {
                 .flatMap(properties::findById).map(Property::getSocietyId).orElse(null);
     }
 
-    /** The locality the post was published under, or null when the post is gone. */
     private String postedLocality(FlatmateReview review) {
         if (review.getRoomId() != null) {
             return rooms.findById(review.getRoomId())

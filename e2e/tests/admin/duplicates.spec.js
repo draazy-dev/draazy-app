@@ -1,10 +1,11 @@
 import { expect, test } from '../../fixtures/live.js';
-import { API, apiLogin, uploadedListingPhotos, uniqueMobile } from '../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAs, uploadedListingPhotos, uniqueMobile } from '../../helpers/liveAuth.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
 // A meter number unique to this test run, so a cluster here can only contain this test's rows.
-const meterNo = () => `MSEDCL-DUP-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6)}`;
+// MeterKey keeps only digits and needs six, so the unique part must be digits.
+const meterNo = () => `MSEDCL-DUP-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
 async function api(method, path, token, body) {
   const res = await fetch(`${API}${path}`, {
@@ -60,6 +61,7 @@ const ON_BEHALF_LISTING = {
   deal: 'rent',
   propertyType: 'apartment',
   price: 32000,
+  deposit: 64000,
   bhk: 2,
   locality: 'Kothrud',
   city: 'Pune',
@@ -148,6 +150,13 @@ test.describe('LIVE: the duplicates desk (D255)', () => {
     const dropped = await ok('GET', `/me/listings/${dropId}`, loser.token);
     expect(dropped.archived).toBe(true);
 
+    // The owner is told, and My Properties keeps the row with the reason; the keeper hears nothing.
+    const mine = await ok('GET', '/me/listings', loser.token);
+    expect(mine.content.find((l) => l.id === dropId)?.archivedNote).toMatch(/duplicate/i);
+    const inbox = await ok('GET', '/notifications?size=50', loser.token);
+    expect(JSON.stringify(inbox)).toContain('archived as a duplicate');
+    expect(JSON.stringify(await ok('GET', '/notifications?size=50', keeper.token))).not.toContain('archived as a duplicate');
+
     // The keeper must not receive synthetic duplicate fields with no backing column.
     const kept = await ok('GET', `/me/listings/${keepId}`, keeper.token);
     expect(kept.archived).toBe(false);
@@ -217,7 +226,24 @@ test.describe('LIVE: the duplicates desk (D255)', () => {
     expect(dismiss.status).toBe(403);
   });
 
-  test('the tab renders the cluster an operator has to choose between', async ({ page, login }) => {
+  test('a listing archived as a duplicate stays on its owner\u2019s My Properties with the reason', async ({ page }) => {
+  const meter = meterNo();
+  const keeper = await freshOwner();
+  const loser = await freshOwner();
+  const title = `Dup Owner View ${Date.now().toString(36)}`;
+  const keepId = await createListing(keeper.token, { meter, title: `${title} — keep` });
+  const dropId = await createListing(loser.token, { meter, title: `${title} — drop` });
+
+  const merged = await api('POST', '/admin/properties/duplicates/merge', await adminToken(), { keepId, dropIds: [dropId] });
+  expect(merged.status).toBe(204);
+
+  await signedInAs(page, loser.mobile);
+  await page.goto('/dashboard#listings');
+  await expect(page.getByText(`${title} — drop`).first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Archived as a duplicate of another listing.')).toBeVisible();
+});
+
+test('the tab renders the cluster an operator has to choose between', async ({ page, login }) => {
     const meter = meterNo();
     const incumbent = await freshOwner();
     const collider = await freshOwner();
@@ -237,6 +263,10 @@ test.describe('LIVE: the duplicates desk (D255)', () => {
     await expect(card).toBeVisible({ timeout: 15_000 });
 
     await expect(card.getByText(`${title} — B`)).toBeVisible();
+
+    // The price reads in the app's own format, never the raw 32000.
+    await expect(card.getByText('₹32,000').first()).toBeVisible();
+    await expect(card.getByText('32000', { exact: true })).toHaveCount(0);
 
     // The provider translates wire vocabulary so moderators never see raw `address`.
     await expect(card.getByText(/same address \/ electricity meter/)).toBeVisible();

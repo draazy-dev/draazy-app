@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { seedConsent } from '../../helpers/liveAuth.js';
+import { expectFloatingCard, floatBottom } from '../../helpers/floatCard.js';
 
 const menu = (page) => page.locator('.dz-dropdown__menu--portal.is-portal-open');
 const rootVar = (page, name) => page.evaluate((n) => document.documentElement.style.getPropertyValue(n), name);
@@ -33,7 +34,7 @@ test.describe('Searchable dropdowns on a phone', () => {
     const vh = await page.evaluate(() => window.innerHeight);
 
     expect(box.y, 'the picker starts near the top of the screen').toBeLessThan(vh * 0.1);
-    expect(Math.abs(box.y + box.height - vh), 'with no keyboard it reaches the bottom').toBeLessThanOrEqual(1);
+    expect(Math.abs(box.y + box.height - await floatBottom(page)), 'with no keyboard it floats just above the nav').toBeLessThanOrEqual(1);
 
     const search = await picker.locator('.dz-dropdown__search').boundingBox();
     expect(search.y - box.y, 'search sits at the top of the picker').toBeLessThan(60);
@@ -41,6 +42,7 @@ test.describe('Searchable dropdowns on a phone', () => {
 
   test('carry their own way out beside the search box', async ({ page }) => {
     const picker = await openSearchablePicker(page);
+    await settledBox(picker);
     const cancel = picker.getByRole('button', { name: 'Cancel' });
     await expect(cancel).toBeInViewport();
     const tap = await cancel.boundingBox();
@@ -63,7 +65,7 @@ test.describe('Searchable dropdowns on a phone', () => {
     await page.evaluate((kb) => document.documentElement.style.setProperty('--dz-vv-bottom', `${kb}px`), keyboard);
     const vh = await page.evaluate(() => window.innerHeight);
     const box = await picker.boundingBox();
-    expect(Math.abs(box.y + box.height - (vh - keyboard))).toBeLessThanOrEqual(1);
+    expect(Math.abs(box.y + box.height - (vh - keyboard - 12)), 'floats 12px above the keyboard').toBeLessThanOrEqual(1);
     await expect(picker.locator('[role="option"]').nth(2), 'results stay visible above the keyboard').toBeInViewport();
 
     await page.keyboard.press('Escape');
@@ -71,18 +73,17 @@ test.describe('Searchable dropdowns on a phone', () => {
     expect(await rootVar(page, '--dz-vv-bottom'), 'closing hands the root back clean').toBe('');
   });
 
-  test('a short list without search stays a bottom sheet', async ({ page }) => {
+  test('a short list without search is a content-height floating card', async ({ page }) => {
     await seedConsent(page);
     await page.goto('/listings');
     await page.locator('.dz-dd-sort .dz-dropdown__trigger').first().click();
     const sheet = menu(page);
     await expect(sheet).toHaveClass(/dz-dropdown__menu--sheet/);
     await expect(sheet).not.toHaveClass(/dz-dropdown__menu--picker/);
-    await expect(sheet.locator('.dz-dropdown__search-close'), 'a sheet still closes by tapping the scrim').toHaveCount(0);
-    const box = await settledBox(sheet);
+    await expect(sheet.locator('.dz-dropdown__search-close'), 'a card still closes by tapping the scrim').toHaveCount(0);
+    const box = await expectFloatingCard(page, sheet);
     const vh = await page.evaluate(() => window.innerHeight);
-    expect(Math.abs(box.y + box.height - vh)).toBeLessThanOrEqual(1);
-    expect(box.y, 'a six-option sheet is not stretched to full height').toBeGreaterThan(vh * 0.2);
+    expect(box.y, 'a six-option card is not stretched to full height').toBeGreaterThan(vh * 0.2);
 
     const option = await sheet.getByRole('option').first().boundingBox();
     expect(option.height, 'a dropdown option is a real target, not a sliver').toBeGreaterThanOrEqual(44 - 0.5);

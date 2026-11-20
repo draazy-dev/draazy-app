@@ -25,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TenantProfileService implements VerifiedTenantLookup {
-
     public static final int MAX_VERIFIED_BATCH = 50;
 
     private final TenantProfileRepository profiles;
@@ -123,8 +122,6 @@ public class TenantProfileService implements VerifiedTenantLookup {
                 .collect(Collectors.toSet());
     }
 
-    // Badge visible only when it exists and the caller is entitled.
-    // Unverified short-circuits before the relationship queries; both branches produce indistinguishable `false`.
     private boolean maySeeBadge(UUID callerId, UUID targetId, Set<UUID> verified,
                                 Map<UUID, Boolean> relationships) {
         if (targetId == null || !verified.contains(targetId)) {

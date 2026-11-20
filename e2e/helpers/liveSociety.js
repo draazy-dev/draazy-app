@@ -78,7 +78,8 @@ export async function publishSocietyListing(slug, name, { deal = 'buy' } = {}) {
 }
 
 export async function retireListing(id) {
-  await rejectListingWithFetch(id, await authHeaders(ACTORS.admin), { reasonCode: 'other' });
+  const res = await rejectListingWithFetch(id, await authHeaders(ACTORS.admin), { reasonCode: 'other', reason: 'e2e cleanup' });
+  expect(res.status, res.text).toBe(200);
 }
 
 // Posts name a society by id and the server derives the stored name from it, so a spec that wants

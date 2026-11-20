@@ -30,17 +30,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestParam;
 
-/** Facets are reflected off {@link PropertyController#search} so a third hand-kept list cannot drift. */
 @DisplayName("Listings — every search facet costs a re-review, at one of two prices")
 class ListingFoundationTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
     PropertyRepository properties;
 
-    /** Edits that take the listing off search. {@code landUse} is stated rather than derived: it carries no
-     *  {@code @RequestParam}, so the facet loop below can never reach it. */
     private static final Set<String> OFF_SEARCH =
             Set.of("bhk", "propertyType", "locality", "deal", "landUse");
 
@@ -48,8 +44,6 @@ class ListingFoundationTest extends AbstractApiTest {
             Set.of("price", "furnishing", "possession", "address", "societyId", "electricityMeterNo",
                     "carpetArea", "images", "description", "amenities", "reraId");
 
-    /** Facets with no listing attribute behind them: price bounds, free text, moderation state, the owner id
-     *  (untransferable by PATCH) and the result ordering. */
     private static final Set<String> NOT_LISTING_ATTRIBUTES =
             Set.of("minPrice", "maxPrice", "q", "status", "owner", "rank");
 
@@ -96,13 +90,10 @@ class ListingFoundationTest extends AbstractApiTest {
         p.setFurnishing("unfurnished");
         p.setPossession("under-construction");
 
-        // Filed, because re-approval refuses an unfiled listing.
         p.setLocalitySlug("kothrud");
         return properties.saveAndFlush(p);
     }
 
-    /** Not a behaviour check — only that somebody decided which side a facet is on, and that it is
-     *  exactly one of the two sets. */
     private Property pendingListing(User owner, String title) {
         Property p = approvedListing(owner, title);
         p.setStatus(PropertyStatus.PENDING);
@@ -213,8 +204,6 @@ class ListingFoundationTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.recheckPending").value(false));
     }
 
-    /** Searchability is proven separately in {@link #aPriceEditKeepsTheListingInSearch} — status is the
-     *  mechanism, being findable is the promise. */
     private void assertStaysLiveAndQueuesRecheck(String jsonPatch, String field) throws Exception {
         User o = owner("98764" + String.format("%05d", Math.abs(jsonPatch.hashCode()) % 100000));
         Property p = approvedListing(o);
@@ -255,10 +244,12 @@ class ListingFoundationTest extends AbstractApiTest {
                 .findFirst()
                 .orElseThrow()
                 .getResubmittedAt()).isNull();
+        assertThat(jdbc.queryForList("select title from notifications where user_id = ? and type = 'listing.under_review'",
+                String.class, o.getId())).hasSize(1);
     }
 
     @Test
-    @DisplayName("owner edit of a rejected listing keeps the final verdict")
+    @DisplayName("owner edit of a rejected listing is refused and keeps the final verdict")
     void rejectedListingEditStaysRejected() throws Exception {
         User o = owner("9876300099");
         Property p = approvedListing(o, "Rejected resubmit");
@@ -269,9 +260,8 @@ class ListingFoundationTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(o))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"locality\":\"Baner\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("rejected"))
-                .andExpect(jsonPath("$.resubmittedAt").doesNotExist());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("listing_not_editable"));
 
         Property saved = properties.findById(p.getId()).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(PropertyStatus.REJECTED);
@@ -689,8 +679,6 @@ class ListingFoundationTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.recheckPending").value(false));
     }
 
-    /** {@code status} staying approved is the mechanism; {@code GET /properties} hard-floors to approved and
-     *  un-archived, so this is the promise. */
     @Test
     @DisplayName("a price edit leaves the listing findable in public search, re-check and all")
     void aPriceEditKeepsTheListingInSearch() throws Exception {
@@ -715,8 +703,6 @@ class ListingFoundationTest extends AbstractApiTest {
                 .isTrue();
     }
 
-    /** A full re-moderation already looks at the whole listing, so queueing the price change too would show
-     *  the same edit twice. */
     @Test
     @DisplayName("an edit that trips both halves reverts, and does not also queue a re-check")
     void remoderationSupersedesRecheck() throws Exception {
@@ -732,7 +718,6 @@ class ListingFoundationTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.recheckPending").value(false));
     }
 
-    /** Otherwise the queue only grows and "live but flagged" becomes a flag nobody reads. */
     @Test
     @DisplayName("a moderator setting a status clears the pending re-check")
     void moderatorActionClearsTheRecheck() throws Exception {
@@ -761,8 +746,6 @@ class ListingFoundationTest extends AbstractApiTest {
                 .isFalse();
     }
 
-    /** Without this, "re-review everything" passes every case above while making a deposit correction cost a
-     *  moderator's time. */
     @Test
     @DisplayName("a non-searchable edit still leaves an approved listing approved and unqueued")
     void nonFoundationEditsDoNotRevert() throws Exception {

@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 /* `/me/flatmate-requests` is the host's inbox (what seekers sent), not to be confused with
    `/me/flatmate-posts`, which is the seeker's own authored posts. */
@@ -11,12 +13,13 @@ const track = flatmateCleanup(test);
 
 async function newHost() {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Host' });
   return { mobile, accessToken };
 }
 
 async function approve(id) {
   const { accessToken } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, id, auth(accessToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(accessToken),
@@ -43,14 +46,13 @@ test.describe('Host flatmate requests inbox (live API)', () => {
     const host2 = await newHost();
     const seeker = await newHost();
 
-    // A restricted policy queues the join as pending; policy 'any' accepts it outright.
     const created = await fetch(`${API}/flatmates/groups`, {
       method: 'POST',
       headers: auth(host1.accessToken),
-      body: JSON.stringify({
-        title: `Inbox owner ${Date.now().toString(36)}`, name: 'Host', locality: 'Baner', rent: 30000,
-        seats: 2, seatsOpen: 1, policy: 'women', role: 'tenant',
-      }),
+      body: JSON.stringify(huntingGroup({
+        title: `Inbox owner ${Date.now().toString(36)}`, locality: 'Baner', rent: 30000, deposit: 50000,
+        seats: 2, seatsOpen: 1, policy: 'women',
+      })),
     });
     expect(created.status, await created.clone().text()).toBe(201);
     const group = await created.json();
@@ -60,7 +62,7 @@ test.describe('Host flatmate requests inbox (live API)', () => {
     const join = await fetch(`${API}/flatmates/groups/${group.id}/join`, {
       method: 'POST',
       headers: auth(seeker.accessToken),
-      body: JSON.stringify({}),
+      body: JSON.stringify({ gender: 'female' }),
     });
     expect(join.status, await join.clone().text()).toBe(201);
 

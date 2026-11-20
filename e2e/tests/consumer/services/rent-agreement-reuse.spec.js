@@ -2,8 +2,10 @@
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, authHeaders, signedInAs, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import {
-  PNG, active, clickNext, fillOwner, fillProperty, fillTenant, fillTerms, fillWitnesses, inviteTenant, payAndSubmit,
+  PNG, active, clickNext, fillOwner, fillProperty, fillTenant, fillTerms, inviteTenant, payAndSubmit,
 } from '../../../helpers/rentAgreementWizard.js';
+import { gotoSettled, reloadSettled } from '../../../helpers/settle.js';
+import { newListing } from '../../../helpers/monetisation.js';
 /* What the platform already holds is not asked for again. Each claim needs a second account or a
    server-side filing, so all three are asserted live. */
 
@@ -18,14 +20,17 @@ async function invitesFor(token) {
   return Array.isArray(rows) ? rows : [];
 }
 
-async function coFillOverHttp(ownerToken, inviteeMobile) {
+async function coFillOverHttp(ownerToken, inviteeMobile, flat = { flatNo: 'B-1204', society: 'Skyline Heights' }) {
   const res = await fetch(`${API}/service-requests/co-fill`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
       request: {
         type: 'rent-agreement',
-        details: { ownerName: 'Anita Verma', property: 'B-1204, Skyline Heights', rent: '30000', _state: { tenantMode: 'invite', prop: { gramPanchayat: false } } },
+        details: {
+          ownerName: 'Anita Verma', property: `${flat.flatNo}, ${flat.society}`, rent: '30000',
+          _state: { tenantMode: 'invite', prop: { gramPanchayat: false, ...flat, pincode: '411045' } },
+        },
       },
       role: 'tenant',
       mobile: inviteeMobile,
@@ -56,7 +61,7 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     const { accessToken: nextToken } = await apiLogin(nextMobile, { api: API });
 
     await signedInAs(page, ownerMobile);
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     const panel = page.getByTestId('ra-declined-panel');
     await expect(panel.getByText('Your tenant declined the invitation')).toBeVisible();
 
@@ -68,7 +73,32 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     expect(rows.map((r) => r.requestId), 'the new tenant is addressed by the same request').toContain(requestId);
   });
 
-  test('once the tenant accepts, the owner can pay from the locked panel and hears why it is refused', async ({ page }) => {
+  test('the owner pays as soon as their side is done, then can withdraw and re-invite without a reload', async ({ page }) => {
+    test.slow();
+    await signedInAsNew(page, { api: API });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
+    await fillProperty(page);
+    await fillOwner(page);
+    await inviteTenant(page, uniqueMobile());
+    await fillTerms(page);
+    await active(page).getByRole('checkbox').check();
+    const checkout = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && /\/service-requests\/[^/]+\/checkout$/.test(new URL(r.url()).pathname),
+    );
+    await payAndSubmit(page);
+    expect((await checkout).status(), 'checkout opened before the tenant filled anything').toBe(200);
+    /* Only a signed webhook settles a payment, so the e2e owner lands on the unconfirmed card. */
+    await expect(page.getByText("We couldn't confirm your payment yet")).toBeVisible();
+
+    const withdraw = page.getByRole('button', { name: 'Withdraw this invite' });
+    await expect(withdraw).toBeVisible();
+    await withdraw.click();
+    const panel = page.getByTestId('ra-declined-panel');
+    await expect(panel.getByText('No tenant is invited to this agreement')).toBeVisible();
+    await expect(panel.locator('#ra-reinvite-mobile')).toBeVisible();
+  });
+
+  test('the owner can pay a tenant-invite filing from the locked panel and hears why it is refused', async ({ page }) => {
     const ownerMobile = uniqueMobile();
     const { accessToken: ownerToken } = await apiLogin(ownerMobile, { api: API });
     const tenantMobile = uniqueMobile();
@@ -81,9 +111,9 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     expect(accepted.ok, 'the invitee can accept').toBe(true);
 
     await signedInAs(page, ownerMobile);
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     const panel = page.getByTestId('ra-pay-panel');
-    await expect(panel.getByText('Your tenant has filled in their part')).toBeVisible();
+    await expect(panel.getByText('Ready for payment'), 'the tenant fills in after payment').toBeVisible();
     /* The filing above has no papers, so the server's readiness check must refuse — and the
        owner must be told what it said, not left with a button that does nothing. */
 
@@ -96,23 +126,74 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     await panel.getByRole('button', { name: /^Pay/ }).click();
     const refused = await checkout;
     expect(refused.request().postDataJSON(), 'the accepted declaration travels with the checkout')
-      .toEqual({ declaration: 'ra-decl-2026-09' });
+      .toEqual({ declaration: 'ra-decl-2026-10' });
     expect(refused.status(), 'the click reached the server checkout').toBe(409);
     await expect(page.getByText(/not ready for payment yet/)).toBeVisible();
     await expect(panel.getByRole('button', { name: /^Pay/ })).toBeEnabled();
   });
 
+  test('a declined or closed payment says not completed at once, instead of a long spinner and a pending notice', async ({ page }) => {
+    const ownerMobile = uniqueMobile();
+    const { accessToken: ownerToken } = await apiLogin(ownerMobile, { api: API });
+    const tenantMobile = uniqueMobile();
+    const { accessToken: tenantToken } = await apiLogin(tenantMobile, { api: API });
+    const { requestId, partyId } = await coFillOverHttp(ownerToken, tenantMobile);
+    const accepted = await fetch(`${API}/me/service-request-invites/${partyId}`, {
+      method: 'POST', headers: authed(tenantToken), body: JSON.stringify({ decision: 'accept' }),
+    });
+    expect(accepted.ok, 'the invitee can accept').toBe(true);
+
+    /* The SDK resolves a bank decline and a closed modal alike as `{ error }`. The mock session never reaches
+       the SDK, so checkout is answered with a real-looking session and the SDK global is faked. */
+    await page.addInitScript(() => { window.Cashfree = () => ({ checkout: async () => ({ error: { message: 'declined' } }) }); });
+    await page.route('**/service-requests/*/checkout', async (route) => {
+      const res = await fetch(`${API}/service-requests/${requestId}`, { headers: authed(ownerToken) });
+      return route.fulfill({ json: { ...(await res.json()), paymentSessionId: 'session_e2e' } });
+    });
+
+    await signedInAs(page, ownerMobile);
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
+    const panel = page.getByTestId('ra-pay-panel');
+    await panel.getByRole('checkbox').check();
+    await panel.getByRole('button', { name: /^Pay/ }).click();
+
+    await expect(panel.getByText('Payment not completed')).toBeVisible({ timeout: 5000 });
+    await expect(panel.getByRole('button', { name: 'Try payment again' })).toBeVisible();
+    await expect(page.getByText("We couldn't confirm your payment yet")).toHaveCount(0);
+  });
+
+  test('an owner holding two payable agreements sees a pay panel for each flat', async ({ page }) => {
+    const ownerMobile = uniqueMobile();
+    const { accessToken: ownerToken } = await apiLogin(ownerMobile, { api: API });
+    /* One unpaid agreement is allowed per flat, so the two filings name different flats. */
+    const flats = [{ flatNo: 'B-1204', society: 'Skyline Heights' }, { flatNo: 'C-302', society: 'Riverview Towers' }];
+    for (const flat of flats) {
+      const tenantMobile = uniqueMobile();
+      const { accessToken: tenantToken } = await apiLogin(tenantMobile, { api: API });
+      const { partyId } = await coFillOverHttp(ownerToken, tenantMobile, flat);
+      const accepted = await fetch(`${API}/me/service-request-invites/${partyId}`, {
+        method: 'POST', headers: authed(tenantToken), body: JSON.stringify({ decision: 'accept' }),
+      });
+      expect(accepted.ok, `the tenant of ${flat.flatNo} accepts`).toBe(true);
+    }
+
+    await signedInAs(page, ownerMobile);
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
+    const panels = page.getByTestId('ra-pay-panel');
+    await expect(panels).toHaveCount(2);
+    for (const flat of flats) await expect(panels.filter({ hasText: flat.society })).toHaveCount(1);
+  });
+
   test('a filing that fell short is completed in place after a reload, not refused as a second unpaid request', async ({ page }) => {
     test.slow();
     const ownerMobile = await signedInAsNew(page, { api: API });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
 
     const fillAll = async () => {
       await fillProperty(page);
       await fillOwner(page);
       await fillTenant(page);
       await fillTerms(page);
-      await fillWitnesses(page);
       await active(page).getByRole('checkbox').check();
     };
     const isCreate = (r) => r.method() === 'POST' && /\/service-requests$/.test(new URL(r.url()).pathname);
@@ -122,9 +203,9 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     const created = page.waitForResponse((r) => isCreate(r.request()));
     await payAndSubmit(page);
     const requestId = (await (await created).json()).id;
-    await expect(page.getByText(/couldn't send the PAN and Aadhaar details/)).toBeVisible();
+    await expect(page.getByText(/couldn't send the PAN details/)).toBeVisible();
 
-    await page.reload({ waitUntil: 'networkidle' });
+    await reloadSettled(page);
     await page.getByTestId('ra-continue-filed').click();
     await expect(page.locator('.step-dot').nth(0)).toHaveClass(/\bactive\b/);
 
@@ -148,22 +229,21 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
   test('on another device, papers already on the filed request are not asked for again', async ({ page, browser }) => {
     test.slow();
     const ownerMobile = await signedInAsNew(page, { api: API });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await page.route('**/service-requests/*/identities', (route) => route.fulfill({ status: 503, body: '{}' }), { times: 1 });
     await fillProperty(page);
     await fillOwner(page);
     await fillTenant(page);
     await fillTerms(page);
-    await fillWitnesses(page);
     await active(page).getByRole('checkbox').check();
     const created = page.waitForResponse((r) => r.request().method() === 'POST' && /\/service-requests$/.test(new URL(r.url()).pathname));
     await payAndSubmit(page);
     const requestId = (await (await created).json()).id;
-    await expect(page.getByText(/couldn't send the PAN and Aadhaar details/)).toBeVisible();
+    await expect(page.getByText(/couldn't send the PAN details/)).toBeVisible();
     /* A fresh context has no local draft: the answers come from the request, the papers must too. */
     const other = await (await browser.newContext()).newPage();
     await signedInAs(other, ownerMobile);
-    await other.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(other, `${BASE}/services/rent-agreement`);
     await other.getByTestId('ra-continue-filed').click();
 
     const sent = [];
@@ -178,7 +258,6 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     await clickNext(other, 2);
     await fillTenant(other, { docs: false });
     await fillTerms(other);
-    await fillWitnesses(other);
     await active(other).getByRole('checkbox').check();
     const checkout = other.waitForResponse(
       (r) => r.request().method() === 'POST' && /\/service-requests\/[^/]+\/checkout$/.test(new URL(r.url()).pathname),
@@ -195,22 +274,21 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     const tenantMobile = uniqueMobile();
     const { accessToken: tenantToken } = await apiLogin(tenantMobile, { api: API });
     const ownerMobile = await signedInAsNew(page, { api: API });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement`);
     await page.route('**/service-requests/*/identities', (route) => route.fulfill({ status: 503, body: '{}' }), { times: 1 });
     await fillProperty(page);
     await fillOwner(page);
     await inviteTenant(page, tenantMobile);
     await fillTerms(page);
-    await fillWitnesses(page);
     await active(page).getByRole('checkbox').check();
     const created = page.waitForResponse((r) => r.request().method() === 'POST' && /\/service-requests\/co-fill$/.test(new URL(r.url()).pathname));
-    await active(page).getByRole('button', { name: /Generate Agreement & Proceed/ }).click();
+    await payAndSubmit(page);
     const requestId = (await (await created).json()).id;
-    await expect(page.getByText(/couldn't send the PAN and Aadhaar details/)).toBeVisible();
+    await expect(page.getByText(/couldn't send the PAN details/)).toBeVisible();
 
     const other = await (await browser.newContext()).newPage();
     await signedInAs(other, ownerMobile);
-    await other.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await gotoSettled(other, `${BASE}/services/rent-agreement`);
     await expect(other.getByText(/shared with your tenant and stay as filed/)).toBeVisible();
     await other.getByTestId('ra-continue-filed').click();
     return { other, requestId, tenantToken };
@@ -229,7 +307,6 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     await fillOwner(other, { docs: false });
     await clickNext(other, 3);
     await fillTerms(other);
-    await fillWitnesses(other);
     await active(other).getByRole('checkbox').check();
     const identities = other.waitForResponse((r) => r.request().method() === 'PUT' && /\/identities$/.test(new URL(r.url()).pathname));
     await active(other).getByRole('button', { name: /Retry payment/ }).click();
@@ -258,9 +335,8 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     await fillOwner(other, { docs: false });
     await clickNext(other, 3);
     await fillTerms(other, { next: false });
-    await active(other).getByPlaceholder('e.g. 25000').fill('31000');
+    await active(other).getByPlaceholder('e.g. 25,000').fill('31000');
     await clickNext(other, 4);
-    await fillWitnesses(other);
     await active(other).getByRole('checkbox').check();
     await active(other).getByRole('button', { name: /Retry payment/ }).click();
 
@@ -269,46 +345,42 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     await other.context().close();
   });
 
-  test('a paper already in your Documents is filed by reference, not re-uploaded', async ({ page }) => {
+  test("the flat's Index II already in its Documents is filed by reference, not re-uploaded", async ({ page }) => {
     test.slow();
     const ownerMobile = await signedInAsNew(page, { api: API });
-    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    const { id: propertyId } = await newListing(ownerMobile, { title: 'Reuse flat' });
+    await gotoSettled(page, `${BASE}/services/rent-agreement?listing=${propertyId}`);
     await fillProperty(page);
 
     const o = active(page);
     const savedToVault = page.waitForResponse(
-      (r) => r.request().method() === 'POST' && /\/me\/documents\/personal$/.test(new URL(r.url()).pathname),
+      (r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith(`/me/documents/${propertyId}`),
     );
-    await o.locator('input[type="file"]').nth(0).setInputFiles({ name: 'live-pan.png', mimeType: 'image/png', buffer: PNG });
-    expect((await savedToVault).ok(), 'the first owner paper was saved to the vault').toBe(true);
+    await o.locator('input[type="file"]').nth(0).setInputFiles({ name: 'live-own.png', mimeType: 'image/png', buffer: PNG });
+    expect((await savedToVault).ok(), "the Index II was saved to the flat's vault").toBe(true);
     await expect(o.getByText('Saved to your Documents')).toBeVisible({ timeout: 15000 });
     await expect
       .poll(async () => page.evaluate(() => {
         const draft = JSON.parse(localStorage.getItem('dzDraft:rentAgreement') || '{}');
-        return draft.docRefs?.owner?.['o-pan'] || null;
+        return draft.docRefs?.owner?.['o-own'] || null;
       }), { timeout: 10000 })
-      .toMatchObject({ fileName: 'live-pan.jpg', fromVault: true });
+      .toMatchObject({ fileName: 'live-own.jpg', fromVault: true });
     /* A vault row carries a signed URL, not bytes, so the reload proves the slot is held by id. */
-    await page.reload({ waitUntil: 'networkidle' });
-    await expect(o.getByText('live-pan.jpg')).toBeVisible();
+    await reloadSettled(page);
+    await expect(o.getByText('live-own.jpg')).toBeVisible();
     await expect(o.getByText('From your Documents')).toBeVisible();
 
-    const inputs = o.locator('input[type="file"]');
-    for (let i = 1; i < 4; i++) {
-      await inputs.nth(i).setInputFiles({ name: `owner-doc-${i}.png`, mimeType: 'image/png', buffer: PNG });
-      await expect(o.getByText(`owner-doc-${i}.jpg`)).toBeVisible();
-    }
+    await expect(o.locator('input[type="file"]'), 'Index II is the only paper a licensor uploads').toHaveCount(1);
     await fillOwner(page, { docs: false });
     await inviteTenant(page, uniqueMobile());
     await fillTerms(page);
-    await fillWitnesses(page);
 
     const review = active(page);
     await review.getByRole('checkbox').check();
     const filed = page.waitForResponse(
       (r) => r.request().method() === 'POST' && /\/service-requests\/[^/]+\/docs\/from-vault$/.test(new URL(r.url()).pathname),
     );
-    await review.getByRole('button', { name: /Generate Agreement & Proceed/ }).click();
+    await payAndSubmit(page);
     const res = await filed;
     expect(res.status(), 'the server filed the vault copy onto the request').toBe(201);
     const { category } = JSON.parse(res.request().postData() || '{}');
@@ -317,6 +389,6 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     const read = await fetch(`${API}/service-requests/${requestId}`, { headers: await authHeaders(ownerMobile) });
     expect(read.status).toBe(200);
     const docs = (await read.json()).documents || [];
-    expect(docs.map((d) => d.category), 'the PAN is on the request under its slot').toContain(category);
+    expect(docs.map((d) => d.category), 'the Index II is on the request under its slot').toContain(category);
   });
 });

@@ -2,7 +2,7 @@
 
 > How a signed-in (or number-identified) user raises a help ticket, chats with support in a threaded
 > conversation, and how that ticket feeds the staff support queue.
-> **Status:** documented from React source - **Primary role(s):** buyer/owner/tenant (customer) + support staff (responder)
+> **Primary role(s):** buyer/owner/tenant (customer) + support staff (responder)
 
 ---
 
@@ -11,8 +11,8 @@
   a booking/visit problem, a bug.
 - **Job-to-be-done:** "Report my issue with context (category, priority, screenshots), get a ticket
   id, and go back and forth with support until it's resolved."
-- **Why it matters:** it's the human safety net behind the self-serve product and the trust promise;
-  every unresolved ticket is churn risk. It also feeds the ops support queue that staff work.
+- **Why it matters:** the human safety net behind the self-serve product and the trust promise; every
+  unresolved ticket is churn risk. It also feeds the ops support queue that staff work.
 
 ## 2. Entry points
 - **Route:** `/support` (the public Support/Help page). Deep links: `?cat=<category>` preselects the
@@ -81,13 +81,12 @@ labels are i18n-resolved (`getCatLabel`).
   `unreadCustomer` for customer). Opening a thread on the consumer side marks it read as `customer`.
 
 ### Validation (`Support.submit`)
-Enforced before `createTicket`:
+Enforced before `createTicket`; each failure toasts a specific error and aborts:
 - **Name** required (trimmed non-empty).
 - **Mobile** must match `^[6-9]\d{9}$` (Indian 10-digit; input pre-normalised by stripping non-digits
   and a leading `91`).
 - **Subject** length >= 4 (input `maxLength=120`; store also hard-caps `subject` to 140 chars).
 - **Message** length >= 8.
-Each failure toasts a specific error and aborts.
 
 ### Image attachments (`compressFiles` / `compressImage`)
 - Up to `MAX_IMAGES = 4` images per message; non-image files are filtered out; extras beyond the
@@ -105,10 +104,10 @@ Each failure toasts a specific error and aborts.
   opens the thread.
 
 ## 6. Maker-checker / approval
-- **Not a maker-checker.** Support is a two-party conversation, not a proposer/approver workflow. The
-  nearest analogue is the unread + status handshake (customer waits on staff and vice-versa), but
-  there is no approve/reject gate. (See [`../../system/cross-cutting.md`](../../system/cross-cutting.md)
-  section 2 for the pattern this flow does NOT use.)
+- **Not a maker-checker.** Support is a two-party conversation, not a proposer/approver workflow; the
+  nearest analogue is the unread + status handshake, but there is no approve/reject gate. (See
+  [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2 for the pattern this flow
+  does NOT use.)
 
 ## 7. State machine
 ```
@@ -118,6 +117,7 @@ create -> new
   open      --staff resolves (back-office)--> resolved
   resolved  --customer reply--> open      (re-opened)
   resolved  --(staff) closes--> closed
+  any       --desk `POST /support/tickets/{id}/close` (tickets:write)--> closed  (customer is notified "Your support ticket was closed"; closing twice is a no-op)
   closed    --customer reply--> open      (re-opened)
   waiting   --customer reply--> open
 ```

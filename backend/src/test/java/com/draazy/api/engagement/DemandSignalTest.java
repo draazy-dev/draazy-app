@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
@@ -20,15 +22,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
-/** Demand signals: the anonymous half of the supply-gap report. The write must work without a token, or it misses
- * the population it measures; the read stays non-public. */
 @DisplayName("demand signals feed the supply-gap report")
 class DemandSignalTest extends AbstractApiTest {
-
-    /** A slug no seed row uses, so counts in this class cannot drift with the fixtures. */
     private static final String LOCALITY = "d10-demand-locality";
 
-    /** Deliberately never inserted into `localities` — see theUnknownLocalityIsTheInterestingRow. */
     private static final String UNKNOWN = "d10-nowhere-at-all";
 
     @Autowired
@@ -36,6 +33,9 @@ class DemandSignalTest extends AbstractApiTest {
 
     @Autowired
     EntityManager em;
+
+    @Autowired
+    PropertyRepository properties;
 
     private void locality() {
         jdbc.update("""
@@ -51,7 +51,6 @@ class DemandSignalTest extends AbstractApiTest {
         return n == null ? 0 : n;
     }
 
-    /** The JPA save is unflushed and {@code jdbc} reads don't flush, so flush before counting. */
     private void send(String body) throws Exception {
         mvc.perform(post("/demand-signals").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isAccepted());
@@ -112,6 +111,21 @@ class DemandSignalTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("a locality that is not slug-shaped is refused, so scanner payloads never reach the report")
+    void theLocalityIsSlugShaped() throws Exception {
+        for (String junk : new String[] {"/etc/passwd", "../../etc/passwd", "c:\\\\Windows\\\\win.ini", "/",
+                "<script>", "Baner", "' OR '1'='1"}) {
+            mvc.perform(post("/demand-signals").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"kind\":\"alert\",\"localitySlug\":\"" + junk + "\"}"))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+        em.flush();
+
+        assertThat(jdbc.queryForObject("select count(*) from demand_signals where locality_slug !~ '^[a-z0-9]+(-[a-z0-9]+)*$'",
+                Integer.class)).isZero();
+    }
+
+    @Test
     @DisplayName("an empty locality is stored as absent, not as a place named nothing")
     void blankLocalityBecomesNull() throws Exception {
         send("{\"kind\":\"search\",\"localitySlug\":\"\"}");
@@ -146,8 +160,6 @@ class DemandSignalTest extends AbstractApiTest {
         send("{\"kind\":\"search\",\"localitySlug\":\"" + LOCALITY + "\"}");
         send("{\"kind\":\"alert\",\"localitySlug\":\"" + LOCALITY + "\"}");
 
-        // 1 search (x2) + 1 alert (x5) = 7; views are not counted as they grow with supply.
-        // Hamcrest `contains`, as a filtered JSONPath yields an array even for one row.
         mvc.perform(get("/admin/supply-gap").header("Authorization", bearer(admin())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.localitySlug=='" + LOCALITY + "')].searches")
@@ -189,15 +201,12 @@ class DemandSignalTest extends AbstractApiTest {
     void theUnknownLocalityIsTheInterestingRow() throws Exception {
         send("{\"kind\":\"alert\",\"localitySlug\":\"" + UNKNOWN + "\"}");
 
-        // No `localities` row means no foreign key: someone asking for uncovered ground, which a FK would reject.
         mvc.perform(get("/admin/supply-gap").header("Authorization", bearer(admin())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.localitySlug=='" + UNKNOWN + "')].alerts")
                         .value(Matchers.contains(1)))
                 .andExpect(jsonPath("$[?(@.localitySlug=='" + UNKNOWN + "')].supply")
                         .value(Matchers.contains(0)))
-                // NON_NULL omits localityName entirely, so the filtered selection is empty rather
-                // than a list holding null -- the response does not advertise a field it withheld.
                 .andExpect(jsonPath("$[?(@.localitySlug=='" + UNKNOWN + "')].localityName")
                         .value(Matchers.empty()));
     }
@@ -224,7 +233,6 @@ class DemandSignalTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isAccepted());
         }
-        // Four anonymous searches add to `searches` only: nothing distinguishes four strangers from one seeker.
         for (int i = 0; i < 4; i++) {
             send(body);
         }
@@ -236,6 +244,84 @@ class DemandSignalTest extends AbstractApiTest {
                         .value(Matchers.contains(7)))
                 .andExpect(jsonPath("$[?(@.localitySlug=='" + LOCALITY + "')].repeatSeekers")
                         .value(Matchers.contains(1)));
+    }
+
+    @Test
+    @DisplayName("a property view counts toward its owner's views, except the owner's own")
+    void aViewCountsTowardTheListing() throws Exception {
+        User owner = new User("9820950004", "owner");
+        owner.setMobileVerified(true);
+        owner = users.saveAndFlush(owner);
+        User visitor = new User("9820950005", "buyer");
+        visitor.setMobileVerified(true);
+        visitor = users.saveAndFlush(visitor);
+        Property listing = liveListing(owner, "Viewed flat");
+        String view = "{\"kind\":\"view\",\"propertyId\":\"" + listing.getId() + "\"}";
+
+        send(view);
+        for (User viewer : List.of(visitor, owner)) {
+            mvc.perform(post("/demand-signals").header("Authorization", bearer(viewer))
+                            .contentType(MediaType.APPLICATION_JSON).content(view))
+                    .andExpect(status().isAccepted());
+        }
+        send("{\"kind\":\"search\",\"propertyId\":\"" + listing.getId() + "\"}");
+
+        assertThat(jdbc.queryForObject("select views from properties where id = ?", Integer.class, listing.getId()))
+                .isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("a viewer counts once a day, however often they reload; anonymous viewers are told apart by IP")
+    void aViewerCountsOncePerDay() throws Exception {
+        User owner = new User("9820950006", "owner");
+        owner.setMobileVerified(true);
+        owner = users.saveAndFlush(owner);
+        User visitor = new User("9820950007", "buyer");
+        visitor.setMobileVerified(true);
+        visitor = users.saveAndFlush(visitor);
+        Property listing = liveListing(owner, "Reloaded flat");
+        String view = "{\"kind\":\"view\",\"propertyId\":\"" + listing.getId() + "\"}";
+
+        for (int i = 0; i < 3; i++) {
+            mvc.perform(post("/demand-signals").header("Authorization", bearer(visitor))
+                            .contentType(MediaType.APPLICATION_JSON).content(view))
+                    .andExpect(status().isAccepted());
+            for (String ip : List.of("10.0.0.1", "10.0.0.2")) {
+                mvc.perform(post("/demand-signals").with(r -> { r.setRemoteAddr(ip); return r; })
+                                .contentType(MediaType.APPLICATION_JSON).content(view))
+                        .andExpect(status().isAccepted());
+            }
+        }
+        em.flush();
+
+        assertThat(jdbc.queryForObject("select views from properties where id = ?", Integer.class, listing.getId()))
+                .isEqualTo(3);
+        assertThat(jdbc.queryForObject("select count(*) from demand_signals where property_id = ?",
+                Integer.class, listing.getId()))
+                .as("demand stays raw; only the owner's counter is de-duplicated")
+                .isEqualTo(9);
+    }
+
+    @Test
+    @DisplayName("a listing that is not live gains no views")
+    void anOffMarketListingGainsNoViews() throws Exception {
+        User owner = new User("9820950008", "owner");
+        owner.setMobileVerified(true);
+        owner = users.saveAndFlush(owner);
+        Property listing = liveListing(owner, "Paused flat");
+        listing.pauseByOwner();
+        properties.saveAndFlush(listing);
+
+        send("{\"kind\":\"view\",\"propertyId\":\"" + listing.getId() + "\"}");
+
+        assertThat(jdbc.queryForObject("select views from properties where id = ?", Integer.class, listing.getId()))
+                .isZero();
+    }
+
+    private Property liveListing(User owner, String title) {
+        Property listing = new Property(owner, title, "rent", "apartment", 25000L, "Kothrud", "Pune");
+        listing.setStatus("approved");
+        return properties.saveAndFlush(listing);
     }
 
     private User admin() {

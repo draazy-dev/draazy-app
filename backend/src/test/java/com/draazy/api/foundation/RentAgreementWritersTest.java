@@ -11,13 +11,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * {@code RentAgreementService} mints Tenant-verified badges. Its desk, four-eyes and self-dealing
- * gates live in {@code RentAgreementRegistration}, so a second caller would be a route around them.
- */
 @DisplayName("Rent agreement writers — one gated front door")
 class RentAgreementWritersTest {
-
     private static final Path MAIN = Path.of("src", "main", "java", "com", "draazy", "api");
 
     @Test

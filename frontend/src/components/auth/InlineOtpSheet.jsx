@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { Trans, useTranslation } from 'react-i18next';
-import { ArrowRight, CheckCircle2, Loader2, Send, User, Mail } from 'lucide-react';
+import { ArrowRight, Loader2, Send, User, UserCircle, Mail, Smartphone } from 'lucide-react';
 import Modal from '../ui/Modal.jsx';
 import MobileField from '../MobileField.jsx';
 import OtpBoxes from './OtpBoxes.jsx';
@@ -13,6 +13,7 @@ import { useOtpFlow } from './useOtpFlow.js';
 import { sendOtp as sendOtpSvc } from '../../services/authService.js';
 import { classifyOtpVerifyError } from '../../lib/otpVerifyError.js';
 import { healStaleShell } from '../../lib/seamErrors.js';
+import { redeemOnNewAccount } from '../../lib/referralAttribution.js';
 import { isValidName } from '../../lib/auth.js';
 import useBackToClose from '../../hooks/useBackToClose.js';
 
@@ -23,7 +24,7 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
   const { login, update } = useAuth();
   const mobile = useMobileInput('');
   const turnstile = useTurnstile();
-  const otp = useOtpFlow((m) => sendOtpSvc({ mobile: m, turnstileToken: turnstile.spend() }));
+  const otp = useOtpFlow((m) => turnstile.withToken((tok) => sendOtpSvc({ mobile: m, turnstileToken: tok })));
   const setMobileValue = mobile.setValue;
   const resetOtp = otp.reset;
   const [mobileErr, setMobileErr] = useState(false);
@@ -90,6 +91,7 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
     try {
       const who = await login({ mobile: mobile.value, otp: otp.otp, remember: true });
       if (who && !who.name?.trim()) {
+        redeemOnNewAccount();
         verifiedUser.current = who;
         setNeedsProfile(true);
         return;
@@ -162,20 +164,17 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
       {verifying ? <><Loader2 className="w-5 h-5 animate-spin" /> {t('auth.verifying')}</> : <>{t('auth.verifyAndSignIn')} <ArrowRight className="w-4 h-4" /></>}
     </button>
   ) : (
-    <button type="submit" form={INLINE_OTP_FORM_ID} disabled={otp.sending} className="send-otp-btn w-full min-h-[48px] rounded-xl border border-teal-400/30 bg-teal-400/10 text-teal-300 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+    <button type="submit" form={INLINE_OTP_FORM_ID} disabled={otp.sending} className="send-otp-btn w-full h-btn-lg rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2">
       {otp.sending ? <><Loader2 className="w-5 h-5 animate-spin" /> {t('auth.sending')}</> : <><Send className="w-4 h-4" /> {t('auth.sendOtp')}</>}
     </button>
   );
 
   return (
-    <Modal open={open} onClose={onClose} title={title} footer={footer} size="sm">
+    <Modal open={open} onClose={onClose} title={title} footer={footer} size="sm" bare>
       <form id={INLINE_OTP_FORM_ID} onSubmit={submit} className="space-y-5">
         {needsProfile ? (
           <>
-          <div className="text-center">
-            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
-            <p className="text-sm text-gray-400">{t('auth.completeProfileSub')}</p>
-          </div>
+          <SheetHeading icon={UserCircle} title={t('auth.completeProfileTitle')} sub={t('auth.completeProfileSub')} />
           <div>
             <label htmlFor="inline-profile-name" className="block text-sm font-medium text-gray-300 mb-2">{t('auth.fullName')} <span className="text-rose-400">*</span></label>
             <div className="relative">
@@ -196,16 +195,16 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
           </>
         ) : (
           <>
-          <p className="text-sm text-gray-400">{subtitle || t(`auth.intent.${reason}Sub`)}</p>
+          <SheetHeading icon={Smartphone} title={title} sub={subtitle || t(`auth.intent.${reason}Sub`)} />
           <div className={'input-group' + (mobileErr ? ' error' : '')}>
             <label htmlFor="inline-otp-mobile" className="block text-sm font-medium text-gray-300 mb-2">{t('auth.mobileNumber')} <span className="text-rose-400">*</span></label>
             <MobileField id="inline-otp-mobile" autoFocus enterKeyHint="send" value={mobile.value} onChange={(v) => { if (v !== mobile.value && otp.otpSent) otp.reset(); mobile.setValue(v); setMobileErr(false); setVerifyError(null); }} error={mobileErr} disabled={otp.sending || verifying} placeholder={t('auth.mobilePlaceholder')} inputClassName="!text-base" />
             {mobileErr ? <p className="text-red-400 text-xs mt-1.5 ml-1">{t('auth.errMobile')}</p> : null}
           </div>
           <p role="alert" id="inline-otp-status" className={status ? 'text-red-400 text-xs text-center' : 'sr-only'}>{status}</p>
+          <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
           {!otp.otpSent ? (
             <>
-              <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
               <p className="text-[11px] leading-relaxed text-gray-500">
                 <Trans
                   i18nKey="auth.inlineOtpTerms"
@@ -213,7 +212,8 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
                     1: <Link to="/terms" className="text-teal-400 hover:text-teal-300" />,
                     3: <Link to="/privacy" className="text-teal-400 hover:text-teal-300" />,
                   }}
-                />
+                />{' '}
+                {t('auth.whatsappNotice')}
               </p>
             </>
           ) : (
@@ -237,5 +237,17 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
         )}
       </form>
     </Modal>
+  );
+}
+
+function SheetHeading({ icon: Icon, title, sub }) {
+  return (
+    <div className="text-center pt-1">
+      <div className="w-12 h-12 bg-gradient-to-br from-teal-400/20 to-teal-600/20 rounded-2xl flex items-center justify-center mx-auto mb-3.5 border border-teal-400/20">
+        <Icon className="w-6 h-6 text-teal-400" />
+      </div>
+      <h2 className="text-2xl font-bold text-white mb-2">{title}</h2>
+      <p className="text-gray-400 text-sm">{sub}</p>
+    </div>
   );
 }

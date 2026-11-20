@@ -7,6 +7,7 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.UnauthorizedException;
 import com.draazy.api.common.trust.Notifier;
+import com.draazy.api.common.trust.WithdrawnCooldown;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.documents.vault.Document;
 import com.draazy.api.documents.vault.DocumentMapper;
@@ -35,10 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DocumentRequestService {
-
     private static final Logger LOG = LoggerFactory.getLogger(DocumentRequestService.class);
 
-    // Long enough for a buyer to forward the link to their lawyer and for the lawyer to get to it after a weekend.
     private static final Duration GRANT_TTL = Duration.ofDays(7);
 
     private final DocumentRequestRepository requests;
@@ -76,10 +75,21 @@ public class DocumentRequestService {
                         buyerId, property.getId(), DocumentRequestStatuses.PENDING)
                 .map(existing -> mapper.toRequesterDto(
                         existing, users.findById(buyerId).orElse(null), 0))
-                .orElseGet(() -> create(buyerId, property, body));
+                .orElseGet(() -> {
+                    refuseWhileCoolingDown(buyerId, property.getId());
+                    return create(buyerId, property, body);
+                });
     }
 
-    // Paged because the owner writes none of these rows.
+    private void refuseWhileCoolingDown(UUID buyerId, UUID propertyId) {
+        requests.findFirstByRequesterIdAndPropertyIdOrderByCreatedAtDesc(buyerId, propertyId)
+                .filter(last -> DocumentRequestStatuses.WITHDRAWN.equals(last.getStatus()))
+                .filter(last -> WithdrawnCooldown.active(last.getUpdatedAt(), Instant.now()))
+                .ifPresent(last -> {
+                    throw WithdrawnCooldown.refusal(last.getUpdatedAt());
+                });
+    }
+
     @Transactional(readOnly = true)
     public Page<DocumentRequestDto> myRequests(UUID ownerId, Pageable pageable) {
         List<UUID> ownedPropertyIds = properties.findIdsByOwnerId(ownerId);
@@ -87,7 +97,8 @@ public class DocumentRequestService {
             return Page.empty(pageable);
         }
         Page<DocumentRequest> rows =
-                requests.findByPropertyIdInOrderByCreatedAtDesc(ownedPropertyIds, pageable);
+                requests.findByPropertyIdInAndStatusNotOrderByCreatedAtDesc(
+                        ownedPropertyIds, DocumentRequestStatuses.WITHDRAWN, pageable);
         Map<UUID, User> requesters = users
                 .findAllById(rows.getContent().stream()
                         .map(DocumentRequest::getRequesterId).distinct().toList())
@@ -111,8 +122,6 @@ public class DocumentRequestService {
         }
         User requester = users.findById(requesterId).orElse(null);
 
-        // Only the granted rows are counted, because only they are allowed to report a count — the mapper zeroes the
-        // rest anyway.
         Map<UUID, Integer> sharedCounts = sharedCounts(rows.getContent().stream()
                 .filter(row -> DocumentRequestStatuses.GRANTED.equals(row.getStatus()))
                 .toList());
@@ -120,7 +129,6 @@ public class DocumentRequestService {
                 row, requester, sharedCounts.getOrDefault(row.getId(), 0)));
     }
 
-    // Owner scope is enforced by lookup, before the row is accepted.
     @Transactional
     public void respond(AuthPrincipal owner, String reqId, StatusUpdate body) {
         DocumentRequest row = Ids.parseUuid(reqId)
@@ -160,14 +168,11 @@ public class DocumentRequestService {
         }
     }
 
-    // Contract `getSharedDocuments` — read the documents a grant unlocked.
-    // Unknown token, declined request, lapsed grant: one message, one status.
     @Transactional(readOnly = true)
     public List<DocumentSummary> shared(String token) {
         return documentMapper.toSummaries(unlocked(sharedGrant(token)));
     }
 
-    /** One file of a token grant, signed on open; the same grant checks as {@link #shared}. */
     @Transactional(readOnly = true)
     public DocumentUrl sharedUrl(String token, String docId) {
         return urlOf(unlocked(sharedGrant(token)), docId);
@@ -178,7 +183,6 @@ public class DocumentRequestService {
         return documentMapper.toSummaries(unlocked(requesterGrant(requesterId, reqId)));
     }
 
-    /** One file of the caller's own grant, signed on open; the same checks as {@link #myGranted}. */
     @Transactional(readOnly = true)
     public DocumentUrl myGrantedUrl(UUID requesterId, String reqId, String docId) {
         return urlOf(unlocked(requesterGrant(requesterId, reqId)), docId);
@@ -210,7 +214,6 @@ public class DocumentRequestService {
                 .orElseThrow(() -> NotFoundException.of("Document"));
     }
 
-    // What a grant actually unlocks, given a row already proven live and already proven the caller's to read.
     private List<Document> unlocked(DocumentRequest grant) {
         List<String> categories = grant.getCategories();
         if (categories.isEmpty()) {
@@ -221,8 +224,6 @@ public class DocumentRequestService {
                 categories.stream().map(c -> c.toLowerCase(Locale.ROOT)).toList());
     }
 
-    // Count the actual files each request would unlock, in one document query for a whole page.
-    // Count only uploaded proofs; approval can exist before an owner uploads the file.
     private Map<UUID, Integer> sharedCounts(List<DocumentRequest> rows) {
         if (rows.isEmpty()) {
             return Map.of();
@@ -261,12 +262,9 @@ public class DocumentRequestService {
                         (buyer == null || buyer.getName() == null || buyer.getName().isBlank()
                                 ? "Someone" : buyer.getName())
                                 + " asked to see documents for " + property.getTitle() + ".",
-                        "/dashboard#leads");
+                        Notifier.REQUEST_INBOX);
             }
         } catch (DataIntegrityViolationException concurrentDuplicate) {
-
-            // A parallel tap won the race; its row is the one true request, so this call is simply
-            // a re-read. Nothing to repair, nothing worth telling the user about.
             LOG.debug("Concurrent document request for property {}", propertyId);
             row = requests.findByRequesterIdAndPropertyIdAndStatus(
                             buyerId, propertyId, DocumentRequestStatuses.PENDING)

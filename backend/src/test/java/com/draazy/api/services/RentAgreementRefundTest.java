@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -19,16 +20,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
-// Everything paid comes back until GRAS duty is paid; after that only the service fee can refund.
-// A second operator must approve so no refund leaves on one person's word.
 @DisplayName("Rent agreement refunds — one operator asks, a second approves, within what D-b allows")
 class RentAgreementRefundTest extends ServiceFixtures {
-
     private static final String TERMS = "{\"type\":\"rent-agreement\",\"details\":{\"rent\":20000,"
             + "\"deposit\":60000,\"months\":11,\"_state\":{\"prop\":{\"gramPanchayat\":false},\"terms\":{\"rent\":\"20000\",\"deposit\":\"60000\","
             + "\"months\":\"11\"}}}}";
 
-    private static final long STATUTORY = 600 + 1000 + 300;
+    private static final long STATUTORY = 565 + 1000 + 300;
 
     private static final String GRN = "MH012345678901234567E";
 
@@ -73,11 +71,12 @@ class RentAgreementRefundTest extends ServiceFixtures {
     }
 
     @Test
-    @DisplayName("before the duty is paid the whole charge comes back, once, and only on a second operator's approval")
+    @DisplayName("before the duty is paid the whole charge comes back, once, and only on a manager's approval")
     void fullRefundBeforeTheDuty() throws Exception {
         User owner = customer("9820009001");
         User maker = staff("9820009002", Teams.RENTAL);
-        User checker = staff("9820009003", Teams.RENTAL);
+        User colleague = staff("9820009003", Teams.RENTAL);
+        User checker = manager("9820009004");
         String id = raiseWithTerms(owner);
         setStatus(maker, id, "assigned", 200);
         long paid = paid(id);
@@ -90,21 +89,29 @@ class RentAgreementRefundTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.dutyPaidOnRecord").value(false));
 
         ask(maker, id, paid + 1, false, null).andExpect(status().isUnprocessableEntity());
-        ask(checker, id, paid, false, null).andExpect(status().isConflict());
+        ask(colleague, id, paid, false, null).andExpect(status().isConflict());
         ask(maker, id, paid, false, null).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.refunds[0].status").value("requested"))
                 .andExpect(jsonPath("$.refunds[0].amount").value(paid))
-                .andExpect(jsonPath("$.refunds[0].mine").value(true));
+                .andExpect(jsonPath("$.refunds[0].mine").value(true))
+                .andExpect(jsonPath("$.canDecide").value(false));
         ask(maker, id, 100, false, null).andExpect(status().isConflict());
+        assertThat(jdbc.queryForList("select link from notifications where user_id = ? and type = ?",
+                String.class, checker.getId(), "service.refund-requested"))
+                .containsExactly("/admin/rent-agreement?request=" + id);
 
         String refund = openRefund(checker, id);
+        summary(checker, id).andExpect(jsonPath("$.canDecide").value(true));
         decideRefund(maker, id, refund, true).andExpect(status().isForbidden());
+        decideRefund(colleague, id, refund, true).andExpect(status().isForbidden());
+        decideRefund(colleague, id, refund, false).andExpect(status().isForbidden());
         decideRefund(checker, id, refund, true).andExpect(status().isOk())
                 .andExpect(jsonPath("$.refunds[0].status").value("approved"))
                 .andExpect(jsonPath("$.refunds[0].gatewayRefundId", startsWith("mock_refund_")))
                 .andExpect(jsonPath("$.refunded").value(paid))
                 .andExpect(jsonPath("$.refundableBeforeDuty").value(0));
-        decideRefund(checker, id, refund, true).andExpect(status().isNotFound());
+        decideRefund(checker, id, refund, true).andExpect(status().isConflict());
+        decideRefund(checker, id, UUID.randomUUID().toString(), true).andExpect(status().isNotFound());
         ask(maker, id, 1, false, null).andExpect(status().isUnprocessableEntity());
 
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
@@ -120,7 +127,7 @@ class RentAgreementRefundTest extends ServiceFixtures {
     void serviceFeeOnlyAfterTheDuty() throws Exception {
         User owner = customer("9820009011");
         User maker = staff("9820009012", Teams.RENTAL);
-        User checker = staff("9820009013", Teams.RENTAL);
+        User checker = manager("9820009013");
         String id = raiseWithTerms(owner);
         setStatus(maker, id, "assigned", 200);
         long fee = paid(id) - STATUTORY;
@@ -150,7 +157,7 @@ class RentAgreementRefundTest extends ServiceFixtures {
     void aFullRefundClosesTheRequest() throws Exception {
         User owner = customer("9820009041");
         User maker = staff("9820009042", Teams.RENTAL);
-        User checker = staff("9820009043", Teams.RENTAL);
+        User checker = manager("9820009043");
         String partial = raiseWithTerms(owner);
         String full = raiseWithTerms(owner);
         setStatus(maker, partial, "assigned", 200);
@@ -172,7 +179,7 @@ class RentAgreementRefundTest extends ServiceFixtures {
     void theRefundWebhookReportsWhatTheGatewayDid() throws Exception {
         User owner = customer("9820009051");
         User maker = staff("9820009052", Teams.RENTAL);
-        User checker = staff("9820009053", Teams.RENTAL);
+        User checker = manager("9820009053");
         String id = raiseWithTerms(owner);
         setStatus(maker, id, "assigned", 200);
         long paid = paid(id);
@@ -191,8 +198,9 @@ class RentAgreementRefundTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.refundableBeforeDuty").value(paid));
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.timeline[?(@.event == 'refund.failed')]", org.hamcrest.Matchers.hasSize(1)));
-        assertThat(jdbc.queryForList("select 1 from notifications where user_id = ? and type = ?",
-                maker.getId(), "service.refund-failed")).hasSize(1);
+        assertThat(jdbc.queryForList("select link from notifications where user_id = ? and type = ?",
+                String.class, maker.getId(), "service.refund-failed"))
+                .containsExactly("/admin/rent-agreement?request=" + id);
 
         ask(maker, id, 500, false, null).andExpect(status().isCreated());
     }
@@ -235,11 +243,41 @@ class RentAgreementRefundTest extends ServiceFixtures {
     }
 
     @Test
+    @DisplayName("a refund made on the Cashfree dashboard enters the ledger once, and the whole sum closes the request")
+    void aDashboardRefundEntersTheLedger() throws Exception {
+        User owner = customer("9820009201");
+        User maker = staff("9820009202", Teams.RENTAL);
+        String id = raiseWithTerms(owner);
+        setStatus(maker, id, "assigned", 200);
+        long paid = paid(id);
+        String order = requestRepo.findById(UUID.fromString(id)).orElseThrow().getPaymentRef();
+
+        deliverDashboardRefund(order, "cf_dash_pending", 500, "PENDING");
+        summary(maker, id).andExpect(jsonPath("$.refunded").value(0));
+
+        deliverDashboardRefund(order, "cf_dash_1", 500, "SUCCESS");
+        deliverDashboardRefund(order, "cf_dash_1", 500, "SUCCESS");
+        summary(maker, id).andExpect(jsonPath("$.refunded").value(500))
+                .andExpect(jsonPath("$.refunds.length()").value(1))
+                .andExpect(jsonPath("$.refunds[0].status").value("approved"))
+                .andExpect(jsonPath("$.refunds[0].gatewayRefundId").value("cf_dash_1"))
+                .andExpect(jsonPath("$.refundableBeforeDuty").value(paid - 500));
+        expectStatus(owner, id, "assigned");
+        assertThat(jdbc.queryForList("select amount from credit_notes where source_type = 'service_request_refund'"
+                + " and user_id = ?", Long.class, owner.getId())).containsExactly(500L);
+
+        deliverDashboardRefund(order, "cf_dash_2", paid - 500, "SUCCESS");
+        expectStatus(owner, id, "cancelled");
+        assertThat(jdbc.queryForList("select 1 from notifications where user_id = ? and type = ?",
+                owner.getId(), "service.refund-approved")).hasSize(2);
+    }
+
+    @Test
     @DisplayName("a paid checkout is invoiced once, only the platform fee counted as taxable, and the credit note cites it")
     void aPaidCheckoutIsInvoicedAndItsCreditNoteCitesTheInvoice() throws Exception {
         User owner = customer("9820009071");
         User maker = staff("9820009072", Teams.RENTAL);
-        User checker = staff("9820009073", Teams.RENTAL);
+        User checker = manager("9820009073");
         String id = raiseWithTerms(owner);
         serviceRequests.applyWebhookOutcome(paymentRef(id), true, null, null);
         em.flush();
@@ -269,7 +307,7 @@ class RentAgreementRefundTest extends ServiceFixtures {
     void aConfirmedRefundIssuesACreditNote() throws Exception {
         User owner = customer("9820009061");
         User maker = staff("9820009062", Teams.RENTAL);
-        User checker = staff("9820009063", Teams.RENTAL);
+        User checker = manager("9820009063");
         String id = raiseWithTerms(owner);
         setStatus(maker, id, "assigned", 200);
         String merchantId = "rf_" + approvedRefund(maker, checker, id, 500).replace("-", "");
@@ -294,4 +332,155 @@ class RentAgreementRefundTest extends ServiceFixtures {
         mvc.perform(get(Routes.Refunds.MY_PAYMENTS).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$[0].status").value("refunded"))
                 .andExpect(jsonPath("$[0].creditNoteNo").value(notes.get(0).get("number")));
-    }}
+    }
+
+    @Test
+    @DisplayName("a desk cancel of a paid agreement raises a refund of everything paid, and only a manager pays it")
+    void aDeskCancelRaisesTheRefundForAManager() throws Exception {
+        User owner = customer("9820009301");
+        User maker = staff("9820009302", Teams.RENTAL);
+        User colleague = staff("9820009303", Teams.RENTAL);
+        User checker = manager("9820009304");
+        String id = raiseWithTerms(owner);
+        setStatus(maker, id, "assigned", 200);
+        long paid = paid(id);
+
+        setStatus(maker, id, "cancelled", 200);
+
+        summary(colleague, id).andExpect(jsonPath("$.refunds.length()").value(1))
+                .andExpect(jsonPath("$.refunds[0].status").value("requested"))
+                .andExpect(jsonPath("$.refunds[0].amount").value(paid))
+                .andExpect(jsonPath("$.refunds[0].reason", startsWith("Cancelled by the desk: ")))
+                .andExpect(jsonPath("$.canDecide").value(false));
+        assertThat(jdbc.queryForObject("select body from notifications where user_id = ? and type = ?",
+                String.class, owner.getId(), "service.cancelled"))
+                .contains("The desk cannot continue this request")
+                .contains(Notifier.rupees(paid) + " refund");
+        assertThat(jdbc.queryForList("select link from notifications where user_id = ? and type = ?",
+                String.class, checker.getId(), "service.refund-requested"))
+                .containsExactly("/admin/rent-agreement?request=" + id);
+        assertThat(jdbc.queryForList("select 1 from notifications where user_id in (?, ?) and type = ?",
+                maker.getId(), colleague.getId(), "service.refund-requested")).isEmpty();
+
+        String refund = openRefund(checker, id);
+        decideRefund(colleague, id, refund, true).andExpect(status().isForbidden());
+        decideRefund(checker, id, refund, true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.refunds[0].status").value("approved"))
+                .andExpect(jsonPath("$.refunded").value(paid));
+        expectStatus(owner, id, "cancelled");
+        assertThat(jdbc.queryForObject("select title from notifications where user_id = ? and type = ?",
+                String.class, owner.getId(), "service.refund-approved"))
+                .isEqualTo(Notifier.rupees(paid) + " refund on its way");
+    }
+
+    @Test
+    @DisplayName("a refund already waiting is not doubled by the cancel, and an unpaid cancel raises none")
+    void aCancelKeepsTheOpenRefund() throws Exception {
+        User owner = customer("9820009311");
+        User maker = staff("9820009312", Teams.RENTAL);
+        String id = raiseWithTerms(owner);
+        setStatus(maker, id, "assigned", 200);
+        ask(maker, id, 500, false, null).andExpect(status().isCreated());
+
+        setStatus(maker, id, "cancelled", 200);
+
+        summary(maker, id).andExpect(jsonPath("$.refunds.length()").value(1))
+                .andExpect(jsonPath("$.refunds[0].amount").value(500));
+        assertThat(jdbc.queryForObject("select body from notifications where user_id = ? and type = ?",
+                String.class, owner.getId(), "service.cancelled")).contains(Notifier.rupees(500) + " refund");
+
+        String unpaid = raiseUnpaid(owner, listing(owner));
+        setStatus(admin("9820009313"), unpaid, "cancelled", 200);
+        assertThat(jdbc.queryForObject("select count(*) from service_request_refunds where service_request_id = ?",
+                Long.class, UUID.fromString(unpaid))).isZero();
+    }
+
+    @Test
+    @DisplayName("a manager who cancels can approve the refund the cancel raised")
+    void aManagersOwnCancelTheyCanApprove() throws Exception {
+        User owner = customer("9820009321");
+        User manager = manager("9820009322");
+        String id = raiseWithTerms(owner);
+
+        setStatus(manager, id, "cancelled", 200);
+
+        String refund = openRefund(manager, id);
+        summary(manager, id).andExpect(jsonPath("$.refunds[0].mine").value(true))
+                .andExpect(jsonPath("$.canDecide").value(true));
+        decideRefund(manager, id, refund, true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.refunds[0].status").value("approved"));
+    }
+
+    @Test
+    @DisplayName("staff cannot withdraw the refund a cancel promised the customer; only a manager can refuse it")
+    void aCancelledRequestsRefundIsAManagersCall() throws Exception {
+        User owner = customer("9820009341");
+        User maker = staff("9820009342", Teams.RENTAL);
+        User checker = manager("9820009343");
+        String id = raiseWithTerms(owner);
+        setStatus(maker, id, "assigned", 200);
+
+        mvc.perform(patch(Routes.ServiceRequests.STATUS, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(maker))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"cancelled\",\"note\":\"The owner sold the flat.\\nSorry for the trouble!\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject("select body from notifications where user_id = ? and type = ?",
+                String.class, owner.getId(), "service.cancelled"))
+                .contains("Sorry for the trouble! Your ")
+                .doesNotContain("!.");
+        String refund = openRefund(checker, id);
+        decideRefund(maker, id, refund, false).andExpect(status().isForbidden());
+        decideRefund(checker, id, refund, false).andExpect(status().isOk())
+                .andExpect(jsonPath("$.refunds[0].status").value("rejected"));
+    }
+
+    private ResultActions refundsDesk(User caller, String status, String feature) throws Exception {
+        em.flush();
+        em.clear();
+        var call = get(Routes.Refunds.DESK).header(HttpHeaders.AUTHORIZATION, bearer(caller))
+                .param("status", status).param("counts", "true").param("size", "100");
+        return mvc.perform(feature == null ? call : call.param("feature", feature));
+    }
+
+    private int pendingOnDesk(User caller, String feature) throws Exception {
+        String json = refundsDesk(caller, "pending_review", feature).andReturn().getResponse().getContentAsString();
+        return com.jayway.jsonpath.JsonPath.read(json, "$.counts.pending_review");
+    }
+
+    @Test
+    @DisplayName("the refund a cancel raises waits on the refunds desk under the rent-agreement feature")
+    void aCancelsRefundIsOnTheRefundsDesk() throws Exception {
+        User owner = customer("9820009351");
+        User maker = staff("9820009352", Teams.RENTAL);
+        User checker = manager("9820009353");
+        User admin = admin("9820009354");
+        String id = raiseWithTerms(owner);
+        setStatus(maker, id, "assigned", 200);
+        int before = pendingOnDesk(admin, null);
+        int passesBefore = pendingOnDesk(admin, "pass");
+
+        setStatus(maker, id, "cancelled", 200);
+
+        String row = "$.content[?(@.serviceRequestId == '" + id + "')]";
+        refundsDesk(admin, "pending_review", "rent_agreement")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(row + ".kind").value(hasItem("rent_agreement")))
+                .andExpect(jsonPath(row + ".status").value(hasItem("pending_review")))
+                .andExpect(jsonPath(row + ".amount").value(hasItem(Math.toIntExact(paid(id)))))
+                .andExpect(jsonPath(row + ".customerId").value(hasItem(owner.getId().toString())))
+                .andExpect(jsonPath(row + ".label").value(hasItem("Rent agreement")));
+        refundsDesk(admin, "pending_review", null).andExpect(jsonPath(row + ".id").isNotEmpty())
+                .andExpect(jsonPath("$.counts.pending_review").value(before + 1));
+        refundsDesk(admin, "pending_review", "pass").andExpect(jsonPath(row).isEmpty())
+                .andExpect(jsonPath("$.counts.pending_review").value(passesBefore));
+        refundsDesk(admin, "pending_review", "cars").andExpect(status().isBadRequest());
+
+        decideRefund(checker, id, openRefund(checker, id), true).andExpect(status().isOk());
+        refundsDesk(admin, "approved", "rent_agreement")
+                .andExpect(jsonPath(row + ".status").value(hasItem("approved")))
+                .andExpect(jsonPath(row + ".decisionReason").value(hasItem("Checked against the GRAS receipt")));
+        refundsDesk(admin, "pending_review", "rent_agreement").andExpect(jsonPath(row).isEmpty());
+    }
+}

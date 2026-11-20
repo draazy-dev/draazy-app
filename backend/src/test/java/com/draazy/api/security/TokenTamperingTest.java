@@ -28,7 +28,6 @@ import org.springframework.http.MediaType;
 
 @DisplayName("A forged, expired or re-signed access token never authenticates")
 class TokenTamperingTest extends AbstractApiTest {
-
     private static final String PROTECTED = Routes.Auth.ME;
     private static final Base64.Encoder B64 = Base64.getUrlEncoder().withoutPadding();
 
@@ -149,7 +148,6 @@ class TokenTamperingTest extends AbstractApiTest {
                 .andExpect(status().isNoContent());
 
         assertAnonymous(token);
-        // A token minted in the revocation's own second is refused too, so the fresh sign-in waits it out.
         Thread.sleep(1_050 - System.currentTimeMillis() % 1_000);
         mvc.perform(get(PROTECTED).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk());

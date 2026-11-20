@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, uploadedListingPhotos, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 /* Occupancy is server-derived, so the only way to produce a FILLING room is to split a flat and
    then record occupants via `PATCH /flatmates/rooms/{id}/occupants`. */
@@ -54,8 +55,10 @@ async function splitAndFill(occupants) {
   const room = split.json.rooms[0];
   created.roomId = room.id;
   // Approve the room so it appears on the public board.
+  const staffHeaders = auth((await apiLogin(ACTORS.admin)).accessToken);
+  await tickDeskChecklist(API, room.id, staffHeaders);
   const moderated = await api('PATCH', `/admin/flatmates/${room.id}/moderation`,
-    auth((await apiLogin(ACTORS.admin)).accessToken), { modStatus: 'approved' });
+    staffHeaders, { modStatus: 'approved' });
   expect(moderated.status, moderated.text).toBe(200);
 
   const occ = await api('PATCH', `/flatmates/rooms/${room.id}/occupants`, auth(accessToken), {

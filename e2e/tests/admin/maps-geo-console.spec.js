@@ -1,5 +1,5 @@
-/** Maps & Geo console writes (blacklist, city limit) read back via `GET /bootstrap` `geo` from the Node process, not the writing browser.
- * Needs backend :8081 (`local,e2e`); blacklist terms must be >= 2 chars (`MIN_BLACKLIST_TERM`) or they are stored but never published. */
+/** Maps console writes read back via `GET /bootstrap` `geo` from Node, not the writing browser.
+ * Blacklist terms under `MIN_BLACKLIST_TERM` (2 chars) are stored but never published. */
 
 import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders } from '../../helpers/liveAuth.js';
@@ -17,8 +17,8 @@ async function publishedGeo() {
 
 const publishedTerms = async () => (await publishedGeo()).blacklist.map((entry) => entry.term);
 
-/** `settings.geo` is one row for the whole live run, so snapshot before and restore after each test (even on throw) from `GET /admin/settings`:
- * the `/bootstrap` `geo` projection omits each entry's operator `note`, so restoring from it would delete those reasons. */
+/** `settings.geo` is one row for the whole run; restore from `GET /admin/settings` because the `/bootstrap`
+ * projection omits each blacklist entry's `note`, so restoring from it would delete those reasons. */
 let before;
 
 test.beforeEach(async () => {
@@ -36,8 +36,9 @@ test.afterEach(async () => {
         // Arrays replace whole under the server's deep merge, so writing back the original list restores it;
         // objects do not — see `geo-policy.spec.js`.
         blacklist: before.blacklist ?? [],
-        // Absent means enforced (`geo.enforceCityLimit !== false`), so restore to `true`, not `false`, which would unfence locality search for later specs.
+        // Absent means enforced; restoring `false` would unfence locality search for later specs.
         enforceCityLimit: before.enforceCityLimit ?? true,
+        servedDistricts: before.servedDistricts ?? ['Pune'],
       },
     }),
   });
@@ -52,20 +53,19 @@ const settingsSaved = (page) => page.waitForResponse(
 );
 
 test.describe('the maps console writes geo policy to the server', () => {
-  /* The blacklist is the operator's only lever to hide a place; a write that never reaches the server still toasts "saved" and shows in their own list,
-     which only a read of `GET /bootstrap` (`geo`) outside the writing tab can catch. */
+  /* A write that never reaches the server still toasts "saved" and shows in the operator's list;
+     only a read of `GET /bootstrap` outside the writing tab catches it. */
   test("a term blacklisted in the console is hidden for every visitor, not just in the operator's tab", async ({ page, login }) => {
     await login.asAdmin();
     await page.goto('/admin/settings?tab=maps');
-    await expect(page.getByRole('heading', { name: /Blacklisted localities/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Blacklisted places/i })).toBeVisible();
 
     expect(await publishedTerms()).not.toContain(TERM);
 
-    await page.getByPlaceholder(/name\/term to hide/i).fill(TERM);
-    await page.getByPlaceholder('Reason (optional)').fill('live console write-path probe');
+    await page.getByLabel('Hide a place').fill(TERM);
 
     const saved = settingsSaved(page);
-    await page.getByRole('button', { name: /^Add$/ }).click();
+    await page.getByRole('option', { name: new RegExp(`Hide every name containing .${TERM}.`) }).click();
     expect((await saved).status()).toBe(200);
 
     // The panel agrees with itself, which is all the mock twin ever checked.
@@ -74,8 +74,7 @@ test.describe('the maps console writes geo policy to the server', () => {
     await expect.poll(publishedTerms).toContain(TERM);
   });
 
-  /* A remove that never lands leaves the place hidden while the console shows it restored; the entry is seeded over the API so this
-     test does not depend on the Add test above. */
+  /* Seeded over the API so this test does not depend on the Add test above. */
   test('removing a term in the console takes it off the published policy', async ({ page, login }) => {
     const seeded = await fetch(`${API}/admin/settings`, {
       method: 'PUT',
@@ -105,11 +104,11 @@ test.describe('the maps console writes geo policy to the server', () => {
   });
 
   /** One boolean, so assert it on the server: "saved" and "saved locally" look identical. */
-  test('the city-limit switch is readable back from the server', async ({ page, login }) => {
+  test('the search-limit switch is readable back from the server', async ({ page, login }) => {
     await login.asAdmin();
     await page.goto('/admin/settings?tab=maps');
 
-    const cityLimit = page.getByRole('switch', { name: /Restrict Places to selected city/i });
+    const cityLimit = page.getByRole('switch', { name: /Keep search inside served districts/i });
     await expect(cityLimit).toBeVisible();
     // The shipped policy fences searches; absent in the document reads as `true` on the client.
     await expect(cityLimit).toHaveAttribute('aria-checked', 'true');
@@ -131,21 +130,77 @@ test.describe('the maps console writes geo policy to the server', () => {
     await expect.poll(async () => (await publishedGeo()).enforceCityLimit).toBe(true);
   });
 
-  /** Boundary editor fail-soft hint: `GOOGLE_MAPS_HAS_DDS` derives from a build-time Vite var neither lane sets, so both render the demo-map hint;
-   * live also loads real settings/cities, so the clean-console claim covers the editor mounting beside server data. The outline itself needs a vector Map ID. */
-  test('the boundary editor mounts fail-soft under the demo Map ID, beside real server settings', async ({ page, login, consoleErrors }) => {
+  /* Added districts carry their Google place id and viewport so pickers can search them; the console's
+     add box needs live Google autocomplete, so the add is seeded over the API and the remove is clicked. */
+  test('a district added to the served list is published with its area, and removing it in the console takes it off', async ({ page, login }) => {
+    const satara = { name: 'Satara', placeId: 'ChIJ-e2e-satara', bounds: { north: 18.2, south: 17.1, east: 74.9, west: 73.5 } };
+    const seeded = await fetch(`${API}/admin/settings`, {
+      method: 'PUT',
+      headers: await authHeaders(ACTORS.admin),
+      body: JSON.stringify({ geo: { servedDistricts: ['Pune', satara] } }),
+    });
+    expect(seeded.status).toBe(200);
+    await expect.poll(async () => (await publishedGeo()).servedDistricts).toEqual(['Pune', 'Satara']);
+    expect((await publishedGeo()).districtAreas).toContainEqual(satara);
+
+    await login.asAdmin();
+    await page.goto('/admin/settings?tab=maps');
+    const card = page.getByTestId('served-area');
+    await expect(card.getByRole('list', { name: 'Served districts' }).getByRole('listitem')).toHaveText(['Pune', 'Satara']);
+    await expect(card.getByRole('combobox', { name: 'Add a district' })).toBeVisible();
+
+    const saved = settingsSaved(page);
+    await card.getByRole('button', { name: 'Stop serving Satara' }).click();
+    expect((await saved).status()).toBe(200);
+
+    await expect(card.getByRole('list', { name: 'Served districts' }).getByRole('listitem')).toHaveText(['Pune']);
+    // The last district cannot be dropped: an empty list would let no new place in anywhere.
+    await expect(card.getByRole('button', { name: 'Stop serving Pune' })).toBeDisabled();
+    await expect.poll(async () => (await publishedGeo()).servedDistricts).toEqual(['Pune']);
+    expect((await publishedGeo()).districtAreas.map((a) => a.name)).toEqual(['Pune']);
+  });
+
+  test('the server refuses an empty or duplicated district list', async () => {
+    for (const servedDistricts of [[], ['Pune', 'pune']]) {
+      const res = await fetch(`${API}/admin/settings`, {
+        method: 'PUT',
+        headers: await authHeaders(ACTORS.admin),
+        body: JSON.stringify({ geo: { servedDistricts } }),
+      });
+      expect(res.status).toBe(422);
+    }
+  });
+
+  test('a refused district save tells the operator why instead of a generic retry', async ({ page, login }) => {
+    const seeded = await fetch(`${API}/admin/settings`, {
+      method: 'PUT',
+      headers: await authHeaders(ACTORS.admin),
+      body: JSON.stringify({ geo: { servedDistricts: ['Pune', 'Satara'] } }),
+    });
+    expect(seeded.status).toBe(200);
+    await login.asAdmin();
+    await page.goto('/admin/settings?tab=maps');
+    const reason = "'geo.servedDistricts' needs each district named in 2 to 80 characters. Nothing was saved.";
+    await page.route('**/api/admin/settings', (route) => (route.request().method() === 'PUT'
+      ? route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ code: 'VALIDATION_FAILED', message: reason }) })
+      : route.fallback()));
+
+    await page.getByTestId('served-area').getByRole('button', { name: 'Stop serving Satara' }).click();
+
+    await expect(page.getByText(reason)).toBeVisible();
+    await expect(page.getByTestId('served-area').getByRole('list', { name: 'Served districts' }).getByRole('listitem'))
+      .toHaveText(['Pune', 'Satara']);
+  });
+
+  /** The e2e lanes run with a demo Map ID, so the district map mounts without boundary outlines. */
+  test('the district map mounts fail-soft beside real server settings', async ({ page, login, consoleErrors }) => {
     await login.asAdmin();
     await page.goto('/admin/settings?tab=maps');
 
-    // Positive anchor. Without it the hint assertion below could pass on a half-rendered panel,
-    // and the empty-console assertion would be a claim about a page that never drew anything.
-    await expect(page.getByRole('heading', { name: /City coverage/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Served districts/ })).toBeVisible();
+    await expect(page.getByTestId('district-map')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /City coverage/i })).toHaveCount(0);
 
-    // Anchored on the copy that names the variable to set, the actionable half of the hint.
-    await expect(page.getByText(/set a data-driven/i)).toBeVisible();
-    await expect(page.getByText('VITE_GOOGLE_MAPS_MAP_ID', { exact: true })).toBeVisible();
-
-    // `BoundaryHighlight` never mounts while `GOOGLE_MAPS_HAS_DDS` is false, so errors there cannot reach this.
     expect(consoleErrors).toEqual([]);
   });
 });

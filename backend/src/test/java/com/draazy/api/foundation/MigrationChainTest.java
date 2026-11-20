@@ -16,20 +16,14 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** Catches the two textual shapes that made the chain un-replayable: a table created twice with no
- *  DROP between, and two migrations claiming one version. See {@code docs/LOCAL_DEV.md} §1. */
 @DisplayName("Migrations — the chain stays replayable")
 class MigrationChainTest {
-
     private static final Path MIGRATIONS =
             Path.of("src", "main", "resources", "db", "migration").toAbsolutePath();
 
-    /** {@code CREATE TABLE [IF NOT EXISTS] <name>} — the statement whose duplication broke us. */
     private static final Pattern CREATE_TABLE = Pattern.compile(
             "(?im)^\\s*CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:public\\.)?([a-z_][a-z0-9_]*)");
 
-    /** {@code DROP TABLE [IF EXISTS] <name>}. The rule is "created while already live", not
-     *  "created twice", so a deliberate drop-and-rebuild is not reported as the outage shape. */
     private static final Pattern DROP_TABLE = Pattern.compile(
             "(?im)^\\s*DROP\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(?:public\\.)?([a-z_][a-z0-9_]*)");
 
@@ -54,7 +48,6 @@ class MigrationChainTest {
         }
     }
 
-    /** Strip {@code --} line comments so a table named only in prose does not count as created. */
     private static String withoutComments(String sql) {
         return sql.replaceAll("(?m)--.*$", "");
     }
@@ -62,8 +55,6 @@ class MigrationChainTest {
     @Test
     @DisplayName("no table is created twice in the chain")
     void noTableIsCreatedTwice() {
-        // A DROP clears a table, because the next CREATE then runs against an empty slot exactly as
-        // it would in a database built from scratch.
         Map<String, String> liveCreator = new TreeMap<>();
         Map<String, List<String>> duplicated = new TreeMap<>();
         sqlFiles().sorted().forEach(file -> {
@@ -93,7 +84,6 @@ class MigrationChainTest {
                 .isEmpty();
     }
 
-    /** A CREATE or DROP of one table, keyed by where it appears so the chain order is preserved. */
     private record TableStatement(String table, boolean drop) {}
 
     private static Map<Integer, TableStatement> statementsInOrder(String sql) {
@@ -113,8 +103,6 @@ class MigrationChainTest {
         return value.toLowerCase(java.util.Locale.ROOT);
     }
 
-    /** Flyway refuses to start on a duplicate version, and reads {@code 26.10.1} and {@code 26.10.01} as the
-     *  same one; catching it at build time is cheaper, because two branches' merge looks clean. */
     @Test
     @DisplayName("no two migrations claim the same version")
     void versionsAreUnique() {

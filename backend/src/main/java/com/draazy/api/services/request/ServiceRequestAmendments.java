@@ -28,15 +28,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class ServiceRequestAmendments {
-
     private static final Logger log = LoggerFactory.getLogger(ServiceRequestAmendments.class);
 
     private static final int REASON_MAX = 300;
 
     private static final Set<ServiceRequestStatus> AMENDABLE = EnumSet.of(ServiceRequestStatus.ASSIGNED,
-            ServiceRequestStatus.IN_PROGRESS, ServiceRequestStatus.CHANGES_REQUESTED);
+            ServiceRequestStatus.IN_PROGRESS, ServiceRequestStatus.CHANGES_REQUESTED,
+            ServiceRequestStatus.ACTION_REQUIRED);
 
-    // The terms mirrored at the top of details as numbers; the rest live only in _state.terms.
     private static final Set<String> FLAT_TERMS = Set.of("rent", "deposit", "nrDeposit", "months", "regArea");
 
     private final ServiceRequestService requests;
@@ -78,7 +77,6 @@ public class ServiceRequestAmendments {
 
     public record Terms(Long rent, Long deposit, Long nrDeposit, Long months, BigDecimal increment,
             Long incrementEvery, String regArea) {
-
         Map<String, Object> changes() {
             Map<String, Object> out = new LinkedHashMap<>();
             if (rent != null) {
@@ -202,7 +200,7 @@ public class ServiceRequestAmendments {
         String phone = users.findById(caller.userId()).map(User::getMobile).orElse(null);
         PaymentGateway.PaymentOrder order = gateway.createOrder(delta,
                 "service-request-amendment:" + amendmentId,
-                new PaymentGateway.Customer(caller.userId().toString(), phone));
+                new PaymentGateway.Customer(caller.userId().toString(), phone), ServiceRequestService.RETURN_PATH);
         if (order.orderId() == null || order.orderId().isBlank()) {
             throw new IllegalStateException("Payment gateway returned no order id");
         }
@@ -225,7 +223,7 @@ public class ServiceRequestAmendments {
             return false;
         }
 
-        // Request row first, as every other path here takes it, so the two locks cannot deadlock.
+        // Lock the request row first, as every other path does, so the two locks cannot deadlock.
         UUID requestId = amendments.findRequestIdByPaymentRef(orderId).orElse(null);
         if (requestId == null) {
             return false;
@@ -254,13 +252,11 @@ public class ServiceRequestAmendments {
         if (paid) {
             apply(request, amendment, null);
         } else {
-            amendment.releaseOrder();
             requests.record(request, "amendment.payment-failed", null);
         }
         return true;
     }
 
-    // The money is real, so it joins what was paid and can be refunded; only the terms stay unapplied.
     private void keepAsCredit(ServiceRequest request, ServiceRequestAmendment amendment) {
         request.charge(amendment.delta());
         requestRows.saveAndFlush(request);
@@ -276,7 +272,7 @@ public class ServiceRequestAmendments {
             notifier.notify(request.getAssigneeId(), "service.amendment-credit",
                     "Refund due on a withdrawn amendment",
                     Notifier.rupees(amendment.delta()) + " was paid for terms that are no longer open.",
-                    "/ops/drafting-desk");
+                    ServiceRequestTypes.deskFor(request));
         }
     }
 
@@ -291,9 +287,8 @@ public class ServiceRequestAmendments {
     }
 
     private void notifyOtherParties(ServiceRequest request, String type, String title, String body) {
-        parties.findByRequestId(request.getId()).stream()
-                .filter(p -> CoFillParties.ACCEPTED.equals(p.getStatus()) && p.getUserId() != null
-                        && !p.getUserId().equals(request.getRequesterId()))
+        CoFillParties.joined(parties.findByRequestId(request.getId()))
+                .filter(p -> !p.getUserId().equals(request.getRequesterId()))
                 .forEach(p -> notifier.notify(p.getUserId(), type, title, body,
                         ServiceRequestTypes.pageFor(request.getType())));
     }
@@ -322,7 +317,7 @@ public class ServiceRequestAmendments {
         if (request.getAssigneeId() != null) {
             notifier.notify(request.getAssigneeId(), "service.amendment-applied",
                     "Revised terms accepted", "The customer accepted the revised terms. Share the revised draft.",
-                    "/ops/drafting-desk");
+                    ServiceRequestTypes.deskFor(request));
         }
     }
 

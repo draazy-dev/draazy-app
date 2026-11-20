@@ -3,17 +3,7 @@ import { pickDate } from './datePicker.helper.js';
 import { pickSocietyNotOnMaps } from './places.js';
 import { pickLocalityIn } from './locality.js';
 
-// Verhoeff-valid and distinct because both wizard and server reject shared party IDs.
-export const AADHAAR = {
-  owner: '234567890124',
-  tenant: '345678901238',
-  witness1: '456789012341',
-  witness2: '567890123458',
-  coOwner: '678901234560',
-  spare: '789012345674',
-};
-export const MOBILE = { owner: '9811223344', tenant: '9822334455', witness1: '9833445566', witness2: '9844556677', coOwner: '9855667788' };
-export const INVALID_AADHAAR = '123412341234';
+export const MOBILE = { owner: '9811223344', tenant: '9822334455', coOwner: '9855667788' };
 
 export const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4AWJiYGD4D8IgBpBmYAAAAAD//7vS9wEAAAAGSURBVAMAGDACA6ybwrYAAAAASUVORK5CYII=', 'base64');
 const JPG = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD6pooooA//2Q==', 'base64');
@@ -23,9 +13,25 @@ export const todayIso = () => { const d = new Date(); return `${d.getFullYear()}
 
 export const active = (page) => page.locator('.step-panel.active');
 
+// Next smooth-scrolls the form (or the first error) into view, and Playwright's own scroll-into-view
+// fights an animation still in flight until the next action fails as "element is not stable".
+async function scrollSettled(page) {
+  await page.evaluate(() => new Promise((done) => {
+    let last = window.scrollY;
+    let still = 0;
+    const tick = () => {
+      still = window.scrollY === last ? still + 1 : 0;
+      last = window.scrollY;
+      if (still >= 5) done(true); else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }));
+}
+
 // Shared placeholders would hide a failed Next until a later unrelated locator.
 export async function clickNext(page, expectStep) {
   await page.getByRole('button', { name: 'Next' }).click();
+  await scrollSettled(page);
   if (expectStep == null) return;
   await expect(page.locator('.step-dot').nth(expectStep), `wizard did not advance to step ${expectStep + 1}`).toHaveClass(/\bactive\b/);
 }
@@ -80,53 +86,72 @@ export async function fillProperty(page, { next = true, gramPanchayat = false } 
   if (gramPanchayat !== null) await p.getByTestId(gramPanchayat ? 'ra-gram-yes' : 'ra-gram-no').click();
   await p.getByRole('button', { name: 'Taluka', exact: true }).click();
   await page.getByRole('option', { name: 'Haveli', exact: true }).click();
-  await p.getByPlaceholder('e.g. Baner, Pune').fill('Baner');
   await p.getByPlaceholder('411045').fill('411045');
   await p.getByPlaceholder('e.g. 850').fill('850');
+  await fillIgrProperty(page);
   if (next) await clickNext(page, 1);
 }
 
-export async function fillOwner(page, { docs = true, next = true, aadhaar = AADHAAR.owner } = {}) {
+export async function fillIgrProperty(page) {
+  const p = active(page);
+  await p.getByPlaceholder('e.g. Near D-Mart').fill('Near D-Mart');
+  await p.getByPlaceholder('Type the police station name').fill('Chaturshringi');
+  await p.getByPlaceholder('e.g. On main road').fill('On main road');
+  await p.getByPlaceholder('e.g. Tar road').fill('Tar road');
+}
+
+export async function pickGender(page, scope, name = 'Female') {
+  await scope.getByRole('button', { name: 'Gender', exact: true }).first().click();
+  await page.getByRole('option', { name, exact: true }).click();
+}
+
+export async function fillPartyIgr(page, scope, { gender = 'Female', address = true } = {}) {
+  await pickGender(page, scope, gender);
+  if (!address) return;
+  await scope.getByPlaceholder('411004').first().fill('411045');
+  await scope.getByPlaceholder('e.g. Shivajinagar').first().fill('Baner');
+  await scope.getByPlaceholder('Flat, building, street, locality').first().fill('12 MG Road, Baner, Pune');
+}
+
+export async function fillOwner(page, { docs = true, next = true } = {}) {
   const p = active(page);
   await p.getByPlaceholder('As per PAN/Aadhaar').first().fill('Anita Verma');
-  await p.getByPlaceholder('As per identity proof').first().fill('Shaila Verma');
   await pickDate(page, '[data-err="oDob"]', '1980-01-01');
-  await p.getByPlaceholder('If used in older papers').first().fill('Anu');
   await p.getByPlaceholder('ABCDE1234F').first().fill('ABCDE1234F');
-  await p.getByPlaceholder('12-digit Aadhaar').first().fill(aadhaar);
   const mobile = p.getByPlaceholder('10-digit mobile').first();
   // The wizard prefills the signed-in requester, who must be the owner on a flat that is not their listing.
   if (!(await mobile.inputValue())) await mobile.fill(MOBILE.owner);
-  await p.getByPlaceholder('Full permanent address').first().fill('12, MG Road, Pune 411001');
+  await fillPartyIgr(page, p);
   if (docs) await uploadAll(p, 'owner-doc');
   if (next) await clickNext(page, 2);
 }
 
 export async function fillCoOwner(page, scope = active(page), { docs = true } = {}) {
   await scope.getByPlaceholder('As per PAN/Aadhaar').fill('Vikram Verma');
-  await scope.getByPlaceholder('As per identity proof').fill('Meera Verma');
   await pickDate(page, '[data-err="c0dob"]', '1977-05-15');
-  await scope.getByPlaceholder('If used in older papers').fill('Vikram V');
   await scope.getByPlaceholder('ABCDE1234F').fill('VWXYZ9876L');
-  await scope.getByPlaceholder('12-digit Aadhaar').fill(AADHAAR.coOwner);
   await scope.getByPlaceholder('10-digit mobile').fill(MOBILE.coOwner);
-  await scope.getByPlaceholder('Full permanent address').fill('12, MG Road, Pune 411001');
+  await fillPartyIgr(page, scope, { gender: 'Male' });
   if (docs) await uploadAll(scope, 'co-doc');
 }
 
 export async function fillTenant(page, { docs = true, next = true } = {}) {
   const p = active(page);
   await p.getByPlaceholder('As per PAN/Aadhaar').first().fill('Rahul Nair');
-  await p.getByPlaceholder('As per identity proof').first().fill('Latha Nair');
   await pickDate(page, '[data-err="t0dob"]', '1995-01-01');
-  await p.getByPlaceholder('If used in older papers').first().fill('Rahul');
   await p.getByPlaceholder('ABCDE1234F').first().fill('PQRSX6789K');
-  await p.getByPlaceholder('12-digit Aadhaar').first().fill(AADHAAR.tenant);
   await p.getByPlaceholder('10-digit mobile').first().fill(MOBILE.tenant);
-  await p.getByPlaceholder('Full permanent address').first().fill('44, FC Road, Pune 411004');
+  await fillPartyIgr(page, p, { gender: 'Male', address: false });
   await fillTenantPolice(page);
   if (docs) await uploadAll(p, 'tenant-doc');
   if (next) await clickNext(page, 3);
+}
+
+// The removed fields must not come back: Aadhaar OTP happens at the doorstep visit.
+export async function expectNoRemovedPartyInputs(scope) {
+  for (const placeholder of ['12-digit Aadhaar', 'Full permanent address', 'As per identity proof', 'If used in older papers', 'As per Aadhaar or PAN']) {
+    await expect(scope.getByPlaceholder(placeholder), `"${placeholder}" input was removed`).toHaveCount(0);
+  }
 }
 
 export async function fillTenantPolice(page, { tenantIndex = 0, family = false, previous = false } = {}) {
@@ -179,8 +204,8 @@ export async function pickStartDate(page, iso = todayIso()) {
 export async function fillTerms(page, { next = true, deposit = '150000' } = {}) {
   const p = active(page);
   await pickStartDate(page);
-  await p.getByPlaceholder('e.g. 25000').fill('30000');
-  await p.getByPlaceholder('e.g. 100000').fill(deposit);
+  await p.getByPlaceholder('e.g. 25,000').fill('30000');
+  await p.getByPlaceholder('e.g. 1,00,000').fill(deposit);
   await fillDepositPayment(page);
   if (next) await clickNext(page, 4);
 }
@@ -197,22 +222,6 @@ export async function fillDepositPayment(page, { utr = '612345678901' } = {}) {
   await page.locator('.dz-cal').waitFor({ state: 'visible' });
   await page.getByRole('button', { name: todayIso(), exact: true }).first().click();
   await page.locator('.dz-cal').waitFor({ state: 'detached' });
-}
-
-export async function fillWitnesses(page, { next = true } = {}) {
-  const rows = [
-    { n: 1, name: 'Suresh Patil', aadhaar: AADHAAR.witness1, mobile: MOBILE.witness1, addr: '7, Karve Road, Pune 411004' },
-    { n: 2, name: 'Meera Joshi', aadhaar: AADHAAR.witness2, mobile: MOBILE.witness2, addr: '9, JM Road, Pune 411005' },
-  ];
-  for (const w of rows) {
-    const card = active(page).getByTestId(`witness-${w.n}`);
-    await card.getByPlaceholder('As per PAN/Aadhaar').fill(w.name);
-    await card.getByPlaceholder('e.g. 42').fill('40');
-    await card.getByPlaceholder('10-digit mobile').fill(w.mobile);
-    await card.getByPlaceholder('12-digit Aadhaar').fill(w.aadhaar);
-    await card.getByPlaceholder('Full permanent address').fill(w.addr);
-  }
-  if (next) await clickNext(page, 5);
 }
 
 export async function payAndSubmit(page) {

@@ -32,10 +32,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
-/** The duplicate guard must hold on the name as well as the slug, as the slug folds the locality in. */
 @DisplayName("Societies — community minting")
 class SocietyMintTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @MockitoBean PlacesLookup places;
 
@@ -44,12 +42,15 @@ class SocietyMintTest extends AbstractApiTest {
         when(places.details(any(), any())).thenAnswer(call -> {
             Place hint = call.getArgument(1);
             return hint != null && hint.name() != null && !hint.name().isBlank()
-                    ? Optional.of(hint) : Optional.empty();
+                    ? Optional.of(inPune(hint)) : Optional.empty();
         });
     }
 
-    /** Mobile block 98660000xx is used by no other class; no {@code REQUIRES_NEW} provisioning,
-     * so the class-level rollback needs no cleanup. */
+    private static Place inPune(Place hint) {
+        return new Place(hint.placeId(), hint.name(), hint.lat(), hint.lng(), hint.pincode(), hint.types(), "Pune");
+    }
+
+    // Mobile block 98660000xx must stay unique to this class; the DB is shared across test classes.
     private User user(String mobile, String name) {
         User u = new User(mobile, Roles.Wire.BUYER);
         u.setName(name);
@@ -98,14 +99,11 @@ class SocietyMintTest extends AbstractApiTest {
                         + " from societies where slug = ?", slug);
     }
 
-    /** A seeded RERA society by position, not by name — seed display names are not unique. */
     private Map<String, Object> seeded(int offset) {
         return jdbc.queryForMap(
                 "select slug, name from societies where source = 'rera' order by slug offset ?"
                         + " limit 1", offset);
     }
-
-    // ---------------------------------------------------------------- minting
 
     @Test
     @DisplayName("a society somebody adds exists for everybody, not just for them")
@@ -119,12 +117,8 @@ class SocietyMintTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.source").doesNotExist());
 
         String slug = slugOf(created);
-        // The locality is folded into the slug so two societies of the same name in different
-        // suburbs do not collide.
         assertThat(slug).isEqualTo("sunview-heights-d241-wakad");
 
-        // Findable by a completely different, anonymous reader in the very next request. This is
-        // the whole point: the browser-local version was visible to exactly one person.
         mvc.perform(get("/societies/" + slug))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Sunview Heights D241"));
@@ -136,7 +130,6 @@ class SocietyMintTest extends AbstractApiTest {
         Map<String, Object> stored = row(slug);
         assertThat(stored.get("created_by")).isEqualTo(author.getId());
         assertThat(stored.get("source")).isEqualTo("community");
-        // The pin the caller supplied is kept — it is usually better than the locality centroid.
         assertThat(((Number) stored.get("lat")).doubleValue()).isEqualTo(18.598);
     }
 
@@ -145,8 +138,6 @@ class SocietyMintTest extends AbstractApiTest {
     void unknownLocalityIsRefused() throws Exception {
         User author = user("9866000003", "Tanvi Mint");
 
-        // `societies.locality_slug` is a foreign key. An area the caller invented is not a field we
-        // can store; it is a constraint violation, and a 500 on a form filled in correctly.
         mint(author, "{\"placeId\":\"test-marigold-d241\","
                 + "\"name\":\"Marigold Enclave D241\",\"localitySlug\":\"not-a-real-locality-d241\"}")
                 .andExpect(status().isUnprocessableEntity());
@@ -162,7 +153,6 @@ class SocietyMintTest extends AbstractApiTest {
         String slug = slugOf(original);
         String id = idOf(original);
 
-        // 200, not 201, and not an error: they asked for a society by name and there is one.
         ResultActions again = mint(second, body("Trellis Grove D241")).andExpect(status().isOk());
         assertThat(idOf(again)).isEqualTo(id);
         assertThat(slugOf(again)).isEqualTo(slug);
@@ -197,7 +187,7 @@ class SocietyMintTest extends AbstractApiTest {
     void mintUsesWhatGoogleSays() throws Exception {
         User author = user("9866000071", "Quin Mint");
         when(places.details(eq("test-g-1"), any())).thenReturn(Optional.of(
-                new Place("test-g-1", "Google Named Towers D241", 18.5601, 73.8002, "411045", List.of("premise"))));
+                new Place("test-g-1", "Google Named Towers D241", 18.5601, 73.8002, "411045", List.of("premise"), "Pune")));
 
         ResultActions created = mint(author, "{\"placeId\":\"test-g-1\",\"name\":\"Client Typed Name\","
                 + "\"lat\":18.6,\"lng\":73.9}")
@@ -218,7 +208,6 @@ class SocietyMintTest extends AbstractApiTest {
         User second = user("9866000073", "Sol Mint");
         String id = idOf(mint(first, body("Idem Towers D241")).andExpect(status().isCreated()));
 
-        // Even with a different typed name: the place is the identity.
         String again = "{\"placeId\":\"" + placeIdOf("Idem Towers D241") + "\",\"name\":\"Other Spelling\"}";
         assertThat(idOf(mint(second, again).andExpect(status().isOk()))).isEqualTo(id);
 
@@ -232,7 +221,7 @@ class SocietyMintTest extends AbstractApiTest {
         User author = user("9866000074", "Tai Mint");
         for (String id : List.of("test-twin-a", "test-twin-b")) {
             when(places.details(eq(id), any())).thenReturn(Optional.of(
-                    new Place(id, "Twin Court D241", 18.5, 73.8, null, List.of("premise"))));
+                    new Place(id, "Twin Court D241", 18.5, 73.8, null, List.of("premise"), "Pune")));
         }
         String a = slugOf(mint(author, "{\"placeId\":\"test-twin-a\"}").andExpect(status().isCreated()));
         String b = slugOf(mint(author, "{\"placeId\":\"test-twin-b\"}").andExpect(status().isCreated()));
@@ -245,7 +234,7 @@ class SocietyMintTest extends AbstractApiTest {
     void areaTypesAreRefused() throws Exception {
         User author = user("9866000075", "Uma Mint");
         when(places.details(eq("test-area"), any())).thenReturn(Optional.of(
-                new Place("test-area", "Baner", 18.559, 73.78, null, List.of("sublocality_level_1", "political"))));
+                new Place("test-area", "Baner", 18.559, 73.78, null, List.of("sublocality_level_1", "political"), "Pune")));
 
         mint(author, "{\"placeId\":\"test-area\",\"name\":\"Baner\"}")
                 .andExpect(status().isUnprocessableEntity());
@@ -286,14 +275,9 @@ class SocietyMintTest extends AbstractApiTest {
     void unroutableNameIsRefused() throws Exception {
         User author = user("9866000010", "Kabir Mint");
 
-        // It passes the length check and slugifies to the empty string. Minting it would produce a
-        // society at `/society/` that nobody — including its author — could ever open.
         mint(author, body("!!! ???")).andExpect(status().isUnprocessableEntity());
     }
 
-    // ----------------------------------------------------------- mint origin
-
-    /** A mint stating which surface the caller was on; {@code origin} is sent raw so a bad value can be tested. */
     private static String bodyFrom(String name, String origin) {
         return "{\"placeId\":\"" + placeIdOf(name) + "\",\"name\":\"" + name
                 + "\",\"mintOrigin\":\"" + origin + "\"}";
@@ -309,7 +293,6 @@ class SocietyMintTest extends AbstractApiTest {
     void originRoundTrips(String label, String name, String sent, String expected) throws Exception {
         User author = user("9866000024", "Farhan Mint");
 
-        // Old clients send none; it defaults to `listing` so demand can be under-reported but never invented.
         ResultActions created = mint(author, "NONE".equals(sent) ? body(name) : bodyFrom(name, sent))
                 .andExpect(status().isCreated());
 
@@ -330,8 +313,6 @@ class SocietyMintTest extends AbstractApiTest {
             mint(author, bodyFrom(name, "listing")).andExpect(status().isCreated());
         }
 
-        // Validated in code, not left to the DB CHECK: an admitted unknown value would never match `demand`;
-        // it must fire on the duplicate path too.
         mint(author, bodyFrom(name, origin)).andExpect(status().isUnprocessableEntity());
 
         Integer minted = jdbc.queryForObject(
@@ -348,14 +329,11 @@ class SocietyMintTest extends AbstractApiTest {
         String slug = slugOf(mint(lister, bodyFrom("Fennel Heights D241", "listing"))
                 .andExpect(status().isCreated()));
 
-        // Real demand, deliberately not recorded: overwriting `listing` would say no flat was ever posted there.
         mint(searcher, bodyFrom("Fennel Heights D241", "demand"))
                 .andExpect(status().isOk());
 
         assertThat(row(slug).get("mint_origin")).isEqualTo("listing");
     }
-
-    // -------------------------------------------------------------- ops queue
 
     @Test
     @DisplayName("the candidates queue holds member-added societies and nothing else")
@@ -371,8 +349,6 @@ class SocietyMintTest extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(json).contains(slug);
-        // Curated and RERA rows are verified by construction. An operator asked to confirm 320
-        // MahaRERA imports is an operator who stops reading the queue.
         assertThat(json).doesNotContain("amanora-park-hadapsar");
     }
 
@@ -388,7 +364,6 @@ class SocietyMintTest extends AbstractApiTest {
         String posted = slugOf(mint(lister, bodyFrom("Hazel Court D241", "listing"))
                 .andExpect(status().isCreated()));
 
-        // The queue is the only reader; "somebody wants a flat here and there are none" is the signal.
         String json = mvc.perform(get("/admin/society-candidates")
                         .header(HttpHeaders.AUTHORIZATION, ops)
                         .param("size", "100"))
@@ -424,7 +399,6 @@ class SocietyMintTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalPages").value(2));
     }
 
-    /** The {@code mintOrigin} of one queue row, found by its slug. */
     private static String originIn(String json, String slug) {
         int row = json.indexOf("\"slug\":\"" + slug + "\"");
         assertThat(row).as("slug " + slug + " is in the queue").isNotNegative();
@@ -443,9 +417,6 @@ class SocietyMintTest extends AbstractApiTest {
         mvc.perform(get("/admin/society-candidates")).andExpect(status().isUnauthorized());
     }
 
-    // ------------------------------------------------------ duplicate hints
-
-    /** The duplicate column read before verifying; candidates are member-added rows no bundled file covers. */
     private ResultActions dupes(String slug, String ops) throws Exception {
         return dupes(slug, ops, "");
     }
@@ -467,7 +438,6 @@ class SocietyMintTest extends AbstractApiTest {
         String copy = slugOf(mint(second, body("Willow Crest D252"))
                 .andExpect(status().isCreated()));
 
-        // Two member-added rows: the only kind of duplicate the queue actually produces.
         assertThat(original).isNotEqualTo(copy);
         String json = dupes(copy, ops)
                 .andExpect(status().isOk())
@@ -477,8 +447,6 @@ class SocietyMintTest extends AbstractApiTest {
                         .value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.34)))
                 .andReturn().getResponse().getContentAsString();
 
-        // Scoring against the shorter name makes "Willow Towers" a flat 1.0 match on `willow`, so verified
-        // siblings would crowd the real duplicate off the list.
         assertThat(json).doesNotContain("willow-towers").doesNotContain("willow-avenue");
     }
 
@@ -494,7 +462,6 @@ class SocietyMintTest extends AbstractApiTest {
         String mine = slugOf(mint(second, body("Ashgrove Residency"))
                 .andExpect(status().isCreated()));
 
-        // A shared suffix like Residency isn't evidence; counting it breeds false hints operators learn to skip.
         assertThat(dupes(mine, ops).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString())
                 .doesNotContain(other);
@@ -518,7 +485,6 @@ class SocietyMintTest extends AbstractApiTest {
                         .content("{\"from\":\"" + retired + "\",\"into\":\"" + survivor + "\"}"))
                 .andExpect(status().is2xxSuccessful());
 
-        // A merged row keeps its slug and name, so a naive scan would keep proposing an already-resolved pair.
         assertThat(dupes(survivor, ops).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString())
                 .doesNotContain(retired);
@@ -562,15 +528,70 @@ class SocietyMintTest extends AbstractApiTest {
         User owner = user("9866000061", "Rhea Mint");
         String slug = slugOf(mint(owner, body("Limit Court D252")).andExpect(status().isCreated()));
 
-        /* A limit of 0 or 1000 is refused rather than silently clamped, as `?days=0` is on analytics reports:
-           the response must not hide that the number was changed. */
         dupes(slug, ops, "?limit=0").andExpect(status().isBadRequest());
         dupes(slug, ops, "?limit=-3").andExpect(status().isBadRequest());
         dupes(slug, ops, "?limit=1000").andExpect(status().isBadRequest());
 
-        // The bound itself is inclusive, and the default is well inside it.
         dupes(slug, ops, "?limit=25").andExpect(status().isOk());
         dupes(slug, ops, "").andExpect(status().isOk());
+    }
+
+    private ResultActions dupesBatch(String query, String auth) throws Exception {
+        var request = get("/admin/society-candidates/duplicates" + query);
+        return mvc.perform(auth == null ? request : request.header(HttpHeaders.AUTHORIZATION, auth));
+    }
+
+    @Test
+    @DisplayName("one batch read answers each candidate exactly as its own read would, skipping unknown slugs")
+    void batchMatchesSingleReads() throws Exception {
+        User first = user("9866000080", "Kavya Mint");
+        User second = user("9866000081", "Rohan Mint");
+        String ops = staff("9866000082");
+
+        String original = slugOf(mint(first, body("Juniper Heights D252 Wakad"))
+                .andExpect(status().isCreated()));
+        String copy = slugOf(mint(second, body("Juniper Heights D252"))
+                .andExpect(status().isCreated()));
+
+        String single = dupes(copy, ops).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String singleOriginal = dupes(original, ops).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String json = dupesBatch("?slugs=" + copy + "&slugs=" + original + "&slugs=" + copy
+                + "&slugs=no-such-society-d252", ops)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['" + copy + "'][0].slug").value(original))
+                .andExpect(jsonPath("$['" + original + "'][0].slug").value(copy))
+                .andExpect(jsonPath("$['no-such-society-d252']").doesNotExist())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(json).contains(single).contains(singleOriginal);
+    }
+
+    @Test
+    @DisplayName("the batch refuses an empty, oversized or out-of-range request")
+    void batchBoundsAreRefused() throws Exception {
+        String ops = staff("9866000083");
+        String fiftyOne = "?slugs=" + String.join("&slugs=",
+                java.util.stream.IntStream.range(0, 51).mapToObj(i -> "s" + i).toList());
+
+        dupesBatch("", ops).andExpect(status().isBadRequest());
+        dupesBatch(fiftyOne, ops).andExpect(status().isBadRequest());
+        dupesBatch("?slugs=a&limit=0", ops).andExpect(status().isBadRequest());
+        dupesBatch("?slugs=a&limit=26", ops).andExpect(status().isBadRequest());
+        dupesBatch("?slugs=no-such-society-d252", ops)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("the batch is staff-only")
+    void batchIsStaffOnly() throws Exception {
+        User buyer = user("9866000084", "Tara Mint");
+        dupesBatch("?slugs=a", bearer(buyer)).andExpect(status().isForbidden());
+        dupesBatch("?slugs=a", null).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -578,7 +599,7 @@ class SocietyMintTest extends AbstractApiTest {
     void canonicalIdIsStored() throws Exception {
         User author = user("9866000077", "Canon Mint");
         when(places.details(any(), any())).thenReturn(Optional.of(
-                new Place("test-canonical-1", "Canon Towers D254", 18.5601, 73.8002, null, List.of("premise"))));
+                new Place("test-canonical-1", "Canon Towers D254", 18.5601, 73.8002, null, List.of("premise"), "Pune")));
 
         String id = idOf(mint(author, "{\"placeId\":\"test-alias-1\",\"name\":\"Canon Towers D254\"}")
                 .andExpect(status().isCreated()));
@@ -600,15 +621,18 @@ class SocietyMintTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.message").value("Adding societies is temporarily unavailable."));
     }
 
-
     private static String bodyAt(String name, double lat, double lng) {
         return "{\"placeId\":\"" + placeIdOf(name) + "\",\"name\":\"" + name
                 + "\",\"lat\":" + lat + ",\"lng\":" + lng + "}";
     }
 
     private void googleSays(String name, double lat, double lng, String... types) {
+        googleSaysIn("Pune", name, lat, lng, types);
+    }
+
+    private void googleSaysIn(String district, String name, double lat, double lng, String... types) {
         when(places.details(any(), any())).thenReturn(Optional.of(
-                new Place(placeIdOf(name), name, lat, lng, null, List.of(types))));
+                new Place(placeIdOf(name), name, lat, lng, null, List.of(types), district)));
     }
 
     @Test
@@ -637,25 +661,30 @@ class SocietyMintTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("a pin outside the served city is refused before Google is asked")
-    void outOfAreaHintNeverReachesGoogle() throws Exception {
+    @DisplayName("a building Google puts in a neighbouring district is refused, however close its pin")
+    void neighbouringDistrictIsRefused() throws Exception {
         User member = user("9866000073", "Away Mint");
+        googleSaysIn("Raigad", "Khopoli Court D253", 18.7900, 73.3400, "premise");
 
-        mint(member, bodyAt("Marine Drive Court D253", 19.0760, 72.8777))
+        mint(member, bodyAt("Khopoli Court D253", 18.7900, 73.3400))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.message").value("We only list societies in cities we serve."));
-        verify(places, never()).details(any(), any());
+                .andExpect(jsonPath("$.message").value("We only list societies in areas we serve."));
     }
 
     @Test
-    @DisplayName("a place Google locates outside the served city is refused too")
+    @DisplayName("a place Google locates outside the served district, or in no district, is refused")
     void outOfAreaGoogleLocationIsRefused() throws Exception {
         User member = user("9866000074", "Far Mint");
-        googleSays("Faraway Heights D253", 19.0760, 72.8777, "premise");
+        googleSaysIn("Mumbai", "Faraway Heights D253", 19.0760, 72.8777, "premise");
 
         mint(member, body("Faraway Heights D253"))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.message").value("We only list societies in cities we serve."));
+                .andExpect(jsonPath("$.message").value("We only list societies in areas we serve."));
+
+        googleSaysIn(null, "Nowhere Heights D253", 18.5204, 73.8567, "premise");
+        mint(member, body("Nowhere Heights D253"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("We only list societies in areas we serve."));
     }
 
     @Test

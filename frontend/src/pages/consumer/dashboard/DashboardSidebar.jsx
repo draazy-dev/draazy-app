@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import { firstName, initial, roleLabel } from '../../../lib/auth.js';
 
-/* Desktop sidebar navigation for the consumer Dashboard. */
 const groupCount = (group, attentionCounts) =>
   group.sections.reduce((sum, section) => sum + (attentionCounts[section.tab] || 0), 0);
 
@@ -64,7 +63,7 @@ export default function DashboardSidebar({ groups = [], activeTab, onSelect, att
                         >
                           <span className="min-w-0 flex-1 truncate">{tr('dashboard.tabs.' + section.tab, { defaultValue: section.label })}</span>
                           {(attentionCounts[section.tab] || 0) > 0 ? (
-                            <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-rose-500/20 px-1.5 text-[10px] font-bold text-rose-300">{attentionCounts[section.tab]}</span>
+                            <span className="dz-count bg-rose-500/20 text-rose-300">{attentionCounts[section.tab]}</span>
                           ) : null}
                         </button>
                       ))}

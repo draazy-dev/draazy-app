@@ -3,15 +3,11 @@ import Icon from '../../../components/Icon.jsx';
 import { digits } from '../../../lib/contact.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { applyGroupToListing, myFlatmateGroups } from '../../../services/flatmateService.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
-/* A failed load renders nothing rather than an error strip. */
 export function GroupApplyCard({ p, isIn, toast }) {
   const isRent = p?.deal === 'rent';
-  /* `p.id` is the slug (`p5015`) because the property routes accept slug-or-id; `p.uuid` is the
-   * same row's real key, and the fallback covers rows with no separate one. */
   const listingId = String(p?.uuid || p?.id || '');
-  /* `!!mine` is what keeps a signed-out visitor from reading as the owner: without it an empty mobile equals an empty
-     `ownerMobile` and every listing stating no owner looks like theirs. */
   const { user } = useAuth();
   const mine = digits(user?.mobile).slice(-10);
   const isOwnListing = !!mine && mine === digits(p?.ownerMobile || '').slice(-10);
@@ -39,8 +35,7 @@ export function GroupApplyCard({ p, isIn, toast }) {
       setDone(true);
       toast('Your group has applied.', 'success');
     } catch (e) {
-      /* The server's sentence verbatim. */
-      toast(e?.message || 'That did not go through. Please try again.', 'error');
+      toast(userMessage(e, 'That did not go through. Please try again.'), 'error');
     } finally {
       setBusy(false);
     }
@@ -88,4 +83,3 @@ export function GroupApplyCard({ p, isIn, toast }) {
   );
 }
 
-export default GroupApplyCard;

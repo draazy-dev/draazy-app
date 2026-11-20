@@ -6,30 +6,34 @@ import { call, entitlementsOf, openOrder, ownersApproveAll, pendingOrderId, sett
 
 const FREE_CONTACTS = 15;
 
-async function someListings(count) {
-  const res = await fetch(`${API}/properties?size=${count}`);
+async function someListings(count, size = count) {
+  const res = await fetch(`${API}/properties?size=${size}`);
   expect(res.status).toBe(200);
   const rows = (await res.json()).content;
   expect(rows.length, 'the seeded catalogue has listings to contact').toBeGreaterThanOrEqual(count);
-  return rows.map((r) => ({ id: r.id, ref: r.slug || r.id }));
+  return rows.map((r) => ({ id: r.id, ref: r.slug || r.id, deal: r.deal }));
 }
 
 const ask = (mobile, propertyId) => call('POST', '/contacts/request', mobile, { propertyId });
 
-/** A buyer who has spent every free contact, over HTTP: the subject is the press after the fifteenth. */
+/** A buyer who has spent every free contact, over HTTP: the subject is the press after the fifteenth.
+ * The next two listings are rent, because the pack bought afterwards is the rent pack and only opens rent listings. */
 async function exhaustedBuyer() {
   const mobile = uniqueMobile();
   await apiLogin(mobile);
-  const listings = await someListings(FREE_CONTACTS + 2);
-  for (const { id } of listings.slice(0, FREE_CONTACTS)) {
+  const listings = await someListings(FREE_CONTACTS + 2, 100);
+  const spent = listings.slice(0, FREE_CONTACTS);
+  const rentLeft = listings.slice(FREE_CONTACTS).filter((l) => l.deal === 'rent');
+  expect(rentLeft.length, 'two more rent listings to spend the pack on').toBeGreaterThanOrEqual(2);
+  for (const { id } of spent) {
     expect((await ask(mobile, id)).status, 'the free contacts are spendable in full').toBe(200);
     ownersApproveAll(mobile);
   }
-  return { mobile, next: listings[FREE_CONTACTS], another: listings[FREE_CONTACTS + 1] };
+  return { mobile, next: rentLeft[0], another: rentLeft[1] };
 }
 
 test.describe('LIVE: the contact pack', () => {
-  test('past the free contacts the modal offers the pack, checkout is one flat ₹199, and a paid pack opens fifteen more', async ({ page }) => {
+  test('past the free contacts the modal offers the rent pack, checkout is one flat ₹199, and a paid pack opens fifteen more', async ({ page }) => {
     test.slow();
     await seedConsent(page);
     const { mobile, next, another } = await exhaustedBuyer();
@@ -52,8 +56,7 @@ test.describe('LIVE: the contact pack', () => {
     });
 
     await test.step('checkout charges the flat price and opens an unpaid order', async () => {
-      await expect(page).toHaveURL(/\/checkout\?plan=contact-pack/);
-      await expect(page.getByRole('button', { name: /^Pay ₹199$/ }).first()).toBeVisible({ timeout: 20000 });
+      await expect(page).toHaveURL(/\/checkout\?plan=contact-pack(&|$)/);
       await page.getByRole('button', { name: /^Pay ₹199$/ }).first().click();
       await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible({ timeout: 20000 });
       expect((await ask(mobile, next.id)).status, 'an unpaid order opens nothing').toBe(422);
@@ -76,7 +79,7 @@ test.describe('LIVE: the contact pack', () => {
   test('the free contacts lapse thirty days after the first one, and the pack is then the way on', async () => {
     const mobile = uniqueMobile();
     const { accessToken } = await apiLogin(mobile);
-    const [first, second] = await someListings(2);
+    const [first, second] = (await someListings(2, 50)).filter((l) => l.deal === 'rent');
 
     expect((await ask(mobile, first.id)).status).toBe(200);
     const me = await call('GET', '/auth/me', mobile);

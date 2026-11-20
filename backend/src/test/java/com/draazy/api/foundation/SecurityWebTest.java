@@ -22,13 +22,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * End-to-end proof of the web-facing cross-cutting layer through the real filter chain: default-deny
- * → 401 envelope, role guard allow/deny → 403 envelope, and the correlation id echoed on every
- * response. Uses a throwaway test controller so no feature endpoint is needed.
- */
 class SecurityWebTest extends AbstractApiTest {
-
     @Autowired
     UserRepository userRepository;
 
@@ -81,7 +75,6 @@ class SecurityWebTest extends AbstractApiTest {
 
     @TestConfiguration
     static class TestEndpoints {
-
         @Bean
         TestController testController() {
             return new TestController();
@@ -90,7 +83,6 @@ class SecurityWebTest extends AbstractApiTest {
 
     @RestController
     static class TestController {
-
         @GetMapping("/test/secure")
         String secure(@CurrentUser Object user) {
             return "ok";

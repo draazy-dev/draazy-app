@@ -5,10 +5,8 @@ import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** The billing end of {@link ReferralTriggers}. */
 @Component
 class ReferralEvents implements ReferralTriggers {
-
     private final ReferralQualification qualification;
     private final ReferralClawbacks clawbacks;
 

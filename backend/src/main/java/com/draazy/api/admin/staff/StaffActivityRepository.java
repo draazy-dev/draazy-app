@@ -10,12 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Repository;
 
-/** Native SQL: {@code admin} may not import the modules it counts. Joins {@code u.id::text = a.actor}:
- * actor is free text, so a uuid cast would fail the whole query on one malformed row. */
 @Repository
 class StaffActivityRepository {
-
-    /** Consumers write audit rows too (contact reveals), so scope to back-office roles in SQL, not a filter. */
     private static final String BACK_OFFICE = "a.actor_role in ('staff', 'manager', 'admin')";
 
     private static final String FILTERS = """
@@ -130,7 +126,6 @@ class StaffActivityRepository {
         return out;
     }
 
-    /** Bound as ISO text and cast in SQL: a null {@code Instant} gives the driver no type to send. */
     private static Query bind(Query query, StaffActivityFilter filter) {
         query.setParameter("actor", filter.actor());
         query.setParameter("entity", filter.entity());

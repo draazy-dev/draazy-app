@@ -44,7 +44,8 @@ test.describe('My Rental — live', () => {
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
     // Meera owns the anchor listings, so the owner side of the dashboard is present…
-    await expect(page.getByRole('button', { name: /^Requests$/ }).first()).toBeVisible({ timeout: 15000 });
+    // The accessible name carries the pending-count badge ("Requests 7") whenever other specs leave asks open.
+    await expect(page.getByRole('button', { name: /^Requests( \d+)?$/ }).first()).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('button', { name: 'Rental', exact: true })).toHaveCount(0);
   });
 });

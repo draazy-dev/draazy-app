@@ -8,10 +8,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Lives in deals because it is the one context that ranks above leads, finance and catalog.
 @Service
 class OwnerRelationshipService implements OwnerRelationship {
-
     private final OwnerRelationshipQueries queries;
     private final ContactRequestRepository contactRequests;
     private final TenancyRepository tenancies;

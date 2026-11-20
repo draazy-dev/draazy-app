@@ -6,10 +6,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
-/** Counts and ratings arrive as arguments: they are computed over the merge family, not read off the row. */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface SocietyMapper {
-
     @Mapping(target = "listingCount", source = "listingCount")
     @Mapping(target = "avgRating", source = "avgRating")
     @Mapping(target = "reviewCount", source = "reviewCount")

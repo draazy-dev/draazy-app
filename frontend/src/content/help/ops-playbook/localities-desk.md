@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 23
-updated: 2026-10-12
+updated: 2026-11-06
 summary: How to read the Areas tab of Places, retire or restore an area, and who to tell about duplicates or missing pins.
 tags: [ops, internal, localities, directory]
 modules: [places]
@@ -41,7 +41,7 @@ modules: [places]
 
 ## What is on the page
 
-Open **Places** and pick the **Areas** tab. Places also holds the society tabs, shown only if you have the **Societies** function.
+Open **Places** and pick the **Areas** tab. Places also holds the **Duplicates** and **Society details** tabs, shown only if you have the **Societies** function. Those are covered in [Society moderation](/help/a/society-moderation).
 
 The note on the tab says: areas appear when someone picks them from Google Maps suggestions. Retiring an area stops new listings there; its existing listings and page stay. Restore reopens it.
 
@@ -67,7 +67,7 @@ The directory lists every area that is not retired. It also lists retired areas 
 Nobody types a locality in. It is created when an owner or a customer picks a place from the Google Maps suggestions. The system accepts it only if:
 
 - Google calls it a locality, neighbourhood or sub-locality. "Pune" on its own is refused.
-- It is inside Pune. Otherwise the person sees "Pick a locality in Pune."
+- It is inside a served district (Admin ▸ Settings ▸ Maps). Otherwise the person sees "Pick a locality in an area we serve."
 - It is not already there. A place with the same name within about 2.5 km is reused instead of making a new row.
 
 A retired area cannot be picked again. Anyone who picks it, by suggestion or by name, sees "That area isn't open for new listings." Only **Restore** reopens it.

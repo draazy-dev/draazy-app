@@ -4,6 +4,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface FlatmateRequestParties {
+    Optional<Pair> chattable(UUID requestId, UUID userId);
 
-    Optional<UUID> acceptedCounterparty(UUID requestId, UUID userId);
+    record Pair(UUID counterparty, String targetKind, UUID targetId) {
+    }
 }

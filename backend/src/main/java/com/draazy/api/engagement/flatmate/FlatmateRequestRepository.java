@@ -14,24 +14,31 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface FlatmateRequestRepository extends JpaRepository<FlatmateRequest, UUID> {
-
-    /** Re-read behind the advisory lock so duplicate asks return the contract's 409. */
     Optional<FlatmateRequest> findByKindAndTargetIdAndRequesterId(
             String kind, UUID targetId, UUID requesterId);
 
     List<FlatmateRequest> findByKindAndTargetId(String kind, UUID targetId);
 
-    /** Host inbox is paged because popular ads can collect hundreds of stranger asks. */
     Page<FlatmateRequest> findByHostIdOrderByRequestedAtDesc(UUID hostId, Pageable pageable);
 
     Page<FlatmateRequest> findByHostIdAndStatusOrderByRequestedAtDesc(
             UUID hostId, String status, Pageable pageable);
 
+    @Query("""
+            select r from FlatmateRequest r
+            where r.requesterId = :requesterId and (r.status = 'pending' or r.updatedAt >= :since)""")
+    List<FlatmateRequest> findSentSince(@Param("requesterId") UUID requesterId, @Param("since") Instant since);
+
+    @Query("""
+            select r from FlatmateRequest r
+            where r.hostId = :hostId and (r.status = 'pending' or r.updatedAt >= :since)""")
+    List<FlatmateRequest> findReceivedSince(@Param("hostId") UUID hostId, @Param("since") Instant since);
+
+    Optional<FlatmateRequest> findByIdAndRequesterId(UUID id, UUID requesterId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    /** Host-scoped by id, so deciding somebody else's request is a 404 rather than a 403. */
     Optional<FlatmateRequest> findByIdAndHostId(UUID id, UUID hostId);
 
-    /** Sort by {@code createdAt} to ride the requester's index; timestamps are set together. */
     Page<FlatmateRequest> findByRequesterIdOrderByCreatedAtDesc(UUID requesterId, Pageable pageable);
 
     Page<FlatmateRequest> findByRequesterIdAndStatusOrderByCreatedAtDesc(
@@ -43,10 +50,7 @@ public interface FlatmateRequestRepository extends JpaRepository<FlatmateRequest
             """)
     List<FlatmateInterestKeyDto> findKeysByRequesterId(@Param("requesterId") UUID requesterId);
 
-    /** Rate-limit interests by window because each one broadcasts a stranger's number. */
     long countByRequesterIdAndCreatedAtAfter(UUID requesterId, Instant since);
-
-    long countByKindAndTargetIdAndStatus(String kind, UUID targetId, String status);
 
     @Query("""
             select count(r) from FlatmateRequest r
@@ -58,4 +62,9 @@ public interface FlatmateRequestRepository extends JpaRepository<FlatmateRequest
     @Modifying
     @Query("delete from FlatmateRequest r where r.id = :id and r.status = 'pending'")
     int deleteIfPending(@Param("id") UUID id);
+
+    @Modifying
+    @Query("delete from FlatmateRequest r "
+            + "where (r.requesterId = :userId or r.hostId = :userId) and r.status = 'pending'")
+    int deletePendingInvolving(@Param("userId") UUID userId);
 }

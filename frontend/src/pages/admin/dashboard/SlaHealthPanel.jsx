@@ -1,7 +1,6 @@
 import { Link } from 'react-router';
 import { AlertTriangle } from 'lucide-react';
 
-/** `null` is "not measured" and stays grey: a missing rate must not read as 0% or as 100%. */
 function tone(rate) {
   if (rate == null) return 'text-gray-500';
   if (rate >= 90) return 'text-emerald-400';
@@ -21,28 +20,27 @@ const track = (label, t) => (t == null ? null : {
   label, rate: t.slaRatePct, target: t.targetHours, late: t.late,
 });
 
-/** The four tracks `GET /admin/dashboard` carries under `sla`; a track the server omits is not drawn. */
-function tracksOf(sla) {
+function tracksOf(sla, flatmates) {
   return [
     track('Listing approval', sla.listingApproval),
     track('Ticket pickup', sla.ticketPickup),
     track('Service delivery', sla.ticketDelivery),
     track('Concierge → Live', sla.conciergeToLive),
+    flatmates ? track('Flatmate review', sla.flatmateReview) : null,
   ].filter(Boolean);
 }
 
-export default function SlaHealthPanel({ sla }) {
+export default function SlaHealthPanel({ sla, flatmates }) {
   if (!sla) return null;
   return (
     <section aria-labelledby="sla-health-heading" data-testid="sla-health">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 id="sla-health-heading" className="text-lg font-bold">SLA health</h2>
         <span className="text-sm text-gray-500">Share of work finished inside target, and what is late right now</span>
-        {/* `tap-extend`: a text link on a heading baseline gets its 44px from a pseudo-element. */}
         <Link to="/admin/analytics?tab=sla" className="relative tap-extend ml-auto text-xs text-teal-400 hover:text-teal-300 transition-colors">View full analytics →</Link>
       </div>
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {tracksOf(sla).map((t) => (
+      <div className="mb-6 grid gap-4 sm:[grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+        {tracksOf(sla, flatmates).map((t) => (
           <div key={t.label} className="dz-card p-4">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-sm font-semibold text-gray-200">{t.label}</span>

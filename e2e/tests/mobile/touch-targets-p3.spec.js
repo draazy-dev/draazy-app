@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures/live.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 /* boundingBox() returns the painted box, so controls that extend their hit area with a transparent ::before
    are measured via the pseudo-element; see COVERAGE.md, "Unpainted tap targets". */
@@ -35,27 +36,20 @@ test.describe('Touch targets — controls the audit found under the floor', () =
     expect(painted, 'rail must still be drawn thin').toContain('6px');
   });
 
-  test('the plans carousel dots are hittable and unambiguous', async ({ page }) => {
+  test('the plans deal switch and "What\'s included" toggles are full-size taps', async ({ page }) => {
     await consent(page);
     await page.goto('/plans');
 
-    const dots = page.locator('button[aria-current], button:has(> span[aria-hidden="true"].rounded-full)');
-    const first = dots.first();
-    await expect(first).toBeVisible();
-
-    const a = await first.boundingBox();
-    // 24x44: the WCAG 2.5.8 AA floor on the axis that is constrained, full height on
-    // the axis that is free. See the comment in Plans.jsx for why not 44x44.
-    expect(a.width, 'dot target width').toBeGreaterThanOrEqual(24);
-    expect(a.height, 'dot target height').toBeGreaterThanOrEqual(40);
-
-    // Adjacent targets must not overlap — two dots sharing pixels is worse than two
-    // small dots, because neither tap goes where the user aimed.
-    const count = await dots.count();
-    if (count > 1) {
-      const b = await dots.nth(1).boundingBox();
-      expect(b.x, 'adjacent dots must not overlap').toBeGreaterThanOrEqual(a.x + a.width - 1);
+    const radios = page.getByTestId('plans-deal-switch').getByRole('radio');
+    await expect(radios.first()).toBeVisible();
+    for (const radio of await radios.all()) {
+      const box = await radio.boundingBox();
+      expect(box.height, 'deal switch tap height').toBeGreaterThanOrEqual(40);
+      expect(box.width, 'deal switch tap width').toBeGreaterThanOrEqual(44);
     }
+
+    const summary = page.locator('summary', { hasText: "What's included" }).first();
+    expect((await summary.boundingBox()).height, 'disclosure tap height').toBeGreaterThanOrEqual(44);
   });
 
   test('the property gallery dot rail meets the 24px its own comment promises', async ({ page }) => {
@@ -77,6 +71,9 @@ test.describe('Touch targets — controls the audit found under the floor', () =
   test('the budget slider value labels can be tapped to type a figure', async ({ page }) => {
     await consent(page);
     await page.goto('/listings');
+    // The slider lives in the filter card, which is hidden until opened on a phone.
+    await page.locator('.filter-fab').click();
+    await expect(page.locator('.filter-panel')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
 
     const val = page.locator('.rng-val').first();
     await expect(val).toBeVisible();
@@ -107,6 +104,7 @@ test.describe('Admin shell on a field phone', () => {
     await consent(page);
     await login.asAdmin();
     await page.getByRole('button', { name: 'Open menu', exact: true }).click();
+    await expandAdminNav(page);
 
     const nav = page.locator('aside nav');
     const last = nav.getByRole('link').last();
@@ -120,6 +118,25 @@ test.describe('Admin shell on a field phone', () => {
     await expect(page).toHaveURL(new RegExp(`${href}$`));
   });
 
+  test('the drawer carries the Post on Behalf and View live site actions the phone top bar has no room for', async ({ page, login }) => {
+    await consent(page);
+    await login.asAdmin();
+    const drawer = page.locator('aside');
+    await page.getByRole('button', { name: 'Open menu', exact: true }).click();
+
+    const live = drawer.getByRole('button', { name: 'View live site', exact: true });
+    await expect(live).toBeVisible();
+    expect((await live.boundingBox()).height, 'View live site hit height').toBeGreaterThanOrEqual(44);
+
+    await drawer.getByRole('button', { name: 'Post on Behalf', exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/post-on-behalf$/);
+    await expect(drawer).toHaveCSS('transform', /matrix\(1, 0, 0, 1, -\d+/);
+
+    await page.getByRole('button', { name: 'Open menu', exact: true }).click();
+    await live.click();
+    await expect(page).toHaveURL(/\/$/);
+  });
+
   test('on desktop the side rail stays put and scrolls on its own', async ({ page, login }) => {
     await page.setViewportSize({ width: 1280, height: 700 });
     await consent(page);
@@ -128,9 +145,12 @@ test.describe('Admin shell on a field phone', () => {
 
     const rail = page.locator('aside');
     const nav = rail.locator('nav');
-    await expect(nav.getByRole('link').first()).toBeVisible();
-    await page.evaluate(() => window.scrollTo(0, 2000));
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    await expandAdminNav(page);
+    // Retried inside the poll: the report content arrives after the rail, and a short page cannot scroll yet.
+    await expect.poll(() => page.evaluate(() => {
+      window.scrollTo({ top: 2000, behavior: 'instant' });
+      return window.scrollY;
+    })).toBeGreaterThan(0);
     expect((await rail.boundingBox()).y, 'rail must not scroll away with the page').toBe(0);
 
     const last = nav.getByRole('link').last();

@@ -24,24 +24,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Contract and behaviour proof for `/me/rentals` — the tenant's own record of the home they already rent, which is what
-// Isolation.
 @DisplayName("Self-declared rentals — the tenant's own record, scoped to nobody else")
 class TenantRentalEndpointsTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @Autowired TenantRentalRepository rentals;
 
     private User tenant(String mobile) {
-
         User u = new User(mobile, "buyer");
         u.setName("Rental Tenant " + mobile.substring(6));
         u.setMobileVerified(true);
         return users.saveAndFlush(u);
     }
 
-    // A bare `LocalDate.now()` reads the JVM's zone, a day behind IST after 18:30 on a UTC host, so the test reads
-    // the service's clock.
     private static LocalDate today() {
         return LocalDate.now(PlatformTime.IST);
     }
@@ -73,12 +67,8 @@ class TenantRentalEndpointsTest extends AbstractApiTest {
         mvc.perform(get("/me/rentals").header(HttpHeaders.AUTHORIZATION, bearer(me)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
-        // Deliberately not asserting the row is still `active` afterwards. AbstractApiTest is @Transactional, so
-        // every request here joins the test's transaction.
     }
 
-    // A lease entirely in the future accrues nothing rather than a negative count — the create
-    // request deliberately allows it, because signing next month's lease is a real fact.
     @Test
     @DisplayName("a lease that has not started yet accrues nothing")
     void futureLeaseAccruesNothing() throws Exception {
@@ -94,8 +84,6 @@ class TenantRentalEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.fyPaid").value(0));
     }
 
-    // Soft, not hard. A tenant who deletes the wrong lease has otherwise lost a year of their own
-    // record, and the row is still the evidence behind an HRA figure they may already have filed.
     @Test
     @DisplayName("an ended lease stops accruing at leaseEnd")
     void endedLeaseStopsAccruing() throws Exception {
@@ -123,12 +111,9 @@ class TenantRentalEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalPaid").value(90000));
     }
 
-    // ---- isolation ----
     static Stream<Arguments> patchesThatAreRefused() {
         LocalDate start = LocalDate.now(PlatformTime.IST).minusMonths(2);
         return Stream.of(
-                // A null leaseEnd means "still running" to the derivation, so ending without one would
-                // leave the lease accruing an instalment a month for ever.
                 Arguments.of("ending a lease without a leaseEnd", "{\"status\":\"ended\"}"),
                 Arguments.of("a leaseEnd before the leaseStart, an integrity violation if it got through",
                         "{\"leaseEnd\":\"%s\"}".formatted(start.minusDays(1))),

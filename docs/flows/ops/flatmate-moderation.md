@@ -12,17 +12,14 @@
 - **Persona:** a trust-and-safety operator running the flatmate side of the marketplace.
 - **Job-to-be-done:** "Stop the fake, brokered or abusive share posts before a seeker meets a
   stranger through them, and clear the honest ones quickly enough that honest supply still bothers."
-- **Why it matters:** Flatmates is the one place on the platform where strangers agree to share a
-  home. Rooms and groups with a flat start invisible and this desk is what makes them visible, so a
-  backlog here is not a queue getting long - it is a marketplace with no supply. Seeker posts and
-  hunting groups (no flat to verify) go live at once and arrive here as *Live · not yet reviewed*
-  re-checks, to be cleared with **Looks fine** or pulled.
+- **Why it matters:** Flatmates is the one place where strangers agree to share a home. Rooms and
+  groups with a flat start invisible and this desk makes them visible, so a backlog here is a
+  marketplace with no supply. Seeker posts and hunting groups (no flat to verify) go live at once and
+  arrive as *Live · not yet reviewed* re-checks, cleared with **Looks fine** or pulled.
 
-> **Why this desk exists at all.** A retired `/admin/flatmates` screen already moderated seekers,
-> groups and applications. Converting it would have been the smaller change, but it
-> only ever knew **one** of the two verdicts a flatmate row carries, has never been able to show a
-> group application (nothing could create one), and cannot see rooms at all. This page is the whole
-> surface, live.
+> **Why this desk exists at all.** The retired `/admin/flatmates` screen only knew **one** of the two
+> verdicts a flatmate row carries, could never show a group application (nothing could create one),
+> and could not see rooms. This page is the whole surface, live.
 
 ---
 
@@ -30,15 +27,20 @@
 - **Route:** `/ops/flatmate-review`, inside the back-office guard. Nav entry "Flatmate"
   (`AdminLayout.jsx`).
 - **Source components:**
-  - `src/pages/ops/OpsFlatmateReview.jsx` - the page: three tabs (Pending / Published / Hidden &
-    removed) over one card list, and the popup.
-  - `src/pages/ops/flatmate/useFlatmateQueue.js` - fans out to every source a tab covers and merges
-    them into one list keyed by post id (a badge claim keys on its room/group id), so one flat is
-    one card with every reason it is waiting.
+  - `src/pages/ops/OpsFlatmateReview.jsx` - the page: four tabs (Pending / Badge requests / Published
+    / Hidden & removed) over one card list, and the popup.
+  - `src/pages/ops/flatmate/useFlatmateQueue.js` - fans out to every source a tab covers and builds
+    one list keyed by post id (a badge claim keys on its room/group id). **Pending** is moderation
+    rows plus group applications; **Badge requests** is only the open Verified property claims
+    (`GET /admin/flatmate-reviews?status=pending`), oldest first, since it is an SLA queue; the
+    other tabs are newest first. A room awaiting publish that also claims the badge shows once in
+    each tab, one decision per tab.
   - `src/pages/ops/flatmate/FlatmateQueueCard.jsx` - the card: type, headline, reason chips, Review.
   - `src/pages/ops/flatmate/FlatmateReviewModal.jsx` + `review-modal/` - the popup. `PostDetails`
-    (photos, free text, details, host), `BadgeSection` (verification axis), `DecisionSection`
-    (publication axis, including "Looks fine" for a re-check).
+    (photos, free text, details, host), `BadgeRequestBanner` ("Host is seeking the Verified property
+    badge", the claim basis and when it was requested; shown when the popup opens from a Badge
+    requests card), `BadgeSection` (verification axis), `DecisionSection` (publication axis,
+    including "Looks fine" for a re-check).
   - `src/pages/ops/flatmate/board.jsx` - `Tabs`, `QueueState`, `Block`, `fmtDate`.
   - `src/services/flatmateService.js` -> `providers/http/flatmateProvider.js` ->
     `flatmateModerationMapper.js`.
@@ -69,8 +71,8 @@ account holds them; a stored per-user document can narrow that, never widen it.
 ## 5. Business rules & logic  *(the meat)*
 
 ### 5.1 Two axes that cannot reach each other
-A flatmate row carries two independent verdicts, and conflating them is the failure mode this desk
-is designed against:
+A flatmate row carries two independent verdicts; conflating them is the failure mode this desk is
+designed against:
 
 | Axis | Question | Field | Board |
 |------|----------|-------|-------|
@@ -78,12 +80,12 @@ is designed against:
 | Moderation | may the city see this? | `mod_status` | Moderation |
 
 Approving a verification **does not publish the post**, and publishing a post **grants no badge**.
-Both directions are asserted in `ops/flatmate-moderation.spec.js`, because a desk that quietly
-did either would look correct on every screenshot.
+Both directions are asserted in `ops/flatmate-moderation.spec.js`, because a desk that quietly did
+either would look correct on every screenshot.
 
-A group application adds a third column that is not this desk's at all: `status`
+A group application adds a third column that is not this desk's: `status`
 (`pending`/`accepted`/`declined`) belongs to the flat's owner, who answers it from their dashboard.
-The desk writes `mod_status` and leaves `status` exactly where it found it.
+The desk writes `mod_status` and leaves `status` where it found it.
 
 ### 5.2 What reaches the Verification board
 `FlatmateSupplyService.enqueueReviewIfNeeded` writes a review row when the host claims the
@@ -91,26 +93,53 @@ The desk writes `mod_status` and leaves `status` exactly where it found it.
 the flat is the claim the review exists to check, and a self-declared owner is checked by the
 ownership flow instead.
 
+**Verified property** is the flat's badge, and posting never needs it (badge, never a gate). It is earned
+two ways:
+
+- **Tenant-hosted room, or tenant-hosted group that holds its flat** (not hunting, not a split room):
+  the host has submitted their ID (verified or still in review; otherwise 409 `identity_required`
+  when requesting or attaching an agreement to a group), and approval needs it verified (422, and the
+  auto-approval sweep skips them). The host files a **rent agreement with its `validFrom`/`validTill`
+  period** or an **electricity bill naming the flat
+  owner** from their personal vault (categories `Rent agreement` / `Electricity Bill`) via
+  `POST /flatmates/rooms/{id}/badge-request` or `/flatmates/groups/{id}/badge-request`, and the flat
+  owner consents (OTP or WhatsApp notice). The stated period is shown to staff and prefills their
+  end-date check; the badge expiry still comes from the staff-entered date. The consumer picks the
+  post in Dashboard → Documents → Property docs, alongside their listings.
+- **Owner-hosted room or group:** owner tier only when it links to the caller's own property that is
+  approved, not archived and currently carries the owner's **ID verified** badge. An approved but un-badged
+  listing gets the identity tier. A split room inherits its parent's badge; the `OwnershipVerified`
+  event (published when ownership is granted) promotes identity-tier split rooms and groups, and the
+  reconciler demotes them again when the badge is revoked or lapses.
+
+Staff open the filed document with `GET /admin/flatmate-reviews/{id}/document-url` (signed link;
+pending, or 30 days after the decision, else 403 `document_access_expired`; audited
+`flatmate.review.document.open`; a party to the post is refused).
+
+Approving a tenant claim needs the reviewer's `checks`: `nameMatches` and `addressMatches` true, plus
+`validTill` (agreement, after today) or `issuedOn` (bill, not future, at most 90 days old). Otherwise
+422 naming what is missing. The badge runs to `min(validTill, today + 11 months)` for an agreement and
+`today + 11 months` for a bill; the expiry sweep lapses it. The checks are stored on the review and
+cleared when the host files again or edits the post.
+
 Tabs: Pending, **Contested address** (`status=pending&flagged=true`), **Ops-verified**, Rejected,
-All. "Contested address" rather than "Flagged", because that is what the flag means - two hosts
-claiming the same flat - and a desk reading a generic word invents its own meaning for it.
+All. "Contested address" rather than "Flagged", because the flag means two hosts claiming the same flat.
 
 ### 5.3 A rejection must carry a reason
 The desk refuses a blank one ("Add a clear reason before rejecting") and
-`FlatmateModerationService.decideReview` refuses it again: *"A rejection needs a reason - the host is
-always told why."* Two guards for one rule, because the client one is a courtesy and the server one
-is the rule. A host told "no" without being told why cannot fix anything, and will simply post again.
+`FlatmateBadgeReviewService.decideReview` refuses it again: *"A rejection needs a reason - the host is
+always told why."* The client guard is a courtesy, the server one is the rule. A host told "no"
+without why cannot fix anything, and will simply post again.
 
-### 5.4 The host's mobile number is masked
-`FlatmateReviewDto` carries the number in full; `flatmateModerationMapper.js` renders it as
-`••••• 1234`. A **deliberate divergence from the DTO's own javadoc**, on the ruling that this desk
-decides on the declaration and the agreement document and should never need to ring anyone - a desk
-that can phone a host can be socially engineered into doing it on somebody else's behalf.
+### 5.4 The author's mobile number is shown in full
+`FlatmateReviewDto` and the queue cards carry the number in full (`hostMobile` on
+`FlatmateReviewRow`, `authorMobile` on `FlatmateModerationRow`, `applicantMobile` on the staff
+group-application list), as on every back-office surface. The owner's inbox gets no
+`applicantMobile`.
 
 ### 5.5 The moderation vocabulary, and the two words that are missing
-Kinds: `post` / `room` / `group`, one board at a time - three tables, and a merged board would have
-to load every pending row to sort it, or report a `totalElements` that is true of one table and
-false of the screen.
+Kinds: `post` / `room` / `group`, one board at a time — a merged board would have to load every
+pending row to sort it, or report a `totalElements` true of one table and false of the screen.
 
 States: Pending, **Published** (`approved`), Flagged, Removed, **Live** (self-published).
 
@@ -118,24 +147,65 @@ States: Pending, **Published** (`approved`), Flagged, Removed, **Live** (self-pu
   that nobody has looked at yet, or that was edited since, shows on Pending as a re-check; the
   re-check strip's **Looks fine** stamps it `approved`.
 - `rejected` is **absent deliberately**. The shared vocabulary has it and the server would accept
-  it, but on this axis it means exactly what `removed` means, and two words for "not published" is
-  an invitation for a desk to use them inconsistently and then be unable to report on either.
+  it, but on this axis it means exactly what `removed` means, and two words for "not published"
+  invite inconsistent use and unreportable data.
+- `expired` is set by the expiry sweep, never by the desk. It lists under **Hidden & removed** and
+  counts there, and the Decision section offers only Remove (with a note), the one verdict accepted on
+  it, so a report takedown sticks; any other verdict is a 409, because only the host's renewal
+  revives it, and renewing a removed item leaves it removed.
 
 ### 5.6 The free text is never truncated
 The Moderation board renders `note` in full, never behind a "show more". It is where a phone number
 goes when the contact field will not take one, so a moderator who cannot read all of it cannot do
-the job the board exists for.
+the job.
 
 ### 5.7 Publishing is not silent
-Every decision writes an audit row and notifies the author. Flag and Remove take an internal note;
-Publish does not, because withholding needs an explanation and permitting does not.
+Every decision writes an audit row (`from`, `modStatus`, `note`). Flag, Remove and Reject **require**
+an internal note (400 without one), and so does publishing something that was removed or rejected:
+withholding, and undoing a withholding, need an explanation a later moderator can read. A first
+Publish does not. The author is told only when the item goes public, or is removed or rejected; the
+internal note is never sent to them. Re-stamping the current state is a no-op unless it clears a
+re-check (audited as `flatmate.recheck.clear`). The expiry clock restarts only when an item goes public.
+
+### 5.8 Publication parity with properties (FM-TRUST-3)
+Rooms and groups that hold a flat are checked like a property. The popup shows a three-tick
+checklist (photos are real, not a duplicate, details look right) stored as a case file on
+`property_reviews`; **Publish stays disabled until all three are ticked**, and
+`PATCH /admin/flatmates/{id}/moderation` answers 409 `checklist_incomplete` if called without them.
+Only a move into public is gated: Hide and Remove need no ticks, and an already public post is not
+re-gated. Seeker posts and hunting groups stay live-first and are reviewed after (no checklist).
+Posting never needs an ID or property badge (ADR-019); the badges are separate decisions.
+
+### 5.9 Needs info and the Support thread (FM-TRUST-4)
+On a **pending** post the desk can pick a reason code (`photos_not_real`, `duplicate`, `broker`,
+`wrong_details`, `locality_unclear`, `document_unreadable`, `name_mismatch`, `other`) and press
+**Needs info**. The post stays pending and off the board; the reason and note are posted into the
+host's "Messages from Draazy Support" thread (the same `review_messages` model as properties) and
+the host is notified. The case shows "Needs info" on the card; once the host replies or edits, the
+case reopens (`in_review`), the ticks reset, and the card shows "Host replied (N)" until the desk
+reads it. Needs info on a post that is not pending is 409 `needs_info_not_pending`.
 
 ---
 
 ## 6. Maker-checker / approval
-The host is the maker (they post, they declare a tier, they upload an agreement); this desk is the
-checker. There is no second checker - a single staffer's decision is final, which is acceptable
-because both decisions are reversible from the same board and both are audited.
+The host is the maker (they post, declare a tier, upload an agreement); this desk is the checker.
+There is no second checker — a single staffer's decision is final, acceptable because moderation is
+reversible from the same board and audited.
+
+- **No self-checking (403).** A staffer cannot moderate, desk-edit or decide the badge of an item they
+  authored or whose group they belong to, nor moderate a group application they made, one from a
+  group they belong to, or one to a flat they own. Staff accounts cannot join groups, send interest or
+  split a flat, so they never become a party. A staffer with a second, unlinked consumer account is a
+  residual risk this rule cannot see.
+- **A decided badge review is terminal.** The same verdict again is an idempotent 200; a different one
+  is a 409. It reopens only when the host edits the post or the trust reconciler re-queues it.
+- **A taken-down application is frozen.** Once the desk hides or removes it, the owner's accept or
+  decline is a 409. The verdict and the owner's decision serialise on the listing lock, so neither
+  overwrites the other; a badge verdict, renewal and the expiry sweep likewise lock the post first.
+  Restoring a removed application the owner had accepted is a 409 once another group holds the flat,
+  or when its own group is no longer live.
+- **Owner consent never republishes.** Recording an owner's OTP consent writes only the consent flags,
+  so a takedown or a decided review that lands meanwhile is kept.
 
 ---
 
@@ -145,29 +215,37 @@ because both decisions are reversible from the same board and both are audited.
 verification:  pending --approve--> approved (badge granted)
                pending --reject(reason)--> rejected
 
+verification:  approved/rejected --other verdict--> 409 (terminal)
+               approved --revoke(reason)--> rejected  (badge removed, host told; 409 not_approved otherwise)
 moderation:    pending --Publish--> approved (public)
-               pending --Flag--> flagged
+               pending --Flag(note)--> flagged
                pending --Remove(note)--> removed
                live --Looks fine--> approved   (re-check: new post / edited)
-               live --Flag/Remove--> flagged/removed
+               live --Flag/Remove(note)--> flagged/removed
+               removed/rejected --Publish(note)--> approved
+               expired --Remove(note)--> removed   (renew keeps it removed)
+               expired --other--> 409 (host renews)
 
-application:   mod_status live --Clear/Flag/Remove--> approved/flagged/removed
+application:   mod_status live --Clear/Flag(note)/Remove(note)--> approved/flagged/removed
                status pending --(owner, elsewhere)--> accepted/declined
 ```
 
 ---
 
 ## 8. Edge cases, validation & error states
-- **The API is unreachable:** the page renders a panel saying it needs the live API, rather than an
-  empty queue. An empty queue and a disconnected queue look identical, and one of them means "the
-  backlog is clear".
+- **The API is unreachable:** the page renders a panel saying it needs the live API, not an empty
+  queue — the two look identical, and an empty one means "the backlog is clear".
 - **A decided row leaves its tab.** Every assertion about the *result* of a decision has to follow
-  the row to where it went - that is queue behaviour, not a bug.
+  the row to where it went (queue behaviour, not a bug).
+- **Tab counts.** `GET /admin/flatmates/moderation/summary` returns `pending` (awaiting posts,
+  re-checks and group applications - badge claims are not in it), `badgeRequests` (every open claim
+  on a post that is still on the board, the same rows the Badge requests tab lists), `published`
+  and `hidden`. The tab id `badge` reads `badgeRequests`.
 - **`Badge` is a translation layer.** `pending` renders as **Under Review**. Consult
   `components/ui/Badge.jsx` before asserting a status word anywhere near this desk.
 - **Size:** each tab reads up to 100 rows per source (the API's page ceiling). Past that the count
-  line says the list is partial, rather than showing a short queue as if it were complete. Any
-  source failing fails the tab: a queue missing a third of its rows would read as "nothing to do".
+  line says the list is partial. Any source failing fails the tab: a queue missing a third of its
+  rows would read as "nothing to do".
 
 ---
 
@@ -183,8 +261,8 @@ application:   mod_status live --Clear/Flag/Remove--> approved/flagged/removed
 ## 10. Contract note - four routes that are not in the OpenAPI contract
 
 The contract described `GET`/`PATCH /admin/group-applications`: an admin board over a table nothing
-could write to. Wave 2c part 3 built the missing write path, which meant adding four routes the
-contract does not name:
+could write to. Wave 2c part 3 built the missing write path, adding four routes the contract does not
+name:
 
 | Route | Why |
 |-------|-----|
@@ -198,10 +276,17 @@ This is an **intentional extension**, not drift.
 ---
 
 ## 11. Test coverage
-- `e2e/tests/ops/flatmate-moderation.spec.js` - 9 tests: the three-tab layout, every decision taken
-  through the popup, plus the retired `/admin/flatmates` route, live.
-- `e2e/tests/ops/flatmate-review.spec.js` - 1 test: the offline panel, which is the only claim that
-  has to be checked with the API unreachable. The three consumer-facing verification cues moved to
+- `e2e/tests/ops/flatmate-moderation.spec.js` - 10 tests: the four-tab layout, a tenant claim living
+  on Badge requests (with its banner) and not on Pending, every decision taken through the popup,
+  plus the retired `/admin/flatmates` route, live.
+- `e2e/tests/ops/flatmate-trust-desk.spec.js` - 4 tests: the three-tick Publish gate for a room and a
+  flat-holding group, a live-first seeker post, and Needs info with the host's reply.
+- `e2e/tests/consumer/flatmates/support-thread.spec.js` - 4 tests: the dashboard status card, the
+  Support thread reply, the ID verified card and the badge copy.
+- `backend/src/test/java/com/draazy/api/engagement/flatmate/FlatmateCaseFileTest.java` - the tick
+  gate, live-first kinds, Needs info, unread counts, `verifiedOnly` and the agreement migration.
+- `e2e/tests/ops/flatmate-review.spec.js` - 1 test: the offline panel, the only claim that has to be
+  checked with the API unreachable. The three consumer-facing verification cues moved to
   `e2e/tests/consumer/flatmates/review-status.spec.js`, where each label is earned through a
   real Ops decision rather than seeded.
 - `e2e/tests/consumer/flatmates/group-apply.spec.js` - 2 tests, the consumer loop that fills

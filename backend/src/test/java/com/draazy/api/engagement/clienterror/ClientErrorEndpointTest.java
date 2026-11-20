@@ -21,7 +21,6 @@ import org.springframework.test.web.servlet.ResultActions;
 
 @DisplayName("POST /client-errors — the browser's crash report")
 class ClientErrorEndpointTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -35,7 +34,6 @@ class ClientErrorEndpointTest extends AbstractApiTest {
 
     private static final AtomicInteger ADDRESSES = new AtomicInteger();
 
-    // Budgets live in a store shared across the context, so each test reports from its own address.
     private final String address = "10.9.0." + ADDRESSES.incrementAndGet();
 
     private ResultActions send(String json, String authorization) throws Exception {

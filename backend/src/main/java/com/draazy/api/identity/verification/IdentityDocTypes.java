@@ -2,9 +2,7 @@ package com.draazy.api.identity.verification;
 
 import java.util.Set;
 
-// Mirrors the CHECK on identity_verifications.doc_type.
 public final class IdentityDocTypes {
-
     private IdentityDocTypes() {
     }
 

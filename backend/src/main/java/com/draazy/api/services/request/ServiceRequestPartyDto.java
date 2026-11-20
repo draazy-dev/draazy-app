@@ -1,5 +1,6 @@
 package com.draazy.api.services.request;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 
 public record ServiceRequestPartyDto(
@@ -13,5 +14,11 @@ public record ServiceRequestPartyDto(
         String mobile,
         boolean pending,
         String invitedBy,
-        Instant createdAt) {
+        Instant createdAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Boolean whatsappQueued) {
+
+    ServiceRequestPartyDto withWhatsappQueued(Boolean queued) {
+        return new ServiceRequestPartyDto(id, requestId, requestType, role, partyIndex, status, party, mobile,
+                pending, invitedBy, createdAt, queued);
+    }
 }

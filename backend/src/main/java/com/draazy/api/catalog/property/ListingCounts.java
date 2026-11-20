@@ -9,10 +9,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Counts are computed because cached listing_count columns are not maintained. */
 @Service
 public class ListingCounts {
-
     private final PropertyRepository properties;
 
     public ListingCounts(PropertyRepository properties) {
@@ -24,30 +22,30 @@ public class ListingCounts {
         if (societyIds.isEmpty()) {
             return Map.of();
         }
-        return toMap(properties.countLiveBySocietyId(PropertyStatus.APPROVED, societyIds), k -> (UUID) k);
+        return toMap(properties.countLiveBySocietyId(PropertyStatus.APPROVED, societyIds,
+                Freshness.dormantCutoff(Instant.now())), k -> (UUID) k);
     }
 
-    /** City names are free text, so both query and callers lower-case before matching. */
     @Transactional(readOnly = true)
     public Map<String, Long> byCity() {
-        return toMap(properties.countLiveByCity(PropertyStatus.APPROVED), k -> (String) k);
+        return toMap(properties.countLiveByCity(PropertyStatus.APPROVED,
+                Freshness.dormantCutoff(Instant.now())), k -> (String) k);
     }
 
-    /** Lives here because "live" means approved and unarchived in the catalogue. */
     @Transactional(readOnly = true)
     public long forOwner(UUID ownerId) {
-        return properties.countByOwnerIdAndStatusAndArchivedFalse(ownerId, PropertyStatus.APPROVED);
+        return properties.countPublicByOwner(ownerId, PropertyStatus.APPROVED,
+                Freshness.dormantCutoff(Instant.now()));
     }
 
-    /** Whole-catalogue headline: three counts in one statement. */
     @Transactional(readOnly = true)
     public TrustStatsResponse trustStats() {
-        TrustTally tally = properties.tallyTrust(PropertyStatus.APPROVED, Instant.now());
+        Instant now = Instant.now();
+        TrustTally tally = properties.tallyTrust(PropertyStatus.APPROVED, now, Freshness.dormantCutoff(now));
         return new TrustStatsResponse(
                 tally.verifiedListings(), tally.totalListings(), tally.verifiedOwners());
     }
 
-    /** Confine JPQL's {@code Object[]} casts here so callers never see untyped arrays. */
     private static <K> Map<K, Long> toMap(
             Iterable<Object[]> rows, Function<Object, K> keyCast) {
         return java.util.stream.StreamSupport.stream(rows.spliterator(), false)

@@ -1,12 +1,13 @@
 /* Negative assertions are anchored on live-rendered positives so a missing page, mock fallback or
    typo cannot pass as a successful removal. */
 import { test, expect } from '../../fixtures/live.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 async function openAdmin(page, path) {
   await page.goto(path);
 }
 
-test('/admin/support serves the Support queue, and the sidebar offers it beside the service desks', async ({ page, login, consoleErrors }) => {
+test('/admin/support serves Support chats, and the sidebar offers it beside the service desks', async ({ page, login, consoleErrors }) => {
   await login.asAdmin();
   await test.step('/admin/support is its own desk and loads clean', async () => {
     await openAdmin(page, '/admin/support');
@@ -14,13 +15,14 @@ test('/admin/support serves the Support queue, and the sidebar offers it beside 
 
     /* The tab counts, not the shared heading, prove the route reached a served desk rather than an
        API-disabled notice or a blank route. */
-    await expect(page.getByRole('heading', { name: 'Support queue' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Support chats' })).toBeVisible();
     await expect(page.getByTestId('tab-count-all')).toHaveText(/^[\d,]+$/);
 
     expect(consoleErrors).toHaveLength(0);
   });
-  await test.step('the sidebar offers the Support queue and the Home Loans desk, and no Services overview', async () => {
+  await test.step('the sidebar offers Support chats and the Home Loans desk, and no Services overview', async () => {
     await openAdmin(page, '/admin');
+    await expandAdminNav(page);
 
     await expect(page.locator('nav a[href="/admin/home-loans"]').first()).toBeVisible();
     await expect(page.locator('nav a[href="/admin/services"]')).toHaveCount(0);

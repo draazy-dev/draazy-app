@@ -24,9 +24,11 @@
 - **Query params carried in:** `?next=<path>` (post-auth return), `?reason=<key>` (explicit intent
   copy), `?mobile=<digits>`, `?new=1` (sign-in bounced an unknown number to sign-up), `?ref=<code>`
   (referral, applied on sign-up).
-- **Triggers:** `ProtectedRoute` redirects (`/signin?next=...`), the header account button, the
-  "Sign In / Sign Up" nav links, and every in-page gate (contact owner, save, alerts, schedule
-  visit, list property).
+- **Triggers:** `ProtectedRoute` redirects (`/signin?next=...`), the header account button and the
+  "Sign In / Sign Up" nav links. In-page gates (contact owner, save, alerts, schedule visit, list
+  property, …) never come here: `useSignInGate(reason, next, resume)` opens the `InlineOtpSheet` over the
+  current page (`src/context/SignInGateContext.jsx`), then lands on `next` if it is elsewhere and runs
+  `resume`, so the tapped action completes without a re-tap.
 - **Source components:** `Signin.jsx`, `Signup.jsx`, shared auth kit under
   `src/components/auth/` (`useOtpFlow.js`, `OtpBoxes.jsx`, `AuthShell.jsx`, `MobileAuthIntro.jsx`),
   `MobileField.jsx`, `src/lib/authIntent.js`, `src/lib/auth.js`, `src/context/AuthContext.jsx`,
@@ -34,57 +36,49 @@
 
 ## 3. Actors & roles
 - **Anyone** can open `/signin` and `/signup` (public routes).
-- **Role selection:** the consumer sign-up currently hardcodes `role = 'buyer'`
+- **Role selection:** the consumer sign-up hardcodes `role = 'buyer'`
   (`const [role] = useState('buyer')` in `Signup.jsx`); there is no owner/buyer picker on the form.
-  A returning member's role is restored from the local registry on sign-in (see below). Owner
-  capabilities appear once a user posts a listing; the role label is cosmetic today.
+  Owner capabilities appear once a user posts a listing; the role label is cosmetic today.
 - **Guards:** consumer pages use `ProtectedRoute` (requires any signed-in user). `RoleRoute`,
   `ModuleRoute`, `FlagRoute`, `AppFlagRoute` gate back-office and flagged areas. All
-  guards are UX-only. (`TeamRoute` was deleted with the five per-team ops desks — team scoping is
-  the server's job now; see `../ops/service-queues.md`.) See auth + guards in
+  guards are UX-only (team scoping is the server's job; see `../ops/service-queues.md`). See auth + guards in
   [`../../system/cross-cutting.md`](../../system/cross-cutting.md) (section 1).
 
 ## 4. Entities touched
-- [`users`](../../system/data-model.md) - the session user object
-  (`{ name, mobile, role, loginAt }`) written to storage; on sign-up also appended to the local
-  account registry (`draazyUsers`).
+- [`users`](../../system/data-model.md) - the session user object (`{ name, mobile, role, loginAt }`)
+  written to storage.
 - [`identity_verifications`](../../system/data-model.md) - not written here. The reviewed Verified
   badge (L2) is an **opt-in trust signal** that layers on top of auth — it is **not** a gate for
   posting or contacting (mobile-OTP sign-in / L1 is the only floor; see
   [contact-gate-leads.md](./contact-gate-leads.md) and ADR-019).
 - [`referrals`](../../system/data-model.md) - a `?ref=` code present at sign-up is stored via
-  `setReferredBy(ref)` **and** posted to the server with `redeemReferral(ref, 'link')`. The second
-  half was missing until D233, which meant the code being shared was one the browser had minted and
-  `POST /referrals/redeem` could not resolve.
+  `setReferredBy(ref)` **and** posted to the server with `redeemReferral(ref, 'link')` (D233; the
+  browser-minted code alone could not be resolved by `POST /referrals/redeem`).
 
 ## 5. Business rules & logic  *(the meat)*
 
 ### OTP flow
+- **The code goes out on WhatsApp, and so does every later account update.** Non-OTP WhatsApp
+  (`notification_preferences.whatsapp`) is on by default so urgent notices reach people, so each send
+  button carries one line saying so (`auth.whatsappNotice`). Replying STOP opts the number out
+  (`/webhooks/whatsapp`); the Profile toggle turns it off per account.
 - **The server validates the code.** `useOtpFlow.js` owns only the *send* step and the countdown to
   the next resend; the code itself is checked by `POST /auth/login`, which stores it hashed,
   single-use and expiring, and counts attempts (`OtpService`). A wrong code is refused.
-  This section previously read "any 6 digits pass — never validates the code", which was true of
-  the deleted mock and is worth keeping visible as a correction: a reader threat-modelling from
-  the old text would have concluded the OTP was decorative.
 - **The countdown is the server's number, not the browser's.** The send response carries
   `resendAfterSeconds` — `OtpSendBudget`'s configured cooldown, 60s in a deployment and 0 where a
-  mock sender rings no phone — and the hook counts exactly that down. It was a hardcoded 30s, half
-  the deployed gap, so the button came back while the server still refused and a caller who waited
-  for it was answered with a rate-limit error instead of a code. No constant could have been right
-  in every environment, which is why the number travels with the acknowledgement.
+  mock sender rings no phone — and the hook counts exactly that down. A hardcoded client value is
+  wrong in some environment (30s re-enabled the button while the server still refused), which is why
+  the number travels with the acknowledgement.
 - The hook still defaults to a simulated 700 ms dispatch for the **non-auth** verification flows
   that remain mocked (owner consent, society hub, flatmates). Auth pages pass the real service.
-- **The countdown is measured against the wall clock, not against interval ticks.** This is the one
-  flow that guarantees the user leaves the page — they switch to their SMS app to read the code —
-  and a hidden tab's timers are throttled to a crawl or suspended outright on iOS. A tick-counting
-  timer therefore under-counts exactly when it is being used properly, stranding a person behind a
-  disabled button long after the server would have allowed the resend. The hook holds a deadline and
-  re-reads the clock on `visibilitychange`, which is the only thing that makes the number correct at
-  all on a platform that suspended the interval.
-- **A refusal that carries `retryAfterSeconds` restarts the countdown.** Without it the button is
-  live the instant the error renders (`canResend` only asks whether the timer ran out), so the only
-  response the screen offers is the one that just failed and a frustrated person collects one
-  rate-limit error per press. The server's figure is the wait *remaining*, so re-using it never
+- **The countdown is measured against the wall clock, not against interval ticks.** The user leaves the
+  page to read the SMS, and a hidden tab's timers are throttled or suspended outright on iOS; a
+  tick-counting timer would strand them behind a disabled button. The hook holds a deadline and
+  re-reads the clock on `visibilitychange`.
+- **A refusal that carries `retryAfterSeconds` restarts the countdown.** Otherwise the button is
+  live the instant the error renders (`canResend` only asks whether the timer ran out), and each press
+  collects another rate-limit error. The server's figure is the wait *remaining*, so re-using it never
   over-charges the user.
 - Sign in: `submit()` requires a valid 10-digit mobile, then requires `otpSent`, then requires
   `otp.length === 6` before posting mobile + code to the server.
@@ -95,12 +89,18 @@
 
 - **Three send limits, two keys.** The per-mobile cooldown (`SEND_COOLDOWN`, 60s) and the per-mobile
   window ceiling (`MAX_SENDS_PER_WINDOW`, 5 per `SEND_WINDOW`) are keyed on the recipient, because the
-  number is what gets harassed and billed and is the one thing an attacker cannot rotate while still
-  attacking a chosen victim. `MAX_PLATFORM_SENDS_PER_WINDOW` (500/hour) is keyed on nothing, for the
-  attacker who does not care whose phone rings: a script that rotates the recipient never spends a
-  second slot against any single number, and the per-IP `WriteRateLimitFilter` is defeated by the same
-  rotation. That one is a spend ceiling rather than a correctness limit, and is meant to be raised as
-  the platform grows — what it buys is a bounded bill in the worst case.
+  number is what gets harassed and billed and the one thing an attacker cannot rotate while attacking a
+  chosen victim. `MAX_PLATFORM_SENDS_PER_WINDOW` (500/hour) is keyed on nothing, for the attacker who
+  rotates recipients (which also defeats the per-IP `WriteRateLimitFilter`). It is a spend ceiling
+  rather than a correctness limit, meant to be raised as the platform grows: it bounds the worst-case
+  bill.
+- **A daily cap per mobile and an hourly cap per address.** `MAX_SENDS_PER_DAY` (10) stops the hourly
+  five being spent again every hour against one victim. `OtpSendIpBudget` (20 send *attempts* an hour
+  per IPv4 address or IPv6 /64, refusals included) stops one machine draining the platform ceiling by
+  rotating numbers, which would lock every honest sign-in out. It is loose because Indian carriers share
+  one IPv4 address across many subscribers, and it is counted only after the Turnstile check passes, so a
+  bot without a token spends nothing honest callers behind the same address rely on. In memory, like
+  `WriteRateLimitFilter`: a restart refunds it, and the database-backed limits still hold.
 - **The budget is the `otp_codes` rows, not a counter.** One row per send, so the rate limiter needs no
   counter table and stays correct across restarts and nodes. `OtpCodeRepository#findByMobileAndPurpose…`
   deliberately ignores `consumed` and `expiresAt` — it counts *sends*, and filtering them out would let
@@ -109,42 +109,41 @@
   its oldest row says when a slot reopens.
 - **`noRollbackFor` is load-bearing on every transactional caller of a send.** Because the budget is
   derived from rows, a rollback refunds the attempt: no cooldown, no window slot, no trace. So
-  `RateLimitedException` and `OtpSender.DeliveryFailedException` are named on `OtpService.sendCode`,
+  `RateLimitedException` and `OtpSender.DeliveryFailedException` (a 503 with `Retry-After: 60`) are named on `OtpService.sendCode`,
   `sendLoginCode`, `AuthService.login` and `FlatmateSupplyService.ownerConsent`. `noRollbackFor` is
   per-advice — it only stops *that* advice marking a shared transaction rollback-only, so a
   participating inner advice cannot enforce the rule for its callers. **A new transactional caller that
-  omits it silently restores the refund:** nothing throws, no test goes red. The alternatives were
-  worse: a `REQUIRES_NEW` inner commit lets the OTP row escape the rollback every `@Transactional` test
-  relies on, and an after-commit hook does not fire under a test transaction at all.
+  omits it silently restores the refund:** nothing throws, no test goes red. (A `REQUIRES_NEW` inner
+  commit would let the OTP row escape the rollback every `@Transactional` test relies on, and an
+  after-commit hook does not fire under a test transaction.)
 - **The per-recipient check is taken under a lock held until the send commits.** Read-then-insert is not
   a budget under concurrency: two requests naming the same number both read the page before either
-  writes, both find room, and both cause an SMS. `RateLimitLock#holdUntilCommit` is keyed on
-  (mobile, purpose) so the two purposes do not queue behind each other. The platform ceiling is read
-  *first* (once it is reached no per-number answer can let the send through) and without an additional
-  lock: it is a ceiling in the hundreds, so concurrency can only cost an overshoot bounded by the sends
-  in flight, and the alternative is a global mutex serialising every unrelated user's sign-in.
-- **Why `OtpSendBudget` is a separate bean, and not `@Transactional`.** Issuing a code and deciding
-  whether it is allowed share only a table. It must run inside the caller's transaction, because the
-  lock has to hold until the *send* commits, and a new transaction would break that.
+  writes and both cause an SMS. `RateLimitLock#holdUntilCommit` is keyed on (mobile, purpose) so the two
+  purposes do not queue behind each other. The platform ceiling is read *first* (once reached no
+  per-number answer can let the send through) and without an additional lock: it is a ceiling in the
+  hundreds, so concurrency can only cost an overshoot bounded by the sends in flight, and the
+  alternative is a global mutex serialising every unrelated user's sign-in.
+- **`OtpSendBudget` is a separate bean, not `@Transactional`.** It must run inside the caller's
+  transaction, because the lock has to hold until the *send* commits.
 - **Refusals carry a truthful `Retry-After`**, rounded up so a client that obeys it exactly does not get
   a second 429, and the platform-ceiling message says nothing about the platform's state — it is
   returned to an unauthenticated caller who may be the attacker, and "you have exhausted our budget" is
   a completion signal.
-- **Per-code attempt cap (default 3 of a 10^6 space).** Chosen for the honest typist, not the attacker:
-  it is what a person can spend on a mistyped digit before the code dies. The boot refuses a cap outside
-  1–20 — zero burns every code on first use (an outage that looks like a rate limit), unbounded hands an
-  attacker the whole space against one delivered code. The remaining count is told to the caller so the
-  screen can count down; it reveals nothing, since only the holder of the delivered code is in that
-  branch and an attacker learns the same number by subtracting their own failures.
+- **Per-code attempt cap (default 3 of a 10^6 space).** Chosen for the honest typist: it is what a
+  person can spend on a mistyped digit before the code dies. The boot refuses a cap outside 1–20 — zero
+  burns every code on first use (an outage that looks like a rate limit), unbounded hands an attacker
+  the whole space against one delivered code. The remaining count is told to the caller so the screen
+  can count down; it reveals nothing, since only the holder of the delivered code is in that branch and
+  an attacker learns the same number by subtracting their own failures.
 - **Codes are scoped by (mobile, purpose), and that is a security boundary.** The flatmates
   owner-consent flow sends to a landlord who usually has no account; sharing the `login` purpose would
   make "request consent" a way to mint *login* codes for any number a caller can name. Separate purposes
-  also stop either flow exhausting the other's budget. The throttle itself is shared deliberately — two
-  copies of a rate limiter is one copy that gets forgotten when the rule changes.
+  also stop either flow exhausting the other's budget. The throttle itself is shared deliberately (one
+  copy of the rate limiter).
 - **Two predictable-code keys, both fenced at boot.** `draazy.otp.fixed-code` is the e2e affordance (so
   a browser suite can type the code rather than scrape a shared log, which cannot tell two concurrent
-  logins apart); `draazy.otp.sandbox-code` is sandbox's stand-in for a delivery channel it does not
-  have. Only the choice of digits is weakened — still hashed, single-use, TTL'd, budgeted and
+  logins apart); `draazy.otp.sandbox-code` is a sandbox-only break-glass, pinned empty now that
+  sandbox delivers real codes over WhatsApp. Only the choice of digits is weakened — still hashed, single-use, TTL'd, budgeted and
   attempt-capped, and verification is never special-cased. Two keys rather than an exemption, because an
   exemption is invisible in the prod properties file and no environment variable that means something in
   prod can set the sandbox one. `rejectFixedCodeInProduction` and `rejectSandboxCodeOutsideSandbox` kill
@@ -153,8 +152,8 @@
   unrecognised profile lands on the safe side and a superset activation such as `prod,sandbox` fails
   too. The runtime guards are not redundant with the properties pins: a classpath config-data file is
   the *lowest*-precedence source Spring consults, so `DRAAZY_OTP_FIXED_CODE` exported into a
-  deployment's environment silently outranks both pins and only the boot check is left. The sandbox cost is real and accepted: a committed `000000` and
-  login that resolves a user by mobile — the guard keeps the blast radius to that one environment, and
+  deployment's environment silently outranks both pins and only the boot check is left. Should the
+  sandbox break-glass ever be set, the guard keeps the blast radius to that one environment, and
   back-office accounts are out of it entirely because `/auth/login` refuses them (§ Staff login).
 - **`AuthResponse` carries several shapes in one record** because the contract models login as a single
   dual-mode operation: the send step returns `{otpSent, resendAfterSeconds}` and no tokens, the staff
@@ -163,8 +162,7 @@
   `refreshToken` rides the record but is `@JsonIgnore`d — it leaves the server in an `HttpOnly` cookie,
   never in the body — and stays only because `AuthController` needs the raw value to build that cookie.
   The send acknowledgement publishes the *server's* cooldown so the "resend in Ns" counter matches what
-  this environment will actually refuse on; a client-side constant can only be right in whichever
-  environment it was copied from.
+  this environment will actually refuse on.
 - **Every token response embeds `SelfProfile`, not the bare user mapper**, because the client caches
   the embedded user as its session identity — a sign-in that omitted the back-office atoms would leave
   the console with an empty sidebar until something called `GET /auth/me`.
@@ -185,30 +183,30 @@
   what makes the credential belong to the colleague.
 - **403, and only after the credential has been checked.** The staff password step and `login`'s OTP
   check run before this, so a caller who reaches the message has already proved they hold the
-  credential and learns nothing. A 401 would be honest about the outcome and useless to
-  the blocked colleague, who would spend the morning retyping a correct password. The same ordering is
-  why `staffLoginEnabled` is read *after* the password: a caller who could tell "staff sign-in is off"
-  from "invalid credentials" holds an oracle sorting arbitrary emails into staff and not-staff.
-  `StaffSignInService` re-runs the gate on the second-factor steps, so a suspension landing inside the
-  challenge's five minutes still stops the session.
+  credential and learns nothing. A 401 would be useless to the blocked colleague, who would spend the
+  morning retyping a correct password. The same ordering is why `staffLoginEnabled` is read *after* the
+  password: a caller who could tell "staff sign-in is off" from "invalid credentials" holds an oracle
+  sorting arbitrary emails into staff and not-staff. `StaffSignInService` re-runs the gate on the
+  second-factor steps, so a suspension landing inside the challenge's five minutes still stops the
+  session.
 - **`refresh` re-checks the same gate** rather than trusting "a refresh token can only exist if
-  `issueFor` minted one". That is true by accident of today's write paths and nothing enforces it; the
-  moment a privileged account is blocked after sign-in, every live session would keep refreshing for
-  the whole refresh TTL. Its
+  `issueFor` minted one" (true only by accident of today's write paths); otherwise, once a privileged
+  account is blocked, every live session would keep refreshing for the whole refresh TTL. Its
   `noRollbackFor(Unauthorized)` keeps the two revocations on that path (reuse-detection family burn,
   and revoke-all for an archived user), which are security actions taken *because* the request is being
   refused. `ForbiddenException` is deliberately absent, so a refused rotation rolls back and the
   caller's old token survives — harmless, because every attempt to spend it lands here again.
 - **`signupsEnabled` is enforced in `findOrProvision`'s `orElseGet`**, the only branch that brings a
   consumer account into existence, and deliberately not at the send step: refusing before an OTP is
-  checked would answer "is this mobile registered?" to an unauthenticated caller, the enumeration
-  oracle `Signin` deleted its `userExists` probe to avoid. The corollary is that this flag is not an
+  checked would answer "is this mobile registered?" to an unauthenticated caller (the enumeration
+  oracle `Signin` deleted its `userExists` probe to avoid). The corollary is that this flag is not an
   SMS-spend control — a frozen platform still delivers a code to every unknown number that asks. It
   throws 403 rather than 401 because the code has already been verified and burnt, so it must also be
   on `login`'s `noRollbackFor` list or one delivered code could be replayed for its whole TTL against a
-  platform refusing new members. Staff-driven provisioning (`UserService.provisionForStaff`) is not
+  platform refusing new members. Staff-driven provisioning (`UserService.provisionUnverified`) is not
   gated: freezing public onboarding is about who may walk in, not whether the office may still take a
-  listing over the phone. The gate sits at the caller rather than at the insert, so it holds only
+  listing over the phone. A flat owner who confirms a tenant's room from the WhatsApp link is the one
+  other caller, and it checks `signupsEnabled` itself before provisioning. The gate sits at the caller rather than at the insert, so it holds only
   while `UserService.provisionBuyer` has exactly one caller — `AccountProvisioningGuardTest` pins
   that over the source text, and its failure message says what to do with a second one.
 - **Staff sign-in equalises work on an unknown email** with a dummy BCrypt hash, and never reveals which
@@ -258,47 +256,53 @@
 
 ### Sign in (`Signin.jsx`)
 - **Mobile normalisation:** `useMobileInput` + `MobileField`; a valid number is exactly 10 digits.
-- **No unknown-number handoff.** A branch here once asked `!userExists(mobile)` against the browser
-  registry and detoured to `/signup?new=1`. It is gone and will not return in that form: a public
-  "does this mobile have an account?" check is a user-enumeration oracle. The server provisions an
-  account on the first verified login, so a known and an unknown number take the identical path.
-- **Identity comes from the server.** A verified login returns the profile (`SelfProfile`). The
-  request carries the mobile and the code and nothing else — it used to also send `name` and `role`,
-  which the server ignored, and this line used to describe them as "hints". They were removed: a
-  field the server discards still reads, to anyone auditing the call, like something the client can
-  influence about its own account. There is no local registry to restore from.
+- **No unknown-number handoff.** There is no `!userExists(mobile)` detour to `/signup?new=1`, and none
+  may return: a public "does this mobile have an account?" check is a user-enumeration oracle. The
+  server provisions an account on the first verified login, so a known and an unknown number take the
+  identical path.
+- **Identity comes from the server.** A verified login returns the profile (`SelfProfile`). The request
+  carries the mobile and the code and nothing else: a field the server discards still reads, to anyone
+  auditing the call, like something the client can influence about its own account. There is no local
+  registry to restore from.
 - **A first-time account is asked for its name here**, on a third step after the code is verified,
-  because provisioning is nameless. Steps 1 and 2 are byte-identical for everyone, so the step is
-  not an enumeration oracle: it is reached only *after* a code has been verified, by which point the
-  caller has already proven the number is theirs. The trigger is the profile the server returned
-  having no name — not "this row was just inserted" — so an older nameless account is asked too.
+  because provisioning is nameless. Steps 1 and 2 are byte-identical for everyone, so the step is not an
+  enumeration oracle: it is reached only *after* a code has been verified, by which point the caller has
+  proven the number is theirs. The trigger is the returned profile having no name, not "this row was just
+  inserted", so an older nameless account is asked too.
 - **Profile validation:** the name is trimmed at the API boundary and must contain 2–80 characters;
   email remains optional and must be a valid address when present.
 - **Remember this device:** a checkbox (default on) chooses the storage tier (see Session below).
 - **Turnstile token lives in a ref, not state.** It changes whenever the widget solves or expires a
-  challenge, and re-rendering the sign-in form on that can discard a solved challenge and make the
-  user sit through another. The widget renders only when `VITE_TURNSTILE_SITE_KEY` is set, and the
-  send button is deliberately *not* gated on a token — the server decides whether the challenge is
-  required, so gating here would block sign-in on any deployment that has the widget but not the
-  server flag.
-- **A spent code is a sticky blocker.** Typing clears an ordinary error, but not this one: only a
-  fresh code can help, so hiding the message on the next keystroke would walk the user straight back
-  into a refusal. Only a refusal a fresh code cannot fix blocks the form — a busy limiter or a
-  dropped connection leaves the guess intact and stays retryable.
-- **Both success paths hold the confirmation on screen for a second before leaving.** `/signin` has
-  no guest-only guard, so nothing force-unmounts the page; the navbar stays live for that second and
-  a click made there would be stomped by a `replace: true` navigate that also destroys the history
-  entry Back would have needed.
+  challenge, and re-rendering the form on that can discard a solved challenge. The widget renders only
+  when `VITE_TURNSTILE_SITE_KEY` is set, and the send button is deliberately *not* gated on a token: the
+  server decides whether the challenge is required, so gating here would block sign-in on any
+  deployment that has the widget but not the server flag.
+- **A send waits for the challenge, then spends it.** Tokens are single-use and expire after five
+  minutes, and a user who browsed for a while, or taps Send before an invisible challenge finished,
+  would otherwise send no token and get a 403. The send waits up to 15 s for a fresh token (remounting a
+  widget whose script failed, errored or holds a stale token), and every spend remounts the widget so
+  the next send has its own challenge. That includes Resend, which is why the widget stays mounted once
+  the code is sent. A `bot_check_failed` refusal of a request that did carry a token is retried once
+  with a fresh one before the user sees "Security check didn't finish"; the server retries siteverify
+  once on a 5xx or transport error under the same `idempotency_key`.
+- **A spent code is a sticky blocker.** Typing clears an ordinary error, but not this one: only a fresh
+  code can help, so hiding the message on the next keystroke would walk the user back into a refusal.
+  Only a refusal a fresh code cannot fix blocks the form; a busy limiter or a dropped connection leaves
+  the guess intact and stays retryable.
+- **Both success paths hold the confirmation on screen for a second before leaving.** `/signin` has no
+  guest-only guard, so nothing force-unmounts the page; the navbar stays live for that second and a
+  click made there would be stomped by a `replace: true` navigate that also destroys the history entry
+  Back would have needed.
 - **The "create an account" link carries the whole query string**, `next` and `reason` alike, because
-  Signup calls the same `postAuthDest(params)` and a bare `/signup` link silently drops the
-  destination the sender chose. This matters most for the rent-agreement gate, whose visitors are by
-  its own premise the ones without an account.
+  Signup calls the same `postAuthDest(params)` and a bare `/signup` link silently drops the destination
+  the sender chose. This matters most for the rent-agreement gate, whose visitors are by premise
+  without an account.
 - **The name step omits a blank email rather than sending one:** PATCH treats a present field as an
   overwrite, so `email: ''` would erase an address on the retry path.
 - **Redirect:** `login({...})` then `navigate(postAuthDest(params))` - honours `?next=`, else
-  `/dashboard` - except for an account provisioned moments ago, which gets `/listings`: every card
-  on the hub is derived from real activity and a brand-new account has none, so it would open as a
-  page of zeros at the moment of highest intent.
+  `/dashboard` - except for an account provisioned moments ago, which gets `/listings`: every hub card
+  is derived from real activity and a brand-new account has none, so it would open as a page of zeros at
+  the moment of highest intent.
 
 ### Sign up (`Signup.jsx`)
 - **Validation (`validateBase`):** `name.trim().length` must be 2–80; email optional but if present must
@@ -306,370 +310,353 @@
   checked. Errors are per-field booleans with inline messages.
 - **Role:** always `buyer` (see Actors).
 - **Referral capture:** on success, if `?ref=` present, `setReferredBy(ref)` **and**
-  `redeemReferral(ref, 'link')` → `POST /referrals/redeem`. This line used to read "on success, if
-  `?ref=` present, `setReferredBy(ref)`" and nothing else, which was the whole of attribution: the
-  server's redeem endpoint had shipped and nothing had ever called it, so no referral outside the
-  seed data had ever reached the fraud desk (D233). The redeem call is deliberately un-awaited and
-  its failure swallowed — a 409 means the code was unknown, self-referred or already redeemed, and
-  the person who just signed up chose none of those and can fix none of them.
-- **Redirect:** same `postAuthDest(params)` — `?next=`, else `/listings` **only if the account had
-  no name before this authentication**, else `/dashboard`. This is not "sign-up always means new":
-  there is no registration endpoint behind this screen, so `register()` is a sign-in plus a profile
-  patch and a mobile that already has an account passes straight through it. Landing that person on
-  the listings while `/signin` lands them on their dashboard would split one authentication across
-  two destinations. Both doors therefore ask the same question, and `register()` returns `wasNew`
-  because only it sees the profile *before* the patch — afterwards every account has a name.
+  `redeemReferral(ref, 'link')` → `POST /referrals/redeem` (D233: without the call, no referral outside
+  the seed data ever reached the fraud desk). The redeem call is deliberately un-awaited and its failure
+  swallowed — a 409 means the code was unknown, self-referred or already redeemed, and the person who
+  just signed up chose none of those and can fix none of them.
+- **Redirect:** same `postAuthDest(params)` — `?next=`, else `/listings` **only if the account had no
+  name before this authentication**, else `/dashboard`. This is not "sign-up always means new": there is
+  no registration endpoint behind this screen, so `register()` is a sign-in plus a profile patch and a
+  mobile that already has an account passes straight through it. Landing that person on the listings
+  while `/signin` lands them on their dashboard would split one authentication across two destinations.
+  Both doors therefore ask the same question, and `register()` returns `wasNew` because only it sees the
+  profile *before* the patch — afterwards every account has a name.
 
 ### Staff login (`/staff-login`, `StaffLogin.jsx`)
-- **Password plus an authenticator, never the mobile OTP.** `POST /auth/login` refuses staff,
-  manager and admin accounts with 403 `staff_sign_in_required` after the code is checked, so a SIM
-  swap or a leaked SMS cannot open the back office. The console posts email + password to
+- **Password plus an authenticator, never the mobile OTP.** `POST /auth/login` refuses staff, manager
+  and admin accounts with 403 `staff_sign_in_required` after the code is checked, so a SIM swap or a
+  leaked SMS cannot open the back office. The console posts email + password to
   `POST /auth/staff-login`, which returns `{mfa, challenge}` and no tokens; `mfa` is `totp` or, on a
   first sign-in, `enrol`. The challenge is an HMAC-signed, five-minute token naming the account.
 - **Second step.** `totp`: `/auth/staff-login/verify` takes a 6-digit code or a single-use recovery
   code. `enrol`: `/auth/staff-login/enrol` returns a fresh secret and `otpauth://` URI (rendered as a
-  QR), and `/enrol/confirm` proves the app holds it and returns ten recovery codes, shown once. The
-  app entry is named `Draazy` (prod), `Draazy Sandbox` or `Draazy Local`, so one phone holds a separate
-  code per environment. Both
-  completing steps set the refresh cookie and return the session; the password step sets none.
-- **What the server keeps.** The TOTP secret is AES-256-GCM encrypted under `STAFF_TOTP_KEY`;
-  recovery codes are SHA-256 hashes. The last accepted time step is stored, so a code cannot be
-  replayed inside its window. Five misses — wrong passwords or wrong codes — lock the account for 15
-  minutes (429 `staff_sign_in_locked`). An expired or tampered challenge is 401
-  `staff_sign_in_expired`, and the screen restarts at the password.
-- **Recovery is a back-office manager's job.** Admin › Team has *Reset 2FA* (next sign-in re-enrols)
-  and *Reissue invite* (voids the open invite and returns a one-time `/staff-invite#...` link to the
-  creator; the account cannot sign in until it is redeemed). Managers can do this for staff only;
-  admin actions are audited, and manager actions also notify the administrator.
+  QR), and `/enrol/confirm` proves the app holds it and returns ten recovery codes, shown once. The app
+  entry is named `Draazy` (prod), `Draazy Sandbox` or `Draazy Local`, so one phone holds a separate code
+  per environment. Both completing steps set the refresh cookie and return the session; the password
+  step sets none.
+- **What the server keeps.** The TOTP secret is AES-256-GCM encrypted under `STAFF_TOTP_KEY`; recovery
+  codes are SHA-256 hashes. The last accepted time step is stored, so a code cannot be replayed inside
+  its window. Five misses — wrong passwords or wrong codes — lock the account for 15 minutes (429
+  `staff_sign_in_locked`); an email with no staff account locks identically, so the 429 confirms
+  nothing. An expired or tampered challenge is 401 `staff_sign_in_expired`, and the
+  screen restarts at the password.
+- **Recovery is a back-office manager's job.** Admin › Team has *Reset 2FA* (next sign-in re-enrols) and
+  *Reissue invite* (voids the open invite and returns a one-time `/staff-invite#...` link to the
+  creator; the account cannot sign in until it is redeemed). Managers can do this for staff only; admin
+  actions are audited, and manager actions also notify the administrator.
 - **There is one administrator per environment.** First deploy sets `BOOTSTRAP_ADMIN_EMAIL`,
-  `BOOTSTRAP_ADMIN_MOBILE` and optionally `BOOTSTRAP_ADMIN_NAME`; startup logs a one-hour
-  `/staff-invite#...` link for that account. Break-glass recovery sets `BOOTSTRAP_ADMIN_RECOVER` to a
-  fresh nonce and redeploys: startup resets that admin's 2FA, revokes sessions and logs a fresh link.
-- **Role and team are not a choice made in the browser.** The server returns the authenticated
-  account's own role and team and this screen obeys them: the token it holds was minted for that
-  account, and every API call behind the console is authorised server-side regardless of what the
-  page believes.
+  `BOOTSTRAP_ADMIN_MOBILE` and optionally `BOOTSTRAP_ADMIN_NAME`; startup emails a one-hour
+  `/staff-invite#...` link to that address (it is logged only when email is off, locally and in e2e).
+  Break-glass recovery sets `BOOTSTRAP_ADMIN_RECOVER` to a fresh nonce and redeploys: startup resets
+  that admin's 2FA, revokes sessions and emails a fresh link.
+- **Role and team are not a choice made in the browser.** The server returns the authenticated account's
+  own role and team and this screen obeys them; every API call behind the console is authorised
+  server-side regardless of what the page believes.
 - **Managers are real back-office roles.** Admin is the single environment owner, managers sit below
   admin and above function staff, and manager/admin can load the admin shell. Modules still open only
   when `GET /auth/me` returns the needed permission atom.
-- **Safe `next` asks two separate questions:** is it a usable in-app path (`safeInAppPath`, shared
-  with the consumer screens so the two doors cannot drift, and where the `/staff-login` self-redirect
-  dead end is rejected), and does it match this role's access. Asking only the second let
-  `?next=//evil.com` through, since it starts with neither `/admin` nor `/ops`.
+- **Safe `next` asks two separate questions:** is it a usable in-app path (`safeInAppPath`, shared with
+  the consumer screens so the two doors cannot drift, and where the `/staff-login` self-redirect dead
+  end is rejected), and does it match this role's access. Asking only the second let `?next=//evil.com`
+  through, since it starts with neither `/admin` nor `/ops`.
 - **The server's error sentence is kept verbatim**, because this console is internal and English-only.
 
 ### Contextual intent copy (`authIntent.js`)
-- `resolveAuthIntent(params)` picks heading/sub from an explicit `?reason=` key, else infers a
-  reason from the `?next=` path (`/saved` -> `save`, `/schedule-visit` -> `schedule`,
-  `/list-property` -> `listproperty`, `/checkout` -> `checkout`, `/services` -> `services`, etc.),
-  else falls back to the default "Welcome Back".
-- `postAuthDest(params, fallback)` is the single shared post-auth destination for both screens:
-  `?next=` or the fallback, which is `/dashboard` for a returning user and `/listings` for an
-  account that has just been created. The fallback is a parameter rather than a second copy of the
-  safe-`next` rule, so neither screen can drift from the other on what counts as an in-app path.
+- `resolveAuthIntent(params)` picks heading/sub from an explicit `?reason=` key, else infers a reason
+  from the `?next=` path (`/saved` -> `save`, `/schedule-visit` -> `schedule`, `/list-property` ->
+  `listproperty`, `/checkout` -> `checkout`, `/services` -> `services`, etc.), else falls back to the
+  default "Welcome Back".
+- `postAuthDest(params, fallback)` is the single shared post-auth destination for both screens: `?next=`
+  or the fallback, which is `/dashboard` for a returning user and `/listings` for an account that has
+  just been created. The fallback is a parameter rather than a second copy of the safe-`next` rule, so
+  neither screen can drift on what counts as an in-app path.
 
 ### Session persistence (`src/lib/auth.js`)
-- **Keys:** `draazyUser` (the cached profile) and `draazyTokens` (the 15-minute access token).
-  A third key, `draazyUsers`, held the mock's array of completed sign-ups and is gone with it —
-  registration is server-side now, on first verified login.
+- **Keys:** `draazyUser` (the cached profile). The 15-minute access token is held in module memory
+  only, never in web storage; a reload or new tab re-mints it from the refresh cookie before first
+  render (`main.jsx`). A legacy `draazyTokens` entry is adopted once and deleted, which is also how the
+  e2e harness seeds a session. Registration is server-side, on first verified login.
 - **The refresh token is not here.** It is set by the server as an `HttpOnly; Secure; SameSite=Lax`
   cookie named `__Host-draazy_rt` at `Path=/`, so no script on the page can read it. The `__Host-`
-  prefix is load-bearing: it is what makes the browser *enforce* host-only scoping, so no other host
-  under the registrable domain can plant a same-named cookie and choose which session we see. The
-  client asks for the cookie implicitly — every `fetch` in
-  `services/http.js` runs with `credentials: 'include'` — and never sees the value.
-- **Two tiers, one session:** `writeUser(user, remember)` writes to `localStorage` when
-  "remember this device" is on, else `sessionStorage` (tab-scoped). It always clears the other tier,
-  so exactly one tier holds the session. `readUser()` prefers `localStorage`, then `sessionStorage`.
-  Storage access is wrapped in try/catch so private mode degrades gracefully. `remember` is sent to
-  the server as well, because only the server can scope the cookie: on `false` it issues a session
-  cookie, so the long-lived half cannot outlive the tab the user asked to forget.
+  prefix is load-bearing: it makes the browser *enforce* host-only scoping, so no other host under the
+  registrable domain can plant a same-named cookie and choose which session we see. The client asks for
+  the cookie implicitly — every `fetch` in `services/http.js` runs with `credentials: 'include'` — and
+  never sees the value.
+- **Two tiers, one session:** `writeUser(user, remember)` writes to `localStorage` when "remember this
+  device" is on, else `sessionStorage` (tab-scoped). It always clears the other tier, so exactly one
+  tier holds the session. `readUser()` prefers `localStorage`, then `sessionStorage`. Storage access is
+  wrapped in try/catch so private mode degrades gracefully. `remember` is sent to the server as well,
+  because only the server can scope the cookie: on `false` it issues a session cookie, so the long-lived
+  half cannot outlive the tab the user asked to forget.
 - **Nothing here is authoritative.** The cache exists so a reload repaints the right UI before
-  `/auth/me` answers; every read and write is re-authorised server-side. In particular `permissions`
-  is returned **verbatim** as the server resolved it (role ceiling ∩ `back_office_permissions`).
-  It is deliberately not re-derived from the role: that could only ever widen a narrowed account.
+  `/auth/me` answers; every read and write is re-authorised server-side. `permissions` is returned
+  **verbatim** as the server resolved it (role ceiling ∩ `back_office_permissions`), never re-derived
+  from the role, which could only ever widen a narrowed account.
 - **Session object:** whatever `SelfProfile` returned — `{ id, name, mobile, role, ... }`, plus
   `permissions` for back-office roles only (the key is omitted entirely for buyers and owners).
-- `logoutUser()` clears both keys from both tiers, **and** expires the session-hint cookie. The
-  refresh token itself is cleared only by the server, which is the only party that can — it is
-  `HttpOnly`, and `POST /auth/logout` answers 204 with a `Set-Cookie` that expires it. The hint is
-  the deliberate exception: it is readable precisely so the page can delete it, because
-  `authProvider.logout` posts best-effort and swallows a `NetworkError`. Without the client-side
-  clear, a sign-out on a flaky connection would leave the marker in the jar beside an unrevoked
-  refresh cookie, and the next cold boot would spend it and sign the user back in — on a shared
-  machine, into the previous user's account.
-- **The session hint** (`__Host-draazy_session`, or `draazy_session` on plain-http dev) is a
-  server-set, deliberately readable cookie carrying `1` or `0` — remembered or tab-scoped — and no
-  identity. It exists for Safari's ITP, which wipes script-writable storage after seven days without
-  first-party interaction while leaving server-set cookies alone: without it, an empty `localStorage`
-  is indistinguishable from "signed out", and a remembered session would silently mean seven days
-  instead of thirty. `sessionHinted()` is what lets the cold-boot path spend a refresh for the users
-  who have a session to recover and spend nothing for the anonymous majority; `sessionRemembered()`
-  reads its *value* so the recovery restates the right lifetime instead of demoting the cookie it
-  just rescued. `localStorageWritable()` is a separate question asked at the write — see
+- `logoutUser()` clears both keys from both tiers, **and** expires the session-hint cookie. The refresh
+  token itself is cleared only by the server — it is `HttpOnly`, and `POST /auth/logout` answers 204
+  with a `Set-Cookie` that expires it. The hint is the deliberate exception: it is readable precisely so
+  the page can delete it, because `authProvider.logout` posts best-effort and swallows a `NetworkError`.
+  Without the client-side clear, a sign-out on a flaky connection would leave the marker beside an
+  unrevoked refresh cookie, and the next cold boot would spend it and sign the user back in — on a
+  shared machine, into the previous user's account.
+- **The session hint** (`__Host-draazy_session`, or `draazy_session` on plain-http dev) is a server-set,
+  deliberately readable cookie carrying `1` or `0` — remembered or tab-scoped — and no identity. It
+  exists for Safari's ITP, which wipes script-writable storage after seven days without first-party
+  interaction while leaving server-set cookies alone: without it, an empty `localStorage` is
+  indistinguishable from "signed out", and a remembered session would silently mean seven days instead
+  of thirty. `sessionHinted()` lets the cold-boot path spend a refresh for the users who have a session
+  to recover and spend nothing for the anonymous majority; `sessionRemembered()` reads its *value* so
+  the recovery restates the right lifetime instead of demoting the cookie it just rescued.
+  `localStorageWritable()` is a separate question asked at the write — see
   `docs/system/cross-cutting.md` for why those two must not be merged.
-- **`RefreshOriginGate` refuses a cross-site or same-site-sibling `POST /auth/refresh` with 403
-  before the handler reads the cookie.** `SameSite=Lax` decides whether a cookie is *sent*, never
-  whether one may be *set*, so without the gate any page could POST here and have the resulting 401
-  expire the visitor's hint in their own jar — an unauthenticated write primitive that silently
-  disables the ITP recovery. The same-site sibling case is the worse one and the only one an
-  attacker actually gets: it *does* carry the cookie, so an ungated rotation would stale the
-  visitor's token and their next refresh, well outside the grace window, would trip reuse-detection
-  and burn every session they hold. Reading the response was never the point — CORS censors it — so
-  the load-bearing property is that the token is still usable afterwards. The gate and
-  `clearHint`'s own condition are both kept deliberately: one governs who may rotate, the other who
-  may clear, and collapsing them would make one endpoint's behaviour depend on the other's
-  reasoning. Note that MockMvc sends no `Sec-Fetch-Site` header, which is the "treat as ours"
-  branch — so the whole condition could be deleted and every auth test bar the two in
+- **`RefreshOriginGate` refuses a cross-site or same-site-sibling `POST /auth/refresh` with 403 before
+  the handler reads the cookie.** `SameSite=Lax` decides whether a cookie is *sent*, never whether one
+  may be *set*, so without the gate any page could POST here and have the resulting 401 expire the
+  visitor's hint in their own jar — an unauthenticated write primitive that silently disables the ITP
+  recovery. The same-site sibling case is the worse one and the only one an attacker actually gets: it
+  *does* carry the cookie, so an ungated rotation would stale the visitor's token and their next
+  refresh, well outside the grace window, would trip reuse-detection and burn every session they hold.
+  Reading the response was never the point (CORS censors it); the load-bearing property is that the
+  token is still usable afterwards. The gate and `clearHint`'s own condition are both kept deliberately:
+  one governs who may rotate, the other who may clear, and collapsing them would make one endpoint's
+  behaviour depend on the other's reasoning. MockMvc sends no `Sec-Fetch-Site` header, which is the
+  "treat as ours" branch — so the whole condition could be deleted and every auth test bar the two in
   `AuthEndpointsTest` that pin it explicitly would stay green.
 - Helpers: `roleLabel`, `firstName`, `initial`, `isInternal` (admin/manager/staff).
 
 > **The browser holds a cache, not a session.** The credential is a rotating refresh token
 > (hashed server-side in `refresh_tokens`, 30d) plus a 15-minute access JWT; the OTP is real,
 > and identity, roles and permissions are all resolved by the server.
-> What sits in `localStorage` is a plain, user-editable JSON blob and the short-lived access token.
-> The long-lived half is out of reach of any script on the page, so an XSS that reads storage steals
-> at most fifteen minutes rather than a month.
+> What sits in `localStorage` is a plain, user-editable JSON blob; the short-lived access token lives
+> only in memory and the long-lived half is `HttpOnly`, so an XSS that reads storage steals neither.
 
 ### Client transport: 401 recovery, refresh coalescing and sign-out
 
 The rules below live in `services/http.js`, `services/providers/http/authProvider.js` and
-`context/AuthContext.jsx`. They are written down here because each of them is one "tidy-up" away
-from signing real users out.
+`context/AuthContext.jsx`. Each is one "tidy-up" away from signing real users out.
 
 **401 → refresh → replay once.** An expired access token is the expected steady state, not an error.
 The recovery is guarded on the path as well as on `auth`, so it is never applied to `/auth/refresh`
 itself — a 401 there means the session is over, and retrying it would both loop and replay a
 single-use token. The final clause asks "did we think we had a session?". It cannot ask after the
-refresh token, which is an `HttpOnly` cookie we are not allowed to see; the access token stands in
-for it, because the two are written and cleared together. Being wrong is cheap in the only direction
-it can be wrong — a stale access token with no cookie behind it costs one 401 on `/auth/refresh`.
-A 401 whose body carries `attemptsRemaining` is a wrong OTP on a signed-in call (owner consent, for
-example), not an expired token. It is never replayed, because a replay would spend a second guess.
+refresh token, an `HttpOnly` cookie we may not see; the access token stands in for it, because the two
+are written and cleared together. Being wrong is cheap in the only direction it can be: a stale access
+token with no cookie behind it costs one 401 on `/auth/refresh`. A 401 whose body carries
+`attemptsRemaining` is a wrong OTP on a signed-in call (owner consent, for example), not an expired
+token, and is never replayed, because a replay would spend a second guess.
 
 **Clearing the session follows an answer, never the absence of one.** `refreshAccessToken` resolves
 `null` only when the server actually refused, and throws when it could not be reached at all, so an
 unreachable server never reaches the `logoutUser()` line. Signing someone out is destructive and
 irreversible from the client.
 
-**Refresh is coalesced within *and* across tabs.** Refresh tokens are single-use and the backend
-treats replay as theft: presenting an already-rotated token revokes the entire token family for that
-user (`RefreshTokenService.rotate`). The server forgives a replay landing within a few seconds of
-the rotation it lost to, precisely because a client cannot inspect the token to elect a winner — but
-that is a safety net for a race, not a licence to run one. Two layers:
+**Refresh is coalesced within *and* across tabs.** Refresh tokens are single-use and the backend treats
+replay as theft: presenting an already-rotated token revokes the entire token family for that user
+(`RefreshTokenService.rotate`). The server's grace window forgives a replay landing within a few
+seconds of the rotation it lost to, because a client cannot inspect the token to elect a winner — a
+safety net for a race, not a licence to run one. Two layers:
 
-- `refreshInFlight` dedupes concurrent callers inside one tab (three requests 401-ing at once). It
-  is module-scoped, so it is *only* ever a within-tab guard, by construction.
+- `refreshInFlight` dedupes concurrent callers inside one tab (three requests 401-ing at once). It is
+  module-scoped, so it is *only* a within-tab guard.
 - A Web Lock (`draazy:auth-refresh`) serialises tabs, which share one cookie jar and would otherwise
   each refresh independently.
 
-The second layer is load-bearing, not an optimisation, and the reason matters before anyone
-simplifies it away on the grounds that the server forgives the loser anyway. Forgiveness settles who
-gets a session; it does not settle who wins the *cookie*. Both responses carry a `Set-Cookie` and
-the jar keeps whichever lands last. The graced tab's rotation revokes the token the winner's
-response is still carrying, so if that response lands second the browser ends up holding a token the
-server has already revoked. Nothing breaks then — the next refresh is inside the window — but the
-next refresh is normally fifteen minutes later, by which point the grace window has closed, that
-stale cookie reads as a replay, and the family burns. The user is signed out of everything by the
-race the window was supposed to make survivable. The server cannot fix this from its side, so not
-sending the second request is the fix.
+The second layer is load-bearing, not an optimisation. Forgiveness settles who gets a session; it does
+not settle who wins the *cookie*. Both responses carry a `Set-Cookie` and the jar keeps whichever lands
+last. The graced tab's rotation revokes the token the winner's response is still carrying, so if that
+response lands second the browser holds a token the server has already revoked. The next refresh is
+normally fifteen minutes later, by which point the grace window has closed, that stale cookie reads as
+a replay, and the family burns: the user is signed out of everything by the race the window was meant
+to make survivable. The server cannot fix this from its side, so not sending the second request is the
+fix (see the grace-window entry under refresh rotation).
 
-Be honest about the gap: `navigator.locks` is undefined in non-secure contexts, which includes a
-plain-http LAN dev host — the one setup `application-local.properties` turns off `Secure` for. There
-the lock degrades to running inline and two tabs 401-ing together really can both spend the same
-cookie. That is what the grace window absorbs, but it is a safety net being landed on rather than
-held in reserve, so the degradation warns rather than passing silently. A `SecurityError` from
-`navigator.locks.request` (opaque or sandboxed origin) degrades the same way: letting either
-propagate would send a raw `SecurityError` out through `request()`, past the
+The gap: `navigator.locks` is undefined in non-secure contexts, which includes a plain-http LAN dev
+host — the one setup `application-local.properties` turns off `Secure` for. There the lock degrades to
+running inline and two tabs 401-ing together really can both spend the same cookie. The grace window
+absorbs that, but it is a safety net being landed on, so the degradation warns rather than passing
+silently. A `SecurityError` from `navigator.locks.request` (opaque or sandboxed origin) degrades the
+same way: letting it propagate would send a raw `SecurityError` out through `request()`, past the
 `ApiError`/`NetworkError` normalisation every caller branches on.
 
-**The loser of the race must not refresh again.** `doRefresh` compares the access token it entered
-with against the current one; if another tab rotated or signed out, it hands back whatever is there.
-The `entryToken &&` guard is load-bearing, and the obvious "tidy-up" of bailing when it is null is a
-real regression (caught by `signin-otp-session.spec.js`, which logs out instead of renewing): a null access
-token does **not** mean there is no session to renew, because the credential this call spends is the
-`HttpOnly` cookie. Entering with nothing is exactly the cold-boot case where refreshing is the only
-way to find out, so the comparison must stay a guard against a token that *moved*, not a
-precondition that one exists. The comparison is a good witness in the `localStorage` tier, where
-tabs share storage; it is a no-op in the per-tab `sessionStorage` tier (`remember: false`), where the
-lock is the only thing doing any work.
+**The loser of the race must not refresh again.** `doRefresh` compares the access token it entered with
+against the current one; if another tab rotated or signed out, it hands back whatever is there. The
+`entryToken &&` guard is load-bearing, and bailing when it is null is a real regression (caught by
+`signin-otp-session.spec.js`, which logs out instead of renewing): a null access token does **not**
+mean there is no session to renew, because the credential this call spends is the `HttpOnly` cookie.
+Entering with nothing is exactly the cold-boot case where refreshing is the only way to find out, so
+the comparison must stay a guard against a token that *moved*, not a precondition that one exists. The
+comparison is a good witness in the `localStorage` tier, where tabs share storage; it is a no-op in the
+per-tab `sessionStorage` tier (`remember: false`), where the lock is the only thing doing any work.
 
-`sessionRemembered()` is resolved once, before the request, and reused for the write-back. Reading
-it twice would straddle the response, whose own `Set-Cookie` lands before the promise resolves, so
-the second read would be answering with the value the first read just caused. `remember` is restated
-on the refresh body because the browser tells the server nothing about the lifetime of the cookie it
-presents; without it a session the user declined to remember would quietly become a persistent one.
-The refresh call itself is `auth: false` — the cookie *is* the credential, and sending the dead
-access token alongside it would just 401 again.
+`sessionRemembered()` is resolved once, before the request, and reused for the write-back: reading it
+twice would straddle the response, whose own `Set-Cookie` lands before the promise resolves, so the
+second read would answer with the value the first read just caused. `remember` is restated on the
+refresh body because the browser tells the server nothing about the lifetime of the cookie it presents;
+without it a session the user declined to remember would quietly become a persistent one. The refresh
+call itself is `auth: false` — the cookie *is* the credential, and sending the dead access token
+alongside it would just 401 again.
 
-**Only a rejection means the session is over.** A `NetworkError` is not an answer, and returning
-`null` on one would let the caller sign the user out on the strength of a question that was never
-asked. The case that proved this is not offline-with-a-dead-session; it is an in-flight refresh
-cancelled by a navigation: `fetch` rejects with `AbortError`, `send` wraps it, and a session that
-was fine a millisecond earlier gets cleared. Rare per navigation, but the window is exactly the
-moment a user clicks a link on an expired token. It failed `signin-otp-session.spec.js` only in the full
-suite, where load widened the gap between the 401 and the reload.
+**Only a rejection means the session is over.** A `NetworkError` is not an answer, and returning `null`
+on one would let the caller sign the user out on the strength of a question that was never asked. The
+case that proved this is an in-flight refresh cancelled by a navigation: `fetch` rejects with
+`AbortError`, `send` wraps it, and a session that was fine a millisecond earlier gets cleared. It failed
+`signin-otp-session.spec.js` only in the full suite, where load widened the gap between the 401 and the
+reload.
 
-Same reasoning one step further: a 429 or a 5xx is the server declining to answer, not answering
-"no". Only a 401 is the refusal. This became consequential once the boot path called `logoutUser()`
-on a null return, because that deletes the session hint — the one artifact that survives an ITP
-wipe — leaving a refresh cookie with three weeks on it that nothing would ever spend again. Not
-hypothetical: `/auth/refresh` is a mutating verb sent with `auth: false`, so the write rate limit
-buckets it by IP with no principal to key on, and behind carrier-grade NAT one noisy neighbour on
-the shared egress address turns a recoverable session into a permanent sign-out.
+Likewise a 429 or a 5xx is the server declining to answer, not answering "no"; only a 401 is the
+refusal. This matters because the boot path calls `logoutUser()` on a null return, which deletes the
+session hint — the one artifact that survives an ITP wipe — leaving a refresh cookie with three weeks on
+it that nothing would ever spend again. `/auth/refresh` is a mutating verb sent with `auth: false`, so
+the write rate limit buckets it by IP with no principal to key on, and behind carrier-grade NAT one
+noisy neighbour on the shared egress address turns a recoverable session into a permanent sign-out.
 
 **`fromRefresh` marks an error as the renewal's, not the caller's.** Both throws above hand the
 refresh's own failure to a caller that asked for something else, and the status travels with it.
-Unannotated, a saved-properties fetch reports "Too many requests" for a rate limit the user never
-hit on saved properties, and a 503 from `/auth/refresh` reads as the listings service being down.
-The status is worth keeping — it is what makes the failure legible as transient and retryable — so
-only the attribution is wrong, and only the human-facing string moves; `code`, `status`, `fields`
-and `traceId` are untouched. Annotated in place rather than copied, because a copy loses the stack.
+Unannotated, a saved-properties fetch reports "Too many requests" for a rate limit the user never hit on
+saved properties, and a 503 from `/auth/refresh` reads as the listings service being down. The status
+is kept (it makes the failure legible as transient and retryable); only the human-facing string moves,
+and `code`, `status`, `fields` and `traceId` are untouched. Annotated in place rather than copied,
+because a copy loses the stack.
 
-**`restoreSession()` is the cold-boot path**, and its own export rather than part of the 401
-recovery: that path deliberately refuses to refresh without an access token, since for every
-ordinary request an absent token means signed out, and loosening it would make each anonymous page
-view retry through `/auth/refresh`. The cold boot is the one moment an absent token is genuinely
-ambiguous — Safari's ITP clears web storage seven days in while leaving the server-set cookie
-alone — so the ambiguity is resolved once per load instead of on every request. It shares
-`refreshInFlight` and the lock, so a boot restore racing a request-driven refresh cannot present the
-cookie twice.
+**`restoreSession()` is the cold-boot path**, its own export rather than part of the 401 recovery: that
+path deliberately refuses to refresh without an access token, since for every ordinary request an
+absent token means signed out, and loosening it would make each anonymous page view retry through
+`/auth/refresh`. The cold boot is the one moment an absent token is genuinely ambiguous — Safari's ITP
+clears web storage seven days in while leaving the server-set cookie alone — so the ambiguity is
+resolved once per load instead of on every request. It shares `refreshInFlight` and the lock, so a boot
+restore racing a request-driven refresh cannot present the cookie twice.
 
-**`persistTokens` asks two questions, not one.** `remember` is the user's *choice*; where the token
-can actually go is separate. `writeTokens` writes to `localStorage` when told to remember, swallows
-a failed `setItem` and then purges `sessionStorage` — so a remembered token in a store that throws
-lands nowhere and every page load churns a fresh rotation. Demoting the tier keeps the session alive
-locally and leaves the server's 30-day cookie, and the hint recording the choice, untouched. The
-`AuthResponse` is destructured rather than passed whole so a new field never silently deposits
-itself in storage; `refreshToken` in particular must never land there.
+**`persistTokens` asks two questions, not one.** `remember` is the user's *choice*; where the token can
+actually go is separate. `writeTokens` writes to `localStorage` when told to remember, swallows a failed
+`setItem` and then purges `sessionStorage` — so a remembered token in a store that throws lands nowhere
+and every page load churns a fresh rotation. Demoting the tier keeps the session alive locally and
+leaves the server's 30-day cookie, and the hint recording the choice, untouched. The `AuthResponse` is
+destructured rather than passed whole so a new field never silently deposits itself in storage;
+`refreshToken` in particular must never land there.
 
 ### `AuthContext` boot, and what `loading` covers
 
-The cached user is read synchronously so the first paint is already correct and a returning user
-never sees a flash of the signed-out UI. That cache still has to be revalidated — the session may
-have been revoked, or the profile changed on another device — and `loading` covers exactly that.
-**Route guards must not render a decision while it is true**, or a hard refresh bounces a signed-in
-user to `/signin`. It also starts true when there is no cached user but the server's session-hint
-cookie says there is a session: that boot has nothing to paint optimistically and everything to
-recover.
+The cached user is read synchronously so the first paint is already correct and a returning user never
+sees a flash of the signed-out UI. That cache still has to be revalidated — the session may have been
+revoked, or the profile changed on another device — and `loading` covers exactly that. **Route guards
+must not render a decision while it is true**, or a hard refresh bounces a signed-in user to `/signin`.
+It also starts true when there is no cached user but the server's session-hint cookie says there is a
+session: that boot has nothing to paint optimistically and everything to recover.
 
-`sessionGen` is a ref bumped by every deliberate change of identity and read by every background
-write, so a slow reply cannot land on a session that has since moved on. Without it a `getMe()` in
-flight when the user signs out resolves afterwards and re-signs them in — and worse than a render
-glitch, `authProvider.getMe` writes the profile back to storage on the way through, so the cleared
-cache returns too. A ref rather than state: nothing renders from it, and it must be readable by a
-closure created before the change it guards against. The sign-out affordance is reachable while the
-boot revalidation is still in flight (the navbar renders from the cached user without gating on
-`loading`), and the ITP path prepends a whole `POST /auth/refresh` to the `getMe()`, so the window
-is wide.
+`sessionGen` is a ref bumped by every deliberate change of identity and read by every background write,
+so a slow reply cannot land on a session that has since moved on. Without it a `getMe()` in flight when
+the user signs out resolves afterwards and re-signs them in — and, since `authProvider.getMe` writes the
+profile back to storage on the way through, the cleared cache returns too. A ref rather than state:
+nothing renders from it, and it must be readable by a closure created before the change it guards
+against. The sign-out affordance is reachable while the boot revalidation is in flight (the navbar
+renders from the cached user without gating on `loading`), and the ITP path prepends a whole
+`POST /auth/refresh` to the `getMe()`, so the window is wide.
 
 `sessionHinted()` is checked in the boot effect and not left to `loading`, whose other disjunct is a
-cached user — the two are not the same question. A cached user with no hint is reachable: `getMe`
-writes the profile to `localStorage` while an unremembered session's tokens stay in
-`sessionStorage`, so after a browser restart the blob outlives both the tokens and the
-session-scoped cookies. Refreshing on that costs a guaranteed 401 and, since nothing would clear the
-blob, would recur on every cold boot forever — hence the `logoutUser()`: when the answer is
-definitive, erase the evidence that asked the question. That erase sits inside the staleness guard,
-and it matters more than the `setUser` does. A sign-in that starts and finishes inside the restore's
-round trip has already written a fresh access token, user blob and marker cookie; an ungated
-`logoutUser()` would delete all three on behalf of a session that is minutes dead, leaving the worst
-reachable state — React still says "signed in", there is no token, and the 401 recovery cannot
-rescue it because that path requires an access token to exist.
+cached user — the two are not the same question. A cached user with no hint is reachable: `getMe` writes
+the profile to `localStorage` while an unremembered session's tokens stay in `sessionStorage`, so after
+a browser restart the blob outlives both the tokens and the session-scoped cookies. Refreshing on that
+costs a guaranteed 401 and, since nothing would clear the blob, would recur on every cold boot forever —
+hence the `logoutUser()`: when the answer is definitive, erase the evidence that asked the question.
+That erase sits inside the staleness guard, and it matters more than the `setUser` does. A sign-in that
+starts and finishes inside the restore's round trip has already written a fresh access token, user blob
+and marker cookie; an ungated `logoutUser()` would delete all three on behalf of a session that is
+minutes dead, leaving the worst reachable state — React says "signed in", there is no token, and the 401
+recovery cannot rescue it because that path requires an access token to exist.
 
 The `catch` distinguishes "the server says no" from "we couldn't ask". A rejected session (a 401 the
-http client could not refresh) must clear. An unreachable server must not: signing users out on
-every flaky-connection page load would be worse than trusting the cache for one more moment, and the
-next real API call will 401 and clear it properly. A 429 or a 5xx is the same kind of non-answer as
-a dead socket.
+http client could not refresh) must clear. An unreachable server must not: signing users out on every
+flaky-connection page load would be worse than trusting the cache for one more moment, and the next real
+API call will 401 and clear it properly. A 429 or a 5xx is the same kind of non-answer as a dead socket.
 
-`refreshUser()` exists because the boot revalidation is mount-only, so anything the server derives
-from what the user *did* is invisible for the rest of the session. The one that matters today is
-`listingsCount`: posting your first listing makes you an owner server-side, and `hasEverListed`
-would keep saying otherwise until the next full page load. It swallows failures deliberately — a
-stale persona is a slightly wrong plan card, and signing someone out because a background refresh
-failed right after they posted a listing is not a trade worth making — but it warns, because without
-that a refresh that 500s is indistinguishable from a server that never incremented the counter.
+`refreshUser()` exists because the boot revalidation is mount-only, so anything the server derives from
+what the user *did* is invisible for the rest of the session. The one that matters today is
+`listingsCount`: posting your first listing makes you an owner server-side, and `hasEverListed` would
+keep saying otherwise until the next full page load. It swallows failures deliberately — a stale persona
+is a slightly wrong plan card, and signing someone out because a background refresh failed right after
+they posted a listing is not worth it — but it warns, so a refresh that 500s is distinguishable from a
+server that never incremented the counter.
 
 `hasEverListed` is `(user.listingsCount ?? 0) > 0`: has this account **ever** posted a listing,
-including listings since rejected or archived. It is deliberately not `role === 'owner'`, which is
-what stood at those call sites: nothing in the application assigns that role — both signup paths
-mint `buyer` and `setRole` has no call site outside account creation — so the test was a constant
-`false` on every real account, and only the demo seed's hardcoded roles made it look answered. It is
-also **not** interchangeable with `Dashboard.jsx`'s `isOwner` (`listings.length > 0 ||
-ownsInventory`), which is LIVE inventory and the right question for a screen managing what is
-currently posted. Two questions, two answers; one name would make them one wrong answer.
+including listings since rejected or archived. It is deliberately not `role === 'owner'`: nothing in the
+application assigns that role (both signup paths mint `buyer` and `setRole` has no call site outside
+account creation), so that test is `false` on every real account. It is also **not** interchangeable
+with `Dashboard.jsx`'s `isOwner` (`listings.length > 0 || ownsInventory`), which is LIVE inventory and
+the right question for a screen managing what is currently posted. Two questions, two names.
 
-`login`, `register`, `staffVerify` and `staffConfirm` all resolve with what the *server* returned, and that is part
-of the contract. Two screens act inside the same handler, before the next render exists:
+`login`, `register`, `staffVerify` and `staffConfirm` all resolve with what the *server* returned, and
+that is part of the contract. Two screens act inside the same handler, before the next render exists:
 `/staff-login` needs the role and team to choose a console, and `/signin` needs to know whether the
 account it just authenticated has a name yet. `register` resolves `wasNew` because `/auth/login`
-provisions on the first verified code, so the provider's `register` is a sign-in plus a profile
-patch and an existing account passes straight through it — after the patch every account has a name,
-so only the provider can tell the two apart, and `/signup` must not land an established account
-somewhere different than `/signin` would.
+provisions on the first verified code, so the provider's `register` is a sign-in plus a profile patch
+and an existing account passes straight through it — after the patch every account has a name, so only
+the provider can tell the two apart, and `/signup` must not land an established account somewhere
+different than `/signin` would.
 
 ### `authProvider` notes
 
 - **`sendOtp`** carries `turnstileToken` as a header rather than a body field, which keeps the
   `/auth/login` request schema — and therefore the OpenAPI contract — unchanged (tech-debt D130).
-  Omitted entirely when the challenge is off. This is the step worth protecting: it spends an SMS,
-  so a script hammering it costs real money whether or not it ever guesses a code.
+  Omitted entirely when the challenge is off. This is the step worth protecting: it spends an SMS, so a
+  script hammering it costs real money whether or not it ever guesses a code.
 - **`login`** sends `remember` as well as applying it locally: it decides the storage tier here, but
-  only the server can scope the refresh cookie, and a cookie outliving the tab the user asked to
-  forget would leave the longer-lived half of the session behind.
+  only the server can scope the refresh cookie, and a cookie outliving the tab the user asked to forget
+  would leave the longer-lived half of the session behind.
 - **`register` is not a create.** There is no registration endpoint; `/auth/login` provisions a
   nameless buyer from the mobile alone, so this is a sign-in followed by a profile patch.
 - **`staffLogin`** is only the password step: it resolves `{mfa, challenge}` and opens no session.
   `staffVerify` and `staffConfirm` open it, which is why only those two go through `AuthContext`.
-- **`logout` clears locally even if the server call fails** — a user who clicks "sign out" must end
-  up signed out regardless of connectivity. The server call does something the client cannot: revoke
-  the family *and* expire the `__Host-draazy_rt` cookie, which `logoutUser()` cannot reach. If the
-  request fails the cookie survives, and on a shared machine that leaves a spendable 30-day
-  credential any script on the origin can use. That is the same exposure an unclosed tab carries and
-  is bounded the same way. What makes it worse here is the ITP cold-boot restore, which refreshes
-  *without* an access token: if the session hint were left behind, the next launch would spend the
-  surviving cookie and sign the user back into the account of whoever pressed sign-out. Hence
-  `logoutUser()` expiring the hint itself — the one part of the residue the client can reach.
-- **`getMe` / `updateMe` ask for the tier rather than defaulting it.** `writeUser`'s `remember`
-  defaults to `true` and `writeKeyed` purges the other tier, so a bare `writeUser(user)` on a
-  session the user asked *not* to be remembered moves the cached profile from `sessionStorage` into
-  `localStorage`, where it outlives the tab — a signed-in-looking profile left behind on a shared
-  computer next to an access token that correctly died with the tab.
+- **`logout` clears locally even if the server call fails** — a user who clicks "sign out" must end up
+  signed out regardless of connectivity. The server call does what the client cannot: revoke the family
+  *and* expire the `__Host-draazy_rt` cookie, which `logoutUser()` cannot reach. If the request fails
+  the cookie survives, and on a shared machine that leaves a spendable 30-day credential any script on
+  the origin can use — the same exposure an unclosed tab carries, bounded the same way. Worse here is
+  the ITP cold-boot restore, which refreshes *without* an access token: a surviving session hint would
+  let the next launch spend the surviving cookie and sign the user back into the account of whoever
+  pressed sign-out. Hence `logoutUser()` expiring the hint itself — the one part of the residue the
+  client can reach.
+- **`getMe` / `updateMe` ask for the tier rather than defaulting it.** `writeUser`'s `remember` defaults
+  to `true` and `writeKeyed` purges the other tier, so a bare `writeUser(user)` on a session the user
+  asked *not* to be remembered moves the cached profile from `sessionStorage` into `localStorage`, where
+  it outlives the tab — a signed-in-looking profile left on a shared computer next to an access token
+  that correctly died with the tab.
 - **`exportMyData`** returns the server's document as-is. Its `schemaVersion`, `redactionRule` and
   `excluded[]` fields are part of what the subject is entitled to receive; an export that quietly
   dropped the list of what was left out would be a worse answer. A counterparty appears as an opaque
   `partyRef`, never a name.
-- **`requestErasure`** files a request, not a deletion: the account may be the counterparty on a
-  live tenancy or a settled payment. `myErasureRequests` returns only pending and rejected ones — an
-  approved request has already taken the account with it.
+- **`requestErasure`** files a request, not a deletion: the account may be the counterparty on a live
+  tenancy or a settled payment. `myErasureRequests` returns only pending and rejected ones — an approved
+  request has already taken the account with it.
 
 ### `?next=` is validated in one place (`lib/authIntent.js`)
 
-`safeInAppPath` decides whether a `next` is somewhere in this app *and* somewhere worth being sent
-after signing in. Four rejections. The first three are about origin, and they are three rather than
-one because the browser's URL parser normalises a string *before* it decides what the string means,
-so anything that only looks at the first character is checking a value the browser never receives:
+`safeInAppPath` decides whether a `next` is somewhere in this app *and* somewhere worth being sent after
+signing in. Four rejections. The first three are about origin, and they are three rather than one
+because the browser's URL parser normalises a string *before* it decides what the string means, so
+anything that only looks at the first character is checking a value the browser never receives:
 
 - it must begin with a single `/`, which rules out `https://evil.com` and the protocol-relative
-  `//evil.com` — the same-looking string this guard began as, and the only one it caught;
+  `//evil.com`;
 - a backslash **is** a slash to that parser, so `/\evil.com` resolves to `https://evil.com`
   (react-router agrees — its own absolute-URL test spells the pair `[\\/]{2}`);
 - tabs, newlines and other C0 controls are stripped first, so `/\t/evil.com` — which arrives already
   percent-decoded from `URLSearchParams`, e.g. from `?next=/%09/evil.com` — becomes `//evil.com`.
   Rejected rather than sanitised: nothing in this app produces such a `next`.
 
-The fourth is about sense: an auth screen is never a destination. `?next=/signin` survives every
-check above, and none of the three screens has a guest-only guard to bounce it, so honouring it
-`replace`-navigates a user who just signed in back onto the sign-in form — which reads as the
-sign-in having failed.
+The fourth is about sense: an auth screen is never a destination. `?next=/signin` survives every check
+above, and none of the three screens has a guest-only guard to bounce it, so honouring it
+`replace`-navigates a user who just signed in back onto the sign-in form — which reads as the sign-in
+having failed.
 
 `postAuthDest` is the single post-auth destination shared by Sign In and Sign Up, so the same
-authentication never lands users in two different places. Its `fallback` exists so a caller that
-knows the dashboard would be empty can offer somewhere better without re-deriving the rule; both
-auth screens pass `/listings` on exactly one condition — the account had no name before this
-authentication, i.e. it was created by it — so the shared destination still holds. The condition is
-not "which screen am I", because `/signup` has no create endpoint behind it. The fallback is
-validated too, so a future caller cannot turn that trusted literal seam into another redirect path.
+authentication never lands users in two different places. Its `fallback` lets a caller that knows the
+dashboard would be empty offer somewhere better without re-deriving the rule; both auth screens pass
+`/listings` on exactly one condition — the account had no name before this authentication, i.e. it was
+created by it. The condition is not "which screen am I", because `/signup` has no create endpoint
+behind it. The fallback is validated too, so a future caller cannot turn that trusted literal seam into
+another redirect path.
 
 `resolveAuthIntent` resolves i18n **keys**, never copy: the strings live in
 `i18n/locales/en/auth.json` under `auth.intent.*`, so the copy has one home and this module does not
@@ -677,19 +664,19 @@ become a second copy deck.
 
 ### OTP verification errors are classified on `code`, never status
 
-`lib/otpVerifyError.js` is shared because every OTP screen posts to a route that goes through the
-same server primitive, so they all face the same refusals — and the one thing none of them may do is
-render `err.message`. The server's sentence is written for logs, not for the person at the form, and
-the copy for each refusal lives in the locale catalogue, so showing it is itself the bug.
+`lib/otpVerifyError.js` is shared because every OTP screen posts to a route that goes through the same
+server primitive, so they all face the same refusals — and none of them may render `err.message`. The
+server's sentence is written for logs, not for the person at the form, and the copy for each refusal
+lives in the locale catalogue, so showing it is itself the bug.
 
-The statuses collide in both directions: a 401 is "wrong digits" *or* "this account is archived",
-and a 429 is "this code is burnt" *or* "the IP you share is busy" — opposite remedies behind one
-number. Only the code separates them. `attemptsRemaining: 0` is the last allowed guess reporting
-back, not a refusal: the server has burnt the code and the next submit could only 429, so it is
-terminal. A 401 with no count is a code the server no longer holds — expired (5-minute TTL, which a
-user who switched apps to read the SMS will meet) or already spent — so telling them to try again
-would loop them against a code that can never succeed. No status at all means the request was never
-answered and the guess is untouched, so retry.
+The statuses collide in both directions: a 401 is "wrong digits" *or* "this account is archived", and a
+429 is "this code is burnt" *or* "the IP you share is busy" — opposite remedies behind one number. Only
+the code separates them. `attemptsRemaining: 0` is the last allowed guess reporting back, not a
+refusal: the server has burnt the code and the next submit could only 429, so it is terminal. A 401
+with no count is a code the server no longer holds — expired (5-minute TTL, which a user who switched
+apps to read the SMS will meet) or already spent — so telling them to try again would loop them against
+a code that can never succeed. No status at all means the request was never answered and the guess is
+untouched, so retry.
 
 ## 6. Maker-checker / approval
 - **Not applicable.** Sign in / sign up have no proposer-approver step. (The opt-in Verified-badge
@@ -745,11 +732,11 @@ non-disclosure if a known number does exactly the same thing.
 **The name is asked for *after* the code, never before.** Branching at the mobile step is exactly the
 oracle above. Putting the ask behind the OTP costs a genuine new user the same number of screens and
 discloses nothing, because by then the caller has read back a code sent to that handset. Asserted as a
-pair for the same reason: "a new account was asked for a name" is only evidence of a new-account rule
-if an account that already has one is *not* asked. Reaching the dashboard on the second sign-in **is**
-the assertion — the step is a full-screen replacement of the same card, so a named account arriving
-anywhere else could not have skipped it, and the trigger is derived from the profile rather than from
-"this row was just inserted".
+pair: "a new account was asked for a name" is only evidence of a new-account rule if an account that
+already has one is *not* asked. Reaching the dashboard on the second sign-in **is** the assertion — the
+step is a full-screen replacement of the same card, so a named account arriving anywhere else could not
+have skipped it, and the trigger is derived from the profile rather than from "this row was just
+inserted".
 
 **First-time accounts land on listings, not the dashboard.** Every dashboard card is derived from real
 activity, and an account three seconds old has none, so the hub would open as a page of zeros at the
@@ -772,15 +759,13 @@ attribute was set but not that a browser honours it or that `credentials: 'inclu
   fifteen minutes and no spec should wait, while an absent token takes a different path (the recovery
   gate reads it as "not signed in" and never refreshes). The signature is corrupted by **flipping** its
   first character, not appending one — an HS384 signature is exactly 64 base64url characters with no
-  spare bits, so a 65th decodes to nothing, the token verifies happily, and the test passes proving
-  nothing. That is what the first run of that spec did.
+  spare bits, so a 65th decodes to nothing, the token verifies happily, and the test proves nothing.
 - The renewal poll asserts *usable **and** new*, as one conjunction. `.not.toBe(tampered)` alone also
-  passes when the store was cleared (`undefined !== tampered`), so a sign-out satisfied the assertion
-  meant to prove renewal and surfaced a line later as a URL mismatch that read like a routing bug.
-  "Is a JWT" alone is worse: the tampered token is still JWT-shaped, so that poll passed before the
-  recovery had even sent `/auth/refresh`, making the test a race between `reload()` and a
-  401-plus-refresh round trip — one it won for a long time and lost when an unrelated change shifted
-  boot timing by milliseconds.
+  passes when the store was cleared (`undefined !== tampered`), so a sign-out would satisfy the
+  assertion meant to prove renewal and surface later as a URL mismatch that reads like a routing bug.
+  "Is a JWT" alone is worse: the tampered token is still JWT-shaped, so the poll passes before the
+  recovery has even sent `/auth/refresh`, making the test a race between `reload()` and a
+  401-plus-refresh round trip.
 
 **A remembered session survives a web-storage wipe.** Safari's ITP deletes script-writable storage
 after seven days without first-party interaction while leaving server-set cookies alone, so on day
@@ -805,19 +790,19 @@ clears rather than a flag the client sets. A hint outliving its revoked token se
 into a refresh that can only 401, shaped exactly like reuse-detection tripping, on the one path we
 watch for. The offline case matters most: `authProvider.logout` posts best-effort and swallows a
 NetworkError, on the reasoning that the residue is unreachable — the recovery path above is exactly
-such a thing, so that reasoning expired the day it was written. Aborting the request is the only way to
-reach the branch, since a reachable server clears the hint itself and the assertion would pass for the
-wrong reason.
+such a thing, so that reasoning no longer holds. Aborting the request is the only way to reach the
+branch, since a reachable server clears the hint itself and the assertion would pass for the wrong
+reason.
 
 **The OTP attempt count comes from the server, not a local tally.** The page cannot see attempts a
 second tab or an earlier visit already spent, so a local counter would promise three guesses to someone
 who has one. Asserting the *numbers* is the point: an off-by-one either burns a guess the user was owed
 or offers one the server will refuse, and both read as a working form. The wording is read as rendered
-because the server's prose is not the product copy — a screen showing the server's sentence would be
-the bug. Sign Up posts to the same `/auth/login` and so spends the same
-budget, but it also raises refusals Sign In never can: a signup *validation* message names the field to
-fix and keeps the server's text, while everything else is a refusal about the code or the account and
-must be translated.
+because the server's prose is English-only and not the product copy — a screen showing the server's
+sentence would be the bug. Sign Up posts to the same `/auth/login` and so spends the same budget, but
+it also raises refusals Sign In never can: a signup *validation* message names the field to fix and
+keeps the server's text, while everything else is a refusal about the code or the account and must be
+translated.
 
 **A hostile `next` cannot steer a freshly-authenticated session off-site.** `next` is the one piece of
 post-auth routing an attacker gets to write, and it is acted on at the exact moment the session becomes
@@ -835,10 +820,9 @@ Asserting the *landing* rather than "still on localhost" is what makes those tes
 call site navigates with `replace: true`, and `history.replaceState` throws on a cross-origin URL, so a
 vulnerable guard leaves the browser sitting on the sign-in page — still on localhost — and an
 origin-only assertion passes against the bug it exists to catch. `/staff-login` gets its own case
-because it reaches the guard by a different route: it filters `next` by role as well, and for a long
-time the role filter was the *only* check, so a host starting with neither `/admin` nor `/ops` passed
-through untouched. One payload suffices now that both doors call the same function; the point is that
-they still do.
+because it reaches the guard by a different route: it filters `next` by role as well, and the role
+filter alone let through a host starting with neither `/admin` nor `/ops`. One payload suffices now
+that both doors call the same function; the point is that they still do.
 
 **The demo-mode hint is inverted under live auth.** `Signin.jsx` renders "enter any 6 digits" only when
 auth is not live. Against a real OTP that hint is a lie costing a support ticket per user, and it is
@@ -852,13 +836,13 @@ access token is in reach from a spec — the refresh token is an `HttpOnly` cook
 from the same flag — but the storage half is the half a script on the page can read.
 
 **City copy on the auth panels.** City selection is client state; what the panel *says* about a city is
-not. Pune's inventory count next to "launching in Mumbai soon" is not a cosmetic slip — it is a claim
-about stock that does not exist. These assertions move again when the cities/geo work lands
-(`cities.live` becomes a server fact); recorded in `tasks/DECISIONS-NEEDED.md` under decision 2.
+not. Pune's inventory count next to "launching in Mumbai soon" is a claim about stock that does not
+exist. These assertions move again when the cities/geo work lands (`cities.live` becomes a server
+fact); recorded in `tasks/DECISIONS-NEEDED.md` under decision 2.
 
-**The resend countdown is the server's number.** It was a hardcoded 30s in the browser while a
-deployment enforces a 60s gap, so the button came back while the server still refused and a person who
-waited for it got a rate-limit error rather than a code. No constant can be right in both places — e2e
-and local profiles run a mock sender with no gap at all — so the send acknowledgement carries the
-cooldown. The spec asserts 47s precisely because neither side would pick it: 30 is the old constant and
-60 the deployed gap, so either could pass against the bug.
+**The resend countdown is the server's number.** A hardcoded browser constant is wrong somewhere: at 30s
+against a 60s deployed gap the button came back while the server still refused, and a person who waited
+for it got a rate-limit error rather than a code. No constant can be right in both places — e2e and
+local profiles run a mock sender with no gap at all — so the send acknowledgement carries the cooldown.
+The spec asserts 47s precisely because neither side would pick it: 30 and 60 are the old constant and
+the deployed gap, so either could pass against the bug.

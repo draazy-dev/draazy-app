@@ -3,7 +3,6 @@ package com.draazy.api.moderation.verification;
 import java.time.Instant;
 import java.util.List;
 
-// missingKinds is the reason the badge is not granted, making this worth returning.
 public record OwnershipVerificationResponse(
         String propertyId,
         boolean verified,
@@ -13,9 +12,8 @@ public record OwnershipVerificationResponse(
         List<Evidence> evidence,
         Instant requestedAt,
         Instant declinedAt,
-        String declinedReason) {
-
-    // Expired rows stay because the case file is a history, not a snapshot.
+        String declinedReason,
+        boolean ownerIdVerified) {
     public record Evidence(
             String id,
             String docType,

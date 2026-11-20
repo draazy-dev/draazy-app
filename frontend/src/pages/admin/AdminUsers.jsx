@@ -21,8 +21,9 @@ import Badge from '../../components/ui/Badge.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, Cell, Chips, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
+  BTN, CHIP, CHIP_TONE, Cell, Chips, DATE_CHIPS, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const ROLE_CHIPS = [
   { value: '', label: 'All' },
@@ -38,8 +39,6 @@ const STATUS_TABS = [
 const PAGE_SIZE = 20;
 const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 
-/* `requiresReason` mirrors a server 422 and a database check constraint, so a Confirm button that
-   stayed enabled would submit a request that could only fail. */
 const ACTION_COPY = {
   verifyGrant: { title: 'Grant Verified badge', requiresReason: true, minReason: 10, hint: 'Say what you checked. The badge is a claim the platform makes on this person\u2019s behalf.' },
   verifyRemove: { title: 'Remove Verified badge', requiresReason: true, minReason: 10, hint: 'Say what changed. Removing a badge is visible to everyone browsing their listings.' },
@@ -52,7 +51,6 @@ const ACTION_COPY = {
 };
 const reasonMissing = (copy, text) => !!copy?.requiresReason && text.trim().length < (copy.minReason || 1);
 
-/** Icon, dot and text colour per timeline `kind`. */
 const TIMELINE_STYLES = {
   account: { icon: UserPlus, dot: 'bg-emerald-400', color: 'text-emerald-300', title: 'Joined Draazy' },
   enquiry: { icon: Mail, dot: 'bg-teal-400', color: 'text-teal-300', title: 'Sent an enquiry' },
@@ -76,50 +74,49 @@ export default function AdminUsers() {
   const [counts, setCounts] = useState({});
   const [role, setRole] = useState('');
   const [q, setQ] = useState('');
-  const resetKey = `${tab}|${role}|${q}`;
+  const [days, setDays] = useState('');
+  const resetKey = `${tab}|${role}|${q}|${days}`;
   const [pageState, setPageState] = useState({ page: 1, key: resetKey });
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(pageState.key === resetKey ? pageState.page : 1, lastPage);
-  const [actionModal, setActionModal] = useState(null); // { user, action, copy }
+  const [actionModal, setActionModal] = useState(null);
   const [actionError, setActionError] = useState('');
   const [noteText, setNoteText] = useState('');
   const [busy, setBusy] = useState(false);
   const [timelineUser, setTimelineUser] = useState(null);
-  const [timeline, setTimeline] = useState(null); // null = still loading
-  /* Separate from `timeline`: a separate route with a separate audience, since the timeline is
-     admin-only and has no `note` kind. null = still loading. */
+  const [timeline, setTimeline] = useState(null);
   const [userNotes, setUserNotes] = useState(null);
   const [userNoteDraft, setUserNoteDraft] = useState('');
   const [savingNote, setSavingNote] = useState(false);
 
-  // Guards every post-await setState. Re-armed in the effect body rather than only cleared in
-  // cleanup, or StrictMode's mount/unmount/re-mount leaves it false forever.
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
     return () => { alive.current = false; };
   }, []);
 
-  /* Counts ignore status and paging, so fetch them only when role or search changed, or after an action. */
   const countsKey = useRef(null);
+  const loadSeq = useRef(0);
   const load = useCallback(async (recount = false) => {
     const key = `${role}|${q.trim()}`;
     const counts = recount === true || countsKey.current !== key;
-    const res = await listUsers({ role, customers: true, status, q: q.trim(), page: page - 1, size: PAGE_SIZE, counts });
-    if (!alive.current) return;
+    const mine = ++loadSeq.current;
+    const res = await listUsers({ role, customers: true, status, q: q.trim(), days, page: page - 1, size: PAGE_SIZE, counts });
+    if (!alive.current || mine !== loadSeq.current) return;
     setRows(res.items);
     setTotal(res.total);
     if (counts) {
       countsKey.current = key;
       setCounts(res.counts || {});
     }
-  }, [role, status, q, page]);
+  }, [role, status, q, days, page]);
 
-  // Debounced, because `q` changes on every keystroke and each change is a request.
+  const loadedQ = useRef(q);
   useEffect(() => {
-    const id = setTimeout(() => { load(); }, 250);
+    if (loadedQ.current === q) { load(); return undefined; }
+    const id = setTimeout(() => { loadedQ.current = q; load(); }, 250);
     return () => clearTimeout(id);
-  }, [load]);
+  }, [load, q]);
 
   const openAction = useCallback((targetUser, action) => { setActionModal({ user: targetUser, action, copy: ACTION_COPY[action] }); setNoteText(''); setActionError(''); }, []);
   const closeAction = () => { setActionModal(null); setActionError(''); };
@@ -129,8 +126,6 @@ export default function AdminUsers() {
     setTimeline(null);
     setUserNotes(null);
     setUserNoteDraft('');
-    /* Two reads, deliberately not awaited together: a timeline that fails must not blank the notes,
-       and vice versa. They answer different questions about the same person. */
     listNotes('user', targetUser.id)
       .then((rows) => { if (alive.current) setUserNotes(rows); })
       .catch(() => { if (alive.current) setUserNotes([]); });
@@ -143,8 +138,6 @@ export default function AdminUsers() {
   }, [toast]);
   const closeTimeline = () => { setTimelineUser(null); setTimeline(null); setUserNotes(null); setUserNoteDraft(''); };
 
-  /* Refetched rather than optimistically prepended: the server decides the id, the timestamp and
-     the byline, and the byline is the point of the panel. */
   const submitUserNote = async () => {
     const text = userNoteDraft.trim();
     if (!text || !timelineUser || savingNote) return;
@@ -154,14 +147,12 @@ export default function AdminUsers() {
       const rows = await listNotes('user', timelineUser.id);
       if (alive.current) { setUserNotes(rows); setUserNoteDraft(''); }
     } catch (err) {
-      toast(err?.message || 'Could not save that note', 'error');
+      toast(userMessage(err, 'Could not save that note'), 'error');
     } finally {
       if (alive.current) setSavingNote(false);
     }
   };
 
-  /* Every action ends in a reload rather than a local patch: the four routes return nothing or the
-     whole account, and a reload stays correct when the server refuses the change. */
   const confirmAction = async () => {
     if (busy || !actionModal) return;
     const { user: u, action, copy } = actionModal;
@@ -204,7 +195,7 @@ export default function AdminUsers() {
       closeAction();
       await load(true);
     } catch (err) {
-      const message = err?.message || 'That could not be done';
+      const message = userMessage(err, 'That could not be done');
       setActionError(message);
       toast(message, 'error');
     } finally {
@@ -216,14 +207,14 @@ export default function AdminUsers() {
 
   const doExport = async () => {
     try {
-      const all = await listUsers({ role, customers: true, status, q: q.trim(), page: 0, size: MAX_PAGE_SIZE });
+      const all = await listUsers({ role, customers: true, status, q: q.trim(), days, page: 0, size: MAX_PAGE_SIZE });
       exportCsv(
         'draazy-users.csv',
         ['ID', 'Name', 'Mobile', 'Role', 'City', 'Listings', 'Joined', 'Verified', 'Status'],
         all.items.map((u) => [u.id, u.name, u.mobile, u.role, u.city, u.listings || 0, u.joinedAt, u.verified ? 'Yes' : 'No', u.status]),
       );
     } catch (err) {
-      toast(err?.message || 'Could not export the users', 'error');
+      toast(userMessage(err, 'Could not export the users'), 'error');
     }
   };
 
@@ -312,6 +303,7 @@ export default function AdminUsers() {
           <>
             <SearchBox value={q} onChange={setQ} placeholder="Search name or mobile…" label="Search users" />
             <Chips label="Role" options={ROLE_CHIPS} value={role} onChange={setRole} />
+            <Chips label="Joined" options={DATE_CHIPS} value={days} onChange={setDays} />
             <div className="ml-auto flex items-center gap-2">
               {optionEnabled('users.csvExport') ? (
                 <button type="button" onClick={doExport} className={BTN.ghost}>
@@ -399,7 +391,7 @@ export default function AdminUsers() {
               <div className="flex items-center gap-2 text-sm font-bold text-gray-200">
                 <MessageSquareText className="h-4 w-4 text-indigo-400" /> Staff notes
                 {userNotes && (
-                  <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">{userNotes.length}</span>
+                  <span className="dz-count bg-indigo-500/15 text-indigo-300">{userNotes.length}</span>
                 )}
               </div>
               <div className="mt-3 flex items-start gap-2">

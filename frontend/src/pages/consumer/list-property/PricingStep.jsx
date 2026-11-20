@@ -26,8 +26,6 @@ const toTwoDecimal = (value) => {
   return fraction == null ? whole.slice(0, 9) : `${whole.slice(0, 9)}.${fraction.slice(0, 2)}`;
 };
 
-/* Three lease vocabularies, because the three are let on different cycles: a flat on the 11-month tenancy, a shop or
-   shed on year-scale terms, a plot or farm by the year or the crop. */
 const LEASE_TERMS = {
   residential: [agreementOptions, lockinOptions, noticeOptions],
   commercial: [commercialAgreementOptions, commercialLockinOptions, commercialNoticeOptions],
@@ -53,8 +51,6 @@ const PricingStep = ({
   const commercial = isCommercial();
   const plotSale = isPlotSale(form);
   const residentialPricing = !land && !commercial;
-  /* Land is excluded to match the validator: a plot keeps whatever `construction` a flat left behind, and without the
-     guard the RERA field would claim a requirement the step never enforces. */
   const preCompletion = !land && (form.construction === 'new' || form.construction === 'under');
   const leaseKind = leaseKindOf(form.propertyType);
   const [agreementOpts, lockinOpts, noticeOpts] = LEASE_TERMS[leaseKind];
@@ -82,9 +78,9 @@ const PricingStep = ({
               <label className={lbl3}>{t('listProperty.fields.expectedPrice')}</label>
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</div>
-                <input inputMode="numeric" maxLength={12} {...money('price')} data-err="price" placeholder={t('listProperty.ph.egPrice')} className={`${fld} pl-10 pr-4 ${errors.price ? 'dz-invalid' : ''}`} />
+                <input inputMode="numeric" maxLength={18} {...money('price')} data-err="price" placeholder={t('listProperty.ph.egPrice')} className={`${fld} pl-10 pr-4 ${errors.price ? 'dz-invalid' : ''}`} />
               </div>
-              <FieldError show={!!errors.price}>{errors.price === 'min' ? t('listProperty.err.priceMin') : t('listProperty.err.price')}</FieldError>
+              <FieldError show={!!errors.price}>{errors.price === 'min' ? t('listProperty.err.priceMin') : errors.price === 'max' ? t('listProperty.err.priceMax') : t('listProperty.err.price')}</FieldError>
 
               {(priceWords || saleUnitCaption) && (
                 <p className="mt-1.5 ml-1 flex flex-wrap items-baseline gap-x-2 text-xs">
@@ -101,12 +97,10 @@ const PricingStep = ({
             </div>
           </div>
 
-          {/* A commercial unit states the same recurring cost as CAM, per sq.ft., so the two share one slot — either
-             box alone, never both, or they'd be two answers to one question. */}
           <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {!land && !commercial && (
               <div>
-                <label className={lbl3}>{t('listProperty.fields.monthlyMaintenance')} <span className="text-gray-500 font-normal">{t('listProperty.optional')}</span></label>
+                <label className={lbl3}>{t('listProperty.fields.monthlyMaintenance')}</label>
                 <div className="relative">
                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</div>
                   <input inputMode="numeric" maxLength={7} {...money('monthlyMaintenance')} placeholder={t('listProperty.ph.egMaint3500')} className={`${fld} pl-10 pr-16`} />
@@ -128,7 +122,7 @@ const PricingStep = ({
               <p className="text-gray-500 text-xs mb-3">{t('listProperty.help.tenancyStatus')}</p>
               <div className="flex flex-wrap gap-2.5" data-err="tenancyStatus">
                 {tenancyStatusOptions.map(([v, l]) => (
-                  <Pill key={v} selected={form.tenancyStatus === v} onClick={() => set('tenancyStatus', form.tenancyStatus === v ? '' : v)} className="px-5 py-2.5">{l}</Pill>
+                  <Pill key={v} selected={form.tenancyStatus === v} onClick={() => set('tenancyStatus', form.tenancyStatus === v ? '' : v)} className="px-5 h-btn inline-flex items-center justify-center">{l}</Pill>
                 ))}
               </div>
               {form.tenancyStatus === 'leased' && (
@@ -157,7 +151,7 @@ const PricingStep = ({
               <div data-err="possession">
                 <div className="grid grid-cols-2 gap-2.5">
                   {[['ready', t('listProperty.opt.readyToMove')], ['new', t('listProperty.opt.newLaunch')], ['under', t('listProperty.opt.underConstruction')]].map(([v, l]) => (
-                    <Pill key={v} selected={form.construction === v} onClick={() => set('construction', v)} className="py-2.5 text-center">{l}</Pill>
+                    <Pill key={v} selected={form.construction === v} onClick={() => set('construction', v)} className="h-btn inline-flex items-center justify-center text-center">{l}</Pill>
                   ))}
                 </div>
                 <FieldError show={!!errors.possession}>{t('listProperty.err.possession')}</FieldError>
@@ -177,7 +171,7 @@ const PricingStep = ({
               <p className="text-gray-500 text-xs mb-3">{t('listProperty.reraPlots.help')}</p>
               <div className="flex flex-wrap gap-2.5" data-err="plottedProject">
                 {['yes', 'no'].map((v) => (
-                  <Pill key={v} selected={form.plottedProject === v} onClick={() => set('plottedProject', v)} className="px-5 py-2.5">
+                  <Pill key={v} selected={form.plottedProject === v} onClick={() => set('plottedProject', v)} className="px-5 h-btn inline-flex items-center justify-center">
                     {t(`listProperty.opt.${v}`)}
                   </Pill>
                 ))}
@@ -186,12 +180,11 @@ const PricingStep = ({
             </div>
           )}
 
-          {/* MahaRERA sits with the answer that decides whether it is owed, not at the bottom of the document step. */}
           {form.propertyType !== 'farmland' && (
             <div className="mb-6">
               <label htmlFor="lp-rera" className={lbl3}>
                 {t('listProperty.fields.reraNo')}
-                {!reraRequired && <span className="text-gray-500 font-normal"> {t('listProperty.optional')}</span>}
+                {reraRequired && ' *'}
               </label>
               <input
                 id="lp-rera"
@@ -218,7 +211,7 @@ const PricingStep = ({
             <p className="text-gray-500 text-xs mb-3">{t('listProperty.toggle.homeLoanSub')}</p>
             <div className="flex flex-wrap gap-2.5" data-err="loanAvailable">
               {[[true, t('listProperty.opt.yes')], [false, t('listProperty.opt.no')]].map(([v, l]) => (
-                <Pill key={String(v)} selected={form.loanAvailable === v} onClick={() => set('loanAvailable', form.loanAvailable === v ? '' : v)} className="px-5 py-2.5">{l}</Pill>
+                <Pill key={String(v)} selected={form.loanAvailable === v} onClick={() => set('loanAvailable', form.loanAvailable === v ? '' : v)} className="px-5 h-btn inline-flex items-center justify-center">{l}</Pill>
               ))}
             </div>
           </div>
@@ -233,10 +226,10 @@ const PricingStep = ({
               <label className={lbl3}>{t('listProperty.fields.monthlyRent')}</label>
               <div className="relative">
                 <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</div>
-                <input inputMode="numeric" maxLength={9} {...money('monthlyRent')} data-err="monthlyRent" placeholder={t('listProperty.ph.egRent32')} className={`${fld} pl-8 sm:pl-10 pr-14 sm:pr-16 ${errors.monthlyRent ? 'dz-invalid' : ''}`} />
+                <input inputMode="numeric" maxLength={14} {...money('monthlyRent')} data-err="monthlyRent" placeholder={t('listProperty.ph.egRent32')} className={`${fld} pl-8 sm:pl-10 pr-14 sm:pr-16 ${errors.monthlyRent ? 'dz-invalid' : ''}`} />
                 <div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs">{t('listProperty.unit.perMonth')}</div>
               </div>
-              <FieldError show={!!errors.monthlyRent}>{errors.monthlyRent === 'min' ? t('listProperty.err.monthlyRentMin') : t('listProperty.err.monthlyRent')}</FieldError>
+              <FieldError show={!!errors.monthlyRent}>{errors.monthlyRent === 'min' ? t('listProperty.err.monthlyRentMin') : errors.monthlyRent === 'max' ? t('listProperty.err.monthlyRentMax') : t('listProperty.err.monthlyRent')}</FieldError>
               {(rentWords || commercialRentCaption) && (
                 <p className="mt-1.5 ml-1 flex flex-wrap items-baseline gap-x-2 text-xs">
                   {rentWords && <span className="text-gray-600 text-[15.6px]">{rentWords}</span>}
@@ -248,12 +241,12 @@ const PricingStep = ({
               <label className={lbl3}>{t('listProperty.fields.securityDepositReq')}</label>
               <div className="relative">
                 <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</div>
-                <input inputMode="numeric" maxLength={9} {...money('deposit')} data-err="deposit" placeholder={t('listProperty.ph.egDeposit1L')} className={`${fld} pl-8 sm:pl-10 pr-3 sm:pr-4 ${errors.deposit ? 'dz-invalid' : ''}`} />
+                <input inputMode="numeric" maxLength={14} {...money('deposit')} data-err="deposit" placeholder={t('listProperty.ph.egDeposit1L')} className={`${fld} pl-8 sm:pl-10 pr-3 sm:pr-4 ${errors.deposit ? 'dz-invalid' : ''}`} />
               </div>
               <FieldError show={!!errors.deposit}>{errors.deposit === 'max' ? t('listProperty.err.depositMax') : t('listProperty.err.deposit')}</FieldError>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {DEPOSIT_MONTHS[leaseKind].map((m) => (
-                  <button key={m} type="button" onClick={() => setDepositMonths(m)} className="relative inline-flex items-center justify-center min-h-[44px] text-xs px-2 sm:px-2.5 py-1 rounded-full border border-white/10 text-gray-400 hover:border-teal-400/40 hover:text-teal-300 transition-all">{t('listProperty.depositMonths', { count: m })}</button>
+                  <button key={m} type="button" onClick={() => setDepositMonths(m)} className="dz-chip">{t('listProperty.depositMonths', { count: m })}</button>
                 ))}
               </div>
             </div>
@@ -267,7 +260,7 @@ const PricingStep = ({
               <label className={lbl3}>{t('listProperty.fields.maintenanceCharges')}</label>
               <div className="flex flex-wrap gap-2.5">
                 {[['included', t('listProperty.opt.includedInRent')], ['extra', t('listProperty.opt.chargedExtra')]].map(([v, l]) => (
-                  <Pill key={v} selected={form.rentMaintMode === v} onClick={() => set('rentMaintMode', v)} className="px-5 py-2.5">{l}</Pill>
+                  <Pill key={v} selected={form.rentMaintMode === v} onClick={() => set('rentMaintMode', v)} className="px-5 h-btn inline-flex items-center justify-center">{l}</Pill>
                 ))}
               </div>
               {form.rentMaintMode === 'extra' && (
@@ -291,7 +284,7 @@ const PricingStep = ({
             <label className={lbl3}>{t('listProperty.fields.preferredTenants')}</label>
             <div className="flex flex-wrap gap-2.5">
               {[['family', t('listProperty.opt.family')], ['bachelors', t('listProperty.opt.bachelors')], ['bachelor-male', t('listProperty.opt.bachelorMale')], ['bachelor-female', t('listProperty.opt.bachelorFemale')], ['company', t('listProperty.opt.companyLease')], ['anyone', t('listProperty.opt.anyone')]].map(([v, l]) => (
-                <Pill key={v} selected={form.preferredTenants.includes(v)} onClick={() => toggleTenant(v)} className="px-5 py-2.5">
+                <Pill key={v} selected={form.preferredTenants.includes(v)} onClick={() => toggleTenant(v)} className="px-5 h-btn inline-flex items-center justify-center">
                   {v === 'family' ? <span className="flex items-center gap-2"><Users className="w-4 h-4" />{l}</span> : l}
                 </Pill>
               ))}
@@ -306,8 +299,6 @@ const PricingStep = ({
                 {!showTerms && <p className="text-sm text-gray-300 mt-1">{t('listProperty.terms.standard')}</p>}
               </div>
 
-              {/* Only offered while the terms are still standard, because that is the only state with a summary to
-                 return to. */}
               {standardTerms && (
                 <button type="button" onClick={() => setTermsOpen(!termsOpen)} aria-expanded={termsOpen} aria-controls="lp-rental-terms-fields" aria-label={t('listProperty.terms.changeAria')} className="shrink-0 min-h-[44px] px-3 text-sm font-semibold text-teal-300 hover:text-teal-200 transition-colors">
                   {t('listProperty.terms.change')}
@@ -315,7 +306,6 @@ const PricingStep = ({
               )}
             </div>
 
-            {/* Two columns on a phone: lock-in and notice are read against each other. */}
             <div id="lp-rental-terms-fields" className={`mt-3 grid-cols-2 sm:grid-cols-3 gap-4 ${showTerms ? 'grid' : 'hidden'}`}>
               <div className="col-span-2 sm:col-span-1">
                 <label className={lbl}>{t('listProperty.fields.agreementDuration')}</label>
@@ -331,8 +321,6 @@ const PricingStep = ({
               </div>
             </div>
 
-            {/* Rent alone does not describe a commercial tenancy: the fit-out months are rent the tenant never
-               pays, and the escalation is what they will pay in year four. */}
             {commercial && (
               <div className="mt-4 grid grid-cols-2 gap-4">
                 <div>
@@ -357,9 +345,7 @@ const PricingStep = ({
               <label className={lbl3}>{t('listProperty.fields.petsAllowed')}</label>
               <div className="flex flex-wrap gap-3" data-err="petsPolicy">
                 {[['yes', t('listProperty.opt.allowed')], ['no', t('listProperty.opt.notAllowed')]].map(([v, l]) => (
-                  // Re-clicking clears it: an owner who answered by accident, or who no
-                  // longer wants to commit, needs a way back to having said nothing.
-                  <Pill key={v} selected={form.petsPolicy === v} onClick={() => set('petsPolicy', form.petsPolicy === v ? '' : v)} className="px-5 py-2.5">{l}</Pill>
+                  <Pill key={v} selected={form.petsPolicy === v} onClick={() => set('petsPolicy', form.petsPolicy === v ? '' : v)} className="px-5 h-btn inline-flex items-center justify-center">{l}</Pill>
                 ))}
               </div>
             </div>
@@ -367,7 +353,7 @@ const PricingStep = ({
               <label className={lbl3}>{t('listProperty.fields.foodPreference')}</label>
               <div className="flex flex-wrap gap-3">
                 {[['any', t('listProperty.opt.vegAndNonveg')], ['veg', t('listProperty.opt.vegOnlyCap')], ['jain', t('listProperty.opt.jainOnlyCap')]].map(([v, l]) => (
-                  <Pill key={v} selected={form.foodPref === v} onClick={() => set('foodPref', v)} className="px-5 py-2.5">{l}</Pill>
+                  <Pill key={v} selected={form.foodPref === v} onClick={() => set('foodPref', v)} className="px-5 h-btn inline-flex items-center justify-center">{l}</Pill>
                 ))}
               </div>
             </div>

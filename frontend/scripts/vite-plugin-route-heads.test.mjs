@@ -17,6 +17,9 @@ assert.match(page, /"@type":"Service".*"provider":\{"@id":"https:\/\/draazy.com\
 assert.match(page, /"@type":"BreadcrumbList".*"name":"Services","item":"https:\/\/draazy.com\/services"/);
 assert.match(routePage(shell, '/emi-calculator', ROUTE_HEADS['/emi-calculator']), /"@type":"WebApplication"/);
 assert.doesNotMatch(routePage(shell, '/plans', ROUTE_HEADS['/plans']), /ld\+json/);
+assert.match(page, /<meta property="og:image" content="https:\/\/draazy.com\/og\/route\/services-rent-agreement.jpg" \/>/);
+assert.match(page, /<meta property="og:image:width" content="1200" \/>/);
+assert.match(routePage(shell, '/', ROUTE_HEADS['/']), /<meta property="og:image" content="https:\/\/draazy.com\/og-image.jpg" \/>/);
 
 for (const [path, head] of Object.entries(ROUTE_HEADS)) routePage(shell, path, head);
 assert.throws(() => routePage(shell, '/x', { title: 'x'.repeat(61), description: 'd' }), /title is 61 chars/);

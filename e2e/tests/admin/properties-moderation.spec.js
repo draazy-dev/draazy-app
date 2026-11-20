@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../fixtures/live.js';
-import { API, authHeaders, apiLogin, uploadedListingPhotos, uniqueMobile, signIn } from '../../helpers/liveAuth.js';
+import { API, authHeaders, uploadedListingPhotos, uniqueMobile, signIn } from '../../helpers/liveAuth.js';
 import { approveListing, rejectListing } from '../../helpers/moderation.js';
 import { chooseLocality } from '../../helpers/locality.js';
 
@@ -64,6 +64,26 @@ test('approving puts it on the public site; rejecting takes it off again', async
   expect(await publicView(id)).toBe(404);
 
   expect(await ownerView(id, headers)).toBe(200);
+});
+
+test('the owner is told of an approval and a rejection by listing name, with the note apart from the resubmit line', async ({ request }) => {
+  const { id, headers } = await freshListing('Owner is told');
+  const notice = async (type) => {
+    const res = await fetch(`${API}/notifications?size=50`, { headers });
+    expect(res.status).toBe(200);
+    return (await res.json()).content.find((n) => n.type === type);
+  };
+
+  expect((await approveListing(request, id, await admin())).status()).toBe(200);
+  const approved = await notice('listing.approved');
+  expect(approved?.body).toContain('"Owner is told" in Baner');
+  expect(approved.link).toBe(`/property/${id}`);
+
+  expect((await rejectListing(request, id, await admin(), { reasonCode: 'wrong_details', reason: 'Rent is wrong' })).status()).toBe(200);
+  const rejected = await notice('listing.rejected');
+  expect(rejected?.body).toContain('"Owner is told" in Baner');
+  expect(rejected.body).toContain('Rent is wrong\nEdit the listing and resubmit it for review.');
+  expect(rejected.link).toBe(`/messages?support=property:${id}`);
 });
 
 test('the status route refuses the two decisions that belong to other routes', async ({ request }) => {
@@ -159,7 +179,7 @@ test('an unknown listing is a 404, not a 500, on every decision', async () => {
   }
 });
 
-test('a moderator can correct a BHK on a listing they do not own', async ({ page, request }) => {
+test('a moderator can correct the BHK and type on a listing they do not own, picking only approved values', async ({ page, request }) => {
   const title = `BHK correction ${Date.now()}`;
   const { id, headers } = await freshListing(title);
 
@@ -174,10 +194,17 @@ test('a moderator can correct a BHK on a listing they do not own', async ({ page
   await row.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Edit listing' })).toBeVisible();
 
-  // Use the numeric field because the contract stores BHK as an integer.
-  const bhkBox = page.getByLabel('Configuration (BHK)');
-  await expect(bhkBox).toHaveValue('2');
-  await bhkBox.fill('3');
+  // Both fields offer only the values the listing wizard writes.
+  const bhkBox = page.getByRole('button', { name: 'Configuration (BHK)' });
+  const typeBox = page.getByRole('button', { name: 'Property type' });
+  await expect(bhkBox).toContainText('2 BHK');
+  await expect(typeBox).toContainText('Flat');
+  await bhkBox.click();
+  await expect(page.getByRole('option', { name: '5+ BHK', exact: true })).toBeVisible();
+  await page.getByRole('option', { name: '3 BHK', exact: true }).click();
+  await typeBox.click();
+  await expect(page.getByRole('option', { name: 'Office Space', exact: true })).toBeVisible();
+  await page.getByRole('option', { name: 'Villa', exact: true }).click();
   await page.getByRole('button', { name: /Save changes/i }).click();
   // The modal closes only on a write the API accepted; a refusal leaves it open with a toast.
   await expect(page.getByRole('dialog', { name: 'Edit listing' })).toHaveCount(0);
@@ -185,6 +212,7 @@ test('a moderator can correct a BHK on a listing they do not own', async ({ page
   // Read back from the API rather than from the screen.
   const after = await (await fetch(`${API}/me/listings/${id}`, { headers })).json();
   expect(Number(after.bhk)).toBe(3);
+  expect(after.propertyType).toBe('Villa');
 
   // Moderator corrections must not remove an already approved listing from public view.
   expect(after.status).toBe('approved');
@@ -211,11 +239,12 @@ test('cancelling the edit modal discards the change rather than quietly saving i
   const modal = page.getByRole('dialog', { name: 'Edit listing' });
   await expect(modal).toBeVisible();
 
-  const bhkBox = page.getByLabel('Configuration (BHK)');
-  await expect(bhkBox).toHaveValue('2');
-  await bhkBox.fill('3');
+  const bhkBox = modal.getByRole('button', { name: 'Configuration (BHK)' });
+  await expect(bhkBox).toContainText('2 BHK');
+  await bhkBox.click();
+  await page.getByRole('option', { name: '3 BHK', exact: true }).click();
   // Without this the test cannot tell "Cancel discarded the edit" from "the edit never happened".
-  await expect(bhkBox).toHaveValue('3');
+  await expect(bhkBox).toContainText('3 BHK');
 
   await modal.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(modal).toHaveCount(0);
@@ -277,4 +306,54 @@ test('moving a listing to another locality moves its map pin to that locality', 
   expect(after.localitySlug).toBe('wakad');
   expect([Number(after.lat), Number(after.lng)]).toEqual([Number(wakad.lat), Number(wakad.lng)]);
   expect(after.status).toBe('approved');
+});
+
+test('a paused listing shows its own status, and every tab of the edit popup saves what the owner entered', async ({ page, request, consoleErrors }) => {
+  const title = `Full edit ${Date.now()}`;
+  const { id, headers } = await freshListing(title);
+  expect((await approveListing(request, id, await admin())).status()).toBe(200);
+  // The free tier may already have held it back as paused, in which case the owner's pause is refused.
+  await fetch(`${API}/me/listings/${id}/pause`, { method: 'POST', headers, body: '{}' });
+  expect((await (await fetch(`${API}/me/listings/${id}`, { headers })).json()).status).toBe('paused');
+
+  await signIn(page, ACTORS.admin, { screen: 'staff' });
+  await page.goto('/admin/properties?tab=all');
+  await page.getByPlaceholder('Title, owner, mobile or ID').first().fill(title);
+  const row = page.getByTestId('queue-row').filter({ has: page.getByRole('heading', { name: title }) });
+  await expect(row).toHaveCount(1, { timeout: 20000 });
+  await row.getByRole('button', { name: 'Edit', exact: true }).click();
+  const modal = page.getByRole('dialog', { name: 'Edit listing' });
+
+  const statusBox = modal.getByRole('button', { name: 'Status' });
+  await expect(statusBox).toContainText('Paused (current)');
+  await statusBox.click();
+  await expect(page.getByRole('option')).toHaveText(['Approved', 'Pending', 'Paused (current)']);
+  await page.keyboard.press('Escape');
+  await expect(modal.getByRole('tab')).toHaveText(['Basics', 'Details', 'Location', 'Pricing', 'Description', 'Photos']);
+
+  await modal.getByRole('tab', { name: 'Details' }).click();
+  await modal.getByLabel('Bathrooms').fill('2');
+  await modal.getByRole('button', { name: 'Furnishing' }).click();
+  await page.getByRole('option', { name: 'Semi-furnished', exact: true }).click();
+  await modal.getByRole('tab', { name: 'Location' }).click();
+  await modal.getByLabel('Address').fill('A-302, Green Acres, Baner Road');
+  await modal.getByLabel('Pincode').fill('411045');
+  await modal.getByRole('tab', { name: 'Pricing' }).click();
+  await modal.getByLabel(/Security deposit/).fill('60000');
+  await modal.getByRole('group', { name: 'Preferred tenants' }).getByRole('button', { name: 'Family' }).click();
+  await modal.getByRole('tab', { name: 'Description' }).click();
+  await modal.getByRole('textbox', { name: 'Description' }).fill('Sunny two-bedroom flat close to the Baner high street, corrected by the desk.');
+  await modal.getByRole('group', { name: 'Amenities' }).getByRole('button', { name: 'Lift' }).click();
+  await modal.getByRole('button', { name: /Save changes/i }).click();
+  await expect(modal).toHaveCount(0);
+
+  const after = await (await fetch(`${API}/me/listings/${id}`, { headers })).json();
+  expect(after).toMatchObject({
+    status: 'paused', bathrooms: 2, furnishing: 'semi-furnished', address: 'A-302, Green Acres, Baner Road',
+    pincode: '411045', description: 'Sunny two-bedroom flat close to the Baner high street, corrected by the desk.',
+  });
+  expect(Number(after.deposit)).toBe(60000);
+  expect(after.tenants).toContain('family');
+  expect(after.amenities).toContain('Lift');
+  expect(consoleErrors).toEqual([]);
 });

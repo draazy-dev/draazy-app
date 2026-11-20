@@ -1,19 +1,17 @@
 # Notifications
 
 Every message Draazy sends, by channel and audience, with the exact copy. The source of truth is the code; when
-copy changes there, update the row here in the same commit.
-
-`{curly}` marks a runtime value. Links are app routes.
+copy changes there, update the row here in the same commit. `{curly}` marks a runtime value; links are app routes.
 
 ## Channels at a glance
 
 | Channel | Status | Cost to Draazy | Sender | Used for |
 |---|---|---|---|---|
 | In-app (bell) | Live | Free | `Notifier` → `NotificationPublisher` | Almost everything: consumer events, staff hand-offs |
-| Web push | Live when `PUSH_VAPID_PRIVATE_KEY` is set; otherwise logs only | Free | `PushSender` (`WebPushSender`, fallback `LoggingPushSender`) | New chat messages only |
+| Web push | Live when `PUSH_VAPID_PRIVATE_KEY` is set; otherwise logs only | Free | `PushSender` (`WebPushSender`, fallback `LoggingPushSender`) | New chat messages only; an open tab raises its own [in-tab alerts](#in-tab-browser-alerts) |
 | WhatsApp — Meta Cloud API | Live when `WHATSAPP_ENABLED=true` | ~₹0.115 + 18% GST per message | `WhatsAppOtpSender`, `WhatsAppDecisionMessenger` | One-time codes, identity rejected / revoked, the daily waiting-on-you digest |
 | WhatsApp — click-to-chat (`wa.me`) | Live | Free (sent from a person's own WhatsApp) | `ClickToChatSender` (staff), plain links (consumers) | Staff → owner outreach; consumer → consumer handoffs |
-| Email — ZeptoMail | Live when `ZEPTOMAIL_ENABLED=true` | Per-email credit | `EmailSender` (`ZeptoMailEmailSender`) | Staff invite and password reset only |
+| Email — ZeptoMail | Live when `ZEPTOMAIL_ENABLED=true` | Per-email credit | `EmailSender` (`ZeptoMailEmailSender`) | Staff invite, password reset, and a copy of each staff bell alert |
 | SMS | Not built | — | — | — |
 
 Configuration for the paid channels is in [DEPLOY.md](../DEPLOY.md) (WhatsApp identity template, ZeptoMail).
@@ -26,13 +24,14 @@ Configuration for the paid channels is in [DEPLOY.md](../DEPLOY.md) (WhatsApp id
 - **Quiet hours.** When the user has quiet hours on (default off, 22:00–07:00), a row written inside the window gets
   `deliverAfter` and stays hidden until the window closes. Turning quiet hours off releases held rows.
 - **Match-alert switch.** `matchAlerts=false` drops only the `match.*` and `price.*` families (`NotificationTypes`).
-- **Retention.** Rows older than 90 days are swept daily (`NotificationRetention`).
+- **Retention.** The nightly `NotificationRetention` sweep deletes read rows after 30 days and every row after 90.
 - **Channel toggles.** The `whatsapp` toggle (`Notifier.allowsWhatsapp`) gates the paid identity and digest sends;
-  codes are never gated. The `email` and `sms` toggles are stored but read by nothing.
+  codes are never gated. The `email` toggle gates the [staff alert email](#email-zeptomail); `sms` is stored but
+  read by nothing (wire it before adding any paid SMS send).
 - **Chat bursts.** `message.received` writes one bell row per unread run (only when the recipient's unread count in
   that conversation is 1); push is scheduled for every message.
 - **Paid sends happen after commit** and are best-effort: a failed identity-decision WhatsApp is logged and the
-  in-app row still stands. An OTP delivery failure is surfaced to the caller.
+  in-app row stands. An OTP delivery failure is surfaced to the caller.
 - **Privacy.** No notification body carries another user's mobile number. Contact details are revealed only on the
   surfaces behind the contact gate.
 - **Frontend.** `frontend/src/services/providers/http/notificationMapper.js` maps a type to a UI chip by its prefix
@@ -80,8 +79,16 @@ Configuration for the paid channels is in [DEPLOY.md](../DEPLOY.md) (WhatsApp id
 
 | Type | Trigger | To | Title | Body | Link |
 |---|---|---|---|---|---|
-| `listing.approved` | Moderator / verification desk / override approves | Owner | Your listing is approved | It is now live and visible to buyers. | `/property/{id}` |
-| `listing.rejected` | Moderator or reviewer rejects | Owner | Your listing was not approved | `A moderator could not approve it: {reason}` (or `A reviewer …`) | `/dashboard` |
+| `listing.under_review` | Owner submits a listing | Owner | Your listing is under review | `"{title}" in {locality} is with our team. We'll tell you as soon as it is reviewed.` | `/dashboard?review={id}` |
+| `listing.approved` | Moderator / verification desk / override approves and the listing goes live | Owner | Your listing is approved | `"{title}" in {locality} is now live and visible to buyers.` | `/property/{id}` |
+| `listing.approved_paused` | Approval lands paused (free tier: one live listing) | Owner | Your listing is approved | `"{title}" in {locality} is approved.` plus the free-tier hold (buy a listing pass or pause another listing) | `/dashboard?review={id}` |
+| `listing.rejected` | Moderator or reviewer rejects | Owner | Your listing was not approved | `A moderator could not approve "{title}" in {locality}: {reason}` (or `A reviewer …`), then a new line `This decision is final. The listing cannot be resubmitted.` | `/dashboard?review={id}` |
+| `listing.reopened` | Staff reopen a rejected listing | Owner | Your listing is back under review | `"{title}" in {locality}` was reopened by our team and is being reviewed again. | `/dashboard?review={id}` |
+| `listing.flagged` | Staff flag the listing | Owner | Your listing has been taken down | A moderator took down your listing. Contact support if you think this is a mistake. | `/dashboard` |
+| `listing.unflagged` | Staff clear the flag | Owner | Your listing is back under review | `"{title}" in {locality}` is no longer flagged and is back in the review queue. | `/dashboard?review={id}` |
+| `listing.archived` | Staff archive someone else's listing (not the owner's own archive, merge or timeout, which have their own notices) | Owner | Your listing was archived | `"{title}" in {locality}` was archived by our team, plus `Reason: {reason}` when given. | `/dashboard` |
+| `listing.edited_by_staff` | Staff change fields of the listing through the admin edit (one per edit that changed something) | Owner | Your listing was updated by our team | `"{title}" in {locality}` was corrected by a reviewer: {changed fields}. | `/dashboard` |
+| `listing.badge_verified` | Verified property badge granted (not on a re-grant while still valid) | Owner | Your listing is a Verified property | `"{title}" in {locality}` now carries the Verified property badge. | `/dashboard` |
 | `listing.needs_info` | Reviewer asks for clarification | Owner | Your listing needs info | Reason-code message for the owner, plus the reviewer's note | `/dashboard?review={id}` |
 | `listing.needs_info_reminder` | No reply (first reminder) | Owner | Your listing still needs info | Please reply or edit your listing so Draazy can finish the review. Listings with no update are archived after 14 days. | `/dashboard` |
 | `listing.needs_info_reminder` | No reply, day 7 | Owner | Your listing still needs info | Please reply or edit your listing in the next 7 days, or we'll archive it for now. | `/dashboard` |
@@ -95,10 +102,10 @@ Only a reviewer's reject, the pending-expiry reject and a revoke also go out as 
 
 | Type | Trigger | To | Title | Body | Link |
 |---|---|---|---|---|---|
-| `identity.approved` | KYC reviewer approves | User | You're verified | `Your identity has been confirmed. Your profile name now matches your ID: {legal name}` | `/dashboard` |
+| `identity.approved` | KYC reviewer approves | User | You're ID verified | `Your identity has been confirmed. Your profile name now matches your ID: {legal name}` | `/dashboard` |
 | `identity.rejected` | Reviewer rejects, or the pending-expiry sweep rejects | User | Verification needs another try | We couldn't verify your ID this time. Open the verification page to see why and retake. | `/verify-identity` |
 | `identity.rejected` | Automatic check rejects | User | Verification needs another try | The automatic check's reason | `/verify-identity` |
-| `identity.revoked` | Reviewer withdraws the badge | User | Verified badge withdrawn | Reviewer's reason | `/verify-identity` |
+| `identity.revoked` | Reviewer withdraws the badge | User | ID verified badge withdrawn | Reviewer's reason | `/verify-identity` |
 
 ### Alerts
 
@@ -113,7 +120,7 @@ Both are governed by the `matchAlerts` switch.
 
 | Type | Trigger | To | Title | Body | Link |
 |---|---|---|---|---|---|
-| `flatmate.interest` | Someone shows interest in a seeker post | Post owner | `{name} is interested in teaming up` | Open your request inbox to review their interest. | Post |
+| `flatmate.interest` | Someone with a room shows interest in a seeker post | Post owner | `{name} has a room for you` | Open your request inbox to review their interest. | Post |
 | `flatmate.interest.sent` | Same action | Requester | `Your message is with {name}` | If they accept, we will share your mobile number with them so they can reply. Nobody else on the board can see it. | Post |
 | `flatmate.{kind}.interest` | Interest in a room/group listing | Host | `{name} is interested in {target}` | Open your request inbox to review their interest. | Target |
 | `flatmate.request.accepted` / `.declined` | Host decides | Requester | Your flatmate request was accepted / declined | Good news — the host accepted your request. They have your number. / The host has declined this one. Plenty of other people are looking. | Target |
@@ -127,9 +134,10 @@ Both are governed by the `matchAlerts` switch.
 | `flatmate.moderated.{verdict}` | Moderator rejects / removes | Author | Your flatmate ad is not live | It did not pass our review. | Ad |
 | `flatmate.moderated.held` | Linked listing stopped being live | Host | Your flatmate ad is back in review | The listing it was linked to is no longer live, so our team will check the ad before it shows again. | Ad |
 | `flatmate.review.approved` | Agreement check passes (staff) | Host | Your flatmate post is verified | Thanks — we have checked your agreement and your post now shows as verified. | Post |
-| `flatmate.review.approved` | Matched to a Draazy-registered agreement (automatic) | Host | Your flatmate post is Tenant-verified | We matched it to the rent agreement we registered for you, so there was nothing left for our team to check. | Post |
+| `flatmate.review.approved` | Matched to a Draazy-registered agreement (automatic) | Host | Your flatmate post is now a Verified property | We matched it to the rent agreement we registered for you, so there was nothing left for our team to check. | Post |
 | `flatmate.review.rejected` | Agreement check fails | Host | We could not verify your flatmate post | `We could not verify your post. {reason}` | Post |
 | `flatmate.review.expired` | Agreement end date passed | Host | Your flatmate verification has expired | Stored reason | Post |
+| `flatmate.review.revoked` | Staff revoke an approved badge | Host | Your Verified property badge was removed | `We removed the badge from your post. {reason}` | Post |
 
 ### Services (rent agreement and other paid services)
 
@@ -153,10 +161,57 @@ Links open the service's page (`ServiceRequestTypes.pageFor`).
 | `listing.owner_confirmed` | Owner confirms a post-on-behalf listing via the claim link | Staff member who posted it | Owner confirmed a listing | `"{listing}" is ready for review.` | `/admin/properties` |
 | `service.amendment-applied` | Customer accepts revised terms | Assigned drafter | Revised terms accepted | The customer accepted the revised terms. Share the revised draft. | `/ops/drafting-desk` |
 | `team.manager-action` | A **manager** creates, edits, archives, restores, suspends or reactivates a staff account, resets 2FA, reissues an invite or changes permissions | Every live admin | Manager changed team access | `{action}: {staff name}` | `/admin/team` |
+| `refund.requested` / `refund.dispute` / `refund.auto` | A refund is filed, a gateway dispute opens, or a refund is made automatically | Live staff holding `refunds:write` (`RefundStaffAlerts`) | Refund request to review / Payment dispute opened / ? | The order | `/admin/refunds` |
+| `service.amount-mismatch` | A payment's amount does not match its service order | Every live admin | Payment does not match its order | The order | `/admin/finance` |
 
-Staff read these in the admin top bar's bell, under **For you**. The red dot there means "something unread" only:
-unread personal notifications or owner replies. The pending-verification and open-ticket queues are listed in the
-same panel but never light the dot, because they are standing work rather than news.
+### Queue alerts, SLA reminders and escalations
+
+`StaffSlaSweep` (job `staff-sla`, every 15 minutes) watches each queue in `StaffSlaRule.CATALOGUE`. Each item moves
+through up to three levels, and each level is sent once per item: `staff_alert_log` keeps the ledger, keyed on the
+item and the moment its clock started.
+
+| Level | Type | When | To |
+|---|---|---|---|
+| Arrival | `queue.{rule}` | Item younger than 1h: unassigned, or any item for `draft-decision` | The live assignee, else live staff holding the queue's function, else managers (else admins) |
+| Reminder | `sla.{rule}` | Item older than `remind` | The live assignee, else the function holders, else managers (else admins) |
+| Escalation | `escalation.{rule}` | Item older than `escalate` | Every live manager; every live admin when no manager is live |
+
+"Live" means not archived and not suspended. A rule with no `remind`/`escalate` only announces arrivals.
+An item first seen already overdue gets only the escalation. Items for the same recipient, rule and level in one run
+share a single notification ("3 new listings to review", body "Oldest: ? and 2 more").
+
+When an item leaves its queue, the next run marks its unread single-item alerts read. A batched alert links to the
+queue, so it clears once no open item shares that link.
+
+| Rule | Queue | Remind | Escalate | Function |
+|---|---|---|---|---|
+| `listing-review` | Listings pending verification | 24h | 36h | `listingModeration` |
+| `verification-reply` | Owner replies nobody has read | 48h | 72h | `propertyVerification` |
+| `kyc-review` | Identity checks awaiting a reviewer | 48h | 72h | `kyc`; the claimer while the 30-minute claim is live |
+| `identity-appeal` | Identity appeals | 48h | 72h | `kyc` |
+| `desk-pickup` | Unassigned desk tickets and new service requests | 4h | 8h | `desk:{team}` |
+| `rent-agreement` | Rent agreements by stage | stage deadline (`RentAgreementSla`) | 1.5? deadline | `desk:rental` or the assignee |
+| `support-ticket` | Support tickets awaiting a staff reply, timed from the customer's last message (appeal tickets excluded) | 24h | 48h | `support` |
+| `report` | Open user reports | 24h | 48h | `reports` |
+| `flatmate-review` | Flatmate agreements to check | 48h | 72h | `flatmates` |
+| `refund-review` | Refund requests (no arrival: `RefundStaffAlerts` already announces) | 48h | 72h | `refunds` |
+| `erasure` | Account erasure requests | 7d | 20d | Admins at every level |
+| `draft-decision` | A customer approved a service draft or asked for changes; every round re-announces | — | — | The assignee, else `desk:{team}` |
+| `listing-recheck` | Live listings re-queued after an owner edits key fields (badge-only re-checks excluded) | 24h | 36h | `listingModeration` |
+| `badge-request` | Verified-badge (ownership) requests | 48h | 72h | `propertyVerification` |
+| `flatmate-post` | Flatmate posts, rooms and groups awaiting moderation or a re-check | 24h | 48h | `flatmates` |
+| `community-society` | Community-added societies awaiting a merge or keep decision | — | — | `societies` |
+
+Override any threshold with `draazy.staff-sla.{rule}.remind` / `.escalate` (a Duration such as `12h`).
+
+### Where staff read them
+
+The admin top bar's bell shows a count of unread personal notifications plus owner replies, and lists the unread
+ones under **For you**, escalations first. The pending-verification and open-ticket queues are listed in the same
+panel but never add to the count, because they are standing work rather than news. **View all notifications** opens
+`/admin/notifications` (`/staff/notifications` for staff): the consumer inbox with staff chips: All, Escalations,
+My work (`queue.*`, `sla.*`, `refund.*`, `service.*`) and Updates. In-tab browser alerts work there too, and the back
+office asks once to turn them on.
 
 ## WhatsApp — paid (Meta Cloud API)
 
@@ -168,7 +223,7 @@ Business-initiated template messages from the Draazy number. Both templates must
 |---|---|
 | Template | `WHATSAPP_OTP_TEMPLATE_NAME` / `WHATSAPP_OTP_TEMPLATE_LANG` (default `en_US`); boot fails if unset while WhatsApp is enabled |
 | Parameters | `{{1}}` = the 6-digit code; the same code fills the copy-code URL button |
-| Sender | `WhatsAppOtpSender` (local profile logs `[MOCK OTP]`; sandbox uses `draazy.otp.sandbox-code`) |
+| Sender | `WhatsAppOtpSender` on sandbox and prod (local profile logs `[MOCK OTP]`) |
 
 The same template carries every code purpose:
 
@@ -189,17 +244,18 @@ line. Sent after commit by `WhatsAppDecisionMessenger`; failures are logged and 
 | Decision | `{{1}}` |
 |---|---|
 | Rejected (reviewer, or pending too long) | Your Draazy identity verification could not be completed. Open the app to see the reason and retake your photos. |
-| Revoked | Your Draazy verified badge was withdrawn. Open the app to see the reason and submit again. |
+| Revoked | Your Draazy ID verified badge was withdrawn. Open the app to see the reason and submit again. |
 
-Approvals and the automatic check's rejects are in-app only. Both sends respect the user's `whatsapp` toggle.
+Both sends respect the user's `whatsapp` toggle.
 
 ### Waiting-on-you digest — `UTILITY` template
 
 One WhatsApp per user per day, sent by the `waiting-digest` job at 10:00 IST (`draazy.jobs.waiting-digest.enabled`,
 default on) through `WaitingDigestService`. Template `WHATSAPP_DIGEST_TEMPLATE_NAME` / `WHATSAPP_DIGEST_TEMPLATE_LANG`
 (default `en_US`); blank name = skipped and logged, nothing is sent. Needs Meta approval before it is set. Suggested
-body: `You have {{1}} waiting for your reply on Draazy. Open the app to respond.`, with `{{1}}` = `1 request` or
-`N requests`.
+body: `Update on your property listed on Draazy: you have {{1}} waiting for your reply. You can reply under Requests in
+the app.`, with `{{1}}` = `1 request` or `N requests`, and at most a static URL button (the sender passes body
+parameters only). Meta moved the generic "Open the app to respond" wording (`draazy_waiting_digest`) to Marketing.
 
 A user is included only when all of these hold:
 
@@ -422,6 +478,12 @@ Back-office only. No consumer email is sent: consumer email addresses are not ve
 |---|---|---|---|
 | Staff invite | Admin/manager creates a staff account | The new account's email | You're invited to the Draazy back office |
 | Password reset | Admin/manager reissues the invite (reset) | The account's email | Reset your Draazy back-office password |
+| Staff alert | Any bell row delivered to a `staff` account (queue arrivals, SLA reminders, hand-offs) | The staff account's email | Draazy: {bell title} |
+
+The staff alert (`StaffEmailCopy`, called by `NotificationPublisher`) goes only to live (active, unarchived) `staff`
+accounts with an email, never to managers or admins. The `email` toggle turns it off; quiet hours hold only the bell
+row, not the email. It is plain text, queued after commit on its own thread (500 pending, then dropped with a warning):
+the bell title, body and `{draazy.app.base-url}{link}`. A send failure is logged, never thrown.
 
 Body (`StaffInviteMailer`, plain text, sent after commit; skipped when the account has no email):
 ```
@@ -461,6 +523,20 @@ Browsers subscribe through `/me/push-subscriptions` (the frontend needs `VITE_VA
 - **Device.** `frontend/public/push-sw.js` (imported into the Workbox worker) shows the notification and, on tap,
   focuses an open tab or opens the payload `url` (same-origin paths only).
 
+### In-tab browser alerts
+
+Push is skipped while the recipient's chat stream is open, so the open app raises the OS alert itself
+(`frontend/src/lib/browserAlerts.js`): when the bell's unread count rises and the tab is hidden or unfocused,
+it shows `Draazy` / `You have a new notification`, opening `/notifications`. No VAPID key is needed. With
+alerts on, a hidden tab keeps its chat stream reconnecting, so delivery does not lapse at the 5-minute
+stream timeout.
+
+- **Ask.** Signed-in users with an undecided browser permission get a bottom card (`BrowserAlertsPrompt`)
+  outside auth and chat routes. *Not now* snoozes it for 14 days. A refusal turns the card into a how-to-unblock note.
+  A browser that already blocks the site is not asked.
+- **Off.** A site cannot revoke its own permission, so the Profile switch stores a device-local opt-out
+  (`dz_browser_alerts_off_v1`) and unsubscribes push.
+
 ## Gaps and planned changes
 
 **Not notified today**
@@ -473,10 +549,8 @@ Browsers subscribe through `/me/push-subscriptions` (the frontend needs `VITE_VA
   and identity *rejected* (by a reviewer or the pending-expiry sweep) / *revoked*.
 - Identity *approved* and the automatic check's rejects send no WhatsApp: the user is in the app at that moment and the
   bell row covers both.
-- Everything else stays in-app, plus web push.
-- Staff → owner messaging stays on free click-to-chat.
-- The `whatsapp` toggle gates every paid send except codes. The `email` and `sms` toggles stay stored-only: wire them
-  before adding any new paid send on those channels.
+- Everything else stays in-app, plus web push; staff → owner messaging stays on free click-to-chat.
+- Toggles: see [Delivery rules](#delivery-rules).
 - Consumer email (receipts, refunds) only after consumer email verification exists.
 
 ## Adding a notification

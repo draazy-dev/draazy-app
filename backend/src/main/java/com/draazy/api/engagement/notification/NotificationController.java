@@ -17,25 +17,24 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Paged because notifications accrue for years. */
 @RestController
 public class NotificationController {
-
     private final NotificationService notificationService;
 
     public NotificationController(NotificationService notificationService) {
         this.notificationService = notificationService;
     }
 
-    /** Strip client sort so unknown properties cannot reach the query as a 500. */
     @GetMapping(Routes.Engagement.NOTIFICATIONS)
     public PageResponse<NotificationResponse> list(@CurrentUser AuthPrincipal principal,
+            @RequestParam(required = false) Boolean read,
             @PageableDefault(size = 20) Pageable pageable) {
         return PageResponse.of(
-                notificationService.list(principal.userId(), Pageables.unsorted(pageable)),
+                notificationService.list(principal.userId(), read, Pageables.unsorted(pageable)),
                 dto -> dto);
     }
 
@@ -44,7 +43,6 @@ public class NotificationController {
         return new CountResponse(notificationService.unreadCount(principal.userId()));
     }
 
-    /** Reject malformed ids; skipping them could turn a typo into "mark all read". */
     @PostMapping(Routes.Engagement.NOTIFICATIONS_READ)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void markRead(@CurrentUser AuthPrincipal principal,
@@ -55,7 +53,6 @@ public class NotificationController {
         notificationService.markRead(principal.userId(), ids);
     }
 
-    /** Foreign well-formed ids return 404, never 403, so status codes cannot probe the id space. */
     @DeleteMapping(Routes.Engagement.NOTIFICATION_BY_ID)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void dismiss(@CurrentUser AuthPrincipal principal, @PathVariable UUID id) {
@@ -72,7 +69,6 @@ public class NotificationController {
                 request.ids().stream().map(NotificationController::parseId).toList());
     }
 
-    /** Body ids get 400 because the client sent a malformed list, not a missing resource path. */
     private static UUID parseId(String token) {
         return Ids.parseUuid(token)
                 .orElseThrow(() -> new BadRequestException(

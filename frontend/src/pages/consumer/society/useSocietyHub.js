@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useFollows } from '../../../context/FollowContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { useScrollReveal } from '../../../lib/useScrollReveal.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../../lib/useSignInGate.js';
 import { fmtNum } from '../../../lib/format.js';
 import { fnvHash } from '../../../lib/hash.js';
 import { commuteInfo } from '../property/locationIntel.js';
-import { createEntityReview, getEntityReviewSummary, listEntityReviews } from '../../../services/reviewService.js';
+import { createEntityReview, deleteReview, getEntityReviewSummary, listEntityReviews, reviewRefusal, updateReview } from '../../../services/reviewService.js';
 import { getSociety } from '../../../services/societyService.js';
 import { TAB_IDS, REVIEW_CATS, REVIEW_CAT_KEYS, NOW_YEAR, HERO, titleCase } from './constants.js';
 import { genericSociety } from './helpers.jsx';
 
 const MIN_REVIEWS_FOR_TAB = 3;
-/** The reviews tab shows five; list and summary share one request at this size. */
-const REVIEW_READ = { size: 5 };
+const VISITOR_READ = { size: 5 };
 const EMPTY_HOMES = [];
 
 export function useSocietyHub() {
@@ -25,6 +25,7 @@ export function useSocietyHub() {
   const sendToSignIn = useSignInGate();
   const { isIn } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const follows = useFollows();
 
   const activeTab = useMemo(() => {
@@ -34,8 +35,6 @@ export function useSocietyHub() {
   const slug = (routeSlug || '').toLowerCase();
   const fallbackName = params.get('name');
   const fallbackLoc = params.get('loc') || 'Pune';
-  // `socLoading` gates the first paint so a real building never flashes as an unknown one.
-  // `null` from the seam is the honest miss; a thrown read is an outage, not a missing society.
   const [soc, setSoc] = useState(() => genericSociety(slug, fallbackName, fallbackLoc));
   const [socLoading, setSocLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -48,7 +47,6 @@ export function useSocietyHub() {
       .then((resolved) => {
         if (!alive) return;
         if (!resolved) { setSoc(genericSociety(slug, fallbackName, fallbackLoc)); return; }
-        // A thin minted row carries only name + locality; specs are never fabricated.
         const thin = resolved.units == null && !resolved.builder;
         setSoc({ ...resolved, _thin: thin });
       })
@@ -63,48 +61,42 @@ export function useSocietyHub() {
   const locName = soc._locName || titleCase(soc.localitySlug);
 
   const listings = soc.homes || EMPTY_HOMES;
+  const reviewRead = isIn ? undefined : VISITOR_READ;
   const [reviews, setReviews] = useState([]);
-  // `null` until the summary read settles; `summaryFailed` keeps "could not read" distinguishable
-  // from "count is 0", which is the difference between an outage and an unreviewed society.
   const [summary, setSummary] = useState(null);
   const [summaryFailed, setSummaryFailed] = useState(false);
   const [rateOpen, setRateOpen] = useState(false);
   const [pick, setPick] = useState(5);
-  // Sparse by design: a key appears only once the reviewer taps that row, so "did not rate" stays
-  // distinguishable from "rated 1" all the way to the column.
   const [cats, setCats] = useState({});
   const setCat = (k, v) => setCats((c) => ({ ...c, [k]: v }));
   const [revText, setRevText] = useState('');
   const [reportFor, setReportFor] = useState(null);
 
-  // The server accepts the slug as an alias for its UUID key; soc.id is a local synthetic id it cannot resolve.
   useEffect(() => {
     let alive = true;
+    setReviews([]);
     setSummary(null);
     setSummaryFailed(false);
-    listEntityReviews('society', soc.slug, REVIEW_READ)
+    setRateOpen(false);
+    listEntityReviews('society', soc.slug, reviewRead)
       .then((res) => { if (alive) setReviews(res.items); })
       .catch(() => { if (alive) setReviews([]); });
-    // The summary covers the whole corpus, not just the page above.
-    getEntityReviewSummary('society', soc.slug, REVIEW_READ)
+    getEntityReviewSummary('society', soc.slug, reviewRead)
       .then((s) => { if (alive) setSummary(s); })
       .catch(() => { if (alive) setSummaryFailed(true); });
     return () => { alive = false; };
-  }, [soc.slug]);
+  }, [soc.slug, reviewRead]);
 
-  // The summary is the authority: reducing the on-screen page would pass the newest few off as the rating.
   const rating = useMemo(() => ({
     avg: summary ? summary.avg : null,
     count: summary ? summary.count : 0,
     loading: !summary && !summaryFailed,
     failed: summaryFailed,
   }), [summary, summaryFailed]);
-  // `catAvg` is sparse, so `Number.isFinite` is the whole presence test.
   const bars = useMemo(() => {
     const catAvg = summary?.catAvg || {};
     return REVIEW_CATS.filter((k) => Number.isFinite(catAvg[k])).map((k) => ({ id: k, labelKey: REVIEW_CAT_KEYS[k], value: catAvg[k] }));
   }, [summary]);
-  // `null` rather than `0` so an unreviewed society can never print "0/5".
   const overall = useMemo(() => {
     const rated = rating.count > 0 && Number.isFinite(rating.avg);
     return rated ? +rating.avg.toFixed(1) : null;
@@ -120,39 +112,45 @@ export function useSocietyHub() {
   const age = soc.year ? NOW_YEAR - soc.year : null;
   const hero = HERO[fnvHash(soc.slug) % HERO.length];
 
-  const requireLogin = () => { if (!isIn) { sendToSignIn('society'); return false; } return true; };
+  const requireLogin = (resume) => { if (!isIn) { sendToSignIn('society', undefined, resume); return false; } return true; };
   const onFollow = async () => {
-    if (soc._generic || !requireLogin()) return;
-    /* The toast reports the state the write settled on, not the one attempted: the context rolls a
-       failed follow back, and promising alerts on a refused follow is a promise the page can't keep. */
-    const now = await follows.toggle(soc.slug);
-    toast(now ? `Following ${soc.name} — we'll alert you on new listings` : 'Unfollowed', now ? 'success' : 'info');
+    const follow = async () => {
+      const now = await follows.toggle(soc.slug);
+      toast(now ? `Following ${soc.name} — we'll alert you on new listings` : 'Unfollowed', now ? 'success' : 'info');
+    };
+    if (soc._generic || !requireLogin(follow)) return;
+    follow();
   };
-  const submitReview = () => {
-    if (soc._generic || !requireLogin()) return;
-    // No `resident` flag: `categories` carries only the aspects the reviewer actually touched.
-    createEntityReview('society', soc.slug, { rating: pick, text: revText.trim(), categories: cats })
-      .then((saved) => (saved === 'login'
-        ? null
-        // Both reads: the headline comes from the summary, so re-reading only the cards would
-        // leave a stale average beside the reviewer's own rating.
-        : Promise.all([
-          listEntityReviews('society', soc.slug, REVIEW_READ),
-          getEntityReviewSummary('society', soc.slug, REVIEW_READ),
-        ])))
-      .then((res) => {
-        if (!res) return;
-        const [list, sum] = res;
-        setReviews(list.items); setSummary(sum); setSummaryFailed(false);
-        setRevText(''); setPick(5); setCats({}); setRateOpen(false);
-        toast('Thanks for reviewing this society!', 'success');
-      })
-      .catch(() => toast('Your review could not be posted. Please try again.', 'error'));
+  const myReview = reviews.find((r) => r.mine);
+  const reloadReviews = () => Promise.all([
+    listEntityReviews('society', soc.slug, reviewRead),
+    getEntityReviewSummary('society', soc.slug, reviewRead),
+  ]).then(([list, sum]) => { setReviews(list.items); setSummary(sum); setSummaryFailed(false); });
+  const closeComposer = () => { setRevText(''); setPick(5); setCats({}); setRateOpen(false); };
+  const openComposer = () => {
+    if (myReview) { setPick(myReview.rating); setRevText(myReview.text); setCats(myReview.categories); }
+    setRateOpen(true);
   };
-  const openReport = (review) => { if (requireLogin()) setReportFor(review); };
+  const toggleComposer = () => (rateOpen ? closeComposer() : openComposer());
+  const submitReview = (e) => {
+    if (soc._generic || !requireLogin(replay(e))) return;
+    const review = { rating: pick, text: revText.trim(), categories: cats };
+    (myReview ? updateReview(myReview.id, review) : createEntityReview('society', soc.slug, review))
+      .then((saved) => (saved === 'login' ? null : reloadReviews().then(() => {
+        closeComposer();
+        toast(myReview ? t('common.reviewUpdated') : 'Thanks for reviewing this society!', 'success');
+      })))
+      .catch((err) => toast(reviewRefusal(err, t) || 'Your review could not be posted. Please try again.', 'error'));
+  };
+  const deleteMine = () => {
+    if (!window.confirm(t('common.deleteReviewConfirm'))) return;
+    deleteReview(myReview.id)
+      .then(() => reloadReviews().then(() => { closeComposer(); toast(t('common.reviewDeleted'), 'success'); }))
+      .catch(() => toast(t('common.reviewDeleteFailed'), 'error'));
+  };
+  const openReport = (review) => { if (requireLogin(() => setReportFor(review))) setReportFor(review); };
   const closeReport = () => setReportFor(null);
 
-  /* Carry label keys plus value key and args, not text, so either language renders without this hook knowing. */
   const stats = [
     ['home', 'society.statUnits', soc.units != null ? fmtNum(soc.units) : null],
     ['building-2', 'society.statTowers', soc.towers != null ? String(soc.towers) : null],
@@ -190,7 +188,7 @@ export function useSocietyHub() {
     rating, overall, bars, reviews, openReport, reportFor, closeReport, toast,
     hasCoords, dirUrl, commute,
     followed: follows.has(soc.slug), onFollow,
-    hero, rateOpen, setRateOpen, pick, setPick, revText, setRevText, cats, setCat, inp,
+    hero, rateOpen, toggleComposer, openComposer, closeComposer, myReview, deleteMine, pick, setPick, revText, setRevText, cats, setCat, inp,
     submitReview, stats, tabs, current, selectTab,
   };
 }

@@ -5,8 +5,8 @@ import { API, authHeaders } from '../../helpers/liveAuth.js';
 // The seeded admin, as used by the other live admin specs.
 const admin = () => authHeaders('9000000000');
 
-// Named once so the "all six" test cannot drift.
-const TABS = ['Traffic', 'Engagement', 'Funnel', 'Supply Gap', 'Pricing', 'SLA'];
+// Named once so the "all seven" test cannot drift.
+const TABS = ['Traffic', 'Engagement', 'Funnel', 'Flatmates', 'Supply Gap', 'Pricing', 'SLA'];
 
 // Deep links are the page contract, not a shortcut around the UI.
 async function openAnalytics(page, tab) {
@@ -14,7 +14,7 @@ async function openAnalytics(page, tab) {
   await expect(page.getByRole('heading', { name: /Analytics/i })).toBeVisible();
 }
 
-test('analytics opens on Traffic with all six tabs, no Conversion or Anonymous surfers tab, its chart cards and a CSV export, and logs no console errors', async ({ page, login, consoleErrors }) => {
+test('analytics opens on Traffic with all seven tabs, no Conversion or Anonymous surfers tab, its chart cards and a CSV export, and logs no console errors', async ({ page, login, consoleErrors }) => {
   test.slow();
   await login.asAdmin();
   await test.step('analytics page loads without errors', async () => {
@@ -23,7 +23,7 @@ test('analytics opens on Traffic with all six tabs, no Conversion or Anonymous s
     await expect(page.getByRole('tab', { name: 'Traffic' })).toBeVisible();
     expect(consoleErrors).toHaveLength(0);
   });
-  await test.step('analytics opens on Traffic and offers all six tabs', async () => {
+  await test.step('analytics opens on Traffic and offers all seven tabs', async () => {
     await openAnalytics(page);
     await expect(page.getByRole('tab', { name: 'Traffic' })).toHaveAttribute('aria-selected', 'true');
     for (const label of TABS) {
@@ -203,6 +203,31 @@ test('a failed supply-gap read says so instead of zeroing every locality KPI', a
   await expect(page.getByRole('heading', { name: 'City Expansion Requests' })).toBeVisible();
 });
 
+test('scanner payloads cannot become localities or cities, and a long label cannot widen the supply-gap table', async ({ page, login, request }) => {
+  await login.asAdmin();
+  for (const localitySlug of ['/etc/passwd', '../../../etc/passwd', 'c:\\Windows\\win.ini', '/']) {
+    const res = await request.post(`${API}/demand-signals`, { data: { kind: 'alert', localitySlug } });
+    expect(res.status(), localitySlug).toBe(422);
+  }
+  const city = await request.post(`${API}/cities/waitlist`, { data: { city: '<img src=x>', mobile: '9830000099' } });
+  expect(city.status()).toBe(422);
+
+  // Slug- and letter-shaped values still pass validation at full length, so the layout must hold them.
+  const long = 'a'.repeat(120);
+  await page.route('**/admin/supply-gap*', (route) => route.fulfill({
+    json: [{ localitySlug: long, supply: 0, searches: 1, alerts: 1, views: 0, repeatSeekers: 0, demand: 7, demandPerListing: 7 }],
+  }));
+  await page.route('**/admin/cities/waitlist', (route) => route.fulfill({
+    json: [{ city: 'B'.repeat(120), requests: 1, lastRequestedAt: new Date().toISOString() }],
+  }));
+  await openAnalytics(page, 'supply-gap');
+  const table = page.locator('#analytics-panel table');
+  await expect(table).toContainText('Per listing');
+  const { scroll, client } = await table.evaluate((t) => ({ scroll: t.scrollWidth, client: t.parentElement.clientWidth }));
+  expect(scroll).toBeLessThanOrEqual(client);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
 test('Funnel tab totals each stage over the window the API reports', async ({ page, login, request }) => {
   await login.asAdmin();
   const res = await request.get(`${API}/admin/analytics/funnel?days=30`, { headers: await admin() });
@@ -231,28 +256,85 @@ test('a failed funnel read says so instead of showing zero stages', async ({ pag
   await expect(page.getByTestId('funnel-posted')).toHaveCount(0);
 });
 
-test('unmeasured values read as unmeasured and no tab presents generated numbers', async ({ page, login, request }) => {
+test('Flatmates tab totals the weeks GET /admin/analytics/flatmates served', async ({ page, login }) => {
+  await login.asAdmin();
+  // Captured from the live response so the assertion cannot race other workers' writes.
+  let served;
+  await page.route('**/admin/analytics/flatmates*', async (route) => {
+    const res = await route.fetch();
+    served = await res.json();
+    await route.fulfill({ response: res, json: served });
+  });
+
+  await openAnalytics(page, 'flatmates');
+  await expect(page.getByText('New posts by week')).toBeVisible();
+  expect(served.weeks.length).toBeGreaterThan(0);
+
+  const sum = (key) => served.weeks.reduce((s, w) => s + w[key], 0);
+  const kpi = (id) => page.getByTestId(`flatmates-${id}`).locator('div').first();
+  await expect(kpi('posts')).toHaveText((sum('rooms') + sum('groups') + sum('seekers')).toLocaleString('en-IN'));
+  await expect(kpi('requests')).toHaveText(served.replies.sent.toLocaleString('en-IN'));
+  await expect(kpi('matches')).toHaveText(sum('matches').toLocaleString('en-IN'));
+  await expect(kpi('unanswered')).toHaveText(served.replies.unansweredNow.toLocaleString('en-IN'));
+  await expect(kpi('reply-rate')).toHaveText(served.replies.replyRatePct == null ? '—' : `${served.replies.replyRatePct}%`);
+});
+
+test('Flatmates tab shows unmeasured rates as a dash and ranks the locality shortfall', async ({ page, login }) => {
+  await login.asAdmin();
+  await page.route('**/admin/analytics/flatmates*', (route) => route.fulfill({
+    json: {
+      days: 90, from: '2026-01-01', to: '2026-04-01',
+      weeks: [{ week: '2026-03-23', rooms: 2, groups: 1, seekers: 4, requests: 0, matches: 0, replyRatePct: null }],
+      replies: { sent: 0, replyRatePct: null, acceptRatePct: null, medianReplyHours: null, unansweredNow: 0 },
+      localities: [{ locality: 'Zztest Baner', supply: 1, demand: 4 }, { locality: 'Zztest Aundh', supply: 3, demand: 1 }],
+    },
+  }));
+
+  await openAnalytics(page, 'flatmates');
+  await expect(page.getByTestId('flatmates-reply-rate').locator('div').first()).toHaveText('—');
+  await expect(page.getByTestId('flatmates-median-reply').locator('div').first()).toHaveText('—');
+  await expect(page.getByTestId('flatmates-posts').locator('div').first()).toHaveText('7');
+  const rows = page.getByTestId('flatmates-localities').locator('tbody tr');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText('Zztest Baner');
+  await expect(rows.first()).toContainText('+3');
+  await expect(rows.nth(1)).toContainText('-2');
+});
+
+test('a failed flatmates read says so instead of showing zero posts', async ({ page, login }) => {
+  await login.asAdmin();
+  await page.route('**/admin/analytics/flatmates*', (route) => route.fulfill({ status: 500, body: '{}' }));
+
+  await openAnalytics(page, 'flatmates');
+  await expect(page.getByRole('alert').filter({ hasText: /flatmates report did not answer/i })).toBeVisible();
+  await expect(page.getByTestId('flatmates-posts')).toHaveCount(0);
+});
+
+test('unmeasured values read as unmeasured and no tab presents generated numbers', async ({ page, login }) => {
   test.slow();
   await login.asAdmin();
+  // Other specs on the same database review listings within seconds, a real `0h`, so the SLA read is
+  // served with every turnaround unmeasured to pin how the tab renders one.
+  const unmeasured = (t) => t && { ...t, completedCount: 0, avgHours: null, medianHours: null, slaRatePct: null };
+  await page.route('**/admin/analytics/sla*', async (route) => {
+    const sla = await (await route.fetch()).json();
+    await route.fulfill({
+      json: {
+        ...sla, reviewedCount: 0, avgHoursToReview: null, medianHoursToReview: null, breachedCount: 0, slaRatePct: null,
+        ticketPickup: unmeasured(sla.ticketPickup), ticketDelivery: unmeasured(sla.ticketDelivery),
+        conciergeToLive: unmeasured(sla.conciergeToLive), flatmateReview: unmeasured(sla.flatmateReview),
+      },
+    });
+  });
   await test.step('SLA tab reports an unmeasured turnaround as unrecorded, not as zero', async () => {
-    // Missing turnaround renders as "not recorded"; `0h` would claim instant review.
-    const res = await request.get(`${API}/admin/analytics/sla`, { headers: await admin() });
-    expect(res.ok()).toBeTruthy();
-    const { avgHoursToReview } = await res.json();
-
     await openAnalytics(page, 'sla');
-    expect(
-      avgHoursToReview,
-      'the e2e seed records no review decisions, so this is expected to be null; if it is a number '
-        + 'the assertion below is the wrong one and the test needs rewriting, not relaxing',
-    ).toBeNull();
 
     // Scope to this card because unrelated panels can legitimately render `0h`.
     const reviewTile = page.locator('div.rounded-xl').filter({ hasText: 'Avg time to review' });
     await expect(reviewTile).toHaveCount(1);
     await expect(reviewTile).toContainText('not recorded');
-    // The specific wrong answer this guards against. A `|| 0` creeping back into `hours()` — whose
-    // own comment promises "Never `0h`" — reads as a real measurement of a review that was never timed.
+    // The specific wrong answer this guards against: a `|| 0` creeping back into `hours()` reads as a real
+    // measurement of a review that was never timed.
     await expect(reviewTile).not.toContainText('0h');
   });
   await test.step('nothing anywhere on the SLA tab claims a zero-hour turnaround', async () => {
@@ -260,6 +342,7 @@ test('unmeasured values read as unmeasured and no tab presents generated numbers
     await expect(page.getByRole('heading', { name: 'Concierge Pipeline' })).toBeVisible();
     await expect(page.getByText(/(^|[^\d.])0h\b/)).toHaveCount(0);
   });
+  await page.unroute('**/admin/analytics/sla*');
   await test.step('Pricing tab shows a dash, not an invented rate, where too few flats were measured', async () => {
     await openAnalytics(page, 'pricing');
     const table = page.locator('table').filter({ has: page.getByText('Asking ₹/sqft') });

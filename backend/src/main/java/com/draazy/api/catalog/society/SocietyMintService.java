@@ -1,6 +1,7 @@
 package com.draazy.api.catalog.society;
 
 import com.draazy.api.catalog.locality.LocalityBinding;
+import com.draazy.api.catalog.locality.ServedArea;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.RateLimitedException;
@@ -17,8 +18,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -30,18 +33,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** A duplicate Place ID is for an operator to merge; listings, follows and reviews accumulate on both rows. */
 @Service
 public class SocietyMintService {
-
-    /** The most duplicate hints one candidate may ask for; the console shows a few chips, not a report. */
     private static final int MAX_DUPE_HINTS = 25;
 
-    /** Google lookups one member may cause a day; a place we already hold costs none. */
+    private static final int MAX_DUPE_BATCH = 50;
+
     private static final int LOOKUPS_PER_DAY = 20;
 
-    /** Literal siblings of {@code /societies/{slug}}; a society minted under one would be unreachable. */
     private static final Set<String> RESERVED_SLUGS = Set.of("resolve", "top");
+
+    static final String OUTSIDE_AREA_MESSAGE = "We only list societies in areas we serve.";
 
     private static final Logger log = LoggerFactory.getLogger(SocietyMintService.class);
 
@@ -50,22 +52,23 @@ public class SocietyMintService {
     private final SocietyMapper societyMapper;
     private final LocalityBinding localities;
     private final PlacesLookup places;
+    private final ServedArea servedArea;
     private final TransactionTemplate tx;
     private final WriteRateLimitStore lookupBudget;
 
     public SocietyMintService(SocietyRepository societies, SocietyService societyService,
-            SocietyMapper societyMapper, LocalityBinding localities, PlacesLookup places,
+            SocietyMapper societyMapper, LocalityBinding localities, PlacesLookup places, ServedArea servedArea,
             TransactionTemplate tx, WriteRateLimitStore.Factory stores) {
         this.societies = societies;
         this.societyService = societyService;
         this.societyMapper = societyMapper;
         this.localities = localities;
         this.places = places;
+        this.servedArea = servedArea;
         this.tx = tx;
         this.lookupBudget = stores.create("sm", LOOKUPS_PER_DAY, Duration.ofDays(1));
     }
 
-    /** Not one transaction: the Google call must not hold a database connection, so it runs between two. */
     public MintedSociety mint(SocietyMintRequest request, AuthPrincipal caller) {
         UUID authorId = caller.userId();
         String placeId = SocietySpecs.trimmed(request.placeId());
@@ -73,7 +76,6 @@ public class SocietyMintService {
             throw new ValidationException("Pick the society on Google Maps.");
         }
         String origin = mintOrigin(request.mintOrigin());
-        SocietyPlaceRules.requireServed(request.lat(), request.lng());
 
         MintedSociety known = tx.execute(status -> known(placeId));
         if (known != null) {
@@ -120,12 +122,12 @@ public class SocietyMintService {
 
     private int insert(String slug, Place place, String locality, String origin, UUID authorId) {
         return societies.mintCommunity(slug, place.name(), place.placeId(), locality,
-                place.lat(), place.lng(), origin, authorId);
+                place.lat(), place.lng(), origin, authorId, place.district());
     }
 
     private Place verified(String placeId, SocietyMintRequest request, AuthPrincipal caller) {
         spendLookup(caller);
-        Place hint = new Place(placeId, request.name(), request.lat(), request.lng(), null, List.of());
+        Place hint = new Place(placeId, request.name(), request.lat(), request.lng(), null, List.of(), null);
         Place place;
         try {
             place = places.details(placeId, hint)
@@ -134,7 +136,9 @@ public class SocietyMintService {
             log.warn("Places lookup unavailable: {}", e.getMessage());
             throw new ValidationException("Adding societies is temporarily unavailable.");
         }
-        SocietyPlaceRules.requireServed(place.lat(), place.lng());
+        if (!servedArea.covers(place)) {
+            throw new ValidationException(OUTSIDE_AREA_MESSAGE);
+        }
         SocietyPlaceRules.requireBuilding(place);
         return place;
     }
@@ -170,22 +174,45 @@ public class SocietyMintService {
         return societies.candidates(like == null ? "%" : like, pageable).map(societyMapper::toCandidate);
     }
 
-    /** Server-side, as the catalogue is: a client hint list that cannot see community rows says "no duplicate". */
     @Transactional(readOnly = true)
     public List<SocietyDuplicateSuggestion> duplicates(String slug, int limit) {
+        requireHintLimit(limit);
+        Society candidate = societies.findBySlug(slug)
+                .orElseThrow(() -> NotFoundException.of("Society"));
+        return rankDuplicates(candidate, societies.duplicateScan(), limit);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, List<SocietyDuplicateSuggestion>> duplicates(List<String> slugs, int limit) {
+        requireHintLimit(limit);
+        if (slugs.isEmpty() || slugs.size() > MAX_DUPE_BATCH) {
+            throw new BadRequestException("slugs must name between 1 and " + MAX_DUPE_BATCH + " societies");
+        }
+        List<Society> candidates = societies.findBySlugIn(slugs);
+        if (candidates.isEmpty()) {
+            return Map.of();
+        }
+        List<Object[]> live = societies.duplicateScan();
+        Map<String, List<SocietyDuplicateSuggestion>> out = new LinkedHashMap<>();
+        for (Society candidate : candidates) {
+            out.put(candidate.getSlug(), rankDuplicates(candidate, live, limit));
+        }
+        return out;
+    }
+
+    private static void requireHintLimit(int limit) {
         if (limit < 1 || limit > MAX_DUPE_HINTS) {
             throw new BadRequestException("limit must be between 1 and " + MAX_DUPE_HINTS);
         }
-        Society candidate = societies.findBySlug(slug)
-                .orElseThrow(() -> NotFoundException.of("Society"));
+    }
 
+    private static List<SocietyDuplicateSuggestion> rankDuplicates(Society candidate, List<Object[]> live, int limit) {
         Set<String> mine = SocietyMatching.tokens(candidate.getName());
         if (mine.isEmpty()) {
-            // A name of nothing but stopwords would score against everything; no hint beats a useless one.
             return List.of();
         }
-
-        return societies.duplicateScan(candidate.getId()).stream()
+        return live.stream()
+                .filter(row -> !candidate.getSlug().equals(row[0]))
                 .map(row -> score(row, mine, candidate))
                 .filter(s -> s != null && s.score() >= SocietyMatching.FLOOR)
                 .sorted(Comparator.comparingDouble(SocietyDuplicateSuggestion::score).reversed())
@@ -193,7 +220,6 @@ public class SocietyMintService {
                 .toList();
     }
 
-    /** One scan row scored against the candidate, or null if it has no comparable name. */
     private static SocietyDuplicateSuggestion score(Object[] row, Set<String> mine, Society candidate) {
         String name = (String) row[1];
         String localitySlug = (String) row[2];
@@ -214,7 +240,6 @@ public class SocietyMintService {
         return new SocietyDuplicateSuggestion((String) row[0], name, localitySlug, score);
     }
 
-    /** Absent is {@link SocietyMintOrigins#LISTING} for old clients; unknown is a 422, not a CHECK 500. */
     private static String mintOrigin(String supplied) {
         String value = SocietySpecs.trimmed(supplied);
         if (value == null) {
@@ -226,7 +251,6 @@ public class SocietyMintService {
         return value;
     }
 
-    /** Null when none was picked; a slug that is not a live locality is refused. */
     private String knownLocality(String slug) {
         String candidate = SocietySpecs.trimmed(slug);
         if (candidate == null) {
@@ -243,7 +267,6 @@ public class SocietyMintService {
                 .replaceAll("^-+|-+$", "");
     }
 
-    /** The society and whether this call created it: the controller answers 201 for a mint and 200 for a match. */
     public record MintedSociety(SocietyResponse society, boolean created) {
     }
 }

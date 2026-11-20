@@ -11,8 +11,6 @@ const TIER_ICON = {
   ready: Trophy,
 };
 
-/* Dynamic keys are invisible to `check:i18n`, so the mobile wizard spec asserts the rendered
- * text instead — a missing key renders as the key itself and fails there. */
 const TIER_CHEER = {
   warmup: 'listProperty.meter.cheer.warmup',
   momentum: 'listProperty.meter.cheer.momentum',
@@ -27,8 +25,7 @@ const NUDGE_TEXT = {
   amenities: 'listProperty.meter.nudge.amenities',
 };
 
-/* Milestone nodes light up as the owner crosses each threshold. */
-const ProgressMeter = ({ pct, tierKey, label, done, total, nudge }) => {
+const ProgressMeter = ({ pct, tierKey, label, done, total, nudge, context }) => {
   const { t } = useTranslation();
   const Icon = TIER_ICON[tierKey] || Sparkles;
   return (
@@ -43,7 +40,7 @@ const ProgressMeter = ({ pct, tierKey, label, done, total, nudge }) => {
 
             <p className="lp-meter__cheer text-gray-400 text-xs sm:text-sm truncate" data-nudge={nudge || ''} role="status" aria-live="polite" aria-atomic="true">
               {nudge
-                ? t(NUDGE_TEXT[nudge], { count: STRONG_PHOTO_COUNT })
+                ? t(NUDGE_TEXT[nudge], { count: STRONG_PHOTO_COUNT, context })
                 : t(TIER_CHEER[tierKey] || TIER_CHEER.warmup, { done, total, remaining: total - done })}
             </p>
           </div>

@@ -1,16 +1,19 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.trust.FlatmateCaseFiles;
+import com.draazy.api.engagement.livingstyle.LivingStyleCatalogue;
+import com.draazy.api.engagement.livingstyle.LivingStyleService;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
 class FlatmateModerationDetails {
-
     private final FlatmateSeekerPostRepository posts;
     private final FlatmateRoomRepository rooms;
     private final FlatmateGroupRepository groups;
@@ -18,10 +21,13 @@ class FlatmateModerationDetails {
     private final UserRepository users;
     private final FlatmateMapper mapper;
     private final FlatmateRoomCards roomCards;
+    private final LivingStyleService livingStyle;
+    private final FlatmateCaseFiles caseFiles;
 
     FlatmateModerationDetails(FlatmateSeekerPostRepository posts, FlatmateRoomRepository rooms,
             FlatmateGroupRepository groups, FlatmateReviewRepository reviews, UserRepository users,
-            FlatmateMapper mapper, FlatmateRoomCards roomCards) {
+            FlatmateMapper mapper, FlatmateRoomCards roomCards, LivingStyleService livingStyle,
+            FlatmateCaseFiles caseFiles) {
         this.posts = posts;
         this.rooms = rooms;
         this.groups = groups;
@@ -29,6 +35,8 @@ class FlatmateModerationDetails {
         this.users = users;
         this.mapper = mapper;
         this.roomCards = roomCards;
+        this.livingStyle = livingStyle;
+        this.caseFiles = caseFiles;
     }
 
     @Transactional(readOnly = true)
@@ -42,8 +50,10 @@ class FlatmateModerationDetails {
     private FlatmateModerationDetailDto ofPost(FlatmateSeekerPost post) {
         User author = user(post.getUserId());
         return new FlatmateModerationDetailDto(
-                FlatmateModerationQueueDto.of(post, nameOf(author)), null, null,
-                mapper.toDto(post, new FlatmateMapper.SeekerView(mobileOf(author))), null);
+                FlatmateModerationQueueDto.of(post, author), null, null,
+                mapper.toDto(post, new FlatmateMapper.SeekerView(mobileOf(author))), null,
+                styleOf(post.getUserId()),
+                caseFiles.view(FlatmateCaseFiles.KIND_POST, post.getId(), post.getUserId()));
     }
 
     private FlatmateModerationDetailDto ofRoom(FlatmateRoom room) {
@@ -52,8 +62,9 @@ class FlatmateModerationDetails {
         FlatmateMapper.RoomView view = roomCards
                 .ownerViews(List.of(room), nameOf(host), mobileOf(host)).get(room.getId());
         return new FlatmateModerationDetailDto(
-                FlatmateModerationQueueDto.of(room, nameOf(host)), mapper.toDto(room, view), null,
-                null, reviewOf(review, host));
+                FlatmateModerationQueueDto.of(room, host), mapper.toDto(room, view), null,
+                null, reviewOf(review, host, room.getOwnerConsentMobile()), styleOf(room.getHostId()),
+                caseFiles.view(FlatmateCaseFiles.KIND_ROOM, room.getId(), room.getHostId()));
     }
 
     private FlatmateModerationDetailDto ofGroup(FlatmateGroup group) {
@@ -62,13 +73,19 @@ class FlatmateModerationDetails {
         FlatmateMapper.PartyView view = new FlatmateMapper.PartyView(nameOf(host),
                 mobileOf(host), review == null ? null : review.getStatus());
         return new FlatmateModerationDetailDto(
-                FlatmateModerationQueueDto.of(group, nameOf(host)), null, mapper.toDto(group, view),
-                null, reviewOf(review, host));
+                FlatmateModerationQueueDto.of(group, host), null, mapper.toDto(group, view),
+                null, reviewOf(review, host, group.getOwnerConsentMobile()), styleOf(group.getHostId()),
+                caseFiles.view(FlatmateCaseFiles.KIND_GROUP, group.getId(), group.getHostId()));
     }
 
-    private static FlatmateReviewDto reviewOf(FlatmateReview review, User host) {
+    private Map<String, Integer> styleOf(UUID authorId) {
+        return authorId == null ? Map.of() : LivingStyleCatalogue.ordered(livingStyle.answersOf(authorId));
+    }
+
+    private FlatmateReviewDto reviewOf(FlatmateReview review, User host, String ownerMobile) {
         return review == null ? null
-                : FlatmateReviewDto.of(review, nameOf(host), mobileOf(host));
+                : FlatmateReviewDto.of(review, host, ownerMobile,
+                        ownerMobile == null ? null : users.findByMobileAndArchivedFalse(ownerMobile).orElse(null));
     }
 
     private User user(UUID id) {

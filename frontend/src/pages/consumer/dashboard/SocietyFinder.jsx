@@ -4,7 +4,6 @@ import { Bell } from 'lucide-react';
 import { useFollows } from '../../../context/FollowContext.jsx';
 import SocietySelect from '../list-property/SocietySelect.jsx';
 
-/** Pick a building from Google Maps (resolved or minted server-side) and follow it to be alerted when a home is listed there. */
 export default function SocietyFinder({ onFollow }) {
   const { t } = useTranslation();
   const [round, setRound] = useState(0);

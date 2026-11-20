@@ -38,7 +38,10 @@ test('Filter groups follow the property type (Land, Commercial, Residential)', a
   });
 });
 
-const cardHrefs = (page) => cards(page).evaluateAll((els) => els.map((el) => el.getAttribute('href')));
+// Slug-less rows link as `/property/<words>-<uuid>` (listingSeo.propertyPath), so compare the listing key.
+const listingKey = (href) => href?.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)?.[0] ?? href?.replace('/property/', '');
+const cardHrefs = async (page) => (await cards(page).evaluateAll((els) => els.map((el) => el.getAttribute('href'))))
+  .map((href) => `/property/${listingKey(href)}`);
 const apiHrefs = async (request, params) => {
   const url = new URL(`${BASE}/api/properties`);
   Object.entries({ ...params, page: '0', size: '24', rank: 'relevance' }).forEach(([key, value]) => {
@@ -108,4 +111,15 @@ test('Land use and Property type are multi-select checkbox grids that toggle chi
     await expect(page.getByRole('button', { name: /Remove filter Villa/i })).toHaveCount(0);
     await expect(typeInput(page, 'flat')).toBeChecked();
   });
+});
+
+test('a facet the type hides leaves the URL, and returns when the type is cleared', async ({ page }) => {
+  await page.goto(`${BASE}/listings?deal=buy&ptype=plot&bhks=2&furn=semi&amen=lift&v=rera&age=0-5&floor=2-10&constr=ready`);
+  await expect(page.getByRole('button', { name: 'Remove filter Open Plot', exact: true })).toBeVisible();
+  await expect.poll(() => [...new URL(page.url()).searchParams.keys()].sort()).toEqual(['deal', 'ptype']);
+  await expect(page.getByRole('button', { name: 'Remove filter 2 BHK', exact: true })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Remove filter Open Plot', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove filter 2 BHK', exact: true })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.get('bhks')).toBe('2');
 });

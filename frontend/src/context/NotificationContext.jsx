@@ -1,12 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { unreadCount as fetchUnreadCount } from '../services/notificationService.js';
+import { showBrowserAlert } from '../lib/browserAlerts.js';
 import { useAuth } from './AuthContext.jsx';
 import { useConversationUnread } from './ConversationContext.jsx';
 
 const NotificationContext = createContext(null);
 const POLL_MS = 60_000;
-// The stream says when the count changes, but only from the server instance holding it, so a slow
-// poll still catches a notification written on another instance.
 const STREAM_POLL_MS = 300_000;
 
 function clearLegacyNotificationStorage() {
@@ -16,23 +15,24 @@ function clearLegacyNotificationStorage() {
       .filter((key) => key.startsWith('dzNotifications:'))
       .forEach((key) => localStorage.removeItem(key));
   } catch {
-    // localStorage may be disabled; a cleanup miss must not block the app shell.
   }
 }
 
 export function NotificationProvider({ children }) {
   const { isIn } = useAuth();
-  const { subscribe, streamConnected } = useConversationUnread();
+  const { subscribe, streamConnected, freshWhileLive } = useConversationUnread();
   const [unread, setUnread] = useState(0);
   const [status, setStatus] = useState('loading');
 
   const lastRefreshAt = useRef(0);
   const streamUp = useRef(streamConnected);
   streamUp.current = streamConnected;
+  const lastCount = useRef(null);
 
   const refresh = useCallback(async () => {
     lastRefreshAt.current = Date.now();
     if (!isIn) {
+      lastCount.current = null;
       setUnread(0);
       setStatus('ready');
       return 0;
@@ -40,6 +40,10 @@ export function NotificationProvider({ children }) {
     setStatus((s) => (s === 'ready' ? s : 'loading'));
     try {
       const n = await fetchUnreadCount();
+      if (lastCount.current !== null && n > lastCount.current) {
+        showBrowserAlert({ body: 'You have a new notification', url: '/notifications' });
+      }
+      lastCount.current = n;
       setUnread(n);
       setStatus('ready');
       return n;
@@ -59,11 +63,10 @@ export function NotificationProvider({ children }) {
   }, [refresh]);
 
   useEffect(() => {
-    // Focus and visibilitychange fire together on a tab switch; one read answers both.
     const onVisible = () => {
-      if (document.visibilityState === 'visible' && Date.now() - lastRefreshAt.current >= 1_000) refresh();
+      if (document.visibilityState !== 'visible' || Date.now() - lastRefreshAt.current < 1_000) return;
+      if (!freshWhileLive(lastRefreshAt.current)) refresh();
     };
-    // One fixed timer: the stream reconnects every few minutes, so a timer keyed on its state never fires.
     const poll = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       const due = streamUp.current ? STREAM_POLL_MS : POLL_MS;
@@ -76,7 +79,7 @@ export function NotificationProvider({ children }) {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [refresh]);
+  }, [refresh, freshWhileLive]);
 
   useEffect(() => subscribe((event) => {
     if (event.type === 'notification') refresh();

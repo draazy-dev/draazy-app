@@ -7,9 +7,11 @@ import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.provider.PaymentGateway;
 import com.draazy.api.security.AuthPrincipal;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -18,7 +20,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class CoFillServiceRequests {
-
     private final ServiceRequestRepository requests;
     private final ServiceRequestPartyRepository partyRows;
     private final CoFillParties parties;
@@ -59,16 +60,14 @@ public class CoFillServiceRequests {
     public ServiceRequestDto createCoFill(AuthPrincipal caller, ServiceRequestCreate body,
             String role, String mobile) {
         UUID requestId = serviceRequests.fileDeferred(caller, body);
-        parties.invite(caller, requestId.toString(), role, 0, mobile);
+        ServiceRequestPartyDto invited = parties.invite(caller, requestId.toString(), role, 0, mobile);
 
-        // Re-read after invite so the DTO sees the just-written party row.
         ServiceRequest request = requests.findById(requestId).orElseThrow(() -> new IllegalStateException("Service request " + requestId
                         + " disappeared before its co-fill invitation was recorded"));
         serviceRequests.recordBy(request, "party.invited", caller.userId());
-        return mapper.toDto(request, caller);
+        return mapper.toDto(request, caller).withWhatsappQueued(invited.id(), invited.whatsappQueued());
     }
 
-    // Merge only this side; blank fields must not erase the other party's work.
     @Transactional
     public ServiceRequestDto submitPartyDetails(AuthPrincipal caller, String id,
             Map<String, Object> details) {
@@ -82,15 +81,8 @@ public class CoFillServiceRequests {
                         && CoFillParties.ACCEPTED.equals(p.getStatus())).findFirst().orElseThrow(() -> new ForbiddenException(
                         "Accept the invitation first, then submit your details."));
         String side = party.getRole();
-        if (request.getStatus() != ServiceRequestStatus.AWAITING_PAYMENT) {
-            throw new ConflictException(
-                    "This request is " + request.getStatus()
-                            + " — party details may only be submitted before checkout.");
-        }
-        if (request.getPaymentRef() != null) {
-            throw new ConflictException(
-                    "Checkout is already open for this request. Ask the requester to reopen it if"
-                            + " edits are needed.");
+        if (!readiness.sideEditable(request, false, side)) {
+            throw RentAgreementReadiness.editLocked(request);
         }
 
         if (!ServiceRequestPricing.samePricedTerms(request.getDetails(),
@@ -103,13 +95,16 @@ public class CoFillServiceRequests {
                 ownSide(request.getType(), side, party.getPartyIndex(), request.getDetails(), details));
         RentAgreementDetailsRules.checkMerged(merged);
         request.replaceDetails(merged);
+        party.markDetailsSubmitted(Instant.now());
         serviceRequests.recordBy(request, "party.details-submitted", caller.userId());
         audit.record(caller, "service-request.party-details", "service_request",
                 request.getId().toString());
 
+        boolean paid = request.getStatus() != ServiceRequestStatus.AWAITING_PAYMENT;
         notifier.notify(request.getRequesterId(), "service.party-details-submitted",
                 "The other side has filled in their details",
-                "Open the request and pay to send it to our drafting team.",
+                paid ? "Our team will now prepare the draft."
+                        : "Open the request and pay to send it to our drafting team.",
                 ServiceRequestTypes.pageFor(request.getType()));
         return mapper.toDto(requests.saveAndFlush(request), caller);
     }
@@ -165,8 +160,11 @@ public class CoFillServiceRequests {
         ServiceRequest ready = transactions.execute(tx -> checkoutable(caller, id));
         RentAgreementDeclaration.accept(audit, caller, ready, declaration);
         String openOrder = ready.getPaymentRef();
-        if (openOrder != null) {
+        if (openOrder != null && caller.userId().equals(ready.payer())) {
             return resumeCheckout(caller, id, openOrder);
+        }
+        if (openOrder != null) {
+            takeOverCheckout(caller, id, openOrder);
         }
         ServiceRequest payable = transactions.execute(tx -> spendReferralCredit(caller, id));
         if (payable.getStatus() != ServiceRequestStatus.AWAITING_PAYMENT) {
@@ -175,18 +173,44 @@ public class CoFillServiceRequests {
         PaymentGateway.PaymentOrder order = serviceRequests.openOrderFor(caller, payable);
         return transactions.execute(tx -> {
             ServiceRequest request = checkoutable(caller, id);
-            if (!request.attachOrder(order.orderId())) {
+            if (!request.attachOrder(order.orderId(), caller.userId())) {
                 throw new ConflictException("Checkout is already open for this request.");
             }
             return mapper.toDto(requests.saveAndFlush(request), caller).withPaymentSessionId(order.paymentSessionId());
         });
     }
 
-    // A fully waived request has no gateway order to wait for, so it is settled as a paid one would be.
+    // Whoever pays first wins: a second party may replace an abandoned checkout, never a paid or in-flight one.
+    private void takeOverCheckout(AuthPrincipal caller, String id, String orderId) {
+        if (gateway.paid(orderId)) {
+            throw new ConflictException("This agreement has already been paid for. It will show as paid in a few minutes.");
+        }
+        try {
+            gateway.terminate(orderId);
+        } catch (RuntimeException inFlight) {
+            throw new ConflictException("The other side is paying for this agreement right now. Check again in a few minutes.");
+        }
+        if (gateway.paid(orderId)) {
+            throw new ConflictException("This agreement has already been paid for. It will show as paid in a few minutes.");
+        }
+        transactions.executeWithoutResult(tx -> {
+            ServiceRequest request = checkoutable(caller, id);
+            if (orderId.equals(request.getPaymentRef())) {
+                request.releaseOrder();
+                serviceRequests.recordBy(request, "checkout.replaced", caller.userId());
+                requests.saveAndFlush(request);
+            }
+        });
+    }
+
     private ServiceRequest spendReferralCredit(AuthPrincipal caller, String id) {
         ServiceRequest request = checkoutable(caller, id);
-        if (referralCredit.spend(request)) {
+        OptionalLong discount = caller.userId().equals(request.getRequesterId())
+                ? referralCredit.spend(request) : OptionalLong.empty();
+        if (discount.isPresent()) {
             serviceRequests.recordBy(request, "referral-credit.applied", caller.userId());
+            audit.record(caller, "service-request.referral-credit", "service_request",
+                    request.getId().toString(), "discount", String.valueOf(discount.getAsLong()));
             if (request.getAmount() == 0) {
                 serviceRequests.transition(request, ServiceRequestStatus.NEW);
                 serviceRequests.record(request, "payment.waived", null);
@@ -211,9 +235,14 @@ public class CoFillServiceRequests {
 
     private ServiceRequest checkoutable(AuthPrincipal caller, String id) {
         ServiceRequest request = serviceRequests.visibleForUpdate(caller, id);
-        if (!caller.userId().equals(request.getRequesterId())) {
+        if (!caller.userId().equals(request.getRequesterId()) && !joinedParty(caller, request)) {
             throw new ForbiddenException(
-                    "Only the person who raised this request can open checkout.");
+                    "Only the people on this agreement can open checkout.");
+        }
+        if (ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType()) && "invite".equals(String.valueOf(
+                ServiceRequestPricing.childObject(request.getDetails() == null ? Map.of() : request.getDetails(),
+                        "_state").get("ownerMode")))) {
+            throw new ForbiddenException("The owner completes and pays for this agreement.");
         }
         if (request.getStatus() != ServiceRequestStatus.AWAITING_PAYMENT) {
             throw new ConflictException(
@@ -224,7 +253,9 @@ public class CoFillServiceRequests {
             throw new ConflictException("This request has no payable amount.");
         }
         readiness.requireOwnerSide(request);
-        var rows = partyRows.findByRequestId(request.getId());
+        boolean tenantLater = RentAgreementReadiness.tenantFillsLater(request);
+        var rows = partyRows.findByRequestId(request.getId()).stream()
+                .filter(p -> !tenantLater || !"tenant".equals(p.getRole())).toList();
         if (!rows.isEmpty()) {
             if (rows.stream().anyMatch(p -> CoFillParties.INVITED.equals(p.getStatus()))) {
                 throw new ConflictException(pendingInviteMessage(request.getId()));
@@ -235,6 +266,12 @@ public class CoFillServiceRequests {
         }
         readiness.require(request);
         return request;
+    }
+
+    private boolean joinedParty(AuthPrincipal caller, ServiceRequest request) {
+        return ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())
+                && CoFillParties.joined(partyRows.findByRequestId(request.getId()))
+                        .anyMatch(p -> caller.userId().equals(p.getUserId()));
     }
 
     private String pendingInviteMessage(UUID requestId) {

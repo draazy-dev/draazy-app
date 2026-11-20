@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, MapPin, MapPinOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { mintSociety, resolveSociety } from '../../../services/societyService.js';
+import { mintSociety, resolveSociety, searchSocieties } from '../../../services/societyService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { fetchSuggestions, fetchPlaceDetails, newAutocompleteSession } from '../../../lib/places.js';
 import { haversineKm } from '../../../lib/listings/coords.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 import { cleanText } from './sanitize.js';
 import { fld } from './styles.js';
 
@@ -17,8 +18,6 @@ const distanceLabel = (km) => (km < 1
   ? `${Math.max(50, Math.round((km * 1000) / 50) * 50)} m`
   : `${km.toFixed(1)} km`);
 
-/** A society comes only from a Google Maps suggestion, resolved or minted server-side, never from typed text.
- * `onChange` gets the bound society, `{ notOnMaps: true, source: 'notOnMaps' }`, or `null` once typed over. */
 export default function SocietySelect({
   value, name, notOnMaps = false, allowNotOnMaps = true, onChange,
   localityLabel = '', lat = null, lng = null,
@@ -32,6 +31,7 @@ export default function SocietySelect({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const [googleRaw, setGoogleRaw] = useState([]);
+  const [savedRaw, setSavedRaw] = useState([]);
   const [pending, setPending] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -42,7 +42,6 @@ export default function SocietySelect({
   const reqRef = useRef(0);
   const listId = useId();
 
-  // Any user action that supersedes an in-flight pick makes its late answer stale.
   const cancel = useCallback(() => { reqRef.current += 1; setBusy(false); }, []);
 
   useEffect(() => {
@@ -51,28 +50,30 @@ export default function SocietySelect({
 
   useEffect(() => {
     const q = query.trim();
-    if (!open || pending || q.length < 2) { setGoogleRaw([]); return undefined; }
+    if (!open || pending || q.length < 2) { setGoogleRaw([]); setSavedRaw([]); return undefined; }
     let alive = true;
     const timer = setTimeout(async () => {
       if (!sessionRef.current) sessionRef.current = newAutocompleteSession();
       const out = await fetchSuggestions(q, sessionRef.current, {
+        servedArea: true,
         includedPrimaryTypes: GOOGLE_TYPES,
         ...(lat != null && lng != null ? { locationBias: { center: { lat: Number(lat), lng: Number(lng) }, radius: GOOGLE_BIAS_RADIUS_M } } : {}),
       });
-      if (alive) setGoogleRaw(out);
+      const saved = out.some((g) => g.mainText) ? [] : await searchSocieties(q, localityLabel, { mapped: true }).catch(() => []);
+      if (alive) { setGoogleRaw(out); setSavedRaw(saved); }
     }, 250);
     return () => { alive = false; clearTimeout(timer); };
-  }, [query, open, pending, lat, lng]);
+  }, [query, open, pending, lat, lng, localityLabel]);
   const google = useMemo(() => googleRaw.filter((g) => g.mainText).slice(0, GOOGLE_LIMIT), [googleRaw]);
-  // "Not on Google Maps" is an answer to a search that came up short, so it waits for typed text.
+  const saved = useMemo(() => savedRaw.slice(0, GOOGLE_LIMIT), [savedRaw]);
   const typed = query.trim() !== '';
   const offerNotOnMaps = allowNotOnMaps && typed;
   const menuOpen = open && (!!pending || google.length > 0 || typed);
 
   const items = useMemo(() => {
     if (pending) return [...pending.candidates.map((c) => ({ candidate: c })), { notListed: true }];
-    return [...google.map((g) => ({ google: g })), ...(offerNotOnMaps ? [{ notOnMaps: true }] : [])];
-  }, [pending, google, offerNotOnMaps]);
+    return [...google.map((g) => ({ google: g })), ...saved.map((c) => ({ saved: c })), ...(offerNotOnMaps ? [{ notOnMaps: true }] : [])];
+  }, [pending, google, saved, offerNotOnMaps]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -93,6 +94,7 @@ export default function SocietySelect({
       lat: rec.lat ?? place.lat,
       lng: rec.lng ?? place.lng,
       pincode: place.pincode || '',
+      street: place.street || '',
       localityRaw: place.localityRaw || '',
       source,
     });
@@ -162,6 +164,7 @@ export default function SocietySelect({
         lat: d.lat ?? null,
         lng: d.lng ?? null,
         pincode: d.pincode || '',
+        street: d.street || '',
         localityRaw: d.localityRaw || '',
       };
       res = await resolveSociety(place);
@@ -189,6 +192,7 @@ export default function SocietySelect({
   const commit = (item) => {
     if (item.google) return pickGoogle(item.google);
     if (item.candidate) return bind(item.candidate, pending.place, 'pick');
+    if (item.saved) return bind(item.saved, {}, 'pick');
     if (item.notListed) return mint(pending.place);
     return pickNotOnMaps();
   };
@@ -205,6 +209,7 @@ export default function SocietySelect({
   };
 
   const onKeyDown = (e) => {
+    if (e.key === 'Enter' && isImeComposing(e)) return;
     if (!open && (e.key === 'ArrowDown' || e.key === 'Enter')) { e.preventDefault(); setOpen(true); return; }
     if (!open) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(items.length - 1, i + 1)); }
@@ -213,7 +218,6 @@ export default function SocietySelect({
     else if (e.key === 'Escape') { cancel(); setOpen(false); setPending(null); }
   };
 
-  // Returning to the box while still signed out means the sign-in was dismissed: drop the stalled pick.
   const onFocus = () => {
     focusedRef.current = true;
     if (!user && awaitingRef.current) { awaitingRef.current = null; setQuery(name || ''); }
@@ -321,24 +325,49 @@ export default function SocietySelect({
                   </span>
                 </button>
               ))}
+              {saved.length > 0 && <div className="dz-dropdown__group">{t('listProperty.society.savedHeading')}</div>}
+              {saved.map((c, j) => {
+                const i = google.length + j;
+                return (
+                  <button
+                    type="button"
+                    key={c.slug}
+                    id={optId(i)}
+                    role="option"
+                    aria-selected={false}
+                    disabled={busy}
+                    onMouseEnter={() => setActive(i)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => commit(items[i])}
+                    data-testid="society-saved-option"
+                    className={optionClass(i)}
+                  >
+                    <MapPin className="opt-icon" />
+                    <span className="opt-label" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+                      {candidateMeta(c) ? <span className="text-xs text-gray-500" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{candidateMeta(c)}</span> : null}
+                    </span>
+                  </button>
+                );
+              })}
               {offerNotOnMaps && (
                 <button
                   type="button"
-                  id={optId(google.length)}
+                  id={optId(google.length + saved.length)}
                   role="option"
                   aria-selected={notOnMaps}
-                  onMouseEnter={() => setActive(google.length)}
+                  onMouseEnter={() => setActive(google.length + saved.length)}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={pickNotOnMaps}
                   data-testid="society-not-on-maps"
-                  className={optionClass(google.length)}
+                  className={optionClass(google.length + saved.length)}
                 >
                   <MapPinOff className="opt-icon" />
                   <span className="opt-label">{t('listProperty.society.notOnMaps')}</span>
                   {notOnMaps ? <Check className="opt-check" style={{ opacity: 1, transform: 'scale(1)' }} /> : null}
                 </button>
               )}
-              {google.length === 0 && !allowNotOnMaps && query.trim().length >= 2 && <div className="dz-dropdown__empty">{t('listProperty.society.empty')}</div>}
+              {google.length === 0 && saved.length === 0 && !allowNotOnMaps && query.trim().length >= 2 && <div className="dz-dropdown__empty">{t('listProperty.society.empty')}</div>}
             </>
           )}
         </div>

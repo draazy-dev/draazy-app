@@ -11,11 +11,9 @@ import lombok.Getter;
 @Table(name = "message_attachments")
 @Getter
 public class MessageAttachment extends BaseEntity {
-
     @Column(name = "surface", nullable = false, updatable = false)
     private String surface;
 
-    /** The conversation or support ticket. Deliberately not a foreign key — by design. */
     @Column(name = "thread_id", nullable = false, updatable = false)
     private UUID threadId;
 
@@ -38,7 +36,6 @@ public class MessageAttachment extends BaseEntity {
     private String fileName;
 
     protected MessageAttachment() {
-
     }
 
     public static MessageAttachment conversationPhoto(UUID threadId, UUID messageId, UUID uploadedBy,

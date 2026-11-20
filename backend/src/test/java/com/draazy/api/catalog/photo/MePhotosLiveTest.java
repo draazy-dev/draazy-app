@@ -28,15 +28,10 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
-// The real end-to-end: a live HTTP request through the whole server chain into a real Cloudflare R2 bucket.
-// Runs only with `STORAGE_ENABLED=true` and `R2_*`, so offline suites skip it.
 @EnabledIfEnvironmentVariable(named = "STORAGE_ENABLED", matches = "true")
 class MePhotosLiveTest extends AbstractApiTest {
-
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    // Test properties shadow main's storage block, so bind environment values here.
-    // That wires real R2 storage for this context only.
     @DynamicPropertySource
     static void storage(DynamicPropertyRegistry registry) {
         registry.add("draazy.providers.storage.enabled", () -> "true");
@@ -106,7 +101,6 @@ class MePhotosLiveTest extends AbstractApiTest {
         try (S3Client s3 = s3()) {
             s3.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
         } catch (RuntimeException ignored) {
-
         }
     }
 

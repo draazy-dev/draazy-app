@@ -1,6 +1,5 @@
 package com.draazy.api.services.request;
 
-import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.Roles;
 import java.time.Instant;
@@ -9,11 +8,8 @@ import java.util.Set;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-// Separate collaborator keeps read-receipt side rules out of ServiceRequestService.
 @Component
 class ServiceRequestReadReceipts {
-
-    // Mark sides, not individuals; co-fill parties are customers, not desk recipients.
     private static final Set<String> OPS = Set.of(Roles.Wire.STAFF, Roles.Wire.MANAGER, Roles.Wire.ADMIN);
     private static final Set<String> CUSTOMER = Set.of(Roles.Wire.BUYER, Roles.Wire.OWNER);
 
@@ -34,8 +30,6 @@ class ServiceRequestReadReceipts {
         this.approvals = approvals;
     }
 
-    // Idempotent: receipt records first seen, not latest open.
-    // 204 avoids tempting clients to render historical counts.
     @Transactional
     void markRead(AuthPrincipal caller, String id) {
         ServiceRequest request = requests.visible(caller, id);
@@ -45,10 +39,8 @@ class ServiceRequestReadReceipts {
 
     @Transactional
     void markDraftOpened(AuthPrincipal caller, String id) {
-        ServiceRequest request = requests.visible(caller, id);
-        if (request.getStatus() != ServiceRequestStatus.DRAFT_SHARED) {
-            throw new ConflictException("There is no draft out for review on this request.");
-        }
+        ServiceRequest request = requests.visibleLocked(caller, id);
+        approvals.requireOutForReview(request);
         approvals.markOpened(caller, request);
         if (caller.userId().equals(request.getRequesterId())) {
             List<ServiceRequestEvent> timeline = events.findByRequestIdOrderByAtAsc(request.getId());

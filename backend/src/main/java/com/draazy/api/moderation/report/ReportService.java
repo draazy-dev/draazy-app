@@ -1,21 +1,29 @@
 package com.draazy.api.moderation.report;
 
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.error.RateLimitedException;
+import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.engagement.flatmate.FlatmateModerationService;
+import com.draazy.api.identity.user.User;
+import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.moderation.property.PropertyModerationService;
 import com.draazy.api.moderation.user.UserAdminService;
 import com.draazy.api.security.AuthPrincipal;
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -25,9 +33,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Any signed-in user may file; only ops read or act. Filing is unaudited to keep reporters out of audit_log. */
 @Service
 public class ReportService {
+    private static final int MAX_PER_HOUR = 10;
+    private static final Duration WINDOW = Duration.ofHours(1);
 
     private final ReportRepository reports;
     private final ReportMapper mapper;
@@ -35,19 +44,25 @@ public class ReportService {
     private final PropertyModerationService propertyModeration;
     private final UserAdminService userAdmin;
     private final FlatmateModerationService flatmateModeration;
+    private final PropertyRepository properties;
+    private final UserRepository users;
+    private final RateLimitLock locks;
 
     public ReportService(ReportRepository reports, ReportMapper mapper, AuditService audit,
             PropertyModerationService propertyModeration, UserAdminService userAdmin,
-            FlatmateModerationService flatmateModeration) {
+            FlatmateModerationService flatmateModeration, PropertyRepository properties, UserRepository users,
+            RateLimitLock locks) {
         this.reports = reports;
         this.mapper = mapper;
         this.audit = audit;
         this.propertyModeration = propertyModeration;
         this.userAdmin = userAdmin;
         this.flatmateModeration = flatmateModeration;
+        this.properties = properties;
+        this.users = users;
+        this.locks = locks;
     }
 
-    /** Target is deliberately not resolved: a scammer deleting the listing must not also delete the complaint. */
     @Transactional
     public ReportResponse create(UUID reporterId, ReportCreateRequest body) {
         String targetType = body.targetType();
@@ -58,6 +73,15 @@ public class ReportService {
             throw new BadRequestException("Reason '%s' is not a valid complaint about a %s. Expected one of %s"
                     .formatted(body.reason(), targetType, ReportReasons.forTarget(targetType)));
         }
+        if (ReportTargetTypes.USER.equals(targetType)
+                && Ids.parseUuid(body.targetId()).filter(users::existsById).isEmpty()) {
+            throw NotFoundException.of("User");
+        }
+        locks.holdUntilCommit(RateLimitLock.Limit.REPORT_CREATE, reporterId.toString());
+        if (reports.countByReporterIdAndCreatedAtAfter(reporterId, Instant.now().minus(WINDOW)) >= MAX_PER_HOUR) {
+            throw new RateLimitedException("You can file up to " + MAX_PER_HOUR + " reports an hour. Please try again later.",
+                    (int) WINDOW.toSeconds());
+        }
         if (reports.existsByReporterIdAndTargetTypeAndTargetIdAndStatusIn(
                 reporterId, targetType, body.targetId(), ReportStatuses.LIVE)) {
             throw new ConflictException("You have already reported this, and it is still being reviewed");
@@ -66,13 +90,10 @@ public class ReportService {
         try {
             return mapper.toResponse(reports.saveAndFlush(report));
         } catch (DataIntegrityViolationException duplicate) {
-            // Concurrent submissions both pass the check above; the V18 partial unique index is the serialiser.
             throw new ConflictException("You have already reported this, and it is still being reviewed");
         }
     }
 
-    /** Filters are validated: an unknown value would give an empty page that reads as "queue clear".
-     * Each row carries how many reports its target has drawn, counted for this page only. */
     @Transactional(readOnly = true)
     public Page<ReportResponse> list(String status, String reason, String targetType, String q,
             Integer sinceDays, Pageable pageable) {
@@ -80,7 +101,7 @@ public class ReportService {
         String wantedReason = blankToNull(reason);
         String wantedTargetType = blankToNull(targetType);
         String like = LikePatterns.contains(q);
-        Instant since = sinceDays == null || sinceDays <= 0 ? null : Instant.now().minus(sinceDays, ChronoUnit.DAYS);
+        Instant since = PlatformTime.sinceOrNull(sinceDays);
 
         if (wantedStatus != null && !ReportStatuses.isValid(wantedStatus)) {
             throw new BadRequestException("Unknown report status: " + wantedStatus);
@@ -102,10 +123,27 @@ public class ReportService {
                     since == null ? Instant.EPOCH : since, pageable);
         }
         Map<String, Long> perTarget = targetTallies(page.getContent());
-        return page.map(r -> mapper.toResponse(r).withTargetReportCount(perTarget.getOrDefault(r.getTargetId(), 1L)));
+        Map<String, String> titles = resolveTitles(page.getContent());
+        Map<String, User> people = reportedPeople(page.getContent());
+        return page.map(r -> {
+            ReportResponse row = mapper.toResponse(r)
+                    .withTargetReportCount(perTarget.getOrDefault(r.getTargetId(), 1L))
+                    .withTargetTitle(titles.get(r.getTargetId()));
+            User person = people.get(r.getTargetId());
+            return person == null ? row : row.withTargetPerson(person.getName(), person.getMobile());
+        });
     }
 
-    /** Undecided per target type for the tab badges, and per status within {@code targetType} for the chips. */
+    private Map<String, User> reportedPeople(List<Report> rows) {
+        List<UUID> ids = rows.stream()
+                .filter(r -> ReportTargetTypes.USER.equals(r.getTargetType()))
+                .map(r -> Ids.parseUuid(r.getTargetId()))
+                .flatMap(Optional::stream)
+                .distinct()
+                .toList();
+        return users.findAllById(ids).stream().collect(Collectors.toMap(u -> u.getId().toString(), u -> u));
+    }
+
     @Transactional(readOnly = true)
     public Map<String, Long> counts(String targetType) {
         String wantedTargetType = blankToNull(targetType);
@@ -145,14 +183,11 @@ public class ReportService {
         return out;
     }
 
-    /** Defined here so "outstanding" stays with the status vocabulary and the tile matches the screen. */
     @Transactional(readOnly = true)
     public long openCount() {
         return reports.countByStatusIn(ReportStatuses.LIVE);
     }
 
-    /** Decision and enforcement commit in one transaction; only {@code actioned} may enforce, since "dismissed
-     * and taken down" would leave a self-contradicting audit trail. */
     @Transactional
     public ReportResponse triage(AuthPrincipal actor, String id, ReportTriageRequest body) {
         if (!ReportStatuses.isValid(body.status())) {
@@ -187,11 +222,46 @@ public class ReportService {
         audit.record(actor, "report.triage", "report", id, "from", from, "to", body.status(),
                 "enforcement", enforcement, "target", report.getTargetType(),
                 "targetId", report.getTargetId(), "note", body.note());
-        return mapper.toResponse(report);
+        return mapper.toResponse(report).withTargetTitle(resolveTitle(report.getTargetType(), report.getTargetId()));
     }
 
-    /** Delegates to the moderation services that own these transitions so their self-dealing guards and audit rows
-     * apply; a missing target is a 404 so the moderator never closes a report believing something was done. */
+    private Map<String, String> resolveTitles(List<Report> rows) {
+        Map<String, String> out = new HashMap<>();
+        List<UUID> propertyUuids = rows.stream()
+                .filter(r -> ReportTargetTypes.PROPERTY.equals(r.getTargetType()))
+                .map(Report::getTargetId)
+                .map(Ids::parseUuid)
+                .flatMap(Optional::stream)
+                .toList();
+        if (!propertyUuids.isEmpty()) {
+            for (Property p : properties.findAllById(propertyUuids)) {
+                if (p.getTitle() != null && !p.getTitle().isBlank()) {
+                    out.put(p.getId().toString(), p.getTitle());
+                }
+            }
+        }
+        rows.stream()
+                .filter(r -> ReportTargetTypes.PROPERTY.equals(r.getTargetType()))
+                .map(Report::getTargetId)
+                .filter(id -> Ids.parseUuid(id).isEmpty() && !out.containsKey(id))
+                .forEach(slug -> properties.findBySlug(slug).ifPresent(p -> {
+                    if (p.getTitle() != null && !p.getTitle().isBlank()) {
+                        out.put(slug, p.getTitle());
+                    }
+                }));
+        return out;
+    }
+
+    private String resolveTitle(String targetType, String targetId) {
+        if (!ReportTargetTypes.PROPERTY.equals(targetType) || targetId == null) {
+            return null;
+        }
+        return Ids.parseUuid(targetId).flatMap(properties::findById)
+                .or(() -> properties.findBySlug(targetId))
+                .map(Property::getTitle)
+                .orElse(null);
+    }
+
     private void enforce(AuthPrincipal actor, Report report, String enforcement, String note) {
         String because = "Reported: " + report.getReason()
                 + (note == null || note.isBlank() ? "" : " — " + note.trim());
@@ -206,17 +276,14 @@ public class ReportService {
             case ReportEnforcement.SUSPEND_ACCOUNT ->
                     userAdmin.archive(actor, report.getTargetId(), because);
             default -> {
-                // ReportEnforcement.NONE — the moderator decided the complaint and touched nothing.
             }
         }
     }
 
-    /** A malformed id is a 404 for the same reason somebody else's is: it does not exist for you. */
     private static UUID parseId(String token) {
         return Ids.parseUuid(token).orElseThrow(() -> NotFoundException.of("Report"));
     }
 
-    /** A blank filter means "no filter": {@code ""} is a legal column value and would match nothing. */
     private static String blankToNull(String value) {
         return (value == null || value.isBlank()) ? null : value;
     }

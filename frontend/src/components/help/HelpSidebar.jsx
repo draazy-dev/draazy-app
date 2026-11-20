@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
-/* Grouped navigation for the help centre: section → category → article. */
 
 export default function HelpSidebar({ sections, categories, articles, onNavigate }) {
   const { t } = useTranslation();

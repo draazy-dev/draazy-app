@@ -38,7 +38,7 @@ async function seedRequest() {
 async function openDesk(page, login) {
   await login.asStaff(TYPE);
   await page.goto(`/ops/drafting-desk?type=${TYPE}`);
-  await expect(page).toHaveURL(/\/admin\/valuation/);
+  await expect(page).toHaveURL(/\/(admin|staff)\/valuation/);
   await expect(page.getByRole('heading', { name: 'Property Valuation', level: 1 })).toBeVisible();
   // In live mode the screen must render the queue, not the offline panel.
   await expect(page.getByText(/needs the live API/i)).toHaveCount(0);
@@ -73,6 +73,10 @@ test.describe('Drafting desk in the field', () => {
 
       const dialog = page.getByRole('dialog');
       await expect(dialog).toBeVisible();
+      // The phone sheet enters with a scale(0.96) animation, which shrinks every rect until it settles.
+      await dialog.evaluate((el) => Promise.all(el.getAnimations({ subtree: true })
+        .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+        .map((a) => a.finished)));
 
       const undersized = await dialog.locator('button:visible, a[href]:visible').evaluateAll(
         (els, floor) => els

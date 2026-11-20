@@ -28,13 +28,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
-@TestPropertySource(properties = "draazy.identity.qa-sample-rate=0.0")
 class VerificationEndpointsTest extends AbstractApiTest {
-
     private static final String PAN = "ABCDE1234F";
     private static final String OTHER_PAN = "FGHIJ5678K";
 
@@ -78,7 +75,6 @@ class VerificationEndpointsTest extends AbstractApiTest {
         return "{\"number\":\"" + number + "\",\"name\":\"Asha Patil\",\"dob\":\"1991-04-12\"}";
     }
 
-    /** A Verhoeff-valid Aadhaar built from an 11-digit body, so the check digit is never guessed. */
     static String validAadhaar(String body) {
         for (char d = '0'; d <= '9'; d++) {
             if (IdentityNumbers.verhoeffValid(body + d)) {
@@ -482,7 +478,6 @@ class VerificationEndpointsTest extends AbstractApiTest {
         submitPan(first, PAN).andExpect(status().isAccepted());
         approve(reviewer, caseOf(first), PAN).andExpect(status().isOk());
 
-        // The phone's OCR already names the taken card: refuse before a reviewer spends time on it.
         submitPan(second, PAN)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value(ErrorCodes.IDENTITY_ALREADY_REGISTERED));
@@ -496,7 +491,6 @@ class VerificationEndpointsTest extends AbstractApiTest {
                 .isEqualTo(VerificationStatuses.PENDING);
     }
 
-    // ---------------- local-only "simulate a reviewer decision" ----------------
     @Test
     void theQueueFlagsASharedClaimOrPersonToTheReviewer() throws Exception {
         User first = user("9830000023");
@@ -683,7 +677,7 @@ class VerificationEndpointsTest extends AbstractApiTest {
         assertThat(notificationsFor(u)).extracting(n -> n.get("type"))
                 .containsExactly("identity.approved", "identity.revoked");
         assertThat(notificationsFor(u).get(1)).satisfies(row -> {
-            assertThat(row.get("title")).isEqualTo("Verified badge withdrawn");
+            assertThat(row.get("title")).isEqualTo("KYC done badge withdrawn");
             assertThat(row.get("body")).isEqualTo("The approved document was disputed");
             assertThat(row.get("link")).isEqualTo("/verify-identity");
         });
@@ -842,6 +836,31 @@ class VerificationEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
         kycProfile(admin("9830000097"), applicant, "{\"name\":\"%s\"}".formatted("x".repeat(81)))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void staffCannotSetAProfileNameThatSelfServiceWouldRefuse() throws Exception {
+        User u = user("9830000089");
+        submitPan(u, PAN).andExpect(status().isAccepted());
+
+        kycProfile(admin("9830000088"), u, "{\"name\":\"Asha 123\"}")
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("name"));
+        assertThat(jdbc.queryForObject("select name from users where id = ?", String.class, u.getId()))
+                .isNotEqualTo("Asha 123");
+    }
+
+    @Test
+    void approvingWithAnInvalidLegalNameChangesNothing() throws Exception {
+        User u = user("9830000087");
+        submitPan(u, PAN).andExpect(status().isAccepted());
+
+        approveBody(admin("9830000086"), caseOf(u), "{\"number\":\"" + PAN
+                + "\",\"name\":\"Asha 123\",\"dob\":\"1991-04-12\",\"poseConfirmed\":true}")
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("name"));
+        assertThat(jdbc.queryForObject("select verified from users where id = ?", Boolean.class, u.getId()))
+                .isFalse();
     }
 
     @Test

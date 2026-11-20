@@ -9,11 +9,14 @@ import {
   fetchPlaceDetails,
 } from '../../lib/places.js';
 import { resolveLocality, searchLocalities } from '../../services/localityService.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const dbOption = (l) => ({ value: l.name, label: l.name, meta: { locality: l } });
 
-/** A locality is chosen only from a Google suggestion (or a saved one if Google is down), resolved server-side,
- * so the stored name is canonical. `nameOnly` / `unrestricted` skip the resolve; typed text is never committed. */
+// Google can stall without rejecting; past this the saved localities answer instead of "Searching…" forever.
+const GOOGLE_WAIT_MS = 4000;
+const giveUpOnGoogle = () => new Promise((resolve) => { setTimeout(() => resolve([]), GOOGLE_WAIT_MS); });
+
 export default function LocalitySelect({
   multi = false,
   unrestricted = false,
@@ -53,7 +56,10 @@ export default function LocalitySelect({
 
   const asyncSearch = useCallback(async (q) => {
     if (!tokenRef.current) tokenRef.current = newAutocompleteSession();
-    const preds = await fetchLocalitySuggestions(q, tokenRef.current, { crossCity: unrestricted });
+    const preds = await Promise.race([
+      fetchLocalitySuggestions(q, tokenRef.current, { crossCity: unrestricted }),
+      giveUpOnGoogle(),
+    ]);
     if (preds.length) {
       return preds.map((p) => ({
         value: p.mainText,
@@ -126,7 +132,7 @@ export default function LocalitySelect({
       if (token !== reqRef.current || !mountedRef.current) return;
       commit(loc.name, { slug: loc.slug, lat: loc.lat ?? details.lat, lng: loc.lng ?? details.lng, details });
     } catch (e) {
-      if (token === reqRef.current && mountedRef.current) setError(e?.status === 422 ? (e.message && !/^HTTP \d+$/.test(e.message) ? e.message : t('ui.localityPick')) : t('ui.localityFailed'));
+      if (token === reqRef.current && mountedRef.current) setError(e?.status === 422 ? userMessage(e, t('ui.localityPick')) : t('ui.localityFailed'));
     } finally {
       if (token === reqRef.current && mountedRef.current) setBusy(false);
     }
@@ -146,7 +152,7 @@ export default function LocalitySelect({
   return (
     <>
       {multi
-        ? <MultiSelect values={values} onChange={onChange} {...shared} />
+        ? <MultiSelect values={values} onChange={onChange} chips {...shared} />
         : <Select value={value} onChange={onChange} {...shared} />}
       <p className="mt-1 text-xs text-gray-400 empty:hidden" role="status">{busy ? t('ui.localityAdding') : ''}</p>
       {error ? <p id={errorId} className="mt-1 text-xs text-red-400" role="alert" data-testid="locality-error">{error}</p> : null}

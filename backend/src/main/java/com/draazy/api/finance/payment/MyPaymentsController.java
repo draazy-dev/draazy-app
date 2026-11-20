@@ -13,10 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The caller's payment history and refund requests (contracts {@code listMyPayments}, {@code requestRefund}). */
 @RestController
 public class MyPaymentsController {
-
     private final MyPaymentsService payments;
 
     public MyPaymentsController(MyPaymentsService payments) {

@@ -5,7 +5,6 @@ import { exportCsv } from '../../../lib/csv.js';
 import { useToast } from '../../../context/ToastContext.jsx';
 import Table from '../../../components/ui/Table.jsx';
 
-/** `from`/`to` lead because that pair is what an audit reader scans for first. */
 export const describe = (metadata) => {
   if (!metadata || typeof metadata !== 'object') return '';
   const parts = [];
@@ -20,7 +19,6 @@ export const describe = (metadata) => {
   return parts.join(', ');
 };
 
-/** Shortened only visually; the full UUID remains in title text and CSV export. */
 const shortId = (id) => {
   const s = String(id || '');
   return s.length > 8 ? `${s.slice(0, 8)}…` : s;
@@ -32,7 +30,6 @@ const EXPORT_MAX_PAGES = 50;
 
 const when = (at) => new Date(at).toLocaleString('en-IN');
 
-// Every actor, customers and system included; the staff feed is narrowed to back-office roles.
 export default function AuditTrail() {
   const { toast } = useToast();
   const [rows, setRows] = useState(null);

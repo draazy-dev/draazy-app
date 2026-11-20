@@ -25,10 +25,9 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Strangers get 404, not 403, so verification cases do not become an oracle.
+// Strangers get 404, not 403, so verification cases are not an existence oracle.
 @Service
 public class PropertyVerificationService {
-
     private final PropertyReviewRepository reviews;
     private final PropertyRepository properties;
     private final VerificationCases cases;
@@ -38,12 +37,11 @@ public class PropertyVerificationService {
     private final DocumentRepository documents;
     private final Notifier notifier;
     private final ListingSignalService signals;
-    private final PropertyOverrideRequestRepository overrideRequests;
 
     public PropertyVerificationService(PropertyReviewRepository reviews, PropertyRepository properties,
             VerificationCases cases, AccountPermissions permissions, AuditService audit,
             PropertyLifecycle lifecycle, DocumentRepository documents, Notifier notifier,
-            ListingSignalService signals, PropertyOverrideRequestRepository overrideRequests) {
+            ListingSignalService signals) {
         this.reviews = reviews;
         this.properties = properties;
         this.cases = cases;
@@ -53,7 +51,6 @@ public class PropertyVerificationService {
         this.documents = documents;
         this.notifier = notifier;
         this.signals = signals;
-        this.overrideRequests = overrideRequests;
     }
 
     @Transactional(readOnly = true)
@@ -64,7 +61,6 @@ public class PropertyVerificationService {
         return toResponse(review, property, checker);
     }
 
-    // Owners cannot see a case containing only staff-only notes; that closes the probe oracle.
     private PropertyReview ownerVisibleCase(Property property, boolean checker) {
         PropertyReview review = requireCase(property);
         if (!checker && review.getReviewer() == null && review.getDecidedAt() == null
@@ -75,7 +71,6 @@ public class PropertyVerificationService {
         return review;
     }
 
-    // Idempotent because property_reviews.property_id is UNIQUE.
     @Transactional
     public PropertyReviewResponse initiate(AuthPrincipal actor, String propertyId, boolean markRead) {
         Property property = participantPropertyForWrite(actor, propertyId);
@@ -87,7 +82,6 @@ public class PropertyVerificationService {
             property, mayReadNotes(actor) && !actor.userId().equals(property.getOwner().getId()));
     }
 
-    // Opens the case instead of requiring one, closing the oracle on message routes.
     @Transactional
     public PropertyReviewResponse addMessage(AuthPrincipal actor, String propertyId, String body,
             boolean clarificationRequested) {
@@ -112,7 +106,6 @@ public class PropertyVerificationService {
         return toResponse(review, property, checker);
     }
 
-    // Marks only the other side's messages the caller could have seen.
     @Transactional
     public void markRead(AuthPrincipal actor, String propertyId) {
         Property property = participantPropertyForWrite(actor, propertyId);
@@ -128,7 +121,6 @@ public class PropertyVerificationService {
                 .forEach(ReviewMessage::markRead);
     }
 
-    // Approval also publishes in this transaction; a catalogue-missing verdict is no verdict.
     @Transactional
     public PropertyReviewResponse decide(AuthPrincipal actor, String propertyId, String decision,
             String note, String reasonCode, String expectedStatus) {
@@ -141,9 +133,14 @@ public class PropertyVerificationService {
         String normalizedReason = ReviewReasonCodes.require(decision, reasonCode, note);
         Property property = loadForWrite(propertyId);
         lifecycle.requireChecker(actor, property);
+        requireNotStale(property, expectedStatus);
         lifecycle.requireActive(property);
-        PropertyReview review = requireCase(property);
+        if (approve) {
+            lifecycle.requireOwnerConfirmed(property);
+        }
+        PropertyReview review = requireFreshCase(property);
         requireExpected(property.getStatus(), PropertyReviewStatuses.wire(review), expectedStatus);
+        String from = property.getStatus();
         boolean publishingVerifiedApproval = approve
                 && PropertyStatus.APPROVED.equals(review.getStatus())
                 && !PropertyStatus.APPROVED.equals(property.getStatus());
@@ -153,11 +150,8 @@ public class PropertyVerificationService {
                     "Listing status changed; refresh before deciding");
         }
         if (approve) {
-            ApprovalGate.require(review);
-            requireNoSecondApproverBlock(property);
+            ApprovalGate.require(review, property);
 
-                // Checked before the verdict is written, not left to `publish` below: the rollback would
-                // take the verdict with it and cost the reviewer the whole checklist.
             lifecycle.requireFiled(property);
         }
 
@@ -169,17 +163,17 @@ public class PropertyVerificationService {
         } else if (approve) {
             lifecycle.publish(actor, property);
             review.decide(PropertyStatus.APPROVED, actor.userId().toString(), note, null);
-            review.addMessage(actor.userId(), decisionMessage(true, note));
+            review.addApprovalMessage(actor.userId(), approvalMessage(property, note));
         } else {
             review.decide(PropertyStatus.REJECTED, actor.userId().toString(), note, normalizedReason);
-            review.addMessage(actor.userId(), decisionMessage(false,
-                    ReviewReasonCodes.ownerMessage(normalizedReason, note)));
+            review.addMessage(actor.userId(), ReviewReasonCodes.rejectionThread(normalizedReason, note));
             property.setStatus(PropertyStatus.REJECTED);
         }
         reviews.saveAndFlush(review);
         property.clearRecheck();
         audit.record(actor, "property.verification.decision", "property", propertyId,
-                "decision", decision, "note", note, "reasonCode", normalizedReason,
+                "decision", decision, "from", from, "to", property.getStatus(),
+                "note", note, "reasonCode", normalizedReason,
                 "checklist", checklistSnapshot(review),
                 "owner", String.valueOf(property.getOwner().getId()));
         announce(property, decision, normalizedReason, note);
@@ -191,16 +185,16 @@ public class PropertyVerificationService {
             lifecycle.announceApproval(property);
         } else if ("needs_info".equals(decision)) {
             notifier.notify(property.getOwner().getId(), "listing.needs_info", "Your listing needs info",
-                    ReviewReasonCodes.ownerMessage(reasonCode, note), "/dashboard?review=" + property.getId());
+                    ReviewReasonCodes.ownerMessage(reasonCode, note), PropertyLifecycle.reviewLink(property));
         } else {
             notifier.notify(property.getOwner().getId(), "listing.rejected",
                     "Your listing was not approved",
-                    "A reviewer could not approve it: "
-                            + ReviewReasonCodes.ownerMessage(reasonCode, note), "/dashboard");
+                    "A reviewer could not approve " + PropertyLifecycle.label(property) + ": "
+                            + ReviewReasonCodes.rejectionMessage(reasonCode, note),
+                    PropertyLifecycle.reviewLink(property));
         }
     }
 
-    // Addressed by text and refuses the listing owner; see the flow doc.
     @Transactional
     public PropertyReviewResponse setChecklistItem(AuthPrincipal actor, String propertyId, String item,
             boolean pass) {
@@ -209,7 +203,10 @@ public class PropertyVerificationService {
         }
         Property property = loadForWrite(propertyId);
         lifecycle.requireChecker(actor, property);
-        PropertyReview review = requireCase(property);
+        if (VerificationCases.RERA_ITEM.equals(item)) {
+            throw new BadRequestException("rera_item_derived", "Record the RERA result instead of ticking it");
+        }
+        PropertyReview review = requireFreshCase(property);
         ReviewChecklistItem line = review.getChecklist().stream()
                 .filter(entry -> entry.getItem().equals(item))
                 .findFirst()
@@ -220,14 +217,9 @@ public class PropertyVerificationService {
         return toResponse(review, property, mayReadNotes(actor));
     }
 
-    private static String decisionMessage(boolean approve, String note) {
+    private String approvalMessage(Property property, String note) {
         String explanation = note == null ? "" : note.trim();
-        if (approve) {
-            return "\u2705 Your property has been verified and is now live."
-                    + (explanation.isEmpty() ? "" : " " + explanation);
-        }
-        return "\u26D4 Your property could not be approved.\nReason: "
-                + (explanation.isEmpty() ? "It did not meet our verification requirements." : explanation);
+        return lifecycle.approvalMessage(property) + (explanation.isEmpty() ? "" : " " + explanation);
     }
 
     private Property participantProperty(AuthPrincipal actor, String propertyId) {
@@ -242,7 +234,6 @@ public class PropertyVerificationService {
         return Roles.isBackOffice(actor.role());
     }
 
-    // Grant, not role, controls staff-only material.
     private boolean mayReadNotes(AuthPrincipal actor) {
         return isStaff(actor) && permissions.granted(actor, BackOfficePermissions.PROPERTIES_READ);
     }
@@ -250,6 +241,12 @@ public class PropertyVerificationService {
     private PropertyReview requireCase(Property property) {
         return reviews.findByPropertyId(property.getId())
                 .orElseThrow(() -> new NotFoundException("No verification review for this listing"));
+    }
+
+    private PropertyReview requireFreshCase(Property property) {
+        PropertyReview review = requireCase(property);
+        cases.reconcile(review);
+        return review;
     }
 
     private Property load(String propertyId) {
@@ -281,7 +278,6 @@ public class PropertyVerificationService {
         return toResponse(review, property, mayReadNotes(actor));
     }
 
-    // Owners get no checklist until a document exists; staff keep it because emptiness matters.
     private PropertyReviewResponse toResponse(PropertyReview review, Property property,
             boolean staff) {
         UUID ownerId = property.getOwner().getId();
@@ -292,6 +288,7 @@ public class PropertyVerificationService {
         return new PropertyReviewResponse(
                 review.getPropertyId().toString(),
                 PropertyReviewStatuses.wire(review),
+                property.getStatus(),
                 review.getReviewer(),
                 showChecklist
                         ? VerificationCases.ordered(review).stream()
@@ -300,8 +297,6 @@ public class PropertyVerificationService {
                         : List.of(),
                 review.getMessages().stream()
 
-                        // The one line keeping the duplicate finding away from the person it is
-                        // about — a filter on the way out, so there is one place to get wrong.
                         .filter(message -> staff || !message.isInternal())
                         .map(message -> new PropertyReviewResponse.MessageEntry(
                                 message.getId().toString(),
@@ -314,26 +309,15 @@ public class PropertyVerificationService {
                 review.getNotes(),
                 review.getReasonCode(),
                 showsReason(review) ? review.getNotes() : null,
-                staff ? pendingOverride(property.getId()) : null,
                 listingSignals,
-                review.getDecidedAt(), ListingProgress.of(property, staff));
+                review.getDecidedAt(), ListingProgress.of(property, staff), staff ? property.getReraCheck() : null);
     }
 
-    private PropertyReviewResponse.OverrideRequest pendingOverride(UUID propertyId) {
-        return overrideRequests.findFirstByPropertyIdAndStatusOrderByCreatedAtDesc(
-                        propertyId, PropertyOverrideRequest.PENDING)
-                .map(request -> new PropertyReviewResponse.OverrideRequest(
-                        request.getId().toString(),
-                        request.getRequestedBy().toString(),
-                        request.getReason(),
-                        request.getCreatedAt()))
-                .orElse(null);
-    }
-
-    private void requireNoSecondApproverBlock(Property property) {
-        if (signals.hasHardSignal(property.getId())) {
-            throw new ConflictException("second_approver_required",
-                    "A hard broker signal requires a second staff approver.");
+    private void requireNotStale(Property property, String expected) {
+        if (expected != null && !expected.isBlank()) {
+            String wire = reviews.findByPropertyId(property.getId())
+                    .map(PropertyReviewStatuses::wire).orElse(property.getStatus());
+            requireExpected(property.getStatus(), wire, expected);
         }
     }
 

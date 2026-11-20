@@ -1,15 +1,21 @@
 import { test, expect } from '../../../fixtures/live.js';
-import { API, authHeaders, signedInAsNew, grantIdentityBadge } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, signedInAsNew, grantIdentityBadge, fileIdentityCase } from '../../../helpers/liveAuth.js';
 
 // Owns the dashboard badge CTA (ADR-019, badge-not-gate); the profile surface belongs to `verify-funnel.spec.js`.
 const badgeCta = (page) => page.getByTestId('verify-badge-cta');
 
-test('an unverified user sees the opt-in badge CTA on the dashboard', async ({ page }) => {
+test('on a phone the badge CTA is one compact tap row with no "Optional" tag', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await signedInAsNew(page);
   await page.goto('/dashboard');
 
-  await expect(badgeCta(page)).toBeVisible();
-  await expect(badgeCta(page).getByText('Optional', { exact: false })).toBeVisible();
+  const cta = badgeCta(page);
+  await expect(cta).toContainText('Get your KYC badge');
+  await expect(cta).toContainText('Rank higher and get faster replies.');
+  await expect(cta).not.toContainText(/optional/i);
+  const [card, btn, title] = [await cta.boundingBox(), await cta.getByText('Verify', { exact: true }).boundingBox(), await cta.getByText('Get your KYC badge').boundingBox()];
+  expect(btn.y, 'Verify sits beside the title, not on its own line').toBeLessThan(title.y + title.height);
+  expect(card.height, 'the card stays a compact row').toBeLessThan(110);
 });
 
 test('the CTA retires the moment a reviewer confirms', async ({ page }) => {
@@ -23,6 +29,24 @@ test('the CTA retires the moment a reviewer confirms', async ({ page }) => {
   await page.reload();
 
   await expect(page.getByRole('complementary').getByRole('button', { name: 'Home', exact: true })).toBeVisible();
+  await expect(badgeCta(page)).toHaveCount(0);
+});
+
+test('a submitted case reads as in review, and its approval shows on the next dashboard visit without a reload', async ({ page }) => {
+  const mobile = await signedInAsNew(page);
+  const authorization = await fileIdentityCase(mobile);
+  await page.goto('/dashboard');
+
+  await expect(page.getByTestId('verify-badge-pending')).toBeVisible();
+  await expect(badgeCta(page)).toHaveCount(0);
+
+  const approved = await fetch(`${API}/me/verification/identity/simulate`, { method: 'POST', headers: { authorization } });
+  expect(approved.ok).toBe(true);
+  const sidebar = page.getByRole('complementary');
+  await sidebar.getByRole('button', { name: 'Account', exact: true }).first().click();
+  await sidebar.getByRole('button', { name: 'Home', exact: true }).first().click();
+
+  await expect(page.getByTestId('verify-badge-pending')).toHaveCount(0);
   await expect(badgeCta(page)).toHaveCount(0);
 });
 

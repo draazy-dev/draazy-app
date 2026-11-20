@@ -1,5 +1,3 @@
-/* Read by both the page and the build-time prerender so the HTML never says more than the screen;
-   re-read every source and update AS_OF before changing a figure. */
 export const AS_OF = 'October 2026';
 export const CHECKED_ON = '9 October 2026';
 export const CORRECTIONS_EMAIL = 'support@draazy.com';
@@ -38,7 +36,7 @@ export const COMPARE_NOBROKER = {
         src: ['tenant', 'buyer'],
       },
       draazy: {
-        text: 'The first 15 owner contacts are free for 30 days. A Contact Pack, at \u20B9199, adds 15 more for 30 days and does not renew by itself.',
+        text: 'The first 15 owner contacts are free for 30 days. A Rent Contact Pack, at \u20B9199, adds 15 for rent listings for 30 days, and a Buy Contact Pack, at \u20B9399, adds 15 for sale listings for 60 days. Neither renews by itself.',
         link: ['See plans and pricing', '/plans'],
       },
     },
@@ -49,7 +47,7 @@ export const COMPARE_NOBROKER = {
         src: ['home', 'owner'],
       },
       draazy: {
-        text: 'One live listing at a time is free. Each extra live listing needs a Listing Pass at \u20B9999, live for 60 days with no auto-renewal.',
+        text: 'One live listing at a time is free. Each extra live listing needs a Listing Pass: \u20B9999 for 60 days on a rent listing, \u20B91,999 for 90 days on a sale listing, with no auto-renewal.',
         link: ['List your property', '/list-property'],
       },
     },
@@ -60,7 +58,7 @@ export const COMPARE_NOBROKER = {
         src: ['tenant', 'owner', 'terms'],
       },
       draazy: {
-        text: 'Only three things cost money: a Contact Pack, a Listing Pass for each extra live listing, and a rent agreement. None renews by itself. A pass or pack with no premium feature used can be refunded in full within 7 days of purchase.',
+        text: 'Only three things cost money: a Contact Pack, a Listing Pass for each extra live listing, and a rent agreement. None renews by itself. An unused Contact Pack can be refunded in full within 7 days, and a Listing Pass whose listing gets no enquiries in its first 7 live days is refunded in full.',
         link: ['Read the refund policy', '/refund-policy'],
       },
     },
@@ -130,7 +128,7 @@ export const COMPARE_NOBROKER = {
   faq: [
     {
       q: 'Is Draazy cheaper than NoBroker?',
-      a: 'The two publish different plans, so there is no single answer. NoBroker lists \u20B91,649 plus tax for 25 owner contacts over 90 days. Draazy makes the first 15 owner contacts free and sells a 15-contact Contact Pack at \u20B9199. Compare them against the number of owner contacts you expect to need and the city you are searching in.',
+      a: 'The two publish different plans, so there is no single answer. NoBroker lists \u20B91,649 plus tax for 25 owner contacts over 90 days. Draazy makes the first 15 owner contacts free and sells a 15-contact Contact Pack at \u20B9199 for rent listings (\u20B9399 for sale listings). Compare them against the number of owner contacts you expect to need and the city you are searching in.',
     },
     {
       q: 'Does Draazy charge brokerage?',

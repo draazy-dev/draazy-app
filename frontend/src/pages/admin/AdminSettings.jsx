@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Save, AlertTriangle } from 'lucide-react';
-import { listCities, updateCityLive } from '../../services/cityService.js';
-import { onGeoChange } from '../../lib/geoConfig.js';
 import { getSettings, updateSettings } from '../../services/settingsService.js';
 import { DEFAULT_MAX_PHOTOS, MAX_PHOTOS_CEILING, MIN_PHOTOS_CAP } from '../../lib/uploads/policy.js';
 import { classNames } from '../../lib/format.js';
@@ -12,38 +10,33 @@ import { useTabParam } from '../../lib/useTabParam.js';
 import { Chips, QueueTabs } from '../../components/admin/WorkQueue.jsx';
 import Switch from '../../components/ui/Switch.jsx';
 import Loading from '../../components/ui/Loading.jsx';
+import Modal from '../../components/ui/Modal.jsx';
 import AdminFlagsPanel from './settings/AdminFlagsPanel.jsx';
 import AppFlagsPanel, { appFlagOn } from './settings/AppFlagsPanel.jsx';
 import MapsGeoPanel from './settings/MapsGeoPanel.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 function ConfirmDialog({ open, title, message, onConfirm, onCancel, confirmLabel = 'Confirm', danger }) {
-  if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-ink-2 p-6 shadow-2xl animate-slideIn">
-        <div className="flex items-start gap-3 mb-4">
-          <span className={classNames('mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl', danger ? 'bg-rose-500/15' : 'bg-amber-500/15')}>
-            <AlertTriangle className={classNames('h-4.5 w-4.5', danger ? 'text-rose-400' : 'text-amber-400')} />
-          </span>
-          <div>
-            <h3 className="text-sm font-bold text-white">{title}</h3>
-            <p className="text-sm text-gray-400 mt-1 leading-relaxed">{message}</p>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <button onClick={onCancel} className="rounded-xl px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/5 transition-colors">
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className={classNames('rounded-xl px-4 py-2 text-sm font-semibold transition-colors', danger ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30' : 'bg-brand-teal/20 text-brand-teal hover:bg-brand-teal/30')}
-          >
-            {confirmLabel}
-          </button>
-        </div>
+    <Modal
+      open={open}
+      onClose={onCancel}
+      size="sm"
+      title={title}
+      footer={(
+        <>
+          <button onClick={onCancel} className="btn btn-secondary">Cancel</button>
+          <button onClick={onConfirm} className={classNames('btn', danger ? 'btn-danger' : 'btn-primary')}>{confirmLabel}</button>
+        </>
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <span className={classNames('mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl', danger ? 'bg-rose-500/15' : 'bg-amber-500/15')}>
+          <AlertTriangle className={classNames('h-4.5 w-4.5', danger ? 'text-rose-400' : 'text-amber-400')} />
+        </span>
+        <p className="text-sm text-gray-400 leading-relaxed">{message}</p>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -53,17 +46,20 @@ const MAX_GROUPS_CEILING = 10;
 
 const COUNT_FEES = new Set(['freeContactLimit', 'featuredDays']);
 const FEE_FIELDS = [
-  ['listingPass', 'Listing pass (60 days)'],
-  ['contactPack', 'Contact pack (15 contacts, 30 days)'],
+  ['listingPass', 'Rent listing pass (60 days)'],
+  ['listingPassBuy', 'Sale listing pass (90 days)'],
+  ['contactPack', 'Rent contact pack (15 contacts, 30 days)'],
+  ['contactPackBuy', 'Buy contact pack (15 contacts, 60 days)'],
   ['rentAgreementPlatform', 'Rent agreement platform fee'],
   ['freeContactLimit', 'Free owner contacts'],
   ['featuredDays', 'Featured days after verification', 1, 90],
 ];
 const REFERRAL_FIELDS = [
-  ['referralContactBonus', 'Contacts for the referrer', 0, 1000, 'Owner contacts earned per qualified seeker referral.'],
+  ['referralAgreementDiscountPercent', 'Rent agreement discount for the referrer (%)', 1, 100, 'Off the service fee of their next agreement. Stamp duty and registration are not discounted.'],
   ['referralSeekerBonusContacts', 'Contacts for an invited seeker', 0, 1000, 'Extra free contacts a referred seeker starts with.'],
   ['referralOwnerFeaturedDays', 'Featured days for an invited owner', 1, 90, 'Featured placement on their first verified listing.'],
-  ['referralOwnerRewardAgreements', 'Free agreements for the referrer', 0, 10, 'Per qualified owner referral.'],
+  ['referralInvitesPerDay', 'WhatsApp invites per user, per day', 1, 100, 'Stops people spamming friends.'],
+  ['referralRedeemFailuresPerDay', 'Failed code attempts per user, per day', 1, 50, 'Blocks guessing of referral codes.'],
   ['referralQualifyPerMonth', 'Rewards per referrer, per month', 1, 1000, 'Further referrals are rejected as over the cap.'],
   ['referralQualifyPerYear', 'Rewards per referrer, per year', 1, 10000, 'Calendar-year cap on rewarded referrals.'],
   ['referralHoldDays', 'Hold days (medium risk)', 1, 60, 'A held referral is released or rejected after this.'],
@@ -85,9 +81,10 @@ const GRIEVANCE_NAME_MAX = 80;
 const GRIEVANCE_EMAIL_MAX = 120;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const saveError = (err) => (err?.status === 412
-  ? 'Someone else changed these settings — reload to see their changes.'
-  : 'That change was not saved. Please try again.');
+const saveError = (err) => {
+  if (err?.status === 412) return 'Someone else changed these settings — reload to see their changes.';
+  return userMessage(err, 'That change was not saved. Please try again.');
+};
 
 const SITE_FIELDS = [
   ['name', 'Site name'],
@@ -117,37 +114,10 @@ const humanize = (k) =>
     .replace('Sms', 'SMS')
     .replace('Emi', 'EMI');
 
-/** Alphabetical order avoids moving a city pill under the cursor the instant it is toggled. */
-const sortCities = (rows = []) => [...rows].sort(
-  (a, b) => String(a.name || '').localeCompare(String(b.name || '')),
-);
-
-function stripGeoLive(geo = {}) {
-  const { cities: _oldCities, ...restGeo } = geo;
-  const cities = geo.cities && typeof geo.cities === 'object'
-    ? Object.fromEntries(
-      Object.entries(geo.cities)
-        .filter(([, value]) => value && typeof value === 'object')
-        .map(([name, value]) => {
-          const { live: _live, ...rest } = value;
-          return [name, rest];
-        })
-        .filter(([, value]) => Object.keys(value).length),
-    )
-    : undefined;
-  return {
-    ...restGeo,
-    ...(cities ? { cities } : {}),
-  };
-}
-
 export default function AdminSettings() {
   const { toast } = useToast();
   const { adminFlags, setFlag } = useAdminFlags();
   const [settings, setSettings] = useState(null);
-  const [cityRoster, setCityRoster] = useState([]);
-  const [cityRosterError, setCityRosterError] = useState(false);
-  const [pendingCity, setPendingCity] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [tab, setTab] = useTabParam(TABS.map(([id]) => id), 'general');
   const [flagSubTab, setFlagSubTab] = useState('application');
@@ -156,35 +126,14 @@ export default function AdminSettings() {
 
   useEffect(() => {
     let alive = true;
-    // Without the catch the page sits on `<Loading />` for ever, which reads as a slow server
-    // rather than a failed request — on the screen an operator opens when something is wrong.
     getSettings()
       .then((s) => { if (alive) setSettings(s); })
       .catch(() => { if (alive) setLoadError(true); });
     return () => { alive = false; };
   }, []);
 
-  /** `listCities()` avoids `geoConfig`'s built-in fallback, which would make guessed slugs look live. */
-  const loadCityRoster = useCallback(async () => {
-    try {
-      const rows = await listCities();
-      setCityRoster(sortCities(Array.isArray(rows) ? rows : []));
-      setCityRosterError(false);
-    } catch {
-      setCityRoster([]);
-      setCityRosterError(true);
-    }
-  }, []);
-
-  useEffect(() => { loadCityRoster(); }, [loadCityRoster]);
-
-  /** Re-read on shared geo-cache refresh so this panel does not become a stale third copy. */
-  useEffect(() => onGeoChange(loadCityRoster), [loadCityRoster]);
-
-  /** Stable identity keeps the Maps panel from re-syncing over a half-typed bounding box. */
   const geo = useMemo(() => settings?.geo || {}, [settings?.geo]);
 
-  // Confirmation-gated admin flag toggle (must be before early return to satisfy Rules of Hooks)
   const requestAdminFlagToggle = useCallback((section, key, value, moduleTitle) => {
     const label = moduleTitle || humanize(key);
     setConfirm({
@@ -195,8 +144,6 @@ export default function AdminSettings() {
       danger: !value,
       confirmLabel: value ? 'Enable' : 'Disable',
       action: () => {
-        // The toast waits for the write: reporting a module as disabled when the PUT was rejected
-        // is the failure an operator is least likely to check.
         setFlag(section, key, value)
           .then(() => toast(`${label} ${value ? 'enabled' : 'disabled'}`, 'toggle'))
           .catch((err) => toast(saveError(err), 'error'));
@@ -215,7 +162,7 @@ export default function AdminSettings() {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="mt-4 rounded-xl bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/15"
+          className="h-btn-sm inline-flex items-center justify-center mt-4 rounded-xl bg-white/10 px-4 text-sm font-medium text-white transition-colors hover:bg-white/15"
         >
           Reload
         </button>
@@ -233,8 +180,6 @@ export default function AdminSettings() {
     return !blank;
   };
 
-  /* Reports what actually happened, never an unconditional success — the caller applied the value
-     optimistically, so the returned boolean is its cue to roll back. Auditing is the server's. */
   const persist = async (patch, okMessage, okKind = 'success') => {
     try {
       await updateSettings(patch);
@@ -291,7 +236,6 @@ export default function AdminSettings() {
     persist({ flatmates: { maxGroupsPerPerson: maxGroups } }, 'Group limit saved');
   };
 
-  // Move-in Pack: admin-owned prices + launch toggle (consumer /services reads settings.movePack).
   const movePack = settings.movePack || { enabled: false, items: {} };
   const setMovePackItem = (k, v) => setSettings((s) => ({ ...s, movePack: { ...movePack, items: { ...movePack.items,   [k]: v === '' ? '' : Number(v) } } }));
   const setMovePackEnabled = (v) => setSettings((s) => ({ ...s, movePack: { ...movePack, enabled: v } }));
@@ -301,38 +245,14 @@ export default function AdminSettings() {
         'Move-in Pack saved',
       );
 
-  // Google Places geo policy (city limit + blacklist) — persisted to settings.geo
-  // and read live by lib/geoConfig.js across every locality search in the app.
-  const saveGeo = (nextGeo, detail) => {
-    const sanitized = stripGeoLive(nextGeo);
+  const saveGeo = async (nextGeo, detail) => {
+    // Retired city boxes may linger in the stored doc; echoing them back would re-save dead keys.
+    const { cities: _retired, ...sanitized } = nextGeo;
+    const prior = settings.geo;
     setSettings((s) => ({ ...s, geo: sanitized }));
-    persist(
-      { geo: sanitized },
-      detail || 'Maps settings saved',
-    );
-  };
-
-  const saveCityLaunchState = async (city, live) => {
-    if (pendingCity) return false;
-    setPendingCity(city.slug);
-    setCityRoster((rows) => sortCities(rows.map((row) => (
-      row.slug === city.slug ? { ...row, live } : row
-    ))));
-    try {
-      await updateCityLive(city.slug, live);
-    } catch {
-      setCityRoster((rows) => sortCities(rows.map((row) => (
-        row.slug === city.slug ? { ...row, live: !live } : row
-      ))));
-      toast('That change was not saved. Please try again.', 'error');
-      return false;
-    } finally {
-      setPendingCity(null);
-    }
-    // No `logAudit` here either: `CityAdminService` records `city.update` against the
-    // authenticated operator as part of the same write.
-    toast(`${city.name} marked ${live ? 'live' : 'coming soon'}`);
-    return true;
+    const ok = await persist({ geo: sanitized }, detail || 'Maps settings saved');
+    if (!ok) setSettings((s) => ({ ...s, geo: prior }));
+    return ok;
   };
 
   const requestAppFlagToggle = (k) => {
@@ -344,15 +264,11 @@ export default function AdminSettings() {
       confirmLabel: nextVal ? 'Enable' : 'Disable',
       action: async () => {
         setSettings((s) => ({ ...s, flags: { ...s.flags, [k]: nextVal } }));
-        // Only the flag that changed, for the reason `AdminFlagsContext.setFlag` gives: a whole
-        // block re-asserts values this handler never read.
         const saved = await persist(
           { flags: { [k]: nextVal } },
           `${humanize(k)} ${nextVal ? 'enabled' : 'disabled'}`,
           'toggle',
         );
-        // Put the switch back one key at a time, for the reason `saveCityLaunchState` gives. These
-        // flags are kill switches, so a stale position tells an operator the platform is closed.
         if (!saved) setSettings((s) => ({ ...s, flags: { ...s.flags, [k]: !nextVal } }));
       },
     });
@@ -371,7 +287,6 @@ export default function AdminSettings() {
       <QueueTabs tabs={TABS.map(([key, label]) => ({ key, label, count: null }))} active={tab} onChange={setTab} label="Settings sections" idPrefix="settings" />
 
       <div id="settings-panel" role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
-      {/* General */}
       {tab === 'general' && (
         <div className="max-w-2xl space-y-5">
           <div className="dz-card p-5">
@@ -438,7 +353,6 @@ export default function AdminSettings() {
         </div>
       )}
 
-      {/* Fees */}
       {tab === 'fees' && (
         <div className="max-w-xl space-y-5">
           <div className="dz-card p-5">
@@ -501,7 +415,6 @@ export default function AdminSettings() {
             </div>
           )}
 
-          {/* Move-in Pack — prices + launch toggle for the consumer /services bundle */}
           <div className="dz-card p-5">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
@@ -532,25 +445,15 @@ export default function AdminSettings() {
         </div>
       )}
 
-      {/* Maps & Places — Google geo policy: city limit + blacklist */}
       {tab === 'maps' && (
         <div>
           <p className="mb-4 text-sm text-gray-400">
-            Control the Google Places API: limit suggestions to the shopper&rsquo;s selected city and
-            blacklist localities or societies. Applies to every locality / area search across the app.
+            Where new places are accepted, how far search reaches, and what stays hidden.
           </p>
-          <MapsGeoPanel
-            geo={geo}
-            cities={cityRoster}
-            citiesUnavailable={cityRosterError}
-            pendingCity={pendingCity}
-            onSave={saveGeo}
-            onToggleCityLive={saveCityLaunchState}
-          />
+          <MapsGeoPanel geo={geo} onSave={saveGeo} />
         </div>
       )}
 
-      {/* Feature Flags — contains sub-tabs for Application and Admin Modules */}
       {tab === 'flags' && (
         <div>
           <div className="mb-4">
@@ -562,7 +465,6 @@ export default function AdminSettings() {
             />
           </div>
 
-          {/* Application flags — grouped two-column layout */}
           {flagSubTab === 'application' && (
             <div>
               <p className="mb-4 text-sm text-gray-400">Platform-wide feature toggles that control consumer and app behavior.</p>
@@ -570,7 +472,6 @@ export default function AdminSettings() {
             </div>
           )}
 
-          {/* Admin Module flags — two-column layout */}
           {flagSubTab === 'admin' && (
             <div>
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -596,7 +497,6 @@ export default function AdminSettings() {
       )}
       </div>
 
-      {/* Confirmation dialog for flag changes */}
       <ConfirmDialog
         open={!!confirm}
         title={confirm?.title}

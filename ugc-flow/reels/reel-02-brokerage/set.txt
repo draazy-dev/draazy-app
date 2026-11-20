@@ -1,0 +1,58 @@
+REEL 02 / SET IMAGE (0 credits)
+==========================
+JOB ID ............. r02-set
+WHY ................ every clip of the reel attaches this image so the place is the same in every clip (rule R1)
+FLOW SETTINGS
+  Type ............. Image
+  Model ............ Nano Banana 2 Lite
+  Aspect ratio ..... 9:16 portrait
+  Outputs .......... 2
+  Cost shown ....... 0 credits (anything else: stop and ask the user)
+INGREDIENTS ........ none (no character chips: the set must be empty)
+AFTER .............. the user picks one; rename it r02-set (or note its title in the ledger)
+
+TAKE 2 PROMPT (user asked for a modern, posh corridor; use this one). Every landmark word in the
+clip 1-3 set paragraph is kept, so those prompts are unchanged.
+PROMPT START
+Vertical 9:16 photorealistic photo, the eye-level view from where a person would hold a selfie phone, looking
+along the corridor: the common corridor of a new, premium high-rise residential society in Wakad, Pune, on a
+weekday afternoon. Modern, upscale and spotless, like a luxury apartment tower. On the left side of the frame,
+the doorway of an empty flat with its rich brown wooden veneer door, slim matte-black handle, swung fully open
+inward, a sleek white modular switchboard on the wall just inside the doorway, and a bare, empty, freshly
+painted room beyond with a glossy floor. On the right side of the frame, the corridor continues past smooth
+cream-painted walls with a slim warm-wood accent panel and recessed ceiling downlights to a large
+floor-to-ceiling window at its far end, bright with daylight. Polished grey speckled granite floor tiles with a
+soft reflective sheen. A tall green potted plant in a matte charcoal planter beside the next flat's closed
+brown wooden door on the right. No signs, no nameplates, no flat numbers, nothing readable anywhere. There are
+no people in the photo. Natural phone-camera look, true colours, everything in sharp focus.
+
+Lighting and colour: soft, even daylight from the corridor window on the right, a slim, slightly cool white LED
+tube light overhead, true warm colours, clean whites.
+
+No text, no signs, no logos, no watermark.
+PROMPT END
+
+TAKE 1 PROMPT (rejected: too plain)
+PROMPT START
+Vertical 9:16 photorealistic photo, the eye-level view from where a person would hold a selfie phone, looking
+along the corridor: the common corridor of a residential society building in Wakad, Pune, on a weekday
+afternoon. On the left side of the frame, the doorway of an empty flat with its brown wooden door swung fully
+open inward, a white plastic switchboard on the wall just inside the doorway, and a bare, empty room beyond. On
+the right side of the frame, the corridor continues past cream-painted walls to a window at its far end, bright
+with daylight. Grey speckled floor tiles. A green potted plant beside the next flat's closed door on the right.
+No signs, no nameplates, nothing readable anywhere. There are no people in the photo. Natural, slightly
+imperfect phone-camera look, true colours, everything in sharp focus.
+
+Lighting and colour: soft, even daylight from the corridor window on the right, a slightly cool white tube light
+overhead, true warm colours, clean whites.
+
+No text, no signs, no logos, no watermark.
+PROMPT END
+
+CHECK BEFORE THE USER PICKS
+  [ ] open brown wooden door + doorway on the LEFT
+  [ ] white switchboard just inside the doorway
+  [ ] corridor + bright window at the far end on the RIGHT
+  [ ] green potted plant on the right
+  [ ] grey speckled floor tiles
+  [ ] empty of people, nothing readable; room left in the centre for the character(s)

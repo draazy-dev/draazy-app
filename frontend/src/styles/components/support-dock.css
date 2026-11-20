@@ -1,0 +1,88 @@
+.dz-support-dock {
+  position: fixed;
+  right: 11rem;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: 360px;
+  height: min(540px, calc(100dvh - var(--dz-nav-h, 58px) - 16px));
+  overflow: hidden;
+  border: 1px solid rgb(var(--dz-c-white) / calc(.1 * var(--dz-line-boost)));
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: rgb(var(--dz-c-ink));
+  box-shadow: 0 -8px 40px rgb(var(--dz-c-black) / .55);
+}
+
+.dz-support-dock .pc-thread { min-height: 0; }
+.dz-support-dock .pc-head { padding: 8px 10px; gap: 10px; }
+.dz-support-dock .pc-support-topic { padding: 6px 10px 8px; }
+.dz-support-dock .pc-support-topic .dz-dropdown__trigger { height: 36px; }
+
+.pc-dock-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: rgb(var(--dz-c-slate-400));
+}
+
+.pc-dock-btn:hover { background: rgb(var(--dz-c-white) / .06); color: rgb(var(--dz-c-white)); }
+
+.dz-support-dock.is-min {
+  flex-direction: row;
+  align-items: center;
+  width: 240px;
+  height: 44px;
+}
+
+.dz-support-dock__tab {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px 0 10px;
+  color: rgb(var(--dz-c-white));
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dz-support-dock__av {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgb(var(--dz-c-teal-500) / .16);
+  color: rgb(var(--dz-c-teal-300));
+}
+
+.dz-support-dock__name { flex: 1; text-align: left; }
+
+.dz-support-dock__badge {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgb(var(--dz-c-teal-500));
+  color: rgb(var(--dz-c-ink));
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dz-support-dock__x {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 100%;
+  color: rgb(var(--dz-c-slate-400));
+}
+
+.dz-support-dock__loading {
+  margin: auto;
+  font-size: 12.5px;
+  color: rgb(var(--dz-c-slate-400));
+}

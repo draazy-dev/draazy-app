@@ -7,7 +7,7 @@ import { useToast } from '../../../context/ToastContext.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { usePostChooser } from '../../../context/PostChooserContext.jsx';
 import { digits } from '../../../lib/contact.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { useLatest, useSignInGate } from '../../../lib/useSignInGate.js';
 import { recordAskLocally, rememberAsk } from '../../../lib/data/flatmates.js';
 import * as flatmateService from '../../../services/flatmateService.js';
 import { FLATMATE_IMG, detailPath, roomTitle } from './helpers.js';
@@ -15,24 +15,21 @@ import { normalizeTab } from './model.js';
 import { SHARE_OPENER, SEEKER_OPENER } from './openers.js';
 import { useFlatmateDiscovery, emptyFilters } from './useFlatmateDiscovery.jsx';
 import { useFlatmateSupply } from './useFlatmateSupply.jsx';
-import { useGroupPickers } from './useGroupPickers.js';
+import { useGenderGate } from './useGenderGate.jsx';
 import { MAX_PAGE_SIZE } from '../../../services/apiLimits.js';
+import { REVISIT_MAX_AGE } from '../../../services/http.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export { emptyFilters };
-export const MAP_MAX_AREAS = 5;
+export const MAP_MAX_AREAS = 3;
 const DETAIL_KIND = { r: 'room', g: 'group', s: 'post' };
 
-/* The provider drops moderated rows from the public board but not the owner's dashboard; the size matches
- * lib/data/myListings.js so a dashboard visit and this page share one cached read. */
 const MY_PAGE = MAX_PAGE_SIZE;
 const interestKey = ({ kind, targetId }) => (kind === 'room' || kind === 'group' ? `${kind}-${targetId}` : targetId);
 
-/* The shortlist speaks two dialects: cards key their bookmark `r:|g:|s:`, while the server names the table
-   (`room|group|post`) because a flatmate save has no single id space. */
 const SAVE_KIND_BY_PREFIX = { r: 'room', g: 'group', s: 'post' };
 const SAVE_PREFIX_BY_KIND = { room: 'r', group: 'g', post: 's' };
 const savedKey = (kind, id) => `${SAVE_PREFIX_BY_KIND[kind] || 's'}:${id}`;
-/* `'r:abc'` → `{ kind: 'room', id: 'abc' }`; `null` for anything that does not parse. */
 const parseSavedKey = (key) => {
   const kind = SAVE_KIND_BY_PREFIX[String(key).slice(0, 1)];
   const id = String(key).slice(2);
@@ -48,32 +45,27 @@ export function useFlatmates() {
   const sendToSignIn = useSignInGate();
   const [params] = useSearchParams();
   const urlTab = params.get('view');
-  // `normalizeTab` also resolves legacy ?view=flatmates|rooms|groups, so old deep links and saved
-  // alerts land somewhere sensible.
   const [tab, setTab] = useState(() => normalizeTab(urlTab));
   const { openPostChooser } = usePostChooser();
   const [viewMode, setViewMode] = useState('list');
   const [myPosts, myPostsStatus, setMyPosts] = useAsyncList(
-    () => user ? flatmateService.myFlatmatePosts({ size: MY_PAGE }).then((page) => page.items) : Promise.resolve([]),
+    () => user ? flatmateService.myFlatmatePosts({ size: MY_PAGE, maxAge: REVISIT_MAX_AGE }).then((page) => page.items) : Promise.resolve([]),
     [user?.mobile],
   );
-  /* Owner-scoped supply identifies the caller without exposing host details in public feeds. */
   const [myGroups, , setMyGroups] = useAsyncList(
-    () => user ? flatmateService.myFlatmateGroups({ size: MY_PAGE }).then((page) => page.items) : Promise.resolve([]),
+    () => user ? flatmateService.myFlatmateGroups({ size: MY_PAGE, maxAge: REVISIT_MAX_AGE }).then((page) => page.items) : Promise.resolve([]),
     [user?.mobile],
   );
   const [myRooms, , setMyRooms] = useAsyncList(
-    () => user ? flatmateService.myFlatmateRooms({ size: MY_PAGE }).then((page) => page.items) : Promise.resolve([]),
+    () => user ? flatmateService.myFlatmateRooms({ size: MY_PAGE, maxAge: REVISIT_MAX_AGE }).then((page) => page.items) : Promise.resolve([]),
     [user?.mobile],
   );
   const searchRef = useRef({ refresh: () => {} });
-  /* Server-backed and caller-scoped, so it is restored on identity change: a browser-local map
-   * made a room bookmarked on a phone invisible on a laptop. */
   const [saved, setSaved] = useState({});
   useEffect(() => {
     let alive = true;
     if (!user) { setSaved({}); return () => { alive = false; }; }
-    flatmateService.listFlatmateSaveKeys()
+    flatmateService.listFlatmateSaveKeys({ maxAge: REVISIT_MAX_AGE })
       .then((rows) => {
         if (!alive) return;
         setSaved(Object.fromEntries(rows.map((row) => [savedKey(row.kind, row.id), true])));
@@ -86,13 +78,11 @@ export function useFlatmates() {
       });
     return () => { alive = false; };
   }, [user?.mobile]);
-  /* The sent-interest outbox is the CTA's source of truth, and it is the provider's answer rather than this browser's
-     taps — a second device would otherwise offer a duplicate action. */
   const [interests, setInterests] = useState({});
   useEffect(() => {
     let alive = true;
     if (!user) { setInterests({}); return () => { alive = false; }; }
-    flatmateService.myFlatmateInterestKeys()
+    flatmateService.myFlatmateInterestKeys({ maxAge: REVISIT_MAX_AGE })
       .then((rows) => {
         if (!alive) return;
         setInterests(Object.fromEntries(rows.map((row) => [interestKey(row), row])));
@@ -106,7 +96,6 @@ export function useFlatmates() {
     return () => { alive = false; };
   }, [user?.mobile]);
 
-  /* Supply mutations await owner-scoped refreshes before reporting success. */
   const refresh = useCallback(async () => {
     searchRef.current.refresh();
     const [mine, mineGroups, mineRooms] = await Promise.allSettled([
@@ -123,14 +112,10 @@ export function useFlatmates() {
   const myRoomIds = useMemo(() => new Set(myRooms.map((r) => r.id).filter(Boolean)), [myRooms]);
 
   const myPost = myPosts[0] || null;
-  // Matches tolerantly by the last 10 mobile digits, falling back to name. Only user-created
-  // groups carry ownerMobile/ownerName, so seed groups never show owner controls.
   const ownsGroup = (g) => {
     if (!user || !g) return false;
     if (g.id && myGroupIds.has(g.id)) return true;
     const owner = digits(g.ownerMobile).slice(-10);
-    // Require an exact mobile match and never fall through to the weaker name check, so a name
-    // collision cannot grant owner controls over someone else's post.
     if (owner) { const mine = digits(user.mobile).slice(-10); return !!mine && mine === owner; }
     const nm = (user.name || '').trim().toLowerCase();
     return !!nm && !!g.ownerName && g.ownerName.trim().toLowerCase() === nm;
@@ -143,21 +128,19 @@ export function useFlatmates() {
     const nm = (user.name || '').trim().toLowerCase();
     return !!nm && !!r.owner && r.owner.trim().toLowerCase() === nm;
   };
-  const supply = useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: navigate, setInterests, ownsGroup, myPost, myPostsStatus });
-  const { groupOpen, isVerified, setVerifyOpen, openPostModal } = supply;
-  const pickers = useGroupPickers(user, groupOpen);
+  const { askGender, genderSheet } = useGenderGate();
+  const supply = useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: navigate, setInterests, ownsGroup, myPost, myPostsStatus, askGender });
+  const { isVerified, setVerifyOpen, openPostModal } = supply;
 
-  const discovery = useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, openPostModal, onPost: openPostChooser });
+  const discovery = useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, openPostModal, onPost: openPostChooser, viewer: user?.mobile || '' });
   const { setF } = discovery;
   searchRef.current = { refresh: discovery.refreshSearch };
 
-  /* Signed out, the tap goes to sign-in — an anonymous list could never be merged into the real
-   * one. */
-  const onSave = async (k) => {
+  const onSave = async (k, want) => {
     const key = parseSavedKey(k);
     if (!key) return;
-    if (!user) { sendToSignIn('save'); return; }
-    const next = !saved[k];
+    if (!user) { sendToSignIn('save', undefined, () => latest.current.onSave(k, true)); return; }
+    const next = want ?? !saved[k];
     const apply = (on) => setSaved((m) => {
       const n = { ...m };
       if (on) n[k] = true; else delete n[k];
@@ -167,17 +150,15 @@ export function useFlatmates() {
     try {
       if (next) await flatmateService.saveFlatmatePost(key.kind, key.id);
       else await flatmateService.unsaveFlatmatePost(key.kind, key.id);
+      apply(next);
     } catch (e) {
-      // Put it back. A bookmark that stays filled over a save the server never recorded is the one
-      // failure mode the user cannot see until the shortlist is empty.
       apply(!next);
       console.warn('[flatmates] save toggle failed', e);
       toast(t('flatmates.saveFailed'), 'error');
     }
   };
-  /* The server owns interest records; this hook owns optimistic button state. */
   const onInterest = async (r) => {
-    if (!user) { sendToSignIn('contact'); return; }
+    if (!user) { sendToSignIn('contact', undefined, () => latest.current.onInterest(r)); return; }
     if (r.verifiedContactOnly && !isVerified) { toast(t('flatmates.acceptsVerifiedOnlyToast', { name: r.name }), 'error'); setVerifyOpen(true); return; }
     const ask = {
       request: { propertyId: r.id, property: { title: 'Flatmate: ' + r.name, price: r.budget ? '₹' + r.budget + '/mo' : '', loc: (r.localities || [])[0] || 'Pune', img: FLATMATE_IMG }, party: { name: r.name, avatar: (r.name || 'U').slice(0, 2).toUpperCase() }, firstMessage: SEEKER_OPENER },
@@ -193,7 +174,7 @@ export function useFlatmates() {
         return;
       }
       setInterests((m) => { const n = { ...m }; delete n[r.id]; return n; });
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     rememberAsk(user.mobile, r.id);
@@ -202,20 +183,19 @@ export function useFlatmates() {
     toast(t('flatmates.interestSentToast', { name: r.name }));
   };
 
-  // Rooms use a distinct interest key and payload, so they get their own handler. `share` carries
-  // how the seeker intends to take the room — the owner needs to know whether one person or two.
   const onRoomInterest = async (room, share = 'solo') => {
-    if (!user) { sendToSignIn('contact'); return; }
+    if (!user) { sendToSignIn('contact', undefined, () => latest.current.onRoomInterest(room, share)); return; }
     const key = 'room-' + room.id;
     const opener = SHARE_OPENER[share] || SHARE_OPENER.solo;
     const name = room.society || roomTitle(room);
-    // Room view models provide `photos`, so the chat preview uses its first photo as a fallback.
+    const gate = await askGender(room, 'room');
+    if (!gate) return;
     const ask = {
       request: { propertyId: key, property: { title: room.society ? 'Room in ' + room.society : name, price: room.budget ? '₹' + room.budget + '/mo' : '', loc: (room.localities || [])[0] || 'Pune', img: room.img || room.cover || FLATMATE_IMG }, party: { name, avatar: name.slice(0, 2).toUpperCase() }, firstMessage: opener },
     };
     setInterests((m) => ({ ...m, [key]: true }));
     try {
-      await flatmateService.roomInterest(room.id, { share, message: opener });
+      await flatmateService.roomInterest(room.id, { share, message: opener, gender: gate.gender });
     } catch (err) {
       if (err?.code === flatmateService.CONFLICT_ALREADY_INTERESTED) {
         rememberAsk(user.mobile, key);
@@ -224,7 +204,7 @@ export function useFlatmates() {
         return;
       }
       setInterests((m) => { const n = { ...m }; delete n[key]; return n; });
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
+      toast(userMessage(err, t('common.somethingWentWrong')), 'error');
       return;
     }
     rememberAsk(user.mobile, key);
@@ -232,9 +212,8 @@ export function useFlatmates() {
 
     toast(t('flatmates.messageSentOwner', { society: name }));
   };
+  const latest = useLatest({ onSave, onInterest, onRoomInterest });
 
-  // Interest state is device-scoped; repeat requests remain a server-resolved conflict. Returns the
-  // server row (carrying `status`) once loaded, `true` for a tap not yet confirmed, `false` otherwise.
   const interestedFor = (item) => {
     if (!item) return false;
     if (item.kind === 'room') return interests['room-' + item.id] || false;
@@ -259,7 +238,6 @@ export function useFlatmates() {
     viewMode,
     setViewMode,
     myPost,
-    ...pickers,
     ownsGroup,
     ownsRoom,
     myRooms,
@@ -267,6 +245,7 @@ export function useFlatmates() {
     onSave,
     onInterest,
     onRoomInterest,
+    genderSheet,
     interestedFor,
     goToPosting,
     saved,

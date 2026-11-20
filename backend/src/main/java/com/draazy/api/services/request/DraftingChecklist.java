@@ -3,10 +3,7 @@ package com.draazy.api.services.request;
 import com.draazy.api.common.error.ValidationException;
 import java.util.List;
 
-// What the drafter attests before a rent-agreement draft reaches the customer.
-// The keys must match DRAFT_CHECKS in the desk's StaffWorkflowActions.jsx; the labels are for the 422.
 final class DraftingChecklist {
-
     private record Item(String key, String label) {
     }
 

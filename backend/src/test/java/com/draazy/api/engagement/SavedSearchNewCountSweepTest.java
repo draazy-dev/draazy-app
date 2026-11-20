@@ -20,7 +20,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 @DisplayName("D7 - saved-search new_count sweep")
 class SavedSearchNewCountSweepTest extends AbstractApiTest {
-
     @Autowired
     SavedSearchService savedSearches;
 
@@ -95,7 +94,6 @@ class SavedSearchNewCountSweepTest extends AbstractApiTest {
         assertThat(updated).isGreaterThanOrEqualTo(1);
         assertThat(refreshed.getNewCount()).isEqualTo(1);
 
-        // Running again with the same corpus advances the baseline and clears the count.
         long updatedAgain = savedSearches.recomputeNewCounts(Instant.now());
         SavedSearch second = searches.findById(search.getId()).orElseThrow();
         assertThat(second.getNewCount()).isZero();

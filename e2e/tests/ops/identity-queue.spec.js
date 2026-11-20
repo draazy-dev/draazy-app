@@ -4,7 +4,7 @@ import { pickDate } from '../../helpers/datePicker.helper.js';
 test.use({ viewport: { width: 1440, height: 900 } });
 
 const TOTAL = 23;
-const SUMMARY = { pending: TOTAL, overdue: 4, mine: 1, qa: 2, decided: 40 };
+const SUMMARY = { pending: TOTAL, overdue: 4, mine: 1, decided: 40 };
 const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
 const kycCase = (n, overrides = {}) => ({
@@ -60,9 +60,10 @@ test('the queue shows 10 cases a page with the total, and pages on the server', 
   await expect(page.getByTestId('kyc-row')).toHaveCount(10);
   await expect(page.getByTestId('queue-range').first()).toHaveText('1–10 of 23');
   await expect(page.getByTestId('kyc-count-needs')).toHaveText('23');
-  await expect(page.getByTestId('kyc-count-qa')).toHaveText('2');
+  await expect(page.getByRole('tab', { name: /QA sample/ })).toHaveCount(0);
   await expect(page.getByTestId('kyc-count-decided')).toHaveText('40');
-  expect(desk.last()).toMatchObject({ status: 'pending', page: '0', size: '10', sort: 'oldest' });
+  expect(desk.last()).toMatchObject({ status: 'pending', page: '0', size: '10', sort: 'newest' });
+  await expect(page.getByRole('group', { name: 'Sort' })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Next page' }).first().click();
   await expect(page.getByTestId('queue-range').first()).toHaveText('11–20 of 23');
@@ -91,7 +92,6 @@ test('every filter is a server query, and each tab only sends its own', async ({
   await page.getByRole('button', { name: /Overdue 4/ }).click();
   await expect.poll(() => desk.last().overdue).toBe('true');
 
-  await page.getByRole('group', { name: 'Sort' }).getByRole('button', { name: 'Newest' }).click();
   await expect.poll(() => desk.last()).toMatchObject({ status: 'pending', q: 'Asha', docType: 'pan', claim: 'unclaimed', overdue: 'true', sort: 'newest', page: '0' });
 
   await page.getByRole('tab', { name: /^Decided/ }).click();
@@ -102,8 +102,8 @@ test('every filter is a server query, and each tab only sends its own', async ({
   await page.getByRole('group', { name: 'Outcome' }).getByRole('button', { name: 'Revoked' }).click();
   await expect.poll(() => desk.last().outcome).toBe('revoked');
 
-  await page.getByRole('tab', { name: /^QA sample/ }).click();
-  await expect.poll(() => desk.last()).toMatchObject({ status: 'qa', sort: 'oldest' });
+  await page.getByRole('tab', { name: /^Appeals/ }).click();
+  await expect.poll(() => desk.last()).toMatchObject({ status: 'appeal', sort: 'newest' });
   expect(desk.last()).not.toHaveProperty('outcome');
   expect(consoleErrors).toEqual([]);
 });
@@ -126,7 +126,13 @@ test('a case opens with evidence beside the fields, a checklist gating approve, 
   await history.locator('summary').click();
   await expect(history.getByText(/Blurry image — Earlier attempt was blurry\./)).toBeVisible();
 
-  await dialog.getByLabel('Document number').fill('1234');
+  const docNumber = dialog.getByLabel('Document number');
+  await docNumber.fill('97945664164646');
+  await expect(docNumber, 'Aadhaar is grouped 4-4-4 and stops at 12 digits').toHaveValue('9794 5664 1646');
+  await docNumber.evaluate((el) => el.setSelectionRange(5, 5));
+  await docNumber.press('Backspace');
+  await expect(docNumber, 'backspace over a group space removes the digit before it').toHaveValue('9795 6641 646');
+  await docNumber.fill('1234');
   await dialog.getByLabel('Holder name').fill('Applicant 1');
   await pickDate(dialog.page(), '[aria-label="Date of birth"]:visible', '1990-01-01');
   await dialog.getByTestId('ops-identity-pose-confirmed').check();
@@ -144,4 +150,24 @@ test('a case opens with evidence beside the fields, a checklist gating approve, 
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect.poll(() => desk.released).toEqual(['case-1', 'case-2']);
   expect(consoleErrors).toEqual([]);
+});
+
+test.describe('row timestamps', () => {
+  test.use({ timezoneId: 'Asia/Kolkata' });
+
+  test('a row shows when the case was submitted, or last decided, in 12-hour time', async ({ page, login }) => {
+    await mockDesk(page, login);
+    await page.route((url) => url.pathname === '/api/moderation/identity-reviews', (route) => {
+      const decided = new URL(route.request().url()).searchParams.get('status') === 'decided';
+      const row = decided
+        ? kycCase(1, { status: 'verified', submittedAt: '2026-10-18T04:54:00Z', decidedAt: '2026-10-18T09:05:00Z' })
+        : kycCase(1, { submittedAt: '2026-10-18T04:54:00Z' });
+      return route.fulfill({ json: { content: [row], totalElements: 1, totalPages: 1, number: 0, size: 10 } });
+    });
+    await page.goto('/ops/kyc-review');
+
+    await expect(page.getByTestId('kyc-row').getByTestId('activity-stamp')).toHaveText(/^Created 18 Oct 2026, 10:24\sAM$/);
+    await page.getByRole('tab', { name: /^Decided/ }).click();
+    await expect(page.getByTestId('kyc-row').getByTestId('activity-stamp')).toHaveText(/^Updated 18 Oct 2026, 2:35\sPM$/);
+  });
 });

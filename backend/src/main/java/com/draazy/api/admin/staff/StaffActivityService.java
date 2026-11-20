@@ -7,13 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Read-only: staff activity is whatever {@code audit_log} already holds, so completeness does not depend on
- * each frontend page remembering to log. */
 @Service
 public class StaffActivityService {
-
-    /** Capped because the page ranks by volume, so anyone past the cap is not near the top;
-     * the paged, unbounded feed is where "what did this person do" is answered. */
     private static final int LEADERBOARD_CAP = 24;
 
     private final StaffActivityRepository repository;
@@ -33,8 +28,6 @@ public class StaffActivityService {
         return new PageImpl<>(rows, pageable, total);
     }
 
-    /** Six round trips, deliberately: each aggregate is answered from an index, and folding the window in memory
-     * would be browser-side arithmetic moved one tier down. */
     @Transactional(readOnly = true)
     public StaffActivitySummary summary(StaffActivityFilter filter) {
         return new StaffActivitySummary(

@@ -26,9 +26,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import tools.jackson.databind.ObjectMapper;
 
-/** Free text that looks like SQL, LIKE wildcards or bidi tricks is stored byte-for-byte, never interpreted. */
 class HostileTextRoundTripTest extends AbstractApiTest {
-
     private static final String[] HOSTILE = {
             "O'Brien \"quoted\" ; -- trailing",
             "/* block */ ' OR '1'='1",

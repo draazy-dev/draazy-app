@@ -1,6 +1,7 @@
 package com.draazy.api.catalog.listing;
 
 import com.draazy.api.catalog.locality.LocalityBinding;
+import com.draazy.api.catalog.photo.ListingPhotoFiles;
 import com.draazy.api.catalog.property.AddressKey;
 import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
@@ -13,6 +14,7 @@ import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertySort;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ListingQuotaExhaustedException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.persistence.RateLimitLock;
@@ -42,9 +44,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Every read and mutation is keyed by the server-resolved principal, so cross-owner access is a {@code 404}. */
 @Service
 public class ListingService {
+    private static final Set<String> NOT_EDITABLE =
+            Set.of(PropertyStatus.REJECTED, PropertyStatus.SOLD, PropertyStatus.RENTED);
 
     private final PropertyRepository properties;
     private final UserRepository users;
@@ -59,13 +62,20 @@ public class ListingService {
     private final ListingPhotoSources photoSources;
     private final PhotoLimit photoLimit;
     private final PlatformSettings settings;
+    private final ListingSubmissionGuard submissions;
+    private final ListingPhotoFiles photoFiles;
+    private final RejectionAppeal rejectionAppeal;
 
     public ListingService(PropertyRepository properties, UserRepository users,
             LocalityBinding localities, ListingEditRules editRules, PropertyMapper propertyMapper,
             PropertyLifecycle propertyLifecycle, ListingCaseNotes caseNotes, ListingDuplicateProbe duplicates,
             ListingQuota quota, RateLimitLock locks, ListingPhotoSources photoSources,
-            PhotoLimit photoLimit, PlatformSettings settings) {
+            PhotoLimit photoLimit, PlatformSettings settings, ListingSubmissionGuard submissions,
+            ListingPhotoFiles photoFiles, RejectionAppeal rejectionAppeal) {
+        this.rejectionAppeal = rejectionAppeal;
         this.properties = properties;
+        this.submissions = submissions;
+        this.photoFiles = photoFiles;
         this.settings = settings;
         this.users = users;
         this.caseNotes = caseNotes;
@@ -91,7 +101,6 @@ public class ListingService {
                 .orElseThrow(() -> NotFoundException.of("Listing"));
     }
 
-    /** No audit row by design: docs/flows/consumer/list-property-wizard.md section 9.5. */
     @Transactional
     public Property confirmAvailable(UUID userId, String idOrSlug) {
         Property p = resolveOwned(userId, idOrSlug)
@@ -120,7 +129,7 @@ public class ListingService {
         }
         if (!quota.mayGoLive(p)) {
             throw new ListingQuotaExhaustedException("You're on the free tier: 1 live listing at a time."
-                    + " Pause another listing or buy a ₹" + settings.listingPass()
+                    + " Pause another listing or buy a ₹" + settings.listingPass(p.getDeal())
                     + " listing pass for this one.");
         }
         p.resumeByOwner();
@@ -128,47 +137,26 @@ public class ListingService {
         return properties.save(p);
     }
 
-    /** Soft and idempotent, with a server-owned reason: docs/flows/consumer/list-property-wizard.md 9.5. */
-    @Transactional
-    public Property archive(UUID userId, String idOrSlug) {
-        Property p = resolveOwned(userId, idOrSlug)
-                .orElseThrow(() -> NotFoundException.of("Listing"));
-        if (!p.isArchived()) {
-            p.archive("Taken down by the owner");
-            properties.endListingPasses(p.getId());
-            propertyLifecycle.announceArchived(p);
-        }
-        return properties.save(p);
-    }
-
-    /** Trust-critical fields are server-set, so a listing cannot be born approved or attributed to someone else. */
     @Transactional
     public Property create(UUID userId, ListingCreate in) {
-        requirePace(userId);
+        requirePace(userId, in);
         requirePhotosOnCreate(in.images());
-        return createOnBehalf(userId, in, userId);
+        return announced(createOnBehalf(userId, in, userId));
     }
 
-    /** An owner's own posting, held to the daily pace; {@link #createOnBehalf} is not. */
-    @Transactional
-    public Property createWithinAllowance(UUID userId, ListingCreate in, String existingLocalitySlug) {
-        requirePace(userId);
-        return createOnBehalf(userId, in, existingLocalitySlug, userId);
+    private Property announced(Property p) {
+        propertyLifecycle.announceSubmitted(p);
+        return p;
     }
 
-    private void requirePace(UUID userId) {
+    private void requirePace(UUID userId, ListingCreate in) {
         locks.holdUntilCommit(RateLimitLock.Limit.LISTING_CREATE, userId.toString());
+        submissions.requireNotReplay(userId, in);
         quota.requirePace(userId);
     }
 
     @Transactional
     public Property createOnBehalf(UUID userId, ListingCreate in, UUID... uploadOwnerIds) {
-        return createOnBehalf(userId, in, null, uploadOwnerIds);
-    }
-
-    /** {@code existingLocalitySlug} is a binding the record already holds, kept even if it is not live. */
-    @Transactional
-    public Property createOnBehalf(UUID userId, ListingCreate in, String existingLocalitySlug, UUID... uploadOwnerIds) {
         photoLimit.require("A listing", in.images());
         List<UUID> allowedUploadOwners = Arrays.stream(uploadOwnerIds).filter(Objects::nonNull).distinct().toList();
         photoSources.requireUploaded(in.images(), List.of(), allowedUploadOwners);
@@ -176,24 +164,19 @@ public class ListingService {
                 List.of(), allowedUploadOwners);
         User owner = users.findById(userId)
                 .orElseThrow(() -> NotFoundException.of("Owner"));
-        LocalityBinding.Bound locality = localities.require(in.localitySlug(), in.locality(), existingLocalitySlug);
+        LocalityBinding.Bound locality = localities.require(in.localitySlug(), in.locality());
         Property p = new Property(owner, in.title(), in.deal(), in.propertyType(),
                 in.price(), locality.name(), in.city());
 
-        // PropertyMapper's allowlist decides what the client may say, so ListingCreate's
-        // "deliberately absent" set is enforced rather than described.
         propertyMapper.applyTo(in, p);
+        ListingShape.clearUnaskedAnswers(p);
         p.setAvailableOn(AvailableOn.resolve(in.availableOn(), in.availableFrom(), false, p.getDeal()));
         ListingEditRules.clearReadyToMoveSaleAvailableDate(p);
         editRules.stampSociety(p, in.societyId(), true);
 
-        // The poster type records who was on the other end of the call, so it is the caller's to
-        // state and never the request body's.
         p.setStatus(PropertyStatus.PENDING);
         p.setPriceUnit(DealIntent.priceUnitFor(in.deal()));
 
-        // Inherited from the owner, never claimed by the client: approval back-fills existing
-        // listings and this stamps new ones. See list-property-wizard.md section 9.1.
         p.setOwnerVerified(owner.isVerified());
 
         p.setLocalitySlug(locality.slug());
@@ -203,8 +186,7 @@ public class ListingService {
         duplicates.reindexPhotos(p, PhotoHash.fromGallery(in.images()));
         duplicates.flag(p);
 
-        // Counted at create, not approval, and it must stay on a *managed* owner - a detaching
-        // @Modifying above this line drops it silently. See list-property-wizard.md section 9.1.
+        // Must stay on a managed owner: a detaching @Modifying above this line silently drops the count.
         owner.recordListingPosted();
         return p;
     }
@@ -215,15 +197,12 @@ public class ListingService {
         return new ListingSlots(standing.allowance(), standing.held());
     }
 
-    /** The key is derived on the same path a create takes, so the pre-check and the write cannot disagree. */
     @Transactional(readOnly = true)
     public ListingDuplicateVerdict duplicateCheck(UUID userId, ListingDuplicateCheck in) {
         String localitySlug = localities.slugOrNull(in.localitySlug(), in.locality());
         String addressKey = AddressKey.of(in.address(), in.city(), in.locality());
         return duplicates.ownDuplicate(userId,
 
-                // Through the same normaliser the write path runs, which also subsumes the
-                // blank-to-null guard: `= ''` matches in SQL where `= null` does not.
                 MeterKey.of(in.electricityMeterNo()),
                 addressKey, localitySlug);
     }
@@ -232,7 +211,14 @@ public class ListingService {
     public Property update(AuthPrincipal actor, String idOrSlug, ListingUpdate in) {
         Property p = resolveOwnedForWrite(actor.userId(), idOrSlug)
                 .orElseThrow(() -> NotFoundException.of("Listing"));
+        boolean resubmitting = PropertyStatus.REJECTED.equals(p.getStatus()) && !p.isArchived()
+                && rejectionAppeal.mayResubmit(p.getId());
+        if (p.isArchived() || (NOT_EDITABLE.contains(p.getStatus()) && !resubmitting)) {
+            throw new ConflictException(ErrorCodes.LISTING_NOT_EDITABLE,
+                    "This listing is closed and can no longer be edited.");
+        }
         String statusBefore = p.getStatus();
+        Set<String> filesBefore = p.storedFiles();
         boolean answeringInfoRequest = PropertyStatus.PENDING.equals(statusBefore) && p.isAwaitingOwnerInfo();
         List<Object> signalBefore = duplicates.signalOf(p);
         requireNonEmptyPhotosIfPresent(in.images());
@@ -241,7 +227,12 @@ public class ListingService {
         EditImpact impact = editRules.apply(p, in);
         duplicates.reindex(p);
         boolean photosMoved = duplicates.reindexPhotos(p, PhotoHash.fromGallery(in.images()));
-        if (answeringInfoRequest && !p.isArchived()) {
+        if (resubmitting) {
+            propertyLifecycle.reenterPending(actor, p);
+            p.recordResubmission();
+            caseNotes.post(p.getId(), p.getDeal(),
+                    "Thanks \u2014 your changes have gone back to our review desk.");
+        } else if (answeringInfoRequest && !p.isArchived()) {
             propertyLifecycle.reenterPending(actor, p);
             p.provideInfo();
             caseNotes.post(p.getId(), p.getDeal(),
@@ -254,33 +245,46 @@ public class ListingService {
             if (!PropertyStatus.PENDING.equals(statusBefore)) {
                 p.recordResubmission();
             }
-            caseNotes.post(p.getId(), p.getDeal(),
-                    "You changed something fundamental about this listing, so it has gone back "
-                    + "for review and is off search until a moderator approves it. We usually get to "
-                    + "these within a day.");
+            if (!p.awaitsOwnerConfirmation()) {
+                caseNotes.post(p.getId(), p.getDeal(),
+                        "You changed something fundamental about this listing, so it has gone back "
+                        + "for review and is off search until a moderator approves it. We usually get to "
+                        + "these within a day.");
+            }
+        } else if (impact.remoderationRequired() && PropertyStatus.FLAGGED.equals(p.getStatus())) {
+            List<String> held = impact.rechecked().isEmpty() ? List.of("listing basics") : impact.rechecked();
+            String deskItemBefore = p.getRecheckReason();
+            p.requestRecheck(held);
+            p.recordRecheckChanges(impact.changes());
+            if (!Objects.equals(deskItemBefore, p.getRecheckReason())) {
+                caseNotes.post(p.getId(), p.getDeal(), recheckNote(p, held));
+            }
         } else if (impact.recheckOnly()) {
             String deskItemBefore = p.getRecheckReason();
             p.requestRecheck(impact.rechecked());
+            p.recordRecheckChanges(impact.changes());
 
-            // Branch on the work item the domain actually raised, and post only when it moved: an
-            // owner looping a price edit would otherwise flood the desk queue's sort key.
             if (p.getRecheckRequestedAt() != null
                     && !Objects.equals(deskItemBefore, p.getRecheckReason())) {
-                caseNotes.post(p.getId(), p.getDeal(), "You updated: "
-                        + String.join(", ", impact.rechecked())
-                        + ". Your listing stays live \u2014 our team is re-checking these details and will "
-                        + "confirm shortly.");
+                caseNotes.post(p.getId(), p.getDeal(), recheckNote(p, impact.rechecked()));
             }
         }
 
-        // Re-probe only when a signal moved, and last, after the status has settled because the
-        // note quotes it. Photographs count as a signal: list-property-wizard.md section 9.3.
         if (photosMoved || !duplicates.signalOf(p).equals(signalBefore)) {
             duplicates.flag(p);
         }
+        filesBefore.removeAll(p.storedFiles());
+        photoFiles.deleteUnusedAfterCommit(p.getId(), filesBefore);
         return p;
     }
 
+    private static String recheckNote(Property p, List<String> fields) {
+        return "You updated: " + String.join(", ", fields)
+                + (PropertyStatus.FLAGGED.equals(p.getStatus())
+                        ? ". Your listing stays on hold while our team re-checks these details."
+                        : ". Your listing stays live \u2014 our team is re-checking these details and will "
+                        + "confirm shortly.");
+    }
 
     private Optional<Property> resolveOwned(UUID userId, String idOrSlug) {
         UUID id = parseUuid(idOrSlug);

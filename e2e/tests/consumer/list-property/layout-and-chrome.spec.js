@@ -2,9 +2,12 @@
 // assert the opposite of what the sibling `no-gate` spec proves.
 import { test, expect } from '../../../fixtures/live.js';
 import { signedInAsNew } from '../../../helpers/liveAuth.js';
-import { pickFloors, LIST_PROPERTY_DRAFT_KEY, readListPropertyDraft } from '../../../helpers/listingForm.helper.js';
+import { pickFloors, readListPropertyDraft } from '../../../helpers/listingForm.helper.js';
 import { fillSociety } from '../../../helpers/places.js';
 import { pickLocality } from '../../../helpers/locality.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const AVAILABLE_FROM = istInDays(59);
 
 async function gotoFlow(page) {
   const mobile = await signedInAsNew(page);
@@ -54,14 +57,15 @@ const soloRatio = (page, labelText) => page.evaluate((text) => {
   return control.getBoundingClientRect().width / card.getBoundingClientRect().width;
 }, labelText);
 
-test('a fresh Details step: unselected deal and BHK, strength meter, StepNav and compact layout', async ({ page }) => {
+test('a fresh Details step: Pune-market defaults, strength meter, StepNav and compact layout', async ({ page }) => {
   test.slow();
   await gotoFlow(page);
   const meter = page.locator('.lp-meter');
 
-  await test.step('deal and BHK are not pre-filled', async () => {
-    await expect(page.locator('[data-err="deal"] .radio-pill.selected')).toHaveCount(0);
-    await expect(page.locator('[data-err="bhk"] .radio-pill.selected')).toHaveCount(0);
+  await test.step('a new listing opens as a semi-furnished 2 BHK flat for sale', async () => {
+    await expect(page.locator('[data-err="deal"] .radio-pill.selected')).toHaveText(['Sale']);
+    await expect(page.locator('[data-err="bhk"] .radio-pill.selected')).toHaveText(['2']);
+    await expect(page.getByRole('button', { name: 'Semi-Furnished', exact: true })).toHaveAttribute('aria-pressed', 'true');
   });
 
   await test.step('BHK pills read as numbers, consistent with Bathrooms/Balconies', async () => {
@@ -107,7 +111,7 @@ test('a fresh Details step: unselected deal and BHK, strength meter, StepNav and
   });
 
   await test.step('full strength needs optional enrichment and five photos, not documents', async () => {
-    const scores = await page.evaluate(async () => {
+    const scores = await page.evaluate(async (availableFrom) => {
       const { computeProgress } = await import('/src/pages/consumer/list-property/progress.js');
       const form = {
         deal: 'buy', propertyType: 'flat', bhk: '2', bathrooms: '2', balconies: '1',
@@ -116,14 +120,14 @@ test('a fresh Details step: unselected deal and BHK, strength meter, StepNav and
         locality: 'Baner', flatNumber: 'A-401', tower: 'A', societyId: 'soc-1',
         street: 'High Street', landmark: 'Near park', pincode: '411045', price: '9500000',
         monthlyMaintenance: '2500', ownership: 'freehold', construction: 'new',
-        availableFrom: '2027-01-01', reraId: 'P52100000001', description: 'A bright home with a quiet outlook and practical room layout for a family.',
+        availableFrom, reraId: 'P52100000001', description: 'A bright home with a quiet outlook and practical room layout for a family.',
         amenities: ['lift'],
       };
       return {
         fourPhotos: computeProgress({ form, photos: Array(4).fill('photo') }),
         full: computeProgress({ form, photos: Array(5).fill('photo') }),
       };
-    });
+    }, AVAILABLE_FROM);
     expect(scores.fourPhotos.pct).toBeLessThan(100);
     expect(scores.full.pct).toBe(100);
     expect(scores.full.nudge).toBeNull();
@@ -141,8 +145,9 @@ test('a fresh Details step: unselected deal and BHK, strength meter, StepNav and
     expect(await pctOf(page)).toBeGreaterThan(start);
   });
 
-  await test.step('a flatmate post keeps the same four phases as any listing', async () => {
+  await test.step('Rent opens on the whole place; a flatmate post takes four steps: details, location, price, then photos', async () => {
     await page.locator('.radio-pill', { hasText: 'Rent' }).first().click();
+    await expect(page.locator('.radio-pill.selected', { hasText: 'Rent out the whole place' })).toHaveCount(1);
     await page.locator('.radio-pill', { hasText: 'Find a flatmate' }).first().click();
     await expect(page.locator('.lp-steps__item')).toHaveText([/Details/, /Location/, /Price/, /Photos/]);
   });
@@ -166,7 +171,7 @@ test('Start over asks for confirmation, can be cancelled, and then clears the fo
     /* The autosave is debounced and the read below goes through `page.evaluate`, which does not retry. Polling
        the draft waits for the write itself rather than for a duration somebody timed the debounce at once. */
     await expect
-      .poll(async () => readListPropertyDraft(page))
+      .poll(() => readListPropertyDraft(page))
       .toContain('1050');
 
     await page.locator('.lp-reset').click();
@@ -267,7 +272,7 @@ test('a current-location pin is placed, and the pin is still placed after a relo
   const placed = await confirmation.textContent();
   // The autosave is debounced and `evaluate` does not retry, so poll for the write itself.
   await expect
-    .poll(async () => page.evaluate((key) => localStorage.getItem(key), LIST_PROPERTY_DRAFT_KEY))
+    .poll(() => readListPropertyDraft(page))
     .toContain('"pinPlaced":true');
 
   await page.reload();
@@ -344,9 +349,6 @@ test('filling only the mandatory fields keeps the meter above where it started a
   await page.locator('[data-err="ownership"]').click();
   await menuOpen(page);
   await page.locator('.dz-dropdown__option').first().click();
-  // Possession is mandatory and not pre-selected, so leaving it blank would make this a test about an
-  // incomplete form rather than about a complete-but-minimal one.
-  await page.getByRole('button', { name: 'Ready to Move', exact: true }).click();
   /* The final `pctOf` read does not retry, so the meter has to be known-settled first. `Select.jsx` drops
      `is-placeholder` only once a value is selected, the closest thing to a commit signal this control has. */
   await expect(page.locator('[data-err="ownership"] .dz-dropdown__value')).not.toHaveClass(/is-placeholder/);

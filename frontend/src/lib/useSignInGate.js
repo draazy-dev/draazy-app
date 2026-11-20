@@ -1,26 +1,37 @@
-import { useCallback } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { gateReason, signInPath } from './authIntent.js';
+import { useOpenSignInGate } from '../context/SignInGateContext.jsx';
+import { gateReason, safeInAppPath } from './authIntent.js';
 
-/**
- * One answer to "a signed-out visitor clicked something that needs an account": say why, then take
- * them there — and while the session is still restoring, defer rather than deny (hence the return).
- */
 export function useSignInGate() {
   const { loading } = useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  return useCallback((reason, next) => {
+  const openGate = useOpenSignInGate();
+  return useCallback((reason, next, resume) => {
     if (loading) {
       toast(t('auth.gateChecking'), 'info');
       return false;
     }
-    toast(t(`auth.intent.${gateReason(reason)}Heading`), 'info');
-    navigate(signInPath(reason, next));
+    openGate({ reason: gateReason(reason), next: next == null ? null : safeInAppPath(next), resume });
     return true;
-  }, [loading, navigate, t, toast]);
+  }, [loading, openGate, t, toast]);
+}
+
+export function replay(e) {
+  const el = e?.currentTarget;
+  return () => {
+    if (!el?.isConnected) return;
+    if (!(el instanceof HTMLFormElement)) el.click();
+    else if (el.requestSubmit) el.requestSubmit();
+    else el.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  };
+}
+
+export function useLatest(value) {
+  const ref = useRef(value);
+  useLayoutEffect(() => { ref.current = value; });
+  return ref;
 }

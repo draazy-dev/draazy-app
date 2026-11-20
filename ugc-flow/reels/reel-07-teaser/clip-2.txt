@@ -1,0 +1,72 @@
+REEL 07 / CLIP 2 of 2 - THE NAME DROP
+=====================================
+JOB ID ............. r07-c2
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r07-c1 approved by the user AND r07-anchor saved
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 720p native (download "720p Original size")
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+  Cost shown ....... 12 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor, @Sana   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r07-set (image) + r07-anchor (saved frame of the approved clip 1)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 7.9-15.6 s); the long HTML end card follows
+
+PROMPT START
+Absolutely no text of any kind appears on screen at any moment: no subtitles, no captions, no title, no brand
+name written anywhere. The word Draazy is only spoken, never shown. A clean raw phone video like the previous
+clips.
+
+Vertical 9:16 video from a smartphone propped up on the terrace parapet at chest height, a static, locked-off
+shot. The camera does not move. [@IshaanOutdoor] Ishaan stands on the left and [@Sana] Sana stands on the right,
+side by side, both framed from the waist up and facing the lens. No phone is visible anywhere in the frame.
+
+Set (the attached set image r07-set; the same in every clip of this reel): a clean, well-kept rooftop terrace
+of a premium modern residential society in Pune at dusk: smooth light-grey parapet, clean light-beige floor
+tiles, green plants in modern grey planters and two wooden deck chairs near the far parapet. On the left side
+of the frame, the Pune skyline of mid-rise apartment buildings under an orange-pink sky. On the right side of
+the frame, a white water tank and a string of warm fairy lights along the railing. A low parapet wall at waist height behind them. Nothing readable anywhere. The background stays exactly
+the same for the whole clip. Match the attached reference frame exactly: the same camera distance and angle, the
+same background with every object in the same place, the same light and colour grade.
+
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. Clear skin with no moles, taper fade,
+light stubble. The outfit stays the same for the whole clip. Sana looks exactly like her character image:
+shoulder-length dark brown curly hair worn loose, round thin gold-wire glasses, a tiny silver nose stud, a coral
+(#FB923C) linen overshirt with the sleeves rolled to the elbows, open over a cream ribbed tank top. Her outfit
+stays the same for the whole clip.
+
+Both step a little closer to the lens, calm and hopeful, then confident. Not laughing, not grinning, not sad.
+Sana stays silent and smiles during the sign-off. Each line is spoken exactly once, nothing repeated, no other
+words.
+0.3-1.6 s, Ishaan: "Hum sab ne jhela hai."
+1.9-3.4 s, Sana: "Rent, buy, sell, sab ek jagah."
+3.6-5.5 s, Ishaan into the lens with a confident half-smile, eyebrows raised once on "Draazy", slowly and clearly: "Direct hai, easy hai, Draazy hai."
+5.5-5.9 s: a short silent beat, lips closed, the half-smile stays.
+5.9-7.6 s, Ishaan, as a separate sentence, a tiny nod on "Bahut jald": "Bahut jald launch ho raha hai."
+7.6-8.0 s: silent, lips closed, Ishaan holds the half-smile into the lens.
+
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking casual Hinglish
+with a natural Indian accent, clearly male and mid-pitched, conversational and fluent. Sana uses her saved Flow
+character voice: casual Hinglish with a soft Lucknowi Hindi accent, a young female voice, bright and clear,
+medium-high pitch, confident and witty.
+
+Lighting and colour: warm golden dusk light from the left, the fairy lights glowing softly, a cool blue sky
+turning darker, true warm skin tones. Authentic Instagram UGC shot on a phone, natural skin texture, no beauty
+filter.
+
+Audio: a light evening breeze and a distant city hum. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
+PROMPT END
+
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match r07-anchor side by side: skyline + orange-pink sky on the LEFT; white water tank + fairy lights on the RIGHT; low parapet behind them; Ishaan left, Sana right
+  [ ] speaker order Ishaan, Sana, Ishaan
+  [ ] no text on screen; "Draazy" said plainly, once, at about 5.0 s; a silent beat before "Bahut jald"
+
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

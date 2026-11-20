@@ -15,24 +15,44 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface RefundRequestRepository extends JpaRepository<RefundRequest, UUID> {
-
     Optional<RefundRequest> findBySubscriptionId(UUID subscriptionId);
 
     Optional<RefundRequest> findByUserIdAndIdempotencyKey(UUID userId, String idempotencyKey);
 
     List<RefundRequest> findBySubscriptionIdIn(Collection<UUID> subscriptionIds);
 
-    Page<RefundRequest> findByStatus(String status, Pageable pageable);
+    interface DeskEntry {
+        UUID getId();
+
+        String getKind();
+    }
+
+    // Rent-agreement refunds live in service_request_refunds; one union keeps both on a single newest-first page.
+    @Query(value = """
+            select q.id as id, q.kind as kind from (
+              select r.id, 'pass' as kind, r.created_at from refund_requests r
+              where :passes and r.status = :status and r.created_at >= :since
+              union all
+              select s.id, 'rent_agreement', s.created_at from service_request_refunds s
+              where :rentAgreements and s.status in (:rentAgreementStatuses) and s.created_at >= :since
+            ) q order by q.created_at desc, q.id""",
+            countQuery = """
+            select (select count(*) from refund_requests r
+                    where :passes and r.status = :status and r.created_at >= :since)
+                 + (select count(*) from service_request_refunds s
+                    where :rentAgreements and s.status in (:rentAgreementStatuses) and s.created_at >= :since)""",
+            nativeQuery = true)
+    Page<DeskEntry> findDeskEntries(@Param("passes") boolean passes, @Param("status") String status,
+            @Param("rentAgreements") boolean rentAgreements,
+            @Param("rentAgreementStatuses") Collection<String> rentAgreementStatuses,
+            @Param("since") Instant since, Pageable pageable);
 
     long countByStatus(String status);
 
-    /** One decision per request: the row lock is what serialises two staff members on the same row. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from RefundRequest r where r.id = :id")
     Optional<RefundRequest> findForDecision(@Param("id") UUID id);
 
-    /** Requests made earlier than {@code before} by this account, or from the same device or payment
-     * instrument, that still stand. {@code basis} is a LIKE pattern. */
     @Query("""
             select count(r) from RefundRequest r
             where r.basis like :basis and r.status in ('pending_review', 'approved')
@@ -42,18 +62,17 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, UU
             @Param("self") UUID self, @Param("userId") UUID userId, @Param("device") String device,
             @Param("instrument") String instrument);
 
-    /** Other accounts that asked for a refund from the same device or payment instrument. */
     @Query("""
             select count(distinct r.userId) from RefundRequest r
             where r.userId <> :userId and (r.deviceIdHash = :device or r.instrumentHash = :instrument)""")
     long countLinkedAccounts(@Param("userId") UUID userId, @Param("device") String device,
             @Param("instrument") String instrument);
 
-    /** Refunds the system queued on its own: no customer request sits behind them. */
     @Query("""
             select s from Subscription s
             where s.refundDueAt is not null
+              and s.refundDueAt >= :since
               and not exists (select 1 from RefundRequest r where r.subscriptionId = s.id)
             order by s.refundDueAt desc""")
-    Page<Subscription> findAutoRefunds(Pageable pageable);
+    Page<Subscription> findAutoRefunds(@Param("since") Instant since, Pageable pageable);
 }

@@ -5,15 +5,7 @@ import com.draazy.api.provider.PlacesLookup.Place;
 import java.util.List;
 import java.util.Set;
 
-/** What a Google place must be to become a society: in a served city, and a building. */
 final class SocietyPlaceRules {
-
-    // Pune, the box frontend/src/lib/geoConfig.js serves: south, north, west, east.
-    private static final double SOUTH = 18.38;
-    private static final double NORTH = 18.72;
-    private static final double WEST = 73.68;
-    private static final double EAST = 74.02;
-
     private static final Set<String> AREA_TYPES = Set.of(
             "locality", "political", "route", "postal_code", "country", "neighborhood", "plus_code", "geocode");
 
@@ -27,16 +19,6 @@ final class SocietyPlaceRules {
     private static final Set<String> BUILDING_TYPES = Set.of("premise", "subpremise");
 
     private SocietyPlaceRules() {
-    }
-
-    /** A pin we have been given; absent coordinates are not a reason to refuse. */
-    static void requireServed(Double lat, Double lng) {
-        if (lat == null || lng == null) {
-            return;
-        }
-        if (lat < SOUTH || lat > NORTH || lng < WEST || lng > EAST) {
-            throw new ValidationException("We only list societies in cities we serve.");
-        }
     }
 
     static void requireBuilding(Place place) {

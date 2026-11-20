@@ -1,30 +1,41 @@
 package com.draazy.api.services.support;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-/** The caller's own tickets, and the paged platform-wide queue ops triages. */
 public interface SupportTicketRepository extends JpaRepository<SupportTicket, UUID> {
-
-    /** The caller's own tickets. Serves {@code idx_support_tickets_user_created} (V22). */
     List<SupportTicket> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
-    /** Newest-first platform queue; served by {@code idx_support_tickets_created} (V53). */
-    Page<SupportTicket> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    @Query("""
+            select t from SupportTicket t
+            where t.userId = :userId and (t.category is null or t.category not in ('identity_dispute', 'identity_appeal'))
+              and t.status not in ('resolved', 'closed')
+            """)
+    Optional<SupportTicket> findOpenChat(@Param("userId") UUID userId);
 
-    /** Awaiting-reply view, served by the partial {@code idx_support_tickets_awaiting_reply} (V53). Derived, not a
-     * nullable-flag {@code @Query}: Postgres cannot use a partial index behind {@code :flag is null or ...}. */
-    Page<SupportTicket> findByStaffUnreadTrueOrderByCreatedAtDesc(Pageable pageable);
+    @Query("""
+            select t from SupportTicket t
+            where t.userId = :userId and (t.category is null or t.category not in ('identity_dispute', 'identity_appeal'))
+            order by t.updatedAt desc
+            """)
+    List<SupportTicket> findChatsNewestFirst(@Param("userId") UUID userId, Limit limit);
 
-    /** Complement of the awaiting-reply view, so {@code ?awaitingReply=false} is honoured. Needs no index: it is
-     * most of the table, so walking {@code idx_support_tickets_created} fills a page quickly. */
-    Page<SupportTicket> findByStaffUnreadFalseOrderByCreatedAtDesc(Pageable pageable);
-
-    // One grouped COUNT for the queue's three tab totals; the partial index serves the true side.
+    @Query("""
+            select t from SupportTicket t
+            where (:anyReply = true or t.staffUnread = :awaiting)
+              and t.createdAt >= :since
+            order by t.createdAt desc
+            """)
+    Page<SupportTicket> findQueue(@Param("anyReply") boolean anyReply, @Param("awaiting") boolean awaiting,
+            @Param("since") Instant since, Pageable pageable);
     @Query("select t.staffUnread, count(t) from SupportTicket t group by t.staffUnread")
     List<Object[]> countByStaffUnread();
 }

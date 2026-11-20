@@ -1,6 +1,5 @@
 import { useId, useState } from 'react';
 import Icon from '../Icon.jsx';
-/* A section that collapses on phones/tablets (tap the header row) but stays permanently open from lg: upward. */
 
 export default function MobileCollapse({
   header,

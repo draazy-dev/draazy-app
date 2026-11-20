@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Author's and staff's view only; everyone else gets {@link FlatmateSeekerFeedDto}. */
 public record FlatmateSeekerPostDto(
         UUID id,
         String title,
@@ -18,7 +17,10 @@ public record FlatmateSeekerPostDto(
         String moveIn,
         String flatPref,
         String roomPref,
-        List<String> tags,
+        String furnishing,
+        boolean gatedOnly,
+        boolean attachedBath,
+        String parking,
         String note,
         boolean verifiedContactOnly,
         boolean verified,

@@ -2,18 +2,16 @@ import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useLayo
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { classNames } from '../../lib/format.js';
+import Icon from '../Icon.jsx';
 import useSheetViewport from '../../lib/useSheetViewport.js';
 import useVisualViewportInsets from '../../lib/useVisualViewportInsets.js';
 import useSwipeDismiss from '../../lib/useSwipeDismiss.js';
+import { isImeComposing } from '../../lib/isImeComposing.js';
 import useScrollLock from '../../hooks/useScrollLock.js';
 import PoweredByGoogle from './PoweredByGoogle.jsx';
 import { isSearchableList } from './dropdownSearch.js';
-/* Selection order is meaningful here (it drives the trigger summary), so an order-sensitive compare is the right
-   equality for "has the parent caught up". */
 
 const sameValues = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
-/* Mirrors Select.jsx for visual and keyboard parity, but holds an array and keeps the menu open while the user
-   toggles choices. */
 
 const MultiSelect = forwardRef(function MultiSelect({
   values = [],
@@ -32,9 +30,9 @@ const MultiSelect = forwardRef(function MultiSelect({
   onPick,
   noResultsText,
   anchored,
+  chips = false,
+  max = Infinity,
 }, ref) {
-  /* Resolved at render rather than as a default parameter: a default is evaluated against whatever language was
-     active on first mount and would never follow a later switch. */
   const { t } = useTranslation();
   const noResults = noResultsText || t('ui.noMatches');
   const opts = useMemo(
@@ -48,27 +46,26 @@ const MultiSelect = forwardRef(function MultiSelect({
   const [asyncOpts, setAsyncOpts] = useState([]);
   const [loading, setLoading] = useState(false);
   const rootRef = useRef(null);
+  const boxRef = useRef(null);
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const searchRef = useRef(null);
   useImperativeHandle(ref, () => triggerRef.current, []);
   const [portalOpen, setPortalOpen] = useState(false);
-  /* On phones the menu docks to the bottom edge as a sheet instead of hanging off the trigger. */
   const listId = useId();
   const sheet = useSheetViewport() && !anchored;
   const picker = sheet && isSearchable;
   useVisualViewportInsets(open && picker);
 
   const selectedSet = useMemo(() => new Set(values), [values]);
+  const labelOf = useMemo(() => new Map(opts.map((o) => [o.value, o.label])), [opts]);
   const summary = useMemo(
     () => {
       const known = opts.filter((o) => selectedSet.has(o.value)).map((o) => o.label);
-      // Values chosen from live search aren't in the static list — show them too.
-      const knownVals = new Set(opts.map((o) => o.value));
-      const extra = values.filter((v) => !knownVals.has(v));
+      const extra = values.filter((v) => !labelOf.has(v));
       return [...known, ...extra].join(', ');
     },
-    [opts, selectedSet, values],
+    [opts, labelOf, selectedSet, values],
   );
   const asyncNorm = useMemo(
     () => asyncOpts.map((o) => (typeof o === 'string' ? { value: o, label: o } : o)),
@@ -90,7 +87,6 @@ const MultiSelect = forwardRef(function MultiSelect({
     setAsyncOpts([]);
     setLoading(false);
   }, []);
-  // Debounced live search — mirrors Select; races guarded by a cancelled flag.
 
   useEffect(() => {
     if (!asyncSearch || !open) return undefined;
@@ -129,12 +125,12 @@ const MultiSelect = forwardRef(function MultiSelect({
       if (!inRoot && !inMenu) close();
     };
     document.addEventListener('mousedown', onDown);
-    // Capture phase: focus sits on an option after a pick, where Escape would otherwise reach the dialog behind.
     const onEscape = (e) => {
       if (e.key !== 'Escape') return;
       e.preventDefault();
       e.stopPropagation();
       close();
+      triggerRef.current?.focus({ preventScroll: true });
     };
     document.addEventListener('keydown', onEscape, true);
     return () => {
@@ -142,15 +138,11 @@ const MultiSelect = forwardRef(function MultiSelect({
       document.removeEventListener('keydown', onEscape, true);
     };
   }, [open, close]);
-  // Fixed positioning against the trigger so the portalled menu escapes any ancestor
-  // overflow/transform trap and can flip up near the viewport edge.
 
   const position = useCallback(() => {
-    const trigger = triggerRef.current;
+    const trigger = boxRef.current || triggerRef.current;
     const menu = menuRef.current;
     if (!trigger || !menu) return;
-    // Sheet mode is laid out entirely in CSS. Drop any inline geometry a previous
-    // desktop-width pass wrote, or it would out-specify the sheet rules.
     if (sheet) { menu.removeAttribute('style'); return; }
     const r = trigger.getBoundingClientRect();
     menu.style.position = 'fixed';
@@ -170,6 +162,7 @@ const MultiSelect = forwardRef(function MultiSelect({
     }
   }, [sheet]);
 
+  const boxRows = chips ? values.length : 0;
   useLayoutEffect(() => {
     if (!open) return undefined;
     position();
@@ -182,19 +175,14 @@ const MultiSelect = forwardRef(function MultiSelect({
       window.removeEventListener('scroll', onAnchor, true);
       window.removeEventListener('resize', onAnchor);
     };
-  }, [open, position, visible.length]);
-  /* A sheet covers the page, so the page behind it must not scroll with it. */
+  }, [open, position, visible.length, boxRows]);
 
   useScrollLock(open && sheet);
-  // Focused here rather than from an inline ref callback, which would steal focus back on every
-  // re-render the async live-search triggers.
 
   useLayoutEffect(() => {
     if (!open || !isSearchable) return;
     searchRef.current?.focus({ preventScroll: true });
   }, [open, isSearchable]);
-  /* A parent applying `onChange` inside a transition leaves `values` at the pre-click array, so building the next
-     toggle off the prop discards every rapid pick but the last. */
 
   const pendingRef = useRef(null);
   const toggle = useCallback((opt) => {
@@ -202,6 +190,10 @@ const MultiSelect = forwardRef(function MultiSelect({
     const pending = pendingRef.current;
     const current = pending && sameValues(pending.from, values) ? pending.next : values;
     const has = current.includes(opt.value);
+    if (!has && current.length >= max) {
+      if (autoClose) close();
+      return;
+    }
     const next = has
       ? current.filter((v) => v !== opt.value)
       : [...current, opt.value];
@@ -214,13 +206,17 @@ const MultiSelect = forwardRef(function MultiSelect({
     onChange(next);
     if (!has && onPick) onPick(opt);
     if (autoClose) close();
-  }, [onChange, values, autoClose, close, onPick, disabled]);
-  /* Drag the sheet's grab handle down to dismiss. Mobile-only by construction. */
+  }, [onChange, values, autoClose, close, onPick, disabled, max]);
+
+  const remove = (value) => {
+    toggle({ value });
+    triggerRef.current?.focus({ preventScroll: true });
+  };
 
   const swipe = useSwipeDismiss(close);
 
   const onKeyDown = (e) => {
-    if (disabled) return;
+    if (disabled || (e.key === 'Enter' && isImeComposing(e))) return;
     if (!open && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
       setOpen(true);
@@ -253,7 +249,6 @@ const MultiSelect = forwardRef(function MultiSelect({
         }
         break;
       case 'Escape':
-        /* Escape closes the innermost thing only. */
         e.preventDefault();
         e.stopPropagation();
         close();
@@ -263,31 +258,49 @@ const MultiSelect = forwardRef(function MultiSelect({
     }
   };
 
+  const triggerButton = (
+    <button
+      type="button"
+      ref={triggerRef}
+      disabled={disabled}
+      aria-haspopup="listbox"
+      aria-expanded={open}
+      aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
+      className={classNames('dz-dropdown__trigger', !chips && invalid && 'dz-invalid dz-shake')}
+      onClick={() => (open ? close() : setOpen(true))}
+      onKeyDown={onKeyDown}
+    >
+      <span className={classNames('dz-dropdown__value', !(chips ? values.length : summary) && 'is-placeholder')}>
+        {chips ? (values.length ? '' : placeholder || t('ui.selectPlaceholder')) : summary || (placeholder || t('ui.selectPlaceholder'))}
+      </span>
+      <svg className="dz-dropdown__chev" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </button>
+  );
+
   return (
     <div ref={rootRef} className={classNames('dz-dropdown', open && 'is-open', className)} data-err={dataErr}>
-      <button
-        type="button"
-        ref={triggerRef}
-        disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={ariaLabel}
-        aria-describedby={ariaDescribedBy}
-        className={classNames('dz-dropdown__trigger', invalid && 'dz-invalid dz-shake')}
-        onClick={() => (open ? close() : setOpen(true))}
-        onKeyDown={onKeyDown}
-      >
-        <span className={classNames('dz-dropdown__value', !summary && 'is-placeholder')}>
-          {summary || (placeholder || t('ui.selectPlaceholder'))}
-        </span>
-        <svg className="dz-dropdown__chev" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
-
+      {chips ? (
+        <div
+          ref={boxRef}
+          className={classNames('dz-dropdown__box', disabled && 'is-disabled', invalid && 'dz-invalid dz-shake')}
+        >
+          {values.map((v) => {
+            const label = labelOf.get(v) || v;
+            return (
+              <button key={v} type="button" disabled={disabled} onClick={() => remove(v)} aria-label={t('ui.removeItem', { label })} className="dz-chip dz-chip--accent dz-chip--sm">
+                {label}
+                <Icon name="x" />
+              </button>
+            );
+          })}
+          {triggerButton}
+        </div>
+      ) : triggerButton}
       {open && typeof document !== 'undefined'
         ? createPortal(
-              /* Scrim: a sheet is a modal surface, so the page behind it has to read as dismissed rather than merely covered. */
             <>
               {sheet ? <div className="dz-dropdown__scrim" onClick={close} aria-hidden="true" /> : null}
               <div

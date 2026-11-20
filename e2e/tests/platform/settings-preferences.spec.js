@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../fixtures/live.js';
-import { signIn, uniqueMobile, apiLogin, authHeaders, API } from '../../helpers/liveAuth.js';
+import { signIn, uniqueMobile, letterTag, apiLogin, authHeaders, API } from '../../helpers/liveAuth.js';
 
 // Dashboard ▸ Profile & Settings, against the live backend.
 const SEEKER = ACTORS.buyer;
@@ -49,6 +49,42 @@ test.describe('Dashboard settings', () => {
     await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByText("Name can only have letters, spaces and . ' - (2 to 80 characters)")).toBeVisible();
     expect(patches).toEqual([]);
+  });
+
+  test('Gender allows two changes after the first pick, then locks', async ({ page }) => {
+    const mobile = uniqueMobile();
+    await signIn(page, mobile);
+    await page.goto('/dashboard#profile');
+    const gender = page.getByRole('button', { name: 'Gender', exact: true });
+    const save = page.getByRole('button', { name: 'Save changes' });
+    await expect(gender).toBeEnabled();
+    await expect(page.getByText('You can change it 2 times after saving.')).toBeVisible();
+
+    const pick = async (label, value, left) => {
+      await gender.click();
+      await page.getByRole('option', { name: label, exact: true }).click();
+      const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/auth/me'));
+      await save.click();
+      const body = await (await saved).json();
+      expect(body.gender).toBe(value);
+      expect(body.genderChangesLeft).toBe(left);
+    };
+
+    await page.getByLabel('Full name').fill(`Asha ${letterTag()}`);
+    await pick('Female', 'female', 2);
+    await expect(page.getByText('You can change it 2 more times.')).toBeVisible();
+    await pick('Male', 'male', 1);
+    await expect(page.getByText('You can change it 1 more time.')).toBeVisible();
+    await pick('Female', 'female', 0);
+    await expect(gender).toBeDisabled();
+    await expect(page.getByText('No changes left. Contact support to change it.')).toBeVisible();
+
+    const headers = await authHeaders(mobile);
+    const other = await fetch(`${API}/auth/me`, { method: 'PATCH', headers, body: JSON.stringify({ gender: 'male', changeGender: true }) });
+    expect(other.status).toBe(409);
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Gender', exact: true })).toBeDisabled();
   });
 
   test('Light mode is the default, keeps teal fills, and a switch to dark persists on this device', async ({ page, login }) => {
@@ -155,7 +191,7 @@ test.describe('Dashboard settings', () => {
     const sent = res.request().postDataJSON();
     expect(sent.email).toBe(false);
     // Every field present, because the contract requires it.
-    for (const key of ['email', 'sms', 'whatsapp', 'matchAlerts', 'language']) {
+    for (const key of ['email', 'sms', 'whatsapp', 'matchAlerts', 'marketingCalls', 'language']) {
       expect(sent[key], `PUT body is missing ${key}; the server would 422`).not.toBe(undefined);
     }
     expect(sent.quietHours).toMatchObject({ enabled: expect.anything(), start: expect.any(String), end: expect.any(String) });
@@ -290,6 +326,29 @@ test.describe('Dashboard settings', () => {
       ACTORS.owner,
     );
     expect(serialised, 'shared records identify the other party by reference').toContain('partyRef');
+  });
+
+  test('the marketing-calls consent switch is off by default and persists on the server', async ({ page, login, request }) => {
+    await login.asBuyer();
+    await page.goto('/dashboard#profile');
+    const consent = page.getByRole('switch', { name: 'Calls about homes and moving' });
+    await expect(consent).toHaveAttribute('aria-checked', 'false');
+
+    const flip = async () => {
+      const wrote = page.waitForResponse(
+        (r) => r.url().includes('/api/me/notification-preferences') && r.request().method() === 'PUT',
+        { timeout: 15_000 },
+      );
+      await consent.click();
+      expect((await wrote).status()).toBe(200);
+    };
+    await flip();
+    await expect(consent).toHaveAttribute('aria-checked', 'true');
+    const on = await request.get(`${API}/me/notification-preferences`, { headers: await authHeaders(SEEKER) });
+    expect((await on.json()).marketingCalls).toBe(true);
+
+    await flip();
+    await expect(consent).toHaveAttribute('aria-checked', 'false');
   });
 
 });

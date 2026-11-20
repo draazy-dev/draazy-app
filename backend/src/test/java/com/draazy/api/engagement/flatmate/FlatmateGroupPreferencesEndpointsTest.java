@@ -52,7 +52,7 @@ class FlatmateGroupPreferencesEndpointsTest extends AbstractApiTest {
                  "propertyId":"%s","consentMobile":"9800000001",
                  "preferences":{"localities":[%s],"bhk":[%s],"rentMin":%d,"rentMax":%d,
                    "depositMin":60000,"depositMax":120000,"gatedOnly":true,"bachelors":true,
-                   "furnishing":"semi","moveInBy":"2026-09-01"}}
+                   "furnishing":"semi","parking":"car","moveInBy":"2026-09-01"}}
                 """.formatted(UUID.randomUUID(), localities, bhk, rentMin, rentMax);
     }
 
@@ -96,6 +96,7 @@ class FlatmateGroupPreferencesEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.preferences.gatedOnly").value(true))
                 .andExpect(jsonPath("$.preferences.bachelors").value(true))
                 .andExpect(jsonPath("$.preferences.furnishing").value("semi"))
+                .andExpect(jsonPath("$.preferences.parking").value("car"))
                 .andExpect(jsonPath("$.preferences.moveInBy").value("2026-09-01"));
     }
 
@@ -180,23 +181,52 @@ class FlatmateGroupPreferencesEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("can find its flat: an edit without preferences turns it into a housed group")
-    void anEditSettlesIt() throws Exception {
-        User host = user("9811000405", "Hunter Five");
+    @DisplayName("a team that already has a flat cannot be created: it lists its spare seats as a room")
+    void aTeamWithAFlatIsRefusedAtCreate() throws Exception {
+        User host = user("9811000405", "Housed Five");
+        mvc.perform(post(Routes.Flatmates.GROUPS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(housedBody("tenant")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("flat_lists_as_room"));
+    }
+
+    @Test
+    @DisplayName("an owner's team with a flat is refused as owner_lists_rooms")
+    void anOwnerTeamIsRefusedAtCreate() throws Exception {
+        User host = user("9811000406", "Housed Owner");
+        mvc.perform(post(Routes.Flatmates.GROUPS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(housedBody("owner")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("owner_lists_rooms"));
+    }
+
+    @Test
+    @DisplayName("an edit without preferences cannot settle a hunting team into a flat")
+    void anEditCannotSettleIt() throws Exception {
+        User host = user("9811000407", "Hunter Five");
         String id = create(host, huntingBody("\"Aundh\",\"Baner\"", "\"2\"", 30000, 45000));
 
         mvc.perform(patch(Routes.Flatmates.GROUP_BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Three of us, hunting","policy":"any","seats":3,
-                                 "seatsOpen":1,"name":"Asha","locality":"Baner","rent":42000,
-                                 "deposit":84000}
-                                """))
+                        .content(housedBody("tenant")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("flat_lists_as_room"));
+
+        mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.locality").value("Baner"))
-                .andExpect(jsonPath("$.rent").value(42000))
-                .andExpect(jsonPath("$.deposit").value(84000))
-                .andExpect(jsonPath("$.preferences").doesNotExist());
+                .andExpect(jsonPath("$.item.preferences.localities", Matchers.contains("Aundh", "Baner")));
+    }
+
+    private static String housedBody(String role) {
+        return """
+                {"title":"We have a flat","policy":"any","seats":3,"seatsOpen":1,"name":"Ravi",
+                 "locality":"Baner","rent":42000,"deposit":84000,"role":"%s"}
+                """.formatted(role);
     }
 }

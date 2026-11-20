@@ -2,16 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useSaved } from '../../context/SavedContext.jsx';
 import { useFollows } from '../../context/FollowContext.jsx';
 import { useSavedSearches } from '../../context/SavedSearchContext.jsx';
 import { firstName } from '../../lib/auth.js';
-import { useConversationUnread } from '../../context/ConversationContext.jsx';
 import { useVerification } from '../../context/VerificationContext.jsx';
 import { listRecentSearches } from '../../services/recentSearchService.js';
 import { dashboardCaps, primeMeDashboard } from '../../services/meDashboardService.js';
+import { REVISIT_MAX_AGE } from '../../services/http.js';
 import VisitsTab from '../../components/dashboard/VisitsTab.jsx';
 import DocumentsTab from '../../components/dashboard/DocumentsTab.jsx';
 import FinancesTab from '../../components/dashboard/FinancesTab.jsx';
@@ -23,12 +22,12 @@ import LoadError from '../../components/LoadError.jsx';
 import OverviewPanel from './dashboard/OverviewPanel.jsx';
 import MyPropertiesPanel from './dashboard/MyPropertiesPanel.jsx';
 import MyRentalPanel from './dashboard/MyRentalPanel.jsx';
-import EnquiriesPanel from './dashboard/EnquiriesPanel.jsx';
+import RequestsPanel from './requests/RequestsPanel.jsx';
+import { Card } from './dashboard/components.jsx';
 import BillingPanel from './dashboard/BillingPanel.jsx';
 import ActivityPanel from './dashboard/ActivityPanel.jsx';
 import MobileNav from './dashboard/MobileNav.jsx';
 import DashboardSidebar from './dashboard/DashboardSidebar.jsx';
-import DashboardReviewModal from './dashboard/DashboardReviewModal.jsx';
 import { useDashboardData } from './dashboard/useDashboardData.js';
 import { attentionFromItems, buildActionItems, buildDocGroups, buildOwnerStats, buildSeekerStats, countUpcomingVisits } from './dashboard/dashboardData.js';
 import { DashboardOverviewSkeleton } from './dashboard/DashboardSkeleton.jsx';
@@ -39,36 +38,26 @@ export default function Dashboard() {
   const saved = useSaved();
   const follows = useFollows();
   const savedSearches = useSavedSearches();
-  const { flagEnabled } = useAppFlags();
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
-  // Resolve the active tab from either the hash (#listings) or a ?tab= query
-  // param, so deep-links from anywhere in the app land on the right tab.
   const tabFromLocation = () => {
     const h = location.hash.replace('#', '');
     const q = new URLSearchParams(location.search).get('tab') || '';
     return h || q;
   };
-  // Map a raw candidate (real tab id OR legacy alias) to { tab, sub }. Aliases keep
-  // every historical deep-link working.
   const resolveTarget = (candidate) => {
     if (candidate && TAB_ALIAS[candidate]) return TAB_ALIAS[candidate];
     return { tab: candidate || 'overview' };
   };
-  // During render, so the seeds exist before any panel's effect makes its own read. A landing on My Listings
-  // also takes that panel's quota and deal book.
-  const [dashboardDoc] = useState(() => primeMeDashboard({ listingTools: resolveTarget(tabFromLocation()).tab === 'properties' }));
+  const [dashboardDoc] = useState(() => primeMeDashboard({ listingTools: resolveTarget(tabFromLocation()).tab === 'properties', maxAge: REVISIT_MAX_AGE }));
   const [caps, setCaps] = useState({});
   useEffect(() => {
     let live = true;
     dashboardCaps(dashboardDoc).then((next) => { if (live) setCaps(next); });
     return () => { live = false; };
   }, [dashboardDoc]);
-  const { unread: chatUnread } = useConversationUnread();
   const { verified } = useVerification();
-  // Management tabs unlock on actual inventory, not on role, so a brand-new owner is not handed
-  // empty "My Listings / Enquiries / Finances" dead-ends.
   const [managedProps, setManagedProps] = useState([]);
   useEffect(() => {
     let live = true;
@@ -81,33 +70,25 @@ export default function Dashboard() {
     try {
       const rows = await listManaged();
       setManagedProps(Array.isArray(rows) ? rows : []);
-    } catch { /* the rows on screen stay */ }
+    } catch { }
   }, []);
 
   const {
     listings, listingsLoaded, visits, recent, recommended, alertMatches,
-    contactReqs, photoReqs, flatmateReqs, docReqs,
-    reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
-    apps, decideApp,
-    decideContact, decideDocReqs, decideFlatmateReq, decidePhotoReq, mutateVisit, openReview, sendReview,
+    contactReqs, photoReqs, flatmateReqs, docReqs, serviceReqs,
+    reviewsByProp,
+    apps, offers, mutateVisit, openReview,
     dataStatus, dataError, retryData,
-    docReqsStatus, docReqsError, retryDocReqs,
-    contactReqsStatus, contactReqsError, retryContactReqs,
-    photoReqsStatus, photoReqsError, retryPhotoReqs,
-    flatmateReqsStatus, flatmateReqsError, retryFlatmateReqs,
-    appsStatus, appsError, retryApps,
-    isBusy, refreshData, setListings,
+    refreshData, refreshRequests, setListings,
   } = useDashboardData({ user, toast, ownsProperty: caps.ownsProperty });
-  /* "My Rental" shows for buyers/tenants and anyone with a finalised tenancy, not a pure owner; a pending co-fill
-     invite also belongs there so an invited tenant always has a place to act. */
   const isOwner = (listings || []).length > 0 || managedProps.length > 0;
   const { hasTenancy = false, hasRentalInvite = false } = caps;
   const showRental = hasTenancy || !isOwner || hasRentalInvite;
   const hasRentalGroup = hasTenancy || hasRentalInvite;
 
   const visibleTabs = useMemo(
-    () => TABS.filter((t) => (!t.owner || isOwner) && (!t.tenant || showRental) && (!t.flag || flagEnabled(t.flag))),
-    [isOwner, showRental, flagEnabled],
+    () => TABS.filter((t) => (!t.owner || isOwner) && (!t.tenant || showRental)),
+    [isOwner, showRental],
   );
   const dashboardGroups = useMemo(
     () => buildDashboardGroups({ visibleTabs, isOwner, showRental, hasRentalGroup }),
@@ -115,48 +96,35 @@ export default function Dashboard() {
   );
 
   const urlTarget = resolveTarget(tabFromLocation());
-  const urlDef = visibleTabs.find((t) => t.tab === urlTarget.tab);
-  const { tab, sub } = urlDef && !urlDef.link ? urlTarget : { tab: 'overview', sub: undefined };
+  const { tab, sub } = visibleTabs.some((t) => t.tab === urlTarget.tab) ? urlTarget : { tab: 'overview', sub: undefined };
 
   const REVIEW_STATUS = REVIEW_STATUS_MAP;
 
   const go = (next, { replace = false } = {}) => {
     const r = resolveTarget(next);
-    const def = visibleTabs.find((t) => t.tab === r.tab);
-    if (!def) return;
-    // Link-out tabs (e.g. Messages) open a standalone page, not an inline panel.
-    if (def.link) { navigate(def.link); return; }
+    if (r.link) { navigate(r.link); return; }
+    if (!visibleTabs.some((t) => t.tab === r.tab)) return;
     const apply = () => { navigate('#' + next, { replace }); window.scrollTo(0, 0); };
     if (document.startViewTransition) document.startViewTransition(apply);
     else apply();
   };
 
   useEffect(() => {
-    // A deep link to a link-out tab (#messages) redirects to its real page so we
-    // never render a divergent inline version of it.
-    if (urlDef?.link) navigate(urlDef.link, { replace: true });
+    if (urlTarget.link) navigate(urlTarget.link, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- redirect only follows the active URL tab
-  }, [urlDef?.link]);
+  }, [urlTarget.link]);
 
   const reviewParam = new URLSearchParams(location.search).get('review');
   useEffect(() => {
-    if (!reviewParam) return;
-    openReview(reviewParam);
-    const rest = new URLSearchParams(location.search);
-    rest.delete('review');
-    navigate({ search: rest.toString() ? `?${rest}` : '', hash: location.hash }, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- review deep-link is consumed once
+    if (reviewParam) openReview(reviewParam, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- old notification links land here once
   }, [reviewParam]);
 
   const docGroups = useMemo(() => buildDocGroups(docReqs, listings), [docReqs, listings]);
   const pendingDocGroups = docGroups.filter((g) => g.pendingIds.length > 0);
   const savedCount = saved.count;
   const alertCount = savedSearches.count;
-  // From the context, so the tile agrees with the same user's count on another device and with the
-  // follower count the society hub computes server-side.
   const followCount = follows.count;
-  // Rendered for owners too (Resume search). Starts empty, the same shape as "no history yet", so nothing flashes
-  // before the read.
   const [recentSearches, setRecentSearches] = useState([]);
   useEffect(() => {
     let alive = true;
@@ -167,30 +135,21 @@ export default function Dashboard() {
     return () => { alive = false; };
   }, [user?.mobile]);
   const profile = useMemo(() => profileCompletion(user, verified), [user, verified]);
-  // Action Center: what is waiting on this user. Computed per render (small arrays) so the
-  // inline handlers below are never stale, and sorted stale-first.
 
   const scheduledVisits = useMemo(() => visits.filter((v) => v.status === 'scheduled'), [visits]);
   const actionItems = buildActionItems({
     isOwner, contactReqs, apps, photoReqs, pendingDocGroups, listings, reviewsByProp,
-    scheduledVisits, flatmateReqs, userId: user?.id, openReview, isBusy,
-    decideContact, decideApp, go, decideDocReqs, decidePhotoReq, decideFlatmateReq, mutateVisit, navigate,
+    scheduledVisits, flatmateReqs, serviceReqs, offers, userId: user?.id, openReview, go,
   });
-  // Badge counts only items genuinely waiting on the owner, matching the Requests panel's
-  // "Waiting on you"; an already-contactable enquiry needs no accept/decline decision.
-  const attentionCounts = { ...attentionFromItems(actionItems), messages: chatUnread };
+  const attentionCounts = attentionFromItems(actionItems);
 
-  // Total open leads, computed exactly as the Leads panel computes its own total, so the Overview
-  // tile and the panel can never show two different numbers for the same inbox.
   const upcomingVisits = countUpcomingVisits(visits, user?.id);
   const ownerStats = buildOwnerStats({ listings, items: actionItems, go });
   const seekerStats = buildSeekerStats({ savedCount, alertCount, followCount, upcomingVisits, go });
   const hasAnyCoreData = [
-    listings, visits, recent, recommended, alertMatches, contactReqs, photoReqs, flatmateReqs, docReqs, apps,
+    listings, visits, recent, recommended, alertMatches, contactReqs, photoReqs, flatmateReqs, docReqs, apps, offers,
   ].some((rows) => (rows || []).length > 0);
   const personaPending = dataStatus === 'loading' && !hasAnyCoreData;
-  /* Panel components are imported so their identity is stable across Dashboard re-renders: a state change here would
-     otherwise remount the active panel and wipe its internal state. */
 
   const renderPanel = () => {
     if (tab === 'overview' && personaPending) return <DashboardOverviewSkeleton />;
@@ -202,11 +161,11 @@ export default function Dashboard() {
       case 'activity':
         return <ActivityPanel key={'act:' + (sub || '')} initialSub={sub} recent={recent} />;
       case 'leads':
-        return <EnquiriesPanel contactReqs={contactReqs} decideContact={decideContact} photoReqs={photoReqs} decidePhotoReq={decidePhotoReq} flatmateReqs={flatmateReqs} decideFlatmateReq={decideFlatmateReq} docReqs={docReqs} decideDocReqs={decideDocReqs} listings={listings} apps={apps} decideApp={decideApp} openReview={openReview} reviewsByProp={reviewsByProp} contactReqsFailed={contactReqsStatus === 'error'} contactReqsError={contactReqsError} onRetryContactReqs={retryContactReqs} photoReqsFailed={photoReqsStatus === 'error'} photoReqsError={photoReqsError} onRetryPhotoReqs={retryPhotoReqs} docReqsFailed={docReqsStatus === 'error'} docReqsError={docReqsError} onRetryDocReqs={retryDocReqs} flatmateReqsFailed={flatmateReqsStatus === 'error'} flatmateReqsError={flatmateReqsError} onRetryFlatmateReqs={retryFlatmateReqs} appsFailed={appsStatus === 'error'} appsError={appsError} onRetryApps={retryApps} isBusy={isBusy} />;
+        return <Card className="p-3 sm:p-5"><RequestsPanel key={'leads:' + (sub || '')} initialTab={sub} onChanged={refreshRequests} /></Card>;
       case 'finances':
         return <FinancesTab user={user} listings={listings} toast={toast} isOwner={isOwner} showRental={showRental} />;
       case 'documents':
-        return <DocumentsTab user={user} listings={listings} toast={toast} isOwner={isOwner} />;
+        return <DocumentsTab user={user} listings={listings} toast={toast} isOwner={isOwner} onRoomBadgeChanged={refreshData} />;
       case 'visits':
         return <VisitsTab visits={visits} toast={toast} isOwner={isOwner} onUpdate={mutateVisit} />;
       case 'billing':
@@ -225,9 +184,6 @@ export default function Dashboard() {
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Hi, {firstName(user)} <span className="inline-block">👋</span></h1>
           <p className="text-gray-400 text-sm mt-1">Here's your Draazy activity.</p>
         </div>
-        {/* Mobile section switcher — one row that opens a full sheet of all sections, so nothing (and no attention
-           badge) is hidden behind a horizontal scroll. */}
-
         <MobileNav
           groups={dashboardGroups}
           activeTab={tab}
@@ -238,7 +194,6 @@ export default function Dashboard() {
         />
 
         <div className="lg:grid lg:grid-cols-[260px_1fr] lg:gap-6">
-          {/* Sidebar */}
           <DashboardSidebar
             groups={dashboardGroups}
             activeTab={tab}
@@ -248,7 +203,6 @@ export default function Dashboard() {
             onLogout={logout}
             loading={personaPending}
           />
-          {/* Content */}
 
           <section>
             {dataStatus === 'error' && (
@@ -258,17 +212,6 @@ export default function Dashboard() {
           </section>
         </div>
       </div>
-
-      <DashboardReviewModal
-        reviewProp={reviewProp}
-        setReviewProp={setReviewProp}
-        thread={reviewThread}
-        listing={(listings || []).find((l) => l.id === reviewProp || l.uuid === reviewProp)}
-        reviewInput={reviewInput}
-        setReviewInput={setReviewInput}
-        sendReview={sendReview}
-        REVIEW_STATUS={REVIEW_STATUS}
-      />
     </div>
   );
 }

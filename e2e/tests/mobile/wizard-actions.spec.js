@@ -1,7 +1,7 @@
 import { test, expect } from '../../fixtures/live.js';
 import { trackErrors } from '../../helpers/console.js';
 import { authHeaders, ownerIdOf } from '../../helpers/liveAuth.js';
-import { LIST_PROPERTY_DRAFT_KEY as DRAFT_KEY } from '../../helpers/listingForm.helper.js';
+import { LIST_PROPERTY_DRAFT_KEY as DRAFT_KEY, pickFloors, readListPropertyDraft } from '../../helpers/listingForm.helper.js';
 
 // Seed consent because the bar overlaps the wizard's phone-bottom fields.
 async function withConsent(page) {
@@ -19,7 +19,7 @@ async function openWizard(page) {
 }
 
 test.describe('Mobile listing wizard', () => {
-  test('the step 1 form spends its width on fields, keeps its actions pinned and tappable, and flags every invalid field', async ({ page, login }) => {
+  test('the step 1 form spends its width on fields, keeps its actions in flow and tappable, and flags every invalid field', async ({ page, login }) => {
     test.slow();
     const errors = trackErrors(page);
     await withConsent(page);
@@ -57,14 +57,16 @@ test.describe('Mobile listing wizard', () => {
       expect(chrome.reserved).toBeLessThan(64);
     });
 
-    await test.step('the sticky step actions stay in reach and tappable', async () => {
+    await test.step('the step actions sit in flow at the end of the form, compact and tappable', async () => {
       const actions = page.locator('.lp-step-actions').first();
 
-      await expect(actions).toHaveCSS('position', 'sticky');
-      await page.evaluate(() => window.scrollTo(0, 300));
-      await page.waitForTimeout(200);
-      const actionsBox = await actions.boundingBox();
-      expect(actionsBox.y + actionsBox.height, 'the row stays inside the viewport').toBeLessThanOrEqual(page.viewportSize().height);
+      // Sticky/fixed rows drift mid-screen when the iOS keyboard shrinks the visual viewport.
+      await expect(actions).toHaveCSS('position', 'static');
+      const form = await actions.evaluate((el) => {
+        const prev = el.previousElementSibling.getBoundingClientRect();
+        return { below: el.getBoundingClientRect().top >= prev.bottom, last: el === el.parentElement.lastElementChild };
+      });
+      expect(form, 'the row closes the form instead of floating over it').toEqual({ below: true, last: true });
 
       const vw = page.viewportSize().width;
       const primary = actions.getByRole('button', { name: /next/i });
@@ -72,16 +74,11 @@ test.describe('Mobile listing wizard', () => {
       expect(box.width, 'compact, not a full-width bar').toBeLessThan(vw * 0.6);
       expect(box.height).toBeGreaterThanOrEqual(44);
 
-      // A self-contained floating bar: rounded on every corner and solid, so neither its
-      // corners nor the fields behind it leak out where it docks at the end of the card.
-      expect(await actions.evaluate((el) => {
-        const s = getComputedStyle(el);
-        return [s.borderBottomLeftRadius, s.backgroundColor.startsWith('rgba') ? 'translucent' : 'solid'];
-      })).toEqual(['16px', 'solid']);
-
-      // The Ask Draaz launcher must clear the bar rather than sit on its Next button.
-      const launcher = await page.locator('.dz-assistant-layer').boundingBox();
-      if (launcher) expect(launcher.y + launcher.height, 'the launcher sits above the bar').toBeLessThanOrEqual(actionsBox.y);
+      await primary.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      await expect.poll(() => primary.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+      }), { message: 'nothing, not even Ask Draaz, sits on top of Next' }).toBe(true);
     });
 
     expect(errors, 'the wizard logs no console errors on a phone').toEqual([]);
@@ -149,7 +146,7 @@ test.describe('Mobile listing wizard', () => {
 
     await page.getByRole('button', { name: 'Rent', exact: true }).click();
     await page.getByRole('button', { name: /Find a flatmate/ }).click();
-    await expect(page.getByText('This room is for *', { exact: true })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Room type', exact: true })).toBeVisible();
 
     for (const gone of ['Carpet Area', 'Built-up Area', 'Facing', 'Overlooking', 'Age of Property']) {
       await expect(page.getByText(gone, { exact: true }), `${gone} is not a flatmate question`).toHaveCount(0);
@@ -164,32 +161,33 @@ test.describe('Mobile listing wizard', () => {
       if (flatmate) {
         await page.getByRole('button', { name: 'Rent', exact: true }).click();
         await page.getByRole('button', { name: /Find a flatmate/ }).click();
+        await expect(page.getByRole('group', { name: 'Room type', exact: true })).toBeVisible();
       }
       for (const width of [360, 390, 412, 1280]) {
         await page.setViewportSize({ width, height: 844 });
         const pills = page.getByRole('button', { name: /^(Unfurnished|Semi-Furnished|Furnished)$/ });
         await expect(pills).toHaveCount(3);
-        // Pills animate padding, so measure the settled layout after crossing the breakpoint.
+        // Pills animate, so measure the settled layout after crossing the breakpoint.
         await expect(async () => {
           const boxes = await pills.evaluateAll((elements) => elements.map((el) => {
             const r = el.getBoundingClientRect();
             const parent = el.parentElement.getBoundingClientRect();
             const css = getComputedStyle(el);
             return { top: r.top, left: r.left, right: r.right, parentLeft: parent.left, parentRight: parent.right,
-              font: css.fontSize, padTop: css.paddingTop, padBottom: css.paddingBottom, height: r.height };
+              font: css.fontSize, height: r.height };
           }));
           expect(Math.max(...boxes.map((b) => b.top)) - Math.min(...boxes.map((b) => b.top)), `one row at ${width}px (flatmate=${flatmate}): ${JSON.stringify(boxes)}`).toBeLessThan(1);
           if (width < 640) {
             expect(Math.abs(boxes[0].left - boxes[0].parentLeft), 'first tile starts at the row edge').toBeLessThan(1);
             expect(Math.abs(boxes[2].right - boxes[2].parentRight), 'last tile fills the row to the right edge').toBeLessThan(1);
           }
+          const coarse = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
           for (const box of boxes) {
             expect(box.left).toBeGreaterThanOrEqual(box.parentLeft - 1);
             expect(box.right).toBeLessThanOrEqual(box.parentRight + 1);
             expect(box.font).toBe('14px');
-            expect(box.padTop).toBe('12px');
-            expect(box.padBottom).toBe('12px');
-            expect(box.height).toBeGreaterThanOrEqual(44);
+            // Tiles take the shared --btn-h (44px on phones, 40px from 640px up); a touch pointer keeps the 44px floor.
+            expect(box.height).toBe(width < 640 || coarse ? 44 : 40);
           }
         }).toPass({ timeout: 3000 });
       }
@@ -226,7 +224,7 @@ test.describe('Mobile listing wizard', () => {
     await field.fill('1234');
     await page.waitForTimeout(700);
 
-    const saved = await page.evaluate((k) => localStorage.getItem(k), DRAFT_KEY);
+    const saved = await readListPropertyDraft(page);
     expect(saved, 'the wizard autosaved a draft').toBeTruthy();
     expect(saved).toContain('1234');
 
@@ -234,6 +232,32 @@ test.describe('Mobile listing wizard', () => {
     await page.reload();
     await page.locator('.lp-step-actions').first().waitFor({ timeout: 15000 });
     await expect(page.locator('input[placeholder="e.g. 1050"]').first()).toHaveValue('1234');
+  });
+
+  test('Next and Back open the new step at its top, not at the footer', async ({ page, login }) => {
+    await withConsent(page);
+    await login.asNewOwner();
+    await openWizard(page);
+    const opensAtTop = async (heading) => {
+      await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+      await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 3000 }).toBe(0);
+      await page.waitForTimeout(600);
+      expect(await page.evaluate(() => window.scrollY), 'nothing scrolls the page back down').toBe(0);
+    };
+    const tapFromBottom = async (name) => {
+      await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+      await page.locator('.lp-step-actions').last().getByRole('button', { name }).click();
+    };
+
+    await page.locator('[data-err="propertyType"]').click();
+    await page.getByRole('option', { name: 'Flat / Apartment', exact: true }).click();
+    await page.locator('input[data-err="carpetArea"]').fill('1200');
+    await pickFloors(page);
+
+    await tapFromBottom(/Next Step/i);
+    await opensAtTop('Location');
+    await tapFromBottom(/Back/i);
+    await opensAtTop('Property details');
   });
 
 });

@@ -4,8 +4,6 @@ import Icon from '../../../components/Icon.jsx';
 import PlaceSearchInput from '../../../components/search/PlaceSearchInput.jsx';
 import { clampNearRadius, nearMaxFor } from '../../../lib/nearParams.js';
 
-/* The same proximity model Listings uses; it works because every post carries its own
- * coordinates (see helpers.withCoords). */
 export default function NearPlaceField({ filters, setF }) {
   const { t } = useTranslation();
   const nearMode = filters.nearMode || 'km';

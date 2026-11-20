@@ -2,6 +2,7 @@ import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile, signedInAs, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { approveListingWithFetch } from '../../../helpers/moderation.js';
+import { sql } from '../../../helpers/monetisation.js';
 
 async function api(method, path, headers, body) {
   const res = await fetch(`${API}${path}`, {
@@ -93,21 +94,22 @@ test.describe('Scheduled visits (live)', () => {
       await expect(upcoming).toBeVisible();
       await expect(badges(page, 'Awaiting confirmation')).toHaveCount(2);
       await expect(page.getByText('Asha Kulkarni')).toBeVisible();
-      // `isFullMobile` suppresses the button for the five-digit fragment a masked value strips to.
-      await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+      // `isFullMobile` suppresses the in-app Message button for the five-digit fragment a masked value strips to.
+      await expect(page.getByRole('button', { name: /^Message / })).toHaveCount(0);
       expect((await rowOf(asha)).visitor.mobile, 'masked to the owner while merely scheduled')
         .toBe(`${asha.mobile.slice(0, 2)}XXXXX${asha.mobile.slice(-3)}`);
     });
 
-    await test.step('confirming one visit moves only that row, and the handoff appears without a reload', async () => {
+    await test.step('confirming one visit opens its chat, as Confirm in Requests does, and moves only that row', async () => {
       await page.getByRole('button', { name: /^Confirm$/ }).first().click();
-      // Re-read from the server after the write (useDashboardData#mutateVisit), so this is the server's answer.
+      await expect(page).toHaveURL(/\/messages\?c=/);
+      await page.goto('/dashboard#visits');
+      await expect(upcoming).toBeVisible();
       await expect(badges(page, 'Confirmed')).toHaveCount(1);
       await expect(badges(page, 'Awaiting confirmation')).toHaveCount(1);
 
-      const wa = page.locator(`a[href*="wa.me/91${asha.mobile}"]`);
-      await expect(wa).toHaveCount(1);
-      await expect(wa).toHaveAttribute('aria-label', /Asha Kulkarni/);
+      await expect(page.getByRole('button', { name: 'Message Asha Kulkarni' })).toHaveCount(1);
+      await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
       expect((await rowOf(asha)).visitor.mobile, 'revealed to the owner once confirmed').toBe(asha.mobile);
     });
 
@@ -162,24 +164,29 @@ test.describe('Scheduled visits (live)', () => {
       await page.getByRole('button', { name: /^Cancel$/ }).first().click();
       await expect(badges(page, 'Awaiting confirmation')).toHaveCount(1);
       // A cancelled visit leaves Upcoming entirely, so the DOM alone cannot say which row was cancelled.
-      expect((await rowOf(rohit)).status, 'the cancelled row is the one whose button was clicked').toBe('cancelled');
+      // The row drops optimistically, so poll until the write lands.
+      await expect.poll(async () => (await rowOf(rohit)).status, { message: 'the cancelled row is the one whose button was clicked' })
+        .toBe('cancelled');
       expect((await rowOf(asha)).status, 'the other booking is untouched').toBe('scheduled');
     });
 
-    await test.step('the Requests tab carries no Visit-requests sub-tab, and the inbox shows a lead-triage summary strip', async () => {
+    await test.step('the Requests tab shows the pending visit as a card under All only, with no summary strip', async () => {
       await page.goto('/dashboard#leads');
       await page.reload();
-      // The positive anchor: a sibling tab from the same static list. Without it the absence check
-      // below would pass just as happily against a Requests panel that never rendered.
-      await expect(page.getByRole('tab', { name: /Number requests/ }).first()).toBeVisible();
+      await expect(page.getByTestId('requests-panel')).toBeVisible();
+      await expect(page.getByTestId('requests-box-received')).toHaveCount(0);
+      const visitCards = page.locator('[data-testid="request-card"][data-state="pending"]').filter({ has: page.getByTestId('request-kind').filter({ hasText: /^Visit/ }) });
+      await expect(visitCards).toHaveCount(1);
+      await expect(visitCards.getByTestId('request-direction')).toHaveText('Received');
+      for (const tab of ['Number requests', 'Photo requests', 'Documents', 'Flatmate']) {
+        await page.getByRole('tab', { name: new RegExp(`^${tab}`) }).click();
+        await expect(visitCards).toHaveCount(0);
+      }
       await expect(page.getByRole('tab', { name: /^Visit requests$/ })).toHaveCount(0);
-
-      await expect(page.getByText('Waiting on you')).toBeVisible();
-      await expect(page.getByText('Open leads')).toBeVisible();
-      await expect(page.getByText('Oldest waiting')).toBeVisible();
+      await expect(page.getByText('Open leads')).toHaveCount(0);
+      await expect(page.getByText('Oldest waiting')).toHaveCount(0);
     });
   });
-
   test('a buyer viewing their booked visit gets no WhatsApp handoff to the owner', async ({ page }) => {
     const { visitors } = await scene(['Asha Kulkarni']);
     const [asha] = visitors;
@@ -194,6 +201,43 @@ test.describe('Scheduled visits (live)', () => {
     // The row is on screen and fully rendered — and carries no route to the owner's number.
     await expect(page.getByRole('link', { name: /WhatsApp/i })).toHaveCount(0);
     await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+  });
+
+  test('Message on a confirmed visit opens the in-app thread with the visitor, once', async ({ page }) => {
+    const { owner, visitors } = await scene(['Chat Visitor']);
+    const [visitor] = visitors;
+    const confirmed = await api('PATCH', `/visit-requests/${visitor.visitId}/status`, owner.headers, { status: 'confirmed' });
+    expect(confirmed.status).toBe(200);
+
+    await signedInAs(page, owner.mobile);
+    for (const attempt of [1, 2]) {
+      await page.goto('/dashboard#visits');
+      await page.getByRole('button', { name: 'Message Chat Visitor' }).click();
+      await expect(page, `attempt ${attempt} lands in Messages`).toHaveURL(/\/messages\?c=/);
+      await expect(page.getByText(/your visit to .* is confirmed/).first()).toBeVisible();
+    }
+
+    const threads = await api('GET', '/messages?size=100', visitor.headers);
+    expect(threads.status).toBe(200);
+    expect(threads.body.content, 'one thread, not one per tap').toHaveLength(1);
+    const thread = await api('GET', `/messages/${threads.body.content[0].id}`, visitor.headers);
+    expect(thread.body.messages, 'a second tap reuses the thread without re-sending the greeting').toHaveLength(1);
+  });
+
+  test('the owner marks a past confirmed visit as a no-show', async ({ page }) => {
+    const { owner, visitors } = await scene(['No Show Visitor']);
+    const [visitor] = visitors;
+    const confirmed = await api('PATCH', `/visit-requests/${visitor.visitId}/status`, owner.headers, { status: 'confirmed' });
+    expect(confirmed.status).toBe(200);
+    // A slot cannot be booked in the past, so age the confirmed row in place.
+    sql(`UPDATE visits SET slot = now() - interval '2 days' WHERE id = '${visitor.visitId}'`);
+
+    await signedInAs(page, owner.mobile);
+    await page.goto('/dashboard#visits');
+    await page.getByRole('button', { name: "Didn't come" }).click();
+    await expect(page.getByText('Marked as a no-show')).toBeVisible();
+    await expect(page.getByRole('button', { name: "Didn't come" })).toHaveCount(0);
+    expect((await visitRowsOnMine(owner)).find((r) => r.id === visitor.visitId).status).toBe('no-show');
   });
 
   test('a slot in the past is refused at booking and at reschedule', async () => {

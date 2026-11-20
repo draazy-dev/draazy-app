@@ -60,6 +60,15 @@ class PlacesLookupWiringTest {
     }
 
     @org.junit.jupiter.api.Test
+    @DisplayName("the dev lookup places the hint in Pune district only when its pin is inside it")
+    void devLookupDerivesTheDistrict() {
+        assertThat(DevPlacesLookup.district(18.52, 73.85)).isEqualTo("Pune");
+        assertThat(DevPlacesLookup.district(18.15, 74.58)).isEqualTo("Pune");
+        assertThat(DevPlacesLookup.district(19.07, 72.87)).isNull();
+        assertThat(DevPlacesLookup.district(null, 73.85)).isNull();
+    }
+
+    @org.junit.jupiter.api.Test
     @DisplayName("the unconfigured lookup reports itself as unavailable rather than crashing the request")
     void unconfiguredIsUnavailable() {
         UnconfiguredPlacesLookup lookup = new UnconfiguredPlacesLookup();

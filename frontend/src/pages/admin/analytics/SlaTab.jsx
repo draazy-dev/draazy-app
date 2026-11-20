@@ -1,24 +1,17 @@
 import { Link } from 'react-router';
 import { LoadFailedNotice } from './constants.jsx';
 
-/** Elapsed hours, or an explicit statement that nobody recorded them. Never `0h`. */
 const hours = (v) => (v == null ? 'not recorded' : `${Math.round(v * 10) / 10}h`);
 
-/** Nullable percentage. A dash rather than `100%`, which would claim perfect compliance. */
 const rate = (v) => (v == null ? '—' : `${v}%`);
 
-/** Target hours as the unit the desk talks in — days once a target runs past two of them. */
 const targetLabel = (h) => (h == null ? '—' : h >= 48 ? `${Math.round(h / 24)}d` : `${h}h`);
 
-/* Grey is 'no measurement', not a performance band, so the
-   null check comes first; green/red are real comparisons. / */
 const avgTone = (avgHours, targetHours) => (
   avgHours == null || targetHours == null ? 'text-gray-500'
     : avgHours <= targetHours ? 'text-emerald-400'
       : 'text-rose-400');
 
-/** Derived figures are nullable and render as a dash or 'not recorded';
- * counts print zero, as 'nothing waiting' is a measurement. */
 function Track({ title, desc, track, completedLabel, outstandingLabel }) {
   if (!track) return null;
   const compliant = track.slaRatePct == null ? null : track.slaRatePct >= 90;
@@ -65,9 +58,7 @@ function Track({ title, desc, track, completedLabel, outstandingLabel }) {
   );
 }
 
-/** No weekly compliance line: it needs snapshots nothing writes. Null averages render 'not recorded', since
- * coercing to 0 would claim instant service and 0% compliance at once. */
-export default function SlaTab({ sla, failed, days }) {
+export default function SlaTab({ sla, failed, days, flatmates }) {
   if (failed) {
     return (
       <LoadFailedNotice>
@@ -80,14 +71,11 @@ export default function SlaTab({ sla, failed, days }) {
 
   const compliant = sla.slaRatePct == null ? null : sla.slaRatePct >= 90;
   const overdue = sla.pendingBreachingCount;
-  /* The target is served, so it can be absent: a missing one read as
-     0 would mark every listing late, so comparisons are suppressed. */
   const target = sla.targetHours;
   const withinTargetLabel = target == null ? 'Within target' : `Within ${target}h target`;
 
   return (
     <div className="space-y-6">
-      {/* Measured: listing review turnaround and the live backlog. */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {[
           [sla.reviewedCount, `Listings reviewed (${days}d)`, 'text-white'],
@@ -111,14 +99,12 @@ export default function SlaTab({ sla, failed, days }) {
         </p>
       ) : null}
 
-      {/* Measured: the actual queue, longest wait first — the one panel here that is actionable. */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <h3 className="text-sm font-semibold text-gray-300 mb-1">Longest Waiting Listings</h3>
         <p className="text-xs text-gray-500 mb-4">Pending review, oldest first.{target == null ? '' : ` Target is ${target} hours.`}</p>
         {sla.worstPending.length === 0 ? (
           <p className="text-sm text-emerald-300">Nothing is waiting for review.</p>
         ) : (
-          // A scrollable region needs keyboard focus to be reachable without a mouse (WCAG 2.1.1).
           // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- named scroll region
           <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Longest waiting listings">
             <table className="w-full text-sm">
@@ -132,8 +118,8 @@ export default function SlaTab({ sla, failed, days }) {
                       {target == null
                         ? <span className="text-[10px] text-gray-500">—</span>
                         : p.hoursWaiting > target
-                        ? <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">Overdue</span>
-                        : <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">On track</span>}
+                        ? <span className="dz-tag bg-rose-500/15 font-semibold text-rose-300">Overdue</span>
+                        : <span className="dz-tag bg-emerald-500/15 font-semibold text-emerald-300">On track</span>}
                     </td>
                   </tr>
                 ))}
@@ -143,8 +129,6 @@ export default function SlaTab({ sla, failed, days }) {
         )}
       </div>
 
-      {/* Pickup is the first assignment in the audit log, not the
-          current owner column, which forgets tickets handed back. */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Track
           title="Ticket Pickup"
@@ -161,16 +145,23 @@ export default function SlaTab({ sla, failed, days }) {
           outstandingLabel="In flight"
         />
       </div>
-      <Track
-        title="Concierge Pipeline"
-        desc="A staff-posted listing from creation to going live. Owner-posted listings are counted under review above, not here."
-        track={sla.conciergeToLive}
-        completedLabel="Went live"
-        outstandingLabel="Still pending"
-      />
+      <div className={flatmates && sla.flatmateReview ? 'grid gap-6 lg:grid-cols-2' : ''}>
+        <Track
+          title="Concierge Pipeline"
+          desc="A staff-posted listing from creation to going live. Owner-posted listings are counted under review above, not here."
+          track={sla.conciergeToLive}
+          completedLabel="Went live"
+          outstandingLabel="Still pending"
+        />
+        <Track
+          title="Flatmate Review"
+          desc="A seeker, room or group post from submission to its first moderation decision."
+          track={flatmates ? sla.flatmateReview : null}
+          completedLabel="Decided"
+          outstandingLabel="Awaiting review"
+        />
+      </div>
 
-      {/* Targets are policy, not measurement — but every one of them is the number the server
-          compared against, so the table cannot drift away from the panels above it. */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <h3 className="text-sm font-semibold text-gray-300 mb-3">SLA Targets</h3>
         <div className="space-y-3">
@@ -179,13 +170,14 @@ export default function SlaTab({ sla, failed, days }) {
             ['Ticket pickup', sla.ticketPickup?.targetHours, 'Assign incoming service requests'],
             ['Service delivery', sla.ticketDelivery?.targetHours, 'Complete rent agreement, legal, etc.'],
             ['Concierge → Live', sla.conciergeToLive?.targetHours, 'Staff-posted property verified & live'],
-          ].map(([name, hoursTarget, desc]) => (
+            flatmates ? ['Flatmate review', sla.flatmateReview?.targetHours, 'Approve or reject new flatmate posts'] : null,
+          ].filter(Boolean).map(([name, hoursTarget, desc]) => (
             <div key={name} className="flex items-center justify-between border-b border-white/5 pb-2.5 last:border-0 last:pb-0">
               <div>
                 <div className="text-sm font-medium text-gray-200">{name}</div>
                 <div className="text-[11px] text-gray-500">{desc}</div>
               </div>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${hoursTarget == null ? 'bg-white/5 text-gray-400' : 'bg-teal-500/15 text-teal-300'}`}>
+              <span className={`dz-tag font-semibold ${hoursTarget == null ? 'bg-white/5 text-gray-400' : 'bg-teal-500/15 text-teal-300'}`}>
                 {hoursTarget == null ? '—' : `< ${targetLabel(hoursTarget)}`}
               </span>
             </div>

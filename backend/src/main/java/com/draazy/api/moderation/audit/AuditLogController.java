@@ -25,10 +25,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-// Admin-only by design: the audit trail holds privileged users to account.
 @RestController
 public class AuditLogController {
-
     private final AuditLogRepository repository;
     private final UserRepository users;
 
@@ -37,7 +35,6 @@ public class AuditLogController {
         this.users = users;
     }
 
-    // entityId makes the log useful for a case; time-only browsing is for daily review.
     @GetMapping(Routes.Admin.AUDIT_LOG)
     @PreAuthorize("hasRole('" + Roles.ADMIN + "') and "
             + BackOfficePermissions.REQUIRE_AUDIT_READ)

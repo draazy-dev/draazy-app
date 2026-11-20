@@ -97,6 +97,6 @@ test('duplicate ID submit opens a misuse report and posts the dispute', async ({
   await page.getByRole('button', { name: 'Send report', exact: true }).click();
 
   await expect(page.getByText('Report sent. Our team will reply within 2 working days.')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'View support tickets' })).toHaveAttribute('href', '/support');
+  await expect(page.getByRole('link', { name: 'Message Draazy support' })).toHaveAttribute('href', '/messages?support=general');
   expect(disputeBody).toEqual({ note: 'This is my PAN.' });
 });

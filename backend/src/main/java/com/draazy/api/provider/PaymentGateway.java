@@ -6,57 +6,62 @@ import com.draazy.api.provider.cashfree.CashfreeProperties;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 
 public interface PaymentGateway {
-
     String CREATE_ORDER = "create-order";
+    String TERMINATE = "terminate-order";
     String REFUND = "refund";
     String WEBHOOK = "webhook";
 
-    // Prefer `#createOrder(long, String, Customer)` so Cashfree can prefill and notify the real payer.
     default PaymentOrder createOrder(long amountInr, String reference) {
         return createOrder(amountInr, reference, null);
     }
 
     PaymentOrder createOrder(long amountInr, String reference, Customer customer);
 
+    default PaymentOrder createOrder(long amountInr, String reference, Customer customer, String returnPath) {
+        return createOrder(amountInr, reference, customer);
+    }
+
+    default void terminate(String orderId) {
+    }
+
     Optional<String> resumeSession(String orderId);
 
-    /** True once the provider holds the money, so an unresumable order is not mistaken for an unpaid one. */
     boolean paid(String orderId);
+
+    boolean lastAttemptFailed(String orderId);
 
     String refund(String orderId, long amountInr, String refundId, String note);
 
-    /** The provider's id for a refund we already sent under {@code refundId}; empty when it never arrived. */
     Optional<String> findRefund(String orderId, String refundId);
 
-    /** A created payment order. {@code paymentSessionId} is single-use and must not be stored. */
     record PaymentOrder(String orderId, String paymentSessionId) {
     }
 
-    /** {@code phone} may be null — the payer authenticates with their own instrument regardless. */
     record Customer(String id, String phone) {
     }
 }
 
-/** Deterministic fake order, no external call, so the pay flow demos without a merchant account. */
-// The real Cashfree rail.
-// The order id is ours because it is echoed on the webhook and is the only link back to the row.
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.cashfree", name = "enabled",
         havingValue = "false", matchIfMissing = true)
 class MockPaymentGateway implements PaymentGateway {
-
     private final ProviderCalls calls;
 
     MockPaymentGateway(ProviderCalls calls) {
@@ -82,6 +87,11 @@ class MockPaymentGateway implements PaymentGateway {
     }
 
     @Override
+    public boolean lastAttemptFailed(String orderId) {
+        return false;
+    }
+
+    @Override
     public String refund(String orderId, long amountInr, String refundId, String note) {
         calls.record(ProviderCalls.CASHFREE, REFUND, ProviderCalls.Outcome.SKIPPED, null, orderId, "mock", null);
         return "mock_refund_" + refundId;
@@ -93,16 +103,14 @@ class MockPaymentGateway implements PaymentGateway {
     }
 }
 
-// The real Cashfree rail.
-// Vendor orders use our id so webhooks link back and expire with our sweep TTL.
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.cashfree", name = "enabled", havingValue = "true")
 class CashfreePaymentGateway implements PaymentGateway {
-
-    /** The Payment Gateway product is versioned separately from Secure ID (KYC). */
     private static final String API_VERSION = "2025-01-01";
 
     private static final String PLACEHOLDER_PHONE = "9999999999";
+
+    private static final Set<String> FAILED_ATTEMPTS = Set.of("FAILED", "USER_DROPPED", "VOID", "CANCELLED");
 
     private static final String NOTIFY_URL_REQUIREMENT =
             "draazy.providers.cashfree.notify-url (CASHFREE_NOTIFY_URL) must be blank or an "
@@ -111,17 +119,23 @@ class CashfreePaymentGateway implements PaymentGateway {
     private final CashfreeClient cashfree;
     private final CheckoutTtl ttl;
     private final String notifyUrl;
+    private final String returnBase;
     private final ProviderCalls calls;
 
     CashfreePaymentGateway(CashfreeClient cashfree, CheckoutTtl ttl, CashfreeProperties props,
-            ProviderCalls calls) {
+            ProviderCalls calls, @Value("${draazy.app.base-url:}") String appBaseUrl) {
         this.cashfree = cashfree;
         this.ttl = ttl;
         this.notifyUrl = requireHttpsOrBlank(props.notifyUrl());
+        this.returnBase = httpsOrBlank(appBaseUrl);
         this.calls = calls;
     }
 
-    // Cashfree POSTs the phone, amount and HMAC here, so a typo'd `http://` would put all of it in cleartext.
+    private static String httpsOrBlank(String base) {
+        String trimmed = base == null ? "" : base.trim();
+        return trimmed.regionMatches(true, 0, "https://", 0, 8) ? trimmed.replaceAll("/+$", "") : "";
+    }
+
     private static String requireHttpsOrBlank(String configured) {
         if (configured == null || configured.isBlank()) {
             return "";
@@ -134,8 +148,6 @@ class CashfreePaymentGateway implements PaymentGateway {
             throw new IllegalStateException(NOTIFY_URL_REQUIREMENT + " Got: " + trimmed, malformed);
         }
 
-        // equalsIgnoreCase because RFC 3986 makes the scheme case-insensitive and URI does not fold
-        // it: a guard meant to catch a typo must not itself invent one.
         if (!"https".equalsIgnoreCase(parsed.getScheme()) || parsed.getHost() == null) {
             throw new IllegalStateException(NOTIFY_URL_REQUIREMENT + " Got: " + trimmed);
         }
@@ -144,6 +156,11 @@ class CashfreePaymentGateway implements PaymentGateway {
 
     @Override
     public PaymentOrder createOrder(long amountInr, String reference, Customer customer) {
+        return createOrder(amountInr, reference, customer, null);
+    }
+
+    @Override
+    public PaymentOrder createOrder(long amountInr, String reference, Customer customer, String returnPath) {
         String orderId = "dz_" + UUID.randomUUID();
         String customerId = customer != null && customer.id() != null && !customer.id().isBlank()
                 ? customer.id()
@@ -151,6 +168,7 @@ class CashfreePaymentGateway implements PaymentGateway {
         String phone = customer != null && customer.phone() != null && !customer.phone().isBlank()
                 ? customer.phone()
                 : PLACEHOLDER_PHONE;
+        String returnUrl = returnBase.isEmpty() || returnPath == null ? null : returnBase + returnPath;
 
         String sessionId = calls.track(ProviderCalls.CASHFREE, CREATE_ORDER,
                 PLACEHOLDER_PHONE.equals(phone) ? null : phone, orderId, () -> {
@@ -158,13 +176,11 @@ class CashfreePaymentGateway implements PaymentGateway {
                             "/pg/orders",
                             API_VERSION,
                             orderRequest(new OrderSpec(orderId, amountInr, reference,
-                                    new Customer(customerId, phone), ttl.expiryFrom(Instant.now()), notifyUrl)),
+                                    new Customer(customerId, phone), ttl.expiryFrom(Instant.now()), notifyUrl,
+                                    returnUrl)),
                             OrderResponse.class);
                     if (response == null || response.payment_session_id() == null
                             || response.payment_session_id().isBlank()) {
-
-                        // A 2xx with no session id is a broken vendor contract, not a caller mistake, so it
-                        // surfaces as a 500. Transport failures never reach here — CashfreeClient.post throws.
                         throw new IllegalStateException(
                                 "Cashfree returned no payment_session_id for order " + orderId);
                     }
@@ -179,9 +195,33 @@ class CashfreePaymentGateway implements PaymentGateway {
     }
 
     @Override
+    public void terminate(String orderId) {
+        calls.track(ProviderCalls.CASHFREE, TERMINATE, null, orderId, () -> {
+            cashfree.patch("/pg/orders/" + orderId, API_VERSION, Map.of("order_status", "TERMINATED"),
+                    OrderResponse.class);
+        });
+    }
+
+    @Override
     public boolean paid(String orderId) {
         OrderResponse order = cashfree.get("/pg/orders/" + orderId, API_VERSION, OrderResponse.class);
         return order != null && "PAID".equals(order.order_status());
+    }
+
+    @Override
+    public boolean lastAttemptFailed(String orderId) {
+        return newestFailed(cashfree.get("/pg/orders/" + orderId + "/payments", API_VERSION, Payment[].class));
+    }
+
+    static boolean newestFailed(Payment[] payments) {
+        if (payments == null || payments.length == 0
+                || Arrays.stream(payments).anyMatch(p -> "SUCCESS".equals(p.payment_status()))) {
+            return false;
+        }
+        Payment newest = Arrays.stream(payments)
+                .max(Comparator.comparing(Payment::at, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .orElseThrow();
+        return FAILED_ATTEMPTS.contains(newest.payment_status());
     }
 
     static Optional<String> resumable(OrderResponse order) {
@@ -226,7 +266,7 @@ class CashfreePaymentGateway implements PaymentGateway {
     }
 
     record OrderSpec(String orderId, long amountInr, String reference, Customer customer, Instant expiresAt,
-            String notifyUrl) {
+            String notifyUrl, String returnUrl) {
     }
 
     static Map<String, Object> orderRequest(OrderSpec order) {
@@ -239,24 +279,35 @@ class CashfreePaymentGateway implements PaymentGateway {
         body.put("customer_details", Map.of(
                 "customer_id", order.customer().id(),
                 "customer_phone", order.customer().phone()));
+        Map<String, Object> meta = new LinkedHashMap<>();
         if (order.notifyUrl() != null && !order.notifyUrl().isBlank()) {
-            body.put("order_meta", Map.of("notify_url", order.notifyUrl().trim()));
+            meta.put("notify_url", order.notifyUrl().trim());
+        }
+        if (order.returnUrl() != null) {
+            meta.put("return_url", order.returnUrl());
+        }
+        if (!meta.isEmpty()) {
+            body.put("order_meta", meta);
         }
         return body;
     }
 
-    /** UTC and second-precision because a vendor parser may reject an offset or nanoseconds. */
     private static String expiryFormat(Instant expiresAt) {
         return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
                 expiresAt.truncatedTo(ChronoUnit.SECONDS).atOffset(ZoneOffset.UTC));
     }
 
-    /** Reduce a {@code reference} to Cashfree's {@code customer_id} charset, stable per buyer. */
     private static String sanitise(String reference) {
         String cleaned = reference == null ? "" : reference.replaceAll("[^A-Za-z0-9_-]", "_");
         return cleaned.isBlank() ? "guest_" + UUID.randomUUID() : cleaned;
     }
 
     record OrderResponse(String order_id, String payment_session_id, String order_status) {
+    }
+
+    record Payment(String payment_status, String payment_time) {
+        Instant at() {
+            return payment_time == null ? null : OffsetDateTime.parse(payment_time).toInstant();
+        }
     }
 }

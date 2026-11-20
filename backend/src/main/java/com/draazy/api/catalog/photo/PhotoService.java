@@ -14,20 +14,19 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class PhotoService {
-
     private static final Logger log = LoggerFactory.getLogger(PhotoService.class);
 
     private final FileStorage storage;
     private final PhotoKeys keys;
+    private final PhotoUploadQuota quota;
 
-    public PhotoService(FileStorage storage, PhotoKeys keys) {
+    public PhotoService(FileStorage storage, PhotoKeys keys, PhotoUploadQuota quota) {
         this.storage = storage;
         this.keys = keys;
+        this.quota = quota;
     }
 
     public PhotoDto upload(UUID ownerId, MultipartFile file) {
-
-        // Reject a known oversized upload before buffering; validation also checks the actual bytes.
         if (file.getSize() >= PhotoUploads.MAX_BYTES) {
             throw new PayloadTooLargeException("Photos must be smaller than 1,000,000 bytes (1 MB)");
         }
@@ -41,22 +40,35 @@ public class PhotoService {
         if (hash != null) {
             key += "-" + PhotoHash.toHex(hash);
         }
+        quota.reserve(ownerId, key);
         storeVariants(key, bytes);
         return new PhotoDto(storage.storePublic(key, bytes, type));
     }
 
-    // Copies first, so a URL this returns never has a missing copy. Best effort: a card whose copy is
-    // missing (an older or undecodable photo) falls back to the original in PropertyImage.jsx.
-    private void storeVariants(String key, byte[] bytes) {
+    public void delete(String url) {
+        String prefix = storage.publicUrlPrefix();
+        if (url == null || !url.startsWith(prefix)) {
+            return;
+        }
+        String key = url.substring(prefix.length());
+        if (!keys.isPhotoKey(key)) {
+            return;
+        }
+        storage.deletePublic(key);
+        PhotoVariants.allKeys(key).forEach(storage::deletePublic);
+    }
+
+    boolean storeVariants(String key, byte[] bytes) {
         Map<Integer, byte[]> variants;
         try {
             variants = PhotoVariants.of(bytes);
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException | LinkageError e) {
             log.warn("No card-size copies for {}: {}", key, e.toString());
-            return;
+            return false;
         }
-        variants.forEach((width, jpeg) ->
-                storage.storePublic(PhotoVariants.key(key, width), jpeg, MediaSignatures.JPEG));
+        variants.forEach((width, webp) ->
+                storage.storePublic(PhotoVariants.key(key, width), webp, MediaSignatures.WEBP));
+        return !variants.isEmpty();
     }
 
     private static byte[] readBytes(MultipartFile file) {

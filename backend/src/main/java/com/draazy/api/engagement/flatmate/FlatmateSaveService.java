@@ -4,6 +4,9 @@ import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.identity.user.UserStatuses;
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -17,12 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The save stores the key only and the card is joined on read, so a shortlist never shows stale rent or a
- * withdrawn room; rows are anonymous because shortlisting is not an introduction. */
 @Service
 public class FlatmateSaveService {
-
-    /** The three tables a save may point at, as they are spelled in the path and the check constraint. */
     static final String KIND_ROOM = "room";
     static final String KIND_GROUP = "group";
     static final String KIND_POST = "post";
@@ -50,8 +49,6 @@ public class FlatmateSaveService {
         this.users = users;
     }
 
-    /** Saved order is restored because {@code findAllById} does not guarantee it; a save whose target is gone
-     * drops from content but still counts in {@code totalElements}. */
     @Transactional(readOnly = true)
     public Page<Object> listSaved(UUID userId, Pageable pageable) {
         Page<FlatmateSaveRepository.SaveRow> page = saves.findSaves(userId, pageable);
@@ -62,7 +59,6 @@ public class FlatmateSaveService {
         return new PageImpl<>(content, page.getPageable(), page.getTotalElements());
     }
 
-    /** Keys rather than cards: the board already holds the cards and only asks a yes/no question about each. */
     @Transactional(readOnly = true)
     public List<FlatmateSaveKeyDto> listKeys(UUID userId) {
         return saves.findAllSaves(userId).stream()
@@ -70,8 +66,6 @@ public class FlatmateSaveService {
                 .toList();
     }
 
-    /** Existence is checked first: {@code post_id} has no foreign key, so a typo would be stored and
-     * reappear forever as a row that renders nothing. */
     @Transactional
     public void save(UUID userId, String kind, UUID postId) {
         String resolved = requireKind(kind);
@@ -81,19 +75,14 @@ public class FlatmateSaveService {
         saves.insertIfAbsent(userId, resolved, postId);
     }
 
-    /** Idempotently un-shortlist. 204 whether or not a row existed. */
     @Transactional
     public void unsave(UUID userId, String kind, UUID postId) {
         saves.delete(userId, requireKind(kind), postId);
     }
 
-    /* ─── internals ────────────────────────────────────────────────────────────────────────── */
-
     private static String requireKind(String kind) {
         String resolved = kind == null ? "" : kind.trim().toLowerCase(java.util.Locale.ROOT);
         if (!KINDS.contains(resolved)) {
-            /* BadRequest rather than Validation: {@code kind} is a contract path enum, so a value outside it
-               makes the request malformed in itself. */
             throw new BadRequestException("kind must be one of room, group, post");
         }
         return resolved;
@@ -107,47 +96,56 @@ public class FlatmateSaveService {
         };
     }
 
-    /** Uses {@code archived}, not {@code isVisible()}: a post in a re-moderation window should stay shortlisted,
-     * a withdrawn one should not. */
     private boolean exists(String kind, UUID postId) {
         return switch (kind) {
-            case KIND_ROOM -> rooms.findById(postId).filter(row -> !row.isArchived()).isPresent();
-            case KIND_GROUP -> groups.findById(postId).filter(row -> !row.isArchived()).isPresent();
-            default -> posts.findById(postId).filter(row -> !row.isArchived()).isPresent();
+            case KIND_ROOM -> rooms.findVisible(postId).isPresent();
+            case KIND_GROUP -> groups.findVisible(postId).isPresent();
+            default -> posts.findVisible(postId).isPresent();
         };
     }
 
-    /** Room cards go through {@link FlatmateRoomCards} so {@code flatCommitted} has exactly one definition. */
     private List<Object> render(List<FlatmateSaveRepository.SaveRow> window) {
-        Map<UUID, FlatmateRoom> roomById = byId(
-                live(rooms.findAllById(idsOf(window, KIND_ROOM)), FlatmateRoom::isArchived),
-                FlatmateRoom::getId);
-        Map<UUID, FlatmateGroup> groupById = byId(
-                live(groups.findAllById(idsOf(window, KIND_GROUP)), FlatmateGroup::isArchived),
-                FlatmateGroup::getId);
-        Map<UUID, FlatmateSeekerPost> postById = byId(
-                live(posts.findAllById(idsOf(window, KIND_POST)), FlatmateSeekerPost::isArchived),
-                FlatmateSeekerPost::getId);
+        List<FlatmateRoom> roomRows = visible(rooms.findAllById(idsOf(window, KIND_ROOM)), FlatmateRoom::isVisible);
+        List<FlatmateGroup> groupRows = visible(groups.findAllById(idsOf(window, KIND_GROUP)), FlatmateGroup::isVisible);
+        List<FlatmateSeekerPost> postRows =
+                visible(posts.findAllById(idsOf(window, KIND_POST)), FlatmateSeekerPost::isVisible);
 
         List<UUID> hostIds = java.util.stream.Stream.of(
-                        roomById.values().stream().map(FlatmateRoom::getHostId),
-                        groupById.values().stream().map(FlatmateGroup::getHostId),
-                        postById.values().stream().map(FlatmateSeekerPost::getUserId))
+                        roomRows.stream().map(FlatmateRoom::getHostId),
+                        groupRows.stream().map(FlatmateGroup::getHostId),
+                        postRows.stream().map(FlatmateSeekerPost::getUserId))
                 .flatMap(Function.identity())
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        Map<UUID, String> names = users.findAllById(hostIds).stream()
+        List<User> hosts = users.findAllById(hostIds).stream()
+                .filter(user -> UserStatuses.ACTIVE.equals(user.getStatus()) && !user.isArchived())
+                .toList();
+        Set<UUID> active = hosts.stream().map(User::getId).collect(Collectors.toSet());
+        Map<UUID, String> names = hosts.stream()
                 .filter(user -> user.getName() != null)
                 .collect(Collectors.toMap(User::getId, User::getName));
+
+        Map<UUID, FlatmateRoom> roomById = byId(
+                roomRows.stream().filter(r -> active.contains(r.getHostId())).toList(), FlatmateRoom::getId);
+        Map<UUID, FlatmateGroup> groupById = byId(
+                groupRows.stream().filter(g -> active.contains(g.getHostId())).toList(), FlatmateGroup::getId);
+        Map<UUID, FlatmateSeekerPost> postById = byId(
+                postRows.stream().filter(p -> active.contains(p.getUserId())).toList(), FlatmateSeekerPost::getId);
 
         Map<UUID, FlatmateMapper.RoomView> roomViews = cards.anonymousViews(roomById.values(), names);
         Map<UUID, String> verdicts = reviewStatuses.forGroups(groupById.values());
 
         return window.stream()
-                .map(row -> card(row, roomById, groupById, postById, roomViews, names, verdicts))
+                .map(row -> {
+                    Object card = card(row, roomById, groupById, postById, roomViews, names, verdicts);
+                    return card == null ? null : (Object) new SavedFlatmateCard(card, row.getSavedAt());
+                })
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    public record SavedFlatmateCard(@JsonUnwrapped Object card, Instant savedAt) {
     }
 
     private Object card(FlatmateSaveRepository.SaveRow row, Map<UUID, FlatmateRoom> roomById,
@@ -185,9 +183,7 @@ public class FlatmateSaveService {
                 (first, duplicate) -> first));
     }
 
-    /** Withdrawn rows leave {@code content} but not {@code totalElements}: a shortlist may be a card short,
-     * never a card that renders nothing. */
-    private static <T> List<T> live(List<T> rows, java.util.function.Predicate<T> archived) {
-        return rows.stream().filter(archived.negate()).toList();
+    private static <T> List<T> visible(List<T> rows, java.util.function.Predicate<T> isVisible) {
+        return rows.stream().filter(isVisible).toList();
     }
 }

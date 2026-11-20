@@ -14,10 +14,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Three tabs of one page over tables owned by {@code leads} and {@code deals}, kept out of those contexts. */
 @RestController
 public class EnquiryBoardController {
-
     private static final String ENQUIRIES_READ =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "') and "
                     + BackOfficePermissions.REQUIRE_ENQUIRIES_READ;
@@ -28,7 +26,6 @@ public class EnquiryBoardController {
         this.service = service;
     }
 
-    /** {@code GET /admin/enquiries} — {@code pending}, {@code approved}, {@code declined}; absent means all. */
     @GetMapping(Routes.Moderation.ADMIN_ENQUIRIES)
     @PreAuthorize(ENQUIRIES_READ)
     public PageResponse<AdminEnquiryDto> enquiries(
@@ -39,7 +36,6 @@ public class EnquiryBoardController {
         return PageResponse.of(service.enquiries(status, q, days, pageable), dto -> dto);
     }
 
-    /** {@code GET /admin/visits} — {@code scheduled}, {@code completed}, {@code cancelled}. */
     @GetMapping(Routes.Moderation.ADMIN_VISITS)
     @PreAuthorize(ENQUIRIES_READ)
     public PageResponse<AdminVisitDto> visits(
@@ -50,7 +46,6 @@ public class EnquiryBoardController {
         return PageResponse.of(service.visits(status, q, days, pageable), dto -> dto);
     }
 
-    /** {@code GET /admin/deals} — {@code active}, {@code reserved}, {@code closed}. */
     @GetMapping(Routes.Moderation.ADMIN_DEALS)
     @PreAuthorize(ENQUIRIES_READ)
     public PageResponse<AdminDealDto> deals(
@@ -62,7 +57,6 @@ public class EnquiryBoardController {
         return PageResponse.of(service.deals(status, deal, q, days, pageable), dto -> dto);
     }
 
-    /** Board totals plus the funnel; {@code days} and {@code deal} narrow only the funnel. */
     @GetMapping(Routes.Moderation.ADMIN_ENQUIRIES_SUMMARY)
     @PreAuthorize(ENQUIRIES_READ)
     public AdminEnquirySummary summary(
@@ -71,7 +65,6 @@ public class EnquiryBoardController {
         return service.summary(days, deal);
     }
 
-    // Detail reads write an audit row: opening one person's row is logged, browsing the list is not.
     @GetMapping(Routes.Moderation.ADMIN_ENQUIRY_BY_ID)
     @PreAuthorize(ENQUIRIES_READ)
     public AdminEnquiryDto enquiry(@CurrentUser AuthPrincipal actor, @PathVariable String id) {

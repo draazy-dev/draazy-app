@@ -15,10 +15,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-/** Scrubs, caps and dedupes browser error reports into {@code error_event}. Never reveals dedup to the caller. */
 @Service
 public class ClientErrorService {
-
     static final int NEW_FINGERPRINTS_PER_DAY = 200;
     static final int NEW_ANONYMOUS_PER_DAY = 150;
     static final int MAX_WEB_ROWS = 1_000;
@@ -43,7 +41,6 @@ public class ClientErrorService {
         this.perCaller = stores.create("ce", NEW_PER_CALLER_PER_DAY, Duration.ofDays(1));
     }
 
-    /** {@code callerKey} names the reporter: a user id when signed in, else the client address. */
     public void record(ClientErrorRequest body, AuthPrincipal principal, String callerKey) {
         String name = LogScrubber.scrub(body.name(), MAX_SHORT);
         String message = LogScrubber.scrub(body.message(), ErrorEventStore.MAX_MESSAGE);
@@ -75,8 +72,6 @@ public class ClientErrorService {
                 "SELECT EXISTS (SELECT 1 FROM error_event WHERE fingerprint = ?)", Boolean.class, fingerprint));
     }
 
-    // One caller's own budget comes first, so a few addresses cannot spend the shared caps; part of the daily cap
-    // is held back for signed-in users.
     private boolean admitNew(String callerKey, boolean anonymous) {
         String refusal = perCaller.tryAcquire(callerKey, Instant.now()) > 0 ? "this caller's daily budget"
                 : !roomForNewWebError(anonymous ? NEW_ANONYMOUS_PER_DAY : NEW_FINGERPRINTS_PER_DAY) ? "the shared cap"
@@ -117,7 +112,6 @@ public class ClientErrorService {
         }
     }
 
-    // Query and fragment are dropped: the page URL can carry a share token.
     private static String path(String raw) {
         int cut = raw.indexOf('?');
         int hash = raw.indexOf('#');
@@ -125,7 +119,6 @@ public class ClientErrorService {
         return end < 0 ? raw : raw.substring(0, end);
     }
 
-    // Line and column move with every build, so they are left out of the identity of a crash.
     private static String firstFrame(String stack) {
         if (stack == null) {
             return "";

@@ -27,10 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
-// Engagement slice proof: saved properties, society follows, saved searches and notifications.
-// Load-bearing assertions are caller scope, idempotency, FK validation and envelope shape.
 class EngagementEndpointsTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired JwtService jwtService;
     @Autowired UserRepository users;
@@ -84,7 +81,8 @@ class EngagementEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(p.getId().toString()))
-                .andExpect(jsonPath("$.content[0].title").value("Test flat"));
+                .andExpect(jsonPath("$.content[0].title").value("Test flat"))
+                .andExpect(jsonPath("$.content[0].savedAt").isNotEmpty());
     }
 
     @Test
@@ -141,6 +139,28 @@ class EngagementEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void listSaved_hidesASuspendedOwnersListingLikeSearchDoes() throws Exception {
+        User buyer = user("9820100191");
+        User owner = user("9820100192");
+        Property kept = listing(buyer, PropertyStatus.APPROVED);
+        Property suspendedOwners = listing(owner, PropertyStatus.APPROVED);
+        String auth = bearer(buyer);
+        for (Property p : List.of(kept, suspendedOwners)) {
+            mvc.perform(put("/me/saved/" + p.getId()).header(HttpHeaders.AUTHORIZATION, auth))
+                    .andExpect(status().isNoContent());
+        }
+        jdbc.update("update users set status = 'suspended' where id = ?", owner.getId());
+
+        mvc.perform(get("/me/saved").header(HttpHeaders.AUTHORIZATION, auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(kept.getId().toString()));
+        mvc.perform(get("/me/saved/keys").header(HttpHeaders.AUTHORIZATION, auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
     void saveTwice_idempotent() throws Exception {
         User u = user("9820100003");
         Property p = listing(u);
@@ -171,7 +191,6 @@ class EngagementEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-    /** Invariant 1: user A cannot see user B's saved properties. */
     @Test
     void savedProperties_callerScoped() throws Exception {
         User a = user("9820100006");
@@ -276,7 +295,6 @@ class EngagementEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.length()").value(1));
     }
 
-    /** Invariant 1: user A cannot see user B's saved searches. */
     @Test
     void savedSearches_callerScoped() throws Exception {
         User a = user("9820100021");
@@ -358,7 +376,6 @@ class EngagementEndpointsTest extends AbstractApiTest {
 
                 .andExpect(jsonPath("$.query").doesNotExist());
 
-        // The other half of the rule: flatmates without criteria is still a validation failure.
         mvc.perform(post("/me/saved-searches")
                         .header(HttpHeaders.AUTHORIZATION, auth)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -387,7 +404,6 @@ class EngagementEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    /** Same guard on the delivery channel. */
     @Test
     void createSavedSearch_invalidChannel_returns422NotServerError() throws Exception {
         User u = user("9820100028");
@@ -398,8 +414,6 @@ class EngagementEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    // Every legacy value the contract lists must be accepted — the pattern must not be over-tight.
-    // This test is only about the accepted vocabulary, not the count limit.
     @Test
     void createSavedSearch_allContractVocabularyAccepted() throws Exception {
         int i = 0;
@@ -418,8 +432,6 @@ class EngagementEndpointsTest extends AbstractApiTest {
         }
     }
 
-    // The field is `Object`, so Bean Validation cannot attach `@Size`.
-    // Without this bound, every list read re-serializes unbounded JSONB.
     @Test
     void createSavedSearch_oversizedFilters_returns400() throws Exception {
         User u = user("9820100033");
@@ -434,7 +446,6 @@ class EngagementEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
-    /** A realistic facet set is well inside the bound and must still be accepted. */
     @Test
     void createSavedSearch_normalFiltersAccepted() throws Exception {
         User u = user("9820100034");
@@ -514,6 +525,26 @@ class EngagementEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void listNotifications_readFilterSplitsTheInbox() throws Exception {
+        User u = user("9820100049");
+        jdbc.update("insert into notifications (user_id, type, title, read) values (?, 'info', 'Fresh', false)",
+                u.getId());
+        jdbc.update("insert into notifications (user_id, type, title, read) values (?, 'info', 'Seen', true)",
+                u.getId());
+
+        mvc.perform(get("/notifications?read=false").header(HttpHeaders.AUTHORIZATION, bearer(u)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Fresh"));
+        mvc.perform(get("/notifications?read=true").header(HttpHeaders.AUTHORIZATION, bearer(u)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Seen"));
+        mvc.perform(get("/notifications?read=maybe").header(HttpHeaders.AUTHORIZATION, bearer(u)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void notifications_absurdSize_clamped() throws Exception {
         User u = user("9820100031");
         mvc.perform(get("/notifications?size=100000")
@@ -522,8 +553,6 @@ class EngagementEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.size").value(100));
     }
 
-    // Skipping bad ids would turn an all-garbage list into "mark all read";
-    // a client typo must not clear the inbox.
     @Test
     void markRead_malformedId_returns400NotServerError() throws Exception {
         User u = user("9820100032");
@@ -549,7 +578,6 @@ class EngagementEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    /** Invariant 2: mark-read with specific ids only touches the caller's rows. */
     @Test
     void markRead_specificIds_callerScoped() throws Exception {
         User a = user("9820100033");
@@ -597,7 +625,6 @@ class EngagementEndpointsTest extends AbstractApiTest {
         assertThat(bUnread).isOne();
     }
 
-    /** Invariant 1: user A cannot see user B's notifications. */
     @Test
     void notifications_callerScoped() throws Exception {
         User a = user("9820100037");

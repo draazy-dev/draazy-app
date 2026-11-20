@@ -1,5 +1,3 @@
-/* User-visible values here are i18n keys, not copy: this module has no React context, so components resolve them at render. */
-
 const NOW_YEAR = new Date().getFullYear();
 
 const HERO = [
@@ -17,7 +15,6 @@ const SOC_AMEN = {
   spa: ['society.amenSpa', 'sparkles'],
 };
 
-/* Stored on each review as the category id, so ids must stay stable English; labels come from society.cat<Id>. */
 const REVIEW_CATS = ['Safety', 'Maintenance', 'Management', 'Amenities', 'Connectivity'];
 const REVIEW_CAT_KEYS = {
   Safety: 'society.catSafety',

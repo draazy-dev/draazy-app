@@ -18,11 +18,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Desk verdicts gate drafting/registration on verified papers.
-// Stale document ids 409 so old reviews cannot bless re-uploads.
 @Service
 public class ServiceRequestDocumentReviews {
-
     private static final int REASON_MAX = 300;
     private static final int NAMED_AT_MOST = 6;
 
@@ -46,7 +43,6 @@ public class ServiceRequestDocumentReviews {
         this.ownerSide = ownerSide;
     }
 
-    // Checklist is built from the same DTO document list, so GET and checklist cannot drift.
     @Transactional(readOnly = true)
     public ServiceRequestChecklistDto checklist(AuthPrincipal caller, String id) {
         return checklistOf(requests.visible(caller, id), caller);
@@ -142,8 +138,8 @@ public class ServiceRequestDocumentReviews {
 
     private void tellUploader(ServiceRequest request, String slug, String name, String reason) {
         String side = RentAgreementReadiness.sideOf(slug);
-        Set<UUID> recipients = parties.findByRequestId(request.getId()).stream().filter(p -> p.getUserId() != null && CoFillParties.ACCEPTED.equals(p.getStatus())
-                        && p.getRole().equals(side)).map(ServiceRequestParty::getUserId).collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<UUID> recipients = CoFillParties.joined(parties.findByRequestId(request.getId()))
+                .filter(p -> p.getRole().equals(side)).map(ServiceRequestParty::getUserId).collect(Collectors.toCollection(LinkedHashSet::new));
         if (recipients.isEmpty()) {
             recipients.add(request.getRequesterId());
         }

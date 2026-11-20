@@ -4,6 +4,10 @@ import { API, E2E_OTP, apiLogin, completeProfileIfAsked, seedConsent, signIn, un
 /* Locators are scoped to `#root`: `index.html` ships a hidden `pmf-lead` form as a sibling of it for
    Netlify's build bot, so an unscoped `input[type="tel"]` matches two elements and fails strict mode. */
 const WRONG_OTP = E2E_OTP === '111111' ? '222222' : '111111';
+// The app's own module instance (same URL under Vite), since the access token lives only in its memory.
+const heldTokens = (page) => page.evaluate(async () => (await import('/src/lib/auth.js')).readTokens()).catch(() => null);
+const heldAccessToken = async (page) => (await heldTokens(page))?.accessToken ?? null;
+const storedTokens = (page) => page.evaluate(() => localStorage.getItem('draazyTokens') ?? sessionStorage.getItem('draazyTokens'));
 
 async function fillOtp(page, code = E2E_OTP) {
   for (let i = 0; i < 6; i++) {
@@ -22,6 +26,12 @@ test('Sign In and Sign Up show no Google/Apple SSO', async ({ page }) => {
       if (path === '/signin') await expect(page.locator('#signin-mobile')).toBeVisible();
     });
   }
+});
+test('Sign In links the Terms and Privacy Policy, since a first sign-in creates the account', async ({ page }) => {
+  await page.goto('/signin');
+  const root = page.locator('#root');
+  await expect(root.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', '/terms');
+  await expect(root.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy');
 });
 test('Sign In does not disclose whether a number is registered', async ({ page }) => {
   /* Both halves in one test: "the unknown number went to OTP" is only evidence of non-disclosure if
@@ -158,9 +168,10 @@ test('the refresh token is unreadable by scripts, and the session renews anyway'
   await page.goto('/dashboard');
 
   // Scripts must not be able to read the refresh token.
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('draazyTokens') || '{}'));
-  expect(stored.accessToken).toBeTruthy();
-  expect(stored.refreshToken).toBeUndefined();
+  const held = await heldTokens(page);
+  expect(held?.accessToken).toBeTruthy();
+  expect(held.refreshToken).toBeUndefined();
+  expect(await storedTokens(page), 'the access token was persisted where an injected script can read it').toBeNull();
 
   // `document.cookie` is the exact view an injected payload has, so the name's absence from it is
   // the direct statement of what HttpOnly buys.
@@ -175,21 +186,20 @@ test('the refresh token is unreadable by scripts, and the session renews anyway'
 
   /* Tampering, not deletion, is what reaches the 401 recovery, and the signature is *flipped* rather
      than extended — see `docs/flows/consumer/auth.md`. */
-  await page.evaluate(() => {
-    const t = JSON.parse(localStorage.getItem('draazyTokens'));
-    const [header, payload, signature] = t.accessToken.split('.');
-    const corrupted = (signature[0] === 'A' ? 'B' : 'A') + signature.slice(1);
-    localStorage.setItem('draazyTokens',
-      JSON.stringify({ ...t, accessToken: [header, payload, corrupted].join('.') }));
-  });
-  const tampered = await page.evaluate(() => JSON.parse(localStorage.getItem('draazyTokens')).accessToken);
+  // Planted where older builds stored it, which the boot adopts: the one way to make a reload present it.
+  const tampered = await page.evaluate((token) => {
+    const [header, payload, signature] = token.split('.');
+    const corrupted = [header, payload, (signature[0] === 'A' ? 'B' : 'A') + signature.slice(1)].join('.');
+    localStorage.setItem('draazyTokens', JSON.stringify({ accessToken: corrupted }));
+    return corrupted;
+  }, held.accessToken);
 
   await page.reload();
   /* Poll on *usable and new* as one conjunction — either half alone passes against a real bug, and
      the sentence makes the failure diff say which. See `docs/flows/consumer/auth.md`. */
   await expect
     .poll(async () => {
-      const t = await page.evaluate(() => JSON.parse(localStorage.getItem('draazyTokens') || '{}').accessToken);
+      const t = await heldAccessToken(page);
       if (!t) return 'signed out — the store was cleared instead of renewed';
       if (t === tampered) return 'still the tampered token';
       return /^[\w-]+\.[\w-]+\.[\w-]+$/.test(t) ? 'renewed' : 'replaced by something that is not a JWT';
@@ -224,13 +234,13 @@ test('a session survives web storage being wiped, as it must on Safari after sev
   await expect(page, 'the wiped session was not recovered from the refresh cookie')
     .toHaveURL(/\/dashboard/, { timeout: 20_000 });
   await expect
-    .poll(async () => page.evaluate(() => JSON.parse(localStorage.getItem('draazyTokens') || '{}').accessToken),
+    .poll(() => heldAccessToken(page),
       { timeout: 15_000, message: 'no access token was minted from the surviving refresh cookie' })
     .toEqual(expect.stringMatching(/^[\w-]+\.[\w-]+\.[\w-]+$/));
 
   // Recovery preserves the user's persistent-session choice.
-  expect(await page.evaluate(() => localStorage.getItem('draazyTokens')),
-    'the recovered session was demoted to the tab-scoped tier').not.toBeNull();
+  expect((await context.cookies()).find((c) => c.name === 'draazy_session')?.value,
+    'the recovered session was demoted to the tab-scoped tier').toBe('1');
   const rt = (await context.cookies()).find((c) => c.name === 'draazy_rt');
   expect(rt.expires, 'the rotated refresh cookie lost its 30-day lifetime').toBeGreaterThan(0);
 });
@@ -282,14 +292,14 @@ test('the same rescue does not promote a session the user declined to have remem
   await expect(page, 'the wiped session was not recovered from the refresh cookie')
     .toHaveURL(/\/dashboard/, { timeout: 20_000 });
   await expect
-    .poll(async () => page.evaluate(() => sessionStorage.getItem('draazyTokens')),
+    .poll(() => heldAccessToken(page),
       { timeout: 15_000, message: 'no access token was minted from the surviving refresh cookie' })
     .not.toBeNull();
 
   // Asserted separately because they fail independently: the client decides which tier to write,
   // the server decides the cookie's lifetime.
-  expect(await page.evaluate(() => localStorage.getItem('draazyTokens')),
-    'the rescue promoted a declined session to the persistent tier').toBeNull();
+  expect((await context.cookies()).find((c) => c.name === 'draazy_session')?.value,
+    'the rescue promoted a declined session to the persistent tier').toBe('0');
   expect((await context.cookies()).find((c) => c.name === 'draazy_rt').expires,
     'the rescue traded a session cookie for a 30-day one the user did not ask for').toBe(-1);
 });
@@ -305,7 +315,7 @@ test('signing out leaves nothing that claims a session', async ({ page, context 
   await page.request.post('/api/auth/logout', {
     headers: {
       Authorization: `Bearer ${await page.evaluate(
-        () => JSON.parse(localStorage.getItem('draazyTokens')).accessToken)}`,
+        async () => (await import('/src/lib/auth.js')).readAccessToken())}`,
     },
   });
 
@@ -323,10 +333,14 @@ test('a sign-out the server never hears about still ends the session here', asyn
     'no hint to clear — the rest of this test would pass vacuously').toBeTruthy();
 
   await page.route('**/api/auth/logout', (route) => route.abort('connectionfailed'));
-  await page.getByRole('button', { name: 'Account menu' }).click();
   // The navbar renders the desktop dropdown and the mobile drawer into the same tree, so the label
   // matches twice; only one of them is on screen at this viewport.
-  await page.getByRole('button', { name: 'Log out', exact: true }).and(page.locator(':visible')).click();
+  const logOut = page.getByRole('button', { name: 'Log out', exact: true }).and(page.locator(':visible'));
+  // The post-sign-in redirect can remount the navbar under an open menu, so reopen it if it closed.
+  await expect(async () => {
+    if (!(await logOut.isVisible())) await page.getByRole('button', { name: 'Account menu' }).click();
+    await logOut.click({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
 
   await expect
     .poll(async () => (await context.cookies()).some((c) => c.name === 'draazy_session'),
@@ -336,7 +350,7 @@ test('a sign-out the server never hears about still ends the session here', asyn
   // The proof that matters: the cookie the server never revoked must not be spendable by a boot.
   await page.goto('/');
   await expect(page).toHaveURL(/\/(signin)?$/, { timeout: 15_000 });
-  expect(await page.evaluate(() => localStorage.getItem('draazyTokens')),
+  expect(await heldAccessToken(page),
     'the failed sign-out left a session behind for the next person at this machine').toBeNull();
 });
 
@@ -451,7 +465,7 @@ test('an OTP delivery refusal is announced through the form alert', async ({ pag
 /* The host memoises a rejected module specifier, so retrying cannot help; aborting simulates a redeploy
    whose hashed chunks the cached shell still names, and the remedy is a new document. */
 test('a shell that can no longer load its own code reloads itself, and only once', async ({ page }) => {
-  await page.route('**/authProvider.js*', (route) => route.abort());
+  await page.route(/\/authProvider(-[\w-]+)?\.js(\?|$)/, (route) => route.abort());
 
   await page.goto('/signin');
   const mobile = page.locator('#signin-mobile');
@@ -499,11 +513,32 @@ test('a failed OTP resend supersedes a terminal verification message in the form
   await expect(page.locator('#signin-otp-status')).toHaveText('Too many tries. Wait a minute and try again.');
 });
 
-test('a suspended account is told so, and a bot-check refusal is told to reload, though both are 403s', async ({ page }) => {
+test('a suspended account is told so, a bot-check refusal is told to try again, and any other 403 to reload', async ({ page }) => {
   await test.step('bot defence refuses the send step', async () => {
+    let sends = 0;
+    await page.route('**/api/auth/login', (route) => {
+      sends += 1;
+      return route.fulfill({
+        status: 403, contentType: 'application/json',
+        body: JSON.stringify({ error: 'bot_check_failed', message: 'This request could not be verified as human.', status: 403 }),
+      });
+    });
+    await page.goto('/signin');
+    await page.locator('#signin-mobile').fill(uniqueMobile());
+    const send = page.getByRole('button', { name: /Send OTP/i });
+    await send.click();
+    await expect(page.getByText("Security check didn't finish. Please try again.")).toBeVisible();
+    await expect(page.getByText(/contact support/i)).toHaveCount(0);
+    await expect(send).toBeEnabled();
+    // No site key in e2e, so there is no token to refresh and nothing to auto-retry with.
+    expect(sends).toBe(1);
+  });
+
+  await test.step('an unexplained 403 on the send step is told to reload', async () => {
+    await page.unrouteAll();
     await page.route('**/api/auth/login', (route) => route.fulfill({
       status: 403, contentType: 'application/json',
-      body: JSON.stringify({ error: 'forbidden', message: 'This request could not be verified as human.', status: 403 }),
+      body: JSON.stringify({ error: 'forbidden', message: 'Forbidden', status: 403 }),
     }));
     await page.goto('/signin');
     await page.locator('#signin-mobile').fill(uniqueMobile());

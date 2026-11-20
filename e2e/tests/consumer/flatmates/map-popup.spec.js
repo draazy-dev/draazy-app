@@ -1,13 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { focusFlatmateMap } from '../../../helpers/locality.js';
 
 const openMap = async (page, url) => {
   await page.goto(url);
   await page.getByRole('button', { name: 'Map' }).click();
-  await page.locator('[data-sf-area]').first().waitFor({ timeout: 20000 });
-  await page.locator('[data-sf-area]').first().click();
-  await page.locator('.map-pin').first().waitFor({ timeout: 20000 });
-  await page.locator('.map-pin').first().click();
+  await focusFlatmateMap(page, ['Baner']);
+  // Room pins sit where hosts dropped them and can overlap; Enter on the marker is not hit-tested.
+  const marker = page.locator('gmp-advanced-marker', { has: page.locator('[data-fm-pin]') }).first();
+  await marker.waitFor({ timeout: 20000 });
+  await marker.focus();
+  await marker.press('Enter');
   await page.locator('.dz-sp-row').first().waitFor({ timeout: 10000 });
 };
 
@@ -52,29 +55,26 @@ test('map bubbles preview posts with actions, open the list or a detail page, an
 
 test('a room whose request the host accepted offers "Message owner" in the map popup, not "Sent"', async ({ page }) => {
   test.slow();
-  const roomIds = new Promise((resolve) => {
-    page.route('**/api/flatmates/feed**', async (route) => {
-      const res = await route.fetch();
-      const body = await res.json();
-      const ids = [];
-      const walk = (v) => {
-        if (Array.isArray(v)) v.forEach(walk);
-        else if (v && typeof v === 'object') {
-          if (typeof v.id === 'string') ids.push(v.id);
-          Object.values(v).forEach(walk);
-        }
-      };
-      walk(body);
-      resolve(ids);
-      await route.fulfill({ response: res, json: body });
-    });
+  const seen = new Set();
+  await page.route('**/api/flatmates/feed**', async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    const walk = (v) => {
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object') {
+        if (typeof v.id === 'string') seen.add(v.id);
+        Object.values(v).forEach(walk);
+      }
+    };
+    walk(body);
+    await route.fulfill({ response: res, json: body });
   });
-  await page.route('**/api/me/flatmate-interests/keys', async (route) => {
-    const ids = await roomIds;
-    await route.fulfill({ json: ids.map((targetId) => ({ kind: 'room', targetId, status: 'accepted' })) });
-  });
+  await page.route('**/api/me/flatmate-interests/keys', (route) =>
+    route.fulfill({ json: [...seen].map((targetId) => ({ kind: 'room', targetId, status: 'accepted' })) }));
   await signedInAs(page, uniqueMobile());
 
+  // The popup's rooms arrive in a later, area-scoped read; the second visit re-reads keys knowing them.
+  await openMap(page, '/flatmates');
   await openMap(page, '/flatmates');
 
   await expect(page.locator('.dz-sp-cta').filter({ hasText: 'Message owner' }).first()).toBeVisible();

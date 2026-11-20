@@ -1,13 +1,11 @@
 import { Link, useSearchParams } from 'react-router';
 import { Trans, useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import { supportLink } from '../../../lib/supportLink.js';
 import HelpLayout from '../../../components/help/HelpLayout.jsx';
 import { Breadcrumbs, EmptyState } from '../../../components/help/HelpCards.jsx';
 import { excerptFor } from '../../../lib/help.js';
 import { useHelpSearch, useHelpTree } from '../../../lib/useHelp.js';
-/* Full search results. */
-
-/** Wrap matched terms so the reader can see why a result matched. */
 
 function Highlight({ text, terms }) {
   if (!terms.length) return text;
@@ -51,7 +49,7 @@ export default function HelpSearchResults() {
           <EmptyState title={t('help.nothingMatched', { query })}>
             <Trans
               i18nKey="help.nothingMatchedBody"
-              components={{ 1: <Link to="/support" className="text-teal-400 hover:underline" /> }}
+              components={{ 1: <Link to={supportLink('general')} className="text-teal-400 hover:underline" /> }}
             />
           </EmptyState>
         ) : (

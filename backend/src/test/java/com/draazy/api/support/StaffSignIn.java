@@ -11,9 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** Drives the whole back-office sign-in (password, then enrol or code) the way a browser would. */
 public final class StaffSignIn {
-
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
@@ -25,7 +23,6 @@ public final class StaffSignIn {
                 "{\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, password));
     }
 
-    /** Enrols a fresh authenticator; returns its decoded secret. */
     public static byte[] enrol(MockMvc mvc, String challenge) throws Exception {
         JsonNode body = postOk(mvc, Routes.Auth.STAFF_LOGIN_ENROL,
                 "{\"challenge\":\"%s\"}".formatted(challenge));
@@ -44,7 +41,6 @@ public final class StaffSignIn {
         return Totp.code(secret, Totp.stepAt(Instant.now()));
     }
 
-    /** First sign-in of a never-enrolled account, ending with tokens and the refresh cookie. */
     public static MockHttpServletResponse firstSignIn(MockMvc mvc, String email, String password)
             throws Exception {
         String challenge = password(mvc, email, password).get("challenge").asText();

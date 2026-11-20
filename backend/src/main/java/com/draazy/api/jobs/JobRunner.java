@@ -12,12 +12,9 @@ import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Runs every {@link ScheduledJob} in four IST cron groups, each in its own try so one failure never stops the
- * rest. JobRunScheduler's advisory lock keeps each group on one instance. */
 @Component
 @ConditionalOnProperty(name = "draazy.jobs.enabled", havingValue = "true", matchIfMissing = true)
 public class JobRunner {
-
     private static final Logger log = LoggerFactory.getLogger(JobRunner.class);
     private static final String IST = "Asia/Kolkata";
 

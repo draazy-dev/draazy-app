@@ -1,13 +1,14 @@
 import { test, expect } from '../../../fixtures/live.js';
 
-const INTERNAL = ['recheckPending', 'recheckReason', 'recheckRequestedAt', 'archived', 'featured', 'qualityScore',
-  'societyId', 'pincode', 'flagReason', 'formDetails'];
+const INTERNAL = ['recheckPending', 'recheckReason', 'recheckRequestedAt', 'archived', 'featured',
+  'societyId', 'pincode', 'flagReason', 'formDetails', 'qualityScore'];
 const COMPARE = ['id', 'slug', 'deal', 'propertyType', 'bhk', 'price', 'area', 'areaUnit', 'furnishing', 'possession',
   'reraId', 'amenities', 'locality', 'city', 'coverImage'];
 
 const SIMILAR = ['id', 'slug', 'title', 'deal', 'propertyType', 'bhk', 'price', 'area', 'locality', 'city', 'coverImage',
   'reraId', 'ownerVerified', 'distanceKm'];
-const OFF_CARD = ['priceUnit', 'imageCount', 'images', 'societySlug', 'societyName', 'floor', 'totalFloors', 'ageYears',
+// Cards draw the society name as a decision field, so `societyName` is on the card.
+const OFF_CARD = ['priceUnit', 'imageCount', 'images', 'societySlug', 'floor', 'totalFloors', 'ageYears',
   'facing', 'qualityScore', 'freshness', 'lastConfirmedAt', 'owner', 'ownerId'];
 
 const isGet = (r, test) => r.request().method() === 'GET' && test(new URL(r.url()).pathname);
@@ -19,6 +20,7 @@ test('a stranger’s listing detail carries no listing-internal state', async ({
   expect(body.status).toBe('approved');
   expect(INTERNAL.filter((k) => k in body)).toEqual([]);
   await expect(page.locator('h1').first()).toBeVisible();
+  await expect(page.getByText(/Quality Score/i)).toHaveCount(0);
   expect(consoleErrors).toEqual([]);
 });
 

@@ -3,7 +3,6 @@ package com.draazy.api.catalog.society;
 import java.math.BigDecimal;
 import java.util.List;
 
-/** Hub: specs, newest homes and live-listing stats over the whole merge family; ratings come from reviews. */
 public record SocietyDetailResponse(
         String slug,
         String name,

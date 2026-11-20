@@ -14,8 +14,6 @@ function mapReview(row) {
     decidedAt: parseTime(row?.decidedAt),
     filesPurgedAt: parseTime(row?.filesPurgedAt),
     revokedAt: parseTime(row?.revokedAt),
-    qaSampledAt: parseTime(row?.qaSampledAt),
-    qaReviewedAt: parseTime(row?.qaReviewedAt),
   };
 }
 
@@ -25,13 +23,13 @@ function approvalPayload(payload) {
     name: payload?.name,
     poseConfirmed: Boolean(payload?.poseConfirmed),
     numberOverride: Boolean(payload?.numberOverride),
+    ...(payload?.gender ? { gender: payload.gender } : {}),
   };
   return payload?.yearOnly
     ? { ...base, birthYear: Number(payload?.birthYear) }
     : { ...base, dob: payload?.dob };
 }
 
-/** `page` is zero-based on the wire; filters are server predicates, never applied to a loaded page. */
 export async function listIdentityReviews({ status = 'pending', page = 0, size = 10, ...filters } = {}) {
   const res = await get('/moderation/identity-reviews', { status, page, size, ...filters });
   const unwrapped = unwrapPage(res, { page, size });
@@ -67,8 +65,9 @@ export async function revokeIdentityReview(id, reason) {
   return mapReview(await post(`${reviewPath(id)}/revoke`, { reason }));
 }
 
-export async function qaIdentityReview(id, payload) {
-  return mapReview(await post(`${reviewPath(id)}/qa`, payload));
+export async function decideIdentityAppeal(id, outcome) {
+  await post(`${reviewPath(id)}/appeal/${outcome === 'reopen' ? 'reopen' : 'uphold'}`);
+  return getIdentityReview(id);
 }
 
 export async function updateKycProfile(userId, { name, email }) {

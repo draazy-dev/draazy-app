@@ -22,10 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** The two back-office city surfaces are one decision — the waitlist is the evidence, the toggle is
- *  the act — and their guards deliberately differ, which only shows when both are asserted here. */
 class CityAdminEndpointTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -36,8 +33,6 @@ class CityAdminEndpointTest extends AbstractApiTest {
         if (adminId != null) {
             jdbc.update("delete from audit_log where actor = ?", adminId);
         }
-        // The roster is shared state the repeatable seed does not reassert, so restore it by hand or
-        // the next class to read `GET /bootstrap` inherits a live Mumbai.
         jdbc.update("update cities set live = (slug = 'pune')");
     }
 
@@ -45,8 +40,6 @@ class CityAdminEndpointTest extends AbstractApiTest {
         User user = new User(mobile, role);
         user.setName(role + " city editor");
         user.setMobileVerified(true);
-        // A staff account is keyed in the permission map by its desk, and one with no desk is refused
-        // outright. Which desk is immaterial here — the seeded document grants all six the same set.
         if (Roles.Wire.STAFF.equals(role)) user.setTeam(Teams.RENTAL);
         User saved = users.saveAndFlush(user);
         if (Roles.Wire.ADMIN.equals(role)) {
@@ -69,7 +62,6 @@ class CityAdminEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.cities[?(@.slug=='mumbai')].live", contains(true)));
     }
 
-    /** Launching a city is an operational decision, and one nobody can attribute is not a record. */
     @Test
     void togglingACityIsAudited() throws Exception {
         mvc.perform(patch(Routes.Admin.CITY_BY_SLUG.replace("{slug}", "hyderabad"))
@@ -121,9 +113,6 @@ class CityAdminEndpointTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-    // ---------------- GET /admin/cities/waitlist ----------------
-
-    /** Put a signup on the list without going through the public endpoint's validation. */
     private void waitlisted(String mobile, String city, String createdAt) {
         jdbc.update("insert into city_waitlist (mobile, city, created_at) values (?, ?, ?::timestamptz)",
                 mobile, city, createdAt);
@@ -134,8 +123,6 @@ class CityAdminEndpointTest extends AbstractApiTest {
         jdbc.update("delete from city_waitlist where mobile like '98777320%'");
     }
 
-    /** Nashik is asked for twice but first, so a report ordered by recency puts Nagpur on top —
-     *  the one inversion the two orderings disagree on. */
     @Test
     void theWaitlistIsAggregatedByCityMostWantedFirst() throws Exception {
         waitlisted("9877732001", "Nashik", "2024-01-01T10:00:00Z");
@@ -152,8 +139,6 @@ class CityAdminEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[0].city").value("Nashik"));
     }
 
-    /** Without the {@code lower(city)} grouping key this reports Indore twice, each half ranked
-     *  below a city fewer people want, while looking entirely healthy. */
     @Test
     void citiesDifferingOnlyByCaseAreOneRow() throws Exception {
         waitlisted("9877732004", "Indore", "2024-01-01T10:00:00Z");
@@ -165,8 +150,6 @@ class CityAdminEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[?(@.city =~ /(?i)indore/)].requests", contains(2)));
     }
 
-    /** {@code city_waitlist} is unverified public submissions carrying a mobile; the finder is only
-     *  allowed on the repository because it groups before it returns. */
     @Test
     void theReportCarriesNoContactDetail() throws Exception {
         waitlisted("9877732006", "Surat", "2024-01-01T10:00:00Z");
@@ -179,7 +162,6 @@ class CityAdminEndpointTest extends AbstractApiTest {
         assertThat(body).contains("Surat").doesNotContain("9877732006").doesNotContain("mobile");
     }
 
-    /** Ops reads this next to the supply gap on the same tab, so staff is enough — but not a buyer. */
     @Test
     void theWaitlistIsStaffReadableAndNotPublic() throws Exception {
         mvc.perform(get(Routes.Admin.CITY_WAITLIST)).andExpect(status().isUnauthorized());
@@ -193,5 +175,3 @@ class CityAdminEndpointTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 }
-
-

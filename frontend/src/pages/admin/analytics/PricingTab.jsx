@@ -2,17 +2,12 @@ import { BarChart } from '../../../components/charts/index.jsx';
 import { fmtINR, fmtNum, classNames } from '../../../lib/format.js';
 import { C, AX, axis, Card, LoadFailedNotice } from './constants.jsx';
 
-/** Must match `AdminPricingService.MIN_SAMPLE`: fewer approved flats than this get no asking rate. */
 const MIN_SAMPLE = 3;
 
-/** Nullable money. A dash, never a zero — the point of the endpoint is that it can say "no data". */
 const money = (v) => (v == null ? '—' : fmtINR(v));
 
-/** Nullable percentage, same contract. */
 const pct = (v) => (v == null ? '—' : `${v}%`);
 
-/** The Pricing tab: measured locality pricing. Nulls render as dashes, never coerced; `rows` null means not loaded,
- * and `failed` keeps a 500 from rendering as an empty report. */
 export default function PricingTab({ rows, failed }) {
   if (failed) {
     return (
@@ -65,7 +60,6 @@ export default function PricingTab({ rows, failed }) {
 
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <h3 className="text-sm font-semibold text-gray-300 mb-3">Locality Pricing Breakdown</h3>
-        {/* A scrollable region is the documented exception to the no-tabIndex rule: without it the right-hand columns are mouse-only. */}
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- named scroll region, see above */}
         <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Locality pricing breakdown">
           <table className="w-full text-sm">

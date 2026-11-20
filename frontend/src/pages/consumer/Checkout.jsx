@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import { openCashfreeCheckout } from '../../lib/cashfree.js';
-import { listPlans, subscribe as subscribeToPlan } from '../../services/planService.js';
+import { cancelPending, listPlans, orderStatus, subscribe as subscribeToPlan } from '../../services/planService.js';
 import { getEntitlements } from '../../services/entitlementService.js';
 import { myListingCard } from '../../services/propertyService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -11,6 +11,8 @@ import { usePricing } from '../../context/PricingContext.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { fmtDate } from '../../lib/format.js';
 import RefundGuarantee from '../../components/billing/RefundGuarantee.jsx';
+import WhyFee from '../../components/billing/WhyFee.jsx';
+import { passSlug } from '../../lib/dealPlans.js';
 
 const DAY_MS = 86_400_000;
 const POLL_MS = 3_000;
@@ -18,7 +20,6 @@ const POLL_MAX_MS = 30_000;
 const newAttemptId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const isSafePath = (p) => typeof p === 'string' && /^\/(?![/\\])/.test(p);
 
-/** When THIS purchase's entitlement ends, or null while it has not landed: the webhook, not the modal, grants it. */
 async function purchaseExpiry({ needsProperty, propertyId, before }) {
   const e = await getEntitlements().catch(() => null);
   if (needsProperty) return e?.listings?.passes?.find((p) => String(p.propertyId) === String(propertyId))?.expiresAt ?? null;
@@ -28,13 +29,11 @@ async function purchaseExpiry({ needsProperty, propertyId, before }) {
 
 const checkoutPlans = (t) => ({
   'contact-pack': { nameLabel: t('misc.coContactPackName'), priceKey: 'contactPack', sub: t('misc.coContactPackSub'), termDays: 30, icon: 'user-plus', tagline: t('misc.coContactPackTagline'), feats: [t('misc.coContactPackFeat1'), t('misc.coContactPackFeat2'), t('misc.coContactPackFeat3')], done: { cta: t('misc.coContactPackDoneCta'), href: '/listings' } },
+  'contact-pack-buy': { nameLabel: t('misc.coContactPackBuyName'), priceKey: 'contactPackBuy', sub: t('misc.coContactPackBuySub'), termDays: 60, icon: 'user-plus', tagline: t('misc.coContactPackBuyTagline'), feats: [t('misc.coContactPackBuyFeat1'), t('misc.coContactPackBuyFeat2'), t('misc.coContactPackFeat3')], done: { cta: t('misc.coContactPackDoneCta'), href: '/listings' } },
   'listing-pass': { nameLabel: t('misc.coListingPassName'), priceKey: 'listingPass', sub: t('misc.coListingPassSub'), termDays: 60, icon: 'building-2', tagline: t('misc.coListingPassTagline'), feats: [t('misc.coListingPassFeat1'), t('misc.coListingPassFeat2'), t('misc.coListingPassFeat3')], done: { cta: t('misc.coListingPassDoneCta'), href: '/dashboard#properties' } },
+  'listing-pass-buy': { nameLabel: t('misc.coListingPassBuyName'), priceKey: 'listingPassBuy', sub: t('misc.coListingPassBuySub'), termDays: 90, icon: 'building-2', tagline: t('misc.coListingPassBuyTagline'), feats: [t('misc.coListingPassBuyFeat1'), t('misc.coListingPassFeat2'), t('misc.coListingPassFeat3')], done: { cta: t('misc.coListingPassDoneCta'), href: '/dashboard#properties' } },
 });
-const checkoutMethods = (t) => [
-  { id: 'UPI', label: t('misc.coMethodUpiLabel'), desc: t('misc.coMethodUpiDesc'), icon: 'smartphone' },
-  { id: 'Card', label: t('misc.coMethodCardLabel'), desc: t('misc.coMethodCardDesc'), icon: 'credit-card' },
-  { id: 'Netbanking', label: t('misc.coMethodNetbankingLabel'), desc: t('misc.coMethodNetbankingDesc'), icon: 'landmark' },
-];
+const PASS_SLUGS = ['listing-pass', 'listing-pass-buy'];
 const inr = (n) => '₹' + Number(n).toLocaleString('en-IN');
 
 export default function Checkout() {
@@ -42,41 +41,45 @@ export default function Checkout() {
   const { isIn } = useAuth();
   const { flagEnabled } = useAppFlags();
   const [params] = useSearchParams();
-  const planId = params.get('plan');
+  const requestedPlan = params.get('plan');
   const propertyId = params.get('property');
-  // The configured price list, from `GET /bootstrap` (`pricing`). Only the fallback — `serverPlan` below is the
-  // plan catalogue's own row and wins when it resolves.
   const { prices } = usePricing();
   const CO = checkoutPlans(t);
-  const METHODS = checkoutMethods(t);
+  const needsProperty = PASS_SLUGS.includes(requestedPlan);
+  const [listing, setListing] = useState(null);
+  const planId = needsProperty && listing ? passSlug(listing.deal) : requestedPlan;
   const base = CO[planId];
-  const needsProperty = planId === 'listing-pass';
-  const [method, setMethod] = useState('UPI');
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
-  /** `null` until Pay: then `verifying` (polling entitlements), `timeout` (still unconfirmed) or `paid`. */
-  const [phase, setPhase] = useState(null);
-  const [orderRef, setOrderRef] = useState('');
-  /** The open gateway order, kept so a retry after the SDK failed reopens it instead of POSTing again. */
+  const returnedOrder = useRef(params.get('order_id'));
+  const [phase, setPhase] = useState(returnedOrder.current ? 'verifying' : null);
+  const [orderRef, setOrderRef] = useState(returnedOrder.current ?? '');
+  const gatewayOrder = useRef(returnedOrder.current);
   const [session, setSession] = useState(null);
-  /** Server catalogue row for this plan, once it resolves. See the note in `Plans.jsx`. */
-  const [serverPlan, setServerPlan] = useState(null);
-  /** The listing a pass is bought for; `false` once the lookup fails. */
-  const [listing, setListing] = useState(null);
+  const [serverRow, setServerRow] = useState(null);
+  const serverPlan = serverRow?.slug === planId ? serverRow : null;
   const [expiresAt, setExpiresAt] = useState(null);
   const packExpiryBefore = useRef(null);
-  // One key per checkout attempt: a double-tapped Pay returns the same order, a second pack is a new purchase.
-  const [attemptId, setAttemptId] = useState(newAttemptId);
+  const attemptKey = `dz_co_${requestedPlan}_${propertyId || ''}`;
+  const [attemptId, setAttemptId] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(attemptKey);
+      if (saved) return saved;
+    } catch {
+    }
+    const id = newAttemptId();
+    try { sessionStorage.setItem(attemptKey, id); } catch {
+    }
+    return id;
+  });
 
   useEffect(() => {
     let alive = true;
     listPlans()
       .then((rows) => {
         const row = rows.find((r) => r.slug === planId);
-        if (alive && row) setServerPlan(row);
+        if (alive && row) setServerRow(row);
       })
-      // Falls back to the configured fee. The charge is the server's either way — this only
-      // affects which number is shown while the catalogue is unreachable.
       .catch(() => {});
     return () => { alive = false; };
   }, [planId]);
@@ -90,8 +93,6 @@ export default function Checkout() {
     return () => { alive = false; };
   }, [needsProperty, propertyId, isIn]);
 
-  // The amount charged is the server's plan row, so that is the one to display. Showing the
-  // back-office fee here was how a customer came to click "Pay ₹999" and be billed ₹2,499.
   const price = base && (serverPlan?.price ?? prices[base.priceKey]);
   const termDays = serverPlan?.termDays ?? base?.termDays;
   const P = base && { ...base, price };
@@ -104,11 +105,23 @@ export default function Checkout() {
     let timer;
     const started = Date.now();
     const tick = async () => {
-      const at = await purchaseExpiry({ needsProperty, propertyId, before: packExpiryBefore.current });
+      const at = returnedOrder.current ? null : await purchaseExpiry({ needsProperty, propertyId, before: packExpiryBefore.current });
       if (!alive) return;
       if (at) {
         setExpiresAt(at);
         setPhase('paid');
+        try { sessionStorage.removeItem(attemptKey); } catch { }
+        return;
+      }
+      const status = gatewayOrder.current ? await orderStatus(gatewayOrder.current).catch(() => null) : null;
+      if (!alive) return;
+      if (status === 'paid') {
+        setPhase('paid');
+        try { sessionStorage.removeItem(attemptKey); } catch { }
+      } else if (status === 'failed') {
+        setSession(null);
+        setError(t('misc.coPaymentDeclined'));
+        setPhase(null);
       } else if (Date.now() - started >= POLL_MAX_MS) {
         setPhase('timeout');
       } else {
@@ -117,36 +130,60 @@ export default function Checkout() {
     };
     tick();
     return () => { alive = false; clearTimeout(timer); };
-  }, [phase, needsProperty, propertyId]);
+  }, [phase, needsProperty, propertyId, attemptKey, t]);
+
+  const [cancelling, setCancelling] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
+  const rotateAttempt = () => {
+    const fresh = newAttemptId();
+    setAttemptId(fresh);
+    try { sessionStorage.setItem(attemptKey, fresh); } catch { }
+  };
+  const cancelOpenOrder = async () => {
+    setCancelling(true);
+    try {
+      await cancelPending();
+      setSession(null);
+      rotateAttempt();
+      setError('');
+      setOrderOpen(false);
+    } catch {
+      setError(t('misc.coPaymentFailed'));
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const pay = async () => {
     if (paying || phase) return;
     setPaying(true);
     setError('');
+    setOrderOpen(false);
+    returnedOrder.current = null;
     try {
       let order = session;
       if (!order) {
         if (!needsProperty) packExpiryBefore.current = (await getEntitlements().catch(() => null))?.contacts?.packExpiresAt ?? null;
-        const sub = await subscribeToPlan(planId, method.toLowerCase(), { propertyId: needsProperty ? propertyId : undefined, attemptId });
-        /* The reference the customer quotes at support: `paymentRef` is the gateway's order id and appears on
-           their bank statement; the subscription id is the fallback. */
+        const sub = await subscribeToPlan(planId, undefined, { propertyId: needsProperty ? propertyId : undefined, attemptId });
+        if (!sub?.paymentSessionId) rotateAttempt();
         setOrderRef(sub?.paymentRef || sub?.subscriptionId || '');
+        gatewayOrder.current = sub?.paymentRef ?? null;
         order = { sessionId: sub?.paymentSessionId ?? null };
         setSession(order);
       }
-      // The modal closing is not payment: poll for this purchase's own entitlement instead.
       const outcome = order.sessionId ? await openCashfreeCheckout(order.sessionId) : null;
       if (outcome?.error) {
         setSession(null);
-        setAttemptId(newAttemptId());
-        setError(t('misc.coPaymentFailed'));
+        const status = gatewayOrder.current ? await orderStatus(gatewayOrder.current).catch(() => null) : null;
+        if (status === 'paid') setPhase('verifying');
+        else setError(t(status === 'failed' ? 'misc.coPaymentDeclined' : 'misc.coPaymentNotCompleted'));
         return;
       }
       setPhase('verifying');
     } catch (err) {
-      // 409: the one-open-unpaid-order cap, or a listing that already has a pass or cannot take one.
-      // Branch on status, never `err.message` — this page is localised.
-      setError(err?.status === 409 ? t(needsProperty ? 'misc.coPassConflict' : 'misc.coOrderAlreadyOpen') : err?.code === 'purchases_paused' ? t('misc.coPausedBody') : t('misc.coPaymentFailed'));
+      const open = err?.code === 'order_already_open';
+      setOrderOpen(open);
+      setError(open ? t('misc.coOrderAlreadyOpen') : err?.status === 409 ? t(needsProperty ? 'misc.coPassConflict' : 'misc.coOrderAlreadyOpen') : err?.code === 'purchases_paused' ? t('misc.coPausedBody') : t('misc.coPaymentFailed'));
     } finally {
       setPaying(false);
     }
@@ -179,39 +216,38 @@ export default function Checkout() {
           <p className="text-gray-400 text-sm mb-6">{t('misc.coPausedBody')}</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link to="/dashboard" className="btn-teal px-5 py-2.5 rounded-xl font-semibold text-sm">{t('misc.coGoToDashboard')}</Link>
-            <Link to="/plans" className="px-5 py-2.5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coViewPlans')}</Link>
+            <Link to="/plans" className="h-btn inline-flex items-center justify-center px-5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coViewPlans')}</Link>
           </div>
         </div>
       ) : waiting ? (
         <div className="glass rounded-2xl p-8 sm:p-10 max-w-lg mx-auto text-center">
           <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-5" style={{ background: 'rgb(var(--dz-c-amber-500) / .15)' }}><Icon name="clock" className="w-9 h-9 text-amber-400" /></div>
           <h2 className="text-xl font-extrabold mb-1">{t('misc.coPaymentPending')}</h2>
-          <p className="text-gray-400 text-sm mb-1">{P.nameLabel} · {inr(P.price)} {t('misc.coPaidVia')} {method}</p>
+          <p className="text-gray-400 text-sm mb-1">{P.nameLabel} · {inr(P.price)}</p>
           <p className="text-gray-400 text-sm mb-2">{t('misc.coPaymentPendingBody')}</p>
           {orderRef && <p className="text-gray-500 text-xs mb-6">{t('misc.coOrderReference')} · <span className="text-gray-400 font-mono">{orderRef}</span></p>}
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             {phase === 'timeout'
               ? <button type="button" onClick={() => setPhase('verifying')} className="btn-teal px-5 py-2.5 rounded-xl font-semibold text-sm">{t('misc.coCheckAgain')}</button>
               : <span className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm text-gray-400"><Icon name="loader-2" className="w-4 h-4 animate-spin" /> {t('misc.coProcessing')}</span>}
-            <Link to="/dashboard" className="px-5 py-2.5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coGoToDashboard')}</Link>
+            <Link to="/dashboard" className="h-btn inline-flex items-center justify-center px-5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coGoToDashboard')}</Link>
           </div>
         </div>
       ) : paid ? (
         <div className="glass rounded-2xl p-8 sm:p-10 max-w-lg mx-auto text-center">
           <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-5" style={{ background: 'rgb(var(--dz-c-emerald-500) / .15)' }}><Icon name="check-circle-2" className="w-9 h-9 text-emerald-400" /></div>
           <h2 className="text-xl font-extrabold mb-1">{t('misc.coPaymentSuccess')}</h2>
-          <p className="text-gray-400 text-sm mb-1">{P.nameLabel} · {inr(P.price)} {t('misc.coPaidVia')} {method}</p>
+          <p className="text-gray-400 text-sm mb-1">{P.nameLabel} · {inr(P.price)}</p>
           <p className="text-gray-400 text-sm mb-2">{doneBody}</p>
           {orderRef && <p className="text-gray-500 text-xs mb-6">{t('misc.coOrderReference')} · <span className="text-gray-400 font-mono">{orderRef}</span></p>}
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link to={doneHref} className="btn-teal px-5 py-2.5 rounded-xl font-semibold text-sm">{doneCta}</Link>
-            <Link to="/dashboard" className="px-5 py-2.5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coGoToDashboard')}</Link>
+            <Link to="/dashboard" className="h-btn inline-flex items-center justify-center px-5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coGoToDashboard')}</Link>
           </div>
         </div>
       ) : (
         <>
         <div className="grid md:grid-cols-2 gap-6 items-start">
-          {/* Order summary */}
           <div className="glass rounded-2xl p-5 sm:p-6">
             <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">{t('misc.coOrderSummary')}</h2>
             <div className="flex items-start gap-3 mb-4">
@@ -225,29 +261,34 @@ export default function Checkout() {
               <div className="flex justify-between text-gray-400"><span>{P.nameLabel} <span className="text-gray-600">({P.sub})</span></span><span className="text-gray-200">{inr(P.price)}</span></div>
               <div className="flex justify-between font-bold text-base pt-2 border-t border-white/8 mt-2"><span>{t('misc.coTotal')}</span><span>{inr(P.price)}</span></div>
               {needsProperty && <RefundGuarantee kind="pass" />}
-              {planId === 'contact-pack' && <RefundGuarantee kind="pack" />}
+              {!needsProperty && <RefundGuarantee kind="pack" />}
             </div>
           </div>
 
-          {/* Payment method */}
           <div className="glass rounded-2xl p-5 sm:p-6">
-            <h2 id="co-method-label" className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">{t('misc.coPaymentMethod')}</h2>
-            <div role="radiogroup" aria-labelledby="co-method-label" className="space-y-2.5 mb-5">
-              {METHODS.map((m) => (
-                <button key={m.id} type="button" role="radio" aria-checked={m.id === method} onClick={() => setMethod(m.id)} className={'method w-full flex items-center gap-3 text-left' + (m.id === method ? ' active' : '')}>
-                  <Icon name={m.icon} className="w-5 h-5 text-teal-400 flex-shrink-0" />
-                  <span className="flex-1"><span className="block text-sm font-semibold">{m.label}</span><span className="block text-xs text-gray-500">{m.desc}</span></span>
-                  <Icon name={m.id === method ? 'check-circle-2' : 'circle'} className={'w-4 h-4 ' + (m.id === method ? 'text-teal-400' : 'text-gray-600')} />
-                </button>
-              ))}
-            </div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">{t('misc.coPaymentMethod')}</h2>
+            <p className="flex items-center gap-2 text-sm text-gray-300 mb-5"><Icon name="shield-check" className="w-4 h-4 text-teal-400 flex-shrink-0" /> {t('misc.coMethodsNote')}</p>
             <button onClick={pay} disabled={paying} className="btn-teal w-full py-3 rounded-xl font-semibold hidden md:inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">{paying ? <><Icon name="loader-2" className="w-4 h-4 animate-spin" /> {t('misc.coProcessing')}</> : <><Icon name="lock" className="w-4 h-4" /> {t('misc.coPay')} {inr(P.price)}</>}</button>
-            {error && <p role="alert" className="text-rose-300 text-xs text-center mt-3">{error}</p>}
+            {error && (
+              <div className="mt-3 text-center space-y-2">
+                <p role="alert" className="text-rose-300 text-xs">{error}</p>
+                {orderOpen && (
+                  <button
+                    type="button"
+                    onClick={cancelOpenOrder}
+                    disabled={cancelling}
+                    className="text-xs text-teal-400 hover:text-teal-300 underline font-medium cursor-pointer"
+                  >
+                    {cancelling ? t('misc.coProcessing') : t('misc.coCancelPending')}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Mobile sticky pay bar — keeps the total and pay action reachable without
-            scrolling. In-flow (sticky, not fixed) so it releases naturally at the footer. */}
+        <div className="mt-6"><WhyFee compact deal={planId.endsWith('-buy') ? 'buy' : 'rent'} kind={needsProperty ? 'pass' : 'pack'} price={inr(P.price)} /></div>
+
         <div className="md:hidden sticky bottom-0 z-30 -mx-4 sm:-mx-6 mt-6 border-t border-white/10 bg-ink/95 backdrop-blur-xl px-4 sm:px-6 py-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}>
           <div className="flex items-center gap-4">
             <div className="shrink-0">

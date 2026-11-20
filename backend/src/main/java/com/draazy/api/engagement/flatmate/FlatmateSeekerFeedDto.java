@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** A seeker post as anyone but its author sees it: no moderation verdict, no contact, coarse coordinates. */
 public record FlatmateSeekerFeedDto(
         UUID id,
         String title,
@@ -18,7 +17,10 @@ public record FlatmateSeekerFeedDto(
         String moveIn,
         String flatPref,
         String roomPref,
-        List<String> tags,
+        String furnishing,
+        boolean gatedOnly,
+        boolean attachedBath,
+        String parking,
         String note,
         boolean verifiedContactOnly,
         boolean verified,

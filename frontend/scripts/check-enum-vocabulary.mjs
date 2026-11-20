@@ -1,4 +1,3 @@
-/* Every member of every bridged vocabulary is pushed through the real read and write paths, both ways. */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -7,8 +6,6 @@ import { DETAIL_KEYS } from '../src/lib/listingFormDetails.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..');
 
-/* The contract is hand-written and single-source. The stale copies under the backend build
-   directories are output, not source, and are deliberately not read. */
 const SPEC = join(repo, 'backend/src/main/resources/static/openapi/draazy-api.yaml');
 const FORM_DETAILS_JAVA = join(repo, 'backend/src/main/java/com/draazy/api/catalog/listing/ListingFormDetails.java');
 
@@ -33,18 +30,14 @@ const sameSet = (actual, expected, what) => {
   }
 };
 
-/* A line scanner rather than a parser: the frontend has no yaml dependency and this would be the only
-   reason to add one. Case-sensitive and colon-anchored, or `pageNumber` and schema prose fire. */
 const specText = readFileSync(SPEC, 'utf8');
 const specLines = specText.split(/\r?\n/);
 
-/** All enum declarations in the file, keyed by the schema that encloses them. */
 function readEnums() {
   const bySchema = new Map();
   let schema = null;
   for (let i = 0; i < specLines.length; i += 1) {
     const line = specLines[i];
-    // Schema names sit at exactly four spaces under `components: schemas:`.
     const named = /^ {4}([A-Za-z0-9_]+):\s*$/.exec(line);
     if (named) schema = named[1];
     if (!/\benum:/.test(line)) continue;
@@ -62,16 +55,12 @@ function readEnums() {
       }
     }
     if (!values.length) continue;
-    /* Two layouts, both present in the file: flow style puts the enum on the field's own line, block style
-       leaves the field name as a standalone key some lines above. */
     const STRUCTURAL = new Set(['items', 'properties', 'additionalProperties']);
     let inlineField = (/^\s{6,}([A-Za-z0-9_]+):\s*\{/.exec(line) || [])[1] || null;
     if (inlineField && STRUCTURAL.has(inlineField)) inlineField = null;
     let field = inlineField;
     for (let j = i; j >= 0 && !field; j -= 1) {
       const f = /^\s{6,}([A-Za-z0-9_]+):\s*$/.exec(specLines[j]);
-      /* `items` and `properties` are structure, not field names: an array-valued facet declares its enum one
-         level down, so stopping at the first key up finds the wrapper and reports the field as missing. */
       if (f && !STRUCTURAL.has(f[1])) field = f[1];
     }
     const key = schema || '(root)';
@@ -83,8 +72,6 @@ function readEnums() {
 
 const enums = readEnums();
 
-/* Blindness guard. If the scanner stops understanding the file it must say so rather than pass
-   with nothing to compare — the failure mode every check in this directory is written against. */
 const declared = [...enums.values()].reduce((n, list) => n + list.length, 0);
 ok(
   declared >= 150,
@@ -93,7 +80,6 @@ ok(
   + ' vacuous. Fix readEnums(), do not lower this floor.',
 );
 
-/** The values of a named top-level enum schema, e.g. `Furnishing`. */
 function topLevelEnum(name) {
   const found = enums.get(name);
   if (!found || !found.length) {
@@ -105,7 +91,6 @@ function topLevelEnum(name) {
   return new Set(found[0].values);
 }
 
-/** The values of an inline enum on one field of one schema, e.g. `PropertySummary.landUse`. */
 function fieldEnum(schema, field) {
   const found = (enums.get(schema) || []).find((e) => e.field === field);
   if (!found) {
@@ -126,8 +111,6 @@ const { toFacetQuery } = await import('../src/lib/listings/facetQuery.js');
 
 const keysOf = (catalogue) => catalogue.map((e) => (Array.isArray(e) ? e[0] : e.value ?? e)).filter((k) => k !== '');
 
-/* Complete enough for `toFacetQuery` to consider the axis relevant: `sectionVisible` drops facets the chosen
-   types do not make meaningful, so a bare `{}` would pass every assertion below without testing anything. */
 const filterState = (axis, value) => ({
   deal: axis === 'constr' ? 'buy' : 'rent',
   types: new Set(['flat']),
@@ -216,13 +199,9 @@ if (flatmateFurnishing) {
   );
 }
 
-/* Translated in one direction only: a zone whose translation the contract refuses is a 422 the owner cannot
-   act on, and a `LAND_USE` key no zone produces is a filter option no wizard-posted plot can match. */
 console.log('  6. plot zoning translated into land use');
 const landUseWire = fieldEnum('ListingFields', 'landUse');
 const plotZoneWire = fieldEnum('ListingFormDetails', 'plotZone');
-/* Containment, not equality: the contract also carries retired labels, which stay legal so a plot published
-   under one can be re-saved. The loop below runs over the contract, so a legacy label mapping to nothing still fails. */
 if (plotZoneWire) {
   const absent = plotZoneOptions.filter((v) => !plotZoneWire.has(v));
   ok(
@@ -261,8 +240,6 @@ if (landUseWire) {
   }
 }
 
-/* `formDetails` is free-form JSONB in the spec, so its allowlist is hand-written twice. A key on one side only
-   fails silently both ways: absent from JS the answer never ships, absent from Java the 422 names nothing. */
 const javaText = readFileSync(FORM_DETAILS_JAVA, 'utf8');
 
 const javaKeys = new Set();
@@ -274,13 +251,9 @@ for (const table of ['TEXT', 'FLAGS', 'ARRAYS']) {
 ok(javaKeys.size > 40, `Only ${javaKeys.size} formDetails keys read from Java — the scanner has gone blind.`);
 sameSet(DETAIL_KEYS, javaKeys, 'listingFormDetails.js DETAIL_KEYS vs ListingFormDetails.java TEXT+FLAGS+ARRAYS');
 
-/* Report reasons are a plain string in the spec, so the only allowlist is the Java `Set.of` the endpoint
-   validates against: a code the picker offers and Java lacks is a 422 on a reason the UI invited. */
 const REPORT_REASONS_JAVA = join(repo, 'backend/src/main/java/com/draazy/api/moderation/report/ReportReasons.java');
 const reportText = readFileSync(REPORT_REASONS_JAVA, 'utf8');
 
-/* `OTHER` is a constant, not a literal, so a bare `"([^"]+)"` scan would miss it on every set and
-   report four identical phantom failures. Substituted before the literals are read. */
 const javaReasonSet = (name) => {
   const block = new RegExp(`Set<String> ${name} =\\s*Set\\.of\\(([^;]*?)\\);`).exec(reportText);
   ok(Boolean(block), `ReportReasons.java no longer declares a \`Set<String> ${name} = Set.of(...)\` this scanner can read.`);

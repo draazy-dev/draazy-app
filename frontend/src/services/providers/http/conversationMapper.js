@@ -1,7 +1,5 @@
-/** Where the view model wants more than the wire carries, each divergence is handled by degrading visibly rather than
- * by inventing data. */
+import { fmtINR } from '../../../lib/format.js';
 
-/** Wire `Message` → the view model's message shape. */
 export function toMessage(m) {
   if (!m) return null;
   return {
@@ -26,23 +24,22 @@ export function toViewModel(c) {
   return {
     id: c.id,
     propertyId: c.propertyId ?? undefined,
-    // A flatmate group's thread: many members, no counterparty and no listing.
+    propertySlug: c.propertySlug ?? undefined,
     group,
+    flatmate: c.flatmateKind && c.flatmateTargetId ? { kind: c.flatmateKind, id: c.flatmateTargetId } : null,
 
     property: propertyOf(c, group),
 
     party: {
+      id: c.counterpartyId ?? undefined,
       name,
       avatar: initialsOf(name),
       role: group ? 'Group' : c.counterpartyRole === 'owner' ? 'Owner' : 'Buyer',
-      // Masked (98XXXXX210) until the reader's contact request against this listing is approved —
-      // a server decision (ADR-019), deliberately passed through untouched.
       mobile: c.counterpartyMobile ?? '',
     },
 
     youAre: c.youAre || (group ? 'member' : c.counterpartyRole === 'owner' ? 'buyer' : 'owner'),
 
-    /* Server threads exist only after contact approval; waiting states belong to the gate above. */
     staged: false,
 
     at: c.updatedAt ? Date.parse(c.updatedAt) : Date.now(),
@@ -52,25 +49,32 @@ export function toViewModel(c) {
     archived: !!c.archived,
     muted: !!c.muted,
     blocked: !!c.blocked,
+    blockedYou: !!c.blockedYou,
+    listingDeleted: !!c.listingDeleted,
     awaitingReply: !!c.awaitingReply,
     messages,
   };
 }
 
-/** Wire page (or bare array) → a plain array. */
 export const toViewModelList = (payload) =>
   (Array.isArray(payload) ? payload : payload?.content ?? [])
     .map((c) => toViewModel(c))
     .filter(Boolean);
 
-/* Staged chats share the server row shape so the page renders queued messages identically. */
 export function stagedToViewModel(item) {
   const name = item?.party?.name || 'Owner';
+  const prop = item.property || { title: 'Conversation', price: '', loc: '', img: '' };
+  let price = prop.price || '';
+  if (typeof price === 'string' && /^₹\d{5,}$/.test(price)) {
+    const n = Number(price.slice(1));
+    price = prop.deal === 'rent' ? `${fmtINR(n)}/mo` : fmtINR(n);
+  }
   return {
     id: `staged:${item.propertyId}`,
     staged: true,
     propertyId: item.propertyId,
-    property: item.property || { title: 'Conversation', price: '', loc: '', img: '' },
+    propertySlug: item.propertySlug ?? undefined,
+    property: { ...prop, price },
     party: { online: false, avatar: initialsOf(name), role: 'Owner', mobile: '', ...item.party, name },
     youAre: 'buyer',
     at: item.at || Date.now(),
@@ -82,11 +86,11 @@ export function stagedToViewModel(item) {
   };
 }
 
-/** View-model input → the `ConversationCreate` body. */
-export function toConversationCreate({ counterpartyMobile, propertyId, body }) {
+export function toConversationCreate({ counterpartyMobile, propertyId, body, clientId }) {
   const out = { body };
   if (counterpartyMobile) out.counterpartyMobile = counterpartyMobile;
   if (propertyId) out.propertyId = propertyId;
+  if (clientId) out.clientId = clientId;
   return out;
 }
 
@@ -107,6 +111,7 @@ function propertyOf(c, group) {
     : '';
   return {
     title: c.propertyTitle || 'Conversation',
+    slug: c.propertySlug ?? undefined,
     price,
     deal: c.propertyDeal || null,
     bhk: c.propertyBhk || '',

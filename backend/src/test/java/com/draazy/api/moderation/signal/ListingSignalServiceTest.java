@@ -94,14 +94,13 @@ class ListingSignalServiceTest extends AbstractApiTest {
 
         assertThat(got.possibleBroker()).isTrue();
         assertThat(got.hardBlock()).isTrue();
-        assertThat(signals.hasHardSignal(target.getId())).isTrue();
         assertThat(got.items()).extracting(ListingSignals.Item::code)
                 .contains("photo_match_other_account", "brokerage_reports");
     }
 
     @Test
-    @DisplayName("duplicate conflicts require override even though the wire hardBlock stays unchanged")
-    void duplicateConflictCountsForApprovalGate() {
+    @DisplayName("a duplicate conflict is reported without raising the wire hardBlock")
+    void duplicateConflictIsReportedSeparately() {
         User owner = user("9822220111", "owner", "Owner");
         User other = user("9822220112", "owner", "Other");
         Property target = listing(owner, "Plain flat", "Baner", "Plain family listing.");
@@ -115,7 +114,6 @@ class ListingSignalServiceTest extends AbstractApiTest {
 
         assertThat(got.conflict()).isTrue();
         assertThat(got.hardBlock()).isFalse();
-        assertThat(signals.hasHardSignal(target.getId())).isTrue();
         assertThat(got.items()).extracting(ListingSignals.Item::code)
                 .contains("duplicate_conflict");
     }

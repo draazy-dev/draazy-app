@@ -32,11 +32,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Room ownership tests focus on plausible regressions: host scoping and soft withdrawal.
-// The second is Withdrawing#aSplitRoomCannotBeWithdrawnAlone().
 @DisplayName("Flatmates — a host's own rooms")
 class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -75,12 +72,13 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
     private String roomBody(User host, String locality, String society) {
         return """
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                 "furnishing":"semi","locality":"%s","society":"%s","rentShare":15000,
+                 "locality":"%s","society":"%s","rentShare":15000,
                  "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
-                 "foodPref":"any","photos":["%s"],
+                 "foodPref":"any","photos":["%s","%s","%s"],
                  "hostRole":"owner",
-                 "note":"Sunny room, quiet building."}
-                """.formatted(locality, society, photoOf(host));
+                 "note":"Sunny room, quiet building.",%s,%s}
+                """.formatted(locality, society, photoOf(host), UploadedPhotos.of(host.getId()),
+                UploadedPhotos.of(host.getId()), FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS);
     }
 
     private String createRoom(User host, String locality, String society) throws Exception {
@@ -98,8 +96,6 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
         return moderateTo(id, "approved");
     }
 
-    // The transaction still holds the stale entity after UPDATE;
-    // clear it so routes read the database value, as production would.
     private String moderateTo(String id, String modStatus) {
         jdbc.update("update flatmate_rooms set mod_status = ? where id = ?::uuid", modStatus, id);
         em.clear();
@@ -109,7 +105,6 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("GET /me/flatmate-rooms")
     class MyRooms {
-
         @Test
         @DisplayName("includes a room still waiting on moderation — the host is not a stranger")
         void includesAPendingRoom() throws Exception {
@@ -175,8 +170,8 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[0].owner").doesNotExist())
                     .andExpect(jsonPath("$.content[0].addressFingerprint").doesNotExist())
                     .andExpect(jsonPath("$.content[0].flagForReview").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].verificationTier").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].reviewStatus").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].verificationTier").value("identity"))
+                    .andExpect(jsonPath("$.content[0].hostRole").isNotEmpty())
                     .andExpect(jsonPath("$.content[0].host").doesNotExist())
                     .andExpect(jsonPath("$.content[0].photos").doesNotExist())
                     .andExpect(jsonPath("$.content[0].lat").doesNotExist())
@@ -219,7 +214,6 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("DELETE /flatmates/rooms/{id}")
     class Withdrawing {
-
         @Test
         @DisplayName("204, and the room leaves the public feed")
         void withdrawTakesItDown() throws Exception {
@@ -250,8 +244,6 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(host)))
                     .andExpect(status().isNoContent());
 
-            // Host withdrawal must not look like Ops removal; moderation state
-            // and audit trail still point at this row.
             assertThat(jdbc.queryForObject(
                     "select archived from flatmate_rooms where id = ?::uuid", Boolean.class, id))
                     .isTrue();
@@ -289,7 +281,7 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
         }
 
         @Test
-        @DisplayName("someone else's room is a 403 — a room id is public, so nothing leaks")
+        @DisplayName("someone else's room is a 404, so a room id is no existence oracle")
         void strangerRefused() throws Exception {
             User host = user("9840000013", "Host Thirteen");
             User stranger = user("9840000014", "Stranger");
@@ -297,7 +289,7 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
 
             mvc.perform(delete(Routes.Flatmates.ROOM_BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isNotFound());
 
             assertThat(jdbc.queryForObject(
                     "select archived from flatmate_rooms where id = ?::uuid", Boolean.class, id))
@@ -339,8 +331,6 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isUnauthorized());
         }
 
-        // Split-room occupants are the only move-in record, so sibling withdrawal
-        // must not bypass the split delete guard.
         @Test
         @DisplayName("a split room cannot be withdrawn on its own")
         void aSplitRoomCannotBeWithdrawnAlone() throws Exception {

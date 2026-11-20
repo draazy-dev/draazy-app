@@ -14,6 +14,7 @@ import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.support.Races;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,11 +24,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-// Not on AbstractApiTest: its rollback hides commits, and these races only exist across commits.
 @SpringBootTest
 @DisplayName("Concurrent answers to a pending tenancy")
 class TenancyConfirmRaceTest {
-
     private static final int ROUNDS = 8;
     private static final String OWNER_MOBILE = "9876000441";
     private static final String TENANT_MOBILE = "9876000442";
@@ -88,7 +87,7 @@ class TenancyConfirmRaceTest {
         AuthPrincipal caller = new AuthPrincipal(owner.getId(), "owner", null, true, false);
         for (int round = 0; round < ROUNDS; round++) {
             Property p = closedRentDeal();
-            UUID tenancyId = tenancies.findPendingByPropertyId(p.getId()).orElseThrow().getId();
+            UUID tenancyId = pendingTenancy(p.getId()).orElseThrow().getId();
 
             List<Throwable> outcomes = Races.run(2, index -> {
                 if (index == 0) {
@@ -103,7 +102,7 @@ class TenancyConfirmRaceTest {
                     e -> assertThat(e).isNull(),
                     e -> assertThat(e).isInstanceOf(ConflictException.class));
             assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
-            assertThat(tenancies.findPendingByPropertyId(p.getId())).isEmpty();
+            assertThat(pendingTenancy(p.getId())).isEmpty();
             String expected = outcomes.get(0) == null ? TenancyStatuses.ENDED : TenancyStatuses.DECLINED;
             assertThat(tenancies.findById(tenancyId).orElseThrow().getStatus()).isEqualTo(expected);
             assertThat(jdbc.queryForObject("select status from deals where property_id = ?",
@@ -116,7 +115,7 @@ class TenancyConfirmRaceTest {
     void confirmRacingDecline() {
         for (int round = 0; round < ROUNDS; round++) {
             Property p = closedRentDeal();
-            UUID tenancyId = tenancies.findPendingByPropertyId(p.getId()).orElseThrow().getId();
+            UUID tenancyId = pendingTenancy(p.getId()).orElseThrow().getId();
 
             List<Throwable> outcomes = Races.run(2, index -> {
                 if (index == 0) {
@@ -134,5 +133,10 @@ class TenancyConfirmRaceTest {
             assertThat(tenancies.findById(tenancyId).orElseThrow().getStatus()).isEqualTo(expected);
             tenancies.deleteById(tenancyId);
         }
+    }
+
+    private Optional<Tenancy> pendingTenancy(UUID propertyId) {
+        return tenancies.findByPropertyId(propertyId).stream()
+                .filter(t -> "pending".equals(t.getStatus())).findFirst();
     }
 }

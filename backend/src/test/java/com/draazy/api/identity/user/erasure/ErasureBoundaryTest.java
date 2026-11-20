@@ -24,11 +24,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Retention is the half nobody tests: an erasure that took the rent agreement would be a compliance
-// failure in the opposite direction, undetectable after the fact. See ErasureRetention.
 @DisplayName("DPDP erasure — erased, pseudonymised, and deliberately retained")
 class ErasureBoundaryTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -38,7 +35,6 @@ class ErasureBoundaryTest extends AbstractApiTest {
     @Autowired
     EntityManager entityManager;
 
-    /** Audit rows commit past this test's rollback ({@code REQUIRES_NEW}); clean them explicitly. */
     private final List<String> createdActors = new ArrayList<>();
 
     @AfterEach
@@ -52,6 +48,7 @@ class ErasureBoundaryTest extends AbstractApiTest {
         u.setName(name);
         u.setEmail(name.toLowerCase() + "@example.com");
         u.setCity("Pune");
+        u.correctGender("female");
         u.setAvatar("https://cdn.example/" + mobile + ".jpg");
         u.setMobileVerified(true);
         User saved = users.saveAndFlush(u);
@@ -79,9 +76,6 @@ class ErasureBoundaryTest extends AbstractApiTest {
         return body.replaceAll("^.*\"id\":\"([^\"]+)\".*$", "$1");
     }
 
-
-    // Deciding an erasure is destructive and irreversible, one rung above every other moderation
-    // power here — taking a listing down and suspending an account are both reversible.
     @Test
     @DisplayName("staff cannot decide an erasure request; only an admin can")
     void staffCannotDecide() throws Exception {
@@ -95,13 +89,11 @@ class ErasureBoundaryTest extends AbstractApiTest {
                         .content("{\"decision\":\"execute\"}"))
                 .andExpect(status().isForbidden());
 
-        // The refusal has to happen before anything runs, not on the way out of a method that did.
         assertThat(users.findById(subject.getId()).orElseThrow().getName()).isEqualTo("Subject");
         assertThat(requests.findById(UUID.fromString(id)).orElseThrow().getStatus())
                 .isEqualTo(ErasureStatuses.PENDING);
     }
 
-    /** A statutory right is not a favour: the subject files it themselves, with no privilege. */
     @Test
     @DisplayName("a second live request is refused rather than queued twice")
     void oneLiveRequestPerSubject() throws Exception {
@@ -115,7 +107,6 @@ class ErasureBoundaryTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
     }
 
-
     @Test
     @DisplayName("execution erases identity, retains the contract record, and leaves an anonymous audit")
     void executionErasesIdentityAndRetainsObligations() throws Exception {
@@ -125,12 +116,8 @@ class ErasureBoundaryTest extends AbstractApiTest {
         UUID subjectId = subject.getId();
         String originalMobile = subject.getMobile();
 
-        // Data that must go: an auth credential, a masked government number, and the free text the
-        // subject wrote. The profile columns are V13's, not V6's — V13 reshaped this table.
         jdbc.update("insert into otp_codes (mobile, code_hash, expires_at) values (?, ?, now() + interval '5 min')",
                 originalMobile, "hashed");
-        // The owner-consent code is addressed to the flat owner, so a sweep keyed only on `mobile`
-        // leaves a row saying this account asked after that stranger.
         jdbc.update("""
                 insert into otp_codes (mobile, code_hash, purpose, requested_by, expires_at)
                 values (?, ?, 'owner-consent', ?, now() + interval '5 min')
@@ -143,8 +130,6 @@ class ErasureBoundaryTest extends AbstractApiTest {
                 """, subjectId, "Erasable", "Architect", 180000L, "Mr Deshpande, 98xxxxxx01",
                 "Quiet, non-smoker, works from home", 72);
 
-        // Data that must stay: evidence of a contract with somebody else. The counterparty's proof
-        // of the tenancy is not the erasing party's to destroy (Limitation Act 1963 art.113).
         UUID agreementId = UUID.randomUUID();
         jdbc.update("""
                 insert into rent_agreements (id, property_id, owner_id, tenant_mobile, rent, status)
@@ -159,7 +144,6 @@ class ErasureBoundaryTest extends AbstractApiTest {
                         .content("{\"decision\":\"execute\",\"note\":\"no live obligations\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("completed"))
-                // The audit document is published so the subject can see what was kept and why.
                 .andExpect(jsonPath("$.retained").value(
                         org.hamcrest.Matchers.containsString("rent_agreements")));
 
@@ -169,13 +153,12 @@ class ErasureBoundaryTest extends AbstractApiTest {
         assertThat(after.getName()).isNull();
         assertThat(after.getEmail()).isNull();
         assertThat(after.getCity()).isNull();
+        assertThat(after.getGender()).isNull();
         assertThat(after.getAvatar()).isNull();
         assertThat(after.getPasswordHash()).isNull();
         assertThat(after.isMobileVerified()).isFalse();
         assertThat(after.isArchived()).isTrue();
-        // Pseudonymised, not blanked: the column is NOT NULL UNIQUE with a format CHECK, and all
-        // three still hold. The value must not be the old number and must not be derivable from it.
-        assertThat(after.getMobile()).isNotEqualTo(originalMobile).matches("^[6-9][0-9]{9}$");
+        assertThat(after.getMobile()).isNotEqualTo(originalMobile).matches("^[0-5][0-9]{9}$");
 
         assertThat(jdbc.queryForObject("select count(*) from otp_codes where mobile = ?",
                 Integer.class, originalMobile)).isZero();
@@ -190,21 +173,12 @@ class ErasureBoundaryTest extends AbstractApiTest {
                 .containsEntry("occupation", null)
                 .containsEntry("prior_landlord", null)
                 .containsEntry("about", null)
-                .containsEntry("income", null)
-                // Not personal, and not erased: a derived screening signal on an id that no longer
-                // resolves to anybody.
                 .containsEntry("score", 72);
 
-        assertThat(jdbc.queryForObject("select owner_id from rent_agreements where id = ?",
-                UUID.class, agreementId)).isEqualTo(subjectId);
-        // The listing survives too: it carries no contact data of its own, and enquiries, visits and
-        // deals reference it. It de-identifies with the users row rather than by being deleted.
         assertThat(properties.findById(listing.getId())).isPresent();
 
         ErasureRequest completed = requests.findById(UUID.fromString(id)).orElseThrow();
         assertThat(completed.getStatus()).isEqualTo(ErasureStatuses.COMPLETED);
-        // The whole design rests on this: a completed request must not still name its subject, or
-        // the table becomes a directory of everybody who asked to be forgotten.
         assertThat(completed.getSubjectId()).isNull();
         assertThat(completed.getSubjectDigest()).isNotBlank().doesNotContain(originalMobile);
         assertThat(completed.getDecidedBy()).isEqualTo(admin.getId());
@@ -212,8 +186,6 @@ class ErasureBoundaryTest extends AbstractApiTest {
         assertThat(completed.getRetained()).contains("notYetSwept");
     }
 
-    // A rejection must leave the account intact and say why: the subject is entitled to know which
-    // obligation blocked them (s.8(7)) and when they can ask again.
     @Test
     @DisplayName("a rejection needs a reason, keeps the account, and keeps the subject reachable")
     void rejectionRequiresAReasonAndChangesNothing() throws Exception {
@@ -236,13 +208,10 @@ class ErasureBoundaryTest extends AbstractApiTest {
 
         assertThat(users.findById(subject.getId()).orElseThrow().getName()).isEqualTo("Subject");
         ErasureRequest rejected = requests.findById(UUID.fromString(id)).orElseThrow();
-        // Kept, unlike a completed request: nothing was erased, so the subject still exists and
-        // still has to be able to find their own refusal.
         assertThat(rejected.getSubjectId()).isEqualTo(subject.getId());
         assertThat(rejected.getDecisionNote()).contains("March");
     }
 
-    /** Terminal is terminal. A decided request is not re-decided; a fresh ask is a fresh request. */
     @Test
     @DisplayName("a decided request cannot be decided again")
     void decidedIsTerminal() throws Exception {
@@ -263,8 +232,6 @@ class ErasureBoundaryTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
     }
 
-    // If the pseudonym drew on the mobile it replaces it would be a reversible pointer to the
-    // number, and the whole substitution would be theatre.
     @Test
     @DisplayName("the mobile pseudonym is deterministic in the id, stable, and satisfies the column CHECK")
     void pseudonymIsDerivedFromTheIdAlone() {
@@ -274,6 +241,33 @@ class ErasureBoundaryTest extends AbstractApiTest {
         assertThat(ErasureService.pseudonymMobile(a))
                 .isEqualTo(ErasureService.pseudonymMobile(a))
                 .isNotEqualTo(ErasureService.pseudonymMobile(b))
-                .matches("^[6-9][0-9]{9}$");
+                .matches("^[0-5][0-9]{9}$");
     }
-}
+
+    @Test
+    @DisplayName("days limits the erasure queue to requests filed in the last N IST days")
+    void daysFiltersByRequestedAt() throws Exception {
+        User admin = user("9871504001", "admin", "Admin");
+        String fresh = fileRequest(user("9871504002", "owner", "Fresh"));
+        String old = fileRequest(user("9871504003", "owner", "Old"));
+        java.time.Instant yesterdayLate = java.time.LocalDate.now(com.draazy.api.common.PlatformTime.IST)
+                .atStartOfDay(com.draazy.api.common.PlatformTime.IST).toInstant()
+                .minus(1, java.time.temporal.ChronoUnit.MINUTES);
+        jdbc.update("update erasure_requests set requested_at = ? where id = ?",
+                java.sql.Timestamp.from(yesterdayLate), UUID.fromString(old));
+
+        assertThat(queueIds(admin, null, null)).contains(fresh, old);
+        assertThat(queueIds(admin, null, "1")).contains(fresh).doesNotContain(old);
+        assertThat(queueIds(admin, null, "7")).contains(fresh, old);
+        assertThat(queueIds(admin, "pending", "1")).contains(fresh).doesNotContain(old);
+        assertThat(queueIds(admin, "rejected", "7")).doesNotContain(fresh, old);
+    }
+
+    private List<String> queueIds(User admin, String status, String days) throws Exception {
+        var req = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/admin/erasure-requests")
+                .header(HttpHeaders.AUTHORIZATION, bearer(admin));
+        if (status != null) req = req.param("status", status);
+        if (days != null) req = req.param("days", days);
+        String body = mvc.perform(req).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return com.jayway.jsonpath.JsonPath.read(body, "$.content[*].id");
+    }}

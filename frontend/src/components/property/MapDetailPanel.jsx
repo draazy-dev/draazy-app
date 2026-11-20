@@ -47,10 +47,10 @@ const factsOf = (p, t) => {
   const isPlot = isLandListing(p);
   const baths = Number(p.bath) || 0;
   const areaRow = [
+    [isPlot ? t('property.plotArea') : t('property.totalArea'), p.area, p.areaUnit],
     [t('property.carpetArea'), p.carpetArea, 'sqft'],
     [t('property.builtupArea'), p.builtUpArea, 'sqft'],
     [t('property.superBuiltup'), p.superBuiltUpArea, 'sqft'],
-    [isPlot ? t('property.plotArea') : t('property.totalArea'), p.area, p.areaUnit],
   ].find(([, value]) => Number(value) > 0);
   const area = areaRow ? fmtArea(areaRow[1], areaRow[2]) : '';
   const furn = FURN_LBL[p.furnishing];
@@ -86,8 +86,6 @@ export default function MapDetailPanel({ property: p, list, locName, activeIndex
   const [inlineOtpReason, setInlineOtpReason] = useState(null);
   const [resumeAction, setResumeAction] = useState(null);
   const [resumeAfterVerify, setResumeAfterVerify] = useState(0);
-  /* Below 768px this is a bottom sheet with a grabber, and a grabber that cannot be grabbed is the loudest non-native
-     tell on the map. */
   const signedIn = Boolean(isIn || authIn);
   const swipe = useSwipeDismiss(onClose, { axis: 'y', query: '(max-width: 767px)' });
 
@@ -169,8 +167,6 @@ export default function MapDetailPanel({ property: p, list, locName, activeIndex
     setResumeAction(action);
     setInlineOtpReason(reason);
   };
-  // Mirrors the property-detail page: L1 contact (badge-not-gate), so queue a pending in-app chat
-  // request and open the thread, falling back to the enquiry popup when messaging is disabled.
   const contact = async () => {
     if (!signedIn) { openInlineOtp('contact', 'contact'); return; }
     if (!chatEnabled) { setContactOpen(true); return; }
@@ -182,7 +178,7 @@ export default function MapDetailPanel({ property: p, list, locName, activeIndex
     setVisitOpen(true);
   };
   const toggleSave = () => {
-    if (!signedIn) { sendToSignIn('save'); return; }
+    if (!signedIn) { sendToSignIn('save', undefined, () => savedList.save(p.id, p.uuid)); return; }
     savedList.toggle(p.id, p.uuid);
   };
   const isOwner = signedIn && digits(p.ownerMobile) && digits(p.ownerMobile) === digits(user?.mobile);
@@ -190,7 +186,6 @@ export default function MapDetailPanel({ property: p, list, locName, activeIndex
   return (
     <>
       <aside {...swipe} data-no-ptr className="dz-mdp" role="dialog" aria-modal="true" aria-label={titleOf(p, t) + ' details'}>
-        <span className="dz-mdp-grip" aria-hidden="true" />
         <div className="dz-mdp-top">
           <div className="dz-mdp-step">
             <button type="button" onClick={() => step(-1)} disabled={activeIndex <= 0} aria-label="Previous property"><Icon name="chevron-left" /></button>
@@ -281,7 +276,7 @@ export default function MapDetailPanel({ property: p, list, locName, activeIndex
       </aside>
 
       {contactOpen ? <ContactOwnerModal p={p} isIn={signedIn} onClose={() => setContactOpen(false)} toast={toast} /> : null}
-      {visitOpen && scheduleEnabled ? <ScheduleVisitModal p={p} isIn={signedIn} onClose={() => setVisitOpen(false)} toast={toast} /> : null}
+      {visitOpen && scheduleEnabled ? <ScheduleVisitModal p={p} isIn={signedIn} onClose={() => setVisitOpen(false)} /> : null}
       <InlineOtpSheet open={!!inlineOtpReason} reason={inlineOtpReason || 'contact'} onClose={() => { setInlineOtpReason(null); setResumeAction(null); }} onVerified={() => { resumeAfterInlineOtpCloses(); setInlineOtpReason(null); }} />
     </>
   );

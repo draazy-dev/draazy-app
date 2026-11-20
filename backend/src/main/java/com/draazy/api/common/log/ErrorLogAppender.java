@@ -21,12 +21,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/** Captures ERROR events into {@code error_event} via a bounded queue and one daemon writer, so a failing database
- * costs a dropped row, never a blocked request or a loop. */
 @Component
 @ConditionalOnProperty(name = "draazy.error-log.enabled", havingValue = "true", matchIfMissing = true)
 public class ErrorLogAppender extends AppenderBase<ILoggingEvent> {
-
     private static final String OWN_PACKAGE = ErrorLogAppender.class.getPackageName();
     private static final String JOB_TRACE_PREFIX = "job-";
     private static final String APP_PACKAGE = "com.draazy";
@@ -47,7 +44,6 @@ public class ErrorLogAppender extends AppenderBase<ILoggingEvent> {
         setName("draazy-error-log");
     }
 
-    /** Events dropped because the queue was full. */
     public long dropped() {
         return dropped.get();
     }

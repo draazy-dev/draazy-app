@@ -3,6 +3,9 @@ package com.draazy.api.engagement.flatmate;
 import com.draazy.api.common.web.PageResponse;
 import com.draazy.api.common.web.Pageables;
 import com.draazy.api.common.web.Routes;
+import com.draazy.api.engagement.livingstyle.VibeFilter;
+import com.draazy.api.security.AuthPrincipal;
+import com.draazy.api.security.CurrentUser;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -10,11 +13,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Public feed; its own controller because it reads all three collections.
- * Facets: docs/flows/consumer/flatmates.md §5. */
 @RestController
 public class FlatmateFeedController {
-
     private final FlatmateFeedService service;
 
     public FlatmateFeedController(FlatmateFeedService service) {
@@ -23,6 +23,7 @@ public class FlatmateFeedController {
 
     @GetMapping(Routes.Flatmates.FEED)
     public FlatmateFeedResponse<Object> feed(
+            @CurrentUser AuthPrincipal principal,
             @RequestParam(required = false) String tab,
             @RequestParam(required = false) String view,
             @RequestParam(required = false) String q,
@@ -36,26 +37,35 @@ public class FlatmateFeedController {
             @RequestParam(required = false) String gender,
             @RequestParam(required = false, defaultValue = "false") boolean verifiedOnly,
             @RequestParam(required = false) Integer moveInDays,
-            @RequestParam(required = false) List<String> habits,
+            @RequestParam(required = false) List<String> vibe,
             @RequestParam(required = false) String attachedBath,
+            @RequestParam(required = false) String strictGender,
+            @RequestParam(required = false) String roomType,
+            @RequestParam(required = false) String furnishing,
+            @RequestParam(required = false) String gated,
             @RequestParam(required = false) Integer sharing,
+            @RequestParam(required = false) String bhk,
+            @RequestParam(required = false) String vegOnly,
+            @RequestParam(required = false) String parking,
+            @RequestParam(required = false) Integer minAge,
+            @RequestParam(required = false) Integer maxAge,
+            @RequestParam(required = false) Integer minOpenSeats,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) List<String> meLocalities,
             @RequestParam(required = false) Long meBudget,
             @RequestParam(required = false) String meGender,
             @PageableDefault(size = 20) Pageable pageable) {
-
         FlatmateSearchQuery facets = new FlatmateSearchQuery(
                 FlatmateVocabulary.resolveTab(tab, view), q, locality,
                 nearLat, nearLng, nearRadiusKm,
                 minBudget, maxBudget == null ? budget : maxBudget,
-                gender, verifiedOnly, moveInDays, habits, attachedBath, sharing,
-                sort, meLocalities, meBudget, meGender);
+                gender, verifiedOnly, moveInDays, VibeFilter.parse(vibe), attachedBath, sharing,
+                sort, meLocalities, meBudget, meGender, null, "true".equalsIgnoreCase(strictGender), roomType, furnishing,
+                "true".equalsIgnoreCase(gated),
+                new FlatmateTabFacets(bhk, "true".equalsIgnoreCase(vegOnly), parking, minAge, maxAge, minOpenSeats));
 
-        FlatmateFeedService.FeedResult result =
-                service.feed(facets, Pageables.unsorted(pageable));
-        return FlatmateFeedResponse.of(
-                PageResponse.of(result.page(), dto -> dto), result.verifiedTotal(),
-                result.otherTabTotal());
+        FlatmateFeedService.FeedResult result = service.feed(
+                principal == null ? null : principal.userId(), facets, Pageables.unsorted(pageable));
+        return FlatmateFeedResponse.of(PageResponse.of(result.page(), dto -> dto), result);
     }
 }

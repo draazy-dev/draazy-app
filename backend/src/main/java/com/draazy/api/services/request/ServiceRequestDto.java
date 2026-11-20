@@ -1,12 +1,11 @@
 package com.draazy.api.services.request;
 
 import com.draazy.api.documents.vault.DocumentSummary;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-// requesterId stays off wire: requesters know it, ops read names from timeline.
-// Exposing ids invites later client-side filtering leaks.
 public record ServiceRequestDto(
         String id,
         String type,
@@ -25,11 +24,26 @@ public record ServiceRequestDto(
         Long amount,
         String paymentSessionId,
         RegistrationDto registration,
-        PoliceIntimationDto policeIntimation,
         Sla sla,
         Amendment amendment,
         DraftApproval draftApproval,
-        DraftCheck draftCheck) {
+        Charges charges,
+        Attention attention,
+        boolean cancellable,
+        boolean editableByMe,
+        boolean mySideSubmitted,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String myPartyId,
+        boolean payableByMe,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String paidBy) {
+    public record Charges(long platformFee, long stampDuty, long exactDutyInPaise, long registration, long handling,
+            boolean referralCredit) {
+    }
+
+    public record Attention(String party, String reason, List<Paper> papers, Instant askedAt, boolean forYou) {
+    }
+
+    public record Paper(String id, String name) {
+    }
 
     public record TimelineEntry(Instant at, String event, String by) {
     }
@@ -46,17 +60,22 @@ public record ServiceRequestDto(
     }
 
     public record DraftApprovalParty(String key, String label, String method, String mobile,
-            boolean opened, boolean approved, Instant approvedAt) {
+            boolean opened, boolean approved, Instant approvedAt, boolean mine) {
     }
 
-    public record DraftCheck(int version, String status, List<String> reasons, String note,
-            String sharedBy, String checkedBy, Instant checkedAt) {
-    }
-
-    // Stitches the single-use gateway session onto create response; it is never stored.
     public ServiceRequestDto withPaymentSessionId(String sessionId) {
         return new ServiceRequestDto(id, type, team, status, propertyId, ticketId, details, assignee,
                 assignedToMe, timeline, documents, messages, parties, createdAt, amount, sessionId, registration,
-                policeIntimation, sla, amendment, draftApproval, draftCheck);
+                sla, amendment, draftApproval, charges, attention, cancellable, editableByMe,
+                mySideSubmitted, myPartyId, payableByMe, paidBy);
+    }
+
+    ServiceRequestDto withWhatsappQueued(String partyId, Boolean queued) {
+        List<ServiceRequestPartyDto> marked = parties == null ? null : parties.stream()
+                .map(p -> p.id().equals(partyId) ? p.withWhatsappQueued(queued) : p).toList();
+        return new ServiceRequestDto(id, type, team, status, propertyId, ticketId, details, assignee,
+                assignedToMe, timeline, documents, messages, marked, createdAt, amount, paymentSessionId,
+                registration, sla, amendment, draftApproval, charges, attention, cancellable, editableByMe,
+                mySideSubmitted, myPartyId, payableByMe, paidBy);
     }
 }

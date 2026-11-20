@@ -1,30 +1,25 @@
 package com.draazy.api.common.settings;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Every field is an override merged over the client's {@code CITY_GEO}, so there is no seeded row and a fresh install answers {@code {}};
- * a blacklist entry's {@code note} is dropped because anyone can call this route. */
 @Component
 public class GeoPolicyController {
-
     private static final Logger log = LoggerFactory.getLogger(GeoPolicyController.class);
 
-    /** Not seeded, unlike {@code fees}, {@code flags} and {@code movePack}: defaults live in the client's {@code CITY_GEO}, so a seeded copy would be a second source of truth. */
     private static final String GEO_KEY = "geo";
 
-    /** Matches the client's {@code isBlacklisted} minimum ({@code term.length >= 2}, {@code lib/geoConfig.js});
-     * shorter entries are inert, and a test asserts the two stay in step. */
+    public static final String SERVED_DISTRICTS_KEY = "servedDistricts";
+
+    public static final List<String> DEFAULT_SERVED_DISTRICTS = List.of("Pune");
+
     private static final int MIN_BLACKLIST_TERM = 2;
 
-    /** Bounds of the coordinate system. A "latitude" outside these is not a mistyped place. */
     private static final double MAX_LATITUDE = 90;
     private static final double MAX_LONGITUDE = 180;
 
@@ -36,20 +31,62 @@ public class GeoPolicyController {
         this.objectMapper = objectMapper;
     }
 
-    /** A missing or malformed row answers the empty policy, as failing would blank every page render over a hand-edited config row. */
     public GeoPolicyResponse geo() {
         JsonNode stored = storedGeo();
         if (stored == null) {
-            return new GeoPolicyResponse(null, Map.of(), List.of());
+            return new GeoPolicyResponse(null, List.of(), DEFAULT_SERVED_DISTRICTS, List.of());
         }
         JsonNode enforce = stored.get("enforceCityLimit");
+        JsonNode served = stored.get(SERVED_DISTRICTS_KEY);
         return new GeoPolicyResponse(
                 enforce != null && enforce.isBoolean() ? enforce.booleanValue() : null,
-                cities(stored.get("cities")),
-                blacklist(stored.get("blacklist")));
+                blacklist(stored.get("blacklist")),
+                servedDistricts(served),
+                districtAreas(served));
     }
 
-    /** The parsed {@code geo} row, or null for every way reading it can fail. */
+    public List<String> servedDistricts() {
+        JsonNode stored = storedGeo();
+        return stored == null ? DEFAULT_SERVED_DISTRICTS : servedDistricts(stored.get(SERVED_DISTRICTS_KEY));
+    }
+
+    private static List<String> servedDistricts(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return DEFAULT_SERVED_DISTRICTS;
+        }
+        List<String> out = new ArrayList<>();
+        for (JsonNode entry : node) {
+            String name = districtName(entry);
+            if (name != null && out.stream().noneMatch(name::equalsIgnoreCase)) {
+                out.add(name);
+            }
+        }
+        return out.isEmpty() ? DEFAULT_SERVED_DISTRICTS : List.copyOf(out);
+    }
+
+    private static List<GeoPolicyResponse.DistrictArea> districtAreas(JsonNode node) {
+        List<GeoPolicyResponse.DistrictArea> out = new ArrayList<>();
+        if (node == null || !node.isArray()) {
+            return out;
+        }
+        for (JsonNode entry : node) {
+            String name = districtName(entry);
+            if (name == null || !entry.isObject() || out.stream().anyMatch(a -> a.name().equalsIgnoreCase(name))) {
+                continue;
+            }
+            String placeId = text(entry.get("placeId"));
+            GeoPolicyResponse.Bounds bounds = bounds(entry.get("bounds"));
+            if (placeId != null || bounds != null) {
+                out.add(new GeoPolicyResponse.DistrictArea(name, placeId, bounds));
+            }
+        }
+        return out;
+    }
+
+    private static String districtName(JsonNode entry) {
+        return entry != null && entry.isObject() ? text(entry.get("name")) : text(entry);
+    }
+
     private JsonNode storedGeo() {
         return settings.value(GEO_KEY).map(row -> {
             JsonNode parsed;
@@ -69,43 +106,6 @@ public class GeoPolicyController {
         }).orElse(null);
     }
 
-    /** Per-city map overrides keyed by the client's city name; a city with nothing set is omitted, as an empty entry implies an override exists. */
-    private static Map<String, GeoPolicyResponse.CityGeo> cities(JsonNode node) {
-        Map<String, GeoPolicyResponse.CityGeo> out = new LinkedHashMap<>();
-        if (node == null || !node.isObject()) {
-            return out;
-        }
-        node.properties().forEach(entry -> {
-            JsonNode city = entry.getValue();
-            if (city == null || !city.isObject()) {
-                return;
-            }
-            GeoPolicyResponse.CityGeo projected = new GeoPolicyResponse.CityGeo(
-                    latLng(city.get("center")),
-                    bounds(city.get("bounds")));
-            if (projected.center() != null || projected.bounds() != null) {
-                out.put(entry.getKey(), projected);
-            }
-        });
-        return out;
-    }
-
-    /** Null unless both coordinates are finite and in range: a half point mis-centres the map,
-     * and {@code Infinity} is not valid JSON, so it would make the client drop the whole policy. */
-    private static GeoPolicyResponse.LatLng latLng(JsonNode node) {
-        if (node == null || !node.isObject()) {
-            return null;
-        }
-        Double lat = coordinate(node.get("lat"), MAX_LATITUDE);
-        Double lng = coordinate(node.get("lng"), MAX_LONGITUDE);
-        if (lat == null || lng == null) {
-            return null;
-        }
-        return new GeoPolicyResponse.LatLng(lat, lng);
-    }
-
-    /** Null unless all four edges are finite, in range and non-inverted: a gapped or empty box silently breaks
-     * the client's Places restriction. Dropped, not repaired; the built-in bounds then apply. */
     private static GeoPolicyResponse.Bounds bounds(JsonNode node) {
         if (node == null || !node.isObject()) {
             return null;
@@ -123,7 +123,6 @@ public class GeoPolicyController {
         return new GeoPolicyResponse.Bounds(north, south, east, west);
     }
 
-    /** Null rather than clamped: clamping 200 to 90 invents a place the operator never named. */
     private static Double coordinate(JsonNode node, double limit) {
         if (node == null || !node.isNumber()) {
             return null;
@@ -135,7 +134,6 @@ public class GeoPolicyController {
         return value;
     }
 
-    /** Drops the operator's {@code note} (moderator prose; route is anonymous) and entries matching nothing. */
     private static List<GeoPolicyResponse.BlacklistEntry> blacklist(JsonNode node) {
         List<GeoPolicyResponse.BlacklistEntry> out = new ArrayList<>();
         if (node == null || !node.isArray()) {
@@ -158,7 +156,6 @@ public class GeoPolicyController {
         return out;
     }
 
-    /** A trimmed string field, or null when it is absent, the wrong type, or blank. */
     private static String text(JsonNode node) {
         if (node == null || !node.isString()) {
             return null;

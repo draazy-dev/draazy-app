@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 27
-updated: 2026-10-10
+updated: 2026-11-06
 summary: How managers read queue health and the staff activity log, and what to follow up on.
 tags: [ops, internal, team, audit, managers]
 modules: [staffActivity]
@@ -61,9 +61,9 @@ What counts as open:
 | KYC review | Identity checks waiting for review |
 | Property verification | Listings waiting for a verification decision or an ownership check |
 | Listing moderation | Listings waiting for approval |
-| Support | Tickets the staff have not read yet, that are not resolved or closed |
+| Support | [Support chats](/help/a/support-chats) with a customer message staff have not read yet, that are not resolved or closed |
 | Reports | Reports that are open or being reviewed |
-| Each service desk | Requests and tickets that are still in progress, not completed or cancelled |
+| Each service desk | Requests and tickets that are still in progress, not awaiting payment, shared as a draft, waiting on the customer, completed or cancelled |
 
 **Handled** is the number of audited actions the person took. It is not the number of cases closed. Per-function counts only include actions the system can match to a function, so they may add up to less than **handled**.
 
@@ -102,4 +102,5 @@ The admin **All actors** view is a separate read-only trail, 12 rows per page, w
 - [Staff desks](/help/a/staff-desks)
 - [Analytics review](/help/a/analytics-review)
 - [Verification SLAs](/help/a/verification-sla)
-- [Ticket handling and escalation](/help/a/ticket-escalation)
+- [Support chats](/help/a/support-chats)
+- [Chats, tickets and escalation](/help/a/ticket-escalation)

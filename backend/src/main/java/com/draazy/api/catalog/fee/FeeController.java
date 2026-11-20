@@ -7,11 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-// Public on purpose: the fee is why someone picks zero brokerage, so it shows before sign-up.
-// The rent row's platform fee is the admin figure ServiceRequestPricing bills.
 @RestController
 public class FeeController {
-
     private final PlatformFeeRepository fees;
     private final FeeMapper feeMapper;
     private final PlatformSettings settings;

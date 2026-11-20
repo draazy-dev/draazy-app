@@ -1,5 +1,5 @@
-import { Navigate, Route, Routes, useLocation, useNavigationType, useRoutes } from 'react-router';
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { matchRoutes, Navigate, Route, Routes, useLocation, useNavigationType, useRoutes } from 'react-router';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 
 import ConsumerLayout from './components/layout/ConsumerLayout.jsx';
 import PreviewBanner from './components/pmf/PreviewBanner.jsx';
@@ -7,7 +7,10 @@ import { ProtectedRoute, RoleRoute, FlagRoute, AppFlagRoute, ModuleRoute } from 
 import { AppFlagsProvider } from './context/AppFlagsContext.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { lazyPage } from './i18n/lazyPage.js';
+import { preloadable } from './lib/preloadable.js';
 import { applyAppPrefs } from './lib/localPrefs.js';
+import { readAccessToken } from './lib/auth.js';
+import { prefetchMyListing } from './services/propertyService.js';
 import { DESK_BY_VALUE, portalBase, portalPath } from './lib/adminModules.js';
 import { recordPageView, startPageViewBeacon } from './lib/telemetry/pageViewBeacon.js';
 import usePageHead from './lib/usePageHead.js';
@@ -22,24 +25,20 @@ import useKeyboardOpen from './lib/useKeyboardOpen.js';
 import { installReducedMotionScroll } from './lib/motion.js';
 import LegacyHelpLangRedirect from './components/help/LegacyHelpLangRedirect.jsx';
 
-const AdminLayout = lazy(() => import('./components/layout/AdminLayout.jsx'));
+const AdminLayout = preloadable(() => import('./components/layout/AdminLayout.jsx'));
 const StaffLogin = lazy(() => import('./pages/consumer/StaffLogin.jsx'));
 
-/* Route-shaped Suspense fallbacks, necessarily in the entry chunk. They must stay free of imports
-   of their own or they drag a route's dependencies into the critical path. */
 import DashboardSkeleton from './pages/consumer/dashboard/DashboardSkeleton.jsx';
 import FlatmatesSkeleton from './pages/consumer/flatmates/FlatmatesSkeleton.jsx';
 import SocietySkeleton from './pages/consumer/society/SocietySkeleton.jsx';
 
-/* `lazyPage(loader, ...namespaces)` is `lazy()` plus the route's English locale namespaces, so English
-   is not bundled whole onto every visitor's critical path. `npm run check:i18n` proves the list. */
 const Listings = lazyPage(() => import('./pages/consumer/Listings.jsx'), 'listings', 'owner', 'property', 'verify');
 const Property = lazyPage(() => import('./pages/consumer/Property.jsx'), 'listings', 'owner', 'property', 'verify');
 const Owner = lazyPage(() => import('./pages/consumer/Owner.jsx'), 'owner');
 const Compare = lazyPage(() => import('./pages/consumer/Compare.jsx'), 'compare-saved');
 const Dashboard = lazyPage(() => import('./pages/consumer/Dashboard.jsx'), 'dashboard', 'flatmates', 'list-property', 'listings', 'locality', 'owner', 'owner-hub', 'verify');
 const Services = lazyPage(() => import('./pages/consumer/Services.jsx'), 'services');
-const ListProperty = lazyPage(() => import('./pages/consumer/ListProperty.jsx'), 'flatmates', 'list-property', 'owner', 'verify');
+const ListProperty = lazyPage(() => import('./pages/consumer/ListProperty.jsx'), 'dashboard', 'flatmates', 'list-property', 'owner', 'verify');
 const PropertyPassport = lazyPage(() => import('./pages/consumer/PropertyPassport.jsx'), 'locality', 'owner-hub');
 const PackersMovers = lazyPage(() => import('./pages/consumer/services/PackersMovers.jsx'), 'services');
 const PropertyLegal = lazyPage(() => import('./pages/consumer/services/PropertyLegal.jsx'), 'services');
@@ -47,7 +46,7 @@ const HomeLoans = lazyPage(() => import('./pages/consumer/services/HomeLoans.jsx
 const InteriorRenovation = lazyPage(() => import('./pages/consumer/services/InteriorRenovation.jsx'), 'services');
 const PropertyValuation = lazyPage(() => import('./pages/consumer/services/PropertyValuation.jsx'), 'services');
 const RentAgreement = lazyPage(() => import('./pages/consumer/services/RentAgreement.jsx'), 'list-property', 'services');
-const Contact = lazy(() => import('./pages/consumer/Contact.jsx'));
+const Contact = lazyPage(() => import('./pages/consumer/Contact.jsx'), 'misc2');
 const TrustPage = lazy(() => import('./pages/consumer/TrustPage.jsx'));
 const CompareNobroker = lazy(() => import('./pages/consumer/CompareNobroker.jsx'));
 const StaffInvite = lazy(() => import('./pages/consumer/StaffInvite.jsx'));
@@ -58,7 +57,7 @@ const EmiCalculator = lazy(() => import('./pages/consumer/EmiCalculator.jsx'));
 const ToolsHub = lazy(() => import('./pages/consumer/tools/ToolsHub.jsx'));
 const RentReceipt = lazy(() => import('./pages/consumer/tools/RentReceipt.jsx'));
 const StampDutyTool = lazy(() => import('./pages/consumer/tools/StampDutyTool.jsx'));
-const RentAgreementCost = lazy(() => import('./pages/consumer/tools/RentAgreementCost.jsx'));
+const RentAgreementCost = lazyPage(() => import('./pages/consumer/tools/RentAgreementCost.jsx'), 'services');
 const RentalYield = lazy(() => import('./pages/consumer/tools/RentalYield.jsx'));
 const TenantProfile = lazyPage(() => import('./pages/consumer/TenantProfile.jsx'), 'misc2', 'verify');
 const VerifyIdentity = lazyPage(() => import('./pages/consumer/VerifyIdentity.jsx'), 'verify-identity');
@@ -68,12 +67,12 @@ const Society = lazyPage(() => import('./pages/consumer/Society.jsx'), 'list-pro
 const Societies = lazyPage(() => import('./pages/consumer/Societies.jsx'), 'list-property', 'society');
 const Reels = lazyPage(() => import('./pages/consumer/Reels.jsx'), 'compare-saved', 'reels-docs');
 const Saved = lazyPage(() => import('./pages/consumer/Saved.jsx'), 'compare-saved', 'flatmates', 'listings');
-// Static teaser only: keep this route free of payment calls until the rail is live.
 const PayRent = lazyPage(() => import('./pages/consumer/PayRentComingSoon.jsx'), 'misc2');
 const ViewDocuments = lazyPage(() => import('./pages/consumer/ViewDocuments.jsx'), 'reels-docs');
 const Messages = lazyPage(() => import('./pages/consumer/Messages.jsx'), 'flatmates', 'misc2');
-const Flatmates = lazyPage(() => import('./pages/consumer/Flatmates.jsx'), 'flatmates', 'owner', 'property', 'verify');
+const Flatmates = lazyPage(() => import('./pages/consumer/Flatmates.jsx'), 'dashboard', 'flatmates', 'list-property', 'owner', 'property', 'verify');
 const FlatmateDetail = lazyPage(() => import('./pages/consumer/FlatmateDetail.jsx'), 'flatmates', 'owner', 'property');
+const OwnerConfirm = lazyPage(() => import('./pages/consumer/OwnerConfirm.jsx'), 'flatmates');
 const Locality = lazyPage(() => import('./pages/consumer/Locality.jsx'), 'listings', 'locality');
 const RentBuyLanding = lazyPage(() => import('./pages/consumer/RentBuyLanding.jsx'), 'listings', 'owner', 'property', 'verify');
 const FlatmateLanding = lazyPage(() => import('./pages/consumer/FlatmateLanding.jsx'), 'flatmates', 'owner', 'property', 'verify');
@@ -94,51 +93,54 @@ const Disclaimer = lazy(() => import('./pages/consumer/Disclaimer.jsx'));
 
 function ListPropertyRoute() {
   const location = useLocation();
-  const editing = new URLSearchParams(location.search).has('edit');
+  const params = new URLSearchParams(location.search);
+  const editing = params.has('edit');
+  const editId = params.get('edit');
+  useEffect(() => {
+    if (!editing || !readAccessToken()) return;
+    ListProperty.preload();
+    prefetchMyListing(editId).catch(() => {});
+  }, [editing, editId]);
   const page = <ListProperty />;
   return editing ? <ProtectedRoute>{page}</ProtectedRoute> : page;
 }
 
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard.jsx'));
-const AdminProperties = lazy(() => import('./pages/admin/AdminProperties.jsx'));
-const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics.jsx'));
-const AdminUsers = lazy(() => import('./pages/admin/AdminUsers.jsx'));
-const AdminServices = lazy(() => import('./pages/admin/AdminServices.jsx'));
-const AdminRunbooks = lazy(() => import('./pages/admin/AdminRunbooks.jsx'));
-const AdminEnquiries = lazy(() => import('./pages/admin/AdminEnquiries.jsx'));
-const AdminFinance = lazy(() => import('./pages/admin/AdminFinance.jsx'));
-const AdminContent = lazy(() => import('./pages/admin/AdminContent.jsx'));
-const AdminReports = lazy(() => import('./pages/admin/AdminReports.jsx'));
-const AdminSettings = lazy(() => import('./pages/admin/AdminSettings.jsx'));
-const AdminIntegrations = lazy(() => import('./pages/admin/AdminIntegrations.jsx'));
-const AdminErasureRequests = lazy(() => import('./pages/admin/AdminErasureRequests.jsx'));
-const AdminHelpFeedback = lazy(() => import('./pages/admin/AdminHelpFeedback.jsx'));
-const AdminErrorLog = lazy(() => import('./pages/admin/AdminErrorLog.jsx'));
+const AdminDashboard = preloadable(() => import('./pages/admin/AdminDashboard.jsx'));
+const AdminProperties = preloadable(() => import('./pages/admin/AdminProperties.jsx'));
+const AdminAnalytics = preloadable(() => import('./pages/admin/AdminAnalytics.jsx'));
+const AdminUsers = preloadable(() => import('./pages/admin/AdminUsers.jsx'));
+const AdminServices = preloadable(() => import('./pages/admin/AdminServices.jsx'));
+const AdminRunbooks = preloadable(() => import('./pages/admin/AdminRunbooks.jsx'));
+const AdminEnquiries = preloadable(() => import('./pages/admin/AdminEnquiries.jsx'));
+const AdminFinance = preloadable(() => import('./pages/admin/AdminFinance.jsx'));
+const AdminContent = preloadable(() => import('./pages/admin/AdminContent.jsx'));
+const AdminReports = preloadable(() => import('./pages/admin/AdminReports.jsx'));
+const AdminSettings = preloadable(() => import('./pages/admin/AdminSettings.jsx'));
+const AdminIntegrations = preloadable(() => import('./pages/admin/AdminIntegrations.jsx'));
+const AdminErasureRequests = preloadable(() => import('./pages/admin/AdminErasureRequests.jsx'));
+const AdminHelpFeedback = preloadable(() => import('./pages/admin/AdminHelpFeedback.jsx'));
+const AdminErrorLog = preloadable(() => import('./pages/admin/AdminErrorLog.jsx'));
 const AdminPostOnBehalf = lazyPage(() => import('./pages/admin/AdminPostOnBehalf.jsx'), 'list-property');
-const AdminStaffActivity = lazy(() => import('./pages/admin/AdminStaffActivity.jsx'));
-const AdminPlaces = lazy(() => import('./pages/admin/AdminPlaces.jsx'));
-/* The manager warning owns the only translated string on this page; the rest is still English. */
+const AdminStaffActivity = preloadable(() => import('./pages/admin/AdminStaffActivity.jsx'));
+const AdminPlaces = preloadable(() => import('./pages/admin/AdminPlaces.jsx'));
 const AdminTeam = lazyPage(() => import('./pages/admin/AdminTeam.jsx'), 'team');
 
-const OpsReferrals = lazy(() => import('./pages/ops/OpsReferrals.jsx'));
-const OpsRefunds = lazy(() => import('./pages/ops/OpsRefunds.jsx'));
-const OpsFlatmateReview = lazy(() => import('./pages/ops/OpsFlatmateReview.jsx'));
-const OpsIdentityReview = lazy(() => import('./pages/ops/OpsIdentityReview.jsx'));
-const OpsSupportQueue = lazy(() => import('./pages/ops/OpsSupportQueue.jsx'));
-const OpsDraftingDesk = lazy(() => import('./pages/ops/OpsDraftingDesk.jsx'));
-const RentAgreementDesk = lazy(() => import('./pages/ops/rent-agreement/RentAgreementDesk.jsx'));
+const OpsReferrals = preloadable(() => import('./pages/ops/OpsReferrals.jsx'));
+const OpsRefunds = preloadable(() => import('./pages/ops/OpsRefunds.jsx'));
+const AdminLeads = preloadable(() => import('./pages/admin/leads/AdminLeads.jsx'));
+const OpsFlatmateReview = lazyPage(() => import('./pages/ops/OpsFlatmateReview.jsx'), 'flatmates');
+const OpsIdentityReview = preloadable(() => import('./pages/ops/OpsIdentityReview.jsx'));
+const SupportChatsInbox = preloadable(() => import('./pages/ops/support-chats/SupportChatsInbox.jsx'));
+const OpsDraftingDesk = lazyPage(() => import('./pages/ops/OpsDraftingDesk.jsx'), 'services');
+const RentAgreementDesk = lazyPage(() => import('./pages/ops/rent-agreement/RentAgreementDesk.jsx'), 'services');
 
 function ScrollToTop() {
   const { pathname } = useLocation();
   const navType = useNavigationType();
-  // Async content and reveal animations land a restored scroll position part-way down the page,
-  // so force the top on reload. Genuine back/forward (POP) is left alone.
   useEffect(() => {
     const navEntry = performance.getEntriesByType?.('navigation')?.[0];
     if (navEntry?.type === 'reload') window.scrollTo(0, 0);
   }, []);
-  // Pathname-only, so a `?tab=` switch does not yank the reader back to the top; POP is still
-  // gated so the browser can restore its own position.
   const prevPath = useRef(pathname);
   useEffect(() => {
     if (pathname === prevPath.current) return;
@@ -154,13 +156,9 @@ function ReferralCapture() {
   return null;
 }
 
-/* Separate from `ScrollToTop` because it is permanent and sends to our own API. The beacon reduces
-   the pathname to a pattern and never emits back-office routes. */
 function PageViewTelemetry() {
   const { pathname } = useLocation();
 
-  // Mounted once, separate from the effect below: restarting the interval on every route change
-  // would mean a fast-browsing session never flushes until the queue cap or a hidden tab.
   useEffect(() => startPageViewBeacon(), []);
 
   useEffect(() => { recordPageView(pathname); }, [pathname]);
@@ -186,7 +184,6 @@ function LoadingFallback() {
   );
 }
 
-// Old /ops bookmarks carry ?open=<id> and similar; the target's own query wins on a clash.
 function LegacyRedirect({ to }) {
   const { search, hash } = useLocation();
   const [pathname, fixed = ''] = to.split('?');
@@ -196,7 +193,6 @@ function LegacyRedirect({ to }) {
   return <Navigate to={`${pathname}${query ? `?${query}` : ''}${hash}`} replace />;
 }
 
-// Old `?type=` bookmarks land on that desk's own page.
 function DeskRedirect() {
   const { search } = useLocation();
   return <Navigate to={DESK_BY_VALUE[new URLSearchParams(search).get('type')]?.path || '/admin'} replace />;
@@ -207,14 +203,13 @@ function PortalHome() {
   return <Navigate to={portalBase(user)} replace />;
 }
 
-/* Mounted under both /admin/* and /staff/*. Route objects rather than <Route> elements because these
-   paths are relative to the mount, and back-office views are never collected (`isBackOffice`). */
 const BACK_OFFICE_ROUTES = [{
   element: <AdminLayout />,
   children: [
     { index: true, element: <AdminDashboard /> },
     { path: 'runbooks', element: <AdminRunbooks /> },
     { path: 'runbooks/:slug', element: <AdminRunbooks /> },
+    { path: 'notifications', element: <Notifications staff /> },
     { path: 'kyc-review', element: <ModuleRoute moduleKey="kycReview"><OpsIdentityReview /></ModuleRoute> },
     { path: 'properties', element: <ModuleRoute moduleKey="properties"><AdminProperties /></ModuleRoute> },
     { path: 'analytics', element: <ModuleRoute moduleKey="analytics"><FlagRoute flag="analytics"><AdminAnalytics /></FlagRoute></ModuleRoute> },
@@ -226,10 +221,11 @@ const BACK_OFFICE_ROUTES = [{
     { path: 'packers', element: <ModuleRoute moduleKey="desk:packers"><OpsDraftingDesk key="packers" desk="packers" /></ModuleRoute> },
     { path: 'valuation', element: <ModuleRoute moduleKey="desk:valuation"><OpsDraftingDesk key="valuation" desk="valuation" /></ModuleRoute> },
     { path: 'drafting-desk', element: <DeskRedirect /> },
-    { path: 'support', element: <ModuleRoute moduleKey="support"><FlagRoute flag="support"><OpsSupportQueue /></FlagRoute></ModuleRoute> },
+    { path: 'support', element: <ModuleRoute moduleKey="support"><FlagRoute flag="support"><SupportChatsInbox /></FlagRoute></ModuleRoute> },
     { path: 'enquiries', element: <ModuleRoute moduleKey="enquiries"><AdminEnquiries /></ModuleRoute> },
     { path: 'referrals', element: <ModuleRoute moduleKey="referrals"><OpsReferrals /></ModuleRoute> },
     { path: 'refunds', element: <ModuleRoute moduleKey="refunds"><OpsRefunds /></ModuleRoute> },
+    { path: 'leads', element: <ModuleRoute moduleKey="leads"><AdminLeads /></ModuleRoute> },
     { path: 'finance', element: <ModuleRoute moduleKey="finance"><FlagRoute flag="finance"><AdminFinance /></FlagRoute></ModuleRoute> },
     { path: 'content', element: <ModuleRoute moduleKey="content"><AdminContent /></ModuleRoute> },
     { path: 'reports', element: <ModuleRoute moduleKey="reports"><FlagRoute flag="reports"><AdminReports /></FlagRoute></ModuleRoute> },
@@ -249,7 +245,6 @@ const BACK_OFFICE_ROUTES = [{
   ],
 }];
 
-// Each role has one prefix: a link written as /admin/x lands a staff member on /staff/x, and back.
 function BackOffice() {
   const { user } = useAuth();
   const { pathname, search, hash } = useLocation();
@@ -258,9 +253,27 @@ function BackOffice() {
   return target === pathname ? routes : <Navigate to={`${target}${search}${hash}`} replace />;
 }
 
+function preloadablePage(element) {
+  let el = element;
+  while (el && !el.type?.preload) el = el.props?.children;
+  return el?.type;
+}
+
+// Holds the console until the shell and page chunks land: a page that suspends after auth makes
+// React 19 keep its fallback up for at least 300ms (see preloadable.js).
+function BackOfficeEntry({ base, children }) {
+  const { pathname } = useLocation();
+  const [ready, setReady] = useState(() => !readAccessToken());
+  useEffect(() => {
+    if (!readAccessToken()) return;
+    const matches = matchRoutes(BACK_OFFICE_ROUTES, pathname, base);
+    Promise.all([AdminLayout.preload(), preloadablePage(matches?.at(-1)?.route.element)?.preload()])
+      .then(() => setReady(true));
+  }, [base, pathname]);
+  return ready ? children : <LoadingFallback />;
+}
+
 export default function App() {
-  // Apply saved appearance prefs (e.g. Reduce motion) to <html> once on load so
-  // the choice persists across sessions and route changes before any page mounts.
   useEffect(() => { applyAppPrefs(); installReducedMotionScroll(); }, []);
   useKeyboardOpen();
   return (
@@ -272,11 +285,8 @@ export default function App() {
       <StaticRouteHead />
       <Suspense fallback={<LoadingFallback />}>
       <Routes>
-        {/* Standalone full-screen secure viewer (own chrome, no consumer nav) */}
         <Route path="/view-documents/:requestId" element={<ProtectedRoute><ViewDocuments /></ProtectedRoute>} />
         <Route path="/verify-identity" element={<ProtectedRoute><AppFlagsProvider><AppFlagRoute flag="kycBadgeEnabled"><VerifyIdentity /></AppFlagRoute></AppFlagsProvider></ProtectedRoute>} />
-        {/* Public by design: the token in the URL fragment IS the credential, and the recipient has
-            no account. The fragment never reaches a server — the token travels on `X-Share-Token`. */}
         <Route path="/shared-documents" element={<ViewDocuments shared />} />
         <Route element={<ConsumerLayout />}>
           <Route path="/" element={<Home />} />
@@ -288,9 +298,8 @@ export default function App() {
           <Route path="/signup" element={<AppFlagRoute flag="signupsEnabled"><Signup /></AppFlagRoute>} />
           <Route path="/staff-login" element={<StaffLogin />} />
           <Route path="/staff-invite" element={<StaffInvite />} />
+          <Route path="/owner-confirm" element={<OwnerConfirm />} />
           <Route path="/services" element={<Services />} />
-          {/* Public service landing pages — anyone can browse; sign-in is enforced only at the
-              "use the service" action (quote submit / generate / book) inside each page. */}
           <Route path="/services/packers-movers" element={<PackersMovers />} />
           <Route path="/services/property-legal" element={<PropertyLegal />} />
           <Route path="/home-loans" element={<HomeLoans />} />
@@ -314,20 +323,14 @@ export default function App() {
           <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
           <Route path="/schedule-visit" element={<AppFlagRoute flag="scheduleVisit"><ProtectedRoute><ScheduleVisit /></ProtectedRoute></AppFlagRoute>} />
           <Route path="/societies" element={<Societies />} />
-          {/* Own boundary so the outer centred spinner never covers this route: the society page
-              opens on a 224–288px hero, so the swap would shunt everything below it downward. */}
           <Route path="/society/:slug" element={<Suspense fallback={<SocietySkeleton />}><Society /></Suspense>} />
           <Route path="/reels" element={<Reels />} />
-          {/* No auth wall: saves live in localStorage and several surfaces write them while signed
-              out, so a guard here made the bottom nav's Saved tab a dead end for those users. */}
           <Route path="/saved" element={<Saved />} />
           <Route path="/pay-rent" element={<ProtectedRoute><PayRent /></ProtectedRoute>} />
           <Route path="/locality" element={<LocalityIndex />} />
           <Route path="/locality/:slug" element={<Locality />} />
           <Route path="/map" element={<Navigate to="/listings?view=map" replace />} />
-          <Route path="/messages" element={<AppFlagRoute flag="inAppMessaging"><ProtectedRoute><Messages /></ProtectedRoute></AppFlagRoute>} />
-          {/* Same reasoning as /society: hero, filter deck and first card row arrive together, so a
-              centred spinner guarantees a reflow as someone reaches for the List/Map toggle. */}
+          <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
           <Route path="/flatmates" element={<Suspense fallback={<FlatmatesSkeleton />}><Flatmates /></Suspense>} />
           <Route path="/flatmates/:kind/:id" element={<FlatmateDetail />} />
           <Route path="/flatmates/:place" element={<FlatmateLanding />} />
@@ -335,7 +338,6 @@ export default function App() {
           <Route path="/rent/:place/:bhk" element={<RentBuyLanding deal="rent" />} />
           <Route path="/buy/:place" element={<RentBuyLanding deal="buy" />} />
           <Route path="/buy/:place/:bhk" element={<RentBuyLanding deal="buy" />} />
-          {/* Permanent redirect for legacy external links and search results. */}
           <Route path="/share-flat" element={<Navigate to="/flatmates" replace />} />
           <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
           <Route path="/help" element={<HelpHome />} />
@@ -346,7 +348,6 @@ export default function App() {
           <Route path="/help/a/:slug" element={<HelpArticle />} />
           <Route path="/hi/help/*" element={<LegacyHelpLangRedirect />} />
           <Route path="/mr/help/*" element={<LegacyHelpLangRedirect />} />
-          {/* Legacy/guessable aliases so /docs and /help-center land somewhere useful. */}
           <Route path="/docs" element={<Navigate to="/help" replace />} />
           <Route path="/help-center" element={<Navigate to="/help" replace />} />
           <Route path="/blog" element={<BlogIndex />} />
@@ -373,7 +374,6 @@ export default function App() {
           />
           <Route
             path="/dashboard"
-            /** ProtectedRoute wraps Suspense so signed-out users never see dashboard chrome. */
             element={
               <ProtectedRoute>
                 <Suspense fallback={<DashboardSkeleton />}>
@@ -384,8 +384,8 @@ export default function App() {
           />
         </Route>
 
-        <Route path="/admin/*" element={<RoleRoute roles={['staff', 'manager', 'admin']}><BackOffice /></RoleRoute>} />
-        <Route path="/staff/*" element={<RoleRoute roles={['staff', 'manager', 'admin']}><BackOffice /></RoleRoute>} />
+        <Route path="/admin/*" element={<BackOfficeEntry base="/admin"><RoleRoute roles={['staff', 'manager', 'admin']}><BackOffice /></RoleRoute></BackOfficeEntry>} />
+        <Route path="/staff/*" element={<BackOfficeEntry base="/staff"><RoleRoute roles={['staff', 'manager', 'admin']}><BackOffice /></RoleRoute></BackOfficeEntry>} />
 
         <Route path="/ops" element={<LegacyRedirect to="/admin" />} />
         <Route path="/ops/support" element={<LegacyRedirect to="/admin/support" />} />

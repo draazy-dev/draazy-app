@@ -2,7 +2,7 @@
 
 > Two related retention primitives: shortlisting a property (the heart/bookmark) and saving a search
 > as a standing alert that promises "we notify you when new matches are listed".
-> **Status:** documented from React source - **Primary role(s):** buyer/tenant/seeker (also flatmate seekers)
+> **Primary role(s):** buyer/tenant/seeker (also flatmate seekers)
 
 ---
 
@@ -25,10 +25,10 @@
   - The Saved page's per-card "bell-plus" button (`Saved.createAlert`) - turns a saved home into an
     alert for similar homes.
 - **Routes:** `/saved` (not protected; guests see a sign-in prompt),
-  `/listings`, `/flatmates`, `/notifications`, and the Dashboard "Saved & Activity" tab
-  (`#activity`, sub `saved` / `alerts`).
+  `/listings`, `/flatmates`, `/notifications`, and the Dashboard "Alerts & activity" tab
+  (`#alerts`; `#saved` redirects to `/saved`).
 - **Source components:** `src/pages/consumer/Saved.jsx`,
-  `src/pages/consumer/dashboard/SavedPanel.jsx`, `src/pages/consumer/dashboard/AlertsPanel.jsx`,
+  `src/pages/consumer/dashboard/AlertsPanel.jsx`,
   `src/pages/consumer/Notifications.jsx`,
   `src/pages/consumer/listings/{alertCriteria.js,NotifyMeCard.jsx,ResultsArea.jsx}`,
   `src/pages/consumer/flatmates/{alertCriteria.js,FlatmateAlertCard.jsx}`.
@@ -38,15 +38,14 @@
   lead** can create an alert via `NotifyMeCard` / `FlatmateAlertCard` by supplying a mobile - the record
   is keyed by THAT mobile so it "lands under that user and surfaces in their dashboard after they sign
   in - instead of being orphaned under `anon`".
-- No approval/checker involved; this is a private, per-user store.
+- No approval/checker involved; a private, per-user store.
 
 ## 4. Entities touched
 Links go to [`../../system/data-model.md`](../../system/data-model.md).
-> **Runtime note.** The `src/lib/store/*` modules cited below (`notifications.js`, `search.js`) have
-> been deleted. Saving is now `SavedContext` over the server; searches and
-> alerts go through `services/savedSearchService.js`; notifications through
-> `services/notificationService.js`. The keys and rules are kept because they document the shape and
-> the edge cases the server behaviour still has to satisfy.
+> **Runtime note.** The `src/lib/store/*` modules cited below (`notifications.js`, `search.js`) are
+> deleted. Saving is `SavedContext` over the server; searches and alerts go through
+> `services/savedSearchService.js`; notifications through `services/notificationService.js`. The keys
+> and rules are kept because they document the shape and edge cases the server behaviour must satisfy.
 
 - `saved_properties` (was `src/lib/store/notifications.js`, key `dzSavedProps:<mobile|anon>`) -
   created/removed by heart toggle. Just an array of property ids.
@@ -69,17 +68,20 @@ Links go to [`../../system/data-model.md`](../../system/data-model.md).
 - The Saved page uses one segmented row: All / Buy / Rent / Rooms. Its header count is split into
   homes and rooms, and the Alerts row below the tabs links to `/dashboard#alerts` with active/new
   counts. Guests see it only if alerts exist.
-- Guest copy is honest: "Sign in to keep your shortlist on every device." It does not promise local
-  saved hearts or price-drop watchers.
+- One order only, newest save first, no sort control. All merges `/me/saved` and
+  `/me/flatmate-saves` on the `savedAt` each row carries, so a room saved between two homes sits
+  between them.
+- Guest copy: "Sign in to keep your shortlist on every device." It does not promise local saved
+  hearts or price-drop watchers.
 - **Swipe to remove (mobile only):** a saved card can be swiped left to remove (`useSwipeDismiss`,
   `axis: 'x'`, never armed above 640px; `touchAction: 'pan-y'` keeps vertical scrolling with the
-  browser). A swipe is easy to fire by accident on a hand-curated list, so the removal is staged: the
-  card renders as an undo row for `UNDO_WINDOW_MS = 8000` before it commits.
+  browser). Since a swipe is easy to fire by accident, removal is staged: the card renders as an undo
+  row for `UNDO_WINDOW_MS = 8000` before it commits.
 
 ### Saving a search / alert (was `store/search.js`, deleted)
 - `addSavedSearch(o)` creates `{ id: 'ss'+Date.now(), alerts: true, channel: 'whatsapp', at:
   Date.now(), newCount: 0, ...o }`. Defaults: **alerts on**, **channel WhatsApp**, **newCount 0**.
-- **Keying rule:** the record is stored under `savedSearchKey(rec.mobile)` - i.e. the record's OWN
+- **Keying rule:** the record is stored under `savedSearchKey(rec.mobile)` - the record's OWN
   mobile when provided (signed-out lead), otherwise `myMobile()` or `anon`. New records are unshifted
   (newest first).
 - `removeSavedSearch(id)` filters it out; `toggleSearchAlert(id)` flips `alerts` on/off.
@@ -92,10 +94,10 @@ Links go to [`../../system/data-model.md`](../../system/data-model.md).
   `RENT_MAX = 100000`) is treated as "any" and not shown as a chip.
 - `criteriaChips(rec)` renders the full filter set as chips (intent, type, BHK, price,
   localities, furnishing, amenities) - the same chips on the Listings alert card and the dashboard
-  Alerts panel, so every surface shows the identical captured filters.
+  Alerts panel.
 
 ### Saved-home -> "similar homes" alert (`Saved.createAlert`)
-Turning a saved property into an alert builds a filter around it with a **+/-15% price band**:
+Builds a filter around the saved property with a **+/-15% price band**:
 `lo = round(priceNum * 0.85)`, `hi = round(priceNum * 1.15)`, plus same intent (`deal`), same BHK
 (`bhkNum`) and same locality (`localitySlug`). Applied to `budget` for buy or `rent` for rent, then
 `addSavedSearch({ ...buildAlertRecord(f), query: '' })`.
@@ -106,27 +108,27 @@ The only "does anything match right now" logic. `countMatches(rec, props)` count
 - if the alert has localities, the listing's `localitySlug` OR display `locality` (case-insensitive)
   is in the set, AND
 - if the alert has BHK, `String(p.bhkNum)` is in the set.
-It "fails safe to 0 on any mismatch - it never fabricates matches". Note this uses only deal +
-locality + BHK (a subset of the captured criteria); price/furnishing/amenities are captured for
-display but not applied to the count.
+It "fails safe to 0 on any mismatch - it never fabricates matches". It uses only deal + locality + BHK
+(a subset of the captured criteria); price/furnishing/amenities are captured for display but not
+applied to the count.
 
 ### Flatmates alerts (`flatmates/alertCriteria.js`)
 - `buildFlatmateAlertRecord(filters, tab)` produces `{ kind: 'flatmates', tab, q, locality, budget,
   moveIn, gender, sharing, attachedBath, verifiedOnly, habits[], label }`, tab-gated so a stale value
-  for an inactive tab never rides along: `sharing` is captured only on `team-up`, `attachedBath` only
+  for an inactive tab never rides along: `sharing` is captured only on `teams`, `attachedBath` only
   on `move-in`. `BUDGET_MAX = 40000` is "any" and is omitted rather than stored.
-- **Tabs: `move-in` ("Move in now") and `team-up` ("Team up")** - the two live share intents. The
-  legacy `rooms` / `flatmates` / `groups` values survive as read-only aliases (`normalizeTab`), so an
-  alert saved before the redesign still resolves to a real tab instead of silently falling back;
-  `tabMeta` normalizes before labelling, so it is never mislabelled either.
+- **Tabs: `move-in` ("Rooms"), `people` ("Flatmates") and `teams` ("Teams")** - the three live share
+  intents; `tab` stores whichever is active. The legacy `rooms` / `flatmates` / `team-up` / `groups`
+  values survive as read-only aliases (`normalizeTab`: `rooms -> move-in`, `flatmates` and `team-up`
+  `-> people`, `groups -> teams`), so an alert saved with one still resolves to a real tab; `tabMeta`
+  normalizes before labelling.
 - `flatmateCriteriaChips` renders these - on the alert card, in the dashboard Alerts panel, and as
   the "why is this empty" chips in the Flatmates empty state. The Alerts panel routes "View matches"
   to `` /flatmates?view=${normalizeTab(a.tab)} ``.
 - **Where the card appears (`FlatmateAlertCard`):** whenever the active list is empty **or** the
-  seeker has narrowed with 2+ filters (`activeFilterCount >= 2`) - enough intent to want a ping.
-  Its invitation copy swaps on the active tab and uses a plural noun for the subject ("the moment
-  *homes* match" / "*flatmates* match") rather than the tab label, so the sentence stays grammatical
-  after the two-tab rename. Channels offered are WhatsApp and SMS.
+  seeker has narrowed with 2+ filters (`activeFilterCount >= 2`). Its invitation copy swaps on the
+  active tab and uses a plural noun for the subject ("the moment *homes* match" / "*flatmates* match" /
+  "*teams* match") so the sentence stays grammatical. Channels offered are WhatsApp and SMS.
 
 ### Alerts panel (dashboard, `AlertsPanel.jsx`)
 - Lists all saved searches (property + flatmates). Header sub = `${activeCount} active` where
@@ -144,22 +146,20 @@ display but not applied to the count.
   `NOTIF_PREF_DEFAULTS = { email:true, sms:false, whatsapp:true, matchAlerts:true, quietHours:{
   enabled:false, start:'22:00', end:'07:00' }, language:'en' }`. `inQuietHours` handles windows that
   wrap past midnight.
-- **The server now has the same preferences, and honours them (D94/D15, 2026-08-12).**
+- **The server has the same preferences and honours them (D94/D15).**
   `GET/PUT /me/notification-preferences` stores this exact document, field for field, in
   `notification_preferences`. `NotificationPublisher` — the single `Notifier` port every server-side
   writer goes through — applies two of them: `matchAlerts:false` drops proactive `match.*`/`price.*`
   notifications, and quiet hours **defer** rather than suppress (the row is written with its real
   timestamp and `notifications.deliver_after` holds it out of the inbox read until the window
-  closes). So a server-written notification no longer arrives at 3am. **The client is not wired to
-  the endpoint yet** — `ProfileTab.jsx` and this page still read and write localStorage, so the two
-  copies can diverge until that lands. An absent server row resolves to the defaults above, never to
-  silence.
+  closes). **The client is not wired to the endpoint yet** — `ProfileTab.jsx` and this page still
+  read and write localStorage, so the two copies can diverge until that lands. An absent server row
+  resolves to the defaults above, never to silence.
 - Notifications are per-user, seed-once (`seedNotifsIfEmpty`), with unread badge counts, mark-read,
   dismiss, and a safe-link guard (`SAFE_LINK_RE`) since merged items can be externally shaped.
 
 ## 6. Maker-checker / approval
-- **Not applicable.** Saving/alerting is a private per-user action with no approver. (Contrast with
-  the contact-gate flow, which is maker-checker.)
+- **Not applicable.** Saving/alerting is a private per-user action with no approver.
 
 ## 7. State machine
 ```
@@ -169,32 +169,30 @@ Saved search (per id):     created(alerts=true) --toggleSearchAlert--> alerts of
 Alert delivery (derived):  alerts on AND matchAlerts pref on AND not in quiet hours AND matchCount>0
                              -> match notification merged (deduped by id)
 ```
-- `newCount` and `matchCount` are two different questions on the same record and are answered by the
+- `newCount` and `matchCount` are two different questions on the same record, answered by the
   same query with one parameter flipped, so they cannot drift. `newCount` is "what arrived since the
   alert sweep's last baseline" — it falls back to zero once the alert has been sent, and a search
   saved a moment ago has none. `matchCount` is "how many live listings fit these facets right now",
   regardless of age.
-- **`matchCount` is the server's number (D227).** It used to be the browser's: `Notifications.jsx`
-  and the dashboard retention strip each fetched listings and ran `countMatches` over the result.
-  That result was one page — `PAGE_SIZE = 100` — so the count was accidentally correct while the
-  catalogue was smaller than a page and would have become a silent ceiling the day it was not. Now
-  `SavedSearchService` fills the field on every read of the resource (list, create and update alike,
-  so a freshly saved alert never renders a stale zero), and both surfaces read `s.matchCount`.
+- **`matchCount` is the server's number (D227).** `SavedSearchService` fills the field on every read of
+  the resource (list, create and update alike, so a freshly saved alert never renders a stale zero),
+  and `Notifications.jsx` and the dashboard retention strip read `s.matchCount` instead of running
+  `countMatches` over one page (`PAGE_SIZE = 100`), which would have become a silent ceiling.
 
 ## 8. Edge cases, validation & error states
 - **Signed-out lead:** alert stored under the mobile they typed, not `anon`, so it re-appears after
   they sign in with that number.
-- **Empty states:** Saved page has a full empty state and per-category empty states; SavedPanel and
-  AlertsPanel each render a distinct "nothing yet" card with a CTA (never blank).
+- **Empty states:** Saved page has a full empty state and per-category empty states; AlertsPanel
+  renders a distinct "nothing yet" card with a CTA (never blank).
 - **Hidden listing:** archived, paused, pending, rejected and flagged listings drop out of `/me/saved`
   and its totals without deleting the saved row.
 - **"Any" ranges:** default-max budget/rent produce no price chip (noise suppression).
 - **Duplicate saves:** heart toggle is idempotent per id; a saved search is not deduped by criteria
   (two identical saves create two records).
 - **The match count is conservative on both sides:** a facet the record does not carry does not
-  narrow, but a record with no `deal` at all counts **zero** rather than counting everything — an
-  alert that has not said what it wants has not asked for anything. A `flatmates` alert is likewise
-  zero; this count does not read the rooms catalogue. So an alert can legitimately show no matches,
-  and never invents them.
+  narrow, but a record with no `deal` at all counts **zero** rather than everything (an alert that
+  has not said what it wants has not asked for anything). A `flatmates` alert is likewise zero; this
+  count does not read the rooms catalogue. An alert can legitimately show no matches, and never
+  invents them.
 - **Quiet hours / alerts-off:** live match/price notifications are fully suppressed; the record stays
   but no notification is generated.

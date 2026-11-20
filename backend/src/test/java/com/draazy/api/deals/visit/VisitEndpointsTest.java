@@ -28,10 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-// Contract + behaviour proof for the visits sub-slice (A4), driven through the real filter chain against the live
-// Flyway'd Postgres under {@code ddl-auto=validate}.
 class VisitEndpointsTest extends AbstractApiTest {
-
     @Autowired MockMvc mvc;
     @Autowired JwtService jwtService;
     @Autowired UserRepository users;
@@ -99,7 +96,6 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.visitor.id").value(visitor.getId().toString()));
     }
 
-    // The anti-fake-review guard: a visitor can never mark their own visit completed.
     @Test
     void visitorCannotSetCompleted_antiFakeReviewGuard() throws Exception {
         User owner = user("9820200005", "owner");
@@ -215,8 +211,25 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].propertyId").value(p1.getId().toString()));
     }
 
-    // The harvest guard. A visit nobody has agreed to yet must not hand out a phone number, or "book a visit" becomes
-    // a way to read any stranger's mobile off their own listing.
+    @Test
+    void myVisitRequests_showsTheVisitorsNoteToTheOwner() throws Exception {
+        User owner = user("9820200091", "owner");
+        User visitor = user("9820200092", "buyer");
+        Property p = listing(owner, "Note test");
+
+        mvc.perform(post(Routes.Visits.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + futureSlot()
+                                + "\",\"mode\":\"in-person\",\"note\":\"Will come with family\"}"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(get(Routes.Visits.ME_REQUESTS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].note").value("Will come with family"));
+    }
+
     @Test
     void visitorMobile_isMaskedToOwnerWhileMerelyScheduled() throws Exception {
         User owner = user("9820200024", "owner");
@@ -231,8 +244,6 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].visitor.mobile").value("98XXXXX543"));
     }
 
-    // Asserts the masked value BEFORE as well as the raw value after: without the before-half a server that revealed
-    // the mobile to everyone from the moment of booking would satisfy this test completely.
     @Test
     void visitorMobile_isRevealedToOwnerOnceConfirmed() throws Exception {
         User owner = user("9820200124", "owner");
@@ -289,8 +300,6 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].visitor.mobile").value("98XXXXX545"));
     }
 
-    // Cancelling from {@code scheduled} leaves the number masked: a booking that was never agreed to must not leak a
-    // mobile on its way out either.
     @Test
     void cancellingAScheduledVisitLeavesTheMobileMasked() throws Exception {
         User owner = user("9820200126", "owner");
@@ -311,8 +320,6 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].visitor.mobile").value("98XXXXX546"));
     }
 
-    // Asserted at `scheduled` — the status at which the owner is masked — so the two halves cannot both be satisfied
-    // by a single blanket answer.
     @Test
     void visitorAlwaysSeesTheirOwnMobileInFull() throws Exception {
         User owner = user("9820200127", "owner");
@@ -342,11 +349,12 @@ class VisitEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void cancelledVisit_doesNotBlockRebooking() throws Exception {
+    void cancelledVisit_blocksRebookingForADayOnlyWhenTheVisitorCancelled() throws Exception {
         User owner = user("9820200027", "owner");
         User visitor = user("9820200028", "buyer");
         Property p = listing(owner, "Rebook test");
         String visitId = scheduleVisit(visitor, p);
+        String rebook = "{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + futureSlot() + "\"}";
 
         mvc.perform(patch(Routes.Visits.STATUS.replace("{id}", visitId))
                         .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
@@ -357,7 +365,21 @@ class VisitEndpointsTest extends AbstractApiTest {
         mvc.perform(post(Routes.Visits.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + futureSlot() + "\"}"))
+                        .content(rebook))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("recently_withdrawn"));
+
+        Property other = listing(owner, "Owner cancels");
+        String ownerCancelled = scheduleVisit(visitor, other);
+        mvc.perform(patch(Routes.Visits.STATUS.replace("{id}", ownerCancelled))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"cancelled\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post(Routes.Visits.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + other.getId() + "\",\"slot\":\"" + futureSlot() + "\"}"))
                 .andExpect(status().isCreated());
     }
 
@@ -463,7 +485,6 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-    // Rescheduling a cancelled visit must not resurrect it.
     @Test
     void reschedule_terminalVisit_returns409() throws Exception {
         User owner = user("9820200047", "owner");
@@ -665,7 +686,7 @@ class VisitEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void scheduleVisit_onAListingThatIsNotLive_is404LikeThePublicRead() throws Exception {
+    void scheduleVisit_onAListingThatIsNotLive_isRefusedLikeAContactRequest() throws Exception {
         User owner = user("9820200071", "owner");
         User visitor = user("9820200072", "buyer");
         for (String state : List.of("pending", "rejected", "flagged", "paused", "archived")) {
@@ -681,8 +702,8 @@ class VisitEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + futureSlot() + "\"}"))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.error").value("not_found"));
+                    .andExpect(status().is("paused".equals(state) ? 409 : 404))
+                    .andExpect(jsonPath("$.error").value("paused".equals(state) ? "listing_not_live" : "not_found"));
         }
         assertThat(visitRepo.count()).isZero();
     }

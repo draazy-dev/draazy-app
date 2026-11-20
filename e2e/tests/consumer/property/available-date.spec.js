@@ -1,5 +1,5 @@
 import { ACTORS, expect, test } from '../../../fixtures/live.js';
-import { API, authHeaders, ownerIdOf, storedPhotoUrl, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { approveListing, rejectListing } from '../../../helpers/moderation.js';
 import { istInDays } from '../../../helpers/availability.js';
 
@@ -30,7 +30,7 @@ async function publish(request, availableOn) {
       landUse: 'residential',
       possession: 'under-construction',
       availableOn,
-      images: [storedPhotoUrl('', ownerIdOf(headers))],
+      images: await uploadedListingPhotos(headers),
       formDetails: { plotZone: 'Residential' },
     },
   });

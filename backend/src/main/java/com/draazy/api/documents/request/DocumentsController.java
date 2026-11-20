@@ -22,17 +22,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The buyer/anonymous side of document access: asking, and reading what a grant unlocked. */
 @RestController
 public class DocumentsController {
-
     private final DocumentRequestService requestService;
 
     public DocumentsController(DocumentRequestService requestService) {
         this.requestService = requestService;
     }
 
-    /** {@code POST /documents/requests} (contract {@code requestDocumentAccess}). */
     @PostMapping(Routes.Documents.REQUESTS)
     @ResponseStatus(HttpStatus.CREATED)
     public DocumentRequestDto requestDocumentAccess(@CurrentUser AuthPrincipal principal,
@@ -40,8 +37,6 @@ public class DocumentsController {
         return requestService.request(principal.userId(), body);
     }
 
-    /** Lives here, not on {@code MeDocumentRequestsController}, which is scoped via {@code properties.owner_id};
-     * this one is scoped via {@code requester_id}, and mixing both rules invites calling the wrong helper. */
     @GetMapping(Routes.MeDocumentRequests.BASE)
     public PageResponse<DocumentRequestDto> myDocumentAsks(
             @CurrentUser AuthPrincipal principal, @RequestParam(required = false) UUID propertyId,
@@ -51,29 +46,25 @@ public class DocumentsController {
                 dto -> dto);
     }
 
-    /** Scoped via {@code requester_id}; needs no forwardable credential because the buyer is already signed in. */
     @GetMapping(Routes.MeDocumentRequests.DOCUMENTS_BY_ID)
     public List<DocumentSummary> myGrantedDocuments(@CurrentUser AuthPrincipal principal,
             @PathVariable("reqId") String reqId) {
         return requestService.myGranted(principal.userId(), reqId);
     }
 
-    /** Same requester scoping as {@link #myGrantedDocuments}; a file the grant does not unlock is a 404. */
     @GetMapping(Routes.MeDocumentRequests.DOCUMENT_URL)
     public DocumentUrl myGrantedDocumentUrl(@CurrentUser AuthPrincipal principal,
             @PathVariable("reqId") String reqId, @PathVariable("docId") String docId) {
         return requestService.myGrantedUrl(principal.userId(), reqId, docId);
     }
 
-    /** The token is a header, not a query parameter, so it never reaches browser history, proxy logs or Referer;
-     * a stale {@code ?token=} URL fails closed with the same opaque 401. */
+    // Token travels in a header, not the query string, so it never reaches history, proxy logs or Referer.
     @GetMapping(Routes.Documents.SHARED)
     public List<DocumentSummary> getSharedDocuments(
             @RequestHeader(name = ShareTokens.HEADER, required = false) String token) {
         return requestService.shared(token);
     }
 
-    /** Anonymous and token-scoped like {@link #getSharedDocuments}; the exact path is rate limited likewise. */
     @GetMapping(Routes.Documents.SHARED_URL)
     public DocumentUrl getSharedDocumentUrl(
             @RequestHeader(name = ShareTokens.HEADER, required = false) String token,

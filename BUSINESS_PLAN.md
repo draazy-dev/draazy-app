@@ -22,7 +22,7 @@ NoBroker (~$1B+ valuation) and MagicBricks/Housing.com have huge war chests. You
 | Classifieds revenue capture | **0.25–0.5%** of transaction value (listings) vs **up to 5%** (full-stack) | Services & transactions >> pure listings |
 | Key 2026 trends | Video-first discovery, AI valuation, Tier-2/3 growth, trust features | Your differentiation surface |
 
-**Takeaway:** Pure listing portals make thin margins. The money is in **services, transactions, and recurring society SaaS** layered on top of free listings — exactly NoBroker's model. Your wedge is **trust + hyperlocal density**, your profit is **services**.
+**Takeaway:** Pure listing portals make thin margins. The money is in **services, transactions, and recurring society SaaS** on top of free listings, as in NoBroker's model. Your wedge is **trust + hyperlocal density**; your profit is **services**.
 
 ---
 
@@ -78,7 +78,7 @@ NoBroker (~$1B+ valuation) and MagicBricks/Housing.com have huge war chests. You
   friend 14 days Featured. Anyone→seeker: the referrer gets 15 contacts, the friend 5 extra. Verified automatically;
   every listing share link carries the sharer's code.
 - **"Move-in money-back guarantee."** If a verified listing turns out fake, refund + ₹ credit. Converts trust skeptics; near-zero payout if verification works.
-- **Free rent agreement as a hook.** People search "rent agreement Pune" constantly. Give it free → capture the lead → upsell registration, tenant verification, packers.
+- **Free rent agreement as a hook.** People search "rent agreement Pune" constantly. Capture the lead → upsell registration, tenant verification, packers.
 - **HRA rent-receipt generator** (already built) — viral every Jan–Mar tax season; pure top-of-funnel.
 
 ### 4.5 The "unfair" aggressive bets (pick 1–2, fund heavily)
@@ -110,7 +110,7 @@ All prices include GST; government charges are stamp duty and registration, pass
 
 **Later, only once a locality has real liquidity:** services marketplace commissions, Society SaaS, pay-rent and deposit financing. Never: broker plans, broker listings or paid broker leads.
 
-**Unit-economics principle:** A pure listing earns paise; a *move-in* (agreement + verification + movers + loan + rent payments) earns thousands. **Optimise for completed move-ins, not page views.** Your "finalize the deal" flow is the instrumentation point — every finalised deal should trigger a services upsell (you already route to `services.html` on close).
+**Unit-economics principle:** A pure listing earns paise; a *move-in* (agreement + verification + movers + loan + rent payments) earns thousands. **Optimise for completed move-ins, not page views.** Your "finalize the deal" flow is the instrumentation point: every finalised deal should trigger a services upsell (it already routes to `services.html` on close).
 
 ---
 
@@ -172,7 +172,7 @@ All prices include GST; government charges are stamp duty and registration, pass
 
 - **CAC strategy:** Supply CAC near-zero (free + field + society virality). Demand CAC kept low via WhatsApp/long-tail SEO/referrals vs. expensive brand ads.
 - **LTV drivers:** A single move-in can monetise across agreement + verification + movers + loan + rent payments + (if society) recurring SaaS. **Target LTV:CAC ≥ 3:1** within 12 months by stacking services on each move-in.
-- **Burn discipline:** Because you're single-city, you can reach **contribution-positive in Pune** while NoBroker subsidises 50 cities. **Profitable density beats unprofitable breadth** — and is the story that raises your next round.
+- **Burn discipline:** As a single-city player you can reach **contribution-positive in Pune** while NoBroker subsidises 50 cities. **Profitable density beats unprofitable breadth**, and it is the story that raises your next round.
 - **Funding ask framing:** "We are the #1 zero-brokerage platform in Pune with X% locality density and positive unit economics; we're raising to clone the runbook to N cities."
 
 ---
@@ -202,4 +202,4 @@ All prices include GST; government charges are stamp duty and registration, pass
 
 ---
 
-*Existing prototype assets that already de-risk this plan: zero-brokerage owner-direct flow, identity verification, owner phone-privacy with request/approve, maker-checker deal finalisation, document vault, rent agreement + HRA receipts, and an owner finances module. The strategy above turns these from prototype features into a defensible, monetisable, single-city-dominating business.*
+*Existing prototype assets that de-risk this plan: zero-brokerage owner-direct flow, identity verification, owner phone-privacy with request/approve, maker-checker deal finalisation, document vault, rent agreement + HRA receipts, and an owner finances module. The strategy turns them into a defensible, monetisable, single-city-dominating business.*

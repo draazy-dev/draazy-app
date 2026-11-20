@@ -2,7 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\13\\bin\\psql.exe';
+const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe';
 const DB = process.env.E2E_DB_NAME || 'draazy_e2e';
 const USER = process.env.E2E_DB_USER || 'postgres';
 
@@ -10,24 +10,34 @@ const USER = process.env.E2E_DB_USER || 'postgres';
 const WAIVED = new Map([
   ['otp_codes', 'every login writes one; a seeded code is a seeded credential'],
   ['refresh_tokens', 'issued at login, by the same flow every spec starts with'],
+  ['rate_limit_counters', 'written by the postgres rate-limit store on each limited request; a seeded row is a pre-spent budget'],
   ['push_subscriptions', 'written by the push opt-in flow; a seeded endpoint would fake browser registration'],
+  ['flatmate_owner_notices', 'written when a tenant posts a room; the link token exists only in the WhatsApp message'],
   ['provider_call', 'written by every OTP, email and payment call the specs make'],
+  ['photo_uploads', 'written by every POST /me/photos; a seeded row would point the sweep at a file nobody uploaded'],
+  ['whatsapp_opt_outs', "written only by Meta's signed STOP/START webhook, which the e2e profile leaves unconfigured"],
   ['error_event', 'written by the error appender and POST /api/client-errors; a seeded row would fake a captured failure'],
   ['audit_log', 'written BY the admin actions the ops specs assert on'],
   ['transactions', 'written by the payment flows; a seeded row would fake the thing under test'],
   ['outbound_message', 'the send queue - filled when a notification actually fires'],
+  ['staff_alert_log', 'dedupe ledger - written by the staff-sla sweep job, never seeded'],
   ['message_attachments', 'written by the chat upload spec'],
   ['erasure_requests', 'the DSR spec submits one'],
   ['city_waitlist', 'the waitlist form submits one'],
   ['demand_signals', 'append-only; `demand-signals` writes rows and asserts the delta'],
+  ['photo_storage_deletes', 'retry queue; only a failed storage delete on listing purge fills it'],
+  ['property_view_days', 'one row per viewer-day; `demand-signals` views a live listing and asserts the count'],
   ['offer_history', 'append-only trail written when an offer changes state'],
   ['review_messages', 'written by the review-thread spec'],
+  ['support_conversations', 'derived index kept current by every support, review and request message; ops/support-chats writes its own'],
+  ['support_conversation_topics', 'per-context half of support_conversations, written by the same messages'],
   ['ticket_notes', 'written by staff inside the ticket spec'],
   ['internal_notes', 'written by staff on a listing or a user'],
   ['staff_invites', 'written by the invite flow'],
   ['admin_bootstrap_runs', 'written by the single-admin recovery bootstrap'],
-  ['property_verification_override_requests', 'written by the property verification override maker-checker flow'],
+  ['property_verification_override_requests', 'no writer remains; kept only so existing rows survive'],
   ['identity_conflicts', 'written when an identity submit hits the dedup 409'],
+  ['identity_appeals', 'written when a user asks for a second look at a rejected identity check'],
   ['identity_storage_deletes', 'holds only storage deletes that failed and await retry'],
   ['document_requests', 'written when staff request a document'],
   ['finalization_requests', 'written by the finalisation flow'],
@@ -42,6 +52,8 @@ const WAIVED = new Map([
   ['flatmate_requests', 'written by the flatmate request flow'],
   ['flatmate_saves', 'consumer/flatmates/flatmate-saves.spec.js creates every row it reads'],
   ['referrals', 'written on redemption - but referral_codes IS required, see below'],
+  ['referral_invites', 'written by the Refer screen invite flow; a seeded row would suppress a real invite'],
+  ['referral_redeem_failures', 'written by refused redemptions; a seeded row would lock the user out'],
   ['service_orders', 'written when a service is ordered'],
   ['property_ownership_evidence', 'written by the evidence upload'],
   // Rollup outputs may remain empty during a short suite; seeding them would fake the job's result.
@@ -63,7 +75,11 @@ const WAIVED = new Map([
   ['invoice_sequences', 'counter row created by the first invoice issued'],
   ['credit_notes', 'issued from the signed gateway refund webhook; refund specs insert their own'],
   ['credit_note_sequences', 'counter row created by the first credit note issued'],
+  ['request_reminders', 'written by `POST /me/requests/{kind}/{id}/reminders`; `consumer/account/requests-inbox.spec.js` sends its own'],
+  ['request_hidden', 'written when a requester clears a finished request; `consumer/account/requests-inbox.spec.js` clears its own'],
+  ['flatmate_interest_withdrawals', 'written when a seeker withdraws a pending flatmate interest; backend `RequestInboxEndpointsTest` covers it'],
   ['property_live_gaps', 'written when a listing leaves live and comes back; the pass-guarantee specs pause and resume their own'],
+  ['crm_lead_conversions', 'written when staff credit a paid request; `ops/leads-crm.spec.js` converts its own'],
 ]);
 
 // Pending tables need read fixtures; populated entries are reported stale.
@@ -80,13 +96,14 @@ const PENDING = new Map([
   ['service_request_refunds', 'ops: hangs off service_requests'],
   ['service_request_draft_approvals', 'ops: hangs off service_requests'],
   ['service_request_draft_checks', 'ops: hangs off service_requests'],
-  ['service_request_police_intimations', 'ops: hangs off service_requests'],
+  ['service_request_dismissals', 'ops: hangs off service_requests'],
   ['tickets', 'ops: the ticket queue is empty (support_tickets is a different table and IS seeded)'],
   ['owner_kyc', 'trust: no KYC record'],
   ['documents', 'vault: the document vault is empty'],
   ['personal_documents', 'vault: ditto'],
   ['managed_properties', 'managed: the managed console is empty'],
   ['managed_property_documents', 'managed: hangs off managed_properties'],
+  ['managed_property_rent_claims', 'managed: hangs off managed_properties'],
   ['property_reviews', 'review queue: nothing queued'],
   ['property_review_checklist', 'review queue: hangs off property_reviews'],
   ['rent_agreements', 'rent: no agreement to read'],

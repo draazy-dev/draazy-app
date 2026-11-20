@@ -1,9 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 
-/* The HTML is compiled at build time from repo-authored Markdown and raw HTML in the source is dropped, so no
-   untrusted markup can reach here; links are handled on the rendered tree because they need the router and DOM. */
-
 export default function ArticleProse({ html, resolveHref }) {
   const ref = useRef(null);
   const navigate = useNavigate();
@@ -26,7 +23,6 @@ export default function ArticleProse({ html, resolveHref }) {
       const a = e.target.closest?.('a[href]');
       if (!a || !root.contains(a)) return;
       const href = a.getAttribute('href') || '';
-      // Same-page anchors keep their native behaviour; absolute URLs open normally.
       if (!href.startsWith('/') || href.startsWith('//')) return;
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
       e.preventDefault();

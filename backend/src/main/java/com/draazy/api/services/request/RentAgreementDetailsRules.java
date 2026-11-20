@@ -13,25 +13,19 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-// Server copy of wizard term rules; protects checkout when clients skip steps.
 final class RentAgreementDetailsRules {
-
-    static final int START_DATE_PAST_DAYS = 30;
+    // No published IGR back-dating limit; mirrors the Registration Act s.23 four-month window.
+    static final int START_DATE_PAST_DAYS = 120;
     static final int START_DATE_FUTURE_DAYS = 180;
-
-    static final int DUE_DAY_MAX = 28;
 
     static final Set<String> CAPACITIES = Set.of("owner", "co-owner", "poa");
 
     static final int MAX_CO_OWNERS = 3;
     static final int MAX_TENANTS = 6;
-    static final int MAX_OCCUPANTS = 20;
     static final int MAX_AREA = 100_000;
     static final int MAX_FLOOR = 200;
 
-    private static final Set<String> AREA_BASES = Set.of("carpet", "built-up");
     private static final Set<String> AREA_UNITS = Set.of("sqft", "sqm");
-    private static final Set<String> PAYERS = Set.of("Tenant", "Owner");
     private static final Set<String> COST_BEARERS = Set.of("Tenant", "Owner", "Split");
     private static final Set<String> PARKING = Set.of("none", "two-wheeler", "car", "both");
     private static final Set<String> LANGUAGES = Set.of("English", "Marathi");
@@ -43,7 +37,6 @@ final class RentAgreementDetailsRules {
 
     private static final Pattern INTEGER = Pattern.compile("^[0-9]+$");
     private static final Pattern NUMBER = Pattern.compile("^[0-9]+(?:\\.[0-9]+)?$");
-    private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
     private static final Pattern PASSPORT = Pattern.compile("^[A-Za-z0-9]{6,20}$");
 
     private static final Pattern MH_PINCODE = Pattern.compile("^(?!403)4[0-4][0-9]{4}$");
@@ -75,7 +68,7 @@ final class RentAgreementDetailsRules {
         }
     }
 
-    static void check(Map<String, Object> details, LocalDate today, boolean requireWitnessNames) {
+    static void check(Map<String, Object> details, LocalDate today, boolean filing) {
         if (details == null) {
             return;
         }
@@ -83,7 +76,7 @@ final class RentAgreementDetailsRules {
         List<String> problems = new ArrayList<>();
         Map<String, Object> terms = ServiceRequestPricing.childObject(state, "terms");
         terms(terms, today, problems);
-        visit(terms, today, requireWitnessNames, problems);
+        visit(terms, today, filing, problems);
         pricedTerms(details, terms, problems);
         Map<String, Object> prop = ServiceRequestPricing.childObject(state, "prop");
         Object pincode = prop.get("pincode");
@@ -94,7 +87,6 @@ final class RentAgreementDetailsRules {
             problems.add("_state.prop.gramPanchayat must be true or false");
         }
         decimal(prop.get("area"), "_state.prop.area", BigDecimal.ONE, BigDecimal.valueOf(MAX_AREA), problems);
-        oneOf(prop.get("areaBasis"), "_state.prop.areaBasis", AREA_BASES, problems);
         oneOf(prop.get("areaUnit"), "_state.prop.areaUnit", AREA_UNITS, problems);
         whole(prop.get("floor"), "_state.prop.floor", 0, MAX_FLOOR, problems);
         PropertyIgrRules.check(prop, terms, problems);
@@ -106,12 +98,10 @@ final class RentAgreementDetailsRules {
         if (tenants.size() > MAX_TENANTS) {
             problems.add("_state.tenants must contain at most " + MAX_TENANTS + " rows");
         }
-        emails(state, coOwners, tenants, problems);
         adults(state, coOwners, tenants, problems);
         PartyIdentityRules.check(state, coOwners, tenants, today, problems);
         TenantPoliceRecordRules.check(tenants, problems);
         partyTypesAndResidency(state, coOwners, tenants, problems);
-        witnesses(state, requireWitnessNames, problems);
         capacities(state, coOwners, today, problems);
         distinctMobiles(state, coOwners, tenants, problems);
         if (!problems.isEmpty()) {
@@ -121,11 +111,7 @@ final class RentAgreementDetailsRules {
 
     private static void terms(Map<String, Object> terms, LocalDate today, List<String> problems) {
         termAndRise(terms, problems);
-        whole(terms.get("dueDay"), "_state.terms.dueDay", 1, DUE_DAY_MAX, problems);
         whole(terms.get("incrementEvery"), "_state.terms.incrementEvery", 11, 12, problems);
-        whole(terms.get("occupants"), "_state.terms.occupants", 1, MAX_OCCUPANTS, problems);
-        oneOf(terms.get("utilitiesBy"), "_state.terms.utilitiesBy", PAYERS, problems);
-        oneOf(terms.get("taxBy"), "_state.terms.taxBy", PAYERS, problems);
         oneOf(terms.get("costBy"), "_state.terms.costBy", COST_BEARERS, problems);
         oneOf(terms.get("parking"), "_state.terms.parking", PARKING, problems);
         DepositPaymentRules.check(terms, today, problems);
@@ -137,7 +123,8 @@ final class RentAgreementDetailsRules {
             LocalDate date = LocalDate.parse(start.toString());
             if (date.isBefore(today.minusDays(START_DATE_PAST_DAYS))
                     || date.isAfter(today.plusDays(START_DATE_FUTURE_DAYS))) {
-                problems.add("_state.terms.startDate must be within 30 days before and 180 days after today");
+                problems.add("_state.terms.startDate must be within " + START_DATE_PAST_DAYS + " days before and "
+                        + START_DATE_FUTURE_DAYS + " days after today");
             }
         } catch (DateTimeParseException malformed) {
             problems.add("_state.terms.startDate must be an ISO date yyyy-MM-dd");
@@ -169,7 +156,6 @@ final class RentAgreementDetailsRules {
                 LeaveAndLicenceCharges.MAX_MONTHS, problems);
         long cap = months == null ? LeaveAndLicenceCharges.MAX_MONTHS : months;
         whole(terms.get("lockin"), "_state.terms.lockin", 0, cap, problems);
-        whole(terms.get("notice"), "_state.terms.notice", 0, cap, problems);
         decimal(terms.get("increment"), "_state.terms.increment", BigDecimal.ZERO,
                 BigDecimal.valueOf(100), problems);
     }
@@ -250,18 +236,6 @@ final class RentAgreementDetailsRules {
         }
     }
 
-    private static void witnesses(Map<String, Object> state, boolean requireWitnessNames,
-            List<String> problems) {
-        Object witRaw = state.get("wit");
-        Map<String, Object> wit = ServiceRequestPricing.childObject(state, "wit");
-        if (witRaw instanceof Map<?, ?> && requireWitnessNames) {
-            required(wit.get("w1Name"), "_state.wit.w1Name", problems);
-            required(wit.get("w2Name"), "_state.wit.w2Name", problems);
-        }
-        whole(wit.get("w1Age"), "_state.wit.w1Age", 18, 150, problems);
-        whole(wit.get("w2Age"), "_state.wit.w2Age", 18, 150, problems);
-    }
-
     private static void adults(Map<String, Object> state, List<Map<?, ?>> coOwners,
             List<Map<?, ?>> tenants, List<String> problems) {
         whole(ServiceRequestPricing.childObject(state, "owner").get("oAge"), "_state.owner.oAge", 18, 150,
@@ -271,18 +245,6 @@ final class RentAgreementDetailsRules {
         }
         for (int i = 0; i < tenants.size(); i++) {
             whole(tenants.get(i).get("age"), "_state.tenants[" + i + "].age", 18, 150, problems);
-        }
-    }
-
-    private static void emails(Map<String, Object> state, List<Map<?, ?>> coOwners,
-            List<Map<?, ?>> tenants, List<String> problems) {
-        email(ServiceRequestPricing.childObject(state, "owner").get("oEmail"),
-                "_state.owner.oEmail", problems);
-        for (int i = 0; i < coOwners.size(); i++) {
-            email(coOwners.get(i).get("email"), "_state.coOwners[" + i + "].email", problems);
-        }
-        for (int i = 0; i < tenants.size(); i++) {
-            email(tenants.get(i).get("email"), "_state.tenants[" + i + "].email", problems);
         }
     }
 
@@ -320,12 +282,6 @@ final class RentAgreementDetailsRules {
 
     private static String value(Object raw, String fallback) {
         return isStated(raw) ? raw.toString().trim() : fallback;
-    }
-
-    private static void email(Object raw, String path, List<String> problems) {
-        if (isStated(raw) && !EMAIL.matcher(raw.toString().trim()).matches()) {
-            problems.add(path + " must be a valid email address");
-        }
     }
 
     private static void capacities(Map<String, Object> state, List<Map<?, ?>> coOwners,
@@ -393,9 +349,6 @@ final class RentAgreementDetailsRules {
         if (!"invite".equals(String.valueOf(state.get("tenantMode")))) {
             tenants.forEach(row -> mobiles.add(row.get("mobile")));
         }
-        Map<String, Object> wit = ServiceRequestPricing.childObject(state, "wit");
-        mobiles.add(wit.get("w1Mobile"));
-        mobiles.add(wit.get("w2Mobile"));
         for (Object raw : mobiles) {
             String mobile = normaliseMobile(raw);
             if (mobile != null && !seen.add(mobile)) {

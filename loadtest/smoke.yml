@@ -1,0 +1,61 @@
+config:
+  target: "{{ $env.BASE_URL }}"
+  processor: "./processor.js"
+  http:
+    timeout: 10
+  defaults:
+    headers:
+      Accept: application/json
+  # Phases live only under environments: Artillery merges env phase arrays by index rather than replacing them.
+  # Rates are new users/s; a browse session lasts ~12 s, so 4/s ≈ 50 and 12/s ≈ 150 concurrent.
+  environments:
+    sandbox:
+      phases:
+        - { name: warm-up, duration: 120, arrivalRate: 1, rampTo: 4 }
+        - { name: steady, duration: 300, arrivalRate: 4 }
+        - { name: spike, duration: 120, arrivalRate: 12 }
+    local:
+      phases:
+        - { name: dry-run, duration: 60, arrivalRate: 1 }
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+    ensure:
+      thresholds:
+        - "plugins.metrics-by-endpoint.response_time.search.p95": 800
+        - "plugins.metrics-by-endpoint.response_time.property.p95": 800
+        - "plugins.metrics-by-endpoint.response_time.bootstrap.p95": 500
+      conditions:
+        - expression: "draazy.bad_status / http.requests < 0.01"
+        - expression: "draazy.throttled / http.requests < 0.01"
+
+scenarios:
+  - name: browse
+    weight: 19
+    flow:
+      - function: pickSearch
+      - get: { url: "/bootstrap", name: bootstrap, afterResponse: track }
+      - get: { url: "/properties/featured", name: featured, afterResponse: track }
+      - think: 2
+      - get:
+          url: "/properties"
+          name: search
+          qs: { deal: "{{ deal }}", locality: "{{ locality }}", sort: "createdAt,desc", page: 0, size: 24 }
+          afterResponse: [track, pickProperty]
+      - think: 3
+      - get: { url: "/properties/{{ propertyId }}", name: property, ifTrue: "propertyId", afterResponse: track }
+      - get: { url: "/properties/{{ propertyId }}/reviews", name: reviews, ifTrue: "propertyId", afterResponse: track }
+      - think: 5
+
+  - name: otp
+    weight: 1
+    flow:
+      - function: pickMobile
+      - post:
+          url: "/auth/login"
+          name: otp
+          ifTrue: "otpEnabled"
+          headers:
+            cf-turnstile-response: "{{ turnstileToken }}"
+          json: { mobile: "{{ mobile }}" }
+          afterResponse: track

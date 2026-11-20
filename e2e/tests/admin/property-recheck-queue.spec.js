@@ -1,6 +1,6 @@
 // Admin → Properties → **Re-check Queue** (Q14) against the live API.
 import { test, expect, ACTORS } from '../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, uniqueMobile } from '../../helpers/liveAuth.js';
+import { API, authHeaders, fileIdentityCaseAs, uploadedListingPhotos, uniqueMobile } from '../../helpers/liveAuth.js';
 import { appReady } from '../../helpers/app.js';
 import { approveListing, rejectListing } from '../../helpers/moderation.js';
 
@@ -68,7 +68,7 @@ test.afterEach(async ({ request }) => {
   created.clear();
 });
 
-// `listForModeration` fetches `size=100` and reports through `console.error` when the catalogue is larger than that.
+// `warnIfTruncated` reports through `console.error` when a 100-row catalogue read misses rows.
 const CATALOGUE_TRUNCATED = /^\[property\] \d+ listings matched but only \d+ were fetched/;
 const realErrors = (errors) => errors.filter((e) => !CATALOGUE_TRUNCATED.test(e));
 
@@ -106,14 +106,21 @@ test('the queue holds the row the product put there, and names what changed', as
 test('the tab count is the server\u2019s own count of the queue', async ({ page, login, request }) => {
   const seeded = await queuedRecheck(request, 'counted');
 
-  // Read the queue's size from the endpoint the tab is derived from, rather than pinning a number.
   const queue = await api('GET', '/admin/properties?recheck=true&size=1', await admin());
   expect(queue.status).toBe(200);
   expect(queue.body.totalElements, 'the seeded row is not in the server queue').toBeGreaterThanOrEqual(1);
 
+  // Parallel workers move the shared queue mid-load, so compare against the summary this page itself read.
+  let served;
+  page.on('response', async (r) => {
+    if (/\/api\/admin\/properties\/summary(\?|$)/.test(r.url()) && r.ok()) served = (await r.json().catch(() => ({}))).recheck ?? served;
+  });
   await openQueue(page, login, seeded.title);
 
-  await expect(page.getByTestId('tab-count-recheck')).toHaveText(String(queue.body.totalElements));
+  const countText = page.getByTestId('tab-count-recheck');
+  await expect(countText).toHaveText(/^\d+$/);
+  await expect.poll(async () => Number(await countText.textContent()) - served).toBe(0);
+  expect(served).toBeGreaterThanOrEqual(1);
 });
 
 test('the listing really is still live while it waits', async ({ page, login, request }) => {
@@ -147,6 +154,21 @@ test('passing a re-check clears it on the server and leaves the listing earning'
   expect(mine.body.status, 'checked-it-all-fine must not take the listing down').toBe('approved');
   expect(mine.body.recheckPending).toBe(false);
   expect((await fetch(`${API}/properties/${seeded.id}`)).status).toBe(200);
+});
+
+test('a double-click on "Looks fine" opens one confirm and sends one status request', async ({ page, login, request }) => {
+  let confirms = 0;
+  let statusCalls = 0;
+  page.on('dialog', (d) => { confirms += 1; d.accept(); });
+  page.on('request', (r) => { if (r.method() === 'PATCH' && /\/properties\/[^/]+\/status/.test(r.url())) statusCalls += 1; });
+  const seeded = await queuedRecheck(request, 'dblclick');
+  await openQueue(page, login, seeded.title);
+
+  await cardFor(page, seeded.title).getByTestId('recheck-pass').dblclick();
+  await expect(cardFor(page, seeded.title)).toHaveCount(0);
+
+  expect(confirms).toBe(1);
+  expect(statusCalls).toBe(1);
 });
 
 test('failing a re-check takes the listing down, and tells the owner why', async ({ page, login, request }) => {
@@ -212,6 +234,7 @@ test('an upload alone queues nothing; the vault request does, and staff can decl
   expect(uploaded.body.recheckPending, 'filing a paper in the vault is not a badge request').toBe(false);
   expect(uploaded.body.ownershipRequestedAt ?? null).toBeNull();
 
+  await fileIdentityCaseAs(owner.authorization);
   const asked = await api('POST', `/properties/${id}/verification/ownership/request`, owner);
   expect(asked.status).toBe(200);
   const mine = await api('GET', `/me/listings/${id}`, owner);

@@ -83,6 +83,14 @@ class IdentityDisputeEndpointsTest extends AbstractApiTest {
                 delete from identity_verifications
                 where user_id in (select id from users where mobile like '984900%')
                 """);
+        jdbc.update("""
+                delete from support_conversation_topics
+                where user_id in (select id from users where mobile like '984900%')
+                """);
+        jdbc.update("""
+                delete from support_conversations
+                where user_id in (select id from users where mobile like '984900%')
+                """);
         jdbc.update("delete from users where mobile like '984900%'");
     }
 

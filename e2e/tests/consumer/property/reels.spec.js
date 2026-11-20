@@ -11,6 +11,7 @@ const PLOT_WITH_PHOTOS = 'p5032';
 const RESIDENTIAL = /flat|studio|penthouse|independent house|row house|villa/i;
 const MIN_PHOTOS = 3;
 const MAX_PHOTOS = 5;
+const REELS_CAP = 24;
 
 async function catalogue() {
   const res = await fetch(`${API}/properties?sort=newest&size=100`);
@@ -27,9 +28,11 @@ async function withPhotoCounts(rows) {
   return rows.map((p, i) => ({ ...p, photoCount: details[i].images?.length ?? 0 }));
 }
 
+/* The server serves the newest REELS_CAP qualifying homes and the Rent/Buy chips filter those, so earlier specs that
+   publish listings on the shard push older homes out of the feed. `catalogue()` is newest-first, like the feed. */
 async function eligibleIn(rows) {
   const homes = await withPhotoCounts(rows.filter((p) => RESIDENTIAL.test(p.propertyType || '')));
-  return homes.filter((p) => p.photoCount >= MIN_PHOTOS);
+  return homes.filter((p) => p.photoCount >= MIN_PHOTOS).slice(0, REELS_CAP);
 }
 
 /* Cookie consent, seeded before boot so the global bottom banner never overlaps the bottom-of-reel
@@ -85,14 +88,11 @@ test('the feed is residential homes only — and a plot with six photos proves t
 });
 
 test('the feed is the catalogue, not a curated list — every qualifying home is offered', async ({ page }) => {
-  /* Guards over-filtering, which the homes-only test can't. The server caps the feed at 24;
-     relax to min(eligible, 24) if the seeded catalogue outgrows the cap. */
+  /* Guards over-filtering, which the homes-only test can't. */
   const rows = await catalogue();
   const eligible = await eligibleIn(rows);
   expect(eligible.length, 'no listing qualifies for a reel, so the feed proves nothing')
     .toBeGreaterThan(0);
-  expect(eligible.length, 'the catalogue outgrew the 24-reel cap; this assertion needs the cap applied')
-    .toBeLessThanOrEqual(24);
 
   await openFeed(page);
   const shown = await page.locator('.reel a[href^="/property/"]').evaluateAll(
@@ -105,8 +105,8 @@ test('the feed is the catalogue, not a curated list — every qualifying home is
 test('loads with no console errors and core chrome present, and the contact link and View home resolve', async ({ page, consoleErrors }) => {
   await openFeed(page);
   await expect(page.getByText('Reels', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Rent' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Buy' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rent', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Buy', exact: true })).toBeVisible();
 
   // The CTA points at a real route, and the ref is one the API resolves — the shape alone would
   // pass for a link built from a template with the wrong id in it.
@@ -205,6 +205,33 @@ test('photos scroll horizontally within a property and dots update', async ({ pa
   await gallery.evaluate((el) => el.scrollTo({ left: el.clientWidth }));
   /* `evaluateAll` does not retry and the dot is driven by a scroll listener, so polling the read
      waits for the dot to move rather than for a duration. */
+  await expect
+    .poll(async () => page.locator('.reel').first().locator('.reel-dots .reel-dot')
+      .evaluateAll((dots) => dots.findIndex((d) => d.classList.contains('is-on'))))
+    .toBe(1);
+});
+
+test('one vertical throw moves the feed exactly one home', async ({ page }) => {
+  // Reduced motion turns the story auto-advance off, so only the throw can move the feed.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openFeed(page);
+  const feed = page.locator('.reel-wrap');
+  expect(await page.locator('.reel').count(), 'this needs at least four homes in the feed').toBeGreaterThan(3);
+
+  await feed.evaluate((el) => el.scrollBy({ top: el.clientHeight * 3, behavior: 'auto' }));
+  await expect.poll(() => feed.evaluate((el) => Math.round(el.scrollTop / el.clientHeight)),
+    { message: 'a hard flick must stop on the next home, not skim past several' }).toBe(1);
+});
+
+test('one throw advances a reel exactly one photo, and its dot follows', async ({ page }) => {
+  await openFeed(page);
+  const gallery = page.locator('.reel .reel-gallery').first();
+  await expect(gallery).toBeVisible();
+
+  // Headless Chromium has no touch fling; a two-slide scrollBy hits the same directional snap a fling ends in.
+  await gallery.evaluate((el) => el.scrollBy({ left: el.clientWidth * 2, behavior: 'auto' }));
+  await expect.poll(() => gallery.evaluate((el) => Math.round(el.scrollLeft / el.clientWidth)),
+    { message: 'a long throw must still come to rest on the very next photo' }).toBe(1);
   await expect
     .poll(async () => page.locator('.reel').first().locator('.reel-dots .reel-dot')
       .evaluateAll((dots) => dots.findIndex((d) => d.classList.contains('is-on'))))

@@ -16,6 +16,7 @@ import com.draazy.api.leads.contact.ContactRequestStatuses;
 import com.draazy.api.support.AbstractApiTest;
 import java.math.BigDecimal;
 import java.util.List;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,12 +28,13 @@ import tools.jackson.databind.ObjectMapper;
 class OwnerListingCardTest extends AbstractApiTest {
 
     private static final List<String> FULL_RECORD_ONLY = List.of("description", "owner", "amenities", "images",
-            "adminPipeline", "qualityScore", "city", "priceUnit");
+            "adminPipeline", "city", "priceUnit");
 
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
     @Autowired ContactRequestRepository requests;
     @Autowired ObjectMapper objectMapper;
+    @Autowired EntityManager em;
 
     private User user(String mobile) {
         User u = new User(mobile, "owner");
@@ -98,6 +100,10 @@ class OwnerListingCardTest extends AbstractApiTest {
     void theRowIsSlim() throws Exception {
         User o = user("9876511111");
         Property p = listing(o, "Slim 2BHK");
+        em.flush();
+        em.clear();
+        int stored = properties.findById(p.getId()).orElseThrow().getQualityScore().intValue();
+        em.clear();
 
         JsonNode r = row(read("/me/listings?size=100", o), p);
 
@@ -106,6 +112,7 @@ class OwnerListingCardTest extends AbstractApiTest {
         assertThat(r.get("dealStatus").asText()).isEqualTo("active");
         assertThat(r.get("descLength").asInt()).isEqualTo(p.getDescription().length());
         assertThat(r.get("photoCount").asInt()).isZero();
+        assertThat(r.get("qualityScore").asInt()).isEqualTo(stored);
         assertThat(r.has("progress")).isTrue();
         FULL_RECORD_ONLY.forEach(k -> assertThat(r.has(k)).as(k).isFalse());
         assertThat(r.size()).isLessThan(40);

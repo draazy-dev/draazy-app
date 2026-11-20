@@ -1,6 +1,3 @@
-// Verification is a trust signal, never a client-side authorization gate.
-
-/** The never-attempted / signed-out badge — the floor the domain degrades to, never an error. */
 export const NONE_VERIFICATION = Object.freeze({
   verified: false,
   status: 'none',
@@ -22,11 +19,12 @@ export const NONE_VERIFICATION = Object.freeze({
   maskedAadhaar: null,
   mobileMatch: null,
   aadhaarMobile: '',
+  appeal: null,
+  canAppeal: false,
 });
 
 const parseTime = (value) => (value ? Date.parse(value) || null : null);
 
-/** Keep temporary compatibility fields until every caller is off the Aadhaar-shaped UI. */
 export function toVerificationViewModel(res) {
   if (!res || typeof res !== 'object') return { ...NONE_VERIFICATION };
   const status = res.status || 'none';
@@ -56,6 +54,8 @@ export function toVerificationViewModel(res) {
     maskedAadhaar: res.maskedAadhaar ?? null,
     mobileMatch: res.mobileMatch ?? null,
     aadhaarMobile: '',
+    appeal: res.appeal ? { ...res.appeal, openedAt: parseTime(res.appeal.openedAt), decidedAt: parseTime(res.appeal.decidedAt) } : null,
+    canAppeal: Boolean(res.canAppeal),
   };
 }
 

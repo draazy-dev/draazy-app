@@ -12,15 +12,9 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
-/** Optional filters are always bound (a flag plus a neutral value), never as nulls,
- * so PostgreSQL never has to guess a parameter's type. */
 @Repository
 class EnquiryBoardQueries {
-
-    /** {@code since} is never null (epoch when unfiltered); {@code mobilePrefix} is a whole normalised number
-     *  or "-", wildcard-free so {@code like} is equality. */
     record Filter(String status, String deal, String contains, String mobilePrefix, Instant since) {
-
         boolean searching() {
             return !contains.isEmpty();
         }

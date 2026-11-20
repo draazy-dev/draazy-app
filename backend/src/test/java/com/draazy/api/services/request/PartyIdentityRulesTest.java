@@ -9,7 +9,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("Rent agreement party identity: portal DOB and mother's-name fields")
+@DisplayName("Rent agreement party identity: portal party fields")
 class PartyIdentityRulesTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 4);
@@ -43,13 +43,35 @@ class PartyIdentityRulesTest {
     }
 
     @Test
-    @DisplayName("mother's name and alias stay bounded so details json remains small")
-    void textBounds() {
+    @DisplayName("legacy oMother and alias keys are not checked")
+    void removedTextFieldsAreIgnored() {
         String tooLong = "x".repeat(81);
-        assertThatThrownBy(() -> RentAgreementDetailsRules.check(Map.of("_state", Map.of(
+        assertThatCode(() -> RentAgreementDetailsRules.check(Map.of("_state", Map.of(
                 "owner", Map.of("oMother", tooLong, "oAlias", tooLong))), TODAY))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("IGR party fields: mother's name, gender and residential address are format-checked when stated")
+    void igrPartyFields() {
+        Map<String, Object> addr = Map.of("pincode", "560001", "village", "Koramangala", "address", "12 MG Road");
+        assertThatCode(() -> RentAgreementDetailsRules.check(Map.of("_state", Map.of(
+                "owner", Map.of("mother", "Shaila Verma", "gender", "female", "addr", addr, "capacity", "co-owner"),
+                "coOwners", java.util.List.of(Map.of("mother", "Meera", "gender", "male", "addr", addr)),
+                "tenants", java.util.List.of(Map.of("mother", "Latha", "gender", "other")))), TODAY))
+                .doesNotThrowAnyException();
+
+        assertThatThrownBy(() -> RentAgreementDetailsRules.check(Map.of("_state", Map.of(
+                "owner", Map.of("mother", "x".repeat(81), "gender", "m",
+                        "addr", Map.of("pincode", "011004", "address", "y".repeat(201))),
+                "coOwners", java.util.List.of(Map.of("addr", Map.of("village", "z".repeat(81)))),
+                "tenants", java.util.List.of(Map.of("gender", "unknown")))), TODAY))
                 .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("_state.owner.oMother must be at most 80 characters")
-                .hasMessageContaining("_state.owner.oAlias must be at most 80 characters");
+                .hasMessageContaining("_state.owner.mother must be at most 80 characters")
+                .hasMessageContaining("_state.owner.gender must be male, female or other")
+                .hasMessageContaining("_state.owner.addr.pincode must be a 6-digit pincode")
+                .hasMessageContaining("_state.owner.addr.address must be at most 200 characters")
+                .hasMessageContaining("_state.coOwners[0].addr.village must be at most 80 characters")
+                .hasMessageContaining("_state.tenants[0].gender must be male, female or other");
     }
 }

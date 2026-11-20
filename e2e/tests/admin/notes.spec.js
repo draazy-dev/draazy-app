@@ -41,9 +41,10 @@ async function freshListing(title) {
 
 // A seeded listing that answers to both of its public identifiers.
 async function slugAndUuid() {
-  const res = await fetch(`${API}/admin/properties?status=approved&size=1`, { headers: await admin() });
+  const res = await fetch(`${API}/admin/properties?status=approved&size=50`, { headers: await admin() });
   expect(res.status).toBe(200);
-  const row = (await res.json()).content?.[0];
+  // Other specs insert approved rows by SQL without a slug, so take the first one that has one.
+  const row = (await res.json()).content?.find((r) => r.slug);
   expect(row?.slug, 'seeded listings carry a slug — see the V5 catalogue seed').toBeTruthy();
   return { slug: row.slug, uuid: row.id, title: row.title };
 }

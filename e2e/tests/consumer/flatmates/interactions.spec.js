@@ -1,20 +1,24 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../../helpers/flatmateGroup.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
 async function newSeeker() {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Asha K' });
   return { mobile, accessToken };
 }
 
 let adminToken;
 async function approve(id) {
   adminToken ??= (await apiLogin(ACTORS.admin)).accessToken;
+  await tickDeskChecklist(API, id, auth(adminToken));
   const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
     method: 'PATCH',
     headers: auth(adminToken),
@@ -30,14 +34,15 @@ async function seedRoom(hostToken) {
     method: 'POST',
     headers: auth(hostToken),
     body: JSON.stringify({
+      ...(await roomBasics(hostToken)),
       roomType: 'Private room',
       locality: 'Baner',
       rentShare: 18000,
+      deposit: 36000,
       bhk: '2',
       attachedBath: 'attached',
       furnishing: 'semi',
       hostRole: 'tenant',
-      photos: await uploadedListingPhotos(hostToken),
       ...(await tenantRoomAgreement(hostToken)),
     }),
   });
@@ -52,17 +57,16 @@ async function seedGroup(hostToken, over = {}) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(hostToken),
-    body: JSON.stringify({
+    body: JSON.stringify(huntingGroup({
       title: `Group ${Number(uniqueMobile()).toString(36)}`,
-      name: 'Asha K',
       locality: 'Baner',
       rent: 30000,
+      deposit: 50000,
       seats: 3,
       seatsOpen: 2,
       policy: 'any',
-      role: 'tenant',
       ...over,
-    }),
+    })),
   });
   expect(res.status).toBe(201);
   const group = await res.json();
@@ -135,10 +139,10 @@ test.describe('Flatmates interactions', () => {
     expect(res.status).toBe(403);
   });
 
-  test('joining a group is the group\'s version of the same door', async ({ page }) => {
+  test('joining a group is the group\'s version of the same door, and waits for the host even when mixed', async ({ page }) => {
     const host = await newSeeker();
     const seeker = await newSeeker();
-    const group = await seedGroup(host.accessToken);
+    const group = await seedGroup(host.accessToken, { policy: 'any' });
 
     const joinRes = await fetch(`${API}/flatmates/groups/${group.id}/join`, {
       method: 'POST',
@@ -147,10 +151,9 @@ test.describe('Flatmates interactions', () => {
     });
     expect(joinRes.status).toBe(201);
     const request = await joinRes.json();
-    // Unlike the room door this one answers with the row, because an open group auto-accepts and
-    // the caller needs to know they are in rather than waiting.
     expect(request.kind).toBe('group');
-    expect(request.action).toBe('join');
+    expect(request.action).toBe('request');
+    expect(request.status).toBe('pending');
     expect(request.share).toBe('match');
     expect(request.targetId).toBe(group.id);
 
@@ -158,6 +161,9 @@ test.describe('Flatmates interactions', () => {
       headers: auth(host.accessToken),
     })).json();
     expect(inbox.content.some((r) => r.id === request.id)).toBe(true);
+    const detail = await (await fetch(`${API}/flatmates/groups/${group.id}`, { headers: auth(host.accessToken) })).json();
+    expect(detail.item.members).toHaveLength(group.members.length);
+    expect(detail.item.seatsOpen).toBe(group.seatsOpen);
   });
 
   test('a second join on the same group is refused as a duplicate', async ({ page }) => {
@@ -245,7 +251,7 @@ test.describe('Flatmates interactions', () => {
     expect(await outbox()).toMatchObject([{ kind: 'room', status: 'pending' }]);
   });
 
-  test('a seeker can withdraw an ask, and the door reopens', async () => {
+  test('a seeker can withdraw an ask, and the door reopens only after a cooldown', async () => {
     const host = await newSeeker();
     const seeker = await newSeeker();
     const room = await seedRoom(host.accessToken);
@@ -274,6 +280,9 @@ test.describe('Flatmates interactions', () => {
     // has to tell "you already took this back" apart from "that never existed".
     expect((await withdraw('room')).status).toBe(404);
 
-    expect((await ask()).status).toBe(201);
+    // A 7-day cooldown stops an immediate re-ask from re-notifying the host.
+    const reask = await ask();
+    expect(reask.status).toBe(409);
+    expect((await reask.json()).error).toBe('recently_withdrawn');
   });
 });

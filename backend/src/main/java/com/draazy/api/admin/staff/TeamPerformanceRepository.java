@@ -15,7 +15,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 class TeamPerformanceRepository {
-
     private static final String STAFF = """
             select u.id::text, coalesce(nullif(u.name, ''), u.mobile, u.id::text)
             from users u
@@ -59,11 +58,11 @@ class TeamPerformanceRepository {
                       (order by extract(epoch from (decided_at - created_at)) / 60.0)
                     from property_reviews
                     where decided_at >= cast(:from as timestamptz)
-                      and decided_at is not null)
+                      and decided_at is not null and property_id is not null)
             from (
               select created_at as waiting_since
               from property_reviews
-              where status = 'pending'
+              where status = 'pending' and property_id is not null
               union all
               select ownership_requested_at
               from properties
@@ -99,7 +98,7 @@ class TeamPerformanceRepository {
             left join (
               select team, created_at as waiting_since
               from service_requests
-              where status not in ('awaiting-payment', 'draft-shared', 'completed', 'cancelled')
+              where status not in ('awaiting-payment', 'draft-shared', 'action-required', 'completed', 'cancelled')
               union all
               select team, created_at as waiting_since
               from tickets
@@ -113,7 +112,7 @@ class TeamPerformanceRepository {
             from (
               select created_at as waiting_since
               from property_reviews
-              where status = 'pending'
+              where status = 'pending' and property_id is not null
               union all
               select ownership_requested_at
               from properties
@@ -124,7 +123,6 @@ class TeamPerformanceRepository {
             ) property_queue
             """;
 
-    // One branch per function a staffer holds, so /my-work never scans a desk it cannot work.
     private static final List<Map.Entry<String, String>> MY_QUEUES = List.of(
             Map.entry("kyc", """
                     select 'kyc', count(*) filter (where status = 'pending'),
@@ -177,7 +175,7 @@ class TeamPerformanceRepository {
             left join (
               select team, created_at as waiting_since
               from service_requests
-              where status not in ('awaiting-payment', 'draft-shared', 'completed', 'cancelled')
+              where status not in ('awaiting-payment', 'draft-shared', 'action-required', 'completed', 'cancelled')
               union all
               select team, created_at as waiting_since
               from tickets
@@ -248,7 +246,6 @@ class TeamPerformanceRepository {
                 branches.add(queue.getValue());
             }
         }
-        // Team names come from DESK_TEAMS, never from the caller, so formatting them in is safe.
         String teams = DESK_TEAMS.stream()
                 .filter(team -> functions.contains("desk:" + team))
                 .map(team -> "('" + team + "')")

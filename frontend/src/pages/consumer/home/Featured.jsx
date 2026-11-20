@@ -20,36 +20,62 @@ const specs = (p) => {
   return out.slice(0, 3);
 };
 
-/* Guests are sent to sign-in; members toggle the saved store that the navbar heart-count reads. */
+const MAX_CARD_PHOTOS = 5;
+const cardPhotos = (p) => {
+  const photos = [...new Set([p.image || p.img, ...(p.gallery || [])].filter(Boolean))].slice(0, MAX_CARD_PHOTOS);
+  return photos.length ? photos : [''];
+};
+
 function FeaturedCard({ p, priority = false }) {
   const { t } = useTranslation();
   const { isIn } = useAuth();
   const savedList = useSaved();
   const sendToSignIn = useSignInGate();
   const saved = savedList.has(p.id);
-  const image = p.image || p.img || '';
+  const photos = cardPhotos(p);
+  const [shown, setShown] = useState(0);
+  const verifiedLabel = [p.ownerVerified && t('home.featured.idVerified'), p.ownershipVerified && t('home.featured.verifiedProperty')].filter(Boolean).join(' · ');
+
+  const onSwipe = (e) => {
+    const el = e.currentTarget;
+    if (el.clientWidth) setShown(Math.round(el.scrollLeft / el.clientWidth));
+  };
 
   const handleSave = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isIn) { sendToSignIn('save'); return; }
+    if (!isIn) { sendToSignIn('save', undefined, () => savedList.save(p.id, p.uuid)); return; }
     savedList.toggle(p.id, p.uuid);
   };
 
   return (
     <Link to={propertyHref(p)} className="property-card list-reveal glass rounded-2xl overflow-hidden group cursor-pointer flex flex-col">
       <div className="card-img-wrap relative overflow-hidden" style={{ aspectRatio: '16/10' }}>
-        <PropertyImage src={image} sizes={CARD_SIZES} alt={p.title} width={600} height={400} className="w-full h-full object-cover" loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : undefined} />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
-        <div className="absolute top-3 left-3 flex gap-1.5">
+        <div onScroll={onSwipe} className="no-scrollbar flex w-full h-full overflow-x-auto overflow-y-hidden sm:overflow-hidden overscroll-x-contain snap-x snap-mandatory">
+          {photos.map((src, i) => (
+            <div key={src || i} className="snap-start snap-always shrink-0 w-full h-full overflow-hidden">
+              <PropertyImage
+                src={src}
+                sizes={CARD_SIZES}
+                alt={i === 0 ? p.title : ''}
+                width={600}
+                height={400}
+                draggable={false}
+                className="w-full h-full object-cover"
+                loading={priority && i === 0 ? 'eager' : 'lazy'}
+                fetchPriority={priority && i === 0 ? 'high' : undefined}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+        <div className="pointer-events-none absolute top-3 left-3 flex gap-1.5">
           {(p.ownerVerified || p.ownershipVerified) && (
-            <span className="badge-verified-icon" role="img" aria-label={t('home.featured.verified')} title={t('home.featured.verified')}>
+            <span className="badge-verified-icon" role="img" aria-label={verifiedLabel} title={verifiedLabel}>
               <Icon name="shield-check" />
             </span>
           )}
         </div>
-        {/* .tap-extend adds a transparent 44px hit area (WCAG 2.5.8). Never pair it with
-            .tap-target — they set the same property and .tap-target wins by order. */}
         <button
           className="tap-extend heart-on-photo absolute top-3 right-3 w-9 h-9 flex items-center justify-center transition-all"
           onClick={handleSave}
@@ -58,10 +84,16 @@ function FeaturedCard({ p, priority = false }) {
         >
           <Icon name="heart" weight={saved ? 'fill' : 'regular'} className="w-6 h-6" />
         </button>
-        <div className="theme-dark absolute bottom-3 left-3">
+        <div className="theme-dark pointer-events-none absolute bottom-3 left-3">
           <span className="text-xl font-extrabold text-white tabular-nums" style={{ textShadow: '0 1px 4px rgb(var(--dz-c-black) / 0.6)' }}>{priceLabel(p)}</span>
-          {p.deal === 'rent' && <span className="text-xs text-gray-300 ml-1">{t('home.featured.perMonth')}</span>}
         </div>
+        {photos.length > 1 ? (
+          <div data-card-dots="" aria-hidden="true" className="sm:hidden pointer-events-none absolute bottom-4 right-3 flex items-center gap-1.5">
+            {photos.map((_, d) => (
+              <span key={d} className={'block h-1.5 rounded-full shadow-[0_0_3px_rgb(var(--dz-c-black)/0.5)] transition-all ' + (d === shown ? 'w-4 bg-pure-white' : 'w-1.5 bg-pure-white/55')} />
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className="flex flex-col flex-1 p-4 gap-1.5">
         <h3 className="font-semibold text-sm leading-snug text-white group-hover:text-teal-300 transition-colors line-clamp-2">{p.title}</h3>
@@ -81,13 +113,10 @@ function FeaturedCard({ p, priority = false }) {
   );
 }
 
-/* Featured is a paid promotion slot: promoted listings come first, padded with fresh approved stock. */
 export default function Featured({ navigate }) {
   const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  // Verified-supply social proof counted by whoever holds the catalogue, since an exact client-side
-  // count is unavailable against a paginated API. Best-effort: a failure just hides the line.
   const [vstats, setVstats] = useState(null);
 
   useEffect(() => {
@@ -97,16 +126,12 @@ export default function Featured({ navigate }) {
       .catch(() => { if (alive) setLoading(false); });
     trustStats()
       .then((s) => { if (alive && s && s.verifiedListings > 0) setVstats(s); })
-      .catch(() => { /* the rail stands on its own without the proof line */ });
+      .catch(() => { });
     return () => { alive = false; };
   }, []);
 
-  // Once the fetch settles with no promoted/approved stock there is nothing to
-  // feature — drop the whole rail rather than show an empty heading.
   if (!loading && !items.length) return null;
 
-  // Inventory proof belongs beside the stock it describes on a phone. One node in two
-  // mutually-exclusive positions, so the accessibility tree never sees a duplicate.
   const verifiedProof = vstats && (
     <>
       <Icon name="shield-check" className="w-4 h-4" />
@@ -120,8 +145,6 @@ export default function Featured({ navigate }) {
         <div className="section-head flex items-end justify-between sm:mb-8 list-reveal">
           <div>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold sm:mb-2">{t('home.featured.title')}</h2>
-            {/* The subtitle repeats what the rail below it already shows; on a
-                phone that costs a line of the fold for nothing. Restored at lg. */}
             <p className="hidden lg:block text-gray-400 text-sm sm:text-base">{t('home.featured.subtitle')}</p>
             {vstats && (
               <p className="hidden sm:inline-flex mt-2 items-center gap-1.5 text-xs sm:text-sm font-medium text-emerald-300/90">
@@ -134,7 +157,6 @@ export default function Featured({ navigate }) {
           </button>
         </div>
 
-        {/* The negative offset pulls the line out of the section header gap so it reads as a rail caption. */}
         {vstats && (
           <p className="sm:hidden flex w-fit -mt-3 mb-2 items-center gap-1.5 text-xs font-medium text-emerald-300/90">
             {verifiedProof}
@@ -143,9 +165,7 @@ export default function Featured({ navigate }) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading
-            ? /* Two placeholders on a phone, six from sm up. This rail is the first
-                 thing above the mobile fold now, and six stacked grey cards read as
-                 a broken page rather than as loading. */
+            ?
               Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className={'glass rounded-2xl overflow-hidden' + (i >= 2 ? ' hidden sm:block' : '')} aria-hidden="true">
                   <div className="skeleton" style={{ aspectRatio: '16/10' }} />
@@ -156,17 +176,14 @@ export default function Featured({ navigate }) {
                   </div>
                 </div>
               ))
-            : /* The first card is above the fold on mobile, so it must not be
-                 lazy — that would defer the one image the first impression rests on. */
+            :
               items.map((p, i) => <FeaturedCard key={p.id} p={p} priority={i === 0} />)}
         </div>
 
-        {/* Mobile keeps an in-section path to the full catalogue (the header
-           "View All" is desktop-only to avoid crowding the heading row). */}
         {!loading && (
           <button
             onClick={() => navigate('/listings')}
-            className="sm:hidden mt-6 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-teal-500 hover:bg-white/10 hover:text-teal-400 transition-all"
+            className="h-btn sm:hidden mt-6 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 text-sm font-semibold text-teal-500 hover:bg-white/10 hover:text-teal-400 transition-all"
           >
             {t('home.featured.viewAllProperties')} <Icon name="arrow-right" className="w-4 h-4" />
           </button>

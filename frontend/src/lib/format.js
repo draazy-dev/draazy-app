@@ -1,7 +1,4 @@
-/* Formatting + small helpers shared across the app (ports AdminUI.esc/fmtINR/fmtNum). */
-
-/** Parse a price/amount string ("₹25,000/mo") into an integer. */
-export const parseAmount = (s) => parseInt(String(s == null ? '' : s).replace(/[^\d]/g, ''), 10) || 0;
+export const parseAmount = (s) => Math.round(parseFloat(String(s == null ? '' : s).replace(/[^\d.]/g, ''))) || 0;
 
 export function isoToDisplay(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
@@ -11,6 +8,23 @@ export function isoToDisplay(iso) {
 export function fmtDate(iso) {
   const d = iso ? new Date(iso) : null;
   return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+}
+
+export function fmtDateTime(value) {
+  const d = value == null || value === '' ? null : new Date(value);
+  if (!d || Number.isNaN(d.getTime())) return '';
+  const text = d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+  return text.replace(/\b(am|pm)\b/, (m) => m.toUpperCase());
+}
+
+const toMs = (v) => (v == null || v === '' ? NaN : typeof v === 'number' ? v : Date.parse(v));
+
+export function lastActivity(createdAt, ...later) {
+  const created = toMs(createdAt);
+  const times = [created, ...later.map(toMs)].filter(Number.isFinite);
+  if (!times.length) return null;
+  const at = Math.max(...times);
+  return { verb: Number.isFinite(created) && at > created ? 'Updated' : 'Created', at, text: fmtDateTime(at) };
 }
 
 export function fmtINR(n) {
@@ -24,11 +38,7 @@ export function fmtNum(n) {
   return (Number(n) || 0).toLocaleString('en-IN');
 }
 
-/* Mirrors the units the wizard offers; land is priced in acre and guntha, so a hardcoded "sq.ft." rendered a
-   2-acre farm as "2 sq.ft." An unknown unit is printed verbatim, an absent one is the documented sq.ft. */
 const AREA_UNIT_LABEL = {
-  // No prototype: `areaUnit` arrives off the wire, and a plain literal answers `'constructor'`
-  // with a function, which `??` would then accept as a label.
   __proto__: null,
   sqft: 'sq.ft.', sqyd: 'sq.yd.', sqm: 'sq.m.', guntha: 'Guntha', acre: 'Acre', hectare: 'Hectare',
 };
@@ -37,8 +47,6 @@ export function fmtArea(area, unit) {
   return area ? `${fmtNum(area)} ${AREA_UNIT_LABEL[unit] ?? (unit || 'sq.ft.')}` : '';
 }
 
-/* Whether a ₹-per-unit figure may be captioned "per sq.ft." An unstated unit is sq.ft. — that is
-   the contract's default, and `''` is what the wire writes for one. */
 export const isSqftUnit = (unit) => (unit || 'sqft') === 'sqft';
 
 export function rentLabel(n) {
@@ -52,8 +60,6 @@ export function priceLabel(p) {
 export function timeAgo(iso) {
   const d = new Date(iso);
   const diff = Math.floor((Date.now() - d.getTime()) / 86400000);
-  // Unparseable input passes through verbatim (callers seed display literals) but ALWAYS as a
-  // string, so a null createdAt cannot blow up a caller doing .toLowerCase() on it.
   if (Number.isNaN(diff)) return String(iso ?? '');
   if (diff <= 0) return 'Today';
   if (diff === 1) return 'Yesterday';
@@ -73,10 +79,6 @@ export function fmtAgo(ts) {
   const d = Math.floor(h / 24);
   if (d < 30) return d + 'd ago';
   return new Date(t).toLocaleDateString('en-IN');
-}
-
-export function esc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 export function classNames(...xs) {

@@ -2,7 +2,7 @@
 title: "Women's flatshare and PG safety checklist for Pune"
 description: A practical safety checklist for women looking for a flatshare or PG in Pune: what to verify before paying, how to visit, and which police helplines to know.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-06
 author: Draazy Team
 topic: renting
 tags: [women safety, flatshare, PG, flatmates, police helpline, Pune, renting]
@@ -33,7 +33,7 @@ Start with the person who offers you the room.
 - **Look the PG up.** Ask for its address, the operator's name and a landline or office. Speak to a current resident if you can.
 - **Search the name and number online** for complaints.
 
-On Draazy, owners list directly, listings are reviewed by staff, and owners complete a staff-reviewed online KYC. An owner's phone number stays private until you use the contact gate. You should still do your own checks and visit before you pay. Our [guide to how verification works](/how-verification-works) explains what Draazy does and does not check.
+On Draazy, owners list directly and our staff review each listing. An owner's phone number stays masked until the owner approves your contact request. A "KYC done" badge means a person's ID and live selfie were reviewed. A "Verified property" badge means ownership or tenancy papers were accepted. Neither badge certifies legal title or that a place is safe, so do your own checks and visit before you pay. Our [guide to how verification works](/how-verification-works) explains what Draazy does and does not check.
 
 ## How should I visit the place?
 
@@ -53,7 +53,7 @@ On Draazy, owners list directly, listings are reviewed by staff, and owners comp
 - **How the agreement is set up.** Make sure your name is on the agreement or a written understanding. Our [flatmate agreement guide](/blog/flatmate-agreement-pune) shows how.
 - **Who has copies of the keys.**
 
-Look for flatmates through [Draazy Flatmates](/flatmates), meet them in a public place first and tell a friend. Draazy does not replace your own checks.
+Look for flatmates through [Draazy Flatmates](/flatmates). Choose "Women" in the filters, or tap "Women-only homes" to see only homes for women. Posts can carry the same two badges (on Flatmates the person badge reads "ID verified"), and a host approves each request to join a group. Meet people in a public place first and tell a friend. Draazy does not replace your own checks. If a post looks wrong, use "Report this post" and read [how to report a listing or user](/help/a/report-a-listing).
 
 ## What should be in writing for a PG?
 

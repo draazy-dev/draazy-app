@@ -15,7 +15,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +29,6 @@ import org.springframework.test.web.servlet.ResultActions;
 
 @DisplayName("Flatmates — a host's accept takes the seat it promises")
 class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
@@ -58,8 +56,13 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
         return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
+    @Autowired
+    jakarta.persistence.EntityManager em;
+
     private String publish(String table, String id) {
+        em.flush();
         jdbc.update("update " + table + " set mod_status = 'approved' where id = ?::uuid", id);
+        em.clear();
         return id;
     }
 
@@ -67,10 +70,7 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Two of us in Aundh","locality":"Aundh","policy":"women",
-                                 "rent":40000,"seats":2,"seatsOpen":1,"name":"Host"}
-                                """))
+                        .content(FlatmateGroupFixture.hunting("Two of us in Aundh", "Aundh", "women", 40000, 2, 1)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return publish("flatmate_groups", idOf(json));
@@ -82,12 +82,13 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                 "furnishing":"semi","locality":"Aundh","society":"Accept Towers",
+                                 "locality":"Aundh","society":"Accept Towers",
                                  "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                                  "lookingFor":"any","foodPref":"any",
-                                 "photos":["%s"],"hostRole":"owner",
-                                 "note":"Quiet room."}
-                                """.formatted(UploadedPhotos.of(host.getId()))))
+                                 %s,"hostRole":"owner",
+                                 "note":"Quiet room.",%s,%s}
+                                """.formatted(FlatmateRoomFixture.photos(host.getId()), FlatmateRoomFixture.BASICS,
+                                FlatmateRoomFixture.DETAILS)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return publish("flatmate_rooms", idOf(json));
@@ -115,7 +116,7 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
         mvc.perform(post(route, targetId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(requester))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"share\":\"" + share + "\"}"))
+                        .content("{\"share\":\"" + share + "\",\"gender\":\"female\"}"))
                 .andExpect(status().isCreated());
         return jdbc.queryForObject(
                 "select id::text from flatmate_requests where target_id = ?::uuid "
@@ -243,5 +244,31 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
 
         decide(host, requestId, "declined").andExpect(status().isOk());
         assertThat(column("flatmate_rooms", "seats_open", roomId)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("a room with no space left refuses a new ask as room_full")
+    void fullRoomRefusesNewAsks() throws Exception {
+        User host = user("9847000016", "Host");
+        String seat = seatRoom(host);
+        decide(host, ask(Routes.Flatmates.ROOM_INTEREST, seat, user("9847000017", "A"), "solo"), "accepted")
+                .andExpect(status().isOk());
+
+        User owner = user("9847000018", "Owner");
+        String split = splitRoom(owner, 2);
+        decide(owner, ask(Routes.Flatmates.ROOM_INTEREST, split, user("9847000019", "B"), "bring"), "accepted")
+                .andExpect(status().isOk());
+
+        User late = user("9847000020", "Late");
+        for (String roomId : List.of(seat, split)) {
+            mvc.perform(post(Routes.Flatmates.ROOM_INTEREST, roomId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(late))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"share\":\"solo\",\"gender\":\"female\"}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message", Matchers.endsWith("(room_full)")));
+        }
+        assertThat(jdbc.queryForObject("select count(*) from flatmate_requests where requester_id = ?::uuid",
+                Integer.class, late.getId().toString())).isZero();
     }
 }

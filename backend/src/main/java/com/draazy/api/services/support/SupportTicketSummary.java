@@ -9,9 +9,8 @@ public record SupportTicketSummary(
         String status,
         boolean unread,
         LastMessage lastMessage,
-        Instant createdAt) {
-
-    /** {@code body} is cut to a one-line preview. */
+        Instant createdAt,
+        SupportTicketAbout about) {
     public record LastMessage(String authorRole, String body, Instant createdAt) {
     }
 }

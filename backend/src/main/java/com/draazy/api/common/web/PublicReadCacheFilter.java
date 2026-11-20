@@ -29,18 +29,14 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 
-/** Serves public reference reads from memory and lets browsers and the edge cache them (cross-cutting.md §9). */
 @Component
-// After Spring Security, so a hit still passes the origin gate, CORS and the security headers.
 @Order(Ordered.LOWEST_PRECEDENCE)
 public class PublicReadCacheFilter extends OncePerRequestFilter {
-
-    // Each must answer every caller identically: one that varied by caller would leak across users.
+    // Cached routes must answer every caller identically; one varying by caller leaks across users.
     static final Set<String> PATHS = Set.of(
-            Routes.Bootstrap.BASE, Routes.Fees.BASE, Routes.Localities.BASE, Routes.Content.FAQS,
+            Routes.Bootstrap.BASE, Routes.Fees.BASE, Routes.Content.FAQS,
             Routes.Properties.FEATURED, Routes.Properties.SEARCH_INDEX, Routes.Societies.TOP);
 
-    // Caller-aware for a signed-in viewer (the owner, a checker), identical for every anonymous one.
     static final List<PathPattern> ANONYMOUS = Stream.of(
                     Routes.Properties.BASE, Routes.Properties.ANY_SINGLE, Routes.Reviews.FOR_PROPERTY,
                     Routes.Reviews.FOR_ENTITY, Routes.Owners.ANY_SINGLE, Routes.Localities.ANY_SINGLE,
@@ -51,9 +47,13 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
 
     private static final String ADMIN_PREFIX = "/admin/";
 
+    private static final List<PathPattern> MODERATION_WRITES = Stream.of(
+                    Routes.Moderation.PROPERTY_STATUS, Routes.Moderation.PROPERTY_FLAG,
+                    Routes.Moderation.PROPERTY_PHOTO_TAKEDOWN, Routes.Properties.ARCHIVE, Routes.Properties.RESTORE)
+            .map(PathPatternParser.defaultInstance::parse).toList();
+
     private static final Set<String> READ_METHODS = Set.of("GET", "HEAD", "OPTIONS");
 
-    /** Bounds memory against arbitrary query strings, e.g. {@code /properties/featured?x=<random>}. */
     static final int MAX_ENTRIES = 256;
 
     private final long ttlMillis;
@@ -67,11 +67,12 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
                 }
             });
 
+    private long generation;
+
     public PublicReadCacheFilter(@Value("${draazy.cache.public-reads.ttl:30s}") Duration ttl) {
         this.ttlMillis = ttl.toMillis();
     }
 
-    /** Whether this request is served through the cache; false for everything when the TTL is zero. */
     public boolean caches(HttpServletRequest request) {
         if (ttlMillis <= 0 || !"GET".equals(request.getMethod())) {
             return false;
@@ -89,11 +90,13 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
         return ANONYMOUS.stream().anyMatch(p -> p.matches(container));
     }
 
-    // Every back-office write can change a cached answer (settings, cities, plans, FAQs, moderation),
-    // so a successful one drops them all. Only on this instance: the others serve out their TTL.
     private boolean evicts(HttpServletRequest request) {
-        return ttlMillis > 0 && !READ_METHODS.contains(request.getMethod())
-                && pathOf(request).startsWith(ADMIN_PREFIX);
+        if (ttlMillis <= 0 || READ_METHODS.contains(request.getMethod())) {
+            return false;
+        }
+        String path = pathOf(request);
+        PathContainer container = PathContainer.parsePath(path);
+        return path.startsWith(ADMIN_PREFIX) || MODERATION_WRITES.stream().anyMatch(p -> p.matches(container));
     }
 
     private static String pathOf(HttpServletRequest request) {
@@ -111,7 +114,10 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
         if (!caches(request)) {
             chain.doFilter(request, response);
             if (response.getStatus() < HttpServletResponse.SC_BAD_REQUEST) {
-                entries.clear();
+                synchronized (entries) {
+                    generation++;
+                    entries.clear();
+                }
             }
             return;
         }
@@ -119,6 +125,10 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
         long now = System.currentTimeMillis();
         Entry entry = wantsFresh(request) ? null : entries.get(key);
         if (entry == null || entry.expiresAt() <= now) {
+            long seen;
+            synchronized (entries) {
+                seen = generation;
+            }
             ContentCachingResponseWrapper buffer = new ContentCachingResponseWrapper(response);
             chain.doFilter(request, buffer);
             if (buffer.getStatus() != HttpServletResponse.SC_OK) {
@@ -126,21 +136,23 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
                 return;
             }
             byte[] body = buffer.getContentAsByteArray();
-            // Weak: Tomcat will not gzip a response that carries a strong ETag.
             entry = new Entry(body, buffer.getContentType(),
                     "W/\"" + DigestUtils.md5DigestAsHex(body) + '"', now + ttlMillis);
-            entries.put(key, entry);
+            // A write that committed mid-read may have been missed by this body; serve it but don't keep it.
+            synchronized (entries) {
+                if (generation == seen) {
+                    entries.put(key, entry);
+                }
+            }
         }
         serve(entry, now, request, response);
     }
 
-    // max-age counts down to the entry's expiry, so memory plus browser never exceeds one TTL.
     private static void serve(Entry entry, long now, HttpServletRequest request,
             HttpServletResponse response) throws IOException {
         long maxAge = Math.max(1, TimeUnit.MILLISECONDS.toSeconds(entry.expiresAt() - now + 999));
         response.setHeader(HttpHeaders.CACHE_CONTROL,
                 CacheControl.maxAge(maxAge, TimeUnit.SECONDS).cachePublic().getHeaderValue());
-        // Else a browser could replay an anonymous answer to the same visitor just after sign-in.
         response.addHeader(HttpHeaders.VARY, HttpHeaders.AUTHORIZATION);
         if (new ServletWebRequest(request, response).checkNotModified(entry.etag())) {
             return;
@@ -150,7 +162,6 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
         response.getOutputStream().write(entry.body());
     }
 
-    /** Sent on every staff and admin read (http.js), so an editor always sees their own edits. */
     private static boolean wantsFresh(HttpServletRequest request) {
         String header = request.getHeader(HttpHeaders.CACHE_CONTROL);
         if (header == null) {

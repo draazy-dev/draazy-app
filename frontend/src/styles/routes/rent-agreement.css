@@ -1,7 +1,3 @@
-/* rent-agreement — split out of index.css so it ships with the /services/rent-agreement
-   route chunk. All rules scoped to .ra-page. */
-
-/* ===== Rent Agreement wizard (scoped to .ra-page) ===== */
 .ra-page .field {
   background: rgb(var(--dz-c-white) / .05);
   border: 1px solid rgb(var(--dz-c-white) / calc(.1 * var(--dz-line-boost)));
@@ -14,8 +10,28 @@
   outline: none;
 }
 
+.ra-page input.field {
+  height: var(--control-h);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.ra-page .field::placeholder { color: rgb(var(--dz-c-gray-500)); }
+
 .ra-page select.field option {
   background: rgb(var(--dz-c-ink-card));
+}
+
+@media (max-width: 639.98px) {
+  .ra-page .ra-form-card {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 .ra-page .hero {
@@ -47,9 +63,6 @@
   background: rgb(var(--dz-c-amber-500) / .14);
   color: rgb(var(--dz-c-amber-400));
 }
-
-/* Signed out — this step is behind the sign-in line (see LAST_PUBLIC_STEP). Deliberately the
-   quietest variant: an accent colour would read as something owed rather than as "not yet". */
 .ra-page .step-dot.locked {
   border-color: rgb(var(--dz-c-white) / calc(.08 * var(--dz-line-boost)));
   background: rgb(var(--dz-c-white) / .03);
@@ -187,12 +200,13 @@
   flex-shrink: 0;
 }
 
-.ra-page label.lbl {
+.ra-page .lbl {
   display: block;
-  font-size: 13px;
+  font-size: .875rem;
+  line-height: 1.25rem;
   font-weight: 500;
-  color: rgb(var(--dz-c-slate-300));
-  margin-bottom: 8px;
+  color: rgb(var(--dz-c-gray-300));
+  margin-bottom: .5rem;
 }
 
 .ra-page .req::after {
@@ -239,29 +253,24 @@
 }
 
 @media (hover: hover) {
-  /* Gated so touch does not leave the last tapped option highlighted. */
+  .ra-page .opt-pill:not(:disabled):hover,
+  .ra-page .ra-mode:not(:disabled):hover { border-color: rgb(var(--dz-c-teal-500) / .4); }
 
-  .ra-page .opt-pill:hover,
-  .ra-page .ra-mode:hover { border-color: rgb(var(--dz-c-teal-500) / .4); }
-
-  .ra-page .qty-btn:hover {
+  .ra-page .qty-btn:not(:disabled):hover {
     background: rgb(var(--dz-c-teal-500) / .15);
     color: rgb(var(--dz-c-teal-300));
   }
 
-  .ra-page .fr-remove:hover {
+  .ra-page .fr-remove:not(:disabled):hover {
     background: rgb(var(--dz-c-rose-500) / .12);
     color: rgb(var(--dz-c-rose-300));
   }
 
-  .ra-page .upload-box:hover {
+  .ra-page .upload-box:not(:has(input:disabled)):hover {
     border-color: rgb(var(--dz-c-teal-500) / .5);
     background: rgb(var(--dz-c-teal-500) / .05);
   }
 }
-
-/* 28px drawn squares against the 44px floor. `.tap-extend` cannot carry it here — `.qty-step`
-   clips its overflow — so the box itself grows and the glyph stays the size it was designed. */
 @media (pointer: coarse) {
 
   .ra-page .qty-btn {
@@ -279,6 +288,9 @@
 .ra-page .ra-mode:disabled,
 .ra-page .furn-tile:disabled,
 .ra-page .qty-btn:disabled,
-.ra-page .fr-remove:disabled {
-  cursor: default;
+.ra-page .fr-remove:disabled,
+.ra-page .upload-box:has(input:disabled),
+.ra-page :is(input, textarea):disabled:not(.dz-dropdown__menu *) {
+  opacity: 0.55;
+  cursor: not-allowed;
 }

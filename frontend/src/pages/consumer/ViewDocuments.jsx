@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { Trans, useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
+import LogoMark from '../../components/brand/LogoMark.jsx';
 import HScroll from '../../components/ui/HScroll.jsx';
 import { classNames } from '../../lib/format.js';
 import { cssColour } from '../../lib/themeColour';
@@ -17,7 +18,7 @@ function drawWatermark(ctx, w, h, label) {
   ctx.font = `bold ${Math.round(w / 22)}px Inter, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const step = Math.max(24, Math.round(h / 5)); // guard: tiny images round h/5 to 0 → infinite loop
+  const step = Math.max(24, Math.round(h / 5));
   for (let y = 0; y < h + w; y += step) {
     ctx.save();
     ctx.translate(w / 2, y - w / 2);
@@ -44,10 +45,8 @@ const isPdfDoc = (doc) => /pdf/i.test(doc.mime || '') || /\.pdf$/i.test(doc.name
 const isImageDoc = (doc) => /image/i.test(doc.mime || '');
 const docTypeIcon = (doc) => (isImageDoc(doc) ? 'image' : isPdfDoc(doc) ? 'file-text' : 'file-lock-2');
 
-// The signed `url` is minted for the selected document only; `dataUrl` is for inline bytes.
 const docSource = (doc) => doc.dataUrl || doc.url || null;
 
-// Decode a base64 data URL to bytes for pdf.js (it wants a typed array, not a URL).
 function dataUrlToBytes(dataUrl) {
   try {
     const base64 = String(dataUrl).split(',')[1] || '';
@@ -60,7 +59,6 @@ function dataUrlToBytes(dataUrl) {
   }
 }
 
-// Shared zoom toolbar for both the image and PDF canvas viewers.
 function ZoomBar({ zoom, setZoom }) {
   const { t } = useTranslation();
   const btn = 'inline-flex items-center justify-center h-11 w-11 rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none';
@@ -80,8 +78,6 @@ function ZoomBar({ zoom, setZoom }) {
   );
 }
 
-// Images: draw onto a canvas with a tiled watermark. Guarded against StrictMode
-// double-run and rapid doc switches so it never draws twice or leaks.
 function ImageViewer({ doc }) {
   const { t } = useTranslation();
   const wrapRef = useRef(null);
@@ -122,14 +118,12 @@ function ImageViewer({ doc }) {
   );
 }
 
-// pdf.js loads dynamically only when a PDF is shown; canvas
-// rendering keeps the file view-only with the watermark baked in.
 function PdfViewer({ doc }) {
   const { t } = useTranslation();
   const scrollRef = useRef(null);
   const pagesRef = useRef(null);
   const [zoom, setZoom] = useState(1);
-  const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
+  const [status, setStatus] = useState('loading');
 
   useEffect(() => {
     let cancelled = false;
@@ -141,7 +135,6 @@ function PdfViewer({ doc }) {
         if (!pdfjs.GlobalWorkerOptions.workerSrc) {
           pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
         }
-        // Inline bytes when the document carries them; otherwise let pdf.js fetch the signed url.
         const bytes = doc.dataUrl ? dataUrlToBytes(doc.dataUrl) : null;
         const source = bytes ? { data: bytes } : { url: doc.url };
         if (!bytes && !doc.url) throw new Error('Unreadable PDF data');
@@ -149,7 +142,7 @@ function PdfViewer({ doc }) {
         if (cancelled) return;
         if (host) host.replaceChildren();
         const containerW = scrollRef.current?.clientWidth || 760;
-        const dpr = Math.min(window.devicePixelRatio || 1, 2); // cap so mobile canvases stay light
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         for (let n = 1; n <= pdf.numPages; n += 1) {
           const page = await pdf.getPage(n); // eslint-disable-line no-await-in-loop
           if (cancelled) return;
@@ -235,7 +228,6 @@ function DocumentCard({ doc, fetchUrl }) {
   );
 }
 
-// Only the selected document renders, so a multi-doc share doesn't stack every viewer at full height.
 function DocSwitcher({ docs, active, onSelect }) {
   const { t } = useTranslation();
   return (
@@ -289,8 +281,6 @@ const ERR_REVOKED = {
   textKey: 'viewDocs.errRevokedText',
   subKey: 'viewDocs.errRevokedSub',
 };
-/* One neutral state answers all four 404 cases (pending, lapsed, unknown, foreign) so a stranger learns nothing
-   from the screen; ERR_REVOKED's 'share link' wording would mislead a signed-in buyer who never used a link. */
 const ERR_LAPSED = {
   titleKey: 'viewDocs.errLapsedTitle',
   textKey: 'viewDocs.errLapsedText',
@@ -312,11 +302,7 @@ const ERR_PENDING_UPLOAD = {
   subKey: 'viewDocs.errPendingSub',
 };
 
-/** The token rides the URL fragment, never `?token=`: a fragment isn't sent to servers, logs, proxies or Referer.
- * It stays in the address bar, as scrubbing it would break a refresh. */
 function tokenFromHash(hash) {
-  // `decodeURIComponent` because a chat client may percent-encode the fragment on the way through;
-  // the token itself is URL-safe base64 and survives either form.
   try {
     return decodeURIComponent((hash || '').replace(/^#/, '')).trim();
   } catch {
@@ -350,8 +336,6 @@ function useSharedByToken(enabled) {
       })
       .catch((err) => {
         if (cancelled) return;
-        // 401 covers unknown, declined and expired without telling
-        // them apart, so the copy says 'inactive', not 'expired'.
         const errorState = err?.status === 401 ? ERR_REVOKED : ERR_LOAD;
         setState({ shared: [], sub: null, errorState, loading: false });
       });
@@ -361,8 +345,6 @@ function useSharedByToken(enabled) {
   return state;
 }
 
-/** The request id is an identifier, not a capability: the API
- * also requires the JWT user to be the requester, else 404. */
 function useSharedByRequest(requestId, enabled) {
   const [state, setState] = useState({ shared: [], sub: null, errorState: null, loading: true });
 
@@ -411,7 +393,6 @@ export default function ViewDocuments({ shared: byToken = false }) {
   const { shared, sub, errorState, loading } = byToken ? fromToken : fromRequest;
   const [active, setActive] = useState(0);
 
-  // View-only protections (match original: block right-click, drag, Ctrl/Cmd+S/P).
   useEffect(() => {
     const noCtx = (e) => e.preventDefault();
     const noDrag = (e) => e.preventDefault();
@@ -429,35 +410,26 @@ export default function ViewDocuments({ shared: byToken = false }) {
     };
   }, []);
 
-  // No documents *yet* is not none: 'No documents available'
-  // mid-request would tell the recipient their link is broken.
   const showEmpty = !loading && (errorState || shared.length === 0);
   const emptyTitle = errorState ? t(errorState.titleKey) : t('viewDocs.emptyTitle');
   const emptyText = errorState ? t(errorState.textKey) : t('viewDocs.emptyText');
   const subtitle = errorState ? t(errorState.subKey)
     : (!loading && sub ? t(sub.key, sub.args) : t('viewDocs.loading'));
 
-  // The recipient of a share link may have no Draazy account at all — that is the whole point of
-  // the token — so "back to dashboard" would send them to a sign-in wall. Home is the honest exit.
   const exitTo = byToken ? '/' : '/dashboard';
 
   const total = shared.length;
-  const idx = Math.min(active, Math.max(0, total - 1)); // clamp if the share shrinks
+  const idx = Math.min(active, Math.max(0, total - 1));
   const activeDoc = shared[idx];
 
   return (
     <div className="vd-page min-h-[100dvh]" style={{ background: 'rgb(var(--dz-c-ink))' }}>
-      {/* Top bar */}
       <nav className="glass-nav sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div
-              className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-600 to-teal-500 flex items-center justify-center"
-            >
-              <Icon name="home" className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-lg font-extrabold tracking-tight">
-              Pune<span className="gradient-text">Nest</span>
+            <LogoMark className="w-8 h-8 shrink-0 text-teal-400" />
+            <span className="text-lg font-extrabold tracking-tight text-white">
+              Draazy
             </span>
           </Link>
           <span className="flex items-center gap-2">
@@ -468,7 +440,7 @@ export default function ViewDocuments({ shared: byToken = false }) {
             >
               <Icon name="x" className="w-4 h-4" /> <span className="hidden sm:inline">{t('viewDocs.close')}</span>
             </Link>
-            <span className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-400/25 whitespace-nowrap">
+            <span className="dz-tag flex font-semibold bg-amber-500/15 text-amber-300 border border-amber-400/25">
               <Icon name="lock" className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="hidden sm:inline">{t('viewDocs.viewOnlyLong')}</span>
               <span className="sm:hidden">{t('viewDocs.viewOnlyShort')}</span>

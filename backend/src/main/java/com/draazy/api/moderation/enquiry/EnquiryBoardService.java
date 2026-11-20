@@ -2,6 +2,7 @@ package com.draazy.api.moderation.enquiry;
 
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.persistence.LikePatterns;
@@ -18,7 +19,6 @@ import com.draazy.api.leads.contact.ContactRequest;
 import com.draazy.api.leads.contact.ContactRequestRepository;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -31,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class EnquiryBoardService {
-
     private static final int LOCALITY_ROWS = 10;
 
     private final ContactRequestRepository contactRequests;
@@ -58,25 +57,24 @@ public class EnquiryBoardService {
     public Page<AdminEnquiryDto> enquiries(String status, String q, Integer days, Pageable pageable) {
         return queries.enquiries(filter(status, null, q, days), Pageables.unsorted(pageable)).map(r -> new AdminEnquiryDto(
                 r[0].toString(), r[1].toString(), (String) r[2], (String) r[3], (String) r[4],
-                MobileMask.mask((String) r[5]), (String) r[6], (Instant) r[7]));
+                (String) r[5], (String) r[6], (Instant) r[7]));
     }
 
     @Transactional(readOnly = true)
     public Page<AdminVisitDto> visits(String status, String q, Integer days, Pageable pageable) {
         return queries.visits(filter(status, null, q, days), Pageables.unsorted(pageable)).map(r -> new AdminVisitDto(
                 r[0].toString(), r[1].toString(), (String) r[2], (String) r[3], (String) r[4],
-                MobileMask.mask((String) r[5]), (Instant) r[6], (String) r[7], (String) r[8], (Instant) r[9]));
+                (String) r[5], (Instant) r[6], (String) r[7], (String) r[8], (Instant) r[9]));
     }
 
     @Transactional(readOnly = true)
     public Page<AdminDealDto> deals(String status, String deal, String q, Integer days, Pageable pageable) {
         return queries.deals(filter(status, deal, q, days), Pageables.unsorted(pageable)).map(r -> new AdminDealDto(
                 r[0].toString(), r[1].toString(), (String) r[2], (String) r[3], (String) r[4], (String) r[5],
-                MobileMask.mask(r[6] != null ? (String) r[6] : (String) r[7]), (Long) r[8], (String) r[9],
+                r[6] != null ? (String) r[6] : (String) r[7], (Long) r[8], (String) r[9],
                 (Instant) r[10], (Instant) r[11]));
     }
 
-    /** Totals, per-status counts and the funnel in one read; {@code days} and {@code deal} narrow the funnel only. */
     @Transactional(readOnly = true)
     public AdminEnquirySummary summary(Integer days, String deal) {
         Map<String, Long> enquiryCounts = withTotal(queries.countsByStatus("ContactRequest"));
@@ -131,12 +129,12 @@ public class EnquiryBoardService {
     }
 
     private static Instant since(Integer days) {
-        return days == null || days < 1 ? Instant.EPOCH : Instant.now().minus(days, ChronoUnit.DAYS);
+        Instant since = PlatformTime.sinceOrNull(days);
+        return since == null ? Instant.EPOCH : since;
     }
 
     private static EnquiryBoardQueries.Filter filter(String status, String deal, String q, Integer days) {
         String term = q == null ? "" : q.trim().toLowerCase();
-        // Whole number only: rows mask the mobile, so a prefix match would let a caller unmask it digit by digit.
         String mobile = MobileMask.normalise(term);
         return new EnquiryBoardQueries.Filter(
                 status == null ? "" : status.trim(),
@@ -146,7 +144,6 @@ public class EnquiryBoardService {
                 since(days));
     }
 
-    /** {@code GET /admin/enquiries/{id}} — one contact request; audited, as opening a row is. */
     @Transactional
     public AdminEnquiryDto enquiry(AuthPrincipal actor, String id) {
         ContactRequest row = Ids.parseUuid(id)
@@ -172,7 +169,6 @@ public class EnquiryBoardService {
                 row.getCreatedAt());
     }
 
-    /** {@code GET /admin/visits/{id}} — one site visit; audited. */
     @Transactional
     public AdminVisitDto visit(AuthPrincipal actor, String id) {
         Visit row = Ids.parseUuid(id)
@@ -200,7 +196,6 @@ public class EnquiryBoardService {
                 row.getCreatedAt());
     }
 
-    // Same preferred typed number as the list; the audit names its source.
     @Transactional
     public AdminDealDto deal(AuthPrincipal actor, String id) {
         Deal row = Ids.parseUuid(id)

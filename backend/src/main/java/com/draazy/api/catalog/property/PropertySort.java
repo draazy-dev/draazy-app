@@ -8,16 +8,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
-/** Clamp sortable fields to indexed columns so clients cannot probe or force scans. */
 public final class PropertySort {
-
     private static final Set<String> ALLOWED = Set.of("createdAt", "price", "area", "bhk");
 
     private static final Set<String> MODERATION_ALLOWED =
             Set.of("createdAt", "price", "area", "bhk", "recheckRequestedAt", "ownershipRequestedAt", "lastConfirmedAt");
     private static final Sort DEFAULT = Sort.by(Sort.Direction.DESC, "createdAt");
 
-    /** Append an id tiebreaker so equal prices/timestamps do not page in planner order. */
     private static final Sort.Order TIEBREAK = Sort.Order.desc("id");
 
     private PropertySort() {
@@ -54,7 +51,6 @@ public final class PropertySort {
         return Stream.of(o.isAscending() ? o.nullsFirst() : o.nullsLast(), new Sort.Order(o.getDirection(), "createdAt"));
     }
 
-    /** Distinguishes explicit sorting from the default after {@link #sanitize} collapses both. */
     public static boolean hasExplicitSort(Pageable pageable) {
         return pageable.getSort().stream().anyMatch(o -> ALLOWED.contains(o.getProperty()));
     }

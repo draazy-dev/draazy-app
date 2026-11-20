@@ -1,0 +1,63 @@
+REEL 07 / CLIP 1 of 2 - THE RECAP (montage base)
+================================================
+JOB ID ............. r07-c1
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r07-set picked by the user
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 720p native (download "720p Original size")
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+  Cost shown ....... 12 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor, @Sana   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r07-set (image)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.9 s (reel 0.0-7.9 s), intercut with the montage
+
+PROMPT START
+Vertical 9:16 video from a smartphone propped up on the terrace parapet at chest height, a static, locked-off
+shot. The camera does not move. [@IshaanOutdoor] Ishaan stands on the left and [@Sana] Sana stands on the right,
+side by side, both framed from the waist up and facing the lens. No phone is visible anywhere in the frame.
+
+Set (the attached set image r07-set; the same in every clip of this reel): a clean, well-kept rooftop terrace
+of a premium modern residential society in Pune at dusk: smooth light-grey parapet, clean light-beige floor
+tiles, green plants in modern grey planters and two wooden deck chairs near the far parapet. On the left side
+of the frame, the Pune skyline of mid-rise apartment buildings under an orange-pink sky. On the right side of
+the frame, a white water tank and a string of warm fairy lights along the railing. A low parapet wall at waist height behind them. Nothing readable anywhere. The background stays exactly
+the same for the whole clip.
+
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. Clear skin with no moles, taper fade,
+light stubble. The outfit stays the same for the whole clip. Sana looks exactly like her character image:
+shoulder-length dark brown curly hair worn loose, round thin gold-wire glasses, a tiny silver nose stud, a coral
+(#FB923C) linen overshirt with the sleeves rolled to the elbows, open over a cream ribbed tank top. Her outfit
+stays the same for the whole clip.
+
+They list the pains to the lens, dry and deadpan, with a wry half-smile, taking turns. Not laughing, not grinning, not sad. Each line
+is spoken exactly once, nothing repeated, no other words.
+0.3-3.6 s, Ishaan, a small shake of the head: "Broker ke calls... phir brokerage... aur upar se fake owners."
+3.9-7.5 s, Sana, an eye-roll: "Random flatmates... दो ghante ka commute... aur agreement ki moti fees."
+7.5-8.0 s: both silent, lips closed, a deadpan look into the lens.
+
+Voice: Ishaan uses his saved Flow character voice: a 22-year-old Indian college student speaking casual Hinglish
+with a natural Indian accent, clearly male and mid-pitched, conversational and fluent. Sana uses her saved Flow
+character voice: casual Hinglish with a soft Lucknowi Hindi accent, a young female voice, bright and clear,
+medium-high pitch, confident and witty.
+
+Lighting and colour: warm golden dusk light from the left, the fairy lights glowing softly, a cool blue sky
+turning darker, true warm skin tones. Authentic Instagram UGC shot on a phone, natural skin texture, no beauty
+filter.
+
+Audio: a light evening breeze and a distant city hum. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
+PROMPT END
+
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match the set image: skyline + orange-pink sky on the LEFT; white water tank + fairy lights on the RIGHT; low parapet behind them; Ishaan left, Sana right
+  [ ] Ishaan speaks first, Sana second; no swap
+  [ ] after approval: save the anchor frame from the silent hold at the end (lips closed) as r07-anchor
+
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

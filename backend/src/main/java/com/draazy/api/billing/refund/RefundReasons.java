@@ -1,8 +1,6 @@
 package com.draazy.api.billing.refund;
 
-/** The machine-readable answers to "can I get this refunded?". */
 public final class RefundReasons {
-
     private RefundReasons() {
     }
 

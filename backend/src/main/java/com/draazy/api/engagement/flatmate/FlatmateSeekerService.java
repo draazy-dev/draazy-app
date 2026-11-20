@@ -32,23 +32,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FlatmateSeekerService {
-
     private static final Logger log = LoggerFactory.getLogger(FlatmateSeekerService.class);
 
-    /** A rate, not a count: unlike a post an interest is delivered, and re-sending to
-     * somebody already contacted costs nothing. */
     private static final int MAX_INTERESTS = 10;
 
     private static final Duration RATE_WINDOW = Duration.ofHours(1);
 
     private static final int MAX_MESSAGE = 4000;
 
-    /** V27's one-request-per-person-per-target index — the only thing that can settle two presses arriving together.
-     * Shared with {@link FlatmateSupplyService}, which writes the same table. */
     private static final String ONE_PER_TARGET_INDEX = "uq_flatmate_requests_target_requester";
 
-    /** Spelled as stored: the seeker door is {@code flatmate}, not {@code post} — renaming the
-     * column literal needs a migration. */
     private static final java.util.Set<String> INTEREST_KINDS =
             java.util.Set.of("flatmate", "room", "group");
 
@@ -64,12 +57,15 @@ public class FlatmateSeekerService {
     private final FlatmateEditRules editRules;
     private final FlatmateAcceptance acceptance;
     private final LocalityBinding localities;
+    private final FlatmateGenderGate genderGate;
+    private final FlatmateInterestLedger ledger;
 
     public FlatmateSeekerService(FlatmateSeekerPostRepository posts,
             FlatmateRequestRepository requests, FlatmateRequestHydrator hydrator,
             FlatmateMapper mapper, UserRepository users,
             Notifier notifier, RateLimitLock locks,
-            FlatmateEditRules editRules, FlatmateAcceptance acceptance, LocalityBinding localities) {
+            FlatmateEditRules editRules, FlatmateAcceptance acceptance, LocalityBinding localities,
+            FlatmateGenderGate genderGate, FlatmateInterestLedger ledger) {
         this.posts = posts;
         this.requests = requests;
         this.hydrator = hydrator;
@@ -80,10 +76,10 @@ public class FlatmateSeekerService {
         this.editRules = editRules;
         this.acceptance = acceptance;
         this.localities = localities;
+        this.genderGate = genderGate;
+        this.ledger = ledger;
     }
 
-    /** One live post per identity; the partial unique index enforces it, the pre-check only turns
-     * a 500 naming a DB object into a message. */
     @Transactional
     public FlatmateSeekerPostDto create(AuthPrincipal caller, FlatmateSeekerPostCreateRequest body) {
         if (posts.existsByUserIdAndArchivedFalse(caller.userId())) {
@@ -95,11 +91,10 @@ public class FlatmateSeekerService {
                 .orElseThrow(() -> NotFoundException.of("User"));
 
         FlatmateSeekerPost post = new FlatmateSeekerPost(
-                caller.userId(), body.name().strip(), body.budget());
-        apply(post, body);
+                caller.userId(), FlatmateVocabulary.profileName(author), body.budget());
+        apply(post, body, author);
 
-        // Snapshotted from the token, never the body: a client that could assert its own
-        // verification would make the badge worthless.
+        // Snapshotted from the token, never the body: a client-assertable badge would be worthless.
         post.setVerified(caller.verified());
         post.setModStatus(FlatmateVocabulary.MOD_LIVE);
         FlatmatePublication.queueUnreviewed(post.getRecheck(), FlatmateVocabulary.MOD_LIVE, true);
@@ -107,45 +102,34 @@ public class FlatmateSeekerService {
                 new FlatmateMapper.SeekerView(author.getMobile()));
     }
 
-    /** Classified before a word of it is written, because afterwards there is nothing left to
-     * compare against. */
     @Transactional
     public FlatmateSeekerPostDto update(AuthPrincipal caller, UUID postId,
             FlatmateSeekerPostCreateRequest body) {
-        FlatmateSeekerPost post = posts.findById(postId)
-                .filter(p -> !p.isArchived())
+        FlatmateSeekerPost post = posts.findLockedById(postId)
+                .filter(p -> !p.isArchived() && p.getUserId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Flatmate post"));
-        if (!post.getUserId().equals(caller.userId())) {
-            throw new ForbiddenException("You can only edit your own flatmate post.");
-        }
-        FlatmateEditImpact impact = editRules.classify(post, body);
-        post.setName(body.name().strip());
-        post.setBudget(body.budget());
-        apply(post, body);
-        post.setModStatus(post.getExpiry().revive(post.getModStatus()));
-        post.getRecheck().settle(post.getModStatus(), impact.rechecked());
         User author = users.findById(caller.userId())
                 .orElseThrow(() -> NotFoundException.of("User"));
+        String name = FlatmateVocabulary.profileName(author);
+        FlatmateEditImpact impact = editRules.classify(post, body, name);
+        post.setName(name);
+        post.setBudget(body.budget());
+        apply(post, body, author);
+        post.setModStatus(post.getExpiry().revive(post.getModStatus()));
+        post.getRecheck().settle(post.getModStatus(), impact.rechecked());
         return mapper.toDto(posts.saveAndFlush(post),
                 new FlatmateMapper.SeekerView(author.getMobile()));
     }
 
-    /** Soft, so the requests already filed against it keep pointing at something real. Backs both
-     * "Delete" and "Mark filled". */
     @Transactional
     public void delete(AuthPrincipal caller, UUID postId) {
         FlatmateSeekerPost post = posts.findById(postId)
-                .filter(p -> !p.isArchived())
+                .filter(p -> !p.isArchived() && p.getUserId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Flatmate post"));
-        if (!post.getUserId().equals(caller.userId())) {
-            throw new ForbiddenException("You can only remove your own flatmate post.");
-        }
         post.archive("removed by the poster");
         posts.saveAndFlush(post);
     }
 
-    /** One request per (post, requester); audited, because this is a contact release:
-     * docs/flows/consumer/flatmates.md §5. */
     @Transactional
     public void express(AuthPrincipal caller, UUID postId, String share, String message) {
         FlatmateSeekerPost post = posts.findVisible(postId)
@@ -153,13 +137,10 @@ public class FlatmateSeekerService {
 
         UUID hostId = post.getUserId();
         if (hostId.equals(caller.userId())) {
-
-            // 403 rather than 404: the caller can see this post on the public feed.
             throw new ForbiddenException("You cannot express interest in your own post.");
         }
+        genderGate.refuseKnownMismatch(caller.userId(), post.getFlatPref(), "post");
 
-        // A missing badge may refuse a request only because the
-        // person being contacted asked for exactly that.
         if (post.isVerifiedContactOnly() && !caller.verified()) {
             throw new VerificationRequiredException(
                     "This person accepts messages from verified members only. "
@@ -170,19 +151,15 @@ public class FlatmateSeekerService {
                 share, FlatmateVocabulary.SHARE_INTENT, "solo", "share intent");
         String body = pitch(message, intent);
 
-        // Serialised on the requester and held to commit, so a burst cannot all read the same
-        // pre-insert total. Same key FlatmateSupplyService uses, or the burst uses both doors.
         locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_INTEREST, caller.userId().toString());
 
-        // Read AFTER the lock — before it is a stale read by construction — and ahead of the
-        // rate-limit count, since a repeat press is not a delivery.
         if (requests.findByKindAndTargetIdAndRequesterId(
                 "flatmate", post.getId(), caller.userId()).isPresent()) {
             throw alreadyInterested();
         }
+        ledger.requireNotRecentlyWithdrawn("flatmate", post.getId(), caller.userId());
 
-        if (requests.countByRequesterIdAndCreatedAtAfter(
-                caller.userId(), Instant.now().minus(RATE_WINDOW)) >= MAX_INTERESTS) {
+        if (ledger.sentSince(caller.userId(), Instant.now().minus(RATE_WINDOW)) >= MAX_INTERESTS) {
             throw new RateLimitedException(
                     "You have contacted a lot of people in the last hour. Try again shortly.",
                     (int) RATE_WINDOW.toSeconds());
@@ -190,16 +167,12 @@ public class FlatmateSeekerService {
 
         try {
             requests.saveAndFlush(new FlatmateRequest(
-                    "flatmate", post.getId(), hostId, caller.userId(), "request", intent, body));
+                    "flatmate", post.getId(), hostId, caller.userId(), intent, body));
         } catch (DataIntegrityViolationException raced) {
-
-            // Backstop for an isolation level that would carry a pre-lock snapshot past the
-            // re-read. Only this index is translated: a FK or check violation is a real bug.
             if (!isDuplicateInterest(raced)) {
                 throw raced;
             }
 
-            // Reaching this line means the re-read did not do its job; the caller cannot tell.
             log.debug("duplicate flatmate interest reached the index: post={} requester={}",
                     post.getId(), caller.userId());
             throw alreadyInterested();
@@ -210,8 +183,6 @@ public class FlatmateSeekerService {
         notify(hostId, post, requester);
     }
 
-    /** A 0..1 resource in a page envelope. Why not the feed narrowed:
-     * docs/flows/consumer/flatmates.md §5. */
     @Transactional(readOnly = true)
     public Page<FlatmateSeekerPostDto> myPosts(AuthPrincipal caller, Pageable pageable) {
         User author = users.findById(caller.userId())
@@ -233,8 +204,6 @@ public class FlatmateSeekerService {
         return mapper.toDto(post, new FlatmateMapper.SeekerView(author.getMobile()));
     }
 
-    /** Paged because the host does not write these rows (§5.1 api-standards.md), and batch-hydrated
-     * so a page is not an N+1. */
     @Transactional(readOnly = true)
     public Page<FlatmateRequestDto> inbox(AuthPrincipal caller, String status, Pageable pageable) {
         String filter = FlatmateVocabulary.optional(
@@ -248,8 +217,6 @@ public class FlatmateSeekerService {
         return new PageImpl<>(window, pageable, rows.getTotalElements());
     }
 
-    /** Host-scoped by the finder, so deciding somebody else's request is a 404: a 403 would confirm
-     * the id exists. */
     @Transactional
     public FlatmateRequestDto decide(AuthPrincipal caller, UUID requestId, String decision) {
         String verdict = FlatmateVocabulary.require(
@@ -276,8 +243,6 @@ public class FlatmateSeekerService {
         return hydrator.hydrateOne(request).forHost();
     }
 
-    /** The mirror of {@link #inbox}, and deliberately without the host's number:
-     * docs/flows/consumer/flatmates.md §5. */
     @Transactional(readOnly = true)
     public Page<FlatmateRequestDto> outbox(AuthPrincipal caller, String status, Pageable pageable) {
         String filter = FlatmateVocabulary.optional(
@@ -294,8 +259,6 @@ public class FlatmateSeekerService {
         return requests.findKeysByRequesterId(caller.userId());
     }
 
-    /** Hard delete, pending only, and no rate-limit refund:
-     * docs/flows/consumer/flatmates.md §5. */
     @Transactional
     public void withdraw(AuthPrincipal caller, String kind, UUID targetId) {
         String door = FlatmateVocabulary.require(
@@ -308,22 +271,25 @@ public class FlatmateSeekerService {
                     "The host has already answered this one, so it cannot be withdrawn.",
                     FlatmateConflicts.ALREADY_DECIDED));
         }
+        ledger.recordWithdrawal(request);
     }
 
-    private void apply(FlatmateSeekerPost post, FlatmateSeekerPostCreateRequest body) {
-        post.setGender(FlatmateVocabulary.orDefault(
-                body.gender(), FlatmateVocabulary.GENDER, "any", "gender"));
+    private void apply(FlatmateSeekerPost post, FlatmateSeekerPostCreateRequest body, User author) {
+        post.setGender(genderGate.forPost(author, body.gender()));
         post.setFlatPref(FlatmateVocabulary.orDefault(
                 body.flatPref(), FlatmateVocabulary.FLAT_PREF, "any", "flat preference"));
         post.setRoomPref(FlatmateVocabulary.orDefault(
                 body.roomPref(), FlatmateVocabulary.ROOM_PREF, "any", "room preference"));
+        post.setFurnishing(FlatmateVocabulary.optional(body.furnishing(), FlatmateVocabulary.FURNISHING, "furnishing"));
+        post.setGatedOnly(Boolean.TRUE.equals(body.gatedOnly()));
+        post.setAttachedBath(Boolean.TRUE.equals(body.attachedBath()));
+        post.setParking(FlatmateVocabulary.optional(body.parking(), FlatmateVocabulary.PARKING, "parking"));
         post.setAge(body.age());
         post.setBudgetMax(budgetCeiling(body));
         post.setOccupation(FlatmateVocabulary.blankToNull(body.occupation()));
         post.setNote(FlatmateVocabulary.blankToNull(body.note()));
         post.setTitle(FlatmateVocabulary.blankToNull(body.title()));
         post.setLocalities(localities.canonicalNames(clean(body.localities()), post.getLocalities()));
-        post.setTags(clean(body.tags()));
         post.setMoveIn(FlatmateVocabulary.blankToNull(body.moveIn()));
         post.setMoveInAt(parseMoveIn(body.moveIn()));
         if (body.verifiedContactOnly() != null) {
@@ -331,8 +297,6 @@ public class FlatmateSeekerService {
         }
     }
 
-    /** Refused rather than silently swapped when it sits below the floor: a range the board would
-     * read backwards matches nothing, which looks like a board with no rooms on it. */
     private static Long budgetCeiling(FlatmateSeekerPostCreateRequest body) {
         Long ceiling = body.budgetMax();
         if (ceiling != null && ceiling < body.budget()) {
@@ -342,7 +306,6 @@ public class FlatmateSeekerService {
         return ceiling;
     }
 
-    /** Shared with {@link FlatmateEditRules}, which must compare a list the way it will be stored. */
     static List<String> clean(List<String> values) {
         if (values == null) {
             return new ArrayList<>();
@@ -353,8 +316,6 @@ public class FlatmateSeekerService {
                 .toList();
     }
 
-    /** Unparseable stores null; the literal {@code now} resolves to today, since null means "has
-     * not said". */
     private static LocalDate parseMoveIn(String moveIn) {
         String value = FlatmateVocabulary.blankToNull(moveIn);
         return value == null ? null : switch (value.toLowerCase(java.util.Locale.ROOT)) {
@@ -370,8 +331,6 @@ public class FlatmateSeekerService {
         };
     }
 
-    /** An absent message becomes a sentence the host can act on rather than an empty notification
-     * body. */
     private static String pitch(String message, String intent) {
         String supplied = FlatmateVocabulary.blankToNull(message);
         if (supplied != null) {
@@ -380,7 +339,7 @@ public class FlatmateSeekerService {
         return switch (intent) {
             case "bring" -> "Hi! We are two of us looking together — is that alright?";
             case "match" -> "Hi! I'm interested, and happy to share the room with someone.";
-            default -> "Hi! I'm interested in teaming up.";
+            default -> "Hi! I have a room in my flat that could suit you.";
         };
     }
 
@@ -388,23 +347,20 @@ public class FlatmateSeekerService {
         return ConstraintViolations.isOn(violation, ONE_PER_TARGET_INDEX);
     }
 
-    /** {@link FlatmateConflicts} appends the marker the client routes on, so nothing can be
-     * after it by accident. */
     private static ConflictException alreadyInterested() {
         return FlatmateConflicts.alreadyInterested(
                 "You have already expressed interest in this post — your earlier message is with them.");
     }
 
     private void notify(UUID hostId, FlatmateSeekerPost post, User requester) {
+        String requesterName = FlatmateVocabulary.blankToNull(requester.getName());
 
-        // Through the Notifier port, so the host's quiet hours and preferences apply; still flushed
-        // inside the caller's transaction, because this row IS the delivery.
         notifier.notify(
                 hostId,
                 "flatmate.interest",
-                requester.getName() + " is interested in teaming up",
+                (requesterName == null ? "Someone" : requesterName) + " has a room for you",
                 "Open your request inbox to review their interest.",
-                FlatmateLinks.of("post", post.getId()));
+                Notifier.REQUEST_INBOX);
         notifier.notify(
                 requester.getId(),
                 "flatmate.interest.sent",

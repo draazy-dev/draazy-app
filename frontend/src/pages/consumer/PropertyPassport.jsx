@@ -7,9 +7,10 @@ import Modal from '../../components/ui/Modal.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { fmtINR, fmtNum } from '../../lib/format.js';
-import { getManaged, publishManaged, deleteManaged } from '../../services/managedService.js';
-import { passportChecklist, passportPercent } from './owner-hub/helpers.js';
+import { getManaged, deleteManaged } from '../../services/managedService.js';
+import { passportChecklist, passportPercent, publishHref } from './owner-hub/helpers.js';
 import DocVault from './owner-hub/DocVault.jsx';
+import KeyFacts from './owner-hub/KeyFacts.jsx';
 import RentPanel from './owner-hub/RentPanel.jsx';
 
 export default function PropertyPassport() {
@@ -24,8 +25,6 @@ export default function PropertyPassport() {
   const [docCount, setDocCount] = useState(0);
   const [confirmDel, setConfirmDel] = useState(false);
 
-  /* `undefined` is "not asked yet" (spinner); `null` is "no such property of yours" (empty state). A rejection
-     is treated as not-found: the seam already maps 404 to null, so the rest is a fault the page cannot act on. */
   const refresh = useCallback(async () => {
     try {
       setProp((await getManaged(id)) || null);
@@ -49,21 +48,7 @@ export default function PropertyPassport() {
   const pct = passportPercent(prop, docCount);
   const checklist = passportChecklist(prop, docCount);
   const val = prop.valuation;
-
-  // Publishing can be refused: the marketplace contract is stricter than the owner's private file,
-  // and the server re-runs the listing's own validation at this boundary.
-  const publish = async () => {
-    let res;
-    try {
-      res = await publishManaged(prop.id, { published: !!prop.publishedListingId });
-    } catch (e) {
-      toast(e?.message || t('ownerHub.publishFailed'), 'error');
-      return;
-    }
-    if (res?.already) { toast(t('ownerHub.alreadyListed'), 'info'); return; }
-    toast(t('ownerHub.submittedReview'), 'success');
-    if (res?.record) setProp(res.record);
-  };
+  const facts = [prop.bhk, prop.area ? `${fmtNum(prop.area)} ${prop.areaUnit}` : '', prop.type].filter(Boolean).join(' · ');
 
   const remove = async () => {
     await deleteManaged(prop.id);
@@ -77,30 +62,35 @@ export default function PropertyPassport() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         <Link to="/dashboard#properties" className="inline-flex items-center gap-1.5 text-gray-400 text-sm hover:text-white mb-4"><Icon name="arrow-left" className="w-4 h-4" /> {t('ownerHub.myProperties')}</Link>
 
-        {/* Header */}
         <div className="glass-card rounded-2xl p-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1.5">
                 {prop.publishedListingId
-                  ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-teal-1/15 border border-brand-teal-2/25 text-brand-teal-3 text-xs font-medium"><Icon name="globe" className="w-3.5 h-3.5" /> {t('ownerHub.listedToBuyers')}</span>
-                  : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-300 text-xs font-medium"><Icon name="lock" className="w-3.5 h-3.5" /> {t('ownerHub.private')}</span>}
+                  ? <span className="dz-tag bg-brand-teal-1/15 border border-brand-teal-2/25 text-brand-teal-3 font-medium"><Icon name="globe" className="w-3.5 h-3.5" /> {t('ownerHub.listedToBuyers')}</span>
+                  : <span className="dz-tag bg-white/5 border border-white/10 text-gray-300 font-medium"><Icon name="lock" className="w-3.5 h-3.5" /> {t('ownerHub.private')}</span>}
+                {prop.agreementVerified && (
+                  <span data-testid="passport-agreement-verified" title={t('ownerHub.agreementVerifiedHint')} className="dz-tag bg-emerald-500/15 border border-emerald-400/25 text-emerald-300 font-medium"><Icon name="badge-check" className="w-3.5 h-3.5" /> {t('ownerHub.agreementVerified')}</span>
+                )}
               </div>
               <h1 className="text-2xl font-bold text-white truncate">{prop.title}</h1>
               <p className="text-gray-400 text-sm mt-1 flex items-center gap-1.5"><Icon name="map-pin" className="w-4 h-4 text-brand-teal-2" /> {prop.loc || prop.locality}</p>
+              {facts && <p className="text-gray-400 text-xs mt-1">{facts}</p>}
               <p className="text-xl font-bold gradient-text mt-2">{prop.priceStr}</p>
             </div>
-            <div className="flex gap-2.5 flex-shrink-0">
-              {prop.publishedListingId ? (
-                <Link to={`/property/${prop.publishedListingId}`} className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5 flex items-center gap-2"><Icon name="external-link" className="w-4 h-4 text-brand-teal-2" /> {t('ownerHub.viewListing')}</Link>
-              ) : (
-                <button onClick={publish} className="btn-teal px-4 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center gap-2"><Icon name="megaphone" className="w-4 h-4" /> {t('ownerHub.publishAsListing')}</button>
-              )}
-              <button onClick={() => setConfirmDel(true)} aria-label={t('ownerHub.removeProperty')} className="px-3 py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/30 flex items-center gap-2 transition-all"><Icon name="trash-2" className="w-4 h-4" /></button>
+            <div className="flex flex-col gap-1.5 flex-shrink-0 sm:items-end">
+              <div className="flex gap-2.5">
+                {prop.publishedListingId ? (
+                  <Link to={`/property/${prop.publishedListingId}`} className="h-btn px-4 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5 flex items-center gap-2"><Icon name="external-link" className="w-4 h-4 text-brand-teal-2" /> {t('ownerHub.viewListing')}</Link>
+                ) : (
+                  <Link to={publishHref(prop)} data-testid="passport-publish" className="btn-teal flex-1 sm:flex-none min-h-[44px] px-4 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"><Icon name="megaphone" className="w-4 h-4" /> {t('ownerHub.publishAsListing')}</Link>
+                )}
+                <button onClick={() => setConfirmDel(true)} aria-label={t('ownerHub.removeProperty')} className="min-h-[44px] min-w-[44px] justify-center px-3 py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/30 flex items-center gap-2 transition-all"><Icon name="trash-2" className="w-4 h-4" /></button>
+              </div>
+              {!prop.publishedListingId && <p className="text-[11px] text-gray-500 sm:max-w-[16rem] sm:text-right">{t('ownerHub.publishHint')}</p>}
             </div>
           </div>
 
-          {/* Completeness meter */}
           <div className="mt-5 pt-5 border-t border-white/10">
             <div className="flex items-center justify-between text-sm mb-2"><span className="text-gray-300 font-medium">{t('ownerHub.completeness')}</span><span data-testid="passport-percent" className="text-brand-teal-3 font-bold">{pct}%</span></div>
             <div className="insight-bar mb-3"><span style={{ width: `${pct}%` }} /></div>
@@ -122,12 +112,11 @@ export default function PropertyPassport() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 mt-6">
           <div className="space-y-6">
-            {/* The vault reports its own count rather than the passport re-reading it: it has just
-                fetched the list to render it, and a second request would only race the first. */}
+            <KeyFacts prop={prop} />
             <DocVault mobile={mobile} propId={prop.id} onChange={setDocCount} />
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-6 order-first lg:order-none">
             <RentPanel prop={prop} onChange={refresh} />
 
             {val && (
@@ -138,7 +127,7 @@ export default function PropertyPassport() {
                   <div className="rd-cell flex items-center justify-between"><span className="text-gray-400 text-sm">{t('ownerHub.estSale')}</span><span className="text-white font-semibold">{fmtINR(val.sale.mid)}</span></div>
                   <div className="rd-cell flex items-center justify-between"><span className="text-gray-400 text-sm">{t('ownerHub.localityRate')}</span><span className="text-white font-semibold">₹{fmtNum(val.perSqft)}{t('locality.perSqft')}</span></div>
                 </div>
-                <Link to="/services/property-valuation" className="mt-4 w-full block text-center py-2.5 rounded-xl border border-brand-teal-2/40 text-brand-teal-3 text-sm font-semibold hover:bg-brand-teal-1/10 transition-all">{t('ownerHub.getAccurate')}</Link>
+                <Link to="/services/property-valuation" className="h-btn mt-4 w-full flex items-center justify-center rounded-xl border border-brand-teal-2/40 text-brand-teal-3 text-sm font-semibold hover:bg-brand-teal-1/10 transition-all">{t('ownerHub.getAccurate')}</Link>
               </div>
             )}
           </div>
@@ -152,8 +141,8 @@ export default function PropertyPassport() {
         size="sm"
         footer={(
           <>
-            <button onClick={() => setConfirmDel(false)} className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5">{t('ownerHub.keepIt')}</button>
-            <button onClick={remove} className="px-4 py-2.5 rounded-xl bg-rose-500/90 hover:bg-rose-500 text-white text-sm font-semibold flex items-center gap-2"><Icon name="trash-2" className="w-4 h-4" /> {t('ownerHub.remove')}</button>
+            <button onClick={() => setConfirmDel(false)} className="h-btn inline-flex items-center justify-center px-4 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5">{t('ownerHub.keepIt')}</button>
+            <button onClick={remove} className="h-btn px-4 rounded-xl bg-rose-500/90 hover:bg-rose-500 text-white text-sm font-semibold flex items-center gap-2"><Icon name="trash-2" className="w-4 h-4" /> {t('ownerHub.remove')}</button>
           </>
         )}
       >

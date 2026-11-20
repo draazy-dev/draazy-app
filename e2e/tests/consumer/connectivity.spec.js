@@ -12,6 +12,13 @@ const region = (page) => page.locator('div[role="status"][aria-live="polite"][ar
 const banner = (page) => page.locator('.dz-connectivity-card');
 const retryButton = (page) => page.getByRole('button', { name: 'Retry' });
 const countLine = (page, text) => page.getByText(text, { exact: true }).filter({ visible: true });
+// The page module only (dev .jsx or hashed build chunk):
+// App statically imports FlatmatesSkeleton, so a reload must reach it.
+const FLATMATES_CHUNK = /\/Flatmates(\.jsx|-[\w-]{8,}\.js)/;
+const visitFlatmates = (page) => page.evaluate(() => {
+  history.pushState({}, '', '/flatmates');
+  dispatchEvent(new PopStateEvent('popstate'));
+});
 
 const PROBE_SLUG = 'connectivity-probe-flat';
 
@@ -155,6 +162,22 @@ test.describe('Connectivity banner (D165)', () => {
     await expect(banner(page)).toHaveCount(0, { timeout: 5_000 });
   });
 
+  test('a read the server never answers gives up and offers a retry instead of loading forever', async ({ page }) => {
+    let hits = 0;
+    await page.route('**/api/**', (route) => {
+      if (!new URL(route.request().url()).pathname.startsWith('/api/properties')) return route.continue();
+      hits += 1;
+    });
+    await page.clock.install();
+
+    await open(page, '/listings');
+    await expect.poll(() => hits).toBeGreaterThan(0);
+    await page.clock.fastForward(20_000);
+
+    await expect(page.getByText(LIST_UNREACHABLE, { exact: true })).toBeVisible();
+    await expect(retryButton(page)).toBeVisible();
+  });
+
   test('the live region is mounted before it has anything to say, and announcing does not move focus', async ({ page, context }) => {
     await open(page, '/listings');
     // So the region must already be there while it is still empty.
@@ -172,5 +195,45 @@ test.describe('Connectivity banner (D165)', () => {
     expect(await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))).toBe('Grid view');
 
     await context.setOffline(false);
+  });
+
+  test('a page chunk that cannot load offline shows a calm offline card, not the raw import error', async ({ page, context }) => {
+    await open(page, '/');
+    await page.route(FLATMATES_CHUNK, (route) => route.abort('failed'));
+    await context.setOffline(true);
+    await visitFlatmates(page);
+
+    await expect(page.getByRole('heading', { name: "You're offline" })).toBeVisible();
+    await expect(page.getByText(/needs a connection/i)).toBeVisible();
+    await expect(page.getByText(/dynamically imported module/i)).toHaveCount(0);
+    await expect(banner(page)).toContainText(OFFLINE_TITLE);
+    await context.setOffline(false);
+  });
+
+  test('a page chunk a deploy deleted heals itself with one reload', async ({ page }) => {
+    await open(page, '/');
+    await page.route(FLATMATES_CHUNK, (route) => route.abort('failed'), { times: 1 });
+    const reloaded = page.waitForEvent('load');
+    await visitFlatmates(page);
+
+    await reloaded;
+    await expect(page).toHaveURL(/\/flatmates$/);
+    await expect(page.getByRole('button', { name: 'Map' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('error-boundary')).toHaveCount(0);
+    await expect(page.getByText(/dynamically imported module/i)).toHaveCount(0);
+  });
+
+  test('a chunk that still fails after the one reload shows the card instead of looping', async ({ page }) => {
+    await open(page, '/');
+    await page.route(FLATMATES_CHUNK, (route) => route.abort('failed'));
+    const reloaded = page.waitForEvent('load');
+    await visitFlatmates(page);
+    await reloaded;
+
+    await expect(page.getByRole('heading', { name: "This page couldn't load" })).toBeVisible();
+    let reloadedAgain = false;
+    page.on('load', () => { reloadedAgain = true; });
+    await page.waitForTimeout(1_500);
+    expect(reloadedAgain).toBe(false);
   });
 });

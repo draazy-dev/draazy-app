@@ -3,7 +3,6 @@ import { passportPercent } from '../../pages/consumer/owner-hub/helpers.js';
 const isProperty = (l) => !l.flatmate && !l.flatmatePost && !l.flatmateGroup;
 const listingKeys = (listing) => [listing.uuid, listing.id].filter(Boolean).map(String);
 
-/* The dashboard's own listings and managed records, composed into the panel's rows; reads nothing. */
 export function composeOwnerProperties(posted, managed) {
   const managedByPublishedId = new Map();
   managed.forEach((record) => {
@@ -29,6 +28,7 @@ export function composeOwnerProperties(posted, managed) {
     .map((record) => ({
       id: record.id,
       managedId: record.id,
+      sourceRoomId: record.sourceRoomId || '',
       private: true,
       title: record.title,
       locality: record.locality,
@@ -40,7 +40,15 @@ export function composeOwnerProperties(posted, managed) {
       views: 0,
       real: true,
       type: record.type,
+      bhk: record.bhk,
+      area: record.area,
+      areaUnit: record.areaUnit,
+      furnishing: record.furnishing,
+      society: record.society,
       rented: !!record.rented,
+      tenantName: record.tenantName,
+      leaseEnd: record.leaseEnd,
+      agreementVerified: !!record.agreementVerified,
       passportPct: passportPercent(record, 0),
       createdAt: record.createdAt,
     }));

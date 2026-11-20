@@ -13,11 +13,9 @@ import lombok.Setter;
 @Table(name = "tenant_rentals")
 @Getter
 public class TenantRental extends SoftDeleteEntity {
-
     @Column(name = "tenant_id", nullable = false, updatable = false)
     private UUID tenantId;
 
-    /** Security deposit, whole INR, or null when unknown. */
     @Setter
     @Column(name = "address", nullable = false)
     private String address;

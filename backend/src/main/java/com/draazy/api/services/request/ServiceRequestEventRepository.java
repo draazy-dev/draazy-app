@@ -6,10 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-// Timeline reads.
-// Append-only, so there is no update or delete path.
 public interface ServiceRequestEventRepository extends JpaRepository<ServiceRequestEvent, UUID> {
-
     List<ServiceRequestEvent> findByRequestIdOrderByAtAsc(UUID requestId);
 
     List<ServiceRequestEvent> findByRequestIdInOrderByAtAsc(Collection<UUID> requestIds);

@@ -8,13 +8,13 @@ const verifiedOnServer = async (mobile) => (await apiLogin(mobile)).user.verifie
 
 const openBoard = async (page) => {
   await page.goto(`${BASE}/flatmates`);
-  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 20000 });
 };
 
 const hero = (page) => page.locator('.sf-hero').first();
 const onCaptureRoute = (page) => expect(page).toHaveURL(/\/verify-identity/);
 
-const verifiedBadge = (page) => hero(page).getByText('Verified Seeker', { exact: true });
+const verifiedBadge = (page) => hero(page).getByText('ID verified', { exact: true });
 
 test.describe('Flatmates seeker verification entry point (live)', () => {
   test('the hero CTA hands an unverified seeker to the identity funnel, and declining leaves them on the board', async ({ page }) => {

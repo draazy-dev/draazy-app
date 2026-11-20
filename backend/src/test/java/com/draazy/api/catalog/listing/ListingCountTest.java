@@ -15,11 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
-// The managed owner dirty-check write is load-bearing;
-// a detached owner silently drops the tally.
 @DisplayName("Listings count — the column that used to have no writer")
 class ListingCountTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @Autowired EntityManager em;
 
@@ -35,7 +32,6 @@ class ListingCountTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    /** The count as {@code users} actually holds it, with Hibernate's cached copy taken out of the way. */
     private int storedCount(UUID id) {
         em.flush();
         em.clear();
@@ -64,8 +60,6 @@ class ListingCountTest extends AbstractApiTest {
                 .isEqualTo(1);
     }
 
-    // Across an archive, the count still climbs to 2:
-    // it is a lifetime tally, not a live-listing boolean.
     @Test
     @DisplayName("a second listing takes the count to two, across the archive that freed the slot")
     void theCountAccumulates() throws Exception {
@@ -82,8 +76,6 @@ class ListingCountTest extends AbstractApiTest {
         assertThat(storedCount(o.getId())).isEqualTo(2);
     }
 
-    // The role stays `buyer`, and that is the point of the whole change.
-    // Posting must not promote a buyer; account creation is the only role writer.
     @Test
     @DisplayName("posting does not promote the account to the owner role")
     void postingDoesNotChangeTheRole() throws Exception {

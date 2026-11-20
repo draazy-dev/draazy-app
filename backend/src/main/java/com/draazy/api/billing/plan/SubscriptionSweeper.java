@@ -24,10 +24,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Ends lapsed terms and abandoned checkouts; neither sweep is the entitlement rule, which is judged on read. */
 @Service
 public class SubscriptionSweeper implements AbandonedCheckouts {
-
     private static final Logger log = LoggerFactory.getLogger(SubscriptionSweeper.class);
 
     private final SubscriptionRepository subscriptions;
@@ -52,8 +50,6 @@ public class SubscriptionSweeper implements AbandonedCheckouts {
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
-    /** Pauses what the free tier has no room for, then expires the lapsed terms. Each pause is its own
-     * transaction, listing row before the owner's LISTING_LIVE lock like the go-live paths. */
     public int expireLapsed(Instant now) {
         List<Subscription> lapsed = newestListingFirst(subscriptions
                 .findByStatusAndRenewsAtLessThanEqual(SubscriptionStatuses.ACTIVE, now));
@@ -82,7 +78,6 @@ public class SubscriptionSweeper implements AbandonedCheckouts {
         return expire(expirable, now);
     }
 
-    // Newest listing first, so the oldest is judged last and keeps the free slot, as a plan lapse does.
     private List<Subscription> newestListingFirst(List<Subscription> lapsed) {
         Map<UUID, Instant> listedAt = properties.findAllById(lapsed.stream().map(Subscription::getPropertyId)
                         .filter(Objects::nonNull).distinct().toList()).stream()
@@ -118,7 +113,6 @@ public class SubscriptionSweeper implements AbandonedCheckouts {
         return ended == null ? 0 : ended;
     }
 
-    /** Sends the refunds recorded as due, one gateway call and one short transaction per row. */
     public int sendDueRefunds() {
         return passes.sendDueRefunds();
     }
@@ -150,13 +144,11 @@ public class SubscriptionSweeper implements AbandonedCheckouts {
         notifier.notify(p.getOwner().getId(), type, "Your listing is paused", message, "/dashboard");
     }
 
-    /** {@inheritDoc} — "subscription", so a sweep log line names the table that moved. */
     @Override
     public String family() {
         return "subscription";
     }
 
-    /** Cancel checkouts opened before {@code cutoff} and never paid; the pending status is the proof. */
     @Override
     @Transactional
     public int expireAbandonedCheckouts(Instant cutoff) {

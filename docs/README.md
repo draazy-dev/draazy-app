@@ -2,9 +2,9 @@
 
 Written documentation for Draazy (Pune-first real-estate marketplace).
 
-These docs were originally the **API-build reference**: the React app held the business logic in a
-mock service layer, and the docs captured it so it could be re-implemented server-side. **That
-purpose is discharged** — the backend exists and the mock layer is gone. So the rule changed:
+These docs began as the **API-build reference** (business logic captured from the mock service layer
+so it could be re-implemented server-side). That purpose is discharged — the backend exists and the
+mock layer is gone. The rule now:
 
 > **If a machine already enforces a fact, the docs do not restate it.** They carry the *reasoning*,
 > which no test can hold.
@@ -36,21 +36,18 @@ purpose is discharged** — the backend exists and the mock layer is gone. So th
 
 ## Running it
 
-Operational, not part of the reading order above — reach for these when you are at a terminal.
+Operational — reach for these at a terminal.
 
 - [`system/profiles.md`](./system/profiles.md) — the four tiers (`local` → `local,e2e` → `sandbox` → `prod`), what each turns on, and how the deployed ones are kept from drifting apart.
 - [`system/notifications.md`](./system/notifications.md) — every in-app, WhatsApp, email and push message we send (consumer and back office), with its copy, cost and trigger.
 - [`LOCAL_DEV.md`](./LOCAL_DEV.md) — both halves on one machine.
-- [`DEPLOY.md`](./DEPLOY.md) — the deploy **contract**: the same-site cookie rule, every environment variable, and which mistakes fail silently. Read it to understand a value.
-- [`MANUAL_VERIFICATION.md`](./MANUAL_VERIFICATION.md) — what to check by hand in sandbox (full regression) and production (smoke) after a deploy, and the production never-do list.
-- [`DEPLOY_WALKTHROUGH.md`](./DEPLOY_WALKTHROUGH.md) — the **sequence**: Supabase → container → GCP → GitHub → Cloud Run → Cloudflare Pages → `sandbox.draazy.com`, in order, for macOS and Windows. Read it to perform a deploy. Where the two disagree on a value, `DEPLOY.md` wins; where they disagree on order, the walkthrough does.
+- [`DEPLOY.md`](./DEPLOY.md) — the single deployment document: same-site cookie rule, DigitalOcean database and App Platform setup, every environment variable, the GitHub deploy pipeline, first-time setup order (macOS and Windows), logs and alerts, and the manual verification checklists (sandbox regression, production smoke, never-do list).
 
 ## Map
 
 ```
 docs/
-  DEPLOY.md   deploy contract · DEPLOY_WALKTHROUGH.md ordered runbook · LOCAL_DEV.md
-              MANUAL_VERIFICATION.md sandbox regression + prod smoke
+  DEPLOY.md   deployment, first-time setup and manual verification · LOCAL_DEV.md
   system/     platform-architecture, package-structure, data-model, cross-cutting, api-standards,
               design-system, frontend-data-seam, profiles, notifications, code-quality,
               legal-entity-and-compliance, tech-debt, open-questions, fixture-registry
@@ -63,8 +60,8 @@ docs/
 - **Maker-checker** is defined once in [`system/cross-cutting.md`](./system/cross-cutting.md); flow docs reference it.
 - Entity **field shapes** are defined once in the OpenAPI component schemas. [`system/data-model.md`](./system/data-model.md) owns the ER map and persistence design. Flow docs link, they do not re-define.
 - Every flow doc follows the same 8-section shape: purpose, entry points, actors, entities, **business rules**, maker-checker, state machine, edge cases.
-- Flow docs deliberately do **not** carry "target API endpoints", "backend responsibilities" or "current mock implementation" sections. Those were removed on 2026-08-08 — 1,151 lines that restated the spec, the Java tree and the mock source, none of which they could keep in sync. Read the enforced source instead.
-- A dated audit or review is **not** a doc. Its findings belong in the register (if actionable), in open-questions (if a decision), or in a standing ruling (if settled). Four such reviews were deleted on 2026-08-08 after every finding was traced to one of those homes.
+- Flow docs deliberately do **not** carry "target API endpoints", "backend responsibilities" or "current mock implementation" sections (they restated the spec, the Java tree and the mock source, and could not stay in sync). Read the enforced source instead.
+- A dated audit or review is **not** a doc. Its findings belong in the register (if actionable), in open-questions (if a decision), or in a standing ruling (if settled).
 
 ## Flow index
 

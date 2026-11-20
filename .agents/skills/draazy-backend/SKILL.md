@@ -17,65 +17,58 @@ user-invocable: true
 
 # PuneNest backend
 
-PuneNest is a Pune-first real-estate marketplace. The **React frontend is complete** and already
-talks to a service-abstraction layer (`src/services/*Service.js`) that resolves every domain to the
-live REST API (`src/services/providers/http/{domain}Provider.js`, globbed by `src/services/config.js`).
+PuneNest is a Pune-first real-estate marketplace. The **React frontend is complete** and talks to a
+service-abstraction layer (`src/services/*Service.js`) that resolves every domain to the live REST
+API (`src/services/providers/http/{domain}Provider.js`, globbed by `src/services/config.js`).
 There is no mock provider and no per-domain switch.
 
-**Your job on the backend is to implement the server side of that `http` provider** as a
-Spring Boot 4 + PostgreSQL application whose request/response shapes match the OpenAPI spec
-(`backend/src/main/resources/static/openapi/punenest-api.yaml`) exactly, so components never change —
-only the provider swaps.
+**Your job is to implement the server side of that `http` provider** as a Spring Boot 4 + PostgreSQL
+application whose request/response shapes match the OpenAPI spec
+(`backend/src/main/resources/static/openapi/punenest-api.yaml`) exactly, so components never change.
 
-This skill is versioned in this repo at `.agents/skills/draazy-backend/`; all paths below are
-relative to the repo root (Windows, PowerShell). Backend lives in `backend/` (Spring Boot 4.1, Java 25, Maven, groupId
+This skill lives at `.agents/skills/draazy-backend/`; paths below are relative to the repo root
+(Windows, PowerShell). Backend: `backend/` (Spring Boot 4.1, Java 25, Maven, groupId
 `com.punenest`, root package `com.punenest.api`). The **auth/identity slice**
-(`com.punenest.api.identity` + `com.punenest.api.security`) is the reference implementation — study it
-as the canonical example of the house style before writing new code.
+(`com.punenest.api.identity` + `com.punenest.api.security`) is the reference implementation: study it
+as the canonical house style before writing new code.
 
 ## When to use this skill
 
-- **System design / architecture** for the backend (the current priority): turning the contract
-  into an ERD, a schema, cross-cutting foundations, and a build order.
+- **System design / architecture** (current priority): contract → ERD, schema, cross-cutting foundations, build order.
 - **Database work**: PostgreSQL schema, Flyway migrations, indexes, JSONB, soft-delete columns.
-- **API implementation**: controllers, services, repositories, entities, DTOs for any of the
-  endpoint domains defined in the OpenAPI spec.
+- **API implementation**: controllers, services, repositories, entities, DTOs for any OpenAPI domain.
 - **Cross-cutting concerns**: JWT auth, role guards, the contact/Aadhaar gate, pagination,
   error handling, CORS, OpenAPI, config profiles, external-provider seams, caching.
 - **Wiring**: connecting the frontend `http` provider to the live API.
 
 ## Always-on companions
 
-This skill governs backend implementation. Keep consulting the project's always-on skills:
-`real-estate-expert` (domain model — the source of truth for what listings/deals/gates *mean*),
-`senior-product-manager-realestate` (scope & priority — build what matters first),
-`ponytail` (laziest-that-works discipline — shortest correct diff, reuse before you build).
+Keep consulting: `real-estate-expert` (domain model — source of truth for what listings/deals/gates *mean*),
+`senior-product-manager-realestate` (scope & priority), `ponytail` (shortest correct diff, reuse before you build).
 For frontend/contract questions, cross-reference `draazy-frontend`.
 
 ## Golden rules
 
 1. **The contract is law.** The OpenAPI spec
    (`backend/src/main/resources/static/openapi/punenest-api.yaml`) is the single source of truth for
-   every path, verb, auth level (`x-roles`/`security`), query param, and JSON shape; the standing
-   conventions live in `docs/system/api-standards.md`. The frontend already codes against these
-   shapes. Never invent a divergent shape; if the spec is wrong or missing something, fix the spec
-   first (and flag it), then implement. When in doubt, match the mock provider output.
-2. **Contract-first, vertical slices.** Build one domain at a time as a full slice
+   every path, verb, auth level (`x-roles`/`security`), query param, and JSON shape; standing
+   conventions are in `docs/system/api-standards.md`. Never invent a divergent shape; if the spec is
+   wrong or missing something, fix the spec first (and flag it), then implement. When in doubt, match the mock provider output.
+2. **Contract-first, vertical slices.** One domain at a time as a full slice
    (entity -> repository -> service -> controller -> DTO mapping -> test), not layer-by-layer across
-   the whole app. A shipped, contract-accurate `/properties` beats forty half-wired controllers.
-3. **Match the house style.** Study the auth/identity slice and mirror it: package **by feature**
+   the app. A shipped, contract-accurate `/properties` beats forty half-wired controllers.
+3. **Match the house style.** Mirror the auth/identity slice: package **by feature**
    under `com.punenest.api` (`identity`, `catalog`, `deals`, `finance`, `provider`, …), constructor
    injection (no field `@Autowired`), **Java `record`s for DTOs**, Javadoc that explains *why* (the
-   cost/design reason), and `// ponytail:` comments where you take a deliberate pragmatic shortcut.
+   cost/design reason), and `// ponytail:` comments for a deliberate pragmatic shortcut.
    See `references/architecture.md`.
-4. **Soft-delete, never hard-delete.** No `DELETE`-to-oblivion. Removals go through
+4. **Soft-delete, never hard-delete.** Removals go through
    `archive`/`restore` (properties, users, content). Archived rows are excluded from public queries
-   by default and included in admin views via `?archived=true`. This is a platform-wide policy.
+   by default and included in admin views via `?archived=true`. Platform-wide policy.
 5. **Respect the trust & gating model.** Owner contact details stay hidden until a contact request is
    approved (mask as `98XXXXX210`). The contact gate requires Aadhaar verification — return
-   `403 { "error": "aadhaar_required" }` when missing. Editing a listing *foundation* fields
-   (price, bhk, type, locality) reverts its status to `pending`. These rules live in the domain, not
-   just the UI — enforce them server-side.
+   `403 { "error": "aadhaar_required" }` when missing. Editing a listing *foundation* field
+   (price, bhk, type, locality) reverts its status to `pending`. Enforce these server-side, not just in the UI.
 6. **Isolate the outside world behind a seam.** Every external dependency (OTP/SMS, payment gateway,
    file storage, Google Routes) sits behind an interface in `com.punenest.api.provider` with a
    deterministic **mock/dev impl** and a real impl marked `@Primary` for prod. The app must run and be
@@ -104,7 +97,7 @@ For frontend/contract questions, cross-reference `draazy-frontend`.
 ## System-design workflow (start here)
 
 The immediate goal is a **strong foundation before coding**. Work through the phases in
-`references/system-design.md` in order — do not skip to controllers:
+`references/system-design.md` in order; do not skip to controllers:
 
 0. **Freeze the contract** — confirm the OpenAPI spec (`…/static/openapi/punenest-api.yaml`) covers the domains you will build; patch gaps first.
 1. **Data model** — turn the contract Data Model Reference into an ERD + Flyway `V1` schema
@@ -128,10 +121,10 @@ The immediate goal is a **strong foundation before coding**. Work through the ph
 
 ## References (read when relevant)
 
-- [references/architecture.md](./references/architecture.md) — Spring Boot layering, package-by-feature layout, DTO/record style,
-  constructor injection, JWT & role guards, the contact-gate filter, error handling, pagination,
-  the provider-seam pattern, caching, config profiles, and the build/run/test commands.
-- [references/data-model.md](./references/data-model.md) — the full PostgreSQL schema grouped by domain, Flyway migration
-  conventions, PK/FK/index/JSONB/soft-delete rules, and the entity-mapping guidance.
-- [references/system-design.md](./references/system-design.md) — the phased roadmap that takes the project from contract to a live,
-  frontend-wired API, with the recommended module build order and per-slice checklist.
+- [references/architecture.md](./references/architecture.md) — layering, package-by-feature layout, DTO/record style,
+  constructor injection, JWT & role guards, contact-gate filter, error handling, pagination,
+  provider seams, caching, config profiles, build/run/test commands.
+- [references/data-model.md](./references/data-model.md) — PostgreSQL schema by domain, Flyway conventions,
+  PK/FK/index/JSONB/soft-delete rules, entity-mapping guidance.
+- [references/system-design.md](./references/system-design.md) — phased roadmap from contract to a live,
+  frontend-wired API, with module build order and per-slice checklist.

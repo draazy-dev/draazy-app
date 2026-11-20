@@ -7,10 +7,8 @@ import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.Roles;
 import org.springframework.stereotype.Component;
 
-// Desk checks are centralized so subresource controllers share the same staff ownership gate.
 @Component
 public class ServiceRequestDesks {
-
     private final ServiceRequestRepository requests;
     private final AccountPermissions accountPermissions;
 

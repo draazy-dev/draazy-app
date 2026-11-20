@@ -6,11 +6,8 @@ import { healStaleShell } from '../../lib/seamErrors.js';
 import { staffAuthError } from '../../lib/staffAuthError.js';
 import StaffShell, { StaffField, STAFF_SUBMIT } from '../../components/auth/StaffShell.jsx';
 
-/* A new colleague turns their invite into a password. The token may arrive in the URL fragment,
-   which never reaches a server log, or be pasted from the message it came in. */
 export default function StaffInvite() {
   const [token, setToken] = useState(() => window.location.hash.slice(1));
-  // Keep the single-use token out of history and session restore.
   useEffect(() => {
     if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
   }, []);

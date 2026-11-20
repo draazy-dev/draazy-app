@@ -8,9 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Consumer finders return live localities only; archived rows must not receive new listings. */
 public interface LocalityRepository extends JpaRepository<Locality, String> {
-
     Optional<Locality> findByPlaceId(String placeId);
 
     List<Locality> findByNameIgnoreCaseAndArchivedAtIsNull(String name);
@@ -24,31 +22,28 @@ public interface LocalityRepository extends JpaRepository<Locality, String> {
             """)
     List<Locality> searchLive(@Param("q") String q, Pageable page);
 
-    /** Inserts a live row; 0 means the slug or the place is already taken, and nothing was written. */
+    @Query(value = """
+            select * from localities l
+            where l.archived_at is null and word_similarity(lower(:q), lower(l.name)) >= 0.5
+            order by word_similarity(lower(:q), lower(l.name)) desc, l.name
+            limit :size""", nativeQuery = true)
+    List<Locality> searchLiveClose(@Param("q") String q, @Param("size") int size);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
-            insert into localities (slug, name, city, lat, lng, place_id, active)
-            values (:slug, :name, :city, :lat, :lng, :placeId, true)
+            insert into localities (slug, name, city, lat, lng, place_id, active, district, district_checked_at)
+            values (:slug, :name, :city, :lat, :lng, :placeId, true, :district, now())
             on conflict do nothing""", nativeQuery = true)
     int mint(@Param("slug") String slug, @Param("name") String name, @Param("city") String city,
-            @Param("placeId") String placeId, @Param("lat") double lat, @Param("lng") double lng);
+            @Param("placeId") String placeId, @Param("lat") double lat, @Param("lng") double lng,
+            @Param("district") String district);
 
-    /** Gives a dormant seed row (inactive, no place) the one just picked; 0 means somebody else got there first. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             update localities
-            set place_id = :placeId, name = :name, lat = :lat, lng = :lng, active = true, archived_at = null
+            set place_id = :placeId, name = :name, lat = :lat, lng = :lng, active = true, archived_at = null,
+                district = :district, district_checked_at = now()
             where slug = :slug and place_id is null and active = false""", nativeQuery = true)
     int adopt(@Param("slug") String slug, @Param("placeId") String placeId, @Param("name") String name,
-            @Param("lat") double lat, @Param("lng") double lng);
-
-    /** The directory: live rows, plus non-live ones that still have approved listings bound to them. */
-    @Query("""
-            select l from Locality l
-            where l.archivedAt is null
-               or exists (select 1 from Property p
-                          where p.localitySlug = l.slug and p.status = :status and p.archived = false)
-            order by l.name
-            """)
-    List<Locality> findDirectory(@Param("status") String status);
+            @Param("lat") double lat, @Param("lng") double lng, @Param("district") String district);
 }

@@ -16,9 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** Absent means off here, unlike {@code /flags}: silence about a price is never a yes. Round trips are admin write then anonymous read. */
 class MovePackEndpointTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
 
     private String adminToken() {
@@ -28,7 +26,6 @@ class MovePackEndpointTest extends AbstractApiTest {
         return "Bearer " + jwtService.issueAccessToken(users.saveAndFlush(u));
     }
 
-    /** Anonymous: a route missed in {@code SecurityConfig} would 401 and look like an unlaunched pack. */
     @Test
     void anonymousCallersGetTheSeededPrices() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))
@@ -38,7 +35,6 @@ class MovePackEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.movePack.items.verify").value(999));
     }
 
-    /** Ships {@code enabled: false} (safe for a thing that takes money) with prices filled in, so launching is one boolean, not retyping six numbers. */
     @Test
     void thePackShipsDisabledButPriced() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))
@@ -47,7 +43,6 @@ class MovePackEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.movePack.items").isNotEmpty());
     }
 
-    /** Launching or repricing the pack reaches a visitor with no account; the deep merge keeps the prices the admin did not send, as replace would empty the pack. */
     @Test
     void aLaunchSavedByAnAdminIsVisibleToAnAnonymousClient() throws Exception {
         mvc.perform(put(Routes.Admin.SETTINGS)
@@ -63,7 +58,6 @@ class MovePackEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.movePack.items.clean").value(2500));
     }
 
-    /** A string, a negative and a fractional price are each dropped, not clamped: a number no operator chose is worse than a line item that cannot sell yet. */
     @Test
     void pricesThatAreNotWholeNonNegativeNumbersAreOmitted() throws Exception {
         mvc.perform(put(Routes.Admin.SETTINGS)
@@ -78,12 +72,9 @@ class MovePackEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.movePack.items.paint").doesNotExist())
                 .andExpect(jsonPath("$.movePack.items.verify").doesNotExist())
                 .andExpect(jsonPath("$.movePack.items.internet").doesNotExist())
-                // The valid siblings in the same block are unaffected: one bad price must not
-                // take the pack down with it.
                 .andExpect(jsonPath("$.movePack.items.movers").value(8000));
     }
 
-    /** A malformed block answers coming-soon, which shows no numbers and takes no payment, so bad configuration never sells at a wrong price. */
     @Test
     void aMalformedBlockFallsBackToComingSoon() throws Exception {
         mvc.perform(put(Routes.Admin.SETTINGS)

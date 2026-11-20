@@ -2,7 +2,7 @@
 title: "Flatmate agreement in Pune: names, consent and basics"
 description: How to set up a shared flat in Pune: whose name goes on the rent agreement, getting the owner's consent for sub-letting, and a simple flatmate understanding.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-06
 author: Draazy Team
 topic: renting
 tags: [flatmates, flat share, sub-letting, rent agreement, leave and licence, Pune]
@@ -41,7 +41,7 @@ If you are the main tenant and want to add someone:
 
 1. Ask the owner in writing, with the new person's name and ID.
 2. Get the consent in writing. A message from the owner is better than a verbal yes.
-3. Ask for the agreement to be amended or re-registered with the new name.
+3. Ask for the agreement to be amended or re-registered with the new name. If you manage the flat's people on [Draazy Flatmates](/flatmates), it offers **Request a new rent agreement** once the group changes, with the property already filled in.
 4. Make sure tenant details are given to the police, as in [tenant police verification](/blog/tenant-police-verification-pune).
 
 Do not take money from a flatmate for a room you have not been allowed to sub-let. If the owner objects, the flatmate loses their place and you owe them their money.

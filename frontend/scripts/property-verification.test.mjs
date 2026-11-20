@@ -59,7 +59,6 @@ test('badge document type policy accepts images and PDFs', async () => {
   assert.equal(await uploadType(pdf, true), 'application/pdf');
 });
 
-// Signature-shaped dictionaries exercise the preservation branch, not cryptographic validity.
 test('PDF worker preserves small signature-bearing bytes and never recommends stripping signatures', async () => {
   const pdf = await PDFDocument.create();
   pdf.addPage().drawText('Synthetic ownership evidence');

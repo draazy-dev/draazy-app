@@ -35,9 +35,6 @@ class RentAgreementReadinessTest extends ServiceFixtures {
     private static final String OWNER_AADHAAR = "211122223335";
     private static final String CO_OWNER_AADHAAR = "555566667771";
     private static final String TENANT_AADHAAR = "444455556666";
-    private static final String WITNESS_1_AADHAAR = "666677778888";
-    private static final String WITNESS_2_AADHAAR = "234567890124";
-    private static final List<String> PERSON_PAPERS = List.of("pan", "aadhaar", "photo");
 
     @AfterEach
     void clearAuditRows() {
@@ -50,28 +47,64 @@ class RentAgreementReadinessTest extends ServiceFixtures {
     class Gate {
 
         @Test
-        @DisplayName("names what is missing, then opens once every party, paper and witness is on file")
+        @DisplayName("names what is missing, then opens once ownership proof and a PAN for each party are on file")
         void opensOnlyWhenComplete() throws Exception {
             User owner = customer("9820000701");
             String id = create(owner, state("owner", "", "9820000701", "9820000702"), 201);
 
             checkout(owner, id, 409)
                     .andExpect(jsonPath("$.message", allOf(
-                            containsString("Licensor 1 — PAN card"),
-                            containsString("and "))));
+                            containsString("Upload required documents before checkout"),
+                            containsString("Index II"),
+                            not(containsString("PAN card")))));
 
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR),
-                    witnesses()), 204);
-            papers(owner, id, "licensor-0-", PERSON_PAPERS);
             upload(owner, id, "ownership-proof");
             checkout(owner, id, 409)
                     .andExpect(jsonPath("$.message", allOf(
-                            containsString("Tenant 1 — PAN card"),
-                            containsString("Tenant 1 — Passport photo"),
-                            not(containsString("Licensor")))));
+                            containsString("Record PAN numbers before checkout: Licensor 1, Tenant 1"))));
 
-            papers(owner, id, "tenant-0-", PERSON_PAPERS);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             checkout(owner, id, 200).andExpect(jsonPath("$.paymentSessionId").isNotEmpty());
+        }
+
+        @Test
+        @DisplayName("opens on a PAN for every licensor and tenant, with no Aadhaar or person scans")
+        void opensOnPanRowsAlone() throws Exception {
+            User owner = customer("9820000771");
+            String coOwners = "[{\"name\":\"Vikram Patil\",\"age\":\"48\",\"mobile\":\"9820000773\","
+                    + "\"capacity\":\"co-owner\"}]";
+            String id = create(owner, state("co-owner", coOwners, "9820000771", "9820000772"), 201);
+            upload(owner, id, "ownership-proof");
+
+            identities(owner, id, parties(panOnly("owner", 0, "ABCDE1234F"), panOnly("tenant", 0, "FGHIJ5678K")), 204);
+            checkout(owner, id, 409).andExpect(jsonPath("$.message", allOf(
+                    containsString("Record PAN numbers before checkout"),
+                    containsString("Licensor 2"),
+                    not(containsString("Licensor 1")),
+                    not(containsString("Tenant 1")))));
+
+            identities(owner, id, parties(panOnly("owner", 0, "ABCDE1234F"), panOnly("owner", 1, "KLMNO9012P"),
+                    panOnly("tenant", 0, "FGHIJ5678K")), 204);
+            checkout(owner, id, 200).andExpect(jsonPath("$.paymentSessionId").isNotEmpty());
+        }
+
+        @Test
+        @DisplayName("an Aadhaar number does not stand in for the PAN, and an NRI tenant still owes one")
+        void aadhaarAloneIsNotEnough() throws Exception {
+            User owner = customer("9820000774");
+            String foreignTenant = "{\"name\":\"Ria Sharma\",\"age\":\"29\",\"mobile\":\"9820000775\","
+                    + "\"residency\":\"nri\",\"passport\":\"Z1234567\"}";
+            String id = create(owner, "{\"owner\":{\"oName\":\"Asha Patil\",\"oAge\":\"52\","
+                    + "\"oMobile\":\"9820000774\",\"capacity\":\"owner\"},"
+                    + "\"tenants\":[" + foreignTenant + "]," + PROP + "," + TERMS + "}", 201);
+            upload(owner, id, "ownership-proof");
+            upload(owner, id, "tenant-0-passport");
+            identities(owner, id, parties(party("owner", 0, OWNER_AADHAAR, null)), 204);
+
+            checkout(owner, id, 409).andExpect(jsonPath("$.message", allOf(
+                    containsString("Record PAN numbers before checkout"),
+                    containsString("Licensor 1"),
+                    containsString("Tenant 1"))));
         }
 
         @Test
@@ -86,21 +119,19 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                     + "\"workplaceAddress\":\"Draazy Labs, Baner\",\"workIdProofType\":\"Employee ID\"}}";
             String id = create(owner, "{\"owner\":{\"oName\":\"Asha Patil\",\"oAge\":\"52\","
                     + "\"oAddr\":\"MG Road, Pune\",\"oMobile\":\"9820000715\",\"capacity\":\"owner\"},"
-                    + "\"tenants\":[" + tenantJson + "]," + PROP + "," + WITNESSES + "," + TERMS + "}", 201);
+                    + "\"tenants\":[" + tenantJson + "]," + PROP + "," + TERMS + "}", 201);
 
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR), witnesses()), 204);
-            papers(owner, id, "licensor-0-", PERSON_PAPERS);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             upload(owner, id, "ownership-proof");
-            papers(owner, id, "tenant-0-", PERSON_PAPERS);
 
             checkout(owner, id, 409).andExpect(jsonPath("$.message", allOf(
                     containsString("Tenant 1 — Address proof"),
                     containsString("Tenant 1 — Previous address proof"),
-                    containsString("Tenant 1 — Work proof"))));
+                    containsString("Tenant 1 — Work ID proof"))));
 
             upload(owner, id, "tenant-0-addressproof");
             upload(owner, id, "tenant-0-prevaddressproof");
-            upload(owner, id, "tenant-0-income");
+            upload(owner, id, "tenant-0-workidproof");
             checkout(owner, id, 200);
         }
 
@@ -109,10 +140,8 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         void legacyRequestWithStampedAreaPassesCheckout() throws Exception {
             User owner = customer("9820000746");
             String id = create(owner, state("owner", "", "9820000746", "9820000747"), 201);
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR), witnesses()), 204);
-            papers(owner, id, "licensor-0-", PERSON_PAPERS);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             upload(owner, id, "ownership-proof");
-            papers(owner, id, "tenant-0-", PERSON_PAPERS);
             jdbc.update("update service_requests set details = jsonb_set(details, '{_state,prop}', "
                     + "(details->'_state'->'prop') - 'gramPanchayat') where id = ?::uuid", id);
             em.clear();
@@ -125,10 +154,8 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         void noAreaAndNoAnswerBlocksCheckout() throws Exception {
             User owner = customer("9820000748");
             String id = create(owner, state("owner", "", "9820000748", "9820000749"), 201);
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR), witnesses()), 204);
-            papers(owner, id, "licensor-0-", PERSON_PAPERS);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             upload(owner, id, "ownership-proof");
-            papers(owner, id, "tenant-0-", PERSON_PAPERS);
             jdbc.update("update service_requests set details = "
                     + "jsonb_set(details, '{_state,prop}', (details->'_state'->'prop') - 'gramPanchayat') "
                     + "#- '{regArea}' #- '{_state,regArea}' where id = ?::uuid", id);
@@ -139,15 +166,35 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         }
 
         @Test
+        @DisplayName("a draft missing the IGR property particulars is saved but not paid for")
+        void igrPropertyFieldsBlockCheckout() throws Exception {
+            User owner = customer("9820000738");
+            String id = create(owner, state("owner", "", "9820000738", "9820000739"), 201);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
+            upload(owner, id, "ownership-proof");
+            jdbc.update("update service_requests set details = jsonb_set(details, '{_state,prop}', "
+                    + "(details->'_state'->'prop') - 'landmark' - 'roadType' "
+                    + "|| '{\"policeStation\":\"\"}'::jsonb) where id = ?::uuid", id);
+            em.clear();
+
+            checkout(owner, id, 409).andExpect(jsonPath("$.message", allOf(
+                    containsString("Complete the agreement before checkout"),
+                    containsString("Landmark"),
+                    containsString("Police station"),
+                    containsString("Road type"),
+                    not(containsString("Road / vicinity")),
+                    not(containsString("Village / city")),
+                    not(containsString("Construction type")),
+                    not(containsString("Zone")))));
+        }
+
+        @Test
         @DisplayName("nobody pays without accepting the current declaration, and the acceptance is kept")
         void declarationIsRecorded() throws Exception {
             User owner = customer("9820000744");
             String id = create(owner, state("owner", "", "9820000744", "9820000745"), 201);
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR),
-                    witnesses()), 204);
-            papers(owner, id, "licensor-0-", PERSON_PAPERS);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             upload(owner, id, "ownership-proof");
-            papers(owner, id, "tenant-0-", PERSON_PAPERS);
 
             checkout(owner, id, null, 409)
                     .andExpect(jsonPath("$.message", containsString("Accept the declaration")));
@@ -159,7 +206,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                     + " where action = 'service-request.declaration-accepted' and entity_id = ?", id);
             assertThat(rows).hasSize(1);
             assertThat(rows.get(0)).containsEntry("actor", owner.getId().toString())
-                    .containsEntry("version", "ra-decl-2026-09");
+                    .containsEntry("version", "ra-decl-2026-10");
             assertThat((String) rows.get(0).get("hash")).hasSize(64);
         }
 
@@ -168,11 +215,8 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         void aClosedCheckoutResumes() throws Exception {
             User owner = customer("9820000730");
             String id = create(owner, state("owner", "", "9820000730", "9820000731"), 201);
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR),
-                    witnesses()), 204);
-            papers(owner, id, "licensor-0-", PERSON_PAPERS);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             upload(owner, id, "ownership-proof");
-            papers(owner, id, "tenant-0-", PERSON_PAPERS);
 
             String first = field(checkout(owner, id, 200).andReturn().getResponse().getContentAsString(),
                     "paymentSessionId");
@@ -187,13 +231,14 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         }
 
         @Test
-        @DisplayName("inviting a co-fill side discards identity scans the requester uploaded for that side")
+        @DisplayName("inviting a co-fill side discards passport scans the requester uploaded for that side")
         void invitePurgesPreUploadedCounterpartyScans() throws Exception {
             User owner = customer("9820000720");
             User tenant = customer("9820000721");
-            String id = create(owner, state("owner", "", "9820000720", "9820000721"), 201);
+            String id = create(owner, state("owner", "", "9820000720", "9820000721").replace("\"tenants\":[{",
+                    "\"tenants\":[{\"residency\":\"nri\",\"passport\":\"Z1234567\","), 201);
 
-            papers(owner, id, "tenant-0-", PERSON_PAPERS);
+            upload(owner, id, "tenant-0-passport");
             String party = mvc.perform(post(Routes.ServiceRequests.PARTIES, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -206,8 +251,8 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                             .content("{\"decision\":\"accept\"}"))
                     .andExpect(status().isOk());
 
-            read(owner, id).andExpect(jsonPath("$.documents[?(@.category=='tenant-0-aadhaar')]", hasSize(0)));
-            upload(owner, id, "tenant-0-aadhaar", 403);
+            read(owner, id).andExpect(jsonPath("$.documents[?(@.category=='tenant-0-passport')]", hasSize(0)));
+            upload(owner, id, "tenant-0-passport", 403);
         }
 
         @Test
@@ -218,42 +263,44 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                     + "\"capacity\":\"co-owner\"}]";
             String id = create(owner, state("poa", coOwners, "9820000703", "9820000704"), 201);
 
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR),
-                    witnesses()), 204);
-            papers(owner, id, "licensor-0-", PERSON_PAPERS);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             upload(owner, id, "ownership-proof");
-            papers(owner, id, "tenant-0-", PERSON_PAPERS);
 
             checkout(owner, id, 409)
                     .andExpect(jsonPath("$.message", allOf(
-                            containsString("Licensor 1 — Registered power of attorney"),
-                            containsString("Licensor 2 — PAN card"))));
+                            containsString("Registered power of attorney"),
+                            not(containsString("PAN")))));
 
             upload(owner, id, "licensor-0-poa");
+            checkout(owner, id, 409)
+                    .andExpect(jsonPath("$.message", allOf(
+                            containsString("Record PAN numbers before checkout: Licensor 2"),
+                            not(containsString("Licensor 1")))));
+
             identities(owner, id, parties(owner(0, OWNER_AADHAAR), owner(1, CO_OWNER_AADHAAR),
-                    tenant(TENANT_AADHAAR), witnesses()), 204);
-            papers(owner, id, "licensor-1-", PERSON_PAPERS);
+                    tenant(TENANT_AADHAAR)), 204);
             checkout(owner, id, 200);
         }
 
         @Test
-        @DisplayName("NRI and foreign licensees use the SRO route without Aadhaar")
-        void offlineLicenseeSkipsAadhaarIdentity() throws Exception {
+        @DisplayName("NRI and foreign licensees owe passport scans, and a PAN like everyone else")
+        void offlineLicenseeOwesPassportAndPan() throws Exception {
             User owner = customer("9820000766");
-            String foreignTenant = "{\"name\":\"Ria Sharma\",\"age\":\"29\",\"addr\":\"FC Road, Pune\","
+            String foreignTenant = "{\"name\":\"Ria Sharma\",\"age\":\"29\","
                     + "\"mobile\":\"9820000767\",\"residency\":\"foreign\",\"passport\":\"Z1234567\","
                     + "\"visaOci\":\"OCI-123\"}";
             String id = create(owner, "{\"owner\":{\"oName\":\"Asha Patil\",\"oAge\":\"52\","
-                    + "\"oAddr\":\"MG Road, Pune\",\"oMobile\":\"9820000766\",\"capacity\":\"owner\"},"
-                    + "\"tenants\":[" + foreignTenant + "]," + PROP + "," + WITNESSES + "," + TERMS + "}", 201);
+                    + "\"oMobile\":\"9820000766\",\"capacity\":\"owner\"},"
+                    + "\"tenants\":[" + foreignTenant + "]," + PROP + "," + TERMS + "}", 201);
 
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), witnesses()), 204);
-            papers(owner, id, "licensor-0-", PERSON_PAPERS);
             upload(owner, id, "ownership-proof");
-            upload(owner, id, "tenant-0-pan");
+            checkout(owner, id, 409).andExpect(jsonPath("$.message", allOf(
+                    containsString("Tenant 1 — Passport scan"),
+                    containsString("Tenant 1 — Visa / OCI scan"))));
+
             upload(owner, id, "tenant-0-passport");
             upload(owner, id, "tenant-0-visa");
-            upload(owner, id, "tenant-0-photo");
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
 
             checkout(owner, id, 200);
         }
@@ -264,31 +311,25 @@ class RentAgreementReadinessTest extends ServiceFixtures {
             User owner = customer("9820000768");
             String id = create(owner, state("owner", "", "9820000768", "9820000769")
                     .replace("\"owner\":{\"oName\"", "\"owner\":{\"type\":\"entity\",\"oName\""), 201);
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR),
-                    witnesses()), 204);
-            papers(owner, id, "licensor-0-", PERSON_PAPERS);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             upload(owner, id, "ownership-proof");
-            papers(owner, id, "tenant-0-", PERSON_PAPERS);
 
             checkout(owner, id, 409).andExpect(jsonPath("$.message",
                     containsString("legal desk quote flow")));
         }
 
         @Test
-            @DisplayName("missing identity rows are named after the papers are complete")
-            void identitiesAreCheckedAfterPapers() throws Exception {
+        @DisplayName("missing identity rows are named after the papers are complete")
+        void identitiesAreCheckedAfterPapers() throws Exception {
             User owner = customer("9820000706");
             String id = create(owner, state("owner", "", "9820000706", "9820000707"), 201);
 
-                papers(owner, id, "licensor-0-", PERSON_PAPERS);
-                upload(owner, id, "ownership-proof");
-                papers(owner, id, "tenant-0-", PERSON_PAPERS);
+            upload(owner, id, "ownership-proof");
 
-                checkout(owner, id, 409)
-                        .andExpect(jsonPath("$.message", allOf(
-                                containsString("Licensor 1"),
-                                containsString("Tenant 1"),
-                                containsString("Witness 1"))));
+            checkout(owner, id, 409)
+                    .andExpect(jsonPath("$.message", allOf(
+                            containsString("Licensor 1"),
+                            containsString("Tenant 1"))));
         }
 
         @Test
@@ -296,19 +337,16 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         void particularsAreCheckedLast() throws Exception {
             User owner = customer("9820000742");
             String id = create(owner, "{\"owner\":{\"oMobile\":\"9820000742\"},"
-                    + "\"tenants\":[{\"mobile\":\"9820000743\"}]," + WITNESSES + "}", 201);
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR),
-                    witnesses()), 204);
-            papers(owner, id, "licensor-0-", PERSON_PAPERS);
+                    + "\"tenants\":[{\"mobile\":\"9820000743\"}]}", 201);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR), tenant(TENANT_AADHAAR)), 204);
             upload(owner, id, "ownership-proof");
-            papers(owner, id, "tenant-0-", PERSON_PAPERS);
 
             checkout(owner, id, 409)
                     .andExpect(jsonPath("$.message", allOf(
                             containsString("Complete the agreement before checkout"),
                             containsString("Monthly rent"),
                             containsString("Flat number"),
-                            not(containsString("Witness 1 name")))));
+                            not(containsString("address")))));
         }
     }
 
@@ -326,10 +364,8 @@ class RentAgreementReadinessTest extends ServiceFixtures {
             for (String terms : List.of(
                     "{\"months\":\"61\"}",
                     "{\"months\":\"11\",\"lockin\":\"12\"}",
-                    "{\"months\":\"11\",\"notice\":\"12\"}",
-                    "{\"months\":\"11\",\"dueDay\":\"32\"}",
                     "{\"months\":\"11\",\"increment\":\"101\"}",
-                    "{\"months\":\"11\",\"startDate\":\"" + LocalDate.now(PlatformTime.IST).minusDays(31) + "\"}",
+                    "{\"months\":\"11\",\"startDate\":\"" + LocalDate.now(PlatformTime.IST).minusDays(121) + "\"}",
                     "{\"months\":\"11\",\"startDate\":\"" + LocalDate.now(PlatformTime.IST).plusDays(181) + "\"}",
                     "{\"months\":\"11\",\"startDate\":\"next week\"}",
                     "{\"months\":\"11\",\"language\":\"Hindi\"}",
@@ -342,9 +378,10 @@ class RentAgreementReadinessTest extends ServiceFixtures {
             }
             create(owner, "{" + mobiles + ",\"terms\":{\"months\":\"11\",\"language\":\"Marathi\",\"visitAt\":\"licensee\","
                     + "\"visitSlot\":\"evening\",\"visitDate\":\"" + LocalDate.now(PlatformTime.IST).plusDays(1) + "\"}}", 201);
+            create(customer("9820000728"), "{\"owner\":{\"oMobile\":\"9820000728\"},\"tenants\":[{\"mobile\":\"9820000729\"}],"
+                    + "\"terms\":{\"months\":\"11\",\"startDate\":\"" + LocalDate.now(PlatformTime.IST).minusDays(120) + "\"}}", 201);
             create(owner, "{\"owner\":{\"oMobile\":\"9820000708\"},\"tenants\":[{\"mobile\":\"98200 00708\"}],"
                     + "\"terms\":{\"months\":\"11\",\"startDate\":\"" + start + "\"}}", 422);
-            create(owner, "{" + mobiles + ",\"wit\":{\"w1Mobile\":\"9820000709\"}}", 422);
             create(owner, "{\"owner\":{\"oMobile\":\"9820000708\",\"capacity\":\"tenant\"}}", 422);
         }
 
@@ -369,23 +406,23 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         void eachSideWritesItsOwnHalf() throws Exception {
             User owner = customer("9820000712");
             User tenant = customer("9820000713");
-            String id = coFill(owner, tenant, "," + PROP + "," + WITNESSES + ",\"terms\":{\"rent\":\"30000\","
+            String id = coFill(owner, tenant, NRI, "," + PROP + ",\"terms\":{\"rent\":\"30000\","
                     + "\"deposit\":\"0\",\"months\":\"11\",\"startDate\":\""
                     + LocalDate.now(PlatformTime.IST).plusDays(7) + "\"}");
             partyDetails(tenant, id, "{\"_state\":{\"owner\":{\"oMobile\":\"9820000712\"},"
-                    + "\"tenants\":[{\"name\":\"Ria\",\"age\":\"29\",\"addr\":\"FC Road, Pune\",\"mobile\":\"9820000713\"}]}}", 200);
+                    + "\"tenants\":[{\"name\":\"Ria\",\"age\":\"29\",\"mobile\":\"9820000713\"" + NRI + "}]}}", 200);
 
             identities(tenant, id, parties(owner(0, OWNER_AADHAAR)), 403);
             identities(tenant, id, parties(tenant(TENANT_AADHAAR)), 204);
             identities(owner, id, parties(tenant(TENANT_AADHAAR)), 409);
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), witnesses()), 204);
-            upload(tenant, id, "licensor-0-aadhaar", 403);
-            upload(tenant, id, " Licensor-0-PAN", 403);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR)), 204);
+            upload(tenant, id, "licensor-0-passport", 403);
+            upload(tenant, id, " Licensor-0-Passport", 403);
             upload(tenant, id, "ownership-proof", 403);
-            upload(owner, id, "tenant-0-aadhaar", 403);
-            papers(owner, id, "licensor-0-", PERSON_PAPERS);
+            upload(owner, id, "tenant-0-passport", 403);
+            upload(owner, id, "licensor-0-passport");
             upload(owner, id, "ownership-proof");
-            papers(tenant, id, "tenant-0-", PERSON_PAPERS);
+            upload(tenant, id, "tenant-0-passport");
 
             checkout(owner, id, 200).andExpect(jsonPath("$.paymentSessionId").isNotEmpty());
             identities(tenant, id, parties(tenant(TENANT_AADHAAR)), 409);
@@ -406,32 +443,32 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         void invitedSideCannotRepeatANumber() throws Exception {
             User owner = customer("9820000786");
             User tenant = customer("9820000787");
-            String id = coFill(owner, tenant, "," + PROP + "," + WITNESSES + "," + TERMS);
-            identities(owner, id, parties(owner(0, OWNER_AADHAAR), witnesses()), 204);
+            String id = coFill(owner, tenant, "," + PROP + "," + TERMS);
+            identities(owner, id, parties(owner(0, OWNER_AADHAAR)), 204);
 
             identities(tenant, id, parties(party("tenant", 0, TENANT_AADHAAR, "abcde1234f")), 422);
             identities(tenant, id, parties(tenant(OWNER_AADHAAR)), 422);
         }
 
         @Test
-        @DisplayName("the invited side writes only its own half; the licensor, flat, terms and witnesses stay the requester's")
+        @DisplayName("the invited side writes only its own half; the licensor, flat and terms stay the requester's")
         void invitedSideWritesOnlyItsOwnHalf() throws Exception {
             User owner = customer("9820000742");
             User tenant = customer("9820000743");
-            String id = coFill(owner, tenant, "," + PROP + "," + WITNESSES + "," + TERMS);
+            String id = coFill(owner, tenant, "," + PROP + "," + TERMS);
 
             partyDetails(tenant, id, "{\"ownerName\":\"Mallory\",\"_state\":{\"owner\":{\"oName\":\"Mallory\"},"
-                    + "\"prop\":{\"flatNo\":\"Z-9\"},\"wit\":{\"w1Name\":\"Eve\"},\"terms\":{\"lockin\":\"1\"},"
+                    + "\"prop\":{\"flatNo\":\"Z-9\"},\"terms\":{\"lockin\":\"1\"},"
                     + "\"tenants\":[" + tenantRow("Ria Sharma", tenant.getMobile()) + "]}}", 200);
             partyDetails(tenant, id, "{\"_state\":{\"tenants\":[]}}", 422);
 
             Map<String, Object> state = jdbc.queryForMap("select details->'_state'->'owner'->>'oName' as owner,"
-                    + " details->'_state'->'prop'->>'flatNo' as flat, details->'_state'->'wit'->>'w1Name' as witness,"
+                    + " details->'_state'->'prop'->>'flatNo' as flat,"
                     + " details->'_state'->'terms'->>'lockin' as lockin, details->>'ownerName' as summary,"
                     + " details->'_state'->'tenants'->0->>'name' as tenant from service_requests where id = ?",
                     UUID.fromString(id));
             assertThat(state).containsEntry("owner", "Asha Patil").containsEntry("flat", "B-1204")
-                    .containsEntry("witness", "Suresh Patil").containsEntry("tenant", "Ria Sharma");
+                    .containsEntry("tenant", "Ria Sharma");
             assertThat(state.get("lockin")).isNull();
             assertThat(state.get("summary")).isNotEqualTo("Mallory");
         }
@@ -454,35 +491,36 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         }
 
         @Test
-        @DisplayName("each side opens only its own PAN, Aadhaar and photo scans; ownership proof and ops read both")
+        @DisplayName("each side opens only its own passport scans; ownership proof and ops read both")
         void identityScansStayOnTheirSide() throws Exception {
             User owner = customer("9820000715");
             User tenant = customer("9820000716");
-            String id = coFill(owner, tenant);
-            upload(owner, id, "licensor-0-pan");
+            String id = coFill(owner, tenant, NRI, ",\"tenants\":[{\"name\":\"Ria\",\"mobile\":\"9820000716\""
+                    + NRI + "}]");
+            upload(owner, id, "licensor-0-passport");
             upload(owner, id, "ownership-proof");
-            upload(tenant, id, "tenant-0-aadhaar");
+            upload(tenant, id, "tenant-0-passport");
 
             read(owner, id)
-                    .andExpect(jsonPath(url("licensor-0-pan")).value(contains(notNullValue())))
-                    .andExpect(jsonPath(url("tenant-0-aadhaar")).value(contains(nullValue())))
-                    .andExpect(jsonPath("$.documents[?(@.category=='tenant-0-aadhaar')].fileName")
+                    .andExpect(jsonPath(url("licensor-0-passport")).value(contains(notNullValue())))
+                    .andExpect(jsonPath(url("tenant-0-passport")).value(contains(nullValue())))
+                    .andExpect(jsonPath("$.documents[?(@.category=='tenant-0-passport')].fileName")
                             .value(contains(nullValue())));
             read(tenant, id)
-                    .andExpect(jsonPath(url("tenant-0-aadhaar")).value(contains(notNullValue())))
-                    .andExpect(jsonPath(url("licensor-0-pan")).value(contains(nullValue())))
+                    .andExpect(jsonPath(url("tenant-0-passport")).value(contains(notNullValue())))
+                    .andExpect(jsonPath(url("licensor-0-passport")).value(contains(nullValue())))
                     .andExpect(jsonPath(url("ownership-proof")).value(contains(notNullValue())));
             read(admin("9820000717"), id)
-                    .andExpect(jsonPath(url("licensor-0-pan")).value(contains(notNullValue())))
-                    .andExpect(jsonPath(url("tenant-0-aadhaar")).value(contains(notNullValue())));
+                    .andExpect(jsonPath(url("licensor-0-passport")).value(contains(notNullValue())))
+                    .andExpect(jsonPath(url("tenant-0-passport")).value(contains(notNullValue())));
 
             User desk = admin("9820000720");
-            mint(owner, id, "licensor-0-pan", desk, 200);
-            mint(owner, id, "tenant-0-aadhaar", desk, 404);
-            mint(tenant, id, "tenant-0-aadhaar", desk, 200);
-            mint(tenant, id, "licensor-0-pan", desk, 404);
+            mint(owner, id, "licensor-0-passport", desk, 200);
+            mint(owner, id, "tenant-0-passport", desk, 404);
+            mint(tenant, id, "tenant-0-passport", desk, 200);
+            mint(tenant, id, "licensor-0-passport", desk, 404);
             mint(tenant, id, "ownership-proof", desk, 200);
-            mint(desk, id, "tenant-0-aadhaar", desk, 200);
+            mint(desk, id, "tenant-0-passport", desk, 200);
         }
 
         @Test
@@ -490,10 +528,10 @@ class RentAgreementReadinessTest extends ServiceFixtures {
         void staffPartyGetsNoOpsView() throws Exception {
             User owner = customer("9820000718");
             User staffTenant = admin("9820000719");
-            String id = coFill(owner, staffTenant);
-            upload(owner, id, "licensor-0-pan");
+            String id = coFill(owner, staffTenant, NRI, "");
+            upload(owner, id, "licensor-0-passport");
 
-            read(staffTenant, id).andExpect(jsonPath(url("licensor-0-pan")).value(contains(nullValue())));
+            read(staffTenant, id).andExpect(jsonPath(url("licensor-0-passport")).value(contains(nullValue())));
         }
     }
 
@@ -501,20 +539,19 @@ class RentAgreementReadinessTest extends ServiceFixtures {
     @DisplayName("a party's papers upload before any listing exists")
     void papersNeedNoListing() throws Exception {
         User owner = customer("9820000714");
-        String id = create(owner, "{\"owner\":{\"oMobile\":\"9820000714\"}}", 201);
+        String id = create(owner, "{\"owner\":{\"oMobile\":\"9820000714\"" + NRI + "}}", 201);
 
-        upload(owner, id, "licensor-0-pan");
+        upload(owner, id, "licensor-0-passport");
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.propertyId").doesNotExist())
-                .andExpect(jsonPath("$.documents[0].category").value("licensor-0-pan"));
+                .andExpect(jsonPath("$.documents[0].category").value("licensor-0-passport"));
     }
 
     private static final String PROP = "\"prop\":{\"gramPanchayat\":false,\"propType\":\"Flat / Apartment\",\"flatNo\":\"B-1204\","
-            + "\"society\":\"Skyline Heights\",\"locality\":\"Baner\",\"pincode\":\"411045\",\"area\":\"850\"}";
-    private static final String WITNESSES = "\"wit\":{\"w1Name\":\"Suresh Patil\",\"w1Age\":\"41\","
-            + "\"w1Addr\":\"Karve Road, Pune\",\"w2Name\":\"Meera Joshi\",\"w2Age\":\"36\",\"w2Addr\":\"JM Road, Pune\"}";
+            + "\"society\":\"Skyline Heights\",\"locality\":\"Baner\",\"pincode\":\"411045\",\"area\":\"850\","
+            + IGR_PROP_FIELDS + "}";
     private static final String TERMS = "\"terms\":{\"rent\":\"30000\",\"deposit\":\"0\",\"months\":\"11\","
             + "\"startDate\":\"" + LocalDate.now(PlatformTime.IST).plusDays(7) + "\"}";
 
@@ -532,26 +569,29 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                 + "\",\"capacity\":\"" + capacity + "\"" + poa + "},"
                 + (coOwners.isEmpty() ? "" : "\"coOwners\":" + coOwners + ",")
                 + "\"tenants\":[{\"name\":\"Ria Sharma\",\"age\":\"29\",\"addr\":\"FC Road, Pune\",\"mobile\":\"" + tenantMobile
-                + "\"}]," + PROP + "," + WITNESSES + ","
+                + "\"}]," + PROP + ","
                 + "\"terms\":{\"months\":\"11\",\"rent\":\"30000\",\"deposit\":\"0\",\"lockin\":\"3\","
-                + "\"notice\":\"1\",\"dueDay\":\"5\",\"increment\":\"5\",\"startDate\":\"" + start + "\"}}";
+                + "\"increment\":\"5\",\"startDate\":\"" + start + "\"}}";
     }
 
+    private static final String NRI = ",\"residency\":\"nri\",\"passport\":\"Z1234567\"";
+
     private static String owner(int index, String aadhaar) {
-        return party("owner", index, aadhaar, index == 0 ? "ABCDE1234F" : null);
+        return party("owner", index, aadhaar, index == 0 ? "ABCDE1234F" : "KLMNO9012P");
     }
 
     private static String tenant(String aadhaar) {
         return party("tenant", 0, aadhaar, "FGHIJ5678K");
     }
 
-    private static String witnesses() {
-        return party("witness", 0, WITNESS_1_AADHAAR, null) + "," + party("witness", 1, WITNESS_2_AADHAAR, null);
-    }
-
     private static String party(String role, int index, String aadhaar, String pan) {
         return "{\"partyRole\":\"" + role + "\",\"partyIndex\":" + index + ",\"partyName\":\"" + role + index
                 + "\",\"aadhaar\":\"" + aadhaar + "\"" + (pan == null ? "" : ",\"pan\":\"" + pan + "\"") + "}";
+    }
+
+    private static String panOnly(String role, int index, String pan) {
+        return "{\"partyRole\":\"" + role + "\",\"partyIndex\":" + index + ",\"partyName\":\"" + role + index
+                + "\",\"pan\":\"" + pan + "\"}";
     }
 
     private static String parties(String... rows) {
@@ -577,12 +617,16 @@ class RentAgreementReadinessTest extends ServiceFixtures {
     }
 
     private String coFill(User owner, User tenant, String moreState) throws Exception {
+        return coFill(owner, tenant, "", moreState);
+    }
+
+    private String coFill(User owner, User tenant, String ownerExtra, String moreState) throws Exception {
         String created = mvc.perform(post(Routes.ServiceRequests.CO_FILL_CREATE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"request\":{\"type\":\"rent-agreement\",\"details\":{\"_state\":"
-                                + "{\"owner\":{\"oName\":\"Asha Patil\",\"oAge\":\"52\",\"oAddr\":\"MG Road, Pune\",\"oMobile\":\""
-                                + owner.getMobile() + "\"}" + moreState + "}}},"
+                                + "{\"owner\":{\"oName\":\"Asha Patil\",\"oAge\":\"52\",\"oMobile\":\""
+                                + owner.getMobile() + "\"" + ownerExtra + "}" + moreState + "}}},"
                                 + "\"role\":\"tenant\",\"mobile\":\"" + tenant.getMobile() + "\"}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
@@ -615,13 +659,6 @@ class RentAgreementReadinessTest extends ServiceFixtures {
                 .andExpect(status().is(expected));
     }
 
-    private void papers(User caller, String id, String prefix, List<String> slugs) throws Exception {
-        for (String slug : slugs) {
-            upload(caller, id, prefix + slug);
-        }
-    }
-
-
 
     private ResultActions read(User caller, String id) throws Exception {
         return mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
@@ -644,7 +681,7 @@ class RentAgreementReadinessTest extends ServiceFixtures {
 
     private ResultActions checkout(User caller, String id, int expected)
             throws Exception {
-        return checkout(caller, id, "{\"declaration\":\"ra-decl-2026-09\"}", expected);
+        return checkout(caller, id, "{\"declaration\":\"ra-decl-2026-10\"}", expected);
     }
 
     private ResultActions checkout(User caller, String id, String body, int expected)

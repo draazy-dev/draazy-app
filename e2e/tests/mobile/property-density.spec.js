@@ -29,29 +29,26 @@ test.describe('Property detail — phone density', () => {
       expect(title.y + 24, `the title starts at ${Math.round(title.y)} and must be inside the ${vh}px fold`).toBeLessThan(vh);
 
       const stats = page.locator('.dz-stat-social');
-      await expect(stats.getByText('Views')).toBeVisible();
-      await expect(stats.getByText('Enquiries')).toBeVisible();
+      await expect(stats.getByText(/\d+ views?/)).toBeVisible();
+      await expect(stats.getByText(/\d+ enquir(y|ies)/)).toBeVisible();
       await expect(page.getByText('Shortlisted', { exact: true })).toHaveCount(0);
       await expect(page.getByText(/viewing now|enquiries this week|visits scheduled/i)).toHaveCount(0);
     });
 
-    await test.step('the stat block reads as a ledger, not a grid of tiles', async () => {
-      const rows = page.locator('.dz-stat-facts > *, .dz-stat-social > *');
+    await test.step('the header reads in tiers: identity, then trust, then social proof', async () => {
+      const top = async (loc) => (await loc.boundingBox()).y;
+      const facts = page.getByTestId('property-facts');
+      const trust = page.getByTestId('property-trust');
+      const social = page.locator('.dz-stat-social');
 
-      const shape = await rows.evaluateAll((els) => els
-        .filter((el) => el.offsetParent !== null)
-        .map((el) => {
-          const s = getComputedStyle(el);
-          const kids = [...el.children];
-          return {
-            boxed: s.borderTopWidth !== '0px' || s.backgroundColor !== 'rgba(0, 0, 0, 0)',
-            oneLine: kids.length === 2 && Math.abs(kids[0].getBoundingClientRect().top - kids[1].getBoundingClientRect().top) < 12,
-          };
-        }));
+      expect(await top(page.locator('h1').first())).toBeLessThan(await top(facts));
+      expect(await top(facts)).toBeLessThan(await top(page.getByTestId('property-freshness')));
+      expect(await top(page.getByTestId('property-freshness'))).toBeLessThan(await top(trust));
+      expect(await top(trust)).toBeLessThan(await top(social));
 
-      expect(shape.length, 'at least three stat rows should be on screen').toBeGreaterThanOrEqual(3);
-      expect(shape.every((r) => !r.boxed), 'no stat row may keep its own tile surface on a phone').toBe(true);
-      expect(shape.every((r) => r.oneLine), 'label and value share one line').toBe(true);
+      // Social proof is a footnote, not a stack of rows: one line, two at the narrowest width.
+      expect((await social.boundingBox()).height, 'social proof must not grow back into a ledger').toBeLessThan(48);
+      await expect(trust.locator('.tag-strip')).toBeVisible();
     });
 
     // The claim earns its place in the always-visible strip only if it is there *instead of*, not as well as.
@@ -71,30 +68,29 @@ test.describe('Property detail — phone density', () => {
       await gotoProp(page, BUY_FLAT_WITH_SQFT_PRICE);
       await expect(page.getByText('EMI starts at')).toHaveCount(0);
       await expect(page.getByText('Est. EMI')).toHaveCount(0);
-      await expect(page.locator('.dz-stat-facts').getByText('Price / sq.ft'), 'a buyer does compare by the foot').toBeVisible();
+      await expect(page.getByTestId('property-facts').getByText('/sq.ft'), 'a buyer does compare by the foot').toBeVisible();
 
       await gotoProp(page);
-      await expect(page.getByText('Rent / sq.ft')).toHaveCount(0);
-      await expect(page.locator('.dz-stat-facts').getByText('Deposit')).toHaveCount(0);
+      await expect(page.getByText(/Rent \/ sq\.ft|\/month\/sq\.ft/)).toHaveCount(0);
+      await expect(page.getByTestId('property-facts').getByText(/deposit/i)).toHaveCount(0);
     });
 
     await test.step('the collapsible trust tiles close to a single row', async () => {
       // Bound both sides: too tall wastes space, too short breaks the 44px toggle.
-      const tile = (heading) => page.getByText(heading, { exact: true }).first();
-      const heightOf = (heading) => tile(heading).evaluate((el) => el.closest('.rounded-2xl').getBoundingClientRect().height);
-
-      for (const heading of ['Draazy Assured', 'Sharing this flat?']) {
-        await expect(tile(heading), `${heading} must be on screen, or its height proves nothing`).toBeVisible();
-        const h = await heightOf(heading);
-        expect(h, `${heading} collapsed to ${Math.round(h)}px`).toBeLessThan(68);
-        expect(h, `${heading} collapsed to ${Math.round(h)}px, under a 44px row plus its padding`).toBeGreaterThan(48);
+      const toggle = (name) => page.getByRole('button', { name, exact: true });
+      for (const name of ['Draazy Assured', 'Sharing this flat?']) {
+        await expect(toggle(name), `${name} must be on screen, or its height proves nothing`).toBeVisible();
+        const h = (await toggle(name).boundingBox()).height;
+        expect(h, `${name} toggle is ${Math.round(h)}px`).toBeGreaterThanOrEqual(44);
+        expect(h, `${name} toggle is ${Math.round(h)}px, more than one row`).toBeLessThan(68);
       }
 
       // Asserted on a claim the panel alone makes: the zero-brokerage one sits in the tag strip, so matching
       // on it would pass against an element outside this panel entirely.
-      await page.getByRole('button', { name: 'Draazy Assured' }).click();
-      await expect(page.getByText('Number protected — no spam calls', { exact: true })).toBeVisible();
-      expect(await heightOf('Draazy Assured')).toBeGreaterThan(120);
+      const claim = page.getByText('Number protected — no spam calls', { exact: true });
+      await expect(claim).toBeHidden();
+      await toggle('Draazy Assured').click();
+      await expect(claim).toBeVisible();
     });
 
     await test.step('the tab strip scrolls horizontally only', async () => {

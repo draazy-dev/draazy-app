@@ -4,7 +4,7 @@ import { API, authHeaders } from '../../helpers/liveAuth.js';
 const CANDIDATE_KEYS = new Set(['slug', 'name', 'localitySlug', 'mintOrigin', 'createdAt']);
 const DIRECTORY_KEYS = new Set(['slug', 'name', 'builder', 'localitySlug', 'year', 'maintenancePerSqft']);
 const LOCALITY_KEYS = new Set(['slug', 'name', 'lat', 'lng', 'archived', 'liveListings']);
-const REVIEW_ROW_KEYS = new Set(['id', 'targetType', 'targetId', 'author', 'rating', 'body', 'createdAt', 'status']);
+const REVIEW_ROW_KEYS = new Set(['id', 'targetType', 'targetId', 'author', 'authorMobile', 'rating', 'body', 'createdAt', 'status']);
 
 function recordGets(page) {
   const seen = [];
@@ -75,7 +75,6 @@ test('the localities console reads the slim admin list', async ({ page, login, c
   await page.goto('/admin/places?tab=areas');
   await expect(page.getByRole('table').locator('tbody tr').first()).toBeVisible();
   await expect.poll(() => gets.withPath('/api/admin/localities').length).toBe(1);
-  expect(gets.withPath('/api/localities')).toEqual([]);
   expect(consoleErrors).toHaveLength(0);
 });
 

@@ -5,8 +5,9 @@ import {
 import { useToast } from '../../../context/ToastContext.jsx';
 import { fmtINR } from '../../../lib/format.js';
 import { AMENDABLE_TERMS, amendmentRows, currentTerm } from '../../../lib/amendmentTerms.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
-const AMENDABLE = new Set(['docs_review', 'changes_requested']);
+const AMENDABLE = new Set(['docs_review', 'changes_requested', 'action_required']);
 const REASON_MAX = 300;
 
 function Owed({ delta }) {
@@ -15,7 +16,6 @@ function Owed({ delta }) {
   return <>The fee does not change.</>;
 }
 
-/** The desk re-prices a paid rent agreement; the customer accepts (and pays any difference) before drafting goes on. */
 export default function AmendTerms({ request, onUpdated }) {
   const titleId = useId();
   const { toast } = useToast();
@@ -45,7 +45,7 @@ export default function AmendTerms({ request, onUpdated }) {
       setEditing(false);
       toast(success, 'success');
     } catch (err) {
-      toast(err?.message || 'The terms were not changed.', 'error');
+      toast(userMessage(err, 'The terms were not changed.'), 'error');
     } finally {
       setBusy(false);
     }

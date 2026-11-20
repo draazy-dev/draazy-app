@@ -1,7 +1,10 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, apiLogin, authHeaders, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
-import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { istInDays } from '../../../helpers/availability.js';
+
+const MOVE_IN = istInDays(28);
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -17,7 +20,7 @@ async function create(kind, token, body) {
 }
 
 const group = (token, title, over = {}) => create('groups', token, {
-  title, name: 'Strip Host', locality: 'Baner', rent: 30000, seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant', ...over,
+  title, locality: 'Baner', rent: 30000, deposit: 50000, seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant', ...over,
 });
 
 const strip = (page) => page.getByTestId('my-posts-strip');
@@ -39,18 +42,21 @@ async function rentListing(token, title) {
 const dropListing = async (id) =>
   rejectListingWithFetch(id, await authHeaders(ACTORS.admin), { reason: 'Zztest cleanup — my-posts strip fixture' });
 
-test('team up: own posts sit in the strip, capped at two with a View all link, and stay out of the feed', async ({ page }) => {
+test('teams and flatmates: own posts sit in the strip, capped at two with a View all link, and stay out of the feed', async ({ page }) => {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Strip Host' });
   const post = await create('posts', accessToken, {
-    name: 'Strip Seeker', gender: 'female', age: 26, occupation: 'Engineer', budget: 16000,
-    localities: ['Baner'], moveIn: '2026-12-01', flatPref: 'any', roomPref: 'private', tags: [], note: 'Strip test',
+    gender: 'female', age: 26, occupation: 'Engineer', budget: 16000,
+    localities: ['Baner'], moveIn: MOVE_IN, flatPref: 'any', roomPref: 'private', note: 'Strip test',
   });
-  const first = await group(accessToken, `Strip group A ${stamp()}`);
-  await group(accessToken, `Strip group B ${stamp()}`);
+  const hunt = { locality: undefined, rent: undefined, deposit: undefined,
+    preferences: { localities: ['Baner'], rentMax: 45000, depositMax: 90000, gatedOnly: false, bachelors: false } };
+  const first = await group(accessToken, `Strip group A ${stamp()}`, hunt);
+  const second = await group(accessToken, `Strip group B ${stamp()}`, hunt);
+  const third = await group(accessToken, `Strip group C ${stamp()}`, hunt);
 
   await signedInAs(page, mobile);
-  await page.goto(`${BASE}/flatmates?view=team-up`);
+  await page.goto(`${BASE}/flatmates?view=teams`);
   await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 20_000 });
 
   await expect(strip(page).locator('.my-post-tile')).toHaveCount(2);
@@ -58,35 +64,33 @@ test('team up: own posts sit in the strip, capped at two with a View all link, a
   const viewAll = strip(page).getByRole('link', { name: 'View all (3)' });
   await expect(viewAll).toHaveAttribute('href', '/dashboard#listings');
 
+  for (const g of [first, second, third]) {
+    await expect(page.locator(`[data-sf-id="g:${g.id}"]`)).toHaveCount(0);
+  }
+
+  await page.locator('button[data-tab="people"]').click();
+  await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 20_000 });
+  await expect(strip(page).locator('.my-post-tile')).toHaveCount(1);
   await expect(page.locator(`[data-sf-id="s:${post.id}"]`)).toHaveCount(0);
-  await expect(page.locator(`[data-sf-id="g:${first.id}"]`)).toHaveCount(0);
 
   await strip(page).locator(`a[href="/flatmates/post/${post.id}"]`).click();
   await expect(page).toHaveURL(new RegExp(`/flatmates/post/${post.id}$`));
 });
 
-test('move in: a group tied to the host\'s flat appears in the move-in strip only', async ({ page }) => {
+test('the Teams strip holds hunting teams, and Move-in lists rooms only', async ({ page }) => {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
-  const listing = await rentListing(accessToken, `Zztest strip flat ${stamp()}`);
-  expect((await approveListingWithFetch(listing.id, await authHeaders(ACTORS.admin))).status).toBe(200);
-  try {
-    const title = `Strip flat group ${stamp()}`;
-    const g = await group(accessToken, title, { propertyId: listing.id, role: 'owner' });
-    expect(g.propertyId, 'the group must be tied to the host\'s flat').toBe(listing.id);
+  const { accessToken } = await apiLogin(mobile, { name: 'Strip Host' });
+  const hunting = await group(accessToken, `Strip hunting group ${stamp()}`, { locality: undefined, rent: undefined, deposit: undefined,
+    preferences: { localities: ['Baner'], rentMax: 45000, depositMax: 90000, gatedOnly: false, bachelors: false } });
+  const tileFor = (g) => strip(page).locator(`a[href="/flatmates/group/${g.id}"]`);
 
-    await signedInAs(page, mobile);
-    await page.goto(`${BASE}/flatmates?view=move-in`);
-    const tile = strip(page).locator(`a[href="/flatmates/group/${g.id}"]`);
-    await expect(tile).toBeVisible({ timeout: 20_000 });
-    await expect(tile).toContainText(title);
+  await signedInAs(page, mobile);
+  await page.goto(`${BASE}/flatmates?view=teams`);
+  await expect(tileFor(hunting)).toBeVisible({ timeout: 20_000 });
 
-    await page.getByRole('button', { name: /Team up/ }).first().click();
-    await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 20_000 });
-    await expect(strip(page).locator(`a[href="/flatmates/group/${g.id}"]`)).toHaveCount(0);
-  } finally {
-    await dropListing(listing.id);
-  }
+  await page.locator('button[data-tab="move-in"]').click();
+  await expect(page.locator('[data-sf-id^="r:"]').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('a[href^="/flatmates/group/"]')).toHaveCount(0);
 });
 
 test('board tiles carry no action buttons beyond save', async ({ page }) => {

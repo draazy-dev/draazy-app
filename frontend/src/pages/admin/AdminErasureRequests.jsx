@@ -6,8 +6,9 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, Chips, FactRow, PageNav, QueuePanel, RowCard, RowList,
+  BTN, CHIP, CHIP_TONE, Chips, DATE_CHIPS, FactRow, PageNav, QueuePanel, RowCard, RowList,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const PAGE_SIZE = 20;
 const NOTE_MAX = 2000;
@@ -55,6 +56,7 @@ function RequestRow({ r, onDecide }) {
 export default function AdminErasureRequests() {
   const { toast } = useToast();
   const [status, setStatus] = useState('pending');
+  const [days, setDays] = useState('');
   const [page, setPage] = useState(1);
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState('');
@@ -63,15 +65,15 @@ export default function AdminErasureRequests() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(() => listErasureRequests({ status, page: page - 1, size: PAGE_SIZE })
-    .then((res) => { setLoadError(''); setData(res); }), [status, page]);
+  const load = useCallback(() => listErasureRequests({ status, days, page: page - 1, size: PAGE_SIZE })
+    .then((res) => { setLoadError(''); setData(res); }), [status, days, page]);
 
   useEffect(() => {
     let alive = true;
     setData((prev) => (prev ? { ...prev, stale: true } : prev));
     load().catch((err) => {
       if (!alive) return;
-      setLoadError(err?.message || 'Could not load erasure requests');
+      setLoadError(userMessage(err, 'Could not load erasure requests'));
       setData({ items: [], total: 0, totalPages: 0 });
     });
     return () => { alive = false; };
@@ -88,7 +90,7 @@ export default function AdminErasureRequests() {
     try {
       await decideErasureRequest(decision.request.id, decision.action, note);
     } catch (err) {
-      setError(err?.message || 'That request could not be decided');
+      setError(userMessage(err, 'That request could not be decided'));
       load().catch(() => {});
       setBusy(false);
       return;
@@ -97,7 +99,7 @@ export default function AdminErasureRequests() {
     toast(reject ? 'Erasure request rejected' : 'Data erased', 'success');
     setDecision(null);
     setNote('');
-    load().catch((err) => setLoadError(err?.message || 'Could not load erasure requests'));
+    load().catch((err) => setLoadError(userMessage(err, 'Could not load erasure requests')));
   };
 
   if (!data) return <Loading />;
@@ -110,6 +112,7 @@ export default function AdminErasureRequests() {
         toolbar={(
           <>
             <Chips label="Status" options={STATUS_CHIPS} value={status} onChange={(v) => { setStatus(v); setPage(1); }} />
+            <Chips label="Filed" options={DATE_CHIPS} value={days} onChange={(v) => { setDays(v); setPage(1); }} />
             <div className="ml-auto">
               <PageNav
                 page={page}

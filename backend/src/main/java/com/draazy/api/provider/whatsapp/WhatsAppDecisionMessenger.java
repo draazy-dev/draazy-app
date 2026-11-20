@@ -10,14 +10,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/** A blank template name means skip: unlike a login, a decision notice can fall back on the in-app row. */
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.whatsapp", name = "enabled", havingValue = "true")
 class WhatsAppDecisionMessenger implements DecisionMessenger {
-
     private static final Logger log = LoggerFactory.getLogger(WhatsAppDecisionMessenger.class);
 
-    /** See {@code WhatsAppOtpSender.COUNTRY_CODE}: the upstream normaliser only admits Indian mobiles. */
     private static final String COUNTRY_CODE = "91";
 
     private static final String OPERATION = DecisionMessenger.IDENTITY_DECISION;
@@ -25,31 +22,80 @@ class WhatsAppDecisionMessenger implements DecisionMessenger {
     private final WhatsAppClient client;
     private final WhatsAppProperties props;
     private final ProviderCalls calls;
+    private final WhatsAppOptOuts optOuts;
 
-    WhatsAppDecisionMessenger(WhatsAppClient client, WhatsAppProperties props, ProviderCalls calls) {
+    WhatsAppDecisionMessenger(WhatsAppClient client, WhatsAppProperties props, ProviderCalls calls,
+            WhatsAppOptOuts optOuts) {
         this.client = client;
         this.props = props;
         this.calls = calls;
+        this.optOuts = optOuts;
     }
 
     @Override
     public void sendIdentityDecision(String mobile, String line) {
         send(OPERATION, "Identity decision", "identity-template-name", props.identityTemplateName(),
-                props.identityTemplateLang(), mobile, line);
+                props.identityTemplateLang(), props.phoneNumberId(), mobile, List.of(line));
     }
 
     @Override
     public boolean sendWaitingDigest(String mobile, String waiting) {
         return send(DecisionMessenger.WAITING_DIGEST, "Waiting digest", "digest-template-name",
-                props.digestTemplateName(), props.digestTemplateLang(), mobile, waiting);
+                props.digestTemplateName(), props.digestTemplateLang(), props.phoneNumberId(), mobile,
+                List.of(waiting));
+    }
+
+    @Override
+    public boolean sendOwnerNotice(String mobile, String tenantName, String place, String link) {
+        return send(DecisionMessenger.OWNER_NOTICE, "Owner notice", "owner-notice-template-name",
+                props.ownerNoticeTemplateName(), props.ownerNoticeTemplateLang(), props.ownerNoticeSender(),
+                mobile, List.of(tenantName, place, link));
+    }
+
+    @Override
+    public boolean sendServiceAttention(String mobile, String service) {
+        return send(DecisionMessenger.SERVICE_ATTENTION, "Service attention", "service-template-name",
+                props.serviceTemplateName(), props.serviceTemplateLang(), props.phoneNumberId(), mobile,
+                List.of(service));
+    }
+
+    @Override
+    public boolean agreementInviteDeliverable(String mobile) {
+        return !isBlank(props.agreementInviteTemplateName()) && !isBlank(props.agreementInviteTemplateLang())
+                && !optOuts.isOptedOut(mobile);
+    }
+
+    @Override
+    public boolean sendAgreementInvite(String mobile, String inviter, String side, String place, String link) {
+        return send(DecisionMessenger.AGREEMENT_INVITE, "Agreement invite", "agreement-invite-template-name",
+                props.agreementInviteTemplateName(), props.agreementInviteTemplateLang(), props.phoneNumberId(),
+                mobile, List.of(inviter, side, place, link));
+    }
+
+    @Override
+    public boolean referralInviteEnabled() {
+        return !isBlank(props.referralInviteTemplateName());
+    }
+
+    @Override
+    public boolean sendReferralInvite(String mobile, String inviter, String link) {
+        return send(DecisionMessenger.REFERRAL_INVITE, "Referral invite", "referral-invite-template-name",
+                props.referralInviteTemplateName(), props.referralInviteTemplateLang(),
+                props.referralInviteSender(), mobile, List.of(inviter, link));
     }
 
     private boolean send(String operation, String what, String property, String template, String lang,
-            String mobile, String parameter) {
+            String fromNumberId, String mobile, List<String> parameters) {
         if (isBlank(template) || isBlank(lang)) {
             log.info("{} for {} not sent on WhatsApp: {} unset", what, MobileMask.mask(mobile), property);
             calls.record(ProviderCalls.WHATSAPP, operation, ProviderCalls.Outcome.SKIPPED, mobile, null,
                     "template unset", null);
+            return false;
+        }
+        if (optOuts.isOptedOut(mobile)) {
+            log.info("{} for {} not sent on WhatsApp: the number replied STOP", what, MobileMask.mask(mobile));
+            calls.record(ProviderCalls.WHATSAPP, operation, ProviderCalls.Outcome.SKIPPED, mobile, null,
+                    "opted out", null);
             return false;
         }
         Map<String, Object> payload = Map.of(
@@ -62,13 +108,13 @@ class WhatsAppDecisionMessenger implements DecisionMessenger {
                         "language", Map.of("code", lang),
                         "components", List.of(
                                 Map.of("type", "body",
-                                        "parameters", List.of(Map.of("type", "text", "text", parameter))))));
+                                        "parameters", parameters.stream()
+                                                .map(p -> Map.of("type", "text", "text", p)).toList()))));
         try {
             calls.track(ProviderCalls.WHATSAPP, operation, mobile, null,
-                    () -> client.post("/" + props.phoneNumberId() + "/messages", payload));
+                    () -> client.post("/" + fromNumberId + "/messages", payload));
             return true;
         } catch (WhatsAppClient.WhatsAppException e) {
-            // Best-effort by contract: the in-app row already carries the news.
             log.warn("{} WhatsApp send failed for {}", what, MobileMask.mask(mobile), e);
             return false;
         }

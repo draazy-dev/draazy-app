@@ -6,6 +6,7 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.payments.CheckoutTtl;
 import com.draazy.api.common.persistence.ConstraintViolations;
 import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.web.Ids;
@@ -17,7 +18,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -28,16 +31,13 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-// A free plan is active immediately because there is no money to wait for.
 // Priced subscriptions become active only through the signature-verified webhook path.
 @Service
 public class SubscriptionService {
-
     private static final Logger log = LoggerFactory.getLogger(SubscriptionService.class);
 
     private static final int MAX_OPEN_UNPAID_PER_USER = 1;
 
-    // Named here so its violation can be told apart from the idempotency index.
     private static final String OPEN_UNPAID_INDEX = "uq_subscriptions_open_unpaid";
 
     private static final ZoneId TERM_ZONE = PlatformTime.IST;
@@ -54,13 +54,14 @@ public class SubscriptionService {
     private final PlatformSettings platformSettings;
     private final ListingPasses passes;
     private final Invoices invoices;
+    private final CheckoutTtl ttl;
 
     private final TransactionTemplate transactions;
 
     public SubscriptionService(PlanRepository plans, SubscriptionRepository subscriptions,
             PlanMapper mapper, PaymentGateway gateway, UserRepository users,
             PlatformSettings platformSettings, ListingPasses passes, Invoices invoices,
-            PlatformTransactionManager transactionManager) {
+            CheckoutTtl ttl, PlatformTransactionManager transactionManager) {
         this.plans = plans;
         this.subscriptions = subscriptions;
         this.mapper = mapper;
@@ -69,6 +70,7 @@ public class SubscriptionService {
         this.platformSettings = platformSettings;
         this.passes = passes;
         this.invoices = invoices;
+        this.ttl = ttl;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -82,9 +84,45 @@ public class SubscriptionService {
         return currentFor(caller.userId()).map(mapper::toDto).orElseGet(SubscriptionDto::none);
     }
 
+    public boolean cancelPending(AuthPrincipal caller) {
+        List<String> abandonedOrders = transactions.execute(tx -> {
+            List<String> refs = new ArrayList<>();
+            for (Subscription s : subscriptions.findByUserIdOrderByStartedAtDesc(caller.userId())) {
+                if (SubscriptionStatuses.PENDING.equals(s.getStatus()) && s.abandonCheckout()) {
+                    subscriptions.saveAndFlush(s);
+                    refs.add(s.getPaymentRef());
+                }
+            }
+            return refs;
+        });
+        abandonedOrders.stream().filter(Objects::nonNull).forEach(this::terminateQuietly);
+        return !abandonedOrders.isEmpty();
+    }
+
+    private void terminateQuietly(String orderId) {
+        try {
+            gateway.terminate(orderId);
+        } catch (RuntimeException failed) {
+            log.warn("Could not terminate abandoned gateway order {}; it stays payable until expiry", orderId,
+                    failed);
+        }
+    }
+
+    public String orderStatus(AuthPrincipal caller, String orderId) {
+        Subscription s = subscriptions.findByPaymentRef(orderId)
+                .filter(found -> found.getUserId().equals(caller.userId()))
+                .orElseThrow(() -> NotFoundException.of("Order"));
+        if (SubscriptionStatuses.isEntitling(s.getStatus())) {
+            return "paid";
+        }
+        if (!SubscriptionStatuses.PENDING.equals(s.getStatus())) {
+            return "closed";
+        }
+        return gateway.lastAttemptFailed(orderId) ? "failed" : "pending";
+    }
+
     public SubscriptionDto subscribe(AuthPrincipal caller, SubscribeRequest body,
             String idempotencyKey) {
-        // The admin kill switch for a gateway outage or fraud spike; plans already bought keep working.
         if (!platformSettings.subscriptionPlansEnabled()) {
             throw new ForbiddenException(ErrorCodes.PURCHASES_PAUSED,
                     "Plan purchases are paused for a short while. Please try again later.");
@@ -93,7 +131,6 @@ public class SubscriptionService {
         Opened opened = transactions.execute(tx -> open(caller, body, key));
 
         if (opened.settled() != null) {
-
             return opened.settled();
         }
 
@@ -102,7 +139,6 @@ public class SubscriptionService {
             order = createOrder(opened);
             return transactions.execute(tx -> attach(opened.subscriptionId(), order));
         } catch (RuntimeException checkoutFailed) {
-
             abandon(opened);
             throw checkoutFailed;
         }
@@ -113,7 +149,12 @@ public class SubscriptionService {
             Optional<Subscription> replay =
                     subscriptions.findByUserIdAndIdempotencyKey(caller.userId(), key);
             if (replay.isPresent()) {
-                return Opened.settled(mapper.toDto(replay.get()));
+                Subscription existing = replay.get();
+                if (SubscriptionStatuses.PENDING.equals(existing.getStatus()) && existing.getPaymentRef() != null) {
+                    String sessionId = gateway.resumeSession(existing.getPaymentRef()).orElse(null);
+                    return Opened.settled(mapper.toDto(existing).withPaymentSessionId(sessionId));
+                }
+                return Opened.settled(mapper.toDto(existing));
             }
         }
 
@@ -122,7 +163,7 @@ public class SubscriptionService {
                 .filter(Plan::isActive)
                 .orElseThrow(() -> NotFoundException.of("Plan"));
         UUID propertyId = Plan.KIND_LISTING_PASS.equals(plan.getKind())
-                ? passes.requireBuyable(caller.userId(), body.propertyId())
+                ? passes.requireBuyable(caller.userId(), body.propertyId(), plan.getDeal())
                 : null;
 
         Instant now = Instant.now();
@@ -130,7 +171,16 @@ public class SubscriptionService {
         boolean free = price <= 0;
 
         if (!free) {
-
+            Instant cutoff = ttl.cutoffFrom(now);
+            List<Subscription> pending = subscriptions.findByUserIdOrderByStartedAtDesc(caller.userId()).stream()
+                    .filter(s -> SubscriptionStatuses.PENDING.equals(s.getStatus()))
+                    .toList();
+            for (Subscription s : pending) {
+                if (s.getCreatedAt() != null && s.getCreatedAt().isBefore(cutoff)) {
+                    s.abandonCheckout();
+                    subscriptions.saveAndFlush(s);
+                }
+            }
             long openUnpaid = subscriptions.countByUserIdAndStatus(
                     caller.userId(), SubscriptionStatuses.PENDING);
             if (openUnpaid >= MAX_OPEN_UNPAID_PER_USER) {
@@ -152,8 +202,6 @@ public class SubscriptionService {
         try {
             saved = subscriptions.saveAndFlush(subscription);
         } catch (DataIntegrityViolationException violation) {
-
-            // Other constraint failures stay generic so only the open-order cap gets this 409.
             if (isOpenUnpaidCollision(violation)) {
                 log.info("Concurrent subscribe lost the open-unpaid race for {}", caller.userId());
                 throw openUnpaidConflict();
@@ -164,15 +212,15 @@ public class SubscriptionService {
             return Opened.settled(mapper.toDto(saved));
         }
 
-        // why here: this is the last transaction that will be open, and the gateway call must not
-        // hold a connection while it waits on the network.
         String phone = users.findById(caller.userId()).map(User::getMobile).orElse(null);
 
-        // Use the saved amount so the gateway order and later ledger report one number.
         return new Opened(null, saved.getId(), saved.getAmount(),
                 "subscription:" + caller.userId() + ":" + plan.getId()
                         + (propertyId == null ? "" : ":" + propertyId),
-                new PaymentGateway.Customer(caller.userId().toString(), phone));
+                new PaymentGateway.Customer(caller.userId().toString(), phone),
+                "/checkout?plan=" + plan.getKind() + ("buy".equals(plan.getDeal()) ? "-buy" : "")
+                        + (propertyId == null ? "" : "&property=" + propertyId)
+                        + "&order_id={order_id}");
     }
 
     private SubscriptionDto attach(UUID subscriptionId, PaymentGateway.PaymentOrder order) {
@@ -190,7 +238,6 @@ public class SubscriptionService {
         return mapper.toDto(saved).withPaymentSessionId(order.paymentSessionId());
     }
 
-    // Compensating write for a gateway that refused the order after the row was committed.
     private void abandon(Opened opened) {
         try {
             transactions.executeWithoutResult(tx -> subscriptions.findById(opened.subscriptionId())
@@ -206,10 +253,9 @@ public class SubscriptionService {
     }
 
     private record Opened(SubscriptionDto settled, UUID subscriptionId, long price,
-            String reference, PaymentGateway.Customer customer) {
-
+            String reference, PaymentGateway.Customer customer, String returnPath) {
         static Opened settled(SubscriptionDto dto) {
-            return new Opened(dto, null, 0, null, null);
+            return new Opened(dto, null, 0, null, null, null);
         }
     }
 
@@ -236,20 +282,21 @@ public class SubscriptionService {
                 && passes.refundIfMismatched(subscription, paidAt, paidAmount, currency)) {
             return true;
         }
-        if (paid && subscription.getPropertyId() != null && passes.isDead(subscription)) {
+        // A paid callback can land after cancel or sweep; the invoice check stops a replay after a
+        // lost dispute from paying out twice.
+        if (paid && passes.isDead(subscription)
+                && !invoices.issued(Invoices.SUBSCRIPTION, subscription.getId())) {
             passes.refund(subscription, paidAt);
             return true;
         }
         if (!paid) {
-            if (subscription.fail()) {
-                log.info("Subscription {} cancelled: payment failed", subscription.getId());
-            }
+            log.info("Payment attempt on subscription {} was not completed; the order stays open for a retry",
+                    subscription.getId());
             return true;
         }
         Optional<Plan> plan = plans.findById(subscription.getPlanId());
         Instant renewal;
         if (plan.isEmpty()) {
-
             log.warn("Plan {} not found while settling subscription {}; granting the default "
                     + "{}-month term instead of the purchased one",
                     subscription.getPlanId(), subscription.getId(), YEARLY);
@@ -290,19 +337,16 @@ public class SubscriptionService {
     }
 
     private ConflictException openUnpaidConflict() {
-        return new ConflictException("You already have a subscription order waiting for payment. "
+        return new ConflictException(ErrorCodes.ORDER_ALREADY_OPEN,
+                "You already have a subscription order waiting for payment. "
                 + "Finish paying for it, or wait for it to expire — an unpaid order is cancelled "
                 + "automatically once its checkout has run out.");
     }
 
-    // Match only the cap index; other insert failures must not masquerade as business rules.
-    // A generic constraint failure is safer than saying the user already has an unpaid order.
     private static boolean isOpenUnpaidCollision(DataIntegrityViolationException violation) {
         return ConstraintViolations.isOn(violation, OPEN_UNPAID_INDEX);
     }
 
-    // Standing may include pending orders; entitlement answers only what is usable now.
-    // Only the retired subscription tiers count: passes and packs are priced by their own readers.
     @Transactional(readOnly = true)
     public Optional<Plan> entitlingPlan(UUID userId) {
         Instant now = Instant.now();
@@ -313,7 +357,6 @@ public class SubscriptionService {
                 .findFirst();
     }
 
-    /** The caller's unexpired listing passes, soonest to lapse first. */
     @Transactional(readOnly = true)
     public List<Subscription> listingPasses(UUID userId) {
         return subscriptions.findEntitlingPasses(userId, SubscriptionStatuses.ENTITLED, Instant.now());
@@ -337,7 +380,7 @@ public class SubscriptionService {
 
     private PaymentGateway.PaymentOrder createOrder(Opened opened) {
         PaymentGateway.PaymentOrder order =
-                gateway.createOrder(opened.price(), opened.reference(), opened.customer());
+                gateway.createOrder(opened.price(), opened.reference(), opened.customer(), opened.returnPath());
         if (order.orderId() == null || order.orderId().isBlank()) {
             throw new IllegalStateException("Payment gateway returned no order id");
         }

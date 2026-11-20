@@ -10,13 +10,26 @@ export const Pill = ({ selected, onClick, children, className = '', dataErr, ari
     {...(role === 'radio' ? { 'aria-checked': !!selected } : { 'aria-pressed': !!selected })}
     aria-label={ariaLabel}
     data-err={dataErr}
-    className={`radio-pill rounded-xl text-sm font-medium cursor-pointer ${selected ? 'selected' : 'text-gray-400'} ${className}`}
+    className={`radio-pill tap-coarse rounded-xl text-sm font-medium cursor-pointer ${selected ? 'selected' : 'text-gray-400'} ${className}`}
   >
     {children}
   </div>
 );
 
 export { default as FieldError } from '../../../components/ui/FieldError.jsx';
+
+export const PillRow = ({ options, value, onChange, label, cols = 'grid-cols-2', fit = false, role = 'button', dataErr, invalid = false }) => (
+  <div
+    role={role === 'radio' ? 'radiogroup' : 'group'}
+    aria-label={label}
+    data-err={dataErr}
+    className={`${fit ? 'flex' : `grid ${cols}`} gap-2 ${invalid ? 'dz-invalid-group' : ''}`}
+  >
+    {options.map(([v, l]) => (
+      <Pill key={v} role={role} selected={value === v} onClick={() => onChange(v)} className={`min-h-[var(--btn-h)] px-2 py-1.5 inline-flex items-center justify-center text-center leading-tight ${fit ? 'grow whitespace-nowrap' : ''}`}>{l}</Pill>
+    ))}
+  </div>
+);
 
 export const Toggle = ({ on, onClick, ariaLabel }) => (
   <div

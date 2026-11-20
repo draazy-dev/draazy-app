@@ -1,0 +1,35 @@
+REEL 04 / SET IMAGE (0 credits)
+==========================
+JOB ID ............. r04-set
+WHY ................ every clip of the reel attaches this image so the place is the same in every clip (rule R1)
+FLOW SETTINGS
+  Type ............. Image
+  Model ............ Nano Banana 2 Lite
+  Aspect ratio ..... 9:16 portrait
+  Outputs .......... 2
+  Cost shown ....... 0 credits (anything else: stop and ask the user)
+INGREDIENTS ........ none (no character chips: the set must be empty)
+AFTER .............. the user picks one; rename it r04-set (or note its title in the ledger)
+
+PROMPT START
+Vertical 9:16 photorealistic photo, the view from a phone propped on the table, with two empty chairs on the far
+side of the table: a small café on FC Road, Pune, on a sunny afternoon. A light wooden table in the foreground
+with two white ceramic coffee cups. On the left side of the frame, a large glass window onto a tree-lined street
+with soft sunlight and blurred passers-by. On the right side of the frame, an exposed red-brick wall with a
+hanging green plant. A warm pendant lamp at the top of the frame. No menu boards, no signs, nothing readable
+anywhere. There are no people in the photo. Natural, slightly imperfect phone-camera look, true colours,
+everything in sharp focus.
+
+Lighting and colour: warm afternoon sunlight through the window on the left, soft fill from the brick wall, true
+warm colours.
+
+No text, no signs, no logos, no watermark.
+PROMPT END
+
+CHECK BEFORE THE USER PICKS
+  [ ] wooden table + two white cups in the foreground
+  [ ] big street window on the LEFT
+  [ ] red-brick wall + hanging plant on the RIGHT
+  [ ] pendant lamp at the top
+  [ ] Ishaan left, Sana right
+  [ ] empty of people, nothing readable; room left in the centre for the character(s)

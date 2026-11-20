@@ -25,7 +25,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ConversationMapper {
-
     private final ConversationMessageRepository messages;
     private final UserRepository users;
     private final PropertyRepository properties;
@@ -76,8 +75,6 @@ public class ConversationMapper {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toCollection(HashSet::new));
 
-        // The thread's authors as well as the counterparties: a message needs a display name, and
-        // on the detail read that includes the reader themselves.
         threads.values().forEach(thread ->
                 thread.forEach(m -> counterparties.add(m.getAuthorId())));
         counterparties.add(readerId);
@@ -111,16 +108,17 @@ public class ConversationMapper {
                     boolean available = listing != null && listing.isDirectlyReachable();
                     UUID latestAuthor = latestAuthors.get(c.getId());
                     ContactVisibility visibility = visibilityFor(readerId, other, listing, approved);
-                    // Number and presence serve the open thread's header, not a hundred inbox rows.
                     boolean detail = threads.containsKey(c.getId());
                     return new ConversationDto(
                             c.getId().toString(),
                             c.isGroup() ? ConversationDto.GROUP : ConversationDto.DIRECT,
+                            other == null ? null : other.getId().toString(),
                             other == null ? null : other.getName(),
                             other == null ? null : other.getRole(),
                             other == null || !detail ? null : MobileMask.applyTo(other.getMobile(), visibility),
                             youAre(readerId, c, listing),
                             c.getPropertyId() == null ? null : c.getPropertyId().toString(),
+                            listing == null ? null : listing.getSlug(),
                             listing == null ? null : listing.getTitle(),
                             available ? listing.getPrice() : null,
                             available ? listing.getDeal() : null,
@@ -128,15 +126,20 @@ public class ConversationMapper {
                             available ? listing.getLocality() : null,
                             available ? cover(listing) : null,
                             available,
+                            listing != null && listing.isDeletedByOwner(),
                             c.isGroup() ? c.getFlatmateGroupId().toString() : null,
                             group == null ? null : group.title(),
                             group == null ? null : group.memberCount(),
+                            c.getFlatmateKind(),
+                            c.getFlatmateTargetId() == null ? null : c.getFlatmateTargetId().toString(),
                             lastMessage(c.getLastMessage(), latestAuthor, readerId, visibility),
                             unread.getOrDefault(c.getId(), 0L),
                             c.getUpdatedAt(),
                             mine.archived(),
                             mine.muted(),
                             other != null && blocks.byReader().contains(other.getId()),
+                            other != null && blocks.eitherWay().contains(other.getId())
+                                    && !blocks.byReader().contains(other.getId()),
                             latestAuthor != null && !readerId.equals(latestAuthor),
                             detail ? presence(c, reader, other, other != null && blocks.eitherWay().contains(other.getId())) : null,
                             detail

@@ -5,50 +5,50 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { useFormDraft } from '../../../lib/hooks';
 import { parseAmount } from '../../../lib/format';
-import { myListing, checkOwnDuplicate } from '../../../services/propertyService.js';
+import { myListing, checkOwnDuplicate, confirmOwnerListing } from '../../../services/propertyService.js';
+import { getOwnerListingState } from '../../../components/listing/ListingStatusCard.jsx';
 import { ADDRESS_PARTS, hasStoredAddress } from '../../../lib/listingFormDetails.js';
 import { createRoom, updateRoom } from '../../../services/flatmateService.js';
 import { canSplitIntoRooms } from '../../../lib/data/flatSplit.js';
 import { loadWizardQuota } from '../../../lib/data/listingQuota.js';
-import { formatIndian } from './format.js';
+import { formatMoneyInput } from './format.js';
+import { toMoney, roundMoney } from './sanitize.js';
 import { haptic } from '../../../lib/haptics.js';
+import { SESSION_ENDED_EVENT } from '../../../services/http.js';
 import {
   isResidentialType, isLandType, isCommercialType, isHouseType, COMMERCIAL_SPEC_KEYS,
   leaseKindOf, LEASE_DEFAULTS, defaultAreaUnitFor, FLOOR_PLAN_CATEGORY, photoCategoriesFor,
   homeTypeLabelFor, withInFlatAsFurniture,
 } from './constants.js';
-import { initialForm } from './initialForm.js';
+import { initialForm, newListingForm, NEW_LISTING_DEFAULTS } from './initialForm.js';
 import { classifyChanges } from './editPolicy.js';
-import { scrollToError, validateStep1, validateLocationStep, validatePricingStep, validateStep3, validateFlatmateStep1, validateFlatmateLocation, validateFlatmatePrice } from './validation.js';
+import { scrollToError, validateStep1, validateLocationStep, validatePricingStep, validateStep3, validateFlatmateRoom, validateFlatmateLocation, validateFlatmatePricing } from './validation.js';
 import { triggerConfetti } from './confetti.js';
 import { listingLabels, persistListing, roomHeadline } from './submit.js';
-import { hasContactDetails } from './contactDetails.js';
 import { headlineOf } from '../../../lib/headline.js';
 import { hasAgreementEvidence, numeric, terms } from '../flatmates/helpers.js';
 import { computeProgress } from './progress.js';
 import useListingMedia from './useListingMedia';
 import useListingLocation from './useListingLocation';
-import useRoomEdit from './useRoomEdit';
+import useRoomEdit, { useHomePrefill } from './useRoomEdit';
 import { LISTING_STEPS } from './StepNav.jsx';
 import { track } from '../../../lib/pmf.js';
+import { DRAFT_OWNER_KEY, adoptSharedDraft, draftKeyFor } from './draftSlots.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const LIST_PROPERTY_DRAFT_PREFIX = 'dzDraft:list-property';
 const LEGACY_LIST_PROPERTY_DRAFT_KEY = `${LIST_PROPERTY_DRAFT_PREFIX}:v2`;
 const DRAFT_STEP_KEY = '__currentStep';
 const DRAFT_PHOTOS_KEY = '__photos';
-const DRAFT_OWNER_KEY = '__owner';
 const DRAFT_RENT_MODE_KEY = '__rentMode';
-const LIST_PROPERTY_DRAFT_KEY = `${LIST_PROPERTY_DRAFT_PREFIX}:v3`;
-const dealPreset = (searchParams, flatmateMode, editId) => {
-  if (editId) return '';
+const dealPreset = (searchParams, flatmateMode) => {
   const deal = searchParams.get('deal');
   if (deal === 'buy' || deal === 'rent') return deal;
-  return flatmateMode ? 'rent' : '';
+  return flatmateMode ? 'rent' : NEW_LISTING_DEFAULTS.deal;
 };
-const initialForEntry = (searchParams, flatmateMode, editId) => ({
-  ...initialForm,
-  deal: dealPreset(searchParams, flatmateMode, editId),
-});
+const initialForEntry = (searchParams, flatmateMode, editId) => (editId
+  ? { ...initialForm }
+  : { ...newListingForm, deal: dealPreset(searchParams, flatmateMode) });
 const bathroomsForBhk = (bhk) => {
   const n = Number(bhk);
   if (!Number.isFinite(n) || n <= 1) return '1';
@@ -94,6 +94,7 @@ export default function useListProperty() {
   const editId = searchParams.get('edit');
   const flatmateMode = searchParams.get('flatmate') === '1';
   const editRoomId = flatmateMode && !editId ? searchParams.get('editRoom') : null;
+  const homeId = !flatmateMode && !editId ? searchParams.get('home') : null;
   const rawStepParam = searchParams.get('step');
   const entryStep = parseStep(rawStepParam);
   const editEntryStep = useRef(entryStep);
@@ -102,6 +103,7 @@ export default function useListProperty() {
   const [rentMode, setRentMode] = useState(() => (flatmateMode && !editId ? 'flatmate' : 'whole'));
   const [showSuccess, setShowSuccess] = useState(false);
   const [postedListing, setPostedListing] = useState(null);
+  const [postedRoom, setPostedRoom] = useState(null);
   const [savedListingStatus, setSavedListingStatus] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [errors, setErrors] = useState({});
@@ -111,7 +113,6 @@ export default function useListProperty() {
   const [showDupGuard, setShowDupGuard] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
-  // Prevent another submit while the network write is pending.
   const [posting, setPosting] = useState(false);
   const [dupExistingId, setDupExistingId] = useState('');
   const [dupPending, setDupPending] = useState(false);
@@ -119,22 +120,9 @@ export default function useListProperty() {
   const stepRef = useRef(1);
   const [quota, setQuota] = useState({ used: 0, allowance: null });
   const [passListingId, setPassListingId] = useState('');
-  useEffect(() => {
-    if (editId || editRoomId || authLoading) return undefined;
-    if (!user) {
-      setQuota({ used: 0, allowance: null });
-      return undefined;
-    }
-    let live = true;
-    loadWizardQuota().then((q) => {
-      if (!live) return;
-      setQuota(q);
-    });
-    return () => { live = false; };
-  }, [editId, editRoomId, authLoading, user]);
 
   const [form, setForm] = useState(() => initialForEntry(searchParams, flatmateMode, editId));
-  // Async geocodes must read the latest form rather than an older render closure.
+  const entryForm = useRef(form);
   const formRef = useRef(form);
   const skipLeaveGuard = useRef(false);
   const pendingLeave = useRef(null);
@@ -143,12 +131,15 @@ export default function useListProperty() {
 
   const ownerMobile = user?.mobile || '';
   const media = useListingMedia({ setErrors });
-  const { photos, setPhotos } = media;
+  const { photos, setPhotos, restorePhotos } = media;
   const ownerId = ownerDraftId(user);
-  const initialOwnerId = useRef(ownerId);
   const previousOwnerId = useRef(ownerId);
+  const expiredOwnerId = useRef('');
+  const draftable = !editId && !editRoomId && !homeId;
+  const [draftOwner, setDraftOwner] = useState(() => { if (draftable) adoptSharedDraft(ownerId); return ownerId; });
+  const keepWorkOnRestore = useRef(false);
   const signedIn = !!ownerId;
-  const draftEnabled = !editId && !editRoomId && !authLoading;
+  const draftEnabled = draftable && !authLoading;
   const writeStepParam = useCallback((step, { replace = false, pushedFrom } = {}) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -188,7 +179,8 @@ export default function useListProperty() {
       setForm((previous) => ({
         ...previous,
         bhk: value,
-        bathrooms: previous.bathrooms || bathroomsForBhk(value),
+        bathrooms: previous.bathrooms && previous.bathrooms !== bathroomsForBhk(previous.bhk)
+          ? previous.bathrooms : bathroomsForBhk(value),
       }));
       if (errors.bhk || errors.bathrooms) {
         setErrors((previous) => {
@@ -200,6 +192,7 @@ export default function useListProperty() {
       }
       return;
     }
+    if (field === 'totalFloors' && errors.floor === 'aboveTotal') setErrors(({ floor: _floor, ...rest }) => rest);
     set(field, value);
   };
 
@@ -210,53 +203,75 @@ export default function useListProperty() {
     return legacyView ? { ...restored, facing: '', overlooking: restored.overlooking || legacyView } : restored;
   }), []);
   const restoreDraftExtras = useCallback((saved) => {
+    if (keepWorkOnRestore.current) {
+      keepWorkOnRestore.current = false;
+      return null;
+    }
     const savedFields = { ...saved };
     delete savedFields.__documents;
     const {
       [DRAFT_STEP_KEY]: savedStep, [DRAFT_PHOTOS_KEY]: savedPhotos, [DRAFT_OWNER_KEY]: savedOwner,
       [DRAFT_RENT_MODE_KEY]: savedRentMode, ...fields
     } = savedFields;
-    if (!savedOwner && ownerId && initialOwnerId.current !== '') return null;
     if (savedOwner && savedOwner !== ownerId) return null;
     const restoredPhotos = durablePhotos(savedPhotos);
-    if (restoredPhotos.length) setPhotos(restoredPhotos);
+    if (restoredPhotos.length) restorePhotos(restoredPhotos);
     const roomDraft = !editId && (flatmateMode || savedRentMode === 'flatmate');
     if (roomDraft) setRentMode('flatmate');
     const step = Math.min(parseStep(savedStep), LISTING_STEPS.length);
     if (step > 1) writeStepParam(step, { replace: true });
-    return fields.locality && !fields.localitySlug ? { ...fields, locality: '', localitySlug: '' } : fields;
-  }, [editId, flatmateMode, ownerId, setPhotos, writeStepParam]);
+    const roomFields = roomDraft ? { ...fields, deal: 'rent' } : fields;
+    return roomFields.locality && !roomFields.localitySlug ? { ...roomFields, locality: '', localitySlug: '' } : roomFields;
+  }, [editId, flatmateMode, ownerId, restorePhotos, writeStepParam]);
   const draftForm = useMemo(() => ({
     ...form,
     [DRAFT_STEP_KEY]: currentStep,
     [DRAFT_PHOTOS_KEY]: durablePhotos(photos),
-    [DRAFT_OWNER_KEY]: ownerId,
+    [DRAFT_OWNER_KEY]: draftOwner,
     [DRAFT_RENT_MODE_KEY]: rentMode,
-  }), [currentStep, form, ownerId, photos, rentMode]);
+  }), [currentStep, draftOwner, form, photos, rentMode]);
   useEffect(() => {
     if (editId) return;
     try { localStorage.removeItem(LEGACY_LIST_PROPERTY_DRAFT_KEY); } catch {}
   }, [editId]);
-  const { clear: clearFormDraft, discard: discardFormDraft, flush: flushFormDraft, startFresh } = useFormDraft(LIST_PROPERTY_DRAFT_KEY, draftForm, restoreDraft, {
+  const { clear: clearFormDraft, flush: flushFormDraft, startFresh } = useFormDraft(draftKeyFor(draftOwner), draftForm, restoreDraft, {
     enabled: draftEnabled,
-    omit: ['agreementDeclared', 'agreementDoc', 'hostRole', 'ownerConsentMobile', 'ownerConsent'],
+    omit: ['agreementDeclared', 'agreementDoc', 'hostRole', 'ownerConsentMobile', 'ownerConsent', 'attachedPropertyId'],
     onRestore: restoreDraftExtras,
   });
+  useEffect(() => {
+    const onEnded = () => { expiredOwnerId.current = previousOwnerId.current; };
+    window.addEventListener(SESSION_ENDED_EVENT, onEnded);
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, onEnded);
+  }, []);
   useLayoutEffect(() => {
     const previous = previousOwnerId.current;
     if (previous === ownerId) return;
     previousOwnerId.current = ownerId;
-    if (!previous) return;
+    const expired = expiredOwnerId.current;
+    if (ownerId) expiredOwnerId.current = '';
+    if (expired && (!ownerId || ownerId === expired)) return;
+    if (!previous && !expired) {
+      const working = form !== entryForm.current || photos.length > 0;
+      if (draftable) adoptSharedDraft(ownerId, { guestWork: working });
+      keepWorkOnRestore.current = working;
+      setDraftOwner(ownerId);
+      return;
+    }
+    flushFormDraft();
+    keepWorkOnRestore.current = false;
+    setDraftOwner(ownerId);
     dupSeq.current += 1;
-    discardFormDraft();
     media.resetMedia();
     const fresh = initialForEntry(searchParams, flatmateMode, editId);
     setForm(fresh);
     formRef.current = fresh;
+    entryForm.current = fresh;
     setCurrentStep(1);
     setRentMode(flatmateMode && !editId ? 'flatmate' : 'whole');
     setShowSuccess(false);
     setPostedListing(null);
+    setPostedRoom(null);
     setPassListingId('');
     setSavedListingStatus('');
     setShowResetConfirm(false);
@@ -270,7 +285,7 @@ export default function useListProperty() {
     setDupPending(false);
     setQuota({ used: 0, allowance: null });
     writeStepParam(1, { replace: true });
-  }, [discardFormDraft, editId, flatmateMode, media, ownerId, writeStepParam]);
+  }, [draftable, editId, flatmateMode, flushFormDraft, form, media, ownerId, photos.length, writeStepParam]);
   const [draftHydrated, setDraftHydrated] = useState(false);
   useEffect(() => { if (draftEnabled) setDraftHydrated(true); }, [draftEnabled]);
   const requestAuthPrompt = useCallback(() => {
@@ -289,29 +304,44 @@ export default function useListProperty() {
 
   const isFlatmateMode = !editId && form.deal === 'rent' && rentMode === 'flatmate';
 
+  const quotaUser = useRef(null);
+  useEffect(() => {
+    if (editId || editRoomId) quotaUser.current = null;
+    if (editId || editRoomId || authLoading) return undefined;
+    if (!user) {
+      quotaUser.current = null;
+      setQuota({ used: 0, allowance: null });
+      return undefined;
+    }
+    // Rooms never show or use the quota; a mode toggle reuses the one already read for this user.
+    if (isFlatmateMode || quotaUser.current === user) return undefined;
+    quotaUser.current = user;
+    loadWizardQuota().then((q) => {
+      if (quotaUser.current === user) setQuota(q);
+    });
+    return undefined;
+  }, [editId, editRoomId, authLoading, user, isFlatmateMode]);
+
   const progressState = useMemo(
     () => computeProgress({ form, photos, isFlatmateMode }),
     [form, photos, isFlatmateMode],
   );
 
   useEffect(() => {
-    // Entry intent wins over a draft, but never over an existing listing. The home type is reset
-    // with the property type because they are one answer.
     if (flatmateMode && !editId) {
       setForm((f) => ({ ...f, deal: 'rent', propertyType: 'flat', homeTypeLabel: homeTypeLabelFor('flat'), hostRole: 'tenant' }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- flatmate mode.
   }, []);
 
-  // Readiness belongs to a listing AND owner, never merely to the last completed request.
   const [editListing, setEditListing] = useState(null);
   const [editLoad, setEditLoad] = useState(null);
   const [editAttempt, setEditAttempt] = useState(0);
   const editKey = JSON.stringify([editId, ownerId, ownerMobile]);
   const editRequest = useRef(null);
   const roomEdit = useRoomEdit({ roomId: editRoomId, canLoad: !authLoading, setForm, setPhotos });
+  useHomePrefill({ homeId, canLoad: !authLoading && signedIn, setForm });
   const roomBaseline = editRoomId ? roomEdit.baseline : undefined;
-  // A room PATCH leaves the binding alone unless it changed, so a room on an archived society can still be saved.
   const roomSocietyField = !editRoomId ? { societyId: form.societyId || '' }
     : form.societyId === (roomBaseline?.societyId || '') ? {}
       : form.societyId ? { societyId: form.societyId } : { clearSociety: true };
@@ -323,7 +353,7 @@ export default function useListProperty() {
   const leaveGuardActive = useMemo(() => {
     if (showSuccess || skipLeaveGuard.current) return false;
     const baseline = editRoomId ? roomEdit.baseline || initialForm
-      : editId && editListing?.form ? editListing.form : initialForm;
+      : editId ? editListing?.form || initialForm : entryForm.current;
     const savedPhotoUrls = editRoomId ? roomEdit.photoUrls
       : editId ? (editListing?.images || editListing?.gallery || []).filter(Boolean) : [];
     const photoUrls = durablePhotos(photos).map((photo) => photo.url);
@@ -413,8 +443,6 @@ export default function useListProperty() {
         const loaded = withInFlatAsFurniture({
           ...initialForm,
           ...listing.form,
-          /* Listings posted against the old boolean carry `naSanctioned`; without this the owner opens the edit on an
-             unanswered picker and re-saving would erase their own answer. */
           naStatus: listing.form.naStatus || (listing.form.naSanctioned ? 'sanctioned' : ''),
           pinPlaced: placed,
           ...(placed ? {} : { propLat: initialForm.propLat, propLng: initialForm.propLng }),
@@ -425,8 +453,6 @@ export default function useListProperty() {
         const imgs = (listing.images || listing.gallery || []).filter(Boolean);
         setForm(snapshot);
         setEditListing({ ...listing, form: snapshot });
-        /* Categories are not stored, so photos come back as 'Other' — except the tagged plan, which `submit.js`
-           reads: without restoring it, any save at all would withdraw the owner's floor plan unasked. */
         setPhotos(imgs.map((url) => ({
           url,
           category: url === listing.floorPlan ? FLOOR_PLAN_CATEGORY : 'Other',
@@ -446,6 +472,8 @@ export default function useListProperty() {
     return classifyChanges(editListing.form, form,
       (editListing.images || editListing.gallery || []).filter(Boolean), photos.map((p) => p.url).filter(Boolean));
   }, [editId, editReady, editListing, form, photos]);
+  const claimMode = !!editListing && getOwnerListingState(editListing) === 'confirm';
+  const baseline = claimMode ? null : editListing;
 
   useEffect(() => {
     if (showSuccess) window.scrollTo({ top: 0, behavior: 'auto' });
@@ -470,7 +498,6 @@ export default function useListProperty() {
     });
   }, []);
 
-  // Prevent another property's type-specific answers from silently being saved.
   const TYPE_SPECIFIC_KEYS = [
     'commercialType',
     'washrooms', 'shellType', 'parkingSpaces', 'powerBackup', 'pantry', 'camCharges', 'suitableFor', 'fixtures',
@@ -479,21 +506,16 @@ export default function useListProperty() {
     'areaUnit', 'plotLength', 'plotWidth', 'openSides', 'roadWidth', 'cornerPlot', 'boundaryWall',
     'plotZone', 'plottedProject', 'naStatus', 'waterSource', 'electricity', 'roadAccess', 'otherRights', 'buyerEligibility',
     'plotArea', 'floorsInHouse', 'furniture', 'monthlyRent',
-    // Commercial never asks for it, so a residential answer left behind would publish unseen.
     'age',
   ];
   const changePropertyType = useCallback((v) => {
     setForm((prev) => {
       const next = { ...prev, propertyType: v };
       TYPE_SPECIFIC_KEYS.forEach((k) => { next[k] = initialForm[k]; });
-      /* Not a TYPE_SPECIFIC_KEY, because those reset to `initialForm` and every type would come
-       * back "Flat". */
       next.homeTypeLabel = homeTypeLabelFor(v) || prev.homeTypeLabel;
       next.areaUnit = defaultAreaUnitFor(v);
       const kind = leaseKindOf(v);
       if (leaseKindOf(prev.propertyType) !== kind) Object.assign(next, LEASE_DEFAULTS[kind]);
-      /* The land form renders neither control, and the stale possession is worse than cosmetic: an "under
-         construction" left behind is what the validator's land exclusion exists to survive. */
       return isLandType(v) ? { ...next, overlooking: '', construction: '' } : next;
     });
     if (!photoCategoriesFor(v, '').includes(FLOOR_PLAN_CATEGORY)) {
@@ -510,8 +532,6 @@ export default function useListProperty() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- type changes.
   }, [form.deal]);
 
-  /* The subtype picks a use-profile, which decides which fixtures, amenities, specs and photo categories exist at all
-     — Office to Warehouse otherwise keeps a Server Room the warehouse form cannot unpick. */
   const changeCommercialType = useCallback((v) => {
     setForm((prev) => ({
       ...prev,
@@ -522,8 +542,6 @@ export default function useListProperty() {
       pantry: false,
       ...Object.fromEntries(COMMERCIAL_SPEC_KEYS.map((k) => [k, initialForm[k]])),
     }));
-    /* Floor Plan is exempt: it carries a claim, and dropping it would quietly unpublish the
-     * plan. */
     setPhotos((prev) => prev.map((p) => (
       p.category && p.category !== FLOOR_PLAN_CATEGORY ? { ...p, category: 'Other' } : p
     )));
@@ -542,8 +560,9 @@ export default function useListProperty() {
   const isHouse = () => isHouseType(form.propertyType);
 
   const money = (field) => ({
-    value: formatIndian(form[field]),
-    onChange: (e) => set(field, e.target.value.replace(/\D/g, '')),
+    value: formatMoneyInput(form[field]),
+    onChange: (e) => set(field, toMoney(e.target.value)),
+    onBlur: (e) => set(field, roundMoney(toMoney(e.target.value))),
   });
   const setDepositMonths = (months) => {
     const rent = parseAmount(form.monthlyRent);
@@ -552,60 +571,63 @@ export default function useListProperty() {
 
   const lastStep = LISTING_STEPS.length;
   const maxReachableStep = useCallback(() => {
-    const original = editListing?.form;
-    const first = isFlatmateMode ? validateFlatmateStep1(form) : validateStep1(form, original);
-    if (Object.keys(first).length) return 1;
-    const locationErrors = isFlatmateMode ? validateFlatmateLocation(form, roomBaseline) : validateLocationStep(form, original);
+    const original = baseline?.form;
+    if (isFlatmateMode) {
+      if (Object.keys(validateFlatmateRoom(form, roomBaseline)).length) return 1;
+      const locationErrors = validateFlatmateLocation(form, roomBaseline);
+      if (!editId && !locationSet && !editListing) locationErrors.location = true;
+      if (Object.keys(locationErrors).length) return 2;
+      return Object.keys(validateFlatmatePricing(form, roomBaseline)).length ? 3 : lastStep;
+    }
+    if (Object.keys(validateStep1(form, original)).length) return 1;
+    const locationErrors = validateLocationStep(form, original);
     if (!editId && !locationSet && !editListing) locationErrors.location = true;
     if (Object.keys(locationErrors).length) return 2;
-    const priceErrors = isFlatmateMode ? validateFlatmatePrice(form) : validatePricingStep(form, original);
-    return Object.keys(priceErrors).length ? 3 : lastStep;
-  }, [editId, editListing, form, isFlatmateMode, lastStep, locationSet, roomBaseline]);
+    return Object.keys(validatePricingStep(form, original)).length ? 3 : lastStep;
+  }, [baseline, editId, editListing, form, isFlatmateMode, lastStep, locationSet, roomBaseline]);
   const goToStep = useCallback((step, { replace = false } = {}) => {
     if (!editReady) return;
     dupSeq.current += 1;
     const next = Math.max(1, Math.min(Number(step) || 1, maxReachableStep(), lastStep));
     setCurrentStep(next);
     writeStepParam(next, { replace, pushedFrom: replace ? undefined : currentStep });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentStep, editReady, lastStep, maxReachableStep, writeStepParam]);
   useEffect(() => {
     if (!editReady || (draftEnabled && !draftHydrated)) return;
     const requested = Math.min(entryStep, lastStep);
     const clamped = Math.min(requested, maxReachableStep());
-    setCurrentStep((current) => {
-      if (current !== clamped) window.scrollTo({ top: 0, behavior: 'auto' });
-      return clamped;
-    });
+    setCurrentStep(clamped);
     if (requested !== clamped || (clamped === 1 && rawStepParam)) writeStepParam(clamped, { replace: true });
   }, [draftEnabled, draftHydrated, editReady, entryStep, lastStep, maxReachableStep, rawStepParam, writeStepParam]);
+  useLayoutEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [currentStep]);
+  useEffect(() => {
+    const previous = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    return () => { window.history.scrollRestoration = previous; };
+  }, []);
   useEffect(() => { stepRef.current = currentStep; }, [currentStep]);
   useEffect(() => () => { dupSeq.current += 1; }, []);
   const nextStep = () => {
     if (!editReady) return;
     const err = isFlatmateMode
-      ? (currentStep === 1 ? validateFlatmateStep1(form)
+      ? (currentStep === 1 ? validateFlatmateRoom(form, roomBaseline)
         : currentStep === 2 ? validateFlatmateLocation(form, roomBaseline)
-          : currentStep === 3 ? validateFlatmatePrice(form) : {})
-      : (currentStep === 1 ? validateStep1(form, editListing?.form)
-        : currentStep === 2 ? validateLocationStep(form, editListing?.form)
-          : currentStep === 3 ? validatePricingStep(form, editListing?.form) : {});
-    /* An edit is exempt: a listing published before the pin existed would otherwise be barred
-     * from its own price correction. */
+          : currentStep === 3 ? validateFlatmatePricing(form, roomBaseline) : {})
+      : (currentStep === 1 ? validateStep1(form, baseline?.form)
+        : currentStep === 2 ? validateLocationStep(form, baseline?.form)
+          : currentStep === 3 ? validatePricingStep(form, baseline?.form) : {});
     if (currentStep === 2 && !locationSet && !editListing) err.location = true;
     if (Object.keys(err).length) { setErrors(err); scrollToError(err); return; }
     setErrors({});
     const advance = () => {
       if (currentStep < lastStep) {
         goToStep(currentStep + 1);
-        // A validation failure must not produce the successful-advance haptic.
         haptic('step');
       }
     };
-    if (currentStep === 3 && !signedIn) {
-      const authStep = Math.min(currentStep + 1, lastStep);
-      setCurrentStep(authStep);
-      writeStepParam(authStep, { replace: false, pushedFrom: currentStep });
+    if (currentStep === lastStep - 1 && !signedIn) {
+      setCurrentStep(lastStep);
+      writeStepParam(lastStep, { replace: false, pushedFrom: currentStep });
       requestAuthPrompt();
       return;
     }
@@ -620,7 +642,10 @@ export default function useListProperty() {
           if (!mine.found) { advance(); return; }
           setDupExistingId(mine.existingId || '');
           setShowDupGuard(true);
-        }, () => { if (stillHere()) advance(); })
+        }, (error) => {
+          if (!stillHere()) return;
+          if (error?.status === 401) requestAuthPrompt(); else advance();
+        })
         .catch(() => {})
         .finally(() => setDupPending(false));
       return;
@@ -634,7 +659,6 @@ export default function useListProperty() {
     else goToStep(currentStep - 1, { replace: true });
   };
 
-  // Resetting an edit restores the server snapshot without touching a separate new-post draft.
   const openResetConfirm = () => { if (editReady) setShowResetConfirm(true); };
   const confirmReset = () => {
     if (!editReady || posting) return;
@@ -644,15 +668,13 @@ export default function useListProperty() {
   };
 
   const finalizeListing = async () => {
-    // Never PATCH unhydrated defaults over the owner's saved listing.
     if (!editReady) {
       toast(t('listProperty.editLoadFailed', 'We could not load that listing. Reload the page and try again.'), 'error');
       return;
     }
     const request = editRequest.current;
-    const res = await persistListing({ form, user, editId, editListing, photos });
+    const res = await persistListing({ form, user, editId, editListing, photos, homeId });
     if (editId && request !== editRequest.current) return;
-    // Same owner already has this exact property live → stop and point them to it.
     if (res && res.ok === false && res.blocked) {
       setDupExistingId(res.existingId || '');
       setShowDupGuard(true);
@@ -660,6 +682,7 @@ export default function useListProperty() {
       return;
     }
     if (res && res.ok === false) {
+      if (res.unauthenticated) { requestAuthPrompt(); return; }
       if (res.fieldErrors && Object.keys(res.fieldErrors).length) {
         const fieldErrors = res.fieldErrors;
         const step = Math.max(1, Math.min(res.fieldErrorStep || currentStep, lastStep));
@@ -678,9 +701,20 @@ export default function useListProperty() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    if (claimMode) {
+      try {
+        await confirmOwnerListing(editId);
+      } catch (error) {
+        toast(userMessage(error, t('listProperty.claim.confirmFailed')), 'error');
+        return;
+      }
+      skipLeaveGuard.current = true;
+      toast(t('listProperty.claim.confirmed'), 'success');
+      navigate('/dashboard#listings');
+      return;
+    }
     if (!editId) clearFormDraft();
     if (!editId) track('listing_submitted', { deal: res?.listing?.deal, type: res?.listing?.type });
-    // Refresh owner eligibility and quota after consuming a new-post allowance.
     if (!editId) refreshUser();
     skipLeaveGuard.current = true;
     triggerConfetti();
@@ -694,14 +728,14 @@ export default function useListProperty() {
   const submitProperty = () => {
     if (!editReady || posting || media.isMediaProcessing()) return;
     if (!signedIn) { requestAuthPrompt(); return; }
-    const step1Errors = editId ? validateStep1(form, editListing.form) : {};
-    const locationErrors = editId ? validateLocationStep(form, editListing.form) : {};
-    const pricingErrors = editId ? validatePricingStep(form, editListing.form) : {};
+    const step1Errors = editId ? validateStep1(form, baseline?.form) : {};
+    const locationErrors = editId ? validateLocationStep(form, baseline?.form) : {};
+    const pricingErrors = editId ? validatePricingStep(form, baseline?.form) : {};
     const err = {
       ...step1Errors,
       ...locationErrors,
       ...pricingErrors,
-      ...validateStep3(form, photos, editId ? editListing : null, media.maxPhotos),
+      ...validateStep3(form, photos, baseline, media.maxPhotos),
     };
     if (Object.keys(err).length) {
       const failStep = Object.keys(step1Errors).length ? 1
@@ -718,29 +752,31 @@ export default function useListProperty() {
 
     setPosting(true);
     finalizeListing()
-      .catch(() => toast('Could not post your listing. Please try again.', 'error'))
+      .catch((error) => {
+        if (error?.status === 401) requestAuthPrompt();
+        else toast('Could not post your listing. Please try again.', 'error');
+      })
       .finally(() => setPosting(false));
   };
 
   const submitFlatmate = async () => {
     if (!editReady || editId || posting || media.isMediaProcessing()) return;
-    const err = {};
-    if (!form.bhk) err.bhk = true;
-    if (!form.roomType) err.roomType = true;
-    if (form.hostRole === 'tenant') {
-      if (!form.agreementDeclared) err.agreementDeclared = true;
-      if (!hasAgreementEvidence(form.agreementDoc)) err.agreementDoc = true;
-      if (!form.ownerConsent) err.ownerConsent = true;
-    }
-    if (!form.locality || (!form.localitySlug && !editRoomId)) err.locality = true;
-    if (!form.societyId && !form.societyNotOnMaps && !(editRoomId && !roomEdit.baseline?.societyId)) err.society = true;
-    if (!form.pinPlaced) err.location = true;
-    if (!(Number(form.rentShare) > 0)) err.rentShare = true;
-    if (!form.availableFrom) err.availableFrom = true;
-    if (photos.length > media.maxPhotos) err.photos = 'max';
-    if (hasContactDetails(form.title)) err.title = true;
-    if (Object.keys(err).length) { setErrors(err); scrollToError(err); return; }
     if (!signedIn) { requestAuthPrompt(); return; }
+    const stepErrors = [
+      validateFlatmateRoom(form, roomBaseline),
+      validateFlatmateLocation(form, roomBaseline),
+      validateFlatmatePricing(form, roomBaseline),
+      validateStep3(form, photos, roomBaseline && { form: roomBaseline, images: roomEdit.photoUrls }, media.maxPhotos),
+    ];
+    const err = Object.assign({}, ...stepErrors);
+    if (photos.some((photo) => !photo.url)) err.photos = 'failed';
+    if (Object.keys(err).length) {
+      const failStep = stepErrors.findIndex((stepErr) => Object.keys(stepErr).length) + 1 || currentStep;
+      if (failStep !== currentStep) { setCurrentStep(failStep); writeStepParam(failStep, { replace: true }); }
+      setErrors(err);
+      scrollToError(err);
+      return;
+    }
     setPosting(true);
     try {
       const agreementDoc = form.hostRole === 'tenant' && form.agreementDeclared ? form.agreementDoc : null;
@@ -763,17 +799,19 @@ export default function useListProperty() {
         availableFrom: form.availableFrom,
         lookingFor: form.lookingFor,
         foodPref: form.foodPref,
-        lifestyle: form.lifestyle,
         hostRole: form.hostRole,
         agreementDeclared: !!form.agreementDeclared && hasAgreementEvidence(agreementDoc),
         agreementDoc,
         ownerConsentMobile: form.ownerConsentMobile,
         ownerConsent: form.hostRole === 'tenant' && !!form.ownerConsent,
+        propertyId: form.attachedPropertyId || undefined,
         photos: photos.map((photo) => photo.url),
         note: form.note,
         lat: form.propLat,
         lng: form.propLng,
         gatedCommunity: house && !!form.gatedCommunity,
+        parking: form.roomParking || null,
+        amenities: form.roomAmenities,
         details: {
           ...(house ? numeric('floorsInHouse', form.floorsInHouse) : { floor: form.floor, ...numeric('totalFloors', form.totalFloors) }),
           ...numeric('bathrooms', form.bathrooms),
@@ -792,14 +830,13 @@ export default function useListProperty() {
         navigate('/dashboard#properties');
         return;
       }
-      await createRoom(room);
+      setPostedRoom(await createRoom(room));
       clearFormDraft();
       skipLeaveGuard.current = true;
       triggerConfetti();
       setShowSuccess(true);
     } catch (err) {
-      // The eligibility refusal explains what the host must change.
-      const refused = err?.status === 400 && err?.message;
+      const refused = err?.status === 400 && userMessage(err, '');
       toast(refused || (editRoomId ? t('listProperty.edit.roomSaveFailed') : 'Could not post your flatmate listing. Please try again.'), 'error');
       if (refused) window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
@@ -833,13 +870,14 @@ export default function useListProperty() {
     showSuccess, showResetConfirm, setShowResetConfirm, errors,
     showLeaveConfirm, setShowLeaveConfirm, confirmLeave,
     postedListing,
+    postedRoom,
     authPromptOpen,
     setAuthPromptOpen,
     closeAuthPrompt,
     requestAuthPrompt,
     needsAuthForMedia: !signedIn,
     savedListingStatus,
-    editApproved, editChanges, showIdentityGuard, setShowIdentityGuard,
+    editApproved, editChanges, claimMode, showIdentityGuard, setShowIdentityGuard,
     showDupGuard, setShowDupGuard, dupExistingId, dupPending, passListingId,
     form, progressState,
     toggleInArray, toggleTenant, changePropertyType, changeCommercialType,

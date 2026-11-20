@@ -8,6 +8,7 @@ import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyResponse;
 import com.draazy.api.catalog.property.PropertySearchQuery;
 import com.draazy.api.catalog.property.PropertyService;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.trust.BackOfficeVisibility;
 import com.draazy.api.common.trust.ContactVisibility;
 import com.draazy.api.common.trust.MessageSender;
@@ -48,25 +49,20 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// Rationale: docs/flows/admin/property-verification.md#moderation-controller.
 @RestController
 public class PropertyModerationController {
-
     private static final String STAFF_OR_ADMIN =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
 
     private static final String PROPERTIES_READ =
             STAFF_OR_ADMIN + " and " + BackOfficePermissions.REQUIRE_PROPERTIES_READ;
 
-    // One atom for these actions because the console offers them from the same row.
     private static final String PROPERTIES_MODERATE =
             STAFF_OR_ADMIN + " and " + BackOfficePermissions.REQUIRE_PROPERTIES_MODERATE;
 
-    // Separate atom because this route lets the caller name another listing owner.
     private static final String POST_ON_BEHALF_WRITE =
             STAFF_OR_ADMIN + " and " + BackOfficePermissions.REQUIRE_POSTONBEHALF_WRITE;
 
-    // Verifiers fix what they review without also holding the moderation desk.
     private static final String PROPERTIES_EDIT = STAFF_OR_ADMIN + " and ("
             + BackOfficePermissions.REQUIRE_PROPERTIES_VERIFY + " or "
             + BackOfficePermissions.REQUIRE_PROPERTIES_MODERATE + ")";
@@ -82,12 +78,14 @@ public class PropertyModerationController {
     private final ListingSignalService signals;
     private final PropertyReviewQueue reviewQueue;
     private final PropertyQueueRowMapper rows;
+    private final PropertyPhotoTakedownService photoTakedowns;
 
     public PropertyModerationController(PropertyModerationService service, ListingModerationService listings,
             PropertyService propertyService, PropertyMapper propertyMapper,
             OnBehalfListingService onBehalf, PropertyModerationSummaryRepository summaries,
             OwnerOutreachService outreach, ListingDuplicateClusterService duplicateClusters,
-            ListingSignalService signals, PropertyReviewQueue reviewQueue, PropertyQueueRowMapper rows) {
+            ListingSignalService signals, PropertyReviewQueue reviewQueue, PropertyQueueRowMapper rows,
+            PropertyPhotoTakedownService photoTakedowns) {
         this.service = service;
         this.listings = listings;
         this.propertyService = propertyService;
@@ -99,9 +97,9 @@ public class PropertyModerationController {
         this.signals = signals;
         this.reviewQueue = reviewQueue;
         this.rows = rows;
+        this.photoTakedowns = photoTakedowns;
     }
 
-    // Queue rationale: docs/flows/admin/property-verification.md#moderation-controller.
     @GetMapping(Routes.Moderation.ADMIN_PROPERTIES)
     @PreAuthorize(PROPERTIES_READ)
     public PageResponse<PropertyQueueRow> queue(
@@ -122,16 +120,15 @@ public class PropertyModerationController {
             @RequestParam(required = false) Boolean unconfirmed,
             @RequestParam(required = false) String progress,
             @RequestParam(required = false) Boolean badge,
+            @RequestParam(required = false) Integer days,
             @PageableDefault(size = 20) Pageable pageable) {
-
-        // The owner facet is the public profile page's, deliberately not offered here: the desk
-        // already reaches an owner's stock through the user record.
         PropertySearchQuery filters = new PropertySearchQuery(
                 deal, type, locality, bhk, minPrice, maxPrice, furnishing, possession, q, status,
                 null);
         ModerationFacets mod = new ModerationFacets(
                 archived, recheck, featured, postedByAdmin, unconfirmed, progress, badge);
-        Page<Property> page = propertyService.searchForModeration(filters, mod, pageable);
+        Page<Property> page = propertyService.searchForModeration(
+                filters, mod, PlatformTime.sinceOrNull(days), pageable);
         OutreachCounts counts = outreach.countsFor(page.getContent());
         Map<UUID, ListingSignals> pageSignals = signals.forProperties(page.getContent());
         Set<UUID> replied = reviewQueue.awaitingStaff(
@@ -141,7 +138,6 @@ public class PropertyModerationController {
                         replied.contains(p.getId())));
     }
 
-    // The full record behind a queue row: the review modal, the View modal and a deep link.
     @GetMapping(Routes.Moderation.ADMIN_PROPERTY)
     @PreAuthorize(PROPERTIES_READ)
     public PropertyModerationResponse detail(@PathVariable String id) {
@@ -154,14 +150,12 @@ public class PropertyModerationController {
                 reviewQueue.awaitingStaff(List.of(p.getId())).contains(p.getId()));
     }
 
-    // Unfiltered because it answers "how much is waiting that I am not looking at".
     @GetMapping(Routes.Moderation.ADMIN_PROPERTIES_SUMMARY)
     @PreAuthorize(PROPERTIES_READ)
     public PropertyModerationSummary summary() {
         return summaries.summary();
     }
 
-    /** {@code PATCH /properties/{id}/status} (contract {@code setPropertyStatus}). */
     @PatchMapping(Routes.Moderation.PROPERTY_STATUS)
     @PreAuthorize(PROPERTIES_MODERATE)
     public void setStatus(@CurrentUser AuthPrincipal principal, @PathVariable String id,
@@ -170,7 +164,6 @@ public class PropertyModerationController {
                 body.reasonCode(), body.expectedStatus());
     }
 
-    /** {@code POST /properties/{id}/flag} (contract {@code flagProperty}). */
     @PostMapping(Routes.Moderation.PROPERTY_FLAG)
     @PreAuthorize(PROPERTIES_MODERATE)
     public void flag(@CurrentUser AuthPrincipal principal, @PathVariable String id,
@@ -178,7 +171,6 @@ public class PropertyModerationController {
         service.flag(principal, id, body.reason());
     }
 
-    /** {@code DELETE /properties/{id}/flag} (contract {@code clearFlag}) — 204. */
     @DeleteMapping(Routes.Moderation.PROPERTY_FLAG)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize(PROPERTIES_MODERATE)
@@ -186,7 +178,16 @@ public class PropertyModerationController {
         service.clearFlag(principal, id);
     }
 
-    // Returns a body because field mapping lives in ListingModerationService.
+    @PostMapping(Routes.Moderation.PROPERTY_PHOTO_TAKEDOWN)
+    @PreAuthorize(PROPERTIES_MODERATE)
+    public PropertyResponse takedownPhoto(@CurrentUser AuthPrincipal principal,
+            @PathVariable String id, @Valid @RequestBody PhotoTakedownRequest body) {
+        Property updated = photoTakedowns.takedown(principal, id, body.photo(), body.reason());
+        return propertyMapper.toResponse(updated, ContactVisibility.REVEALED,
+                BackOfficeVisibility.VISIBLE, outreach.countsFor(List.of(updated)),
+                PrivateFieldVisibility.VISIBLE);
+    }
+
     @PatchMapping(Routes.Moderation.PROPERTY_ADMIN_UPDATE)
     @PreAuthorize(PROPERTIES_EDIT)
     public PropertyResponse adminUpdate(@CurrentUser AuthPrincipal principal,
@@ -197,34 +198,27 @@ public class PropertyModerationController {
                 PrivateFieldVisibility.VISIBLE);
     }
 
-    // Uses POST_ON_BEHALF_WRITE because the caller names somebody else as owner.
     @PostMapping(Routes.Moderation.ADMIN_PROPERTIES)
     @PreAuthorize(POST_ON_BEHALF_WRITE)
     @ResponseStatus(HttpStatus.CREATED)
     public PropertyResponse createOnBehalf(@CurrentUser AuthPrincipal principal,
             @Valid @RequestBody OnBehalfListingRequest body) {
-
-        // NONE rather than a lookup: the listing did not exist a moment ago, so nobody can have
-        // chased its owner about it. Querying would be a round trip guaranteed to return zero.
         return propertyMapper.toResponse(onBehalf.create(principal, body), ContactVisibility.REVEALED,
                 BackOfficeVisibility.VISIBLE, OutreachCounts.NONE, PrivateFieldVisibility.VISIBLE);
     }
 
-    // Guarded by the write atom because only the on-behalf desk uses this.
     @GetMapping(Routes.Moderation.ADMIN_PROPERTIES_OWNER_STANDING)
     @PreAuthorize(POST_ON_BEHALF_WRITE)
     public OnBehalfListingService.OwnerListingStanding ownerStanding(@RequestParam String mobile) {
         return onBehalf.standingFor(mobile);
     }
 
-    // A report, not a bare list, so the caller sees when the scan hit its ceiling.
     @GetMapping(Routes.Moderation.ADMIN_PROPERTIES_DUPLICATES)
     @PreAuthorize(PROPERTIES_READ)
     public DuplicateClusterReport duplicates() {
         return duplicateClusters.clusters();
     }
 
-    // Archiving is what PROPERTIES_MODERATE governs everywhere else, so it governs merges too.
     @PostMapping(Routes.Moderation.ADMIN_PROPERTIES_DUPLICATES_MERGE)
     @PreAuthorize(PROPERTIES_MODERATE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -233,7 +227,6 @@ public class PropertyModerationController {
         duplicateClusters.resolve(principal, body.keepId(), body.dropIds());
     }
 
-    // Idempotent so double-clicks and second operators return 204, not a unique-index clash.
     @PostMapping(Routes.Moderation.ADMIN_PROPERTIES_DUPLICATES_DISMISS)
     @PreAuthorize(PROPERTIES_MODERATE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -242,7 +235,6 @@ public class PropertyModerationController {
         duplicateClusters.dismiss(principal, body.ids());
     }
 
-    // Send happens on staff's own device, so the server records prepared, not delivered.
     @PostMapping(Routes.Moderation.PROPERTY_OUTREACH)
     @PreAuthorize(POST_ON_BEHALF_WRITE)
     public MessageSender.Prepared chaseOwner(@CurrentUser AuthPrincipal principal,
@@ -257,7 +249,6 @@ public class PropertyModerationController {
         return outreach.markSent(principal, id, messageId);
     }
 
-    // Read atom, not write: colleagues must see when someone already called.
     @GetMapping(Routes.Moderation.PROPERTY_OUTREACH)
     @PreAuthorize(PROPERTIES_READ)
     public List<OwnerOutreachService.OwnerOutreachEntry> outreachHistory(@PathVariable String id) {
@@ -271,6 +262,9 @@ public class PropertyModerationController {
             String reasonCode, String expectedStatus) {
     }
 
-    public record ReasonRequest(String reason) {
+    public record ReasonRequest(@NotBlank String reason) {
+    }
+
+    public record PhotoTakedownRequest(@NotBlank String photo, @NotBlank String reason) {
     }
 }

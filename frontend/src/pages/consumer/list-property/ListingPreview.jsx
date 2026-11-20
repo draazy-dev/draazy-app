@@ -5,7 +5,7 @@ import { formatIndian, perUnit } from './format.js';
 import { listingLabels } from './submit.js';
 import { headlineOf } from '../../../lib/headline.js';
 import { availabilityLabel } from '../../../lib/availability.js';
-import { isLandType, isResidentialType, plotUnitOptions, farmUnitOptions } from './constants.js';
+import { copyContextOf, isLandType, isResidentialType, plotUnitOptions, farmUnitOptions } from './constants.js';
 
 const UNIT_LABELS = Object.fromEntries([...plotUnitOptions, ...farmUnitOptions]);
 const FURNISHING_KEYS = { unfurnished: 'unfurnished', semi: 'semiFurnished', furnished: 'furnished' };
@@ -89,13 +89,13 @@ export default function ListingPreview({ open, onClose, form, photos, onEdit, on
             ? <img src={cover} alt="" className="h-full w-full object-cover" />
             : <div className="flex h-full items-center justify-center gap-2 text-sm text-gray-400"><ImageOff className="w-5 h-5" /> {t('listProperty.preview.noPhotos')}</div>}
           {photos.length > 0 && (
-            <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white">
+            <span className="dz-tag absolute bottom-2 right-2 bg-black/60 text-white">
               {t('listProperty.preview.photoCount', { count: photos.length })}
             </span>
           )}
         </div>
         <h3 className="text-lg font-bold text-white">{title}</h3>
-        <p className="mb-4 text-xs text-gray-400">{t('listProperty.preview.privacyNote')}</p>
+        <p className="mb-4 text-xs text-gray-400">{t('listProperty.preview.privacyNote', { context: copyContextOf(form.propertyType) })}</p>
         {sectionsFor(form, t).map((s) => (
           <section key={s.step} className="border-t border-white/10 py-3">
             <div className="mb-2 flex items-center justify-between">

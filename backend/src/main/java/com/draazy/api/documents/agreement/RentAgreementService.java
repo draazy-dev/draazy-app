@@ -23,15 +23,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * The rent-agreement records the flatmate trust sweep reads as evidence. Rows are born only from a
- * paid service request's final-document upload ({@link #prepare}); the wizard, pricing and ops queue
- * live under {@code /service-requests}. Who may call {@link #transition} is decided there too — this
- * class holds the invariants that must survive any caller.
- */
 @Service
 public class RentAgreementService {
-
     private final RentAgreementRepository agreements;
     private final DocumentRepository documents;
     private final DocumentMapper documentMapper;
@@ -47,12 +40,6 @@ public class RentAgreementService {
         this.audit = audit;
     }
 
-    /**
-     * Both sides in one call — one document, two signatories. The tenant side matches on mobile
-     * because that is the only identifier the record carries for them, and a mobile is only what
-     * someone typed: until a row is registered it is the owner's to see, not whoever holds that
-     * number. An owner-typed URL on a row no desk produced is never shown to the tenant side.
-     */
     @Transactional(readOnly = true)
     public List<RentAgreementDto> mine(UUID callerId) {
         return toDtos(callerId, agreements.findForParty(callerId, mobileOf(callerId)).stream()
@@ -60,7 +47,6 @@ public class RentAgreementService {
                 .toList());
     }
 
-    /** One {@code draft} row per distinct valid tenant mobile. Unparseable numbers are dropped, not stored. */
     @Transactional
     public void prepare(PreparedAgreement prepared, Collection<String> tenantMobiles) {
         Set<String> mobiles = tenantMobiles.stream()
@@ -72,13 +58,6 @@ public class RentAgreementService {
                 .toList());
     }
 
-    /**
-     * The only writer of {@code status}. Out-of-order moves are 422 — only the stored row knows.
-     *
-     * <p>{@code registered} and {@code active} mint a trust badge with no human in the loop, so they
-     * need a row the paid flow created, its registered copy, and a checker who is neither the staff
-     * member who uploaded that copy nor a signatory.
-     */
     @Transactional
     public void transition(AuthPrincipal caller, UUID id, String status) {
         String next = status == null ? "" : status.strip();

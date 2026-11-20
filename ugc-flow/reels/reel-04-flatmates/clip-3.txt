@@ -1,0 +1,70 @@
+REEL 04 / CLIP 3 of 3 - TEASE + SIGN-OFF
+========================================
+JOB ID ............. r04-c3
+READ FIRST ......... reels\00-CONTINUITY-RULES.txt (workflow, settings check, common checks, fixes)
+GATE ............... r04-c1 approved by the user AND r04-anchor saved
+FLOW SETTINGS (check every line on screen before clicking Generate)
+  Type ............. Video > Ingredients
+  Model ............ Gemini Omni Flash 1.1
+  Resolution ....... 720p (user-approved; download "720p Original size")
+  Aspect ratio ..... 9:16 portrait
+  Length ........... 8 s
+  Outputs .......... 1
+  Cost shown ....... 12 credits (anything else: stop and ask the user)
+CHARACTER CHIPS .... @IshaanOutdoor, @Sana   (each [@Name] token becomes a chip; pick the CHARACTER suggestion)
+INGREDIENTS ........ r04-set (image) + r04-anchor (saved frame of the approved clip 1)   (check the thumbnails before generating)
+USE IN EDIT ........ 0.0-7.7 s (reel 15.4-23.1 s); the HTML end card follows
+
+PROMPT START
+Absolutely no text of any kind appears on screen at any moment: no subtitles, no captions, no title, no brand
+name written anywhere. The word Draazy is only spoken, never shown. A clean raw phone video like the previous
+clips.
+
+Vertical 9:16 video from a smartphone propped up on a café table at chest height, a static, locked-off shot. The
+camera does not move. [@IshaanOutdoor] Ishaan sits on the left and [@Sana] Sana sits on the right, side by side
+on the far side of the table, both framed from the waist up and facing the lens. Their hands rest on the table.
+No phone, phone stand or tripod anywhere on the table or in the frame.
+
+Set (the attached set image r04-set; the same in every clip of this reel): a small café on FC Road, Pune, on a
+sunny afternoon. A light wooden table in the foreground with two white ceramic coffee cups. On the left side of
+the frame, a large glass window onto a tree-lined street with soft sunlight and blurred passers-by. On the right
+side of the frame, an exposed red-brick wall with a hanging green plant. A warm pendant lamp at the top of the
+frame. No menu boards, no signs, nothing readable anywhere. The background stays exactly the same for the whole
+clip. Match the attached reference frame exactly: the same camera distance and angle, the same background with
+every object in the same place, the same light and colour grade.
+
+Ishaan wears exactly the same outfit as his character image: a teal (#14B8A6) cotton overshirt worn open over a
+plain white crew-neck tee, with a black backpack strap over one shoulder. His face has clear, even skin with no moles, no beauty spots and no dark spots on his cheeks, taper fade,
+light stubble. The outfit stays the same for the whole clip. Sana looks exactly like her character image:
+shoulder-length dark brown curly hair worn loose, round thin gold-wire glasses, a tiny silver nose stud, a coral
+(#FB923C) linen overshirt with the sleeves rolled to the elbows, open over a cream ribbed tank top. Her outfit
+stays the same for the whole clip.
+
+Sana delivers the idea to the lens, pointing at the camera on "Socho". Then Ishaan says the sign-off while Sana
+smiles and nods along, silent. Both calm and hopeful, then confident. Not laughing, not grinning, not sad. Each
+line is spoken exactly once, nothing repeated, no other words.
+0.3-3.4 s, Sana, pointing at the lens: "Socho, vibe match aur KYC, milne se pehle."
+3.6-7.6 s, Ishaan into the lens with a confident half-smile, eyebrows raised once on "Draazy", a tiny nod on "Bahut jald", slowly and clearly: "Direct hai, easy hai, Draazy hai. Bahut jald launch ho raha hai."
+7.6-8.0 s: silent, lips closed, Ishaan holds the half-smile into the lens.
+
+Voice: Sana uses her saved Flow character voice: casual Hinglish with a soft Lucknowi Hindi accent, a young
+female voice, bright and clear, medium-high pitch, confident and witty. Ishaan uses his saved Flow character
+voice: a 22-year-old Indian college student speaking casual Hinglish with a natural Indian accent, clearly male
+and mid-pitched, conversational and fluent.
+
+Lighting and colour: warm afternoon sunlight through the window on the left, soft fill from the brick wall, true
+warm skin tones. Authentic Instagram UGC shot on a phone, natural skin texture, no beauty filter.
+
+Audio: quiet café ambience, soft clinks of cups and a low murmur. No music.
+
+No subtitles, no captions, no on-screen text or graphics, no logos, no watermark.
+PROMPT END
+
+CLIP CHECKS (on top of the common accept check in 00-CONTINUITY-RULES.txt)
+  [ ] landmarks match r04-anchor side by side: wooden table + two white cups in the foreground; big street window on the LEFT; red-brick wall + hanging plant on the RIGHT; pendant lamp at the top; Ishaan left, Sana right
+  [ ] Sana says the tease, Ishaan says the sign-off; no swap (if swapped, regenerate, never edit)
+  [ ] "KYC" is spoken as the letters K-Y-C; "vibe match" as English words
+  [ ] no text on screen; "Draazy" said plainly, once, at about 5.5 s
+
+IF REJECTED: follow WHEN A TAKE FAILS in 00-CONTINUITY-RULES.txt (set drift with good audio -> 10-credit
+continuity edit; anything about words or acting -> regenerate unchanged once; then ask the user).

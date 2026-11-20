@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate, useSearchParams } from 'react-router';
 import '../../styles/routes/messages.css';
 import SharedReportModal from '../../components/ReportModal.jsx';
 import { OWNER_REPORT_REASONS } from '../../lib/reportReasons.js';
@@ -18,30 +19,68 @@ import {
   updateConversationState,
 } from '../../services/conversationService.js';
 import { useConversationUnread } from '../../context/ConversationContext.jsx';
-import Inbox from './messages/Inbox.jsx';
+import Inbox, { SUPPORT_ID } from './messages/Inbox.jsx';
+import RequestThread from './messages/RequestThread.jsx';
+import SupportThread from './messages/SupportThread.jsx';
 import Thread from './messages/Thread.jsx';
+import { quickReplies } from './messages/quickReplies.js';
+import { useRequestThreads } from './messages/useRequestThreads.js';
+import { contextKey, parseContextKey } from '../../lib/supportLink.js';
+import { useSupportChat } from '../../context/SupportChatContext.jsx';
+import { useAppFlags } from '../../context/AppFlagsContext.jsx';
+import { targetSlug } from './requests/requestMeta.js';
+import { useRequestActions } from './requests/useRequestActions.js';
+import { userMessage } from '../../lib/userMessage.js';
 
-// Canned openers keep a cold thread moving — the questions buyers actually ask.
-const INBOX_POLL_MS = 60000;
+const INBOX_POLL_MS = 300000;
 const THREAD_FALLBACK_POLL_MS = 4000;
 const INBOX_FALLBACK_POLL_MS = 30000;
 const clientId = () => `c${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+const isLocalId = (id) => /^(staged|request):/.test(String(id || ''));
 const mergeMessages = (serverMessages = [], localMessages = []) => {
   const serverClientIds = new Set(serverMessages.map((m) => m.clientId).filter(Boolean));
   const localOnly = localMessages.filter((m) => (m.pending || m.failed) && m.clientId && !serverClientIds.has(m.clientId));
   return [...serverMessages, ...localOnly];
 };
 
+const linkedContext = (param) => (param ? contextKey(parseContextKey(param)) : null);
+
 export default function Messages() {
+  const { flagEnabled } = useAppFlags();
+  return flagEnabled('inAppMessaging') ? <Conversations /> : <SupportOnly />;
+}
+
+function SupportOnly() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  return (
+    <div className="messages-page pt-2 pb-6">
+      <div className="pc-shell max-w-3xl mx-auto px-3 sm:px-6">
+        <div className="pc-wrap is-narrow show-thread">
+          <SupportThread t={t} user={user} contextKey={linkedContext(params.get('support'))} onBack={() => navigate(-1)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Conversations() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  /* No canned auto-reply or typing dots: the other end is a real person, so fabricating a reply from them would put
-     words in their mouth, and the message would not exist on their device. */
   const { user } = useAuth();
-  const { refresh: refreshChatBadge, streamConnected, subscribe } = useConversationUnread();
+  const { refresh: refreshChatBadge, streamConnected, subscribe, freshWhileLive } = useConversationUnread();
   const [convs, setConvs] = useState([]);
-  const [tab, setTab] = useState('chats');
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const wantId = params.get('c');
+  const openProp = params.get('openProp');
+  const supportParam = params.get('support');
   const [activeId, setActiveId] = useState(null);
+  const [supportKey, setSupportKey] = useState(null);
+  const support = useSupportChat(true);
+  const supportOpened = useRef(null);
   const [search, setSearch] = useState('');
   const [narrow, setNarrow] = useState(false);
   const [showThread, setShowThread] = useState(false);
@@ -56,23 +95,27 @@ export default function Messages() {
   const activeAt = useRef(null);
   const activeIdRef = useRef(null);
   const inboxUnread = useRef(0);
+  const reloadedAt = useRef(0);
+  const hydrated = useRef(new Map());
+  const unreadWhileHidden = useRef(null);
   const lastWake = useRef(0);
   const queue = useRef([]);
   const photoUrls = useRef(new Set());
   const loadedRef = useRef(false);
   const autoOpened = useRef(false);
+  const pickedFirst = useRef(false);
   const flushQueueRef = useRef(() => {});
-  const active = useMemo(() => convs.find((c) => c.id === activeId) || null, [activeId, convs]);
+  const { inbox: requestInbox, threads } = useRequestThreads(convs);
+  const active = useMemo(() => convs.find((c) => c.id === activeId) || threads.find((c) => c.id === activeId) || null, [activeId, convs, threads]);
   activeIdRef.current = activeId;
   const typingUntil = active ? typing[active.id] || 0 : 0;
 
-  /* Optimistic local update. */
   const patchConv = useCallback((id, fn) => {
     setConvs((cur) => cur.map((c) => (c.id === id ? fn(c) : c)));
   }, []);
 
-  /** Re-read from whichever provider is active, and keep the navbar badge in step. */
   const reload = useCallback(async ({ quiet = false } = {}) => {
+    reloadedAt.current = Date.now();
     if (!quiet) { setLoading(true); setError(null); }
     try {
       await drainPendingChats().catch(() => null);
@@ -80,7 +123,6 @@ export default function Messages() {
       setConvs((cur) => list.map((next) => {
         const old = cur.find((c) => c.id === next.id);
         if (!old) return next;
-        // The inbox row carries no number or presence; keep what the thread read last brought.
         return {
           ...old,
           ...next,
@@ -95,7 +137,6 @@ export default function Messages() {
       setOffline(false);
       flushQueueRef.current();
       const unreadTotal = list.reduce((sum, c) => sum + (c.unread || 0), 0);
-      // The badge was read at sign-in and the stream keeps it current; only a changed inbox can find it stale.
       if (!firstLoad && unreadTotal !== inboxUnread.current) refreshChatBadge();
       inboxUnread.current = unreadTotal;
       return list;
@@ -107,11 +148,17 @@ export default function Messages() {
     }
   }, [refreshChatBadge]);
 
+  const markRead = useCallback((id, count) => {
+    inboxUnread.current = Math.max(0, inboxUnread.current - count);
+    markConversationRead(id).then(refreshChatBadge).catch(() => {});
+  }, [refreshChatBadge]);
+
   const hydrate = useCallback((id, onlyIfNew = false) => {
-    if (!id || String(id).startsWith('staged:')) return;
+    if (!id || isLocalId(id)) return;
     getConversation(id)
       .then((full) => {
         if (!full) return;
+        hydrated.current.set(id, full.messages);
         activeAt.current = full.at;
         const lastId = full.messages.at(-1)?.id ?? null;
         if (onlyIfNew && lastId === lastMsgId.current) return;
@@ -119,13 +166,20 @@ export default function Messages() {
         patchConv(id, (c) => ({ ...c, ...full, unread: 0, messages: mergeMessages(full.messages, c.messages) }));
         setOffline(false);
         flushQueueRef.current();
-        if (!document.hidden && full.unread > 0) markConversationRead(id).then(refreshChatBadge).catch(() => {});
+        if (full.unread > 0 && document.hidden) unreadWhileHidden.current = { id, count: full.unread };
+        else if (full.unread > 0) markRead(id, full.unread);
       })
       .catch(() => {});
-  }, [patchConv, refreshChatBadge]);
+  }, [markRead, patchConv]);
 
-  /* Load the inbox, having first tried to send anything staged. */
   useEffect(() => { reload().catch(() => {}); }, [reload]);
+
+  const requestActions = useRequestActions({ inbox: requestInbox, toast, onChanged: () => reload({ quiet: true }).catch(() => {}) });
+
+  const legacyRequestsTab = params.get('tab') === 'requests';
+  useEffect(() => {
+    if (legacyRequestsTab) navigate('/dashboard?tab=leads', { replace: true });
+  }, [legacyRequestsTab, navigate]);
 
   useEffect(() => {
     const resize = () => setNarrow((wrapRef.current?.clientWidth || 9999) < 720);
@@ -134,7 +188,6 @@ export default function Messages() {
     return () => window.removeEventListener('resize', resize);
   }, []);
 
-  // Mobile: opening a thread pushes a history entry so the back button collapses to the list.
   useEffect(() => {
     const onPop = (event) => {
       if (!event.state?.pcThread) setShowThread(false);
@@ -143,8 +196,6 @@ export default function Messages() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  // With the stream up, the inbox poll is a backstop for events published on another instance; it
-  // re-reads the open thread only when its row moved.
   useEffect(() => {
     const timer = setInterval(() => {
       if (document.hidden) return;
@@ -159,7 +210,7 @@ export default function Messages() {
   }, [hydrate, reload, streamConnected]);
 
   useEffect(() => {
-    if (streamConnected || !activeId || String(activeId).startsWith('staged:')) return undefined;
+    if (streamConnected || !activeId || isLocalId(activeId)) return undefined;
     const timer = setInterval(() => { if (!document.hidden) hydrate(activeId); }, THREAD_FALLBACK_POLL_MS);
     return () => clearInterval(timer);
   }, [activeId, hydrate, streamConnected]);
@@ -183,35 +234,77 @@ export default function Messages() {
     return () => window.clearTimeout(timer);
   }, [activeId, typingUntil]);
 
-  // Desktop auto-opens the first thread; `?c=<id>` or `?openProp=<propertyId>` opens that one on any width.
   useEffect(() => {
-    if (!convs.length) return;
-    const params = new URLSearchParams(window.location.search);
-    const want = params.get('c');
-    const openProp = params.get('openProp');
-    const target = (want && convs.find((c) => c.id === want)) || (openProp && convs.find((c) => c.propertyId === openProp && c.youAre === 'buyer'));
+    autoOpened.current = false;
+    if (wantId && loadedRef.current && !isLocalId(wantId)) reload({ quiet: true }).catch(() => {});
+  }, [openProp, reload, wantId]);
+
+  useEffect(() => {
+    if (!String(activeId || '').startsWith('request:') || threads.some((c) => c.id === activeId)) return;
+    setActiveId(null);
+    setShowThread(false);
+    if (window.history.state?.pcThread) window.history.back();
+  }, [activeId, threads]);
+
+  const sentStatus = requestInbox.boxes.sent.status;
+  useEffect(() => {
+    if (loading || sentStatus === 'loading' || (!convs.length && !threads.length)) return;
+    const matchProp = (c) =>
+      c.youAre === 'buyer' &&
+      (c.propertyId === openProp || c.propertySlug === openProp || c.property?.slug === openProp);
+    const matchRequest = (c) =>
+      c.box === 'sent' && c.request.kind === 'contact' && (c.request.target?.id === openProp || targetSlug(c.request) === openProp);
+    const target =
+      (wantId && (convs.find((c) => c.id === wantId) || threads.find((c) => c.id === wantId))) ||
+      (openProp && (convs.find((c) => !c.staged && matchProp(c)) || threads.find(matchRequest) || convs.find(matchProp)));
     if (target && target.id !== activeId && !autoOpened.current) {
       autoOpened.current = true;
       openConv(target.id);
     }
-    else if (!activeId && (wrapRef.current?.clientWidth || window.innerWidth) >= 720) {
+    else if (!activeId && !supportParam && !pickedFirst.current && (wrapRef.current?.clientWidth || window.innerWidth) >= 720) {
       const first = convs.find((c) => !c.staged && !c.archived);
-      if (first) openConv(first.id);
+      if (first) {
+        pickedFirst.current = true;
+        openConv(first.id);
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-open only follows conversation list changes
-  }, [convs.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-open only follows list and link changes
+  }, [convs.length, threads.length, wantId, openProp, loading, sentStatus]);
 
-  // Optimistic: the badge clears on tap; `hydrate` posts the read only when the thread had unread.
-  const openConv = (id, opts = {}) => {
-    if (opts.report) setReportOpen(true);
-    patchConv(id, (c) => ({ ...c, unread: 0 }));
-    hydrate(id);
-    setActiveId(id);
+  const showPane = () => {
     if ((wrapRef.current?.clientWidth || window.innerWidth) < 720) {
       window.history.pushState({ pcThread: true }, '');
       setShowThread(true);
     } else setShowThread(true);
   };
+
+  const openConv = (id, opts = {}) => {
+    if (opts.report) setReportOpen(true);
+    patchConv(id, (c) => ({ ...c, unread: 0 }));
+    hydrate(id);
+    setActiveId(id);
+    showPane();
+  };
+
+  const openSupport = (key) => {
+    setSupportKey(key || null);
+    if (activeId === SUPPORT_ID) return;
+    setActiveId(SUPPORT_ID);
+    showPane();
+  };
+
+  useEffect(() => {
+    if (!supportParam || supportOpened.current === supportParam) return;
+    supportOpened.current = supportParam;
+    openSupport(linkedContext(supportParam));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- opens once per deep link
+  }, [supportParam]);
+
+  const hydrateUnlessHas = useCallback((id, sentId) => {
+    window.setTimeout(() => {
+      if (!hydrated.current.get(id)?.some((m) => m.id === sentId)) hydrate(id);
+    }, 1000);
+  }, [hydrate]);
 
   const sendNow = useCallback(async ({ conversationId, text, id, replyTo }) => {
     const sent = await replyToConversation(conversationId, { body: text, clientId: id, replyToId: replyTo?.id });
@@ -221,8 +314,8 @@ export default function Messages() {
       lastMessage: sent.text,
       messages: c.messages.map((m) => (m.clientId === id ? sent : m)),
     }));
-    window.setTimeout(() => hydrate(conversationId), 1000);
-  }, [hydrate, patchConv]);
+    hydrateUnlessHas(conversationId, sent.id);
+  }, [hydrateUnlessHas, patchConv]);
 
   const sendPhotoNow = useCallback(async ({ conversationId, file, caption, id, previewUrl }) => {
     const sent = await sendConversationPhoto(conversationId, { file, caption, clientId: id });
@@ -236,8 +329,8 @@ export default function Messages() {
       URL.revokeObjectURL(previewUrl);
       photoUrls.current.delete(previewUrl);
     }
-    window.setTimeout(() => hydrate(conversationId), 1000);
-  }, [hydrate, patchConv]);
+    hydrateUnlessHas(conversationId, sent.id);
+  }, [hydrateUnlessHas, patchConv]);
 
   const markFailed = useCallback((conversationId, id, message) => {
     patchConv(conversationId, (c) => ({
@@ -248,17 +341,22 @@ export default function Messages() {
 
   const flushQueue = useCallback(() => {
     const pending = queue.current.splice(0);
-    pending.forEach((item) => sendNow(item).catch((err) => markFailed(item.conversationId, item.id, err?.message || 'Not sent')));
+    pending.forEach((item) => sendNow(item).catch((err) => markFailed(item.conversationId, item.id, userMessage(err, 'Not sent'))));
   }, [markFailed, sendNow]);
   flushQueueRef.current = flushQueue;
 
   useEffect(() => {
     const onOnline = () => { setOffline(false); flushQueue(); reload({ quiet: true }).catch(() => {}); };
     const onOffline = () => setOffline(true);
-    // Returning to the tab fires both focus and visibilitychange; one re-read answers both.
     const onVisible = () => {
       if (document.hidden || Date.now() - lastWake.current < 1000) return;
       lastWake.current = Date.now();
+      const missed = unreadWhileHidden.current;
+      unreadWhileHidden.current = null;
+      if (freshWhileLive(reloadedAt.current)) {
+        if (missed && missed.id === activeId) markRead(missed.id, missed.count);
+        return;
+      }
       reload({ quiet: true }).catch(() => {});
       if (activeId) hydrate(activeId);
     };
@@ -272,17 +370,15 @@ export default function Messages() {
       window.removeEventListener('focus', onVisible);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [activeId, flushQueue, hydrate, reload]);
+  }, [activeId, flushQueue, freshWhileLive, hydrate, markRead, reload]);
 
   const sendText = (text, replyTo = null, retryId = null) => {
-    if (!active || active.staged || active.blocked) return;
+    if (!active || active.staged || active.blocked || active.blockedYou || active.listingDeleted) return;
     setSendError('');
     const body = String(text || '').trim();
     if (!body) return;
     const id = retryId || clientId();
     const at = Date.now();
-    // Paint the bubble first; the request follows. A failed send re-reads the thread, so the
-    // message disappears rather than sitting there looking delivered.
     if (!retryId) {
       const optimistic = { id: `client:${id}`, clientId: id, from: 'me', text: body, at, read: false, pending: true, replyTo: replyTo ? { id: replyTo.id, body: replyTo.text, author: replyTo.author } : null };
       patchConv(active.id, (c) => ({ ...c, at, lastMessage: body, messages: [...c.messages, optimistic] }));
@@ -303,26 +399,32 @@ export default function Messages() {
           setOffline(true);
           return;
         }
-        markFailed(active.id, id, err.message || t('misc.msgSendFailed'));
+        markFailed(active.id, id, userMessage(err, t('misc.msgSendFailed')));
         return;
       }
-      const message = err?.message || t('misc.msgSendFailed');
+      const message = userMessage(err, t('misc.msgSendFailed'));
+      if (err?.code === 'conversation_closed') {
+        setSendError('');
+        patchConv(active.id, (c) => ({ ...c, listingDeleted: true, messages: c.messages.filter((m) => m.clientId !== id) }));
+        return;
+      }
+      if (err?.status === 403 && /can't message/i.test(message)) {
+        setSendError('');
+        patchConv(active.id, (c) => ({ ...c, blockedYou: true, messages: c.messages.filter((m) => m.clientId !== id) }));
+        return;
+      }
       setSendError(err?.status === 403 || err?.status === 429 ? message : '');
       markFailed(active.id, id, message);
     });
   };
-    // "Propose a visit" routes into the real scheduling flow when it's enabled,
-    // instead of posting a fake fixed-time card.
 
   const sendPhoto = ({ file, caption = '', previewUrl, retry } = {}) => {
-    if (!active || active.staged || active.blocked || !file) return;
+    if (!active || active.staged || active.blocked || active.listingDeleted || !file) return;
     if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 8_000_000) {
       toast('Upload a JPEG or PNG up to 8 MB.', 'error');
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       return;
     }
-    // The wire has no attachment or card type — `MessageCreate` carries `body` alone — so a share chip sends its text
-    // and the icon is a local decoration. The recipient sees the sentence.
     setSendError('');
     const id = retry?.clientId || clientId();
     const url = previewUrl || retry?.photoPreviewUrl || URL.createObjectURL(file);
@@ -349,14 +451,14 @@ export default function Messages() {
       }));
     }
     sendPhotoNow({ conversationId: active.id, file, caption: caption || retry?.text || '', id, previewUrl: url }).catch((err) => {
-      const message = err?.message || 'Photo not sent — try again.';
+      const message = userMessage(err, 'Photo not sent — try again.');
       setSendError(err?.status === 403 || err?.status === 429 ? message : '');
       markFailed(active.id, id, message);
     });
   };
 
   const typingNow = useCallback((id) => {
-    if (!id || String(id).startsWith('staged:')) return;
+    if (!id || isLocalId(id)) return;
     sendTyping(id).catch(() => {});
   }, []);
 
@@ -385,58 +487,63 @@ export default function Messages() {
     photoUrls.current.clear();
   }, []);
 
-  // The reveal is a gate read, so it lands after render. It starts closed and only ever opens, which is the safe
-  // direction: a thread briefly showing a masked number is a cosmetic delay.
   const wrapCls = 'pc-wrap' + (narrow ? ' is-narrow' : '') + (showThread ? ' show-thread' : '');
+  const closeThread = () => { setShowThread(false); if (window.history.state?.pcThread) window.history.back(); };
 
   return (
     <div className="messages-page pt-2 pb-6">
       <div className="pc-shell max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          {/* Thread */}
-          {/* List */}
         <div ref={wrapRef} className={wrapCls}>
           <Inbox
             t={t}
             items={convs}
+            requests={threads}
+            support={support.chat}
             activeId={activeId}
-            tab={tab}
-            setTab={setTab}
             search={search}
             setSearch={setSearch}
             onOpen={openConv}
+            onOpenSupport={openSupport}
             onRetry={() => reload().catch(() => {})}
             onState={changeState}
             onBlock={block}
             loading={loading}
             error={error}
           />
-          <Thread
-            t={t}
-            active={active}
-            userId={user?.id}
-            offline={offline}
-            sendError={sendError}
-            onBack={() => { setShowThread(false); if (window.history.state?.pcThread) window.history.back(); }}
-            onSend={sendText}
-            onPhoto={sendPhoto}
-            onPhotoError={(message) => toast(message, 'error')}
-            onTyping={typingNow}
-            typing={typingUntil > Date.now()}
-            onDelete={deleteMessage}
-            onState={changeState}
-            onBlock={block}
-            onReport={() => setReportOpen(true)}
-          />
+          {activeId === SUPPORT_ID ? (
+            <SupportThread t={t} user={user} contextKey={supportKey} onBack={closeThread} visible={!narrow || showThread} />
+          ) : active?.request ? (
+            <RequestThread key={active.id} t={t} thread={active} actions={requestActions} onBack={closeThread} />
+          ) : (
+            <Thread
+              t={t}
+              active={active}
+              userId={user?.id}
+              offline={offline}
+              sendError={sendError}
+              onBack={closeThread}
+              onSend={sendText}
+              onPhoto={sendPhoto}
+              onPhotoError={(message) => toast(message, 'error')}
+              onTyping={typingNow}
+              typing={typingUntil > Date.now()}
+              onDelete={deleteMessage}
+              onState={changeState}
+              onBlock={block}
+              onReport={() => setReportOpen(true)}
+              replies={quickReplies(active, requestInbox.boxes)}
+            />
+          )}
         </div>
       </div>
-      {reportOpen && active && !active.group ? (
+      {reportOpen && active && !active.group && !active.request ? (
         <SharedReportModal
           kind="user"
           reasons={OWNER_REPORT_REASONS}
           title={t('misc.msgReportTitle', { name: active.party.name })}
           subtitle={t('misc.msgReportSubtitle')}
           success={t('misc.msgReportSuccess')}
-          target={{ id: active.propertyId || active.id, title: active.property.title, ownerName: active.party.name, ownerMobile: active.party.mobile && active.party.mobile.replace(/\D/g, '').length === 10 ? active.party.mobile : '' }}
+          target={{ id: active.party.id, title: active.party.name, ownerName: active.party.name, ownerMobile: active.party.mobile && active.party.mobile.replace(/\D/g, '').length === 10 ? active.party.mobile : '' }}
           onClose={() => setReportOpen(false)}
           toast={toast}
         />

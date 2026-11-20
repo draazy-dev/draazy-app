@@ -76,15 +76,23 @@ const PhotoUploader = ({
   const ERROR_COPY = {
     min: ['listProperty.err.photosMin', { count: MIN_PUBLISH_PHOTOS }],
     max: ['listProperty.err.photosMax', { count: maxPhotos }],
+    failed: ['listProperty.err.photosFailed', {}],
+    capped: ['listProperty.err.photosCapped', { count: maxPhotos, skipped: String(error).split(':')[1] }],
+    expired: ['listProperty.err.photosExpired', { count: Number(String(error).split(':')[1]) }],
     categories: ['listProperty.err.photosKeyCats', { count: Math.min(MIN_PUBLISH_KEY_CATEGORIES, KEY_CATS.length), cats: KEY_CATS.join(', ') }],
   };
-  const errorCopy = ERROR_COPY[error] || ['listProperty.photoUploader.errorAddPhoto', {}];
+  const errorCopy = ERROR_COPY[String(error).split(':')[0]] || ['listProperty.photoUploader.errorAddPhoto', {}];
+  const dropPhotos = (event) => {
+    event.preventDefault();
+    if (disabled) return;
+    handlePhotoUpload({ target: { files: event.dataTransfer.files, value: '' } });
+  };
   return (
     <div className="mb-6" data-err="photos" aria-busy={isMediaBusy}>
       <label className={lbl3}>{label || t('listProperty.photoUploader.defaultLabel')}</label>
       {hint && <p className="text-gray-500 text-xs mb-3">{hint}</p>}
 
-      <label className={`upload-zone rounded-2xl p-5 text-center block focus-within:ring-2 focus-within:ring-teal-400 ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} ${error ? 'dz-invalid' : ''}`}>
+      <label onDragOver={(e) => e.preventDefault()} onDrop={dropPhotos} className={`upload-zone rounded-2xl p-5 text-center block focus-within:ring-2 focus-within:ring-teal-400 ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} ${error ? 'dz-invalid' : ''}`}>
         <input type="file" className="sr-only" multiple accept={PHOTO_ACCEPT} disabled={disabled} aria-label={t('listProperty.photoUx.photoPicker')} onChange={handlePhotoUpload} />
         <div className="w-12 h-12 rounded-xl bg-teal-400/10 border border-teal-400/20 flex items-center justify-center mx-auto mb-2.5"><CloudUpload className="w-6 h-6 text-teal-400" /></div>
         <p className="text-white font-medium text-sm mb-0.5">{t('listProperty.photoUploader.addPhoto')}</p>
@@ -98,7 +106,7 @@ const PhotoUploader = ({
         <>
           <div className="flex flex-wrap gap-2 mt-4 mb-3">
             {KEY_CATS.map((k) => (
-              <span key={k} className={`text-[11px] px-2.5 py-1 rounded-full border flex items-center gap-1 ${hasCat(k) ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300' : 'bg-white/5 border-white/10 text-gray-400'}`}>
+              <span key={k} className={`dz-tag border flex ${hasCat(k) ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300' : 'bg-white/5 border-white/10 text-gray-400'}`}>
                 {hasCat(k) ? <Check className="w-3 h-3" /> : <Circle className="w-3 h-3" />} {k}
               </span>
             ))}
@@ -119,13 +127,12 @@ const PhotoUploader = ({
               >
                 <div className="relative h-[122px] group">
                   {(p.url || p.previewUrl) && <img src={p.url || p.previewUrl} alt="" draggable={false} className="w-full h-full object-cover pointer-events-none" />}
-                  {i === 0 && !p.error && <span className="absolute top-2 left-2 text-[9px] font-bold px-2 py-0.5 rounded-full bg-teal-500 text-white">{t('listProperty.photoUploader.cover')}</span>}
+                  {i === 0 && !p.error && <span className="dz-tag absolute top-2 left-2 font-bold bg-teal-500 text-white">{t('listProperty.photoUploader.cover')}</span>}
                   {p.uploading && (
                     <div className="absolute inset-0 bg-black/45 flex items-center justify-center text-pure-white text-xs gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" /> {t('listProperty.photoUx.uploading')}
                     </div>
                   )}
-                  {/* The button keeps its 44px touch target; only the disc inside it is drawn. */}
                   <button
                     type="button"
                     disabled={isMediaBusy}
@@ -170,9 +177,9 @@ const PhotoUploader = ({
                 {p.error && (
                   <div className="p-2 text-xs text-red-200">
                     <p>{p.error}</p>
-                    <button type="button" disabled={isMediaBusy} onClick={() => setPhotoCategory('__retry', i)} className="mt-2 min-h-[44px] inline-flex items-center gap-1 text-teal-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {p.retryable !== false && <button type="button" disabled={isMediaBusy} onClick={() => setPhotoCategory('__retry', i)} className="mt-2 min-h-[44px] inline-flex items-center gap-1 text-teal-200 disabled:opacity-50 disabled:cursor-not-allowed">
                       <RotateCcw className="w-3.5 h-3.5" /> {t('listProperty.photoUx.retry')}
-                    </button>
+                    </button>}
                   </div>
                 )}
               </SortablePhoto>
@@ -185,7 +192,7 @@ const PhotoUploader = ({
           </div>
           </SortableContext>
           </DndContext>
-          {uploadedCount < 3 && <p className="text-teal-300 text-xs mt-2">{t('listProperty.photoUploader.threePhotoHint')}</p>}
+          {uploadedCount < MIN_PUBLISH_PHOTOS && <p className="text-teal-300 text-xs mt-2">{t('listProperty.photoUploader.minPhotoHint', { count: MIN_PUBLISH_PHOTOS })}</p>}
         </>
       )}
     </div>

@@ -8,7 +8,6 @@ export default function LocationTab({ ctx }) {
   const { soc, hasCoords, dirUrl, commute } = ctx;
   return (
             <>
-            {/* Location & connectivity */}
             {!soc._generic ? (
               <section className="reveal">
                 <div className="flex items-start justify-between gap-3 mb-1.5">
@@ -18,13 +17,11 @@ export default function LocationTab({ ctx }) {
                   ) : null}
                 </div>
                 <Link to={`/locality/${soc.localitySlug}`} className="text-xs font-medium text-brand-teal-3 hover:underline inline-flex items-center gap-1 mb-3">{t('society.localityInsights')} <Icon name="arrow-right" className="w-3.5 h-3.5" /></Link>
-                {/* Full-bleed map tile */}
                 <SocietyMap lat={hasCoords ? soc.lat : null} lng={hasCoords ? soc.lng : null} name={soc.name} height={340} />
                 {!hasCoords ? (
                   <p className="text-xs text-slate-500 mt-2 mb-4">{t('society.locationNotSet')}</p>
                 ) : <div className="mb-4" />}
                 <div className="space-y-4">
-                  {/* Commute to work — same tile pattern as the property Location tab */}
                   {commute.legs.length ? (
                     <div>
                       <div className="flex items-center justify-between mb-2.5">

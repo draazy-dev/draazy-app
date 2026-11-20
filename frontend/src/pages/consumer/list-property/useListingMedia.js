@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { uploadPhoto } from '../../../services/photoService.js';
 import usePhotoLimit from '../../../lib/uploads/usePhotoLimit.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const MAX_PARALLEL_PHOTO_UPLOADS = 3;
 const moveItem = (items, from, to) => {
@@ -18,6 +19,7 @@ export default function useListingMedia({ setErrors }) {
   const [mediaStatus, setMediaStatus] = useState('');
   const operation = useRef(null);
   const uploadSeq = useRef(0);
+  const restoreSeq = useRef(0);
   const previewUrls = useRef(new Set());
   useEffect(() => () => {
     operation.current?.abort();
@@ -53,7 +55,7 @@ export default function useListingMedia({ setErrors }) {
     } catch (error) {
       if (controller.signal.aborted) return;
       setPhotos((prev) => prev.map((photo) => (photo.id === slot.id
-        ? { ...photo, uploading: false, error: error.message || 'Upload failed. Please try again.' }
+        ? { ...photo, uploading: false, error: userMessage(error, 'Upload failed. Please try again.'), retryable: error.retryable !== false }
         : photo)));
     }
   };
@@ -67,7 +69,7 @@ export default function useListingMedia({ setErrors }) {
     if (!controller) return;
     const available = Math.max(0, maxPhotos - photos.length);
     const batch = picked.slice(0, available);
-    const failures = picked.length > available ? [`Only ${maxPhotos} photos are allowed. Extra selections were skipped.`] : [];
+    const skipped = picked.length - batch.length;
     clearError('photos');
     const slots = batch.map((file) => {
       const previewUrl = URL.createObjectURL(file);
@@ -95,7 +97,7 @@ export default function useListingMedia({ setErrors }) {
           done += 1;
         }
       }));
-      if (failures.length) setError('photos', failures.join(' '));
+      if (skipped) setError('photos', `capped:${skipped}`);
     } finally { finish(controller); }
   };
   const retryPhoto = async (i) => {
@@ -123,6 +125,7 @@ export default function useListingMedia({ setErrors }) {
     });
   };
   const resetMedia = () => {
+    restoreSeq.current += 1;
     operation.current?.abort();
     operation.current = null;
     previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
@@ -132,12 +135,34 @@ export default function useListingMedia({ setErrors }) {
     setVideoName('');
     setMediaStatus('');
   };
+  const restorePhotos = useCallback((saved) => {
+    const seq = ++restoreSeq.current;
+    setPhotos(saved);
+    const loads = (url) => new Promise((resolve) => {
+      const probe = new Image();
+      probe.onload = () => resolve(true);
+      probe.onerror = () => resolve(false);
+      probe.src = url;
+    });
+    const missing = async (urls) => (await Promise.all(urls.map(loads))).flatMap((ok, i) => (ok ? [] : [urls[i]]));
+    (async () => {
+      let gone = await missing(saved.map(({ url }) => url));
+      if (gone.length) {
+        await new Promise((resolve) => { setTimeout(resolve, 2000); });
+        gone = await missing(gone);
+      }
+      if (!gone.length || !navigator.onLine || seq !== restoreSeq.current) return;
+      const dead = new Set(gone);
+      setPhotos((prev) => prev.filter((photo) => !dead.has(photo.url)));
+      setErrors((prev) => ({ ...prev, photos: `expired:${dead.size}` }));
+    })();
+  }, [setErrors]);
 
   return {
     photos, setPhotos,
     video, setVideo,
     videoName, setVideoName,
     mediaStatus, isMediaBusy: !!mediaStatus, isMediaProcessing: () => !!operation.current, maxPhotos,
-    handlePhotoUpload, removePhoto, setPhotoCategory, retryPhoto, resetMedia,
+    handlePhotoUpload, removePhoto, setPhotoCategory, retryPhoto, resetMedia, restorePhotos,
   };
 }

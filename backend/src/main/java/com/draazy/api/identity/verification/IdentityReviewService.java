@@ -9,9 +9,11 @@ import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.IdentityAlreadyRegisteredException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.persistence.AfterCommit;
 import com.draazy.api.common.persistence.ConstraintViolations;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.trust.OwnerBadgeSink;
+import com.draazy.api.identity.user.PersonNames;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.provider.DecisionMessenger;
@@ -23,19 +25,14 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class IdentityReviewService {
-
     private static final Logger log = LoggerFactory.getLogger(IdentityReviewService.class);
 
     private static final String IDENTITY_HASH_CONSTRAINT = "identity_verifications_identity_hash_key";
@@ -54,12 +51,12 @@ public class IdentityReviewService {
     private final AuditService audit;
     private final Clock clock;
     private final IdentityReviewReadService read;
-    private final double qaSampleRate;
+    private final PersonNames personNames;
 
     public IdentityReviewService(IdentityVerificationRepository verifications, UserRepository users,
             IdentityHasher hasher, OwnerBadgeSink ownerBadge, Notifier notifier,
             DecisionMessenger decisionMessenger, AuditService audit, Clock clock, IdentityReviewReadService read,
-            @Value("${draazy.identity.qa-sample-rate:0.25}") double qaSampleRate) {
+            PersonNames personNames) {
         this.verifications = verifications;
         this.users = users;
         this.hasher = hasher;
@@ -69,7 +66,7 @@ public class IdentityReviewService {
         this.audit = audit;
         this.clock = clock;
         this.read = read;
-        this.qaSampleRate = qaSampleRate;
+        this.personNames = personNames;
     }
 
     @Transactional(readOnly = true)
@@ -115,6 +112,7 @@ public class IdentityReviewService {
         }
         Instant now = Instant.now(clock);
         String legalName = normaliseName(body.name());
+        personNames.require(legalName.replace("\u200C", "").replace("\u200D", ""));
         v.setIdentityHash(hash);
         v.setDocLast4(IdentityNumbers.last4(canonical));
         v.setHolderName(legalName);
@@ -127,16 +125,17 @@ public class IdentityReviewService {
         v.setDecidedAt(now);
         v.setClaimedBy(null);
         v.setClaimedAt(null);
-        if (shouldSampleQa(v)) {
-            v.setQaSampledAt(now);
-        }
         flushIdentityHash();
 
         User user = users.findById(v.getUserId())
                 .orElseThrow(() -> new NotFoundException("User not found"));
         String oldName = user.getName();
+        String oldGender = user.getGender();
         user.setName(legalName);
         user.setVerified(true);
+        if (body.gender() != null) {
+            user.correctGender(body.gender());
+        }
         users.saveAndFlush(user);
         verifications.saveAndFlush(v);
         int listings = ownerBadge.markOwnerVerified(user.getId());
@@ -144,14 +143,15 @@ public class IdentityReviewService {
                 reviewer == null ? null : reviewer.userId(), listings);
 
         UUID userId = user.getId();
-        notifier.notify(userId, "identity.approved", "You're verified",
+        notifier.notify(userId, "identity.approved", "Your KYC is done",
                 "Your identity has been confirmed. Your profile name now matches your ID: " + legalName,
                 VERIFIED_BADGE_LINK);
         recordUserNameAudit(reviewer, userId, oldName, legalName, v.getId());
         recordAudit(reviewer, "identity.verification.approved", v,
                 "docType", v.getDocType(), "userId", v.getUserId().toString(),
                 "numberOverridden", String.valueOf(numberOverridden),
-                "poseChallenge", String.valueOf(v.getLivenessChallenge()));
+                "poseChallenge", String.valueOf(v.getLivenessChallenge()),
+                "genderBefore", String.valueOf(oldGender), "genderAfter", String.valueOf(user.getGender()));
         return read.currentReview(reviewer, v);
     }
 
@@ -202,15 +202,9 @@ public class IdentityReviewService {
         if (!VerificationStatuses.VERIFIED.equals(v.getStatus())) {
             throw new ConflictException("Only a verified identity can be revoked");
         }
-        requireNoOpenQaByMaker(reviewer, v);
         Instant now = Instant.now(clock);
         String reason = body.reason().trim();
         requireReasonLength(reason);
-        revokeVerified(reviewer, v, reason, now);
-        return read.currentReview(reviewer, v);
-    }
-
-    void revokeVerified(AuthPrincipal reviewer, IdentityVerification v, String reason, Instant now) {
         v.setStatus(VerificationStatuses.REVOKED);
         v.setRevokedAt(now);
         v.setRevokedBy(reviewer.userId());
@@ -228,11 +222,12 @@ public class IdentityReviewService {
         log.info("identity revoked user={} reviewer={} listingsCleared={}", user.getId(), reviewer.userId(), listings);
         UUID userId = user.getId();
         String mobile = user.getMobile();
-        notifier.notify(userId, "identity.revoked", "Verified badge withdrawn", reason, "/verify-identity");
+        notifier.notify(userId, "identity.revoked", "KYC done badge withdrawn", reason, "/verify-identity");
         sendWhatsapp(userId, mobile,
-                "Your Draazy verified badge was withdrawn. Open the app to see the reason and submit again.");
+                "Your Draazy KYC done badge was withdrawn. Open the app to see the reason and submit again.");
         recordAudit(reviewer, "identity.verification.revoked", v,
                 "reason", reason, "userId", v.getUserId().toString());
+        return read.currentReview(reviewer, v);
     }
 
     private void requireFreshClaimHolderOrUnclaimed(AuthPrincipal reviewer, IdentityVerification v) {
@@ -251,21 +246,6 @@ public class IdentityReviewService {
         String name = users.findById(v.getClaimedBy()).map(User::getName).orElse("another reviewer");
         throw new ConflictException(ErrorCodes.IDENTITY_CASE_CLAIMED,
                 "This case is claimed by " + name);
-    }
-
-    private boolean shouldSampleQa(IdentityVerification v) {
-        return !"passed".equals(v.getLiveness())
-                || v.getLivenessChallenge() == null
-                || v.isNumberOverridden()
-                || isResubmission(v)
-                || ThreadLocalRandom.current().nextDouble() < qaSampleRate;
-    }
-
-    private static boolean isResubmission(IdentityVerification v) {
-        return v.getAttemptCount() > 1
-                || (v.getCreatedAt() != null
-                && v.getSubmittedAt() != null
-                && v.getSubmittedAt().isAfter(v.getCreatedAt().plus(Duration.ofSeconds(1))));
     }
 
     private static String normaliseName(String value) {
@@ -311,17 +291,6 @@ public class IdentityReviewService {
         }
     }
 
-    private static void requireNoOpenQaByMaker(AuthPrincipal reviewer, IdentityVerification v) {
-        if (reviewer != null
-                && v.getReviewerId() != null
-                && reviewer.userId().equals(v.getReviewerId())
-                && v.getQaSampledAt() != null
-                && v.getQaReviewedAt() == null) {
-            throw new ConflictException(ErrorCodes.IDENTITY_QA_OPEN,
-                    "This sampled approval is still awaiting QA review");
-        }
-    }
-
     private void flushIdentityHash() {
         try {
             verifications.flush();
@@ -336,21 +305,8 @@ public class IdentityReviewService {
 
     private void sendWhatsapp(UUID userId, String mobile, String line) {
         if (notifier.allowsWhatsapp(userId)) {
-            afterCommit(() -> decisionMessenger.sendIdentityDecision(mobile, line));
+            AfterCommit.run(() -> decisionMessenger.sendIdentityDecision(mobile, line));
         }
-    }
-
-    private static void afterCommit(Runnable callback) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            callback.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                callback.run();
-            }
-        });
     }
 
     private record ConfirmedDob(LocalDate value, boolean yearOnly) {
@@ -426,5 +382,4 @@ public class IdentityReviewService {
             throw new ConflictException("This case has already been decided");
         }
     }
-
 }

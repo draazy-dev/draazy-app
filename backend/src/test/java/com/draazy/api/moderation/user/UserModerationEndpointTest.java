@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.draazy.api.common.trust.MobileMask;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -16,8 +16,10 @@ import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,24 +29,20 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-// Suspend, verified badge and review-flag actions. Load-bearing: aSuspendedAccountCannotSignIn —
-// writing status='suspended' without AuthService reading it would only produce a badge.
 @DisplayName("V77 — suspend, badge and flag")
 class UserModerationEndpointTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
 
     @PersistenceContext
     EntityManager em;
 
-    /** The service and this test share one transaction, but raw SQL cannot see unflushed entities. */
     private void flushSoRawSqlCanSeeIt() {
         em.flush();
     }
 
-    // Audit rows are REQUIRES_NEW so they outlive class rollback; leaving them would poison the
-    // entity-id filter test below, which counts.
+    // Audit rows are REQUIRES_NEW and outlive the class rollback; leaving them would poison
+    // the entity-id filter test below, which counts.
     @AfterEach
     void clearCommittedAuditRows() {
         jdbc.update("DELETE FROM audit_log WHERE action LIKE 'user.%'");
@@ -81,8 +79,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .content("{\"reason\":\"listings look fake\"}"))
                 .andExpect(status().isOk());
 
-        // Flush before clear: the route ran inside this test's transaction, so detaching without
-        // flushing throws the status write away and reports "active".
         flushSoRawSqlCanSeeIt();
         em.clear();
         User reloaded = users.findById(target.getId()).orElseThrow();
@@ -180,8 +176,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.message").value("You cannot suspend your own account"));
     }
 
-    // Reactivate refuses an archived account (rather than silently promoting) because the
-    // archived-to-active path has a live-email collision guard this route does not.
     @Test
     @DisplayName("reactivate refuses an archived account and points at restore")
     void reactivateIsNotRestore() throws Exception {
@@ -206,7 +200,7 @@ class UserModerationEndpointTest extends AbstractApiTest {
         mvc.perform(get(Routes.Users.BASE).param("q", "9877000032").param("counts", "true")
                         .header(HttpHeaders.AUTHORIZATION, bearer(actor)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].mobile").value("98XXXXX032"))
+                .andExpect(jsonPath("$.content[0].mobile").value("9877000032"))
                 .andExpect(jsonPath("$.content[0].badgePending").doesNotExist())
                 .andExpect(jsonPath("$.content[0].email").doesNotExist())
                 .andExpect(jsonPath("$.content[0].lastActive").doesNotExist())
@@ -388,8 +382,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
         assertThat(users.findById(target.getId()).orElseThrow().isFlagged()).isFalse();
     }
 
-    // The flag is a note between moderators about the holder, so the /me route must not carry it;
-    // boxed on the record so an omitted value does not render as false.
     @Test
     @DisplayName("the review flag never appears on the account holder's own profile")
     void ownProfileDoesNotCarryTheFlag() throws Exception {
@@ -483,8 +475,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    // Without this filter the audit log is browsable only by time, useless for a case — and it is
-    // what lets the badge and flag routes store no provenance of their own.
     @Test
     @DisplayName("admin edit cannot change a verified user's name")
     void adminNameChangeIsLockedForVerifiedUsers() throws Exception {
@@ -517,7 +507,7 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .content("{\"name\":\"Renamed Owner\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Renamed Owner"))
-                .andExpect(jsonPath("$.mobile").value(MobileMask.mask(target.getMobile())))
+                .andExpect(jsonPath("$.mobile").value(target.getMobile()))
                 .andExpect(jsonPath("$.email").doesNotExist());
 
         String metadata = jdbc.queryForObject("""
@@ -556,8 +546,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].entityId").value(target.getId().toString()));
     }
 
-    // The account line is the one entry every user has, so a brand-new account must still come
-    // back with exactly one event rather than an empty list.
     @Test
     @DisplayName("a new account's timeline is its creation and nothing else")
     void timelineAlwaysHasTheAccountLine() throws Exception {
@@ -573,8 +561,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[0].entityId").value(target.getId().toString()));
     }
 
-    // Cross at least one module boundary; a moderation action is the cheapest second source and
-    // pins the audit join — the one arm of the union keyed on text rather than uuid.
     @Test
     @DisplayName("the timeline unions moderation actions with the account line")
     void timelineIncludesModerationActions() throws Exception {
@@ -597,8 +583,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[1].kind").value("account"));
     }
 
-    // An empty timeline is a normal answer for a new account, so a mistyped id must not render as
-    // "this person has done nothing" — see UserModerationService#timeline.
     @Test
     @DisplayName("an unknown id is 404, not an empty timeline")
     void timelineRefusesAnUnknownId() throws Exception {
@@ -608,8 +592,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-    // Admin-only despite users:read, because one arm of the union is the audit log (admin-only) —
-    // staff reaching this would get moderation history through an unlocked door.
     @Test
     @DisplayName("staff cannot read a timeline either")
     void timelineIsAdminOnly() throws Exception {
@@ -621,7 +603,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
-    // guards
     @Test
     @DisplayName("staff cannot reach any of the four")
     void staffAreRefused() throws Exception {
@@ -643,7 +624,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
     }
 
     private MockHttpServletResponse otpLoginResponse(String mobile) throws Exception {
-
         flushSoRawSqlCanSeeIt();
         jdbc.update("DELETE FROM otp_codes WHERE mobile = ?", mobile);
         em.clear();
@@ -656,7 +636,7 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 UPDATE otp_codes SET code_hash = ?
                 WHERE id = (SELECT id FROM otp_codes WHERE mobile = ?
                             ORDER BY created_at DESC LIMIT 1)""",
-                sha256Hex("424242"), mobile);
+                otpHash("424242"), mobile);
 
         em.clear();
         return mvc.perform(post(Routes.Auth.LOGIN)
@@ -665,13 +645,25 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andReturn().getResponse();
     }
 
-    private static String sha256Hex(String value) throws Exception {
-        byte[] digest = MessageDigest.getInstance("SHA-256")
-                .digest(value.getBytes(StandardCharsets.UTF_8));
-        StringBuilder hex = new StringBuilder(digest.length * 2);
-        for (byte b : digest) {
-            hex.append("%02x".formatted(b));
-        }
-        return hex.toString();
+
+    @Test
+    @DisplayName("days limits the directory to people who joined in the last N IST days")
+    void daysFiltersByJoinedAt() throws Exception {
+        User actor = person("9871502001", Roles.Wire.ADMIN);
+        person("9871502002", Roles.Wire.BUYER);
+        User yesterday = person("9871502003", Roles.Wire.BUYER);
+        Instant yesterdayLate = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                .minus(1, ChronoUnit.MINUTES);
+        jdbc.update("update users set created_at = ? where id = ?", Timestamp.from(yesterdayLate), yesterday.getId());
+
+        assertThat(directoryNames(actor, null)).hasSize(3);
+        assertThat(directoryNames(actor, "1")).containsExactlyInAnyOrder("V77 probe 9871502001", "V77 probe 9871502002");
+        assertThat(directoryNames(actor, "7")).hasSize(3);
     }
-}
+
+    private List<String> directoryNames(User actor, String days) throws Exception {
+        var req = get(Routes.Users.BASE).header(HttpHeaders.AUTHORIZATION, bearer(actor)).param("q", "v77 probe 98715020");
+        if (days != null) req = req.param("days", days);
+        String body = mvc.perform(req).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return com.jayway.jsonpath.JsonPath.read(body, "$.content[*].name");
+    }}

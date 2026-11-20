@@ -2,8 +2,6 @@ package com.draazy.api.provider.whatsapp;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-// Meta WhatsApp Cloud API credentials and the on/off flag for every WhatsApp-backed provider.
-// `enabled` binds the key but must not gate behaviour; docs/system/profiles.md#vendor-flags.
 @ConfigurationProperties("draazy.providers.whatsapp")
 public record WhatsAppProperties(
         boolean enabled,
@@ -16,9 +14,27 @@ public record WhatsAppProperties(
         String identityTemplateName,
         String identityTemplateLang,
         String digestTemplateName,
-        String digestTemplateLang) {
+        String digestTemplateLang,
+        String ownerNoticeTemplateName,
+        String ownerNoticeTemplateLang,
+        String ownerNoticePhoneNumberId,
+        String serviceTemplateName,
+        String serviceTemplateLang,
+        String agreementInviteTemplateName,
+        String agreementInviteTemplateLang,
+        String referralInviteTemplateName,
+        String referralInviteTemplateLang,
+        String referralInvitePhoneNumberId) {
+    public String ownerNoticeSender() {
+        return ownerNoticePhoneNumberId == null || ownerNoticePhoneNumberId.isBlank()
+                ? phoneNumberId : ownerNoticePhoneNumberId;
+    }
 
-    // Redact the bearer token; accidental logging would require rotation.
+    public String referralInviteSender() {
+        return referralInvitePhoneNumberId == null || referralInvitePhoneNumberId.isBlank()
+                ? phoneNumberId : referralInvitePhoneNumberId;
+    }
+
     @Override
     public String toString() {
         return "WhatsAppProperties[enabled=" + enabled
@@ -32,6 +48,16 @@ public record WhatsAppProperties(
                 + ", identityTemplateName=" + identityTemplateName
                 + ", identityTemplateLang=" + identityTemplateLang
                 + ", digestTemplateName=" + digestTemplateName
-                + ", digestTemplateLang=" + digestTemplateLang + "]";
+                + ", digestTemplateLang=" + digestTemplateLang
+                + ", ownerNoticeTemplateName=" + ownerNoticeTemplateName
+                + ", ownerNoticeTemplateLang=" + ownerNoticeTemplateLang
+                + ", ownerNoticePhoneNumberId=" + ownerNoticePhoneNumberId
+                + ", serviceTemplateName=" + serviceTemplateName
+                + ", serviceTemplateLang=" + serviceTemplateLang
+                + ", agreementInviteTemplateName=" + agreementInviteTemplateName
+                + ", agreementInviteTemplateLang=" + agreementInviteTemplateLang
+                + ", referralInviteTemplateName=" + referralInviteTemplateName
+                + ", referralInviteTemplateLang=" + referralInviteTemplateLang
+                + ", referralInvitePhoneNumberId=" + referralInvitePhoneNumberId + "]";
     }
 }

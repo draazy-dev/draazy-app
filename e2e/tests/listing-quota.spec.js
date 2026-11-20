@@ -2,6 +2,7 @@ import { expect, test } from '../fixtures/live.js';
 import { ACTORS } from '../fixtures/live.js';
 import { signedInAs, authHeaders, API, uniqueMobile } from '../helpers/liveAuth.js';
 import { newListing } from '../helpers/monetisation.js';
+import { gotoSettled } from '../helpers/settle.js';
 
 test.describe('Listing quota — live', () => {
   test('the server, not the browser, decides the ceiling and the count', async ({ request }) => {
@@ -16,7 +17,7 @@ test.describe('Listing quota — live', () => {
     expect(listings).not.toHaveProperty('referralBonus');
     expect(listings.passes).toEqual([]);
     // Present and zero, not absent.
-    expect(agreements.free).toBe(0);
+    expect(agreements).toMatchObject({ credits: 0, used: 0, remaining: 0 });
 
     const mine = await request.get(`${API}/me/listings`, { headers });
     expect(mine.status()).toBe(200);
@@ -39,21 +40,22 @@ test.describe('Listing quota — live', () => {
     await signedInAs(page, ACTORS.owner);
 
     await test.step('the form opens: the tier is applied when a listing is approved, not when it is drafted', async () => {
-      await page.goto('/list-property', { waitUntil: 'networkidle' });
+      await gotoSettled(page, '/list-property');
       await expect(page.getByTestId('listing-wizard')).toBeVisible({ timeout: 15000 });
       await expect(page.locator('[data-err="propertyType"]')).toBeVisible({ timeout: 15000 });
       await expect(page.getByText(/used your free listing/i)).toHaveCount(0);
       await expect(page.getByText(/^\d+ of 1 free live listing used$/)).toBeVisible();
-      await expect(page.getByText(/Go live with a ₹999 pass or pause the other/)).toBeVisible();
+      await expect(page.getByText(/Go live with a ₹[\d,]+ pass or pause the other/)).toBeVisible();
     });
 
     // Flatmate rooms do not occupy listing slots, so this path was never tiered.
-    await test.step('the flatmate flow opens, and the whole-flat flow is one tap away', async () => {
-      await page.goto('/list-property?flatmate=1', { waitUntil: 'networkidle' });
+    await test.step('the room flow opens straight on the room, without re-asking what is being posted', async () => {
+      await gotoSettled(page, '/list-property?flatmate=1');
       await expect(page.getByTestId('listing-wizard')).toBeVisible({ timeout: 15000 });
-      await page.getByText('Rent out the whole place').click();
-      await expect(page.getByTestId('listing-wizard')).toBeVisible();
-      await expect(page.getByText('Find a flatmate')).toBeVisible();
+      await expect(page.getByRole('group', { name: 'Room type', exact: true })).toBeVisible();
+      await expect(page.getByText('Rent out the whole place')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Sale', exact: true })).toHaveCount(0);
+      await expect(page.getByText(/^\d+ of 1 free live listing used$/)).toHaveCount(0);
     });
   });
 
@@ -67,7 +69,7 @@ test.describe('Listing quota — live', () => {
 
     await signedInAs(page, mobile);
     const slots = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/me/listings/quota');
-    await page.goto('/list-property', { waitUntil: 'networkidle' });
+    await gotoSettled(page, '/list-property');
 
     await expect(page.getByTestId('listing-wizard')).toBeVisible({ timeout: 15000 });
     expect(await (await slots).json()).toEqual({ used: 0, allowance: 1 });

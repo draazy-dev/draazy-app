@@ -46,6 +46,9 @@ const DASHBOARD_SECTIONS = [
 for (const [name, url] of [['dashboard', '/dashboard'], ['owner hub', '/owner-hub']]) {
   test(`the ${name} reads its inbox sections once, from /me/dashboard`, async ({ page, login, consoleErrors }) => {
     await login.asOwner();
+    // The post-login landing page can still be reading /me/bootstrap; leave it before counting.
+    // A same-origin static file, because about:blank denies the init scripts' storage access.
+    await page.goto('/robots.txt');
     const gets = countGets(page);
     const dashboardRead = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/me/dashboard');
     await page.goto(url);
@@ -80,9 +83,9 @@ test('a seeker dashboard carries rental flags, not tenancies, and never reads or
 
   // Past the seeds' 5s window, so the tab-return refresh goes to the network.
   await page.waitForTimeout(6000);
-  const visitsBefore = gets.timesPath('/api/visits');
+  const docsBefore = gets.timesPath('/api/me/dashboard');
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await expect.poll(() => gets.timesPath('/api/visits')).toBeGreaterThan(visitsBefore);
+  await expect.poll(() => gets.timesPath('/api/me/dashboard')).toBeGreaterThan(docsBefore);
   await page.waitForTimeout(1000);
   for (const path of OWNER_INBOXES) expect(gets.timesPath(path), path).toBe(0);
   expect(consoleErrors).toEqual([]);
@@ -157,7 +160,6 @@ test('the societies directory reads one filtered page, then the next on Show mor
   await page.getByRole('button', { name: /show more/i }).click();
   await expect.poll(() => gets.timesPath('/api/societies')).toBe(2);
   expect(gets.keys()).toContain('/api/societies?sort=relevance&page=1&size=24');
-  expect(gets.timesPath('/api/localities'), 'the locality filter searches; it never downloads the directory').toBe(0);
   expect(consoleErrors).toEqual([]);
 });
 
@@ -206,8 +208,8 @@ test('an admin page makes one light bell request, not three list reads', async (
   }
   expect(body.length, 'five slim rows per section, not five full admin rows').toBeLessThan(3_000);
 
-  await page.getByRole('button', { name: 'Notifications' }).click();
-  await page.getByRole('button', { name: 'Notifications' }).click();
+  await page.getByRole('button', { name: 'Notifications', exact: true }).click();
+  await page.getByRole('button', { name: 'Notifications', exact: true }).click();
   await page.waitForTimeout(500);
   expect(gets.timesPath('/api/admin/bell'), 'opening and closing the bell does not refetch it').toBe(1);
   expect(consoleErrors).toEqual([]);
@@ -249,19 +251,19 @@ const DESKS = [
     },
   },
   {
-    name: 'support reads the queue once, with the tab counts on it',
+    name: 'support chats reads the inbox once and the tab counts once',
     url: '/admin/support',
-    ready: /Support/,
-    once: ['/api/admin/support-tickets'],
-    never: [],
+    ready: /Support chats/,
+    once: ['/api/admin/support/chats', '/api/admin/support/chats/counts'],
+    never: ['/api/admin/support-tickets'],
     check: (gets) => expect(gets.keys().filter((k) => /[?&]size=1(&|$)/.test(k))).toEqual([]),
   },
   {
-    name: 'flatmates reads one moderation queue for every kind and state',
+    name: 'flatmates reads one moderation queue for every kind and state, and no badge-claim list until the Badge requests tab opens',
     url: '/admin/flatmates',
     ready: /Flatmate/i,
-    once: ['/api/admin/flatmates/moderation', '/api/admin/group-applications', '/api/admin/flatmate-reviews'],
-    never: [],
+    once: ['/api/admin/flatmates/moderation', '/api/admin/group-applications'],
+    never: ['/api/admin/flatmate-reviews'],
     check: () => {},
   },
   {
@@ -308,7 +310,7 @@ for (const d of DESKS) {
     await login.asAdmin();
     const gets = countGets(page);
     await page.goto(d.url);
-    await expect(page.getByText(d.ready).first()).toBeVisible();
+    await expect(page.getByRole('main').getByText(d.ready).first()).toBeVisible();
     await page.waitForTimeout(1000);
 
     for (const path of d.once) expect(gets.timesPath(path), path).toBe(1);
@@ -350,8 +352,8 @@ test('My Listings draws its chips from the listing rows and a row action re-read
     }
 
     const before = calls.length;
-    page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Pause', exact: true }).click();
+    await page.getByTestId('confirm-modal-ok').click();
     await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
     await page.waitForTimeout(1000);
     expect(calls.slice(before).filter((c) => c.startsWith('GET ') && /\/api\/me\/(listings|contact-requests|deals|dashboard)/.test(c))).toEqual([]);

@@ -1,6 +1,8 @@
 package com.draazy.api.identity.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.ResultActions;
 
 @DisplayName("PATCH /auth/me profile updates")
 class UserProfileUpdateTest extends AbstractApiTest {
@@ -79,6 +82,97 @@ class UserProfileUpdateTest extends AbstractApiTest {
                         .content("{\"name\":\"New Name\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("New Name"));
+    }
+
+    @Test
+    @DisplayName("oversized email, city and avatar are rejected")
+    void freeTextFieldsAreBounded() throws Exception {
+        User user = user("Old Name", false);
+        for (String body : new String[] {
+                "{\"email\":\"" + "a".repeat(64) + "@" + ("b".repeat(49) + ".").repeat(4) + "test\"}",
+                "{\"city\":\"" + "P".repeat(81) + "\"}",
+                "{\"avatar\":\"https://x.test/" + "a".repeat(2048) + "\"}"}) {
+            mvc.perform(patch(Routes.Auth.ME)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(user))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+    }
+
+    private ResultActions patchGender(User user, String gender)
+            throws Exception {
+        return patchGender(user, gender, false);
+    }
+
+    private ResultActions patchGender(User user, String gender, boolean change)
+            throws Exception {
+        return mvc.perform(patch(Routes.Auth.ME)
+                .header(HttpHeaders.AUTHORIZATION, bearer(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"gender\":\"" + gender + "\"" + (change ? ",\"changeGender\":true" : "") + "}"));
+    }
+
+    @Test
+    @DisplayName("gender can be changed twice after it is set, then locks; the same value is a free no-op")
+    void genderChangesAreCapped() throws Exception {
+        User user = user("Asha", false);
+
+        patchGender(user, "female").andExpect(status().isOk())
+                .andExpect(jsonPath("$.gender").value("female"))
+                .andExpect(jsonPath("$.genderChangesLeft").value(2));
+        patchGender(user, "female").andExpect(status().isOk())
+                .andExpect(jsonPath("$.genderChangesLeft").value(2));
+        patchGender(user, "male").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("already set")));
+        patchGender(user, "male", true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.gender").value("male"))
+                .andExpect(jsonPath("$.genderChangesLeft").value(1));
+        patchGender(user, "female", true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.genderChangesLeft").value(0));
+        mvc.perform(get(Routes.Auth.ME).header(HttpHeaders.AUTHORIZATION, bearer(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.gender").value("female"))
+                .andExpect(jsonPath("$.genderChangesLeft").value(0));
+        patchGender(user, "male", true).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("used all your gender changes")));
+        patchGender(user, "female", true).andExpect(status().isOk());
+
+        em.flush();
+        assertThat(jdbc.queryForObject("select gender from users where id = ?", String.class, user.getId()))
+                .isEqualTo("female");
+    }
+
+    @Test
+    @DisplayName("an ID-verified profile cannot change its gender from self-service")
+    void verifiedGenderIsLocked() throws Exception {
+        User user = user("Meera", true);
+        user.correctGender("female");
+        users.saveAndFlush(user);
+
+        mvc.perform(get(Routes.Auth.ME).header(HttpHeaders.AUTHORIZATION, bearer(user)))
+                .andExpect(jsonPath("$.genderChangesLeft").value(0));
+        patchGender(user, "male", true).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("confirmed from your ID")));
+
+        em.flush();
+        assertThat(jdbc.queryForObject("select gender from users where id = ?", String.class, user.getId()))
+                .isEqualTo("female");
+    }
+
+    @Test
+    @DisplayName("gender accepts only male or female, and a patch without it leaves it alone")
+    void genderIsValidatedAndOptional() throws Exception {
+        User user = user("Ravi", false);
+
+        patchGender(user, "other").andExpect(status().isUnprocessableEntity());
+        patchGender(user, "male").andExpect(status().isOk());
+        mvc.perform(patch(Routes.Auth.ME)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(user))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"city\":\"Pune\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.gender").value("male"));
     }
 
     private static String freshMobile() {

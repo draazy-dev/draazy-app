@@ -20,11 +20,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-// `GET /admin/properties/summary` ? the console's headline counts, computed by the database.
-// Counters describe the whole table, so absolute values depend on shared suite data.
 @DisplayName("D214 — the moderation summary counts the table, not the page")
 class PropertyModerationSummaryTest extends AbstractApiTest {
-
     @Autowired
     UserRepository users;
     @Autowired
@@ -46,7 +43,6 @@ class PropertyModerationSummaryTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** The raw response body; {@link #moved} reads individual counters back out of it. */
     private String summary(User staff) throws Exception {
         return mvc.perform(get("/admin/properties/summary")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
@@ -54,7 +50,6 @@ class PropertyModerationSummaryTest extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString();
     }
 
-    // One listing per status makes dropped or duplicated filters move the wrong tile.
     @Test
     @DisplayName("each status lands on its own counter")
     void eachStatusLandsOnItsOwnCounter() throws Exception {
@@ -72,9 +67,6 @@ class PropertyModerationSummaryTest extends AbstractApiTest {
         moved(before, after, "pending", 1);
         moved(before, after, "flagged", 1);
         moved(before, after, "approved", 1);
-
-        // `rejected` has no tile of its own — it is in `total` and nowhere else, which is why
-        // `total` moves by four while the three named counters account for only three of them.
     }
 
     @Test
@@ -95,8 +87,6 @@ class PropertyModerationSummaryTest extends AbstractApiTest {
         moved(before, summary(staff), "featured", 1);
     }
 
-    // `sold` and `rented` count only in total; separate tiles would be undrainable queues.
-    // This also pins the absence of `'Under Review'`.
     @Test
     @DisplayName("a closed deal counts in total and on no queue tile")
     void closedDealsCountInTotalOnly() throws Exception {
@@ -113,8 +103,6 @@ class PropertyModerationSummaryTest extends AbstractApiTest {
         moved(before, after, "approved", 0);
     }
 
-    // Stays-live rows are approved, unarchived and searchable,
-    // so `pending` counters never reveal that queue.
     @Test
     @DisplayName("a queued re-check counts as recheck while still counting as approved")
     void recheckIsCountedSeparatelyFromApproved() throws Exception {
@@ -131,7 +119,6 @@ class PropertyModerationSummaryTest extends AbstractApiTest {
         moved(before, after, "approved", 1);
     }
 
-    // Archived is the one counter outside the `not archived` floor.
     @Test
     @DisplayName("a badge-only request counts as a badge request, not a re-check")
     void badgeRequestIsNotARecheck() throws Exception {
@@ -165,7 +152,6 @@ class PropertyModerationSummaryTest extends AbstractApiTest {
         moved(before, after, "approved", 0);
     }
 
-    // Summary counts reveal the backlog size, so they need the same guard as queue rows.
     @Test
     @DisplayName("a buyer cannot measure the backlog")
     void buyerCannotMeasureTheBacklog() throws Exception {
@@ -176,7 +162,6 @@ class PropertyModerationSummaryTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** Reads one counter from each summary and asserts the difference, naming the tile on failure. */
     private void moved(String before, String after, String counter, long expected) {
         long delta = counter(after, counter) - counter(before, counter);
         org.junit.jupiter.api.Assertions.assertEquals(expected, delta,

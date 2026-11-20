@@ -1,21 +1,17 @@
-// Shared test base. New specs should import { test, expect } from here instead
-// of '@playwright/test' to pick up the project conventions:
-//
-//   import { test, expect } from '../fixtures/base.js';
-//
-// Fixtures provided:
-//   - consoleErrors : string[] auto-collecting real console/page errors.
-//   - login         : { asBuyer, asOwner, asTenant, asAdmin, asStaff, asManager }
-//                     bound to the current page.
-//
-// baseURL comes from the Playwright config (BASE_URL env, default :5173), so
-// specs use relative paths: await page.goto('/listings').
+// Specs import { test, expect } from here, not '@playwright/test', to get the consoleErrors and login fixtures
+// and the settle() request tracker.
 
 import { test as base, expect } from '@playwright/test';
 import { trackErrors } from '../helpers/console.js';
+import { tracker } from '../helpers/settle.js';
 import * as auth from '../helpers/auth.js';
 
 export const test = base.extend({
+  // Installed before the first navigation so settle() also waits on requests already in flight.
+  page: async ({ page }, use) => {
+    tracker(page);
+    await use(page);
+  },
   consoleErrors: async ({ page }, use) => {
     const errors = trackErrors(page);
     await use(errors);

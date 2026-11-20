@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -12,6 +13,9 @@ import com.draazy.api.provider.EmailSender;
 import com.draazy.api.provider.ProviderCalls;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +29,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("/admin/integrations — provider health and call log")
 class AdminIntegrationsTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
     @Autowired ProviderCalls calls;
     @Autowired EmailSender email;
@@ -34,12 +37,17 @@ class AdminIntegrationsTest extends AbstractApiTest {
 
     private final String tag = "it-" + UUID.randomUUID();
 
-    // Rows are written by a background thread outside the test transaction, so its rollback does not remove them.
-    @AfterEach
-    void removeRows() {
+    private TransactionTemplate ownTransaction() {
         TransactionTemplate own = new TransactionTemplate(transactions);
         own.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        own.executeWithoutResult(s -> jdbc.update("DELETE FROM provider_call WHERE reference LIKE ?", tag + "%"));
+        return own;
+    }
+
+    // Rows come from a background thread outside the test transaction; rollback does not remove them.
+    @AfterEach
+    void removeRows() {
+        ownTransaction().executeWithoutResult(
+                s -> jdbc.update("DELETE FROM provider_call WHERE reference LIKE ?", tag + "%"));
     }
 
     private void awaitRows(int expected) throws InterruptedException {
@@ -117,7 +125,7 @@ class AdminIntegrationsTest extends AbstractApiTest {
                         .param("provider", "whatsapp").param("outcome", "ok")
                         .header(HttpHeaders.AUTHORIZATION, admin))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].recipient").value("98XXXXX233"))
+                .andExpect(jsonPath("$.content[0].recipient").value("9811122233"))
                 .andExpect(jsonPath("$.content[0].durationMs").value(120));
 
         mvc.perform(get(Routes.Admin.INTEGRATION_CALLS).param("q", tag + "-order")
@@ -128,6 +136,32 @@ class AdminIntegrationsTest extends AbstractApiTest {
         mvc.perform(get(Routes.Admin.INTEGRATION_CALLS).param("provider", "sms")
                         .header(HttpHeaders.AUTHORIZATION, admin))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("days keeps only calls made within the last N IST calendar days")
+    void daysWindowFiltersByCreatedAt() throws Exception {
+        calls.record(ProviderCalls.CASHFREE, "refund", ProviderCalls.Outcome.OK, null, tag + "-new", null, 10);
+        calls.record(ProviderCalls.CASHFREE, "refund", ProviderCalls.Outcome.OK, null, tag + "-old", null, 10);
+        awaitRows(2);
+        ownTransaction().executeWithoutResult(s -> jdbc.update(
+                "UPDATE provider_call SET created_at = ? WHERE reference = ?", Timestamp.from(LocalDate
+                        .now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant().minus(1, ChronoUnit.MINUTES)),
+                tag + "-old"));
+        String admin = bearer("9877720006", Roles.Wire.ADMIN);
+
+        mvc.perform(get(Routes.Admin.INTEGRATION_CALLS).param("q", tag + "-new").param("days", "1")
+                        .header(HttpHeaders.AUTHORIZATION, admin))
+                .andExpect(jsonPath("$.totalElements").value(1));
+        mvc.perform(get(Routes.Admin.INTEGRATION_CALLS).param("q", tag + "-old").param("days", "1")
+                        .header(HttpHeaders.AUTHORIZATION, admin))
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get(Routes.Admin.INTEGRATION_CALLS).param("q", tag + "-old").param("days", "7")
+                        .header(HttpHeaders.AUTHORIZATION, admin))
+                .andExpect(jsonPath("$.totalElements").value(1));
+        mvc.perform(get(Routes.Admin.INTEGRATION_CALLS).param("q", tag + "-old")
+                        .header(HttpHeaders.AUTHORIZATION, admin))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test

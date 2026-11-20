@@ -1,7 +1,8 @@
-/** Live society hub through the UI: signs a real person in, clicks the control a member clicks, and reads the result from the ops queue so a dialog that
- * closes without filing cannot pass. Needs backend :8081 (`local,e2e`); uses "Skyline Heights, Baner" except the report test, which mints its own. */
+/** Live society hub: signs a real person in, clicks what a member clicks, and reads the ops queue so a closing
+ * dialog cannot pass unfiled. Uses "Skyline Heights, Baner", except the report test, which mints its own. */
 import { test, expect } from '@playwright/test';
 import { signIn, authHeaders, uniqueMobile, API } from '../helpers/liveAuth.js';
+import { signInSheet } from '../helpers/signInSheet.js';
 import { mintSociety, seedSocietyReviews, mintPickableSociety, publishSocietyListing, retireListing } from '../helpers/liveSociety.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
@@ -29,11 +30,13 @@ test('the retired /hub aggregate read is gone, while the society itself is still
   for (const gone of ['verifiedAt', 'claimStatus', 'verified']) expect(body, `${gone} left the society response`).not.toHaveProperty(gone);
 });
 
-test('a signed-out visitor who follows a society is sent to a sign-in that names the society', async ({ page }) => {
+test('a signed-out visitor who follows a society gets a sign-in sheet that names the society', async ({ page }) => {
   await openHub(page);
+  const before = page.url();
   await page.getByRole('button', { name: 'Follow', exact: true }).click();
-  await expect(page).toHaveURL(/\/signin/, { timeout: 10000 });
-  await expect(page.getByText('Sign in to follow or review this society')).toBeVisible();
+  await expect(signInSheet(page)).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('dialog', { name: 'Sign in to follow or review this society' })).toBeVisible();
+  await expect(page).toHaveURL(before);
 });
 
 test('the hub homes come from the society read, with no separate listings search', async ({ page }) => {

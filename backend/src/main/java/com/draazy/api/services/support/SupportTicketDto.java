@@ -10,5 +10,6 @@ public record SupportTicketDto(
         String status,
         boolean unread,
         List<MessageDto> messages,
-        Instant createdAt) {
+        Instant createdAt,
+        SupportTicketAbout about) {
 }

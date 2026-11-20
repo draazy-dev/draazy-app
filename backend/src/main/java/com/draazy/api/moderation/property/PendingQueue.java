@@ -1,5 +1,6 @@
 package com.draazy.api.moderation.property;
 
+import com.draazy.api.catalog.property.Freshness;
 import com.draazy.api.catalog.property.PropertyStatus;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
@@ -7,32 +8,26 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Slim reads of the verification queue for the bell and the dashboard, which render four fields and
-// two counts; the full admin row is ten times the size.
 @Service
 public class PendingQueue {
-
-    public record Row(String id, String title, String locality, Long price, String owner) {
+    public record Row(String id, String title, String locality, Long price, String owner, String ownerMobile) {
     }
 
     public record Counts(long pending, long flagged, long followUp) {
     }
 
-    // id desc is the admin search's own tiebreak, so these rows line up with that list.
     private static final String ROWS = """
-            select p.id, p.title, p.locality, p.price, o.name
+            select p.id, p.title, p.locality, p.price, o.name, o.mobile
               from Property p join p.owner o
              where p.status = :pending and p.archived = false
              order by p.createdAt %s, p.id desc
             """;
 
-    // Follow-up = waiting past the cutoff, or posted by staff and not yet confirmed by its owner.
     private static final String COUNTS = """
             select sum(case when p.status = :pending then 1 else 0 end),
                    sum(case when p.status = :flagged then 1 else 0 end),
-                   sum(case when p.status = :pending
-                             and (p.createdAt < :staleBefore
-                                  or (p.postedByAdmin = true and p.ownerConfirmedAt is null))
+                   sum(case when p.status = :approved
+                             and coalesce(p.lastConfirmedAt, p.createdAt) <= :unconfirmedBefore
                             then 1 else 0 end)
               from Property p
              where p.archived = false
@@ -53,16 +48,17 @@ public class PendingQueue {
                 .getResultList();
         return rows.stream()
                 .map(r -> new Row(r[0].toString(), (String) r[1], (String) r[2], (Long) r[3],
-                        (String) r[4]))
+                        (String) r[4], (String) r[5]))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public Counts counts(Instant staleBefore) {
+    public Counts counts() {
         Object[] r = (Object[]) em.createQuery(COUNTS)
                 .setParameter("pending", PropertyStatus.PENDING)
                 .setParameter("flagged", PropertyStatus.FLAGGED)
-                .setParameter("staleBefore", staleBefore)
+                .setParameter("approved", PropertyStatus.APPROVED)
+                .setParameter("unconfirmedBefore", Freshness.unconfirmedBefore(Instant.now()))
                 .getSingleResult();
         return new Counts(n(r[0]), n(r[1]), n(r[2]));
     }

@@ -1,21 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
-import PropertyImage from '../../../components/ui/PropertyImage.jsx';
 import { digits, fmtPhone, isFullMobile } from '../../../lib/contact.js';
 import { formatTime } from '../../../lib/chatFormat.js';
+import { isImeComposing } from '../../../lib/isImeComposing.js';
 import { detailPath } from '../flatmates/helpers.js';
 import { ThreadAvatar } from './Inbox.jsx';
 import MessageList from './MessageList.jsx';
+import PropChip from './PropChip.jsx';
+import { useTargetCard } from './useTargetCard.js';
 
-const listingLine = (property) => [property?.bhk, property?.loc].filter(Boolean).join(' · ');
-const quickReplies = (property) => [
-  'Is it still available?',
-  'Can I visit this Saturday?',
-  property?.deal === 'sale' ? "What's the final price?" : "What's the final rent?",
-];
 const draftKey = (userId, threadId) => `dzMsgDraft:${userId || 'anon'}:${threadId}`;
-const finePointer = () => typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches;
+const INPUT_MAX_HEIGHT = 120;
 const hasPrivateContact = (text) =>
   /(^|[^\d])(?:\+?91[\s.-]*|0[\s.-]*)?[6-9](?:[\s.-]*\d){9}(?![\s.-]*\d)/.test(text)
   || /[^\s@]+@[^\s@]+\.[^\s@]+/.test(text);
@@ -53,8 +49,8 @@ export default function Thread({
   userId,
   offline,
   sendError,
+  replies = [],
 }) {
-  const navigate = useNavigate();
   const [menu, setMenu] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
   const [draft, setDraft] = useState('');
@@ -67,10 +63,12 @@ export default function Thread({
   const canCall = isFullMobile(mobile);
   const partyDigits = digits(mobile);
   const key = active ? draftKey(userId, active.id) : '';
-  const showQuick = active && !active.staged && !active.blocked && (!active.messages.length || active.messages.at(-1)?.from === 'them');
+  const showQuick = replies.length > 0 && !draft.trim();
   const showPrivacyHint = draft && !canCall && hasPrivateContact(draft);
-  const replies = useMemo(() => quickReplies(active?.property).slice(0, 3), [active?.property]);
   const previewOpen = !!preview;
+  const flatmate = active && !active.group && !active.propertyId ? active.flatmate : null;
+  const flatmateCard = useTargetCard(flatmate?.kind, flatmate?.id);
+  const listingHref = active?.propertyId ? `/property/${active.propertyId}` : flatmate ? detailPath(flatmate.kind, flatmate.id) : null;
 
   useEffect(() => {
     if (!key) return;
@@ -88,7 +86,10 @@ export default function Thread({
     const el = inputRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    el.style.overflowY = 'hidden';
+    const full = el.scrollHeight + el.offsetHeight - el.clientHeight;
+    el.style.height = `${Math.min(full, INPUT_MAX_HEIGHT)}px`;
+    if (full > INPUT_MAX_HEIGHT) el.style.overflowY = 'auto';
   };
   useEffect(resize, [draft]);
 
@@ -189,18 +190,14 @@ export default function Thread({
               <Link to={detailPath('group', active.group.id)} className="pc-hbtn" title={t('misc.msgViewGroup')} aria-label={t('misc.msgViewGroup')} data-testid="chat-view-group"><Icon name="users-round" className="w-5 h-5" /></Link>
             ) : (
               <div className="pc-head-actions">
-                {canCall ? <><a href={`tel:+91${partyDigits}`} className="pc-hbtn" title={t('misc.msgCallTitle', { phone: fmtPhone(partyDigits) })} aria-label={t('misc.msgCallAria')}><Icon name="phone" className="w-5 h-5" /></a><a href={`https://wa.me/91${partyDigits}`} target="_blank" rel="noopener noreferrer" className="pc-hbtn" title={t('misc.msgWhatsApp')} aria-label={t('misc.msgWhatsApp')}><Icon name="message-circle" className="w-5 h-5" /></a></> : <button className="pc-hbtn" disabled title={t('misc.msgNumberLockedTitle')} aria-label={t('misc.msgNumberLockedAria')}><Icon name="phone-off" className="w-5 h-5" /></button>}
+                {canCall ? <a href={`tel:+91${partyDigits}`} className="pc-hbtn" title={t('misc.msgCallTitle', { phone: fmtPhone(partyDigits) })} aria-label={t('misc.msgCallAria')}><Icon name="phone" className="w-5 h-5" /></a> : <button className="pc-hbtn" disabled title={t('misc.msgNumberLockedTitle')} aria-label={t('misc.msgNumberLockedAria')}><Icon name="phone-off" className="w-5 h-5" /></button>}
                 <button className="pc-hbtn" onClick={() => setMenu((v) => !v)} aria-label="Conversation actions"><Icon name="more-vertical" className="w-5 h-5" /></button>
-                {menu ? <div className="pc-menu"><Link to={`/property/${active.propertyId}`}>View listing</Link><button onClick={() => { setMenu(false); onState(active.id, { archived: !active.archived }); }}>{active.archived ? 'Unarchive' : 'Archive'}</button><button onClick={() => { setMenu(false); onState(active.id, { muted: !active.muted }); }}>{active.muted ? 'Unmute' : 'Mute'}</button><button onClick={() => { setMenu(false); onBlock(active.id, !active.blocked); }}>{active.blocked ? 'Unblock' : 'Block'}</button><button aria-label="Report this user" onClick={() => { setMenu(false); onReport(); }}>Report this user</button></div> : null}
+                {menu ? <div className="pc-menu">{listingHref ? <Link to={listingHref}>View listing</Link> : null}<button onClick={() => { setMenu(false); onState(active.id, { archived: !active.archived }); }}>{active.archived ? 'Unarchive' : 'Archive'}</button><button onClick={() => { setMenu(false); onState(active.id, { muted: !active.muted }); }}>{active.muted ? 'Unmute' : 'Mute'}</button><button onClick={() => { setMenu(false); onBlock(active.id, !active.blocked); }}>{active.blocked ? 'Unblock' : 'Block'}</button><button aria-label="Report this user" onClick={() => { setMenu(false); onReport(); }}>Report this user</button></div> : null}
               </div>
             )}
           </div>
-          {!active.group && active.propertyId ? <div className={'pc-propchip' + (active.property?.available === false ? ' unavailable' : '')}>
-            {active.property?.available === false ? <div className="pc-prop-empty"><Icon name="home" className="w-5 h-5" /></div> : <PropertyImage src={active.property.img} alt="" />}
-            <div className="t"><p>{active.property.title}</p><p>{active.property?.available === false ? 'No longer listed' : [active.property.price, listingLine(active.property)].filter(Boolean).join(' · ')}</p></div>
-            {active.property?.available !== false ? <button type="button" onClick={() => navigate(`/schedule-visit?listing=${active.propertyId}`)}>Schedule visit</button> : null}
-            <Link to={`/property/${active.propertyId}`}>{t('misc.msgViewListing')}</Link>
-          </div> : null}
+          {!active.group && active.propertyId ? <PropChip t={t} propertyId={active.propertyId} property={active.property} /> : null}
+          {flatmateCard?.available !== undefined ? <PropChip t={t} propertyId={flatmate.id} href={listingHref} property={flatmateCard} canSchedule={false} /> : null}
         </div>
 
         <MessageList
@@ -214,17 +211,21 @@ export default function Thread({
         {offline ? <div className="pc-offline">You're offline ? messages send when you're back</div> : null}
         {active.staged ? <div className="pc-wait"><Icon name="clock" className="w-4 h-4" /> {t('misc.msgWaitingOwner')}</div> : active.blocked ? (
           <div className="pc-wait"><Icon name="ban" className="w-4 h-4" /> You blocked {active.party.name} ? <button type="button" onClick={() => onBlock(active.id, false)}>Unblock</button></div>
+        ) : active.listingDeleted ? (
+          <div className="pc-wait" role="status"><Icon name="ban" className="w-4 h-4" /> {t('misc.msgListingDeleted')}</div>
+        ) : active.blockedYou ? (
+          <div className="pc-wait" role="status"><Icon name="ban" className="w-4 h-4" /> {t('misc.msgCantMessage')}</div>
         ) : (
           <>
             {showQuick ? <div className="pc-quick">{replies.map((qr) => <button key={qr} className="pc-quick-chip" onClick={() => send(qr)}>{qr}</button>)}</div> : null}
             {showPrivacyHint ? <div className="pc-privacy-hint">{t('misc.msgPrivateContactHint')}</div> : null}
+            {sendError ? <div className="pc-send-error">{sendError}</div> : null}
             <div className="pc-composer">
               {replyTo ? <div className="pc-reply-bar"><span>{replyTo.text}</span><button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><Icon name="x" className="w-4 h-4" /></button></div> : null}
               <input ref={fileRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={pickPhoto} />
               <button type="button" className="pc-icon-btn pc-attach" onClick={() => fileRef.current?.click()} aria-label={t('misc.msgAttachPhoto')}><Icon name="paperclip" className="w-5 h-5" /></button>
-              <textarea ref={inputRef} className="pc-input" value={draft} onChange={(e) => changeDraft(e.target.value)} onInput={resize} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && finePointer()) { e.preventDefault(); send(); } }} rows={1} enterKeyHint="send" placeholder={t('misc.msgTypeMessage')} aria-label={t('misc.msgTypeMessage')} />
+              <textarea ref={inputRef} className="pc-input" value={draft} onChange={(e) => changeDraft(e.target.value)} onInput={resize} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isImeComposing(e)) { e.preventDefault(); send(); } }} rows={1} enterKeyHint="send" placeholder={t('misc.msgTypeMessage')} aria-label={t('misc.msgTypeMessage')} />
               <button className="pc-send" disabled={!draft.trim()} onClick={() => send()} aria-label={t('misc.msgSendMessage')}><Icon name="send" className="w-5 h-5" /></button>
-              {sendError ? <div className="pc-send-error">{sendError}</div> : null}
             </div>
             {preview ? (
               <div className="pc-photo-preview" role="dialog" aria-modal="true" aria-label={t('misc.msgPhotoPreview')}>

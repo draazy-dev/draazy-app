@@ -5,19 +5,14 @@ import java.time.LocalDate;
 import java.util.List;
 import org.springframework.stereotype.Repository;
 
-// Analytics reads hit only the three daily aggregates, never page_views: they have no identity column and are not
-// recomputed after the 30-day sweep or erasure. Native SQL (no entity), so every query here has a test.
 @Repository
 public class PageViewReportRepository {
-
     private final EntityManager em;
 
     public PageViewReportRepository(EntityManager em) {
         this.em = em;
     }
 
-    // IST days, half-open [from, to). Days without traffic are absent, not zero; the caller fills the gaps.
-    // Returns [day, sessions, anon, signedIn, pageviews, bounced, durationSecs, mobile, tablet, desktop].
     @SuppressWarnings("unchecked")
     public List<Object[]> dailyTraffic(LocalDate from, LocalDate to) {
         return em.createNativeQuery("""
@@ -33,8 +28,6 @@ public class PageViewReportRepository {
                 .getResultList();
     }
 
-    // Ranked and capped in SQL: sorting in Java grows with every route ever served.
-    // Returns [path, pageviews, anonPageviews, exits].
     @SuppressWarnings("unchecked")
     public List<Object[]> topPaths(LocalDate from, LocalDate to, int limit) {
         return em.createNativeQuery("""
@@ -54,8 +47,6 @@ public class PageViewReportRepository {
                 .getResultList();
     }
 
-    // Its own query, not a re-sort of topPaths: a page few reach but all leave from is the one this must surface.
-    // Returns [path, exits].
     @SuppressWarnings("unchecked")
     public List<Object[]> topExitPaths(LocalDate from, LocalDate to, int limit) {
         return em.createNativeQuery("""
@@ -73,8 +64,6 @@ public class PageViewReportRepository {
                 .getResultList();
     }
 
-    // Uncapped on purpose: the caller folds hosts into channels plus "other", and a LIMIT would drop that tail.
-    // Returns [referrerHost, sessions]; the host is "" for a direct arrival.
     @SuppressWarnings("unchecked")
     public List<Object[]> referrerSessions(LocalDate from, LocalDate to) {
         return em.createNativeQuery("""
@@ -89,8 +78,6 @@ public class PageViewReportRepository {
                 .getResultList();
     }
 
-    // Cut on the same IST day as the rollup so visitor-to-signup is a like-for-like ratio; comparing timestamptz
-    // to a bare date would shear days by 5h30 on a UTC server. Absent days, as in dailyTraffic. [day, signups].
     @SuppressWarnings("unchecked")
     public List<Object[]> dailySignups(LocalDate from, LocalDate to) {
         return em.createNativeQuery("""

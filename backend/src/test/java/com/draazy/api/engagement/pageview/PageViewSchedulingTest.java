@@ -8,13 +8,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 
-// Deliberately not @Transactional: a self-invoked write skips the proxy, so only with no ambient transaction to join
-// does "No active transaction" surface, as when ReferralSignalRetention's expiry silently never ran.
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("Page view scheduled jobs")
 class PageViewSchedulingTest {
-
     @Autowired PageViewRetention retention;
     @Autowired PageViewRollup rollup;
 

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, GitMerge } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { classNames } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useTabParam } from '../../lib/useTabParam.js';
 import { useSocietySearch } from '../../lib/useSocietySearch.js';
 import {
-  listSocietyCandidates, listSocietyCandidateDuplicates,
+  listSocietyCandidates, listDuplicatesForCandidates,
   listSocietyMerges, mergeSocieties, undoSocietyMerge, getSocietiesSummary,
   getSocietyAdminView, editSociety, listSocietyDirectory,
 } from '../../services/societyService.js';
@@ -14,13 +14,13 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { hasPermission } from '../../lib/adminModules.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { QueueTabs } from '../../components/admin/WorkQueue.jsx';
-import useScrollLock from '../../hooks/useScrollLock.js';
+import Modal from '../../components/ui/Modal.jsx';
 import { titleCase, DUPES_FAILED } from './societies/helpers.jsx';
 import CandidatesTab from './societies/CandidatesTab.jsx';
 import DirectoryTab from './societies/DirectoryTab.jsx';
 import AdminLocalities from './AdminLocalities.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
-// 20, matching `GET /admin/societies`'s own `@PageableDefault`.
 const DIR_PAGE_SIZE = 20;
 const CAND_PAGE_SIZE = 10;
 
@@ -44,15 +44,12 @@ export default function AdminPlaces() {
   const [candidates, setCandidates] = useState({ items: [], total: 0 });
   const [merges, setMerges] = useState([]);
   const [counts, setCounts] = useState(null);
-  // A failed fetch and a drained queue are indistinguishable on an empty table without this.
   const [queueErrors, setQueueErrors] = useState([]);
   const [bump, setBump] = useState(0);
-  const [edit, setEdit] = useState(null); // { slug, ...form }
-  const [merge, setMerge] = useState(null); // { cand, target, query }
+  const [edit, setEdit] = useState(null);
+  const [merge, setMerge] = useState(null);
   const [merging, setMerging] = useState(false);
-  useScrollLock(Boolean(edit || merge));
 
-  // Server-paged: `candQuery` is debounced into `candSearch`, and a new search resets to page 0.
   const [candQuery, setCandQuery] = useState('');
   const [candSearch, setCandSearch] = useState('');
   const [candPage, setCandPage] = useState(0);
@@ -61,7 +58,6 @@ export default function AdminPlaces() {
     return () => clearTimeout(t);
   }, [candQuery]);
 
-  // Only transport failures are absorbed: a mapper TypeError must not render as an empty queue.
   const safe = (p, label, empty, broke) => p.catch((err) => {
     if (!(err instanceof ApiError || err instanceof NetworkError)) throw err;
     console.warn(`[societies] The ${label} queue could not be loaded.`, err);
@@ -69,7 +65,6 @@ export default function AdminPlaces() {
     return empty;
   });
 
-  // Tab badges: on arrival and after a decision, not on every tab or page change.
   useEffect(() => {
     if (!canSocieties) return undefined;
     let alive = true;
@@ -91,7 +86,6 @@ export default function AdminPlaces() {
       .then((res) => {
         if (!alive) return;
         setQueueErrors((prev) => [...prev.filter((l) => l !== 'society candidates'), ...broke]);
-        // A merge can drain the last row of a page; step back rather than show an empty one.
         if (!res.items.length && candPage > 0 && !broke.length) { setCandPage(candPage - 1); return; }
         setCandidates({ items: res.items, total: res.total });
       });
@@ -109,7 +103,6 @@ export default function AdminPlaces() {
     });
     return () => { alive = false; };
   }, [tab, bump]); // eslint-disable-line react-hooks/exhaustive-deps -- as above.
-  // Server-paged: `dirQuery` is debounced into `dirSearch`, and a new search resets to page 0.
   const [dirQuery, setDirQuery] = useState('');
   const [dirSearch, setDirSearch] = useState('');
   const [dirPage, setDirPage] = useState(0);
@@ -126,12 +119,10 @@ export default function AdminPlaces() {
     setDir((d) => ({ ...d, status: 'loading' }));
     listSocietyDirectory({ q: dirSearch, page: dirPage, size: DIR_PAGE_SIZE })
       .then((res) => { if (alive) setDir({ status: 'ready', items: res.items, total: res.total }); })
-      // Never an empty list on failure: "No societies" and "could not read" are different sentences.
       .catch(() => { if (alive) setDir({ status: 'error', items: [], total: 0 }); });
     return () => { alive = false; };
   }, [tab, dirSearch, dirPage, bump]);
 
-  // The duplicate hint is a request per row: four at a time, only for the page on screen, and cached until a decision.
   const [dupes, setDupes] = useState({});
   const dupesAsked = useRef(new Set());
   const dupesGen = useRef(0);
@@ -143,33 +134,24 @@ export default function AdminPlaces() {
   }, [bump]);
 
   useEffect(() => {
-    if (tab !== 'duplicates') return undefined;
+    if (tab !== 'duplicates') return;
     const gen = dupesGen.current;
-    const queue = candidates.items.map((c) => c.slug).filter((s) => s && !dupesAsked.current.has(s));
-    queue.forEach((s) => dupesAsked.current.add(s));
-    const keep = (slug, rows) => { if (gen === dupesGen.current) setDupes((prev) => ({ ...prev, [slug]: rows })); };
-
-    const worker = async () => {
-      for (let slug = queue.shift(); slug; slug = queue.shift()) {
-        try {
-          keep(slug, await listSocietyCandidateDuplicates(slug));
-        } catch (err) {
-          console.warn(`[societies] Could not check ${slug} for duplicates.`, err);
-          keep(slug, DUPES_FAILED);
-        }
-      }
-    };
-
-    Promise.all([worker(), worker(), worker(), worker()]);
-    // Hand unstarted slugs back now so the next run (same slugs, new page) scans them.
-    return () => { queue.splice(0).forEach((s) => dupesAsked.current.delete(s)); };
+    const slugs = candidates.items.map((c) => c.slug).filter((s) => s && !dupesAsked.current.has(s));
+    if (!slugs.length) return;
+    slugs.forEach((s) => dupesAsked.current.add(s));
+    listDuplicatesForCandidates(slugs)
+      .then((bySlug) => slugs.map((s) => [s, bySlug[s] ?? DUPES_FAILED]))
+      .catch((err) => {
+        console.warn('[societies] Could not check the candidates for duplicates.', err);
+        return slugs.map((s) => [s, DUPES_FAILED]);
+      })
+      .then((found) => { if (gen === dupesGen.current) setDupes((prev) => ({ ...prev, ...Object.fromEntries(found) })); });
   }, [tab, candidates]);
 
   const candidateRows = candidates.items.map((c) => ({ ...c, dupes: dupes[c.slug] }));
 
-  const failed = (err, fallback) => toast(err?.message || fallback, 'error');
+  const failed = (err, fallback) => toast(userMessage(err, fallback), 'error');
 
-  // Ids with a decision in flight. The ref closes the double-click window the state Set cannot.
   const [deciding, setDeciding] = useState(() => new Set());
   const decidingRef = useRef(new Set());
   const withDeciding = async (id, run) => {
@@ -192,7 +174,6 @@ export default function AdminPlaces() {
     try {
       await mergeSocieties(merge.cand.slug, merge.target);
     } catch (err) {
-      // Verbatim: every refusal names the merge that has to be undone first.
       failed(err, 'Could not merge those two societies.');
       return;
     } finally {
@@ -201,7 +182,6 @@ export default function AdminPlaces() {
     setMerge(null); setBump((n) => n + 1);
     toast('Duplicate merged — its listings, follows and reviews now read on the survivor', 'success');
   };
-  // Undo is keyed by the society that was merged away: a survivor can have absorbed several.
   const undoMerge = (m) => withDeciding(m.slug, async () => {
     try {
       await undoSocietyMerge(m.slug);
@@ -219,7 +199,6 @@ export default function AdminPlaces() {
     return mergeCandidates.filter((r) => r.slug !== merge.cand.slug).slice(0, 8);
   }, [merge, mergeCandidates]);
 
-  // Opens from the server's copy: `adminNote` is deliberately absent from the public payload.
   const openEdit = async (s) => {
     let row;
     try {
@@ -238,7 +217,6 @@ export default function AdminPlaces() {
       maintenancePerSqft: Number(edit.maintenancePerSqft) || 0,
       adminNote: edit.adminNote.trim(),
     };
-    // `adminNote` is sent even when empty: '' clears the note, absent leaves it.
     try {
       await editSociety(edit.slug, patch);
     } catch (err) { failed(err, 'Could not save that society.'); return; }
@@ -301,10 +279,15 @@ export default function AdminPlaces() {
         />
       ) : null}
 
-      {edit && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgb(var(--dz-c-black) / .6)', backdropFilter: 'blur(4px)' }} onClick={() => setEdit(null)}>
-          <div role="dialog" aria-modal="true" aria-label="Edit society" className="dz-card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-1">{edit.name}</h3>
+      <Modal
+        open={Boolean(edit)}
+        onClose={() => setEdit(null)}
+        title="Edit society"
+        footer={<><button onClick={() => setEdit(null)} className="btn-outline">Cancel</button><button onClick={saveEdit} className="btn-teal">Save</button></>}
+      >
+        {edit && (
+          <>
+            <p className="font-semibold text-white">{edit.name}</p>
             <p className="text-gray-400 text-sm mb-4">Overlay edits — override the catalogue without touching source data.</p>
             <div className="space-y-3">
               <label className="flex items-center justify-between text-sm"><span>Registered</span>
@@ -316,15 +299,18 @@ export default function AdminPlaces() {
               <label className="block text-sm">Admin note
                 <textarea rows={2} value={edit.adminNote} onChange={(e) => setEdit({ ...edit, adminNote: e.target.value })} className={inp + ' mt-1'} /></label>
             </div>
-            <div className="mt-5 flex gap-2"><button onClick={() => setEdit(null)} className="btn-outline flex-1">Cancel</button><button onClick={saveEdit} className="btn-teal flex-1">Save</button></div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
-      {merge && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgb(var(--dz-c-black) / .6)', backdropFilter: 'blur(4px)' }} onClick={() => setMerge(null)}>
-          <div role="dialog" aria-modal="true" aria-label="Merge society" className="dz-card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-1 flex items-center gap-2"><GitMerge className="h-5 w-5 text-brand-teal" />Merge duplicate</h3>
+      <Modal
+        open={Boolean(merge)}
+        onClose={() => setMerge(null)}
+        title="Merge society"
+        footer={<><button onClick={() => setMerge(null)} className="btn-outline">Cancel</button><button onClick={confirmMerge} disabled={!merge?.target || merging} className="btn-teal disabled:opacity-40">{merging ? 'Merging…' : 'Merge'}</button></>}
+      >
+        {merge && (
+          <>
             <p className="text-gray-400 text-sm mb-4">Fold <span className="text-white font-semibold">“{merge.cand.name}”</span> into a canonical society. Its listings, follows and reviews will read on that society instead; nothing is deleted, and the merge can be undone.</p>
             <label className="block text-sm mb-1 text-gray-300">Merge into</label>
             <input autoFocus value={merge.query} onChange={(e) => setMerge({ ...merge, query: e.target.value })} placeholder="Search societies…" className={inp} />
@@ -339,10 +325,9 @@ export default function AdminPlaces() {
                 </button>
               ))}
             </div>
-            <div className="mt-5 flex gap-2"><button onClick={() => setMerge(null)} className="btn-outline flex-1">Cancel</button><button onClick={confirmMerge} disabled={!merge.target || merging} className="btn-teal flex-1 disabled:opacity-40">{merging ? 'Merging…' : 'Merge'}</button></div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

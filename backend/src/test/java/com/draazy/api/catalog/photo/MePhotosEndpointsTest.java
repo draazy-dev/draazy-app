@@ -18,10 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockMultipartFile;
 
-// Listing photos go to the public bucket, so uploads are image-only
-// and authenticated without property ownership scope.
 class MePhotosEndpointsTest extends AbstractApiTest {
-
     private static final String MOCK_PUBLIC = "/api/dev/storage/public/photos/";
 
     @Autowired

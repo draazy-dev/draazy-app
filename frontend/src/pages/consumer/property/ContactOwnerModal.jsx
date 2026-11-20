@@ -10,16 +10,16 @@ import { requestContact } from '../../../services/contactService.js';
 import { useContactGate } from './useContactGate.js';
 import { useEntitlements, contactsLeft, freeContactsTill } from './useEntitlements.js';
 import { useAppFlags } from '../../../context/AppFlagsContext.jsx';
-import { usePricing } from '../../../context/PricingContext.jsx';
 import { messagesLinkForProp } from '../../../lib/chatFormat.js';
 import { queuePendingChat } from '../../../services/conversationService.js';
 import { useVerification } from '../../../context/VerificationContext.jsx';
 import { track, captureLead } from '../../../lib/pmf.js';
 import useScrollLock from '../../../hooks/useScrollLock.js';
 import useModalDialog from '../../../hooks/useModalDialog.js';
-import { dialableMobile, telHref, whatsappHref } from './contactPhone.js';
+import { dialableMobile, telHref } from './contactPhone.js';
 import { ownerVerificationMeta, OwnerRoleLine, OwnerVerifiedMark } from './ownerVerification.jsx';
 import { propertyKey } from '../../../lib/listingSeo.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 export function ContactOwnerModal({ p, isIn, onClose, toast }) {
   const { t } = useTranslation();
@@ -28,23 +28,19 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
   const [msg, setMsg] = useState('');
   const [verify, setVerify] = useState(false);
   const [quotaOpen, setQuotaOpen] = useState(false);
-  // opt-in badge modal for verified-only owners
-  // free contacts spent → refer or upgrade
   const [busy, setBusy] = useState(false);
   const { flagEnabled } = useAppFlags();
-  const { referral } = usePricing();
   const ownerMobile = String(p.ownerMobile || '');
   const propId = String(p.id || '');
   const routeId = propertyKey(useParams().id);
   const { gate, loading } = useContactGate(routeId || propId);
-  // `isIn` gates the fetch: signed out there is no quota to report, and no token to ask with.
   const { entitlements } = useEntitlements(isIn);
-  const left = contactsLeft(entitlements);
+  const left = contactsLeft(entitlements, p.deal);
   const freeTill = freeContactsTill(entitlements);
   const status = gate.status;
   const ownerHides = status === 'approved' && gate.ownerHidesNumber;
   const revealed = status === 'owner' || (status === 'approved' && !ownerHides);
-  const { identityVerified, anyVerified, roleAndVerification } = ownerVerificationMeta(p, t);
+  const { anyVerified, roleAndVerification } = ownerVerificationMeta(p, t);
   const { verified: seekerVerified, loading: verifying } = useVerification();
   const panelRef = useModalDialog(true, onClose);
   const ownerDialable = dialableMobile(ownerMobile);
@@ -53,12 +49,9 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
 
   const request = async () => {
     if (!isIn) {
-      /* Close only if the gate actually navigated. */
       if (sendToSignIn('contact')) onClose();
       return;
     }
-    // Contact quota spent, so offer the referral or Contact Pack route. The refusal is the
-    // server's, caught below: a browser that could pre-check this could also answer it generously.
     track('contact_click', { action: 'request_number', id: propId });
     captureLead({ context: 'request_number', property: propId });
 
@@ -69,7 +62,6 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
       toast(t('property.requestSentNumber'), 'success');
       onClose();
     } catch (err) {
-      // Owner accepts verified contacts only, so offer the opt-in badge flow rather than a request.
       if (err?.code === 'verification_required') {
         setVerify(true);
         return;
@@ -82,13 +74,19 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
         toast(t('property.contactPendingLimit'), 'info');
         return;
       }
+      if (err?.code === 'recently_withdrawn') {
+        toast(userMessage(err, t('property.recentlyWithdrawn')), 'info');
+        return;
+      }
+      if (err?.code === 'own_listing') {
+        toast(t('property.ownListing'), 'info');
+        onClose();
+        return;
+      }
       if (err?.status === 401) {
-        /* `back` is the listing as it was when the request left: `signInPath` otherwise reads `window.location` at
-           call time and would return them to wherever they navigated meanwhile. */
         if (sendToSignIn('contact', back)) onClose();
         return;
       }
-      // Listing withdrawn / owner contact pulled — nothing was requested, so no quota is spent.
       toast(t('property.contactUnavailable'), 'error');
       onClose();
     } finally {
@@ -114,8 +112,16 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
       toast(t('property.contactPendingLimit'), 'info');
       return true;
     }
+    if (err?.code === 'recently_withdrawn') {
+      toast(userMessage(err, t('property.recentlyWithdrawn')), 'info');
+      return true;
+    }
     if (err?.code === 'listing_not_live') {
       toast(t('property.listingNotLive'), 'info');
+      return true;
+    }
+    if (err?.code === 'own_listing') {
+      toast(t('property.ownListing'), 'info');
       return true;
     }
     if (err?.status === 401) {
@@ -136,7 +142,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
     setBusy(true);
     try {
       await ensureRequest();
-      await queuePendingChat(p, { active: status === 'owner' || status === 'approved' });
+      if (status !== 'owner') await queuePendingChat(p, { active: status === 'approved' });
       onClose();
       navigate(messagesLinkForProp(p));
     } catch (err) {
@@ -159,7 +165,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
     try {
       await ensureRequest(text || undefined);
       if (flagEnabled('inAppMessaging')) {
-        await queuePendingChat(p, { firstMessage: text || undefined, active: status === 'owner' || status === 'approved' });
+        if (status !== 'owner') await queuePendingChat(p, { firstMessage: text || undefined, active: status === 'approved' });
         toast(t('property.enquirySentChat'), 'success');
       } else {
         toast(t('property.requestSentOwner'), 'success');
@@ -198,21 +204,12 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
           </div>
         </div>
 
-        {/* A claim about how fast a *person* replies, so it hangs on the person's badge alone. */}
-        {identityVerified && (
-          <div className="-mt-2 mb-4 flex items-center gap-1.5 text-[11px] text-emerald-300/90">
-            <Icon name="zap" className="w-3.5 h-3.5" /> {t('property.verifiedRespondsFaster')}
-          </div>
-        )}
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 mb-4">
           {revealed ? (
             <>
               <p className="text-xs text-slate-400 mb-1">{t('property.ownersNumber')}</p>
               {ownerDialable ? (
-                <>
-                  <a href={telHref(ownerMobile)} className="flex items-center gap-2 text-base font-semibold text-brand-teal-3 hover:underline"><Icon name="phone" className="w-4 h-4" /> {fmtPhone(ownerMobile)}</a>
-                  <a href={whatsappHref(ownerMobile)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-emerald-400 text-xs font-medium hover:underline"><Icon name="message-circle" className="w-3.5 h-3.5" /> {t('property.messageOnWhatsapp')}</a>
-                </>
+                <a href={telHref(ownerMobile)} className="flex items-center gap-2 text-base font-semibold text-brand-teal-3 hover:underline"><Icon name="phone" className="w-4 h-4" /> {fmtPhone(ownerMobile)}</a>
               ) : (
                 <div className="flex items-center gap-2 text-sm text-slate-300 mb-2"><Icon name="phone-off" className="w-4 h-4 text-slate-500" /> <span className="tracking-wider">{maskPhone(ownerMobile)}</span></div>
               )}
@@ -252,14 +249,12 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
                         <Icon name="lock-keyhole" className="w-3.5 h-3.5" /> {t('property.requestNumber')}
                       </button>
 
-                      {/* Below `lg` this sheet is the only contact surface, so the free-contact countdown has to be
-                         here or a phone buyer meets the wall as a bare 422. */}
                       {isIn && Number.isFinite(left) && (
                         <p className="text-[11px] mt-1.5" data-testid="contacts-left">
                           {left > 0 ? (
                             <span className="text-slate-500">{freeTill ? t('property.contactsLeftTill', { count: left, date: freeTill }) : t('property.contactsLeft', { count: left })}</span>
                           ) : (
-                            <span className="text-amber-300">{t(flagEnabled('referralRewards') ? 'property.contactsLeftNoneReferHint' : 'property.contactsLeftNone', { count: referral.contactBonus })}</span>
+                            <span className="text-amber-300">{t('property.contactsLeftNone')}</span>
                           )}
                         </p>
                       )}
@@ -278,7 +273,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
             <Link to={`/owner/${p.ownerId}`} className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] rounded-lg border border-white/10 text-slate-300 text-[13px] font-medium hover:bg-white/5 transition-smooth"><Icon name="user" className="w-3.5 h-3.5" /> {t('property.profile')}</Link>
           )}
         </div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">{t('property.sendQuickMessage')} <span className="text-slate-500 font-normal">({t('property.optional')})</span></label>
+        <label htmlFor="contact-quick-message" className="block text-sm font-medium text-slate-300 mb-2">{t('property.sendQuickMessage')} <span className="text-slate-500 font-normal">{t('property.optional')}</span></label>
         {p.ownerVerified && !seekerVerified && !verifying && (
           <div className="mb-3 rounded-xl bg-teal-500/10 border border-teal-500/20 px-4 py-3 flex items-start gap-2.5">
             <Icon name="shield-check" className="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" />
@@ -291,10 +286,12 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
             </div>
           </div>
         )}
-        <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} enterKeyHint="send" className="w-full px-4 py-3 rounded-xl text-white text-sm resize-none border border-white/10 bg-white/[0.03] focus:border-brand-teal-2 outline-none mb-3" placeholder={t('property.messagePlaceholder')} />
+        <textarea id="contact-quick-message" value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} enterKeyHint="send" className="w-full px-4 py-3 rounded-xl text-white text-sm resize-none border border-white/10 bg-white/[0.03] focus:border-brand-teal-2 outline-none mb-3" placeholder={t('property.messagePlaceholder')} />
         <button onClick={sendEnquiry} disabled={busy} className="btn-teal w-full flex items-center justify-center gap-2 py-2.5 px-4 disabled:opacity-60"><Icon name="send" className="w-4 h-4" /> {t('property.sendEnquiry')}</button>
         <p className="text-[11px] text-slate-500 mt-3 flex items-center gap-1.5"><Icon name="shield-check" className="w-3.5 h-3.5" /> {t('property.numberStaysPrivate')}</p>
-        <Link to="/tenant-profile" className="mt-3 flex items-center justify-center gap-1.5 min-h-[44px] text-[13px] text-emerald-300 hover:text-emerald-200"><Icon name="user-check" className="w-3.5 h-3.5" /> {t('property.verifiedTenantBadge')}</Link>
+        {p.deal === 'rent' && (
+          <Link to="/tenant-profile" className="mt-3 flex items-center justify-center gap-1.5 min-h-[44px] text-[13px] text-emerald-300 hover:text-emerald-200"><Icon name="user-check" className="w-3.5 h-3.5" /> {t('property.verifiedTenantBadge')}</Link>
+        )}
       </div>
       {verify && (
         <VerifyIdentityRedirect
@@ -302,7 +299,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
           onClose={() => setVerify(false)}
         />
       )}
-      {quotaOpen && <ContactsExhaustedModal onClose={() => setQuotaOpen(false)} />}
+      {quotaOpen && <ContactsExhaustedModal deal={p.deal} onClose={() => setQuotaOpen(false)} />}
     </div>
   );
 }

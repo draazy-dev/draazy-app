@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import Switch from '../ui/Switch.jsx';
 import TimeField from '../ui/TimeField.jsx';
+import NativeSelect from '../ui/NativeSelect.jsx';
 import Modal from '../ui/Modal.jsx';
 import VerifyIdentityRedirect from '../auth/VerifyIdentityRedirect.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -15,12 +16,15 @@ import {
 import {
   getNotificationPreferences,
   registerPushSubscription,
-  unregisterPushSubscription,
   updateNotificationPreferences,
   NOTIFICATION_PREFERENCE_DEFAULTS,
 } from '../../services/notificationService.js';
+import {
+  alertPermission, alertsSupported, browserAlertsOn, currentPushSubscription, disableBrowserAlerts, enableBrowserAlerts,
+} from '../../lib/browserAlerts.js';
 import { exportMyData, requestErasure, myErasureRequests } from '../../services/authService.js';
 import { myTenantProfile } from '../../services/rentService.js';
+import { userMessage } from '../../lib/userMessage.js';
 
 const Card = ({ children, className = '' }) => <div className={'glass-card rounded-2xl ' + className}>{children}</div>;
 const SectionHead = ({ icon, iconCls = 'text-teal-400', title, sub }) => (
@@ -28,8 +32,6 @@ const SectionHead = ({ icon, iconCls = 'text-teal-400', title, sub }) => (
     <div><h2 className="text-lg font-bold text-white flex items-center gap-2">{icon ? <Icon name={icon} className={'w-5 h-5 ' + iconCls} /> : null} {title}</h2>{sub ? <p className="text-gray-500 text-xs mt-0.5">{sub}</p> : null}</div>
   </div>
 );
-// Collapses on mobile (tap the header) but stays open on desktop, so phones get a
-// scannable accordion without changing the web view.
 
 const CollapsibleCard = ({ icon, iconCls = 'text-teal-400', title, sub, defaultOpen = false, children }) => {
   const [open, setOpen] = useState(defaultOpen);
@@ -55,7 +57,6 @@ const CollapsibleCard = ({ icon, iconCls = 'text-teal-400', title, sub, defaultO
     </Card>
   );
 };
-// One preference row: label + description on the left, control on the right.
 
 const PrefRow = ({ title, desc, children }) => (
   <div className="flex items-start justify-between gap-4 py-2">
@@ -63,15 +64,14 @@ const PrefRow = ({ title, desc, children }) => (
     <div className="flex-shrink-0 pt-0.5">{children}</div>
   </div>
 );
-// Trust chips reused in the identity header. Green = confirmed, amber = pending.
 
 const VerifiedChip = ({ label }) => (
-  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/12 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+  <span className="dz-tag border border-emerald-500/20 bg-emerald-500/12 font-semibold text-emerald-300">
     <Icon name="badge-check" className="w-3 h-3" /> {label}
   </span>
 );
 const PendingChip = ({ label, title, onClick }) => {
-  const cls = 'inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/12 px-2 py-0.5 text-[11px] font-semibold text-amber-300';
+  const cls = 'dz-tag border border-amber-500/20 bg-amber-500/12 font-semibold text-amber-300';
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className={cls + ' transition-colors hover:bg-amber-500/20 hover:text-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40'} title={title}>
@@ -87,44 +87,39 @@ const PendingChip = ({ label, title, onClick }) => {
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const VAPID_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-
-function vapidBytes(key) {
-  const padded = `${key}${'='.repeat((4 - (key.length % 4)) % 4)}`;
-  const raw = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
-  return Uint8Array.from([...raw].map((ch) => ch.charCodeAt(0)));
-}
 
 export default function ProfileTab({ user, update, toast, isOwner }) {
   const { logout } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  /* Seeded from the published defaults — the same shape the server returns for a user who has never saved — not from
-     a local copy, which would flash a stale value before the real one. */
-  const [form, setForm] = useState({ name: user?.name || '', mobile: user?.mobile || '', email: user?.email || '', city: user?.city || 'Pune' });
+  const [form, setForm] = useState({ name: user?.name || '', mobile: user?.mobile || '', email: user?.email || '', city: user?.city || 'Pune', gender: '' });
   const [prefs, setPrefs] = useState(NOTIFICATION_PREFERENCE_DEFAULTS);
   const [app, setApp] = useState(() => getAppPrefs());
-  /* Not seeded: the server sends these two non-nullable on every `/auth/me`, so there is always a real answer and
-     never a gap to paper over. */
   const owner = {
     verifiedContactOnly: !!user?.verifiedContactOnly,
     hideNumber: !!user?.hideNumber,
     shareActivityStatus: user?.shareActivityStatus !== false,
     shareReadReceipts: user?.shareReadReceipts !== false,
   };
-  const pushAvailable = Boolean(VAPID_KEY) && typeof window !== 'undefined' && 'PushManager' in window && 'Notification' in window && 'serviceWorker' in navigator;
-  const [pushEnabled, setPushEnabled] = useState(false);
+  const alertsAvailable = alertsSupported();
+  const [permission, setPermission] = useState(alertPermission);
+  const [alertsOn, setAlertsOn] = useState(browserAlertsOn);
   const [pushBusy, setPushBusy] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   const [delText, setDelText] = useState('');
-  // An erasure request already in flight. Replaces the form so a user who has asked is told
-  // where it stands, rather than being invited to ask again.
   const [erasure, setErasure] = useState(null);
   const [erasing, setErasing] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   const { verified: identityVerified } = useVerification();
-  const nameLocked = Boolean(user?.verified || identityVerified);
-  /* Preferences are account-level, so the panel shows what the platform will honour on whatever device is asking. */
+  const nameLocked = Boolean(identityVerified);
+  const genderLeft = user?.genderChangesLeft ?? 0;
+  const genderLocked = Boolean(user?.gender) && genderLeft === 0;
+  const genderPick = form.gender || user?.gender || '';
+  const genderDirty = !genderLocked && genderPick !== (user?.gender || '');
+  const genderHint = !user?.gender ? (genderLeft ? `You can change it ${genderLeft} times after saving.` : "You can't change it after saving.")
+    : !genderLocked ? `You can change it ${genderLeft} more ${genderLeft === 1 ? 'time' : 'times'}.`
+      : identityVerified ? 'Confirmed from your ID. Contact support to change it.'
+        : 'No changes left. Contact support to change it.';
 
   useEffect(() => {
     let alive = true;
@@ -135,20 +130,12 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
   }, []);
 
   useEffect(() => {
-    if (!pushAvailable) return undefined;
-    let alive = true;
-    navigator.serviceWorker.getRegistration('/sw.js')
-      .then((reg) => reg?.pushManager?.getSubscription())
-      .then((sub) => {
-        if (sub) registerPushSubscription(sub.toJSON()).catch(() => {});
-        if (alive) setPushEnabled(!!sub);
-      })
+    currentPushSubscription()
+      .then((sub) => { if (sub) registerPushSubscription(sub.toJSON()).catch(() => {}); })
       .catch(() => {});
-    return () => { alive = false; };
-  }, [pushAvailable]);
+  }, []);
 
   const fld = 'field w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500';
-  /* The score is the server's — the person it describes cannot be the one who computes it. */
 
   const [trust, setTrust] = useState(null);
   useEffect(() => {
@@ -163,8 +150,6 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       .catch(() => {});
     return () => { alive = false; };
   }, [user]);
-  // Mobile is the account key; editing it inline would orphan stored data.
-  // Help URLs carry language, so the prefix must change before HelpLangRoute reads it.
 
   const save = async () => {
     const name = form.name.trim();
@@ -172,20 +157,19 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
     if (!nameLocked && !isValidName(name)) { toast("Name can only have letters, spaces and . ' - (2 to 80 characters)", 'error'); return; }
     if (email && !EMAIL_RE.test(email)) { toast('Enter a valid email address', 'error'); return; }
     try {
-      await update({ ...(nameLocked ? {} : { name }), email, city: form.city });
+      await update({ ...(nameLocked ? {} : { name }), email, city: form.city, ...(genderDirty ? { gender: genderPick, changeGender: Boolean(user?.gender) } : {}) });
+      setForm((f) => ({ ...f, gender: '' }));
       toast('Profile saved', 'success');
     } catch (err) {
-      toast(err?.code === 'NAME_LOCKED_WHILE_VERIFIED' ? 'Name is locked while verified.' : err?.message || 'Could not save your profile. Please try again.', 'error');
+      toast(err?.code === 'NAME_LOCKED_WHILE_VERIFIED' ? 'Name is locked while verified.' : userMessage(err, 'Could not save your profile. Please try again.'), 'error');
     }
   };
-  // Only enable Save once an editable field actually changed.
 
   const dirty =
     (!nameLocked && form.name.trim() !== (user?.name || '').trim()) ||
     form.email.trim() !== (user?.email || '').trim() ||
-    form.city !== (user?.city || 'Pune');
-  /* Optimistic, then reconciled from the write's response; a failure rolls the control back rather than leaving a
-     switch showing a state the server never accepted. */
+    form.city !== (user?.city || 'Pune') ||
+    genderDirty;
 
   const changePrefs = async (patch, announce = true) => {
     const before = prefs;
@@ -196,52 +180,38 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       if (announce) toast('Preferences updated', 'success');
     } catch (err) {
       setPrefs(before);
-      toast(err?.message || 'Could not save that preference. Please try again.', 'error');
+      toast(userMessage(err, 'Could not save that preference. Please try again.'), 'error');
     }
   };
   const changeQuiet = (patch, announce = true) => changePrefs({ quietHours: { ...prefs.quietHours, ...patch } }, announce);
 
   const changeApp = (patch) => { setApp(setAppPrefs(patch)); };
-  /* Saved on the account, not the device: the gate that enforces this runs on the server, where no browser is
-     present. */
 
   const changeOwner = async (patch) => {
     try {
       await update(patch);
       toast('Privacy preference updated', 'success');
     } catch (err) {
-      toast(err?.message || 'Could not save that preference. Please try again.', 'error');
+      toast(userMessage(err, 'Could not save that preference. Please try again.'), 'error');
     }
   };
 
-  /* The right of access, answered by the system of record: the server's document is downloaded verbatim, exclusions
-     and all, so a subject is told what was left out. */
-  const changePush = async (enabled) => {
-    if (!pushAvailable || pushBusy) return;
+  const changeAlerts = async (enabled) => {
+    if (pushBusy) return;
     setPushBusy(true);
     try {
       if (enabled) {
-        const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
-        if (permission !== 'granted') throw new Error('Notifications are blocked for this browser.');
-        // Production's Workbox /sw.js imports push-sw.js; dev has no Workbox worker, so register the push one directly.
-        const reg = await navigator.serviceWorker.register(import.meta.env.DEV ? '/push-sw.js' : '/sw.js');
-        const sub = await reg.pushManager.getSubscription()
-          || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidBytes(VAPID_KEY) });
-        await registerPushSubscription(sub.toJSON());
-        setPushEnabled(true);
-        toast('Message alerts enabled on this device', 'success');
+        await enableBrowserAlerts();
+        toast('Browser notifications enabled on this device', 'success');
       } else {
-        const reg = await navigator.serviceWorker.getRegistration('/sw.js');
-        const sub = await reg?.pushManager?.getSubscription();
-        const endpoint = sub?.endpoint;
-        if (sub) await sub.unsubscribe();
-        if (endpoint) await unregisterPushSubscription(endpoint);
-        setPushEnabled(false);
-        toast('Message alerts disabled on this device', 'success');
+        await disableBrowserAlerts();
+        toast('Browser notifications disabled on this device', 'success');
       }
     } catch (err) {
-      toast(err?.message || 'Could not update message alerts on this device.', 'error');
+      toast(userMessage(err, 'Could not update browser notifications on this device.'), 'error');
     } finally {
+      setPermission(alertPermission());
+      setAlertsOn(browserAlertsOn());
       setPushBusy(false);
     }
   };
@@ -263,7 +233,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast('Your data has been downloaded', 'success');
     } catch (err) {
-      toast(err?.message || 'Could not prepare your data right now. Please try again.', 'error');
+      toast(userMessage(err, 'Could not prepare your data right now. Please try again.'), 'error');
     } finally {
       setExporting(false);
     }
@@ -277,11 +247,9 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
       const filed = await requestErasure({ reason: '' });
       setErasure(filed || null);
       setDelOpen(false);
-      // Not "deleted": the account is still here and the user is still signed in. Saying otherwise
-      // would send them away believing their data is gone while it demonstrably is not.
       toast('Your erasure request has been submitted for review', 'success');
     } catch (err) {
-      toast(err?.body?.error || err?.message || 'Could not submit your request right now. Please try again.', 'error');
+      toast(userMessage(err, 'Could not submit your request right now. Please try again.'), 'error');
     } finally {
       setErasing(false);
     }
@@ -295,7 +263,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-bold text-white truncate">{form.name.trim() || firstName(user)}</h2>
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/8 text-gray-300 border border-white/10">{roleLabel(user?.role)}</span>
+              <span className="dz-tag font-semibold bg-white/8 text-gray-300 border border-white/10">{roleLabel(user?.role)}</span>
             </div>
             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
               <VerifiedChip label={t('verify.chipMobileVerified')} />
@@ -322,20 +290,27 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
           </div>
           <label className="text-sm"><span className="mb-1.5 block text-gray-400">Email</span><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={fld} placeholder="you@example.com" inputMode="email" /></label>
           <label className="text-sm"><span className="mb-1.5 block text-gray-400">City</span><input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={fld} /></label>
+          <div className="text-sm">
+            <span className="mb-1.5 block text-gray-400">Gender</span>
+            <NativeSelect value={genderPick} onChange={(e) => setForm({ ...form, gender: e.target.value })} disabled={genderLocked} aria-label="Gender">
+              {user?.gender ? null : <option value="">Not set</option>}
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+            </NativeSelect>
+            <p className="mt-1 text-[11px] text-gray-500">{genderHint}</p>
+          </div>
         </div>
         <button onClick={save} disabled={!dirty} className="dz-control dz-control--action mt-5 px-5 gap-2 disabled:opacity-40 disabled:cursor-not-allowed"><Icon name="save" className="w-4 h-4" /> Save changes</button>
 
-        <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:flex sm:items-center sm:justify-between sm:gap-4" data-testid="badge-card">
           <div className="flex items-start gap-3 min-w-0">
             <Icon name="shield-check" className={(identityVerified ? 'text-emerald-400' : 'text-amber-400') + ' w-5 h-5 flex-shrink-0 mt-0.5'} />
-            <div className="min-w-0">
-              <p className="text-sm text-white font-medium">Verified badge</p>
-              <p className="text-xs text-gray-500 mt-0.5">{identityVerified ? 'Your identity has been reviewed and verified. The badge builds trust and lifts your ranking.' : 'Optional: verify your identity with a document and selfie review to earn the Verified badge. You can do this anytime.'}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-white font-medium">KYC done badge{identityVerified && <span className="ml-2 text-xs font-semibold text-emerald-300">· Active</span>}</p>
+              <p className="text-xs text-gray-500 mt-1">{identityVerified ? 'Builds trust and lifts your ranking.' : "Show owners and flatmates you're genuine."}</p>
             </div>
           </div>
-          {identityVerified
-            ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-300 flex-shrink-0"><Icon name="badge-check" className="w-4 h-4" /> Verified</span>
-            : <button onClick={() => setIdentityOpen(true)} className="dz-control dz-control--action gap-2 flex-shrink-0"><Icon name="shield-check" className="w-4 h-4" /> Verify identity</button>}
+          {identityVerified ? null : <button onClick={() => setIdentityOpen(true)} className="dz-control dz-control--action justify-center gap-2 mt-3 w-full min-h-[44px] sm:mt-0 sm:w-auto flex-shrink-0"><Icon name="shield-check" className="w-4 h-4" /> Verify identity</button>}
         </div>
       </Card>
 
@@ -356,6 +331,9 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
         <PrefRow title="New property match alerts" desc="Get notified when new listings match your saved searches.">
           <Switch checked={prefs.matchAlerts} onChange={(v) => changePrefs({ matchAlerts: v })} label="New property match alerts" />
         </PrefRow>
+        <PrefRow title="Calls about homes and moving" desc="Let our team call you before your lease ends.">
+          <Switch checked={!!prefs.marketingCalls} onChange={(v) => changePrefs({ marketingCalls: v })} label="Calls about homes and moving" />
+        </PrefRow>
         <div className="mt-2 border-t border-white/5 pt-3">
           <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2">Delivery channels</p>
           {[
@@ -368,9 +346,19 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
           ))}
         </div>
         <div className="mt-3 border-t border-white/5 pt-3 space-y-3">
-          {pushAvailable ? (
-            <PrefRow title="Message alerts on this device" desc="Shows a generic Draazy alert without names or message text.">
-              <Switch checked={pushEnabled} disabled={pushBusy} onChange={changePush} label="Message alerts on this device" />
+          {alertsAvailable ? (
+            <PrefRow
+              title="Browser notifications"
+              desc={permission === 'denied'
+                ? 'Blocked in this browser. Allow notifications for this site from the icon beside the address bar.'
+                : 'Draazy alerts you through your browser. No names or message text are shown.'}
+            >
+              <Switch
+                checked={alertsOn}
+                disabled={pushBusy || permission === 'denied'}
+                onChange={changeAlerts}
+                label="Browser notifications"
+              />
             </PrefRow>
           ) : null}
           <PrefRow title="Quiet hours" desc="Pause non-urgent match & price alerts overnight.">
@@ -394,8 +382,6 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
           <PrefRow title="Accept verified contacts only" desc="Only verified users can ask to contact you or chat.">
             <Switch checked={!!owner.verifiedContactOnly} onChange={(v) => changeOwner({ verifiedContactOnly: v })} label="Accept verified contacts only" />
           </PrefRow>
-            {/* Copy deliberately does not promise masking — the preference is stored but nothing on the server reads
-               it yet. */}
           <PrefRow title="Hide my number from approved buyers" desc="Approved buyers can chat with you, but won't see your phone number.">
             <Switch checked={!!owner.hideNumber} onChange={(v) => changeOwner({ hideNumber: v })} label="Hide my number from approved buyers" />
           </PrefRow>

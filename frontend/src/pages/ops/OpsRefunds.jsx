@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, RefreshCw, ShieldAlert, X } from 'lucide-react';
+import { Link } from 'react-router';
+import { Check, ExternalLink, RefreshCw, ShieldAlert, X } from 'lucide-react';
 import { approveRefund, listRefunds, rejectRefund } from '../../services/refundService.js';
+import { decideServiceRequestRefund } from '../../services/serviceRequestService.js';
 import { classNames, fmtINR } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -10,8 +12,9 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
+  BTN, CHIP, CHIP_TONE, Cell, Chips, DATE_CHIPS, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
 } from '../../components/admin/WorkQueue.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const PAGE_SIZE = 20;
 const TABS = [
@@ -22,12 +25,58 @@ const TABS = [
   { key: 'disputes', label: 'Disputes', status: 'disputed' },
 ];
 const TAB_KEYS = TABS.map((t) => t.key);
-const STATUS_LABEL = { pending_review: 'Pending', approved: 'Approved', rejected: 'Rejected', auto: 'Automatic', disputed: 'Dispute' };
-const STATUS_TONE = { pending_review: CHIP_TONE.amber, approved: CHIP_TONE.green, rejected: CHIP_TONE.red, auto: CHIP_TONE.teal, disputed: CHIP_TONE.red };
+const FEATURE_CHIPS = [
+  { value: '', label: 'All' },
+  { value: 'pass', label: 'Passes' },
+  { value: 'rent_agreement', label: 'Rent agreement' },
+];
+const STATUS_LABEL = { pending_review: 'Pending', approved: 'Approved', rejected: 'Rejected', auto: 'Automatic', disputed: 'Dispute', failed: 'Payout failed' };
+const STATUS_TONE = { pending_review: CHIP_TONE.amber, approved: CHIP_TONE.green, rejected: CHIP_TONE.red, auto: CHIP_TONE.teal, disputed: CHIP_TONE.red, failed: CHIP_TONE.red };
 const NOTE = 'Decide within 2 business days. Approving pays back to the original method; rejecting needs a reason the customer will see.';
+const REASON_LABEL = {
+  paid_after_cancel: 'Paid after the order was cancelled or expired',
+  listing_gone: 'Listing was no longer live when the payment arrived',
+  amount_mismatch: 'Paid amount did not match the order',
+  customer_request: 'Customer asked for it',
+  gateway_dashboard: 'Refunded on the Cashfree dashboard',
+};
+const REFUND_STATE = {
+  queued: 'Queued to send',
+  retrying: 'Cashfree refused it, retrying',
+  sent: 'Sent to Cashfree',
+  confirmed: 'Confirmed by Cashfree',
+};
+const AT_LABEL = { auto: 'Due', disputed: 'Opened' };
 
 const fmtDate = (ms) => (ms ? new Date(ms).toLocaleDateString('en-IN') : '—');
+const fmtDateTime = (ms) => (ms ? new Date(ms).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
 const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
+
+function TransactionFacts({ tx }) {
+  if (!tx) return null;
+  return (
+    <>
+      <FactRow label="Payment">
+        <Cell>Paid {fmtINR(tx.paid)}</Cell>
+        <Cell>{tx.paidAt ? fmtDateTime(tx.paidAt) : ''}</Cell>
+        <Cell>Order {tx.orderStatus}</Cell>
+        <Cell className="font-mono">{tx.invoiceNo ? `Invoice ${tx.invoiceNo}` : 'No invoice'}</Cell>
+      </FactRow>
+      {tx.refundState ? (
+        <FactRow label="Refund">
+          <Cell>{tx.refundAmount != null ? fmtINR(tx.refundAmount) : ''}</Cell>
+          <span className={tx.refundState === 'retrying' ? 'text-amber-300' : undefined} data-testid="refund-state">{REFUND_STATE[tx.refundState] || tx.refundState}</span>
+          <Cell className="font-mono">{tx.gatewayRefund}</Cell>
+          <Cell>
+            {tx.refundState === 'retrying'
+              ? `${tx.refundAttempts} failed${tx.refundTriedAt ? `, last ${fmtDateTime(tx.refundTriedAt)}` : ''}`
+              : tx.refundSettledAt ? `Refunded ${fmtDateTime(tx.refundSettledAt)}` : `Due ${fmtDateTime(tx.refundDueAt)}`}
+          </Cell>
+        </FactRow>
+      ) : null}
+    </>
+  );
+}
 
 function ApproveModal({ row, busy, onClose, onConfirm }) {
   return (
@@ -42,7 +91,7 @@ function ApproveModal({ row, busy, onClose, onConfirm }) {
         </button>
       )}
     >
-      <p className="text-sm text-gray-300">{row.customerName || 'Customer'} · {row.label} · {fmtINR(row.amount)}</p>
+      <p className="text-sm text-gray-300">{row.customerName || 'Customer'}{row.customerMobile ? ` · ${row.customerMobile}` : ''} · {row.label} · {fmtINR(row.amount)}</p>
       <p className="mt-1 font-mono text-xs text-gray-400">{row.orderRef}</p>
       <p className="mt-3 text-xs text-gray-400">This pays {fmtINR(row.amount)} back to the original payment method.</p>
     </Modal>
@@ -64,7 +113,7 @@ function RejectModal({ row, busy, onClose, onConfirm }) {
         </button>
       )}
     >
-      <p className="mb-3 text-sm text-gray-300">{row.customerName} · {row.label} · {fmtINR(row.amount)}</p>
+      <p className="mb-3 text-sm text-gray-300">{row.customerName}{row.customerMobile ? ` · ${row.customerMobile}` : ''} · {row.label} · {fmtINR(row.amount)}</p>
       <label className="block text-xs text-gray-400">
         Reason (required)
         <textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} className="dz-input mt-1 w-full text-sm" data-testid="refund-reject-reason" />
@@ -79,10 +128,14 @@ export default function OpsRefunds() {
   const [counts, setCounts] = useState({});
   const [tab, setTab] = useTabParam(TAB_KEYS, 'pending');
   const [page, setPage] = useState(0);
+  const [days, setDays] = useState('');
+  const [feature, setFeature] = useState('');
   const [reloading, setReloading] = useState(false);
   const [nonce, setNonce] = useState(0);
   const { user } = useAuth();
   const canWrite = canWriteModule(user, 'refunds');
+  // A rent-agreement refund is a manager's call; the service-request endpoint refuses everyone else.
+  const decidesRentAgreements = canWrite && (user?.role === 'admin' || user?.role === 'manager');
   const [rejecting, setRejecting] = useState(null);
   const [approving, setApproving] = useState(null);
   const busy = useRef(false);
@@ -92,7 +145,7 @@ export default function OpsRefunds() {
     const { status } = TABS.find((t) => t.key === tab);
     let live = true;
     setReloading(true);
-    listRefunds({ status, page, size: PAGE_SIZE, counts: true })
+    listRefunds({ status, feature, days, page, size: PAGE_SIZE, counts: true })
       .then((res) => {
         if (!live) return;
         if (res.counts) setCounts(res.counts);
@@ -105,23 +158,28 @@ export default function OpsRefunds() {
       })
       .catch((e) => {
         if (!live) return;
-        setState({ status: 'error', items: [], total: 0, error: e.message || 'Could not read the queue.' });
+        setState({ status: 'error', items: [], total: 0, error: userMessage(e, 'Could not read the queue.') });
         setReloading(false);
       });
     return () => { live = false; };
-  }, [tab, page]);
+  }, [tab, page, days, feature]);
 
   useEffect(load, [load, nonce]);
 
   const reload = () => setNonce((n) => n + 1);
   const switchTab = (key) => { setTab(key); setPage(0); };
+  const changeDays = (value) => { setDays(value); setPage(0); };
+  const changeFeature = (value) => { setFeature(value); setPage(0); };
 
   const decide = async (r, act, reason) => {
     if (!canWrite || busy.current) return;
     busy.current = true;
     setBusyId(r.id);
     try {
-      if (act === 'approve') {
+      if (r.serviceRequestId) {
+        await decideServiceRequestRefund(r.serviceRequestId, r.id, act, reason);
+        toast(act === 'approve' ? 'Refund approved' : 'Refund rejected', act === 'approve' ? undefined : 'error');
+      } else if (act === 'approve') {
         await approveRefund(r.id);
         toast('Refund approved');
       } else {
@@ -134,7 +192,7 @@ export default function OpsRefunds() {
     } catch (e) {
       if (e.status === 409) toast('Already decided or under dispute', 'error');
       else if (e.code === 'refund_not_eligible') toast('The facts changed since the request, so it can no longer be refunded.', 'error');
-      else toast(e.message || 'That decision was refused.', 'error');
+      else toast(userMessage(e, 'That decision was refused.'), 'error');
       if (e.status === 409 || e.code === 'refund_not_eligible') {
         setRejecting(null);
         setApproving(null);
@@ -158,7 +216,7 @@ export default function OpsRefunds() {
   if (state.status === 'error') {
     return (
       <div>
-        <PageHeader title="Refunds" subtitle="Review refund requests, automatic refunds and disputes." />
+        <PageHeader title="Refunds" subtitle="Review pass and rent-agreement refunds, automatic refunds and disputes." />
         <div className="dz-card flex items-start gap-3 p-6 text-sm text-gray-300">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
           <div>
@@ -189,7 +247,13 @@ export default function OpsRefunds() {
   };
 
   const decisions = (r) => {
-    if (!canWrite || r.status !== 'pending_review') return null;
+    const caseLink = r.serviceRequestId ? (
+      <Link to={`/admin/rent-agreement?request=${encodeURIComponent(r.serviceRequestId)}`} className={BTN.ghost} data-testid="refund-open-case">
+        <ExternalLink className="h-3.5 w-3.5" />Open case
+      </Link>
+    ) : null;
+    const allowed = r.serviceRequestId ? decidesRentAgreements : canWrite;
+    if (!allowed || r.status !== 'pending_review') return caseLink;
     const off = busyId === r.id;
     return (
       <>
@@ -199,13 +263,14 @@ export default function OpsRefunds() {
         <button type="button" disabled={off} onClick={() => setRejecting(r)} className={classNames(BTN.ghost, off && 'opacity-50')} data-testid="refund-reject">
           <X className="h-3.5 w-3.5" />Reject
         </button>
+        {caseLink}
       </>
     );
   };
 
   return (
     <div>
-      <PageHeader title="Refunds" subtitle="Review refund requests, automatic refunds and disputes." />
+      <PageHeader title="Refunds" subtitle="Review pass and rent-agreement refunds, automatic refunds and disputes." />
 
       <QueueTabs
         label="Refund queues"
@@ -218,10 +283,14 @@ export default function OpsRefunds() {
         active={tab}
         note={NOTE}
         toolbar={(
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button type="button" onClick={reload} className={BTN.ghost}><RefreshCw className="h-3.5 w-3.5" />Refresh</button>
-            <PageNav {...paging} />
-          </div>
+          <>
+            <Chips label="Feature" options={FEATURE_CHIPS} value={feature} onChange={changeFeature} />
+            <Chips label="Date" options={DATE_CHIPS} value={days} onChange={changeDays} />
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <button type="button" onClick={reload} className={BTN.ghost}><RefreshCw className="h-3.5 w-3.5" />Refresh</button>
+              <PageNav {...paging} />
+            </div>
+          </>
         )}
         footer={paging.pageCount > 1 ? <PageNav {...paging} /> : null}
       >
@@ -232,11 +301,12 @@ export default function OpsRefunds() {
               id={r.id}
               title={<>{r.customerName || 'Customer'} <span className="font-normal text-gray-500">·</span> {fmtINR(r.amount)}</>}
               badges={<span className={classNames(CHIP, STATUS_TONE[r.status] || CHIP_TONE.neutral)}>{STATUS_LABEL[r.status] || r.status}</span>}
-              meta={<><span>{r.label}</span><Dot /><span className="font-mono">{r.orderRef}</span><Dot /><span>Requested {fmtDate(r.at)}</span></>}
+              meta={<><span>{r.label}</span>{r.customerMobile ? <><Dot /><span className="tabular-nums" data-testid="customer-mobile">{r.customerMobile}</span></> : null}<Dot /><span className="font-mono">{r.orderRef}</span>              <Dot /><span>{AT_LABEL[r.status] || 'Requested'} {fmtDate(r.at)}</span></>}
               facts={(
                 <>
                   {r.basis ? <FactRow label="Basis"><span className="col-span-full">{r.basis}</span></FactRow> : null}
-                  <FactRow label="Reason"><span className="col-span-full">{r.customerReason || '—'}</span></FactRow>
+                                <FactRow label="Reason"><span className="col-span-full" data-testid="refund-reason">{(r.status === 'auto' ? REASON_LABEL[r.transaction?.refundReason] : r.customerReason) || '—'}</span></FactRow>
+                                <TransactionFacts tx={r.transaction} />
                   {r.decidedAt ? <FactRow label="Decided"><span className="col-span-full">{fmtDate(r.decidedAt)}</span></FactRow> : null}
                   {r.creditNoteNo ? <FactRow label="Credit note"><span className="col-span-full font-mono">{r.creditNoteNo}</span></FactRow> : null}
                   {r.decisionReason ? <FactRow label="Decision"><span className="col-span-full">{r.decisionReason}</span></FactRow> : null}

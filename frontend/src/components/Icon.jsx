@@ -1,6 +1,3 @@
-// ── Phosphor icons ────────────────────────────────────────────────────────────
-/* Icon.jsx — maps kebab-name strings to Phosphor icons. */
-
 import {
   Airplane, Armchair, ArrowClockwise, ArrowCounterClockwise, ArrowLeft, ArrowRight,
   ArrowUp, ArrowsOut, Bank, Barbell, Bathtub, BatteryCharging,
@@ -22,7 +19,7 @@ import {
   PaperPlaneTilt, Paperclip, PawPrint, PenNib, Pencil, Percent,
   Phone, PhoneCall, PhoneSlash, PiggyBank, Play, PlayCircle,
   PauseCircle, Plus, PlusCircle, Question, Receipt, Repeat,
-  Rocket, Rows, Ruler, Scales, SealCheck, Share,
+  Rocket, Rows, Ruler, Scales, SealCheck, Share, ShareNetwork,
   Shield, ShieldCheck, ShieldWarning, ShoppingBag, SignIn, SignOut,
   Signature, Sparkle, SquaresFour, Stack, Star, StarHalf,
   Sun, Table, Tag, Television, Timer, Toolbox,
@@ -31,12 +28,10 @@ import {
   UserPlus, Users, UsersThree, Video, Wallet, Warehouse,
   Warning, Waves, Wind, X, XCircle, BookOpenText,
   ThumbsUp, ThumbsDown, Archive, Prohibit, DotsThreeVertical, ArrowBendUpLeft,
-  WarningCircle, CloudSlash, Moon,
+  WarningCircle, CloudSlash, Moon, ArrowDownLeft, ArrowUpRight, ChartPie,
 } from '@phosphor-icons/react';
-// ── Lucide fallbacks (icons not in Phosphor) ─────────────────────────────────
 
 import {
-  // layout / nav helpers not in Phosphor
   WashingMachine, Microwave, AirVent, Refrigerator, ChevronDown, ChevronLeft,
   ChevronRight, GitCompare, LockKeyhole, RectangleVertical, LampCeiling, Blinds,
   Droplets, ShowerHead, ParkingCircle, MoveVertical, HeartHandshake, CheckCircle2,
@@ -46,13 +41,13 @@ import {
   Ticket, Bug, ImagePlus, Menu, Gauge, FolderPlus,
   FolderX, AlertCircle, ExternalLink,
 } from 'lucide-react';
-/* ───────────────────────────────────────────────────────────────────────────── Name → component map. */
 
 const MAP = {
-  // ── Navigation & UI chrome ─────────────────────────────────────────────────
   'arrow-right':         ArrowRight,
   'arrow-left':          ArrowLeft,
   'arrow-up':            ArrowUp,
+  'arrow-down-left':     ArrowDownLeft,
+  'arrow-up-right':      ArrowUpRight,
   'caret-down':          CaretDown,
   'caret-left':          CaretLeft,
   'caret-right':         CaretRight,
@@ -68,7 +63,6 @@ const MAP = {
   'layout-grid':         SquaresFour,
   list:                  Rows,
   'move-vertical':       MoveVertical,
-  // ── Actions ────────────────────────────────────────────────────────────────
 
   plus:                  Plus,
   'plus-circle':         PlusCircle,
@@ -84,7 +78,7 @@ const MAP = {
   save:                  FloppyDisk,
   copy:                  Copy,
   share: Share,
-  'share-2':             Share,
+  'share-network':       ShareNetwork,
   download:              Download,
   upload:                Upload,
   'upload-cloud':        CloudArrowUp,
@@ -95,7 +89,6 @@ const MAP = {
   repeat:                Repeat,
   send:                  PaperPlaneTilt,
   'trash-2':             Trash,
-  // ── Auth & security ────────────────────────────────────────────────────────
 
   lock:                  Lock,
   'lock-keyhole':        LockKeyhole,
@@ -107,7 +100,6 @@ const MAP = {
   'file-lock-2':         FileLock,
   'log-in':              SignIn,
   'log-out':             SignOut,
-  // ── Communication ──────────────────────────────────────────────────────────
 
   mail:                  Envelope,
   phone:                 Phone,
@@ -123,7 +115,6 @@ const MAP = {
   'help-circle':         Question,
   headset:               Headset,
   megaphone:             Megaphone,
-  // ── People ─────────────────────────────────────────────────────────────────
 
   user:                  User,
   'user-check':          UserCheck,
@@ -135,7 +126,6 @@ const MAP = {
   'users-round':         UsersThree,
   venus:                 UserCircle,
   mars:                  UserCircle,
-  // ── Property / real-estate ────────────────────────────────────────────────
 
   home:                  House,
   house:                 House,
@@ -159,7 +149,6 @@ const MAP = {
   'paw-print':           PawPrint,
   dog:                   Dog,
   'parking-circle':      ParkingCircle,
-  // ── Finance & commerce ────────────────────────────────────────────────────
 
   'indian-rupee':             CurrencyInr,
   'badge-indian-rupee':       BadgeIndianRupee,
@@ -181,7 +170,6 @@ const MAP = {
   truck:                      Truck,
   toolbox:                    Toolbox,
   package:                    Package,
-  // ── Navigation & location ─────────────────────────────────────────────────
 
   map:                   MapTrifold,
   'map-pin':             MapPin,
@@ -193,18 +181,17 @@ const MAP = {
   milestone:             Milestone,
   'train-front':         Train,
   plane:                 Airplane,
-  // ── Charts & data ─────────────────────────────────────────────────────────
 
   'trending-up':         TrendUp,
   'trending-down':       TrendDown,
   'bar-chart-3':         ChartBar,
+  'pie-chart':           ChartPie,
   'line-chart':          ChartLineUp,
   'chart-line':          ChartLine,
   database:              Database,
   'git-compare':         GitCompare,
   workflow:              Workflow,
   'chevrons-left-right': ChevronsLeftRight,
-  // ── Files & documents ────────────────────────────────────────────────────
 
   'file-text':           FileText,
   'file-check':          FileCheck,
@@ -220,14 +207,12 @@ const MAP = {
   paperclip:             Paperclip,
   'scroll-text':         Note,
   table:                 Table,
-  // ── Editing & writing ────────────────────────────────────────────────────
 
   pencil:                Pencil,
   edit:                  Pencil,
   'pen-line':            PenLine,
   'pen-tool':            PenNib,
   'pan-tool':            PenNib,
-  // ── Media ────────────────────────────────────────────────────────────────
 
   camera:                Camera,
   video:                 Video,
@@ -239,7 +224,6 @@ const MAP = {
   'undo-2':              ArrowCounterClockwise,
   tv:                    Television,
 
-  // ── Amenities & appliances ───────────────────────────────────────────────
   refrigerator:          Refrigerator,
   'washing-machine':     WashingMachine,
   microwave:             Microwave,
@@ -256,7 +240,6 @@ const MAP = {
   'battery-charging':    BatteryCharging,
   shirt:                 Barbell,
   dumbbell:              Barbell,
-  // ── Nature & outdoors ────────────────────────────────────────────────────
 
   trees:                 Tree,
   'tree-pine':           Tree,
@@ -265,7 +248,6 @@ const MAP = {
   waves:                 Waves,
   flame:                 Fire,
   wind:                  Wind,
-  // ── Misc UI ───────────────────────────────────────────────────────────────
 
   star:                  Star,
   'star-half':           StarHalf,
@@ -323,7 +305,6 @@ const MAP = {
   reply:                 ArrowBendUpLeft,
   'circle-alert':        WarningCircle,
   'cloud-off':           CloudSlash,
-  // ── Help centre / documentation ────────────────────────────────────────────
 
   'user-circle':         UserCircle,
   'clipboard-text':      ClipboardText,

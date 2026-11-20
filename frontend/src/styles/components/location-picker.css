@@ -1,5 +1,3 @@
-/* Imported by every map that drops the teal teardrop pin (LocationPicker, SocietyMap), so it ships
-   with whichever route renders one rather than only with list-property. */
 .lp-pin {
   width: 26px;
   height: 26px;

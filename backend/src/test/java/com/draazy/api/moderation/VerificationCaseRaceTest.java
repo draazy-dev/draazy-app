@@ -23,11 +23,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-// No `@Transactional`: `AbstractApiTest`'s rollback would hide every collision, so #cleanUp() is load-bearing.
+// No @Transactional (rollback would hide collisions), so cleanUp() is load-bearing.
 @SpringBootTest
 @DisplayName("Verification case files under concurrency — one listing, one case file")
 class VerificationCaseRaceTest {
-
         @Test
         void aStaleListingWriterCannotOverwriteAConcurrentLifecycleDecision() {
                 Property stale = properties.findById(propertyId).orElseThrow();
@@ -41,7 +40,6 @@ class VerificationCaseRaceTest {
 
     private static final String OWNER_MOBILE = "9876000221";
 
-    /** Enough to lose the race reliably on a machine with spare cores; small enough to stay quick. */
     private static final int RACERS = 4;
 
     @Autowired VerificationCases cases;
@@ -112,7 +110,6 @@ class VerificationCaseRaceTest {
         return n == null ? 0 : n;
     }
 
-    // Checklist count catches a fix that reused the row but re-seeded it.
     @Test
     @DisplayName("four simultaneous opens of one listing produce one case file and no errors")
     void concurrentOpensDoNotCollideOnTheUniqueIndex() {
@@ -130,7 +127,6 @@ class VerificationCaseRaceTest {
                 .isEqualTo(3);
     }
 
-    // Every open after the first takes the fast path — it must not take the lock, and it must create nothing.
     @Test
     @DisplayName("racing an existing case file returns the same one, and creates nothing")
     void concurrentOpensOfAnExistingCaseFileAreReads() {

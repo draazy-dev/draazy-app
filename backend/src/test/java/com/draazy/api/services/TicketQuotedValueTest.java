@@ -15,12 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** The quote a customer accepted is kept apart from the deal value ops book: when they disagree (a 2 BHK quote,
- * a 4 BHK flat) a single column could only record it by destroying the number that made it visible. */
 @DisplayName("Slice 11 — a quote is not a deal value")
 class TicketQuotedValueTest extends ServiceFixtures {
-
-    /** ₹18,499 — the Move-in Pack's six items less the 12% bundle discount, near enough. */
     private static final long QUOTE = 18_499L;
 
     @Test
@@ -35,8 +31,6 @@ class TicketQuotedValueTest extends ServiceFixtures {
                                 + "\"quotedValue\":" + QUOTE + "}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.quotedValue").value(QUOTE))
-                // Accepting a quote must not also hand the client the pipeline number;
-                // fails if someone merges the two columns.
                 .andExpect(jsonPath("$.value").value(nullValue()));
     }
 
@@ -45,8 +39,6 @@ class TicketQuotedValueTest extends ServiceFixtures {
     void theDealValueIsNotTheClientsToSet() throws Exception {
         User buyer = customer("9820000402");
 
-        // Both fields in one body, because the interesting failure is a mapper that starts reading
-        // `value` off the request the moment a sibling money field becomes legal to send.
         mvc.perform(post(Routes.Tickets.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -65,8 +57,6 @@ class TicketQuotedValueTest extends ServiceFixtures {
         String id = raise(buyer, "{\"subject\":\"Move-in Pack booking\",\"team\":\"packers\","
                 + "\"quotedValue\":" + QUOTE + "}");
 
-        // tickets.value has no write path (TicketCreate drops it, TicketUpdate has no such component), so the
-        // assertable claim is that working the ticket does not disturb the customer's quote.
         mvc.perform(patch(Routes.Tickets.BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(desk))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -84,8 +74,6 @@ class TicketQuotedValueTest extends ServiceFixtures {
         String id = raise(buyer, "{\"subject\":\"Move-in Pack booking\",\"team\":\"packers\","
                 + "\"quotedValue\":" + QUOTE + "}");
 
-        // An unknown field is ignored, so the PATCH succeeds; asserted on a fresh GET because a PATCH response
-        // rendered from an entity Hibernate still holds would agree with a write that never reached a column.
         mvc.perform(patch(Routes.Tickets.BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(desk))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -103,8 +91,6 @@ class TicketQuotedValueTest extends ServiceFixtures {
     void zeroIsAQuoteAndMinusOneIsNot() throws Exception {
         User buyer = customer("9820000409");
 
-        // 422, not 400: GlobalExceptionHandler maps a bean-validation failure to UNPROCESSABLE_ENTITY
-        // with a ValidationProblem body.
         mvc.perform(post(Routes.Tickets.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -112,8 +98,6 @@ class TicketQuotedValueTest extends ServiceFixtures {
                                 + "\"quotedValue\":-1}"))
                 .andExpect(status().isUnprocessableEntity());
 
-        // Zero matters: "quoted, free of charge" is a real offer, unlike "nobody quoted" (the absent case);
-        // a truthiness check passes the first half of this test and fails here.
         mvc.perform(post(Routes.Tickets.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                         .contentType(MediaType.APPLICATION_JSON)

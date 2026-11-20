@@ -1,29 +1,84 @@
-/** The caller's own list is a bare array, not a `PageResponse`: it grows with one person's history, and each row
- * carries only the newest message. The desk's queue is paged and thread-less, hence a separate operation. */
-import { get, post } from '../../http.js';
-import { toMessage, toQueuePage, toSummaryList, toTicketCreate, toViewModel } from './supportMapper.js';
+import { get, openEventStream, post } from '../../http.js';
+import { toMessage, toSummaryList, toTicketCreate, toViewModel } from './supportMapper.js';
+import { toChatMessage, toChatSend, toStaffSupportChat, toSupportChat, toSupportChatRow } from './supportChatMapper.js';
+
+export async function getSupportChat() {
+  return toSupportChat(await get('/support/chat'));
+}
+
+export async function sendSupportChatMessage(text, about) {
+  return toChatMessage(await post('/support/chat/messages', toChatSend(text, about)), 'me');
+}
+
+export async function markSupportChatRead() {
+  await post('/support/chat/read');
+}
+
+export async function supportChatUnreadCount() {
+  const res = await get('/support/chat/unread-count');
+  return Number(res?.count) || 0;
+}
+
+export async function listSupportChats({ view = 'awaiting', context, page = 0, size = 30 } = {}) {
+  const query = { view, page, size };
+  if (context) query.context = context;
+  const res = await get('/admin/support/chats', query);
+  const rows = Array.isArray(res?.content) ? res.content : [];
+  return { items: rows.map(toSupportChatRow), total: res?.totalElements ?? rows.length, page, size };
+}
+
+export async function supportChatCounts() {
+  const res = await get('/admin/support/chats/counts');
+  const scope = res?.scope
+    ? { full: !!res.scope.full, contexts: Array.isArray(res.scope.contexts) ? res.scope.contexts : [] }
+    : null;
+  return { awaiting: Number(res?.awaiting) || 0, mine: Number(res?.mine) || 0, all: Number(res?.all) || 0, scope };
+}
+
+const chatPath = (userId) => `/admin/support/chats/${encodeURIComponent(userId)}`;
+
+export async function getStaffSupportChat(userId) {
+  return toStaffSupportChat(await get(chatPath(userId)));
+}
+
+export async function replyToSupportChat(userId, text, about) {
+  return toChatMessage(await post(`${chatPath(userId)}/messages`, toChatSend(text, about)), 'staff');
+}
+
+export async function assignSupportChat(userId, assigneeId = null) {
+  await post(`${chatPath(userId)}/assign`, { assigneeId });
+}
+
+export async function resolveSupportChat(userId) {
+  await post(`${chatPath(userId)}/resolve`);
+}
+
+export async function markStaffSupportChatRead(userId) {
+  await post(`${chatPath(userId)}/read`);
+}
+
+export async function locateSupportChat({ type, id }) {
+  const res = await get('/admin/support/chats/locate', { type, id: String(id) });
+  return { userId: String(res.userId), name: res.name || 'Customer', count: Number(res.count) || 0 };
+}
+
+export async function createServiceTicketFromChat(userId, { team, subject, note, propertyId }) {
+  const res = await post(`${chatPath(userId)}/service-ticket`, {
+    team, subject: String(subject || '').trim(), note: String(note || '').trim() || null, propertyId: propertyId || null,
+  });
+  return { id: String(res.id), team: res.team };
+}
+
+export async function openSupportChatStream({ onEvent, ...opts }) {
+  return openEventStream('/admin/support/chats/stream', {
+    ...opts,
+    onEvent: (event) => onEvent?.(event.type === 'chat' && event.data?.userId
+      ? { ...event, data: toSupportChatRow(event.data) } : event),
+  });
+}
 
 export async function listTickets() {
   return toSummaryList(await get('/support/tickets'));
-}
-
-/** Not a role-widened `listTickets`: this is a paged envelope of thread-less summaries.
- * `awaitingReply` is tri-state: omitted means everything, and `false` for "no filter" hides unanswered tickets. */
-export async function listSupportQueue({ awaitingReply, page = 0, size = 20, counts = false } = {}) {
-  const query = { page, size };
-  if (awaitingReply === true || awaitingReply === false) query.awaitingReply = awaitingReply;
-  if (counts) query.counts = true;
-  return toQueuePage(await get('/admin/support-tickets', query), { page, size });
-}
-
-export async function getTicket(id) {
-  try {
-    return toViewModel(await get(`/support/tickets/${encodeURIComponent(id)}`));
-  } catch {
-    // Somebody else's ticket is a 404 by design — the id is the only secret. The page renders a
-    // missing ticket the same way either way, so there is nothing to distinguish here.
-    return null;
-  }
 }
 
 export async function createTicket(ticket) {

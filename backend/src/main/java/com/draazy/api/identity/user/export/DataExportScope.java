@@ -6,10 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** DPDP s.11 export scope: which rows are the subject's, and the redaction rule for shared records.
- * Rationale: docs/system/legal-entity-and-compliance.md (section 12). */
 public final class DataExportScope {
-
     private DataExportScope() {
     }
 
@@ -17,12 +14,10 @@ public final class DataExportScope {
 
     static final String PARTY_REF = "partyRef";
 
-    /** One table's contribution to the export; {@code sql} must be wrappable in {@code select * from (…) d limit ?}. */
     record Dataset(String domain, String name, String describes, String sql,
             Map<String, String> withheld) {
     }
 
-    /** A whole table left out of the export, and why. Serialised into the response. */
     record Exclusion(String name, String reason) {
     }
 
@@ -47,7 +42,7 @@ public final class DataExportScope {
                 "Your account: the name, number, email and city you gave us, and the trust flags we "
                         + "derived from them.",
                 """
-                select id, name, mobile, email, role, team, status, city,
+                select id, name, mobile, email, role, team, status, city, gender,
                        mobile_verified, verified, verified_contact_only,
                        hide_number, listings_count, avatar, joined_at, last_active,
                        flagged, flagged_at, archived, archived_at, created_at, updated_at
@@ -69,6 +64,15 @@ public final class DataExportScope {
                 select email, sms, whatsapp, match_alerts, quiet_hours_enabled,
                        quiet_start, quiet_end, language, created_at, updated_at
                   from notification_preferences
+                 where user_id = :subjectId
+                """,
+                Map.of()));
+
+        out.add(new Dataset("account", "user_living_style",
+                "Your optional living-style answers, shown to people you could share a home with.",
+                """
+                select answers, updated_at
+                  from user_living_style
                  where user_id = :subjectId
                 """,
                 Map.of()));
@@ -306,13 +310,27 @@ public final class DataExportScope {
                 """
                 select id, title, deal, property_type, bhk, price, locality, locality_slug,
                        society, area, area_unit, furnishing, visibility, status, rented,
-                       tenant_name, monthly_rent, due_day, valuation, published_listing_id,
+                       tenant_name, tenant_mobile, tenant_since, monthly_rent, due_day, lease_end, deposit,
+                       landlord_pan, valuation,
+                       published_listing_id, source_room_id, address_fingerprint,
                        created_at, updated_at
                   from managed_properties
                  where owner_id = :subjectId
                  order by created_at desc
                 """,
                 Map.of()));
+
+        out.add(new Dataset("listings", "managed_properties_as_tenant",
+                "Owners' rent records that name your number as the tenant.",
+                """
+                select id, locality, rented, tenant_name, tenant_mobile, tenant_since, monthly_rent, due_day,
+                      lease_end, deposit, created_at, updated_at,
+                      owner_id as party_ref_src
+                 from managed_properties
+                where tenant_mobile = :subjectMobile
+                order by created_at desc
+                """,
+                withheld("owner_id", "Replaced by partyRef.")));
 
         out.add(new Dataset("listings", "managed_property_documents",
                 "Papers you filed against a property in your Owner Hub.",
@@ -675,16 +693,25 @@ public final class DataExportScope {
                         + "agreement.")));
 
         out.add(new Dataset("agreements", "rent_agreements_as_tenant",
-                "Rent agreements where the tenant's number is yours.",
+                "Registered or active rent agreements where the tenant's number is yours.",
                 """
                 select id, property_id, tenant_mobile, rent, deposit, start_date, duration_months,
-                       status, document_url, created_at, updated_at,
+                       status, final_document_id, created_at, updated_at,
                        owner_id as party_ref_src
                   from rent_agreements
                  where tenant_mobile = :subjectMobile
+                   and status in ('registered', 'active')
                  order by created_at desc
                 """,
-                withheld("owner_id", "Replaced by partyRef.")));
+                withheld(
+                        "owner_id", "Replaced by partyRef.",
+                        "drafts and expired agreements", "An owner types the tenant's number "
+                                + "while drafting, so until registration the number may be "
+                                + "somebody else's. A tenant's own agreements page shows only "
+                                + "registered and active agreements; the export does the same.",
+                        "document_url", "A link the owner typed, which the product never shows "
+                                + "the tenant. final_document_id is the registered copy Draazy "
+                                + "produced.")));
     }
 
     private static void messaging(List<Dataset> out) {
@@ -879,8 +906,8 @@ public final class DataExportScope {
         out.add(new Dataset("support", "support_ticket_messages",
                 "Messages on your support tickets, including our replies.",
                 """
-                select m.id, m.ticket_id, m.author_role, m.body, m.attachments, m.created_at,
-                       m.author_id as party_ref_src
+                select m.id, m.ticket_id, m.author_role, m.body, m.attachments, m.about_type, m.about_id,
+                       m.created_at, m.author_id as party_ref_src
                   from support_ticket_messages m
                   join support_tickets t on t.id = m.ticket_id
                  where t.user_id = :subjectId
@@ -889,6 +916,18 @@ public final class DataExportScope {
                 withheld("author_id", "Replaced by partyRef. Where the author was a staff member "
                         + "the role is still returned, so you can tell our replies from your own; "
                         + "which employee wrote it is not.")));
+
+        out.add(new Dataset("support", "support_conversations",
+                "Where your single support chat with us stands: its status, when it last moved and a "
+                        + "preview of the latest message.",
+                """
+                select status, user_unread, last_at, last_preview, last_from, last_about_type,
+                       last_about_id, created_at, updated_at
+                  from support_conversations
+                 where user_id = :subjectId
+                """,
+                withheld("assignee_id / staff_unread", "Which employee holds your chat, and whether "
+                        + "our team has read it. Both are internal.")));
 
         out.add(new Dataset("support", "tickets",
                 "Ops tickets raised about something you asked for, matched by your account or your "
@@ -916,7 +955,6 @@ public final class DataExportScope {
     }
 
     private static void community(List<Dataset> out) {
-
         out.add(new Dataset("community", "reviews_written",
                 "Reviews you wrote. Where you reviewed a person rather than a place, their id is "
                         + "replaced by the same reference used everywhere else in this document.",
@@ -950,7 +988,7 @@ public final class DataExportScope {
                 "Moderation reviews of flatmate listings you host, and their outcome.",
                 """
                 select id, kind, room_id, group_id, address, tier, owner_consent, status,
-                       created_at, updated_at
+                       created_at, updated_at, pending_since
                   from flatmate_reviews
                  where host_id = :subjectId
                  order by created_at desc
@@ -961,8 +999,6 @@ public final class DataExportScope {
                         "flag_for_review", "An internal triage flag rather than an outcome; status "
                                 + "is the decision you are entitled to.")));
 
-        // Split for the same reason as reviews_written; the "subject already knows who they
-        // reported" argument is refused because uniformity is the redaction rule's only guard.
         out.add(new Dataset("community", "reports_filed",
                 "Reports you filed about a listing or another user. Where you reported a person, "
                         + "their id is replaced by a reference.",
@@ -988,7 +1024,7 @@ public final class DataExportScope {
                        verification_tier, agreement_declared, society_id, society,
                        flat_number, locality, localities, lat, lng, bhk, flat_type,
                        home_type_label, gated_community, furnishing, move_in, available_from,
-                       gender, food, tags, note, photos, status, archived, archived_at,
+                       gender, food, note, photos, status, archived, archived_at,
                        active_until, created_at, updated_at
                   from flatmate_rooms
                  where host_id = :subjectId
@@ -1006,9 +1042,9 @@ public final class DataExportScope {
                 "Flatmate groups you host.",
                 """
                 select id, title, locality, policy, rent, seats_total, seats_open, property_id,
-                       host_role, verification_tier, agreement_declared, owner_consent, tags,
+                       host_role, verification_tier, agreement_declared, owner_consent,
                        note, hunting, localities, pref_bhk, rent_min, deposit_min, deposit_max,
-                       gated_only, bachelors, furnishing, move_in_by,
+                       gated_only, bachelors, furnishing, parking, move_in_by,
                        archived, archived_at, active_until, created_at, updated_at
                   from flatmate_groups
                  where host_id = :subjectId
@@ -1065,7 +1101,8 @@ public final class DataExportScope {
                 "Posts you made looking for a flat or a flatmate.",
                 """
                 select id, name, gender, age, occupation, budget, localities, move_in, move_in_at,
-                       flat_pref, room_pref, tags, note, verified_contact_only, verified, lat,
+                       flat_pref, room_pref, furnishing, gated_only, attached_bath, parking,
+                       note, verified_contact_only, verified, lat,
                        lng, archived, archived_at, active_until, created_at, updated_at
                   from flatmate_seeker_posts
                  where user_id = :subjectId
@@ -1084,6 +1121,16 @@ public final class DataExportScope {
                  order by created_at desc
                 """,
                 Map.of()));
+
+        out.add(new Dataset("flatmate", "flatmate_owner_notices",
+                "WhatsApp notices sent to a flat owner because you listed a room in their flat.",
+                """
+                select id, room_id, owner_mobile, status, responded_at, expires_at, created_at
+                  from flatmate_owner_notices
+                 where host_id = :subjectId
+                 order by created_at desc
+                """,
+                withheld("token_hash", "Digest of the link credential sent to the owner.")));
 
         out.add(new Dataset("flatmate", "referrals_made",
                 "People you referred. Their name is included because the referrals screen already "
@@ -1144,8 +1191,6 @@ public final class DataExportScope {
                         + "returning them would create a correlation token and disclose nothing.")));
     }
 
-    /** Tables holding data about the subject that this export does not return; serialised into every
-     * response so an omission is never silent. */
     static List<Exclusion> exclusions() {
         return List.of(
                 new Exclusion("reports_about_me",
@@ -1211,7 +1256,6 @@ public final class DataExportScope {
         return DATASETS;
     }
 
-    /** Ships the redaction rule in the response payload so it travels with the data itself. */
     static String redactionRule() {
         return "Records you share with somebody else are included in full — that they happened, "
                 + "when, their status, the money, the property — together with everything you "
@@ -1226,7 +1270,6 @@ public final class DataExportScope {
                 + "of another data principal.";
     }
 
-    /** Ordered map literal; the withheld list must diff cleanly between calls. */
     private static Map<String, String> withheld(String... pairs) {
         Map<String, String> map = new LinkedHashMap<>();
         for (int i = 0; i < pairs.length; i += 2) {

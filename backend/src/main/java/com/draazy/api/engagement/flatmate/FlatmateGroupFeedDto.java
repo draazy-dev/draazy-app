@@ -25,13 +25,10 @@ public record FlatmateGroupFeedDto(
         boolean agreementDeclared,
         boolean ownerConsent,
         String reviewStatus,
-        List<String> tags,
         String note,
         String ownerName,
         Instant createdAt,
         FlatmateGroupPreferences preferences) {
-
-    /** No member-row id: only the host's own read needs it, to remove someone. */
     public record Member(String name, String initials, boolean verified, boolean host) {
     }
 }

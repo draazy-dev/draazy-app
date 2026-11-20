@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { PUNE_STAMP_RATE_PCT, computeStampDuty } from '../../../lib/toolCalc.js';
 
-/* Pure math in computeStampDuty() so it stays testable. */
 const fmt = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
 const fmtShort = (n) => (n >= 1e7 ? '₹' + (n / 1e7).toFixed(2) + ' Cr' : '₹' + (n / 1e5).toFixed(1) + ' L');
 

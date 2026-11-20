@@ -1,5 +1,5 @@
 import { expect, test, ACTORS, STAFF } from '../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, signIn, uniqueMobile } from '../../helpers/liveAuth.js';
+import { API, authHeaders, fileIdentityCaseAs, uploadedListingPhotos, signIn, uniqueMobile, completeStaffPostedListing } from '../../helpers/liveAuth.js';
 import { appReady } from '../../helpers/app.js';
 import { approveListing, rejectListing } from '../../helpers/moderation.js';
 
@@ -18,6 +18,7 @@ const BASE_LISTING = {
   deal: 'rent',
   propertyType: 'Flat',
   price: 24000,
+  deposit: 48000,
   city: 'Pune',
   bhk: 2,
   area: 720,
@@ -80,6 +81,7 @@ async function badgeRequestListing(request, tag) {
   const listing = await pendingListing(`badge ${tag}`);
   expect((await approveListing(request, listing.id, await authHeaders(ACTORS.admin))).status()).toBe(200);
   await uploadOwnershipDocument(listing.headers, listing.id);
+  await fileIdentityCaseAs(listing.headers.authorization);
   const asked = await api('POST', `/properties/${listing.id}/verification/ownership/request`, listing.headers);
   expect(asked.status, asked.text).toBe(200);
   return listing;
@@ -112,6 +114,7 @@ const tab = (page, name) => page.getByRole('tab', { name });
 const rows = (page) => page.getByTestId('queue-row');
 const rowFor = (page, title) => rows(page).filter({ has: page.getByRole('heading', { name: title }) });
 const searchBox = (page) => page.getByPlaceholder('Title, owner, mobile or ID');
+const STAMP_12H = /^\d{1,2} [A-Z][a-z]{2,3} \d{4}, \d{1,2}:\d{2}\s(AM|PM)$/;
 
 function queueFetch(match = {}) {
   return (res) => {
@@ -186,9 +189,32 @@ test.describe('LIVE: the properties console', () => {
     const labels = await page.getByRole('tab').allInnerTexts();
     TAB_ORDER.forEach((pattern, i) => expect(labels[i].trim()).toMatch(pattern));
     await expect(tab(page, /^To verify/)).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByTestId('verify-note')).toContainText('Oldest first');
+    await expect(page.getByTestId('verify-note')).toContainText('Newest first');
+    await expect(page.getByRole('group', { name: 'Sort' })).toHaveCount(0);
     await expect(rows(page).first()).toBeVisible({ timeout: 20000 });
     expect(consoleErrors).toEqual([]);
+  });
+
+  test('To verify lists the newest listing first and stamps when it was created', async ({ page, login }) => {
+    const listing = await pendingListing('newest');
+    await login.asAdmin();
+    await openConsole(page, '', { status: 'pending', archived: 'false', sort: 'createdAt,desc', page: '0', size: String(PAGE_LIMIT) });
+
+    const first = rows(page).first();
+    await expect(first.getByRole('heading', { name: listing.title })).toBeVisible({ timeout: 20000 });
+    await expect(first.getByText('Created', { exact: true })).toBeVisible();
+    await expect(first.getByTestId('activity-stamp')).toHaveText(STAMP_12H);
+  });
+
+  test('a re-check tile is stamped with the owner\'s edit, not the creation time', async ({ page, login, request }) => {
+    const listing = await recheckListing(request, 'stamp');
+    await login.asAdmin();
+    await openConsole(page, '?tab=recheck', { recheck: 'true', archived: 'false', sort: 'recheckRequestedAt,desc', page: '0', size: String(PAGE_LIMIT) });
+
+    const row = rowFor(page, listing.title);
+    await expect(row).toBeVisible({ timeout: 20000 });
+    await expect(row.getByText('Updated', { exact: true })).toBeVisible();
+    await expect(row.getByTestId('activity-stamp')).toHaveText(STAMP_12H);
   });
 
   test('tab selection, deep links and removed tab names resolve through the URL', async ({ page, login }) => {
@@ -322,10 +348,15 @@ test.describe('LIVE: the properties console', () => {
     await dialog.getByTestId('review-section-badge').click();
     await expect(dialog.getByRole('region', { name: 'Ownership document checks' })).toBeVisible();
     await dialog.getByTestId('review-section-messages').click();
-    const composer = dialog.getByPlaceholder(/Share a note/);
+    await dialog.getByTestId('open-support-chat').click();
+    const chat = page.getByTestId('staff-dock-window').filter({ has: page.getByTestId('staff-chat') });
+    await expect(chat.getByLabel('Reply about')).toContainText(listing.title);
+    const composer = chat.getByTestId('staff-chat-input');
     await composer.click();
     await page.keyboard.type('needs a clearer photo');
     await expect(composer).toHaveValue('needs a clearer photo');
+    await expect(dialog, 'typing in the chat must not close the review behind it').toBeVisible();
+    await chat.getByRole('button', { name: 'Close chat', exact: true }).click();
 
     const bare = await conciergeListing('no photo');
     await page.goto('/admin/properties', { waitUntil: 'commit' });
@@ -488,6 +519,10 @@ test.describe('LIVE: the properties console', () => {
     expect(await refused.text()).toContain('owner_not_confirmed');
 
     const ownerHeaders = await authHeaders(desk.ownerMobile);
+    const incomplete = await api('POST', `/me/listings/${desk.id}/confirm`, ownerHeaders);
+    expect(incomplete.status).toBe(409);
+    expect(incomplete.body.error).toBe('listing_incomplete');
+    await completeStaffPostedListing(desk.id, ownerHeaders);
     expect((await api('POST', `/me/listings/${desk.id}/confirm`, ownerHeaders)).status).toBe(204);
 
     await login.asAdmin();

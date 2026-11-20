@@ -7,13 +7,10 @@ import SocietyFinder from './SocietyFinder.jsx';
 
 const titleCase = (slug) => String(slug || '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-/** Followed societies: the follow context decides what is followed and describes each from the same read;
- * an unresolved slug (browser-local) still gets a title-cased row and can be unfollowed. */
 export default function FollowedSocietiesPanel() {
   const follows = useFollows();
   const { slugs, rows: bySlug, busy, loading, refreshRows } = follows;
 
-  // A follow made in the finder below has no row yet: re-read once its write settles, once per missing set.
   const missing = useMemo(() => [...slugs].filter((s) => !bySlug.has(s)).join(','), [slugs, bySlug]);
   const tried = useRef('');
   useEffect(() => {
@@ -63,11 +60,11 @@ export default function FollowedSocietiesPanel() {
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {soc ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-gray-300">
+                    <span className="dz-tag border border-white/10 bg-white/5 font-medium text-gray-300">
                       <Icon name="map-pin" className="h-3 w-3 text-gray-400" /> {titleCase(soc.localitySlug)}
                     </span>
                   ) : null}
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-teal-300">
+                  <span className="dz-tag border border-white/10 bg-white/5 font-medium text-teal-300">
                     <Icon name="home" className="h-3 w-3" /> {count ? `${count} home${count > 1 ? 's' : ''} listed now` : 'No homes listed now'}
                   </span>
                 </div>

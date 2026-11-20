@@ -1,0 +1,40 @@
+import { useTranslation } from 'react-i18next';
+import Icon from '../../../components/Icon.jsx';
+import { useCompare } from '../../../context/CompareContext.jsx';
+import { useToast } from '../../../context/ToastContext.jsx';
+import { shareOrCopy } from '../../../lib/share.js';
+import { usePrefetchReferralCode } from '../../../lib/usePrefetchReferralCode.js';
+
+const ON_PHOTO = 'heart-on-photo w-11 h-11 flex items-center justify-center rounded-full cursor-pointer transition-colors';
+
+export function PhotoActions({ p }) {
+  usePrefetchReferralCode();
+  const { t } = useTranslation();
+  const compare = useCompare();
+  const { toast } = useToast();
+  const inCompare = compare.has(p.id);
+
+  const toggleCompare = () => {
+    if (!inCompare && compare.count >= 4) { toast(t('property.compareLimitAlert'), 'info'); return; }
+    compare.toggle(p.id);
+  };
+
+  const share = async () => {
+    const status = await shareOrCopy({ title: p.title || 'Draazy listing' });
+    if (status === 'copied') toast(t('property.shareCopied'), 'success');
+    if (status === 'failed') toast(t('property.shareCopyFail'), 'error');
+  };
+
+  const compareLabel = inCompare ? t('property.removeFromCompare') : t('property.addToCompare');
+
+  return (
+    <>
+      <button type="button" className={ON_PHOTO + ' absolute top-3 left-3' + (inCompare ? ' !text-brand-teal-3' : '')} onClick={toggleCompare} aria-label={compareLabel} title={compareLabel} aria-pressed={inCompare}>
+        <Icon name="scale" weight={inCompare ? 'fill' : 'regular'} className="w-6 h-6" aria-hidden="true" />
+      </button>
+      <button type="button" className={ON_PHOTO + ' absolute top-3 right-3'} onClick={() => void share()} aria-label={t('property.share')}>
+        <Icon name="share-network" className="w-6 h-6" aria-hidden="true" />
+      </button>
+    </>
+  );
+}

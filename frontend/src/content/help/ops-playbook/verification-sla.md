@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 1
-updated: 2026-10-10
+updated: 2026-11-06
 summary: Internal queue rules for listing verification, live re-checks, duplicates and owner follow-up.
 tags: [ops, sla, verification, internal]
 modules: [properties]
@@ -18,15 +18,17 @@ modules: [properties]
 
 **Monitor**
 
-- **To verify** tab, oldest first ? amber at 24 h ("due soon"), rose at 48 h ("overdue").
-- **Re-checks** and **Badge requests** tabs ? amber at 24 h, rose at 72 h.
-- **Flagged** tab count ? every flagged listing is out of search until you clear or archive it.
-- **Duplicates** tab count ? clusters still waiting for a decision.
-- **Follow-up** tab count ? live listings the owner has not confirmed for over two weeks. It has no amber or rose.
+- **To verify** tab, newest first — amber at 24 h ("due soon"), rose at 48 h ("overdue").
+- **Re-checks** and **Badge requests** tabs — amber at 24 h, rose at 72 h.
+- **Flagged** tab count — every flagged listing is out of search until you clear or archive it.
+- **Duplicates** tab count — clusters still waiting for a decision.
+- **Follow-up** tab count — live listings the owner has not confirmed for over two weeks. It has no amber or rose.
+- Your bell alerts (also emailed to staff): **New …**, **Waiting …** and **Escalated: …** for the queues in "Queue alerts and escalations" below.
+- Every queue shows newest first, and each tile shows when the listing was created or last updated.
 
 **Work on**
 
-- Clear **To verify** from the oldest rose row down. Use the **Awaiting owner** chip to separate staff-posted listings that only need an owner nudge.
+- Clear the rose rows in **To verify** first; they sit at the end of the list. Use the **Awaiting owner** chip to separate staff-posted listings that only need an owner nudge.
 - Decide every row in **Re-checks**: **Looks fine**, or take the listing down.
 - Grant or decline every request in **Badge requests**.
 - Decide each cluster in **Duplicates** before approving any member.
@@ -52,6 +54,37 @@ Use the owner follow-up buttons only with the **Post on behalf** function (`post
 
 The SLA panel is green at 90% or better, amber from 75% to 89%, and rose below 75%.
 
+## Queue alerts and escalations
+
+You do not have to watch the tabs all day. A sweep runs every 15 minutes and sends a bell alert for each queue below. On a staff account the same alert is also emailed to the address on the account (managers and admins get the bell only).
+
+| Alert | When | Goes to |
+| --- | --- | --- |
+| **New …** (arrival) | A new item arrives unassigned, in the first hour | Staff holding the function |
+| **Waiting 24h+** (reminder) | The item has waited the reminder time | The assignee, or the staff holding the function |
+| **Escalated: … untouched 36h+** | The item has waited the escalation time | Managers (admins if there are no managers) |
+
+| Queue | Reminder | Escalation | Function that gets it |
+| --- | --- | --- | --- |
+| Listing to review | 24h | 36h | Listing moderation |
+| Listing re-check | 24h | 36h | Listing moderation |
+| Owner reply to answer | 48h | 72h | Property verification |
+| Verified-badge request | 48h | 72h | Property verification |
+| ID check, identity appeal | 48h | 72h | KYC review |
+| Flatmate check | 48h | 72h | Flatmates |
+| Flatmate post to moderate | 24h | 48h | Flatmates |
+| Support chat waiting on us | 24h | 48h | Support |
+| Abuse report | 24h | 48h | Reports |
+| Refund request | 48h | 72h | Refunds |
+| Unassigned service request | 4h | 8h | That service desk |
+| Rent agreement | Past its stage deadline | 1.5 times the stage deadline | Rent Agreement desk |
+| Data-erasure request | 7 days | 20 days | Admins |
+| Customer draft decision, community society | Arrival alert only | None | The desk or Societies |
+
+An alert clears itself when the item is decided. Fix the queue, not the alert. A rent agreement that waits on the tenant's payment invite is shown as waiting, not late. Real alert emails need email delivery switched on in [Settings and integrations](/help/a/settings-and-integrations).
+
+The tab colours above (24h/48h, 24h/72h) are the desk's own colours; the bell alerts use the times in this table. Suspended accounts stop receiving alerts.
+
 ## Listing states
 
 | State | Staff meaning | Buyer-visible effect |
@@ -59,7 +92,7 @@ The SLA panel is green at 90% or better, amber from 75% to 89%, and rose below 7
 | `pending` | Waiting, in review, or awaiting owner info | Hidden from public search |
 | `approved` | Published | Visible unless archived |
 | `needs_info` review | Staff asked for a correction | Listing stays `pending`; owner sees the reason |
-| `rejected` | Final refusal | Hidden; reopen needs second reviewer override |
+| `rejected` | Refusal | Hidden; the owner's edit returns a fixable rejection to `pending`, **Reopen for review** returns any rejection |
 | `flagged` | Unsafe or disputed | Hidden until the flag is cleared or archived |
 | `archived` | Soft-deleted | Hidden; restore returns to `pending` |
 
@@ -68,7 +101,7 @@ The SLA panel is green at 90% or better, amber from 75% to 89%, and rose below 7
 1. Open the listing from **To verify** or **Re-checks**.
 2. Check the photos, duplicate result, details, address and locality.
 3. Tick every checklist item before approving. The **Approve** button stays locked until the checklist is complete, and the server rejects incomplete approvals.
-4. Read fraud signals before deciding. Hard signals require the second-approver path; do not approve directly.
+4. Read fraud signals before deciding. Hard signals stay visible as warnings; weigh them, then decide yourself.
 5. Add an internal note when the decision depends on evidence not visible in the fields.
 6. Decide with **Approve**, **Needs info**, or **Reject**.
 
@@ -76,7 +109,7 @@ The SLA panel is green at 90% or better, amber from 75% to 89%, and rose below 7
 
 ### Approve listing
 
-Use **Approve** only when the checklist is complete, no unresolved duplicate exists, the address and locality are believable, and any hard-signal override has a different second reviewer.
+Use **Approve** only when the checklist is complete, you have weighed any duplicate or broker signal, and the address and locality are believable. One approval is final; you cannot approve a listing you posted or own.
 
 ### Send needs info
 
@@ -86,7 +119,7 @@ The hourly sweep sends owner reminders after 3 days and 7 days. If there is no r
 
 ### Reject listing
 
-Use **Reject** for non-fixable or unsafe listings. A reason code is required. A rejected listing does not reopen just because the owner replies; use the second-reviewer override when a rejected case must re-enter review.
+A reason code is required. Five reasons are fixable: photos not real, wrong details, locality unclear, document unreadable and name mismatch. The owner is told to edit the listing and resubmit it, and the edit sends it back to `pending` for a fresh decision. The other reasons (duplicate, broker, RERA, other) are final: the owner cannot edit, and an owner reply does not reopen the listing. Use **Reopen for review** when a finally rejected case must re-enter review.
 
 ### Work re-checks while live
 
@@ -99,17 +132,18 @@ Use **Keep this, archive the rest** only when the cluster really points to the s
 ## Never do in listing verification
 
 - Do not approve with an unticked checklist.
-- Do not approve a hard-signal case through your own override.
+- Do not approve a listing you posted or own.
 - Do not use **Reject** for a fixable photo, address or document gap.
 - Do not publish a staff-posted listing before the owner confirms it.
 - Do not treat **Follow-up** as a breach queue; send the owner nudge and record the outreach.
 
 ## Escalation path
 
-Escalate suspected organised fraud, legal or police references, minors, media contact, or repeated override attempts through the ticket ladder. Record the listing id, reason code, signals and action already taken.
+Escalate suspected organised fraud, legal or police references, minors, media contact, or repeated attempts to reopen rejected listings up the ladder in [Chats, tickets and escalation](/help/a/ticket-escalation), by phone for a P0. Record the listing id, reason code, signals and action already taken.
 
 ## Related
 
-- [Ticket handling and escalation](/help/a/ticket-escalation)
+- [Chats, tickets and escalation](/help/a/ticket-escalation)
+- [Support chats](/help/a/support-chats)
 - [Ownership and badges](/help/a/ownership-and-badges)
 - [Reports and takedowns](/help/a/reports-and-takedowns)

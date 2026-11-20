@@ -1,23 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from './Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { STEPS, stepStates, statusMeta, isActive, progressPct } from '../lib/serviceRequestStatus.js';
 import {
-  listServiceRequests, decideServiceRequestDraft, approveServiceRequestDraftParty, addServiceRequestMessage, markServiceRequestRead, markServiceRequestDraftOpened,
-  getServiceRequestDocumentUrl,
+  listServiceRequests, decideServiceRequestDraft, approveServiceRequestDraftParty, markServiceRequestDraftOpened,
+  getServiceRequestDocumentUrl, cancelServiceRequest, deleteServiceRequest,
 } from '../services/serviceRequestService.js';
 import { openDocFrom } from '../lib/openDoc.js';
 import { timeAgo } from '../lib/format.js';
 import useScrollLock from '../hooks/useScrollLock.js';
 import RejectedPapers from './RejectedPapers.jsx';
 import RevisedTerms from './RevisedTerms.jsx';
+import AttentionNeeded from './AttentionNeeded.jsx';
+import { Link } from 'react-router';
+import { supportLink } from '../lib/supportLink.js';
 import IdentityRefill, { needsIdentityRefill } from './IdentityRefill.jsx';
+import { REVISIT_READ } from '../services/http.js';
 
 const openRequestFile = (requestId, docId) => openDocFrom(() => getServiceRequestDocumentUrl(requestId, docId));
 
-const REUPLOADABLE = new Set(['docs_review', 'draft_shared', 'changes_requested', 'approved']);
+const REUPLOADABLE = new Set(['docs_review', 'draft_shared', 'changes_requested', 'action_required', 'approved']);
 const rank = (r) => (r.status === 'cancelled' ? 2 : isActive(r.status) ? 0 : 1);
 const hasForeignTenant = (request) => {
   const tenants = request.details?._state?.tenants;
@@ -26,7 +30,12 @@ const hasForeignTenant = (request) => {
 
 const SEGMENT = { done: 'bg-emerald-500', active: 'bg-teal-500', todo: 'bg-white/15' };
 
-// Segments, not labelled chips: five labels cannot share a 360px row without scrolling the current step away.
+// Rent agreements need each party's own open and approval; other drafts use the requester's timeline open.
+const myDraft = (r) => {
+  const mine = r.draftApproval?.parties.find((p) => p.mine);
+  return mine ? { opened: mine.opened, approved: mine.approved } : { opened: !!r.draft?.opened, approved: false };
+};
+
 function Progress({ status }) {
   const pct = progressPct(status);
   if (pct == null) return null;
@@ -50,31 +59,13 @@ function Progress({ status }) {
 
 function PoliceIntimationStep({ request, t }) {
   if (request.type !== 'rental' || request.status !== 'completed') return null;
-  const done = !!request.policeIntimation?.confirmed;
   return (
-    <div className={`mt-3 rounded-xl border p-3 ${done ? 'border-emerald-500/25 bg-emerald-500/8' : 'border-amber-500/25 bg-amber-500/8'}`}>
+    <div className="mb-3 rounded-xl border border-emerald-500/25 bg-emerald-500/8 p-3" data-testid="police-intimation-step">
       <p className="text-sm font-semibold text-white flex items-center gap-2">
-        <Icon name={done ? 'check-circle-2' : 'shield-alert'} className={`w-4 h-4 ${done ? 'text-emerald-300' : 'text-amber-300'}`} />
+        <Icon name="check-circle-2" className="w-4 h-4 text-emerald-300" />
         {t('services.ra.police.title')}
       </p>
-      <p className="mt-1 text-xs leading-relaxed text-gray-300">
-        {done ? t('services.ra.police.done') : t('services.ra.police.pending')}
-      </p>
-      {!done ? (
-        <>
-          <p className="mt-2 text-xs leading-relaxed text-gray-400">{t('services.ra.police.copyNote')}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <a href="https://punepolice.gov.in" target="_blank" rel="noopener noreferrer" className="btn-outline px-3 py-2 rounded-lg text-xs text-gray-200 inline-flex items-center gap-1.5">
-              {t('services.ra.police.pune')} <Icon name="external-link" className="w-3 h-3" />
-            </a>
-            <a href="https://pcpc.gov.in" target="_blank" rel="noopener noreferrer" className="btn-outline px-3 py-2 rounded-lg text-xs text-gray-200 inline-flex items-center gap-1.5">
-              {t('services.ra.police.pcmc')} <Icon name="external-link" className="w-3 h-3" />
-            </a>
-          </div>
-        </>
-      ) : request.policeIntimation?.reference ? (
-        <p className="mt-2 text-xs text-gray-400">{t('services.ra.police.reference', { ref: request.policeIntimation.reference })}</p>
-      ) : null}
+      <p className="mt-1 text-xs leading-relaxed text-gray-300">{t('services.ra.police.done')}</p>
     </div>
   );
 }
@@ -82,25 +73,33 @@ function PoliceIntimationStep({ request, t }) {
 function FormCStep({ request, t }) {
   if (request.type !== 'rental' || request.status !== 'completed' || !hasForeignTenant(request)) return null;
   return (
-    <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/8 p-3">
+    <div className="mb-3 rounded-xl border border-amber-500/25 bg-amber-500/8 p-3">
       <p className="text-sm font-semibold text-white flex items-center gap-2"><Icon name="shield-alert" className="w-4 h-4 text-amber-300" /> {t('services.ra.formC.title')}</p>
       <p className="mt-1 text-xs leading-relaxed text-gray-300">{t('services.ra.formC.tracker')}</p>
     </div>
   );
 }
 
-export default function ServiceTracker({ typeFilter, title = 'Your requests' }) {
+export default function ServiceTracker({ typeFilter, title = 'Your requests', onCancelled, onView, canView }) {
   const { t } = useTranslation();
   const { user, isIn } = useAuth();
   const { toast } = useToast();
   const mobile = user?.mobile || '';
   const [tick, setTick] = useState(0);
-  const [openId, setOpenId] = useState(null);
-  const [msg, setMsg] = useState('');
   const [changeReq, setChangeReq] = useState(null);
   const [changeNote, setChangeNote] = useState('');
   const [otpDraft, setOtpDraft] = useState({});
-  const [showCancelled, setShowCancelled] = useState(false);
+  const [showPast, setShowPast] = useState(false);
+  const [armed, setArmed] = useState(null);
+  const [busy, setBusy] = useState(null);
+  // A ref, not `busy`: a second tap can land before the re-render that disables the button.
+  const inFlight = useRef(false);
+  const once = async (id, fn) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(id);
+    try { await fn(); } finally { inFlight.current = false; setBusy(null); }
+  };
   const refresh = () => setTick((t) => t + 1);
 
   useScrollLock(Boolean(changeReq));
@@ -110,7 +109,6 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [changeReq]);
-  // `tick` re-runs the API read after a mutation.
 
   const [requests, setRequests] = useState([]);
   useEffect(() => {
@@ -118,7 +116,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
     let alive = true;
     (async () => {
       try {
-        const requests = await listServiceRequests(typeFilter);
+        const requests = await listServiceRequests(typeFilter, tick ? undefined : REVISIT_READ);
         if (alive) setRequests([...requests].sort((a, b) => (rank(a) - rank(b)) || ((b.updatedAt || 0) - (a.updatedAt || 0))));
       } catch (error) {
         if (alive) console.warn('[service-tracker] requests failed', error);
@@ -130,100 +128,117 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
 
   const openDraft = async (r) => {
     const opened = await openRequestFile(r.id, r.draft?.id);
-    if (!opened || r.draft?.opened) return;
+    if (!opened || myDraft(r).opened) return;
     try {
       await markServiceRequestDraftOpened(r.id);
       refresh();
     } catch (e) { console.warn('[service-tracker] draft-opened failed', e); }
   };
   const openFinal = (r) => openRequestFile(r.id, r.finalDoc?.id);
-  const approve = async (r) => {
+  const approve = (r) => once(r.id, async () => {
     try {
-      await decideServiceRequestDraft(r.id, 'accepted');
+      const after = await decideServiceRequestDraft(r.id, 'accepted');
       refresh();
-      toast('Draft approved — we\'ll proceed with registration.', 'success');
+      toast(after?.status === 'draft_shared'
+        ? 'You approved the draft — waiting for the other party.'
+        : 'Draft approved — we\'ll proceed with registration.', 'success');
     } catch (e) { console.warn('[service-tracker] approve failed', e); toast('Could not approve the draft. Please try again.', 'error'); }
-  };
-  const sendPartyOtp = async (r, party) => {
+  });
+  const sendPartyOtp = (r, party) => once(r.id, async () => {
     try {
       await approveServiceRequestDraftParty(r.id, party.key);
       toast(`Code sent to ${party.mobile || party.label}.`, 'success');
     } catch (e) { console.warn('[service-tracker] draft party otp send failed', e); toast('Could not send the code. Please try again.', 'error'); }
-  };
-  const verifyPartyOtp = async (r, party) => {
+  });
+  const verifyPartyOtp = (r, party) => {
     const key = `${r.id}:${party.key}`;
     const otp = (otpDraft[key] || '').trim();
-    if (otp.length !== 6) return;
-    try {
-      await approveServiceRequestDraftParty(r.id, party.key, otp);
-      setOtpDraft((prev) => ({ ...prev, [key]: '' }));
-      refresh();
-      toast(`${party.label} approved this draft.`, 'success');
-    } catch (e) { console.warn('[service-tracker] draft party otp verify failed', e); toast('The code was not accepted. Please try again.', 'error'); }
+    if (otp.length !== 6) return undefined;
+    return once(r.id, async () => {
+      try {
+        await approveServiceRequestDraftParty(r.id, party.key, otp);
+        setOtpDraft((prev) => ({ ...prev, [key]: '' }));
+        refresh();
+        toast(`${party.label} approved this draft.`, 'success');
+      } catch (e) { console.warn('[service-tracker] draft party otp verify failed', e); toast('The code was not accepted. Please try again.', 'error'); }
+    });
   };
   const requestChanges = (r) => { setChangeNote(''); setChangeReq(r); };
-  const submitChanges = async () => {
+  const submitChanges = () => {
     const note = changeNote.trim();
-    if (!note || !changeReq) return;
-    try {
-      await decideServiceRequestDraft(changeReq.id, 'changes', note);
-      setChangeReq(null);
-      refresh();
-      toast('Change request sent to our team.', 'success');
-    } catch (e) { console.warn('[service-tracker] request-changes failed', e); toast('Could not send the change request. Please try again.', 'error'); }
+    if (!note || !changeReq) return undefined;
+    return once(changeReq.id, async () => {
+      try {
+        await decideServiceRequestDraft(changeReq.id, 'changes', note);
+        setChangeReq(null);
+        refresh();
+        toast('Change request sent to our team.', 'success');
+      } catch (e) { console.warn('[service-tracker] request-changes failed', e); toast('Could not send the change request. Please try again.', 'error'); }
+    });
   };
-  const send = async (r) => {
-    if (!msg.trim()) return;
-    try {
-      await addServiceRequestMessage(r.id, msg);
-      setMsg('');
-      refresh();
-    } catch (e) { console.warn('[service-tracker] send message failed', e); toast('Message could not be sent. Please try again.', 'error'); }
+  const cancelUnpaid = (r) => {
+    if (inFlight.current) return undefined;
+    if (armed !== r.id) { setArmed(r.id); return undefined; }
+    return once(r.id, async () => {
+      try {
+        await cancelServiceRequest(r.id);
+        toast('Request cancelled.', 'success');
+        onCancelled?.(r.id);
+      } catch (e) {
+        console.warn('[service-tracker] cancel failed', e);
+        toast('Could not cancel this request. Please try again.', 'error');
+      } finally {
+        setArmed(null);
+        refresh();
+      }
+    });
   };
-  const openThread = async (r) => {
-    setOpenId((current) => (current === r.id ? null : r.id));
-    try {
-      await markServiceRequestRead(r.id);
-      refresh();
-    } catch (error) {
-      console.warn('[service-tracker] mark-read failed', error);
-    }
+  const deleteCancelled = (r) => {
+    if (inFlight.current) return undefined;
+    if (armed !== r.id) { setArmed(r.id); return undefined; }
+    return once(r.id, async () => {
+      try {
+        await deleteServiceRequest(r.id);
+        setRequests((prev) => prev.filter((x) => x.id !== r.id));
+        toast('Request deleted.', 'success');
+      } catch (e) {
+        console.warn('[service-tracker] delete failed', e);
+        toast('Could not delete this request. Please try again.', 'error');
+      } finally {
+        setArmed(null);
+      }
+    });
   };
 
-  if (!isIn) return null;
+  if (!isIn || requests.length === 0) return null;
 
-  const cancelledCount = requests.filter((r) => r.status === 'cancelled').length;
-  const shown = showCancelled ? requests : requests.filter((r) => r.status !== 'cancelled');
+  const pastCount = requests.filter((r) => !isActive(r.status)).length;
+  const shown = showPast ? requests : requests.filter((r) => isActive(r.status));
 
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pt">
-      <div className="glass-card rounded-2xl p-5 sm:p-6">
-        <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
-          <h2 className="text-white font-bold text-lg flex items-center gap-2"><Icon name="list-checks" className="w-5 h-5 text-teal-400" /> {title}</h2>
-        </div>
-        <p className="text-gray-400 text-sm mb-4">Track progress, review the draft we prepare, and approve it so we can register it with the government.</p>
+    <section data-testid="service-tracker" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pt">
+      <div className="glass-card rounded-2xl p-4 sm:p-6">
+        <h2 className={'text-white font-bold text-lg flex items-center gap-2' + (shown.length ? ' mb-4' : '')}><Icon name="list-checks" className="w-5 h-5 text-teal-400" /> {title}</h2>
 
-        {shown.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-white/15 p-6 text-center">
-            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-3"><Icon name="file-clock" className="w-6 h-6 text-gray-500" /></div>
-            <p className="text-white text-sm font-semibold">No active request yet</p>
-            <p className="text-gray-500 text-xs mt-1 max-w-md mx-auto">Submit the form below to start one.</p>
-          </div>
-        ) : (
+        {shown.length > 0 && (
           <div className="space-y-4">
             {shown.map((r) => {
-              const m = statusMeta(r.status);
+              const m = r.status === 'action_required' && r.attention && !r.attention.forYou
+                ? { ...statusMeta('awaiting_party'), label: `Waiting on the ${r.attention.party}` }
+                : statusMeta(r.status);
               const unreadStaff = (r.messages || []).filter((x) => x.from === 'staff' && !x.read).length;
               return (
-                <div key={r.id} className="rounded-xl border border-white/10 border-l-4 bg-white/[0.03] p-4" style={{ borderLeftColor: m.color }}>
+                <div key={r.id} className="rounded-xl border border-white/10 border-l-4 bg-white/[0.03] p-3 sm:p-4" style={{ borderLeftColor: m.color }}>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold" style={{ background: m.bg, color: m.color }}><Icon name={m.icon} className="w-3.5 h-3.5 flex-shrink-0" /> {m.label}</span>
+                    <span className="dz-tag font-semibold" style={{ background: m.bg, color: m.color }}><Icon name={m.icon} className="w-3.5 h-3.5 flex-shrink-0" /> {m.label}</span>
                     {r.updatedAt ? <span className="text-[11px] text-gray-500 flex-shrink-0 mt-1">{timeAgo(r.updatedAt)}</span> : null}
                   </div>
                   <p className="text-white font-semibold text-sm line-clamp-2">{r.details?.property || r.details?.from || r.service}</p>
                   <p className="text-gray-500 text-xs mt-0.5 mb-3">{r.service} · Ref {r.id.slice(0, 10)}</p>
+                  {r.paidBy ? <p className="text-emerald-300/90 text-xs -mt-2 mb-3 flex items-center gap-1.5" data-testid="tracker-paid-by"><Icon name="check-circle-2" className="w-3.5 h-3.5" /> Paid by {r.paidBy}</p> : null}
                   <Progress status={r.status} />
 
+                  {r.status === 'action_required' && r.attention ? <AttentionNeeded request={r} onChanged={refresh} /> : null}
                   {r.type === 'rental' && REUPLOADABLE.has(r.status) ? <RejectedPapers requestId={r.id} onUploaded={refresh} /> : null}
                   {r.type === 'rental' && r.amendment ? <RevisedTerms request={r} onChanged={refresh} /> : null}
                   {r.type === 'rental' && isActive(r.status) && needsIdentityRefill(r) ? <IdentityRefill request={r} viewerMobile={mobile} onSaved={refresh} /> : null}
@@ -238,11 +253,11 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
                           return (
                             <li key={party.key} className="flex flex-col gap-2 rounded-lg border border-white/5 p-2 text-xs text-gray-300 sm:flex-row sm:items-center sm:justify-between">
                               <span>{party.label}{party.mobile ? ` · ${party.mobile}` : ''} — {party.approved ? 'approved' : party.opened ? 'opened' : 'pending'}</span>
-                              {!party.approved && party.method === 'otp' ? (
+                              {!party.approved && party.method === 'otp' && !r.myPartyId ? (
                                 <span className="flex gap-2">
-                                  <button type="button" onClick={() => sendPartyOtp(r, party)} className="btn-outline px-2 py-1 text-[11px]">Send code</button>
+                                  <button type="button" onClick={() => sendPartyOtp(r, party)} disabled={busy != null} className="btn-outline px-2 py-1 text-[11px] disabled:opacity-50">Send code</button>
                                   <input value={otpDraft[key] || ''} onChange={(e) => setOtpDraft((prev) => ({ ...prev, [key]: e.target.value.replace(/\D/g, '').slice(0, 6) }))} inputMode="numeric" maxLength={6} aria-label={`OTP for ${party.label}`} className="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-white" placeholder="OTP" />
-                                  <button type="button" onClick={() => verifyPartyOtp(r, party)} disabled={(otpDraft[key] || '').length !== 6} className="btn-teal px-2 py-1 text-[11px] disabled:opacity-50">Verify</button>
+                                  <button type="button" onClick={() => verifyPartyOtp(r, party)} disabled={busy != null || (otpDraft[key] || '').length !== 6} className="btn-teal px-2 py-1 text-[11px] disabled:opacity-50">Verify</button>
                                 </span>
                               ) : null}
                             </li>
@@ -254,57 +269,61 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
                   <PoliceIntimationStep request={r} t={t} />
                   <FormCStep request={r} t={t} />
 
-                  {/* Mobile lays the actions out as an even 2-col grid so long labels don't wrap into a ragged
-                     staircase; a solo Messages button spans the full width. */}
                   {(() => {
-                  const soloMsg = r.status !== 'draft_shared' && !(r.status === 'completed' && r.finalDoc);
+                  const view = !!onView && !!canView && r.status !== 'cancelled' && canView(r);
+                  const draft = myDraft(r);
                   return (
-                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                  <>
+                  {r.status === 'draft_shared' && !draft.opened ? <p className="mb-2 text-[11px] text-gray-500">Open the draft to approve it.</p> : null}
+                  <div className="btn-row" data-testid="tracker-actions">
                     {r.status === 'draft_shared' ? (
                       <>
-                        <button onClick={() => openDraft(r)} className="btn-outline w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-gray-200 text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="file-text" className="w-3.5 h-3.5" /> View draft{r.draft?.version ? ' v' + r.draft.version : ''}</button>
-                        <button onClick={() => approve(r)} disabled={!r.draft?.opened} title={r.draft?.opened ? undefined : 'Open the draft first'} className="btn-teal w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>
-                        <button onClick={() => requestChanges(r)} className="btn-outline w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-gray-200 text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="rotate-ccw" className="w-3.5 h-3.5" /> Request changes</button>
-                        {!r.draft?.opened ? <p className="col-span-2 sm:basis-full text-[11px] text-gray-500">Open the draft to approve it.</p> : null}
+                        <button type="button" onClick={() => openDraft(r)} className="btn-outline"><Icon name="file-text" className="w-3.5 h-3.5" /> View draft{r.draft?.version ? ' v' + r.draft.version : ''}</button>
+                        {draft.approved ? (
+                          <button type="button" disabled data-testid="tracker-approved" className="btn-teal"><Icon name="check-circle-2" className="w-3.5 h-3.5" /> Approved</button>
+                        ) : (
+                          <button type="button" onClick={() => approve(r)} disabled={!draft.opened || busy != null} title={draft.opened ? undefined : 'Open the draft first'} className="btn-teal"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>
+                        )}
+                        {draft.approved ? null : (
+                          <button type="button" onClick={() => requestChanges(r)} className="btn-outline"><Icon name="rotate-ccw" className="w-3.5 h-3.5" /> Request changes</button>
+                        )}
                       </>
                     ) : null}
                     {r.status === 'completed' && r.finalDoc ? (
-                      <button onClick={() => openFinal(r)} className="btn-teal w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="download" className="w-3.5 h-3.5" /> Download registered copy</button>
+                      <button type="button" onClick={() => openFinal(r)} className="btn-teal btn-row-full"><Icon name="download" className="w-3.5 h-3.5" /> Download registered copy</button>
                     ) : null}
-                    <button onClick={() => openThread(r)} className={'btn-outline w-full sm:w-auto justify-center relative px-3 py-2 rounded-lg text-gray-200 text-xs font-semibold inline-flex items-center gap-1.5 ' + (soloMsg ? 'col-span-2 sm:col-span-1' : '')}>
-                      <Icon name="message-square" className="w-3.5 h-3.5" /> Messages
+                    {r.cancellable ? (
+                      <button type="button" onClick={() => cancelUnpaid(r)} disabled={busy != null} data-testid="tracker-cancel-unpaid" className="btn-outline text-rose-300">
+                        <Icon name="x" className="w-3.5 h-3.5" /> {armed === r.id ? 'Tap again to cancel' : 'Cancel request'}
+                      </button>
+                    ) : null}
+                    {r.status === 'cancelled' ? (
+                      <button type="button" onClick={() => deleteCancelled(r)} disabled={busy != null} data-testid="tracker-delete" className="btn-outline text-rose-300">
+                        <Icon name="trash-2" className="w-3.5 h-3.5" /> {armed === r.id ? 'Tap again to delete' : 'Delete'}
+                      </button>
+                    ) : null}
+                    {view ? (
+                      <button type="button" onClick={() => onView(r)} data-testid="tracker-view-details" className="btn-outline">
+                        <Icon name="eye" className="w-3.5 h-3.5" /> View details
+                      </button>
+                    ) : null}
+                    <Link to={supportLink('request', r.id)} data-testid="tracker-support" className="btn-outline relative">
+                      <Icon name="message-square" className="w-3.5 h-3.5" /> Message support
                       {unreadStaff ? <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] flex items-center justify-center font-bold">{unreadStaff}</span> : null}
-                    </button>
+                    </Link>
                   </div>
+                  </>
                   );
                   })()}
-
-                  {openId === r.id ? (
-                    <div className="mt-3 rounded-xl border border-white/8 bg-black/20 p-3">
-                      <div className="space-y-2 max-h-56 overflow-y-auto mb-2">
-                        {(r.messages || []).map((x, i) => (
-                          <div key={x.id || i} className={'flex ' + (x.from === 'user' ? 'justify-end' : 'justify-start')}>
-                            <div className={'max-w-[80%] rounded-2xl px-3 py-1.5 text-xs ' + (x.from === 'user' ? 'bg-brand-teal/20 text-teal-100' : 'bg-white/8 text-gray-200')}>{x.text}</div>
-                          </div>
-                        ))}
-                      </div>
-                      {isActive(r.status) ? (
-                        <div className="flex items-center gap-2">
-                          <input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(r); }} aria-label="Message our team" placeholder="Message our team…" className="flex-1 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs text-white outline-none focus:border-teal-400/50" />
-                          <button onClick={() => send(r)} className="btn-teal px-3 py-2 rounded-lg text-xs font-semibold">Send</button>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
               );
             })}
           </div>
         )}
-        {cancelledCount ? (
-          <button type="button" onClick={() => setShowCancelled((v) => !v)} aria-expanded={showCancelled} className="mt-3 w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white cursor-pointer">
-            <Icon name="chevron-down" className={'w-4 h-4 transition-transform ' + (showCancelled ? 'rotate-180' : '')} />
-            {showCancelled ? 'Hide cancelled requests' : `Show ${cancelledCount} cancelled request${cancelledCount === 1 ? '' : 's'}`}
+        {pastCount ? (
+          <button type="button" onClick={() => setShowPast((v) => !v)} aria-expanded={showPast} className={(shown.length ? 'mt-3 ' : 'mt-1 ') + 'w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white cursor-pointer'}>
+            <Icon name="chevron-down" className={'w-4 h-4 transition-transform ' + (showPast ? 'rotate-180' : '')} />
+            {showPast ? 'Hide past requests' : `Show ${pastCount} past request${pastCount === 1 ? '' : 's'}`}
           </button>
         ) : null}
       </div>
@@ -323,7 +342,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
             <textarea autoFocus value={changeNote} onChange={(e) => setChangeNote(e.target.value)} rows={4} className="w-full px-4 py-3 rounded-xl text-white text-sm resize-none border border-white/10 bg-white/[0.03] focus:border-brand-teal-2 outline-none mb-4" placeholder="e.g. Please correct the monthly rent to ₹32,000 and set the lock-in to 6 months." />
             <div className="flex gap-2">
               <button type="button" onClick={() => setChangeReq(null)} className="btn-outline flex-1 py-2.5 rounded-xl text-gray-200 text-sm font-semibold">Cancel</button>
-              <button type="button" onClick={submitChanges} disabled={!changeNote.trim()} className="btn-teal flex-1 py-2.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="rotate-ccw" className="w-4 h-4" /> Send request</button>
+              <button type="button" onClick={submitChanges} disabled={!changeNote.trim() || busy != null} className="btn-teal flex-1 py-2.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="rotate-ccw" className="w-4 h-4" /> Send request</button>
             </div>
           </div>
         </div>

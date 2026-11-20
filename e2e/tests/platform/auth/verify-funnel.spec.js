@@ -15,7 +15,7 @@ test('entering the verify funnel hands off to capture and grants no badge', asyn
   // entry points are present (identity-header chip + badge-section button); the green pill is not.
   await expect(page.getByRole('button', { name: /ID not verified/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /Verify identity/i })).toBeVisible();
-  await expect(page.getByText('ID verified', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('KYC done', { exact: true })).toHaveCount(0);
 
   await page.getByRole('button', { name: /Verify identity/i }).click();
   await expect(page).toHaveURL(/\/verify-identity/);
@@ -27,7 +27,7 @@ test('entering the verify funnel hands off to capture and grants no badge', asyn
   await page.goto(PROFILE);
   await expect(page.getByRole('button', { name: /Verify identity/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /ID not verified/i })).toBeVisible();
-  await expect(page.getByText('ID verified', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('KYC done', { exact: true })).toHaveCount(0);
 
   // The amber header chip is a button, not decoration — it enters the same funnel as the
   // badge-section CTA, so an unverified user can start from either place.
@@ -48,9 +48,25 @@ test('once a reviewer confirms, the badge renders and the funnel CTAs retire', a
 
   await page.reload();
 
-  await expect(page.getByText('ID verified', { exact: true })).toBeVisible();
+  await expect(page.getByText('KYC done', { exact: true })).toBeVisible();
   // Both entry points retire together — a verified user offered "Get verified" is a bug that has
   // shipped before, because the two live in different components reading the same hook.
   await expect(page.getByRole('button', { name: /ID not verified/i })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Verify identity/i })).toHaveCount(0);
+});
+
+test('on a 390px phone the badge card stacks: title and hint on top, a full-width Verify identity below', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signedInAsNew(page);
+  await page.goto(PROFILE);
+  const card = page.getByTestId('badge-card');
+  const cta = card.getByRole('button', { name: 'Verify identity' });
+  await expect(cta).toBeVisible({ timeout: 15_000 });
+  await expect(card).not.toContainText('Optional');
+  const [c, b, hint] = [await card.boundingBox(), await cta.boundingBox(), await card.getByText("Show owners and flatmates you're genuine.").boundingBox()];
+  expect(b.y, 'button sits below the text').toBeGreaterThanOrEqual(hint.y + hint.height);
+  expect(b.width, 'button spans the card').toBeGreaterThan(c.width - 40);
+  expect(b.height).toBeGreaterThanOrEqual(44);
+  expect(hint.height, 'hint is one line').toBeLessThan(24);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

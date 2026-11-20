@@ -38,11 +38,12 @@ class FlatmateRoomPhotoLimitTest extends AbstractApiTest {
                 .mapToObj(i -> "\"" + UploadedPhotos.of(host.getId()) + "\"")
                 .collect(Collectors.joining(","));
         return """
-                {"bhk":"2","roomType":"private","attachedBath":"attached","furnishing":"semi",
+                {"bhk":"2","roomType":"private","attachedBath":"attached",
                  "locality":"LimitTown","society":"Limit Heights","rentShare":15000,"deposit":30000,
                  "availableFrom":"2026-09-01","lookingFor":"any","foodPref":"any",
-                 "agreementDeclared":true,"photos":[%s],"note":"Sunny room.",%s}
-                """.formatted(photos, FlatmateAgreementFixture.EVIDENCE);
+                 "agreementDeclared":true,"photos":[%s],"note":"Sunny room.",%s,%s,%s}
+                """.formatted(photos, FlatmateAgreementFixture.EVIDENCE, FlatmateRoomFixture.BASICS,
+                FlatmateRoomFixture.DETAILS);
     }
 
     @Test

@@ -8,11 +8,8 @@ import com.draazy.api.identity.user.UserRepository;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** Accepts whatever public identifier the caller holds and stores the schema's key; resolving doubles as
- * an existence check, so a slug typo can't write a review attached to nothing. */
 @Component
 public class ReviewTargetKey {
-
     private final SocietyRepository societies;
     private final LocalityRepository localities;
     private final UserRepository users;
@@ -42,7 +39,6 @@ public class ReviewTargetKey {
         };
     }
 
-    /** A slug miss falls through to an id lookup so a caller who legitimately held the id isn't 404ed. */
     private String societyById(String raw) {
         return societies.findById(uuid(raw, "Society"))
                 .filter(s -> s.getArchivedAt() == null)
@@ -50,8 +46,7 @@ public class ReviewTargetKey {
                 .orElseThrow(() -> NotFoundException.of("Society"));
     }
 
-    /** Malformed UUID is a 404, not 400, so attackers can't tell wrong shape from no such row;
-     * {@link NotFoundException#of} keeps the two messages byte-identical. */
+    // Malformed UUID is a 404, not 400, so the response cannot distinguish bad shape from no such row.
     private static UUID uuid(String raw, String kind) {
         return Ids.parseUuid(raw)
                 .orElseThrow(() -> NotFoundException.of(kind));

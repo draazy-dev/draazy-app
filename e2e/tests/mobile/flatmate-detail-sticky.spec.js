@@ -3,24 +3,27 @@ import { API, apiLogin, uniqueMobile } from '../../helpers/liveAuth.js';
 import { ACTORS } from '../../fixtures/live.js';
 import { flatmateCleanup } from '../../helpers/flatmateCleanup.js';
 import { trackErrors } from '../../helpers/console.js';
+import { tickDeskChecklist } from '../../helpers/flatmateDesk.js';
+import { huntingGroup } from '../../helpers/flatmateGroup.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 const track = flatmateCleanup(test);
 
 async function liveGroup() {
-  const { accessToken } = await apiLogin(uniqueMobile());
+  const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Host' });
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
-    body: JSON.stringify({
-      title: `Sticky ${Date.now().toString(36)}`, name: 'Host', locality: 'Baner', rent: 30000,
-      seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant',
-    }),
+    body: JSON.stringify(huntingGroup({
+      title: `Sticky ${Date.now().toString(36)}`, locality: 'Baner', rent: 30000, deposit: 50000,
+      seats: 3, seatsOpen: 1, policy: 'any',
+    })),
   });
   expect(res.status, await res.clone().text()).toBe(201);
   const group = await res.json();
   track('groups', group.id, accessToken);
   const { accessToken: admin } = await apiLogin(ACTORS.admin);
+  await tickDeskChecklist(API, group.id, auth(admin));
   const mod = await fetch(`${API}/admin/flatmates/${group.id}/moderation`, {
     method: 'PATCH',
     headers: auth(admin),
@@ -43,10 +46,13 @@ test.describe('LIVE: flatmate detail on a phone', () => {
 
     const bar = page.locator('.fm-sticky');
     await expect(bar).toBeVisible({ timeout: 20_000 });
-    await expect(bar).toContainText('Your share');
+    await expect(bar).toContainText('Budget each');
     const barBox = await bar.boundingBox();
     expect(barBox.y + barBox.height, 'the bar sits inside the viewport').toBeLessThanOrEqual(844 + 1);
     expect(barBox.y, 'the bar is in the bottom thumb zone').toBeGreaterThan(844 / 2);
+    const askBox = await bar.getByRole('button', { name: 'Request to join' }).boundingBox();
+    expect(askBox.width / 390, 'the ask takes about half the width').toBeGreaterThan(0.4);
+    expect(askBox.width / 390).toBeLessThan(0.55);
 
     const fab = page.getByRole('button', { name: 'Open Draaz, the Draazy help assistant' });
     await expect(fab).toBeVisible();
@@ -62,7 +68,7 @@ test.describe('LIVE: flatmate detail on a phone', () => {
     const group = await liveGroup();
     await page.setViewportSize({ width: 1280, height: 820 });
     await page.goto(`/flatmates/group/${group.id}`);
-    await expect(page.getByText('Your share').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Budget each').first()).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('.fm-sticky')).toBeHidden();
   });
 });

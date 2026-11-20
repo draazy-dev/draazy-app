@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MessageAttachments {
-
     private final MessageAttachmentRepository attachments;
     private final FileStorage storage;
 
@@ -20,8 +19,6 @@ public class MessageAttachments {
         this.storage = storage;
     }
 
-    // Checked before the bytes are read, so a caller cannot make the server hold megabytes in
-    // memory for an upload that was going to be refused anyway.
     @Transactional(readOnly = true)
     public Map<UUID, List<MessageAttachmentDto>> byMessage(Collection<UUID> messageIds) {
         if (messageIds == null || messageIds.isEmpty()) {
@@ -43,5 +40,4 @@ public class MessageAttachments {
                 storage.signedDownloadUrl(a.getStorageKey()),
                 a.getCreatedAt());
     }
-
 }

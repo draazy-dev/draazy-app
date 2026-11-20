@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.security.Teams;
@@ -17,6 +18,11 @@ import com.draazy.api.services.ticket.Ticket;
 import com.draazy.api.services.ticket.TicketMapper;
 import com.draazy.api.services.ticket.TicketNoteRepository;
 import com.draazy.api.services.ticket.TicketRepository;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -26,12 +32,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import tools.jackson.databind.ObjectMapper;
 
-/** Anyone signed in can raise a ticket but only ops can read the board, so POST /tickets carries no x-roles;
- * team scoping fails closed: a staff account with no desk sees nothing, not everything. */
 @DisplayName("Slice 11 — the ops ticket board")
 class TicketQueueTest extends ServiceFixtures {
-
-    /** Distinctive enough that a substring search for it is a real leak check. */
     private static final String SECRET = "owner says the tenant defaulted twice";
 
     @Autowired
@@ -46,7 +48,6 @@ class TicketQueueTest extends ServiceFixtures {
     @Nested
     @DisplayName("who may do what")
     class Access {
-
         @Test
         @DisplayName("a customer can raise a ticket but cannot read the board")
         void customersRaiseButDoNotRead() throws Exception {
@@ -104,7 +105,6 @@ class TicketQueueTest extends ServiceFixtures {
     @Nested
     @DisplayName("team scoping")
     class Scoping {
-
         @Test
         @DisplayName("a staff member sees only their own desk")
         void staffSeeOneDesk() throws Exception {
@@ -214,7 +214,6 @@ class TicketQueueTest extends ServiceFixtures {
     @Nested
     @DisplayName("working a ticket")
     class Working {
-
         @Test
         @DisplayName("assignment is by user id and resolves to a display name")
         void assignmentByIdShowsAName() throws Exception {
@@ -307,12 +306,9 @@ class TicketQueueTest extends ServiceFixtures {
         }
     }
 
-    /** The raiser and the desk are two audiences: assert against a ticket that already has a note, since an
-     * empty array on a fresh ticket would only prove a coincidence, not the control. */
     @Nested
     @DisplayName("what the raiser may see (D47)")
     class RaiserView {
-
         @Test
         @DisplayName("the note exists, ops read it, and the raiser's copy has no notes field at all")
         void internalNotesAreAbsentFromTheRaisersCopy() throws Exception {
@@ -326,15 +322,11 @@ class TicketQueueTest extends ServiceFixtures {
             String id = field(created, "id");
             User legal = staff("9820000327", Teams.LEGAL);
 
-            // Absent, not null — a null would still be a property the schema promises and a future
-            // mapper could fill.
             assertThat(json.readTree(created).has("notes")).isFalse();
 
-            // Now the note genuinely exists. Everything below is about a ticket that has one.
             note(legal, id, SECRET, 201);
-            assertThat(noteRepo.findByTicketIdOrderByAtAsc(UUID.fromString(id))).hasSize(1);
+            assertThat(noteRepo.findByTicketIdInOrderByAtAsc(List.of(UUID.fromString(id)))).hasSize(1);
 
-            // The desk still gets it — a leak closed by deleting the feature is not a fix.
             mvc.perform(get(Routes.Tickets.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(legal)))
                     .andExpect(status().isOk())
@@ -345,8 +337,6 @@ class TicketQueueTest extends ServiceFixtures {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].notes").doesNotExist());
 
-            // There is no customer read endpoint on this board, so the guarantee is asserted on the type
-            // the customer path returns.
             Ticket annotated = ticketRepo.findById(UUID.fromString(id)).orElseThrow();
             String raiserView = json.writeValueAsString(mapper.toCustomer(annotated));
 
@@ -363,6 +353,49 @@ class TicketQueueTest extends ServiceFixtures {
         void theTypeItselfCarriesNoNotes() {
             assertThat(CustomerTicketDto.class.getRecordComponents())
                     .noneMatch(c -> "notes".equals(c.getName()));
+        }
+    }
+
+    @Nested
+    @DisplayName("the date window")
+    class DateWindow {
+        @Test
+        @DisplayName("days=1 keeps today's tickets and drops yesterday's; days=7 keeps both; the summary ignores days")
+        void daysNarrowsRowsNotCounts() throws Exception {
+            User buyer = customer("9820000391");
+            String today = create(buyer, "{\"subject\":\"Datewin today\",\"team\":\"legal\"}", 201);
+            String yesterday = create(buyer, "{\"subject\":\"Datewin yesterday\",\"team\":\"legal\"}", 201);
+            Instant lateYesterday = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                    .minus(1, ChronoUnit.MINUTES);
+            jdbc.update("update tickets set created_at = ? where id = ?::uuid", Timestamp.from(lateYesterday),
+                    yesterday);
+            User boss = admin("9820000392");
+
+            mvc.perform(get(Routes.Tickets.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(boss))
+                            .param("q", "Datewin").param("days", "1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].id").value(today));
+            mvc.perform(get(Routes.Tickets.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(boss))
+                            .param("q", "Datewin").param("days", "7"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", hasSize(2)));
+            mvc.perform(get(Routes.Tickets.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(boss))
+                            .param("q", "Datewin"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", hasSize(2)));
+            mvc.perform(get(Routes.Tickets.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(boss))
+                            .param("days", "9999"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(get(Routes.Tickets.SUMMARY)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(boss))
+                            .param("days", "1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.all").value(2));
         }
     }
 

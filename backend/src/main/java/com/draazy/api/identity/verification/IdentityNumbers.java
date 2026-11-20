@@ -4,9 +4,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-// Dedup requires the same card to hash the same way, so numbers are canonicalised.
 public final class IdentityNumbers {
-
     private IdentityNumbers() {
     }
 
@@ -37,7 +35,6 @@ public final class IdentityNumbers {
         {2, 7, 9, 3, 8, 0, 6, 4, 1, 5},
         {7, 0, 4, 6, 9, 1, 3, 2, 5, 8}};
 
-    /** Uppercase with every space and hyphen removed; {@code null}/blank becomes empty. */
     public static String normalise(String raw) {
         if (raw == null) {
             return "";

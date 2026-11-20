@@ -9,11 +9,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-// Counting families proves the next priced path cannot ship without an abandoned-checkout sweep.
-// The floor is `>=` so removals fail while new paid families do not churn this guard.
 @DisplayName("D161 — every payment family has a sweep, not just the one that needed it first")
 class AbandonedCheckoutCoverageTest extends AbstractApiTest {
-
     private static final int PRICED_PATHS = 2;
 
     @Autowired List<AbandonedCheckouts> families;

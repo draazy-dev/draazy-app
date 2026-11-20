@@ -18,9 +18,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** Resolves the bearer token on every request. Rationale: docs/system/cross-cutting.md#jwt-auth-filter. */
 public class JwtAuthFilter extends OncePerRequestFilter {
-
     private static final String BEARER = "Bearer ";
     private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
 
@@ -57,8 +55,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    // The live role replaces the claimed one (no row: the claim stands). A blocked account, or a token issued
-    // in or before the second its sessions were revoked (iat is whole seconds), is refused.
     private AuthPrincipal current(JwtService.Verified token) {
         AuthPrincipal claimed = token.principal();
         var standing = roles.standingOf(claimed.userId());

@@ -3,13 +3,13 @@ package com.draazy.api.common.trust;
 import java.util.UUID;
 
 public interface Notifier {
+    String REQUEST_INBOX = "/dashboard?tab=leads&box=received";
 
     void notify(UUID userId, String type, String title, String body, String link);
 
     default void markRead(UUID userId, String type, String link) {
     }
 
-    /** The recipient's WhatsApp toggle; true where no preferences are kept, as for an unset row. */
     default boolean allowsWhatsapp(UUID userId) {
         return true;
     }

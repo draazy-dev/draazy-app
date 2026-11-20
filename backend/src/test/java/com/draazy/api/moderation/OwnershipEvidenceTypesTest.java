@@ -11,6 +11,7 @@ import java.time.LocalTime;
 import java.time.Month;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,11 +20,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Expiry is measured from the document's ISSUE date, not the review date — the two readings only
- *  disagree on an old document, which is why the fixture is a 2019 one. */
 @DisplayName("Ownership evidence — which documents expire, and measured from when")
 class OwnershipEvidenceTypesTest {
-
     private static final Instant LONG_AGO = Instant.parse("2019-04-01T00:00:00Z");
 
     @ParameterizedTest(name = "{0} expires {1} days after it was ISSUED")
@@ -39,7 +37,6 @@ class OwnershipEvidenceTypesTest {
                 .isBefore(Instant.now());
     }
 
-    // Land records can be mutated and a bill goes stale; a building ages slower, hence 180 days.
     static Stream<Arguments> windowedDocuments() {
         return Stream.of(
                 Arguments.of(OwnershipEvidenceTypes.ELECTRICITY_BILL, 90),
@@ -105,14 +102,11 @@ class OwnershipEvidenceTypesTest {
     @Test
     @DisplayName("a rental needs address or title proof; a sale needs title proof")
     void requiredKindsFollowTheDeal() {
-        assertThat(OwnershipEvidenceTypes.requiredKinds("rent"))
-                .containsExactlyInAnyOrder(OwnershipEvidenceTypes.ADDRESS_PROOF, OwnershipEvidenceTypes.TITLE_PROOF);
-        assertThat(OwnershipEvidenceTypes.requiredKinds("buy"))
-                .containsExactly(OwnershipEvidenceTypes.TITLE_PROOF);
-        assertThat(OwnershipEvidenceTypes.requiredKinds("buy"))
-                .as("identity, site photos and the deed are supporting evidence, never a gate")
-                .doesNotContain(OwnershipEvidenceTypes.OWNER_IDENTITY, OwnershipEvidenceTypes.SITE_PRESENCE,
-                        OwnershipEvidenceTypes.TITLE_SUPPORT, OwnershipEvidenceTypes.AUTHORITY_PROOF);
+        assertThat(OwnershipEvidenceTypes.requiredKindAlternatives("rent"))
+                .containsExactly(Set.of(OwnershipEvidenceTypes.ADDRESS_PROOF, OwnershipEvidenceTypes.TITLE_PROOF));
+        assertThat(OwnershipEvidenceTypes.requiredKindAlternatives("buy"))
+                .as("identity, site photos, the deed and authority are supporting evidence, never a gate")
+                .containsExactly(Set.of(OwnershipEvidenceTypes.TITLE_PROOF));
     }
 
     @Test
@@ -121,22 +115,15 @@ class OwnershipEvidenceTypesTest {
         assertThat(OwnershipEvidenceTypes.kindOf(OwnershipEvidenceTypes.POWER_OF_ATTORNEY))
                 .isEqualTo(OwnershipEvidenceTypes.AUTHORITY_PROOF);
         assertThat(OwnershipEvidenceTypes.namesASubject(OwnershipEvidenceTypes.POWER_OF_ATTORNEY)).isTrue();
-        assertThat(OwnershipEvidenceTypes.requiredKinds("rent"))
-                .doesNotContain(OwnershipEvidenceTypes.AUTHORITY_PROOF);
-        assertThat(OwnershipEvidenceTypes.requiredKinds("buy"))
-                .doesNotContain(OwnershipEvidenceTypes.AUTHORITY_PROOF);
     }
 
     @Test
     @DisplayName("only rent takes the shorter gate \u2014 an unrecognised deal takes the sale gate")
     void anUnrecognisedDealTakesTheStricterGate() {
-        assertThat(OwnershipEvidenceTypes.requiredKinds("rent"))
-                .containsExactlyInAnyOrder(OwnershipEvidenceTypes.ADDRESS_PROOF, OwnershipEvidenceTypes.TITLE_PROOF);
-
         for (String deal : new String[] {null, "", "lease", "resale", "pg", "BUY"}) {
-            assertThat(OwnershipEvidenceTypes.requiredKinds(deal))
+            assertThat(OwnershipEvidenceTypes.requiredKindAlternatives(deal))
                     .as("%s is not the rent intent, so it must need the registry's own extract", deal)
-                    .containsExactly(OwnershipEvidenceTypes.TITLE_PROOF);
+                    .containsExactly(Set.of(OwnershipEvidenceTypes.TITLE_PROOF));
         }
     }
 
@@ -159,8 +146,6 @@ class OwnershipEvidenceTypesTest {
         assertThat(OwnershipEvidenceTypes.isKnown("notarised_vibes")).isFalse();
     }
 
-    /** Asserted over the whole vocabulary rather than by asking about today's two types: restating
-     *  the implementation's own condition would agree with it however wrong it became. */
     @Test
     @DisplayName("identity and authority documents have to name their subject")
     void identityAndAuthorityDocumentsMustNameTheirSubject() {
@@ -173,8 +158,6 @@ class OwnershipEvidenceTypesTest {
                         OwnershipEvidenceTypes.POWER_OF_ATTORNEY);
     }
 
-    /** The entry that matters is the one closing {@code title_proof} on a sale: everything else the
-     *  vault holds costs a reviewer a second look, this one mints the badge a buyer pays on. */
     @Test
     @DisplayName("a document filed as a bill cannot be recorded as the registry's extract")
     void aMislabelledDocumentCannotCloseTheTitleFact() {

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { classNames } from '../../lib/format.js';
 
-/* The gradient fade on each side is the only "there's more here" signal on a touch device. Set `fadeColor`
-   to the immediate container's background so it melts into it rather than reading as a shadow. */
 export default function HScroll({
   children,
   className = '',
@@ -26,8 +24,6 @@ export default function HScroll({
     setFadeRight(scrollLeft < scrollWidth - clientWidth - 4);
   }, [ref]);
 
-  // When a control near the edge is tapped (a half-hidden tab), nudge the strip so the whole item is
-  // visible with a little breathing room. Nothing moves if it is already in view.
   const revealChild = useCallback((child) => {
     const el = ref.current;
     if (!el || !child || !el.contains(child)) return;
@@ -44,7 +40,6 @@ export default function HScroll({
     onClickProp?.(e);
     const target = e.target.closest('button, a, [role="tab"]');
     if (target && ref.current?.contains(target)) {
-      // Defer a frame so any active-state width change settles before we measure.
       requestAnimationFrame(() => revealChild(target));
     }
   }, [onClickProp, revealChild, ref]);
@@ -68,8 +63,6 @@ export default function HScroll({
     };
   }, [update, ref]);
 
-  // Recompute when children/content change without an element resize (e.g. a new
-  // filter set) — cheap, only flips state when an edge actually gains/loses clip.
   useEffect(() => { update(); });
 
   return (

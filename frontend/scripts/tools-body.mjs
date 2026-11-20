@@ -1,4 +1,3 @@
-/* Readable prerender of /tools and the four tools from src/data/freeTools.js, the copy the pages themselves render. */
 import { esc } from './seo-html.mjs';
 import { FREE_TOOLS, SOURCES, TOOLS_AS_OF, TOOLS_HUB } from '../src/data/freeTools.js';
 

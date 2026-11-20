@@ -4,6 +4,10 @@ import Loading from '../../../components/ui/Loading.jsx';
 
 export const fmtDate = (ms) => (ms ? new Date(ms).toLocaleDateString('en-IN') : '—');
 
+const CLAIM_BASIS = { tenant: 'tenant evidence', owner: 'owner listing' };
+
+export const claimLabel = (tier) => ['Verified property', CLAIM_BASIS[tier]].filter(Boolean).join(' · ');
+
 export function Block({ icon: Icon, title, children, className, aside }) {
   return (
     <section className={classNames('rounded-2xl border border-white/10 bg-white/[0.03] p-4', className)}>
@@ -16,8 +20,6 @@ export function Block({ icon: Icon, title, children, className, aside }) {
   );
 }
 
-/* A failed read must never render as an empty queue: "nothing to do" and "the read did not work"
-   look the same and only one of them means the desk can go home. */
 export function QueueState({ state, onRetry, empty }) {
   if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') {

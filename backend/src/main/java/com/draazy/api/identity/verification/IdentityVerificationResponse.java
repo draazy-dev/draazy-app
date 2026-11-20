@@ -3,7 +3,6 @@ package com.draazy.api.identity.verification;
 import java.time.Instant;
 import java.time.LocalDate;
 
-// Deliberately thin: the user sees status only, never the reviewer OCR claim.
 public record IdentityVerificationResponse(
         String status,
         String docType,
@@ -15,8 +14,9 @@ public record IdentityVerificationResponse(
         Instant revokedAt,
         String revocationReason,
         int attemptsRemaining,
-        Instant retryAfter) {
-
+        Instant retryAfter,
+        IdentityAppealInfo appeal,
+        boolean canAppeal) {
     public record Claims(String number, String name, LocalDate dob) {
     }
 }

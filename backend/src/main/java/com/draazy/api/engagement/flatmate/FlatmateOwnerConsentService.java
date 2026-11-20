@@ -14,39 +14,37 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.provider.OtpSender;
 import com.draazy.api.security.AuthPrincipal;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FlatmateOwnerConsentService {
-
     private final FlatmateOwnerConsentRepository consents;
     private final FlatmateRoomRepository rooms;
-    private final FlatmateGroupRepository groups;
     private final FlatmateGuardrails guardrails;
 
-    private final FlatmatePublication publication;
+    private final FlatmateReviewRepository reviews;
     private final UserRepository users;
     private final OtpService otpService;
     private final AuditService audit;
 
     public FlatmateOwnerConsentService(FlatmateOwnerConsentRepository consents,
-            FlatmateRoomRepository rooms, FlatmateGroupRepository groups,
-            FlatmateGuardrails guardrails, FlatmatePublication publication,
+            FlatmateRoomRepository rooms,
+            FlatmateGuardrails guardrails, FlatmateReviewRepository reviews,
             UserRepository users, OtpService otpService, AuditService audit) {
         this.consents = consents;
         this.rooms = rooms;
-        this.groups = groups;
         this.guardrails = guardrails;
-        this.publication = publication;
+        this.reviews = reviews;
         this.users = users;
         this.otpService = otpService;
         this.audit = audit;
     }
 
-    /* {@code noRollbackFor} must repeat {@link OtpService#verifyCode}'s list: rollback rules apply at every
-       boundary, so a shorter list here resets the 3-guess ceiling. */
+    // noRollbackFor must repeat OtpService.verifyCode's list,
+    // or a shorter list here resets the 3-guess ceiling.
     @Transactional(noRollbackFor = {OtpSender.DeliveryFailedException.class,
             UnauthorizedException.class, RateLimitedException.class})
     public boolean ownerConsent(AuthPrincipal caller, String title, String society, String locality,
@@ -63,41 +61,31 @@ public class FlatmateOwnerConsentService {
             return false;
         }
         record(caller, mobile, otp, fingerprint);
-        applyConsentToLivePosts(caller, mobile, fingerprint);
+        applyConsentToLivePosts(caller.userId(), mobile, fingerprint);
         return true;
     }
 
-    /** Asked of the consent table, never of the request — a client-typed number would otherwise set the
-     * field Ops reads for the badge. Must run after {@code mapper.applyTo} and after the fingerprint. */
+    // Consent comes from the consent table, never the request.
+    // Must run after mapper.applyTo and after the fingerprint.
     void settleRoomConsent(AuthPrincipal caller, FlatmateRoom room) {
         room.setOwnerConsent(
                 has(room.getOwnerConsentMobile(), caller.userId(), room.getAddressFingerprint()));
     }
 
-    /** Without this sweep nothing re-reads the consent table when the post already exists, so the
-     * flag stays false, Ops cannot approve it, and {@code reconcileDraazyAgreements} skips it forever. */
-    private void applyConsentToLivePosts(AuthPrincipal caller, String mobile, String fingerprint) {
-        rooms.findByAddressFingerprintAndArchivedFalse(fingerprint).stream()
-                .filter(room -> caller.userId().equals(room.getHostId()))
+    private void applyConsentToLivePosts(UUID hostId, String mobile, String fingerprint) {
+        List<UUID> roomIds = rooms.findByAddressFingerprintAndArchivedFalseOrderByIdAsc(fingerprint).stream()
+                .filter(room -> hostId.equals(room.getHostId()))
                 .filter(room -> mobile.equals(room.getOwnerConsentMobile()))
-                .forEach(room -> {
-                    settleRoomConsent(caller, room);
-                    rooms.saveAndFlush(room);
-                    publication.recordOwnerConsentForRoom(room.getId());
-                });
-        groups.findByAddressFingerprintAndArchivedFalse(fingerprint).stream()
-                .filter(group -> caller.userId().equals(group.getHostId()))
-                .filter(group -> mobile.equals(group.getOwnerConsentMobile()))
-                .forEach(group -> {
-                    group.setOwnerConsent(has(group.getOwnerConsentMobile(),
-                            caller.userId(), group.getAddressFingerprint()));
-                    groups.saveAndFlush(group);
-                    publication.recordOwnerConsent(group.getId());
-                });
+                .map(FlatmateRoom::getId).toList();
+        roomIds.forEach(rooms::markOwnerConsent);
+        roomIds.forEach(reviews::markOwnerConsent);
     }
 
-    /** Canonicalise the owner's number so the self-check, the OTP and the stored row key off the
-     * same ten digits, and refuse the shortcut the edge cannot catch: consenting to yourself. */
+    void grantFromNotice(UUID hostId, String ownerMobile, String addressFingerprint) {
+        consents.insertIfAbsent(ownerMobile, hostId.toString(), addressFingerprint);
+        applyConsentToLivePosts(hostId, ownerMobile, addressFingerprint);
+    }
+
     public String normalise(AuthPrincipal caller, String ownerMobile) {
         String mobile = MobileMask.normalise(ownerMobile);
         if (mobile == null) {
@@ -112,20 +100,14 @@ public class FlatmateOwnerConsentService {
         return mobile;
     }
 
-    /** The caller travels because the recipient is a number they typed: every recipient-keyed budget
-     * is one they can reset by typing a different one. {@code requestedBy} is the key they are stuck with. */
     public void send(UUID caller, String ownerMobile, String addressFingerprint) {
         otpService.sendCode(ownerMobile, purposeFor(addressFingerprint), caller);
     }
 
-    /** Delegated because this flow spends the same {@link OtpService} send budget as login, and a
-     * second copy is a second thing to get wrong. */
     public int resendCooldownSeconds() {
         return otpService.resendCooldownSeconds();
     }
 
-    /** The rollback rules are inert under self-invocation but must match the boundary this claims to
-     * be, or the first cross-bean caller resets the 3-guess ceiling. */
     @Transactional(noRollbackFor = {OtpSender.DeliveryFailedException.class,
             UnauthorizedException.class, RateLimitedException.class})
     public void record(AuthPrincipal caller, String ownerMobile, String otp,
@@ -144,8 +126,6 @@ public class FlatmateOwnerConsentService {
         return OtpCode.PURPOSE_OWNER_CONSENT + ":" + Tokens.sha256Hex(addressFingerprint);
     }
 
-    /** Mobile must be normalised and the fingerprint must be the one the post was filed under; a null
-     * one answers false, because a post whose flat cannot be named has nothing to be consented about. */
     @Transactional(readOnly = true)
     public boolean has(String ownerMobile, UUID grantedBy, String addressFingerprint) {
         return ownerMobile != null && addressFingerprint != null

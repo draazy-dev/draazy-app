@@ -1,18 +1,13 @@
 import { classNames } from '../../../lib/format.js';
 import { LoadFailedNotice } from './constants.jsx';
 
-/** A slug with no matching locality prints the slug (unserved demand
- * is the actionable row); a missing slug is named, not blank. */
 const rowLabel = (r) => {
   if (r.localitySlug == null) return 'No locality given';
   return r.localityName || r.localitySlug;
 };
 
-/** Stable across renders and unique per row, including the single null-slug row. */
 const rowKey = (r) => r.localitySlug ?? '__unplaced__';
 
-/* Weighted demand points per listing. Judgements, named so they can be argued with. The no-locality
-   row has no place to source supply for, so it gets no verdict. */
 const HIGH_PER_LISTING = 5;
 const MEDIUM_PER_LISTING = 1;
 const priorityOf = (r) => {
@@ -21,10 +16,7 @@ const priorityOf = (r) => {
   return r.demandPerListing >= MEDIUM_PER_LISTING ? 'medium' : 'ok';
 };
 
-/** Date only: the hour someone typed a city is not actionable and would imply false precision. */
 const askedOn = (iso) => {
-  /* `new Date(null)` is a *valid* Date at the epoch, so the NaN guard below does not catch it and
-     a missing timestamp would print a confident "1 Jan 1970". */
   if (!iso) return '\u2014';
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
@@ -32,8 +24,6 @@ const askedOn = (iso) => {
     : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-/** `cityWaitlist` is null until it arrives, with `failed` separate:
- * [] reads 'no city requests yet', which a 500 must not claim. */
 export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, cityWaitlistFailed, onRetryCityWaitlist }) {
   const rows = supplyGap || [];
   const underServed = rows.filter((r) => priorityOf(r) === 'high' || priorityOf(r) === 'medium');
@@ -45,8 +35,6 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
   const localityAlerts = rows.filter((r) => r.alerts > 0).sort((a, b) => b.alerts - a.alerts);
   const totalLocalityAlerts = localityAlerts.reduce((s, a) => s + a.alerts, 0);
   const maxAlertCount = Math.max(...localityAlerts.map((a) => a.alerts), 1);
-  // Server-ordered (most requested first) -- not re-sorted here, so the console cannot disagree
-  // with the report about which city is top.
   const cityRows = cityWaitlist || [];
   const totalCityRequests = cityRows.reduce((s, c) => s + c.requests, 0);
   const maxCityRequests = Math.max(...cityRows.map((c) => c.requests), 1);
@@ -58,7 +46,6 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
           The supply-gap report did not answer, so no locality figures are shown — don&apos;t read this as &ldquo;no demand&rdquo;.
         </LoadFailedNotice>
       ) : supplyGap && (<>
-      {/* KPI summary */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><div className="text-2xl font-bold text-rose-400">{underServed.length}</div><div className="text-xs text-gray-500 mt-0.5">Under-served</div></div>
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><div className="text-2xl font-bold text-emerald-400">{wellServed.length}</div><div className="text-xs text-gray-500 mt-0.5">Well-served</div></div>
@@ -68,14 +55,13 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><div className="text-2xl font-bold text-rose-400">{totalHot}</div><div className="text-xs text-gray-500 mt-0.5">Hot demand users</div></div>
       </div>
 
-      {/* Visual gap chart */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <h3 className="text-sm font-semibold text-gray-300 mb-1">Supply vs Demand by Locality</h3>
         <p className="text-xs text-gray-500 mb-4">Most demand per listing first. Red = under-served.</p>
         <div className="space-y-2.5">
           {rows.slice(0, 12).map((r) => (
             <div key={rowKey(r)} className="flex items-center gap-3">
-              <span className="text-xs text-gray-300 w-28 shrink-0 truncate font-medium">{rowLabel(r)}</span>
+              <span className="text-xs text-gray-300 w-28 shrink-0 truncate font-medium" title={rowLabel(r)}>{rowLabel(r)}</span>
               <div className="flex-1 flex items-center gap-1 h-5">
                 <div className="flex-1 relative h-full rounded bg-white/5 overflow-hidden"><div className="absolute inset-y-0 left-0 rounded bg-teal-500/60" style={{ width: `${(r.supply / maxSupply) * 100}%` }} /></div>
                 <div className="flex-1 relative h-full rounded bg-white/5 overflow-hidden"><div className="absolute inset-y-0 left-0 rounded bg-indigo-500/60" style={{ width: `${(r.demand / maxDemand) * 100}%` }} /></div>
@@ -90,7 +76,6 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
         </div>
       </div>
 
-      {/* Full table */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <h3 className="text-sm font-semibold text-gray-300 mb-3">All Localities — Detailed Breakdown</h3>
         <div className="overflow-x-auto">
@@ -111,7 +96,7 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
             <tbody>
               {rows.map((r) => (
                 <tr key={rowKey(r)} className="border-b border-white/5">
-                  <td className="py-2.5 text-white font-medium">{rowLabel(r)}</td>
+                  <td className="py-2.5 text-white font-medium"><span className="block max-w-[14rem] truncate" title={rowLabel(r)}>{rowLabel(r)}</span></td>
                   <td className="py-2.5 text-right tabular-nums text-teal-300">{r.supply}</td>
                   <td className="py-2.5 text-right tabular-nums text-indigo-300">{r.demand}</td>
                   <td className="py-2.5 text-right tabular-nums text-amber-300">{r.searches || '—'}</td>
@@ -121,9 +106,9 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
                   <td className={classNames('py-2.5 text-right tabular-nums font-semibold', priorityOf(r) === 'ok' ? 'text-emerald-300' : 'text-rose-300')}>{r.demandPerListing.toFixed(1)}</td>
                   <td className="py-2.5 text-center">
                     {priorityOf(r) == null ? <span className="text-[10px] text-gray-500">—</span>
-                    : priorityOf(r) === 'high' ? <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">High</span>
-                    : priorityOf(r) === 'medium' ? <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">Medium</span>
-                    : <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">OK</span>}
+                    : priorityOf(r) === 'high' ? <span className="dz-tag bg-rose-500/15 font-semibold text-rose-300">High</span>
+                    : priorityOf(r) === 'medium' ? <span className="dz-tag bg-amber-500/15 font-semibold text-amber-300">Medium</span>
+                    : <span className="dz-tag bg-emerald-500/15 font-semibold text-emerald-300">OK</span>}
                   </td>
                 </tr>
               ))}
@@ -132,11 +117,10 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
         </div>
       </div>
 
-      {/* Demand Alerts by Locality — "wanted here" signal from listings alerts */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-sm font-semibold text-gray-300">Demand Alerts by Locality</h3>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-gray-400">
+          <span className="dz-tag border border-white/10 bg-white/5 text-gray-400">
             {totalLocalityAlerts} alert{totalLocalityAlerts !== 1 ? 's' : ''}
           </span>
         </div>
@@ -152,7 +136,7 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
             <div className="space-y-2 mb-4">
               {localityAlerts.map((a) => (
                 <div key={rowKey(a)} className="flex items-center gap-3">
-                  <span className="w-28 shrink-0 truncate">
+                  <span className="w-28 shrink-0 truncate" title={rowLabel(a)}>
                     <span className="text-xs text-gray-300 font-medium">{rowLabel(a)}</span>
                   </span>
                   <div className="flex-1 relative h-6 rounded bg-white/5 overflow-hidden">
@@ -172,19 +156,18 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
             <div className="flex items-center gap-4 text-[11px] text-gray-500 border-t border-white/5 pt-3">
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-500/60" /> Alert count</span>
               <span>Current supply shown on right</span>
-              {localityAlerts[0] && <span className="ml-auto text-amber-300 font-semibold">Top: {rowLabel(localityAlerts[0])} ({localityAlerts[0].alerts})</span>}
+              {localityAlerts[0] && <span className="ml-auto min-w-0 truncate text-amber-300 font-semibold">Top: {rowLabel(localityAlerts[0])} ({localityAlerts[0].alerts})</span>}
             </div>
           </>
         )}
       </div>
       </>)}
 
-      {/* City Expansion Requests — where people want Draazy to launch next (GET /admin/cities/waitlist) */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-sm font-semibold text-gray-300">City Expansion Requests</h3>
           {cityWaitlist && (
-            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-gray-400">
+            <span className="dz-tag border border-white/10 bg-white/5 text-gray-400">
               {totalCityRequests} request{totalCityRequests !== 1 ? 's' : ''}
             </span>
           )}
@@ -212,7 +195,7 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
             <div className="space-y-2 mb-4">
               {cityRows.map((c) => (
                 <div key={c.city.toLowerCase()} className="flex items-center gap-3">
-                  <span className="w-28 shrink-0 truncate">
+                  <span className="w-28 shrink-0 truncate" title={c.city}>
                     <span className="text-xs text-gray-300 font-medium">{c.city}</span>
                   </span>
                   <div className="flex-1 relative h-6 rounded bg-white/5 overflow-hidden">
@@ -232,7 +215,7 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
             <div className="flex items-center gap-4 text-[11px] text-gray-500 border-t border-white/5 pt-3">
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-sky-500/60" /> People asking</span>
               <span>Most recent ask shown on right</span>
-              <span className="ml-auto text-sky-300 font-semibold">Top: {cityRows[0].city} ({cityRows[0].requests})</span>
+              <span className="ml-auto min-w-0 truncate text-sky-300 font-semibold">Top: {cityRows[0].city} ({cityRows[0].requests})</span>
             </div>
           </>
         )}

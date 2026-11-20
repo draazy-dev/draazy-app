@@ -4,6 +4,7 @@ import { openRequestDoc } from './helpers.js';
 import { hasPermission } from '../../../lib/adminModules.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { listServiceRequestRentAgreements, verifyRentAgreement } from '../../../services/serviceRequestService.js';
+import { userMessage } from '../../../lib/userMessage.js';
 
 const STATUS_LABEL = {
   draft: 'Awaiting check',
@@ -13,13 +14,7 @@ const STATUS_LABEL = {
   expired: 'Not registered',
 };
 
-const rupees = (n) => (n == null ? '—' : `₹${Number(n).toLocaleString('en-IN')}`);
-
 function RegistrationRecord({ record }) {
-  const off = [
-    ['Stamp duty', record.stampDuty, record.quotedStampDuty],
-    ['Registration fee', record.registrationFee, record.quotedRegistrationFee],
-  ].filter(([, paid, quoted]) => quoted != null && paid !== quoted);
   return (
     <div className="mt-3 rounded-xl border border-white/5 p-3 text-sm" data-testid="registration-record">
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
@@ -27,21 +22,12 @@ function RegistrationRecord({ record }) {
         <dt className="text-gray-500">Sub-Registrar</dt><dd className="text-gray-200">{record.sro}</dd>
         <dt className="text-gray-500">Registered on</dt><dd className="text-gray-200">{record.registeredOn}</dd>
         <dt className="text-gray-500">GRAS GRN</dt><dd className="text-gray-200">{record.grn}</dd>
-        <dt className="text-gray-500">Duty / fee paid</dt><dd className="text-gray-200">{rupees(record.stampDuty)} / {rupees(record.registrationFee)}</dd>
-        <dt className="text-gray-500">Quoted</dt><dd className="text-gray-200">{rupees(record.quotedStampDuty)} / {rupees(record.quotedRegistrationFee)}</dd>
       </dl>
-      {off.length ? (
-        <p role="note" className="mt-2 text-xs text-amber-200">
-          {off.map(([label, paid, quoted]) => `${label} paid ${rupees(paid)} differs from the ${rupees(quoted)} the customer was quoted.`).join(' ')}
-          {' '}Check the challan before confirming.
-        </p>
-      ) : null}
       <p className="mt-2 text-xs text-gray-500">Recorded by {record.recordedBy || 'a former colleague'}</p>
     </div>
   );
 }
 
-/** Second-operator check keeps tenant trust badges draft-only until the registered copy is confirmed. */
 export default function RegistrationCheck({ request, onError, onUnavailable }) {
   const titleId = useId();
   const { user } = useAuth();
@@ -55,7 +41,7 @@ export default function RegistrationCheck({ request, onError, onUnavailable }) {
     let current = true;
     listServiceRequestRentAgreements(request.id)
       .then((list) => { if (current) setRows(list); })
-      .catch((err) => { if (current) setFailure(err?.message || 'The tenancy rows could not be read.'); });
+      .catch((err) => { if (current) setFailure(userMessage(err, 'The tenancy rows could not be read.')); });
     return () => { current = false; };
   }, [request.id]);
 
@@ -68,7 +54,7 @@ export default function RegistrationCheck({ request, onError, onUnavailable }) {
       setAnnouncement(`${row.tenantName || 'Tenant'}: ${STATUS_LABEL[updated.status] || updated.status}.`);
       requestAnimationFrame(() => document.getElementById(`${titleId}-${row.id}`)?.focus());
     } catch (err) {
-      onError(err?.message || 'That could not be recorded.');
+      onError(userMessage(err, 'That could not be recorded.'));
     } finally {
       setBusy('');
     }

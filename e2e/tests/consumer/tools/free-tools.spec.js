@@ -65,10 +65,11 @@ test('rent agreement cost follows the leave and licence formula', async ({ page,
   await page.goto('/tools/rent-agreement-cost-pune', { waitUntil: 'domcontentloaded' });
   const result = page.getByTestId('tool-result');
   await expect(result).toContainText('₹2,75,000');
-  await expect(result).toContainText('₹800');
+  await expect(result).toContainText('₹712.50');
+  await expect(result).toContainText('₹713');
   await expect(result).toContainText('₹1,000');
   await expect(result).toContainText('₹300');
-  await expect(result).toContainText('₹2,100');
+  await expect(result).toContainText('₹2,013');
 
   await page.getByLabel(/Term in months/).fill('61');
   await expect(page.getByRole('alert')).toContainText('60');
@@ -101,8 +102,11 @@ test('rent receipts: one per month, PAN checked, cash stamp box, and only receip
   await expect(page.getByText('A PAN has 5 letters')).toBeVisible();
   await expect(page.getByRole('button', { name: /Print or save as PDF/ })).toBeDisabled();
   await page.getByLabel(/Landlord PAN/).fill('abcde1234f');
+  await expect(page.getByLabel(/Landlord PAN/)).toHaveValue('ABCDE1234F');
   await expect(page.getByText('A PAN has 5 letters')).toHaveCount(0);
   await expect(page.getByTestId('receipt-preview')).toContainText('PAN: ABCDE1234F');
+  await page.getByLabel(/Landlord PAN/).fill('1abcde12x34f9');
+  await expect(page.getByLabel(/Landlord PAN/), 'a character out of place in AAAAA9999A is dropped').toHaveValue('ABCDE1234F');
 
   await expect(page.getByTestId('receipt-preview')).not.toContainText('revenue stamp');
   await pick(page, 'Payment mode', 'Cash');

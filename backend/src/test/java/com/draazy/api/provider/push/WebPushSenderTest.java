@@ -29,8 +29,6 @@ import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("Web Push sender")
 class WebPushSenderTest {
-
-    // RFC 8291 appendix A.
     private static final String RFC_AS_PUBLIC =
             "BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8";
     private static final String RFC_AS_PRIVATE = "yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw";
@@ -177,6 +175,18 @@ class WebPushSenderTest {
                 HttpClient.newHttpClient(), WebPushSender::isPublicHttps);
 
         assertThat(push(strict)).isFalse();
+        assertThat(requests).hasValue(0);
+    }
+
+    @Test
+    @DisplayName("an endpoint whose host does not resolve is not sent to, and its subscription is kept")
+    void unresolvableHostIsSkippedNotDropped() {
+        WebPushSender strict = new WebPushSender(props(null), JsonMapper.builder().build(),
+                HttpClient.newHttpClient(), WebPushSender::isPublicHttps);
+
+        assertThat(strict.send("https://no-such-push-host.invalid/x",
+                WebPushCrypto.encode(WebPushCrypto.uncompressed(browser.getPublic())),
+                WebPushCrypto.encode(browserAuth), PushPayloads.messageReceived(UUID.randomUUID()))).isTrue();
         assertThat(requests).hasValue(0);
     }
 

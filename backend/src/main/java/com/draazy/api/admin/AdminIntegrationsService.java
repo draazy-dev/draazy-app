@@ -1,10 +1,12 @@
 package com.draazy.api.admin;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.web.PageResponse;
 import com.draazy.api.provider.ProviderCalls;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -23,7 +25,6 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AdminIntegrationsService {
-
     private static final List<String> PROVIDERS =
             List.of(ProviderCalls.ZEPTOMAIL, ProviderCalls.WHATSAPP, ProviderCalls.CASHFREE);
     private static final List<String> OUTCOMES = Arrays.stream(ProviderCalls.Outcome.values())
@@ -75,7 +76,7 @@ public class AdminIntegrationsService {
                 .toList();
     }
 
-    public PageResponse<AdminProviderCall> calls(String provider, String outcome, String q, int page, int size) {
+    public PageResponse<AdminProviderCall> calls(String provider, String outcome, String q, Integer days, int page, int size) {
         if (provider != null && !PROVIDERS.contains(provider)) {
             throw new BadRequestException("provider must be one of " + PROVIDERS);
         }
@@ -89,6 +90,7 @@ public class AdminIntegrationsService {
             throw new BadRequestException("page is beyond the log; at most " + MAX_OFFSET + " rows may be skipped");
         }
 
+        Instant since = PlatformTime.sinceOrNull(days);
         StringBuilder where = new StringBuilder(" WHERE true");
         List<Object> args = new ArrayList<>();
         if (provider != null) {
@@ -99,8 +101,11 @@ public class AdminIntegrationsService {
             where.append(" AND outcome = ?");
             args.add(outcome);
         }
+        if (since != null) {
+            where.append(" AND created_at >= ?");
+            args.add(Timestamp.from(since));
+        }
         if (q != null && !q.isBlank()) {
-            // A recipient is only ever found by its full address; the stored form is masked.
             String hash = ProviderCalls.hashRecipient(q);
             where.append(" AND (reference = ?").append(hash == null ? ")" : " OR recipient_hash = ?)");
             args.add(q.strip());

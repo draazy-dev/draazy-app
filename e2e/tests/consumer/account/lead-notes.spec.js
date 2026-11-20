@@ -2,6 +2,9 @@ import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uploadedListingPhotos, uniqueMobile, signedInAs, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { istInDays, shortLabel } from '../../../helpers/availability.js';
+
+const FOLLOW_UP_ON = istInDays(131);
 
 const createdListings = new Set();
 let actorSequence = 0;
@@ -80,12 +83,12 @@ test('an owner note and follow-up date are stored on the server, not in the brow
   expect(empty.body.find((n) => n.leadKey === leadKey), 'no annotation should exist yet').toBeFalsy();
 
   await signedInAs(page, fixture.owner.mobile);
-  await page.goto('/dashboard#enquiries');
+  await page.goto('/dashboard?tab=leads');
 
-  const lead = page.locator('div.group.relative.rounded-xl').filter({ hasText: buyer.name }).first();
+  const lead = page.getByTestId('request-card').filter({ hasText: buyer.name });
   await expect(lead).toBeVisible();
 
-  await lead.getByRole('button', { name: /^Open .* details$/ }).click();
+  await lead.getByTestId('request-note').click();
   const sheet = page.getByRole('dialog');
   await expect(sheet, 'the lead sheet must open before its fields can be trusted').toBeVisible();
 
@@ -103,7 +106,7 @@ test('an owner note and follow-up date are stored on the server, not in the brow
     && response.request().method() === 'PUT'
     && response.status() === 200,
   );
-  await pickDate(page, '#lead-followup', '2027-03-14');
+  await pickDate(page, '#lead-followup', FOLLOW_UP_ON);
   await savedDate;
   /* Read back below the UI. This is the assertion the old localStorage implementation could not
      have passed: it proves the value left the browser that typed it. */
@@ -114,21 +117,21 @@ test('an owner note and follow-up date are stored on the server, not in the brow
   expect(annotation, 'the annotation must exist server-side').toBeTruthy();
   expect(annotation.note).toContain('before Diwali');
 
-  expect(new Date(annotation.followUpAt).getUTCFullYear()).toBe(2027);
-  expect(annotation.followUpAt.startsWith('2027-03-14'), `follow-up stored as ${annotation.followUpAt}`).toBe(true);
+  expect(new Date(annotation.followUpAt).getUTCFullYear()).toBe(Number(FOLLOW_UP_ON.slice(0, 4)));
+  expect(annotation.followUpAt.startsWith(FOLLOW_UP_ON), `follow-up stored as ${annotation.followUpAt}`).toBe(true);
   /* A second browser context: a different profile, a different localStorage, the same owner. This
      is the defect being fixed, stated as a test — the phone and the laptop must agree. */
 
   const other = await page.context().browser().newContext();
   const otherPage = await other.newPage();
   await signedInAs(otherPage, fixture.owner.mobile);
-  await otherPage.goto('/dashboard#enquiries');
+  await otherPage.goto('/dashboard?tab=leads');
 
-  const otherLead = otherPage.locator('div.group.relative.rounded-xl').filter({ hasText: buyer.name }).first();
+  const otherLead = otherPage.getByTestId('request-card').filter({ hasText: buyer.name });
   await expect(otherLead).toBeVisible();
-  await expect(otherLead, 'the follow-up chip must render for the same owner in a fresh browser').toContainText('14 Mar');
+  await expect(otherLead.getByTestId('request-follow-up'), 'the follow-up pill must render for the same owner in a fresh browser').toContainText(shortLabel(FOLLOW_UP_ON));
 
-  await otherLead.getByRole('button', { name: /^Open .* details$/ }).click();
+  await otherLead.getByTestId('request-note').click();
   const otherSheet = otherPage.getByRole('dialog');
   await expect(otherSheet).toBeVisible();
   await expect(otherSheet.locator('#lead-note')).toHaveValue(/before Diwali/);
@@ -152,11 +155,11 @@ test('clearing both fields deletes the annotation instead of storing a blank one
   const leadKey = `number:${row.id}`;
 
   await signedInAs(page, fixture.owner.mobile);
-  await page.goto('/dashboard#enquiries');
+  await page.goto('/dashboard?tab=leads');
 
-  const lead = page.locator('div.group.relative.rounded-xl').filter({ hasText: buyer.name }).first();
+  const lead = page.getByTestId('request-card').filter({ hasText: buyer.name });
   await expect(lead).toBeVisible();
-  await lead.getByRole('button', { name: /^Open .* details$/ }).click();
+  await lead.getByTestId('request-note').click();
   const sheet = page.getByRole('dialog');
   await expect(sheet).toBeVisible();
 

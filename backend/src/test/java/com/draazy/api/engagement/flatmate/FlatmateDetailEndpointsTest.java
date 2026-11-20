@@ -13,7 +13,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
+import com.draazy.api.support.IdentityCases;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.ArrayList;
@@ -52,6 +52,7 @@ class FlatmateDetailEndpointsTest extends AbstractApiTest {
         u.setName(name);
         u.setMobileVerified(true);
         User saved = users.saveAndFlush(u);
+        IdentityCases.submitted(jdbc, saved.getId());
         createdActors.add(saved.getId().toString());
         return saved;
     }
@@ -70,27 +71,26 @@ class FlatmateDetailEndpointsTest extends AbstractApiTest {
     }
 
     private String group(User host) throws Exception {
-        return create(Routes.Flatmates.GROUPS, host, """
-                {"title":"Detail trio","locality":"DetailTown","policy":"any","rent":40000,
-                 "seats":3,"seatsOpen":1,"name":"Host","tags":[]}
-                """);
+        return create(Routes.Flatmates.GROUPS, host,
+                FlatmateGroupFixture.hunting("Detail trio", "DetailTown", "any", 40000, 3, 1));
     }
 
     private String room(User host) throws Exception {
         return create(Routes.Flatmates.ROOMS, host, """
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                 "furnishing":"semi","locality":"DetailTown","society":"Detail Heights",
+                 "locality":"DetailTown","society":"Detail Heights",
                  "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                  "lookingFor":"any","foodPref":"any","lat":18.5912345,"lng":73.7712345,
-                 "photos":["%s"],"hostRole":"owner","note":"Sunny."}
-                """.formatted(UploadedPhotos.of(host.getId())));
+                 %s,"hostRole":"owner","note":"Sunny.",%s,%s}
+                """.formatted(FlatmateRoomFixture.photos(host.getId()), FlatmateRoomFixture.BASICS,
+                FlatmateRoomFixture.DETAILS));
     }
 
     private String seekerPost(User author) throws Exception {
         return create(Routes.Flatmates.POSTS, author, """
                 {"name":"Detail","gender":"any","age":27,"occupation":"Analyst",
                  "budget":18000,"localities":["DetailTown"],"moveIn":"2026-09-01",
-                 "flatPref":"any","roomPref":"private","tags":[],"note":"Hello."}
+                 "flatPref":"any","roomPref":"private","note":"Hello."}
                 """);
     }
 
@@ -100,8 +100,8 @@ class FlatmateDetailEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("the host reaches their own pending group, with host-only fields")
-    void hostSeesOwnPendingGroup() throws Exception {
+    @DisplayName("the host reaches their own group, with host-only fields")
+    void hostSeesOwnGroup() throws Exception {
         User host = seeker("9812000001", "Host");
         String id = group(host);
 
@@ -115,67 +115,19 @@ class FlatmateDetailEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("the host reads what the tenant badge waits on; a visitor gets no checklist")
-    void verificationChecklistIsTheHostsAlone() throws Exception {
-        User host = seeker("9812000007", "Host");
-        String docId = personalDocuments.saveAndFlush(new PersonalDocument(host.getId(),
-                "Registered Leave and Licence", "a.png",
-                "personal/" + host.getId() + "/" + UUID.randomUUID(), 70L, "image/png"))
-                .getId().toString();
-        String id = create(Routes.Flatmates.GROUPS, host, """
-                {"title":"Checklist trio","locality":"DetailTown","policy":"any","rent":40000,
-                 "seats":3,"seatsOpen":1,"name":"Host","tags":[],"role":"tenant","agreement":true,
-                 "agreementDoc":{"id":"%s","name":"a.png","mime":"image/png","size":70,
-                   "dataUrl":"data:image/png;base64,iVBORw0KGgo="}}
-                """.formatted(docId));
-
-        mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(host)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.verification.status").value("pending"))
-                .andExpect(jsonPath("$.verification.ownerConsent").value(false));
-
-        approve("flatmate_groups", id);
-        mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.verification").doesNotExist());
-    }
-
-    @Test
-    @DisplayName("the host gets their own consent number back unmasked; a visitor never sees it")
-    void consentNumberIsUnmaskedOnlyForTheHost() throws Exception {
-        User host = seeker("9812000006", "Host");
-        String id = create(Routes.Flatmates.GROUPS, host, """
-                {"title":"Consent trio","locality":"DetailTown","policy":"any","rent":40000,
-                 "seats":3,"seatsOpen":1,"name":"Host","tags":[],"role":"tenant",
-                 "consentMobile":"9876543210"}
-                """);
-
-        mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(host)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.item.ownerConsentMobile").value("9876543210"));
-
-        approve("flatmate_groups", id);
-        mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id))
-                .andExpect(status().isOk())
-                .andExpect(content().string(Matchers.not(Matchers.containsString("9876543210"))));
-    }
-
-    @Test
-    @DisplayName("a pending ad is 404 to anyone but its author")
+    @DisplayName("a pending room is 404 to anyone but its author")
     void pendingIsHiddenFromOthers() throws Exception {
         User host = seeker("9812000002", "Host");
         User other = seeker("9812000003", "Other");
-        String groupId = group(host);
         String roomId = room(host);
 
-        mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, groupId)).andExpect(status().isNotFound());
         mvc.perform(get(Routes.Flatmates.ROOM_BY_ID, roomId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(other)))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    @DisplayName("an approved room is public, with photos and without host forensics")
+    @DisplayName("an approved room is public, with photos and specs and without host forensics or address")
     void approvedRoomIsPublic() throws Exception {
         User host = seeker("9812000004", "Host");
         String id = room(host);
@@ -184,7 +136,13 @@ class FlatmateDetailEndpointsTest extends AbstractApiTest {
         mvc.perform(get(Routes.Flatmates.ROOM_BY_ID, id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.owned").value(false))
-                .andExpect(jsonPath("$.photos", Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.photos", Matchers.hasSize(3)))
+                .andExpect(jsonPath("$.specs.bathrooms").value(2))
+                .andExpect(jsonPath("$.specs.floor").value("3"))
+                .andExpect(jsonPath("$.specs.totalFloors").value(10))
+                .andExpect(jsonPath("$.specs.pincode").doesNotExist())
+                .andExpect(jsonPath("$.specs.street").doesNotExist())
+                .andExpect(jsonPath("$.item.host").doesNotExist())
                 .andExpect(jsonPath("$.item.addressFingerprint").doesNotExist())
                 .andExpect(jsonPath("$.item.ownerMobile").doesNotExist())
                 .andExpect(jsonPath("$.item.lat").value(18.591))

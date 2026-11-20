@@ -46,3 +46,16 @@ test('a locality name with regex punctuation is matched as text, not compiled as
   await expect(page.locator('.af-chip', { hasText: /N\.I\.B\.M\./i })).toHaveCount(0);
   expect(thrown, thrown.join('\n')).toEqual([]);
 });
+
+test('a locality spelled one letter off still resolves, and short words are not stretched into one', async ({ page }) => {
+  await page.goto(`${BASE}/listings?deal=rent`);
+  const field = page.locator('.lst-search-field').first();
+  await field.fill('2bhk semi furnished under 30k near hinjewadi');
+  await page.getByRole('button', { name: 'Smart search' }).first().click();
+
+  await expect(page.locator('.af-chip', { hasText: /^Hinjawadi/ }).first()).toBeVisible({ timeout: 10000 });
+  await expect.poll(() => new URL(page.url()).searchParams.get('loc')).toBe('hinjawadi');
+  expect(new URL(page.url()).searchParams.has('q')).toBe(false);
+  // "under" is one edit from Undri, but five letters is too short to trust a near miss.
+  await expect(page.locator('.af-chip', { hasText: /Undri/i })).toHaveCount(0);
+});

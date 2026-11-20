@@ -7,7 +7,6 @@ const maskLast4 = (value) => {
 };
 const IDENTITY = ['aadhaar', 'pan'];
 
-/** What has already been checked and logged against this case. */
 export default function RecordedEvidence({ evidence, documents }) {
   if (!evidence.length) return <p className="text-sm text-gray-500">No evidence recorded.</p>;
   return (

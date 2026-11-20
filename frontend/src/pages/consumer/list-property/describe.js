@@ -1,5 +1,6 @@
 import { commercialLabelOf } from './constants.js';
 import { daysUntil, shortDate } from '../../../lib/availability.js';
+import { bhkLabel as bhkLabelOf } from '../../../lib/listingSeo.js';
 
 const TYPE_LABEL = {
   flat: 'flat',
@@ -11,8 +12,7 @@ const TYPE_LABEL = {
 
 const compact = (parts) => parts.filter(Boolean).join(', ');
 const money = (value) => (value ? `₹${String(value).trim()}` : '');
-const bhkLabel = (form) => (form.bhk && !['commercial', 'openplot', 'farmland'].includes(form.propertyType)
-  ? `${form.bhk === '0' ? '1 RK' : `${form.bhk === '5' ? '5+' : form.bhk} BHK`}` : '');
+const bhkLabel = (form) => bhkLabelOf(form.bhk, form.propertyType);
 const typeLabel = (form) => (form.propertyType === 'commercial'
   ? (commercialLabelOf(form.commercialType) || 'commercial property')
   : (TYPE_LABEL[form.propertyType] || 'property'));

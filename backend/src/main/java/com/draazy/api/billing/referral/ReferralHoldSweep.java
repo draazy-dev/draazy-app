@@ -10,10 +10,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
-/** Settles referrals whose hold ran out and re-checks granted ones, one transaction per row. */
 @Component
 public class ReferralHoldSweep {
-
     private static final Logger log = LoggerFactory.getLogger(ReferralHoldSweep.class);
 
     private static final PageRequest BATCH = PageRequest.of(0, 500);
@@ -31,7 +29,6 @@ public class ReferralHoldSweep {
         this.settings = settings;
     }
 
-    /** Settles one capped page of due holds and returns how many actually moved, so a drain stops on a dead page. */
     public int releaseDue() {
         Instant now = Instant.now();
         int released = 0;

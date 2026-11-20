@@ -23,11 +23,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/** A paid plan stops working when its term ends, on the clock rather than the sweep; the sweep is proved separately. */
 @DisplayName("Subscription lifecycle — a term that ends, ends")
 class SubscriptionLifecycleTest extends AbstractApiTest {
-
-    /** Owner Plus, priced. Any plan id serves; nothing here reads the plan's own fields. */
     private static final String PAID_PLAN = "b1000000-0000-4000-8000-000000000002";
 
     private static final Instant NOW = Instant.parse("2026-06-01T00:00:00Z");
@@ -48,17 +45,12 @@ class SubscriptionLifecycleTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    /** A subscription in whatever state the test needs, dated however it needs. */
     private Subscription subscription(User owner, String status, Instant startedAt, Instant renewsAt) {
         UUID planId = UUID.fromString(PAID_PLAN);
-        // The plan's own price, read rather than written out, so a reprice cannot leave a literal
-        // here claiming a subscription was sold for something it never cost.
         long price = plans.findById(planId).orElseThrow().getPrice();
         return subscriptions.saveAndFlush(new Subscription(owner.getId(),
                 planId, null, status, price, startedAt, renewsAt, null, null));
     }
-
-    // ---- 1: the sweep ends what has run out, and only what has run out ----
 
     @Test
     void theSweepExpiresATermThatHasRunOut() {
@@ -68,8 +60,6 @@ class SubscriptionLifecycleTest extends AbstractApiTest {
         assertThat(sweeper.expireLapsed(NOW)).isEqualTo(1);
         assertThat(subscriptions.findById(lapsed.getId()).orElseThrow().getStatus())
                 .isEqualTo(SubscriptionStatuses.EXPIRED);
-        // Idempotent, which is what makes it safe to run on a timer and safe to run twice if two
-        // instances ever overlap.
         assertThat(sweeper.expireLapsed(NOW)).isZero();
     }
 
@@ -77,11 +67,8 @@ class SubscriptionLifecycleTest extends AbstractApiTest {
         Instant yesterday = NOW.minus(1, ChronoUnit.DAYS);
         return Stream.of(
                 Arguments.of("a term still running", SubscriptionStatuses.ACTIVE, NOW, NEXT_MONTH),
-                // renewsAt is null on a pending row by construction; expiring one would destroy an
-                // order the buyer may still be paying for.
                 Arguments.of("a pending order, which has no term because no money has arrived",
                         SubscriptionStatuses.PENDING, LAST_MONTH, null),
-                // Why it ended is a fact worth keeping.
                 Arguments.of("a cancelled subscription, which keeps saying cancelled",
                         SubscriptionStatuses.CANCELLED, LAST_MONTH, yesterday));
     }
@@ -104,8 +91,6 @@ class SubscriptionLifecycleTest extends AbstractApiTest {
 
         assertThat(sweeper.expireLapsed(NOW)).isEqualTo(1);
     }
-
-    // ---- 1b: a lapsed listing pass pauses the listing it covered, unless the free slot has room ----
 
     private Property listing(User owner, String status) {
         Property p = new Property(owner, "Pass flat", "rent", "apartment", 25000L, "Baner", "Pune");
@@ -184,14 +169,10 @@ class SubscriptionLifecycleTest extends AbstractApiTest {
                 .isEqualTo(PropertyStatus.APPROVED);
     }
 
-    // ---- 2: entitlement is decided against the clock, not against the sweep ----
-
     @Test
     @DisplayName("a lapsed plan stops entitling immediately — without waiting for the sweep to run")
     void alapsedPlanStopsEntitlingBeforeTheSweepRuns() throws Exception {
         User u = subscriber("9876540007");
-        // Deliberately still `active` in the database, and expireLapsed is NOT called. This is the
-        // gap a scheduler alone would leave open.
         subscription(u, SubscriptionStatuses.ACTIVE, LAST_MONTH, Instant.now().minusSeconds(60));
 
         mvc.perform(get(Routes.Plans.SUBSCRIPTION).header(HttpHeaders.AUTHORIZATION, bearer(u)))
@@ -207,8 +188,6 @@ class SubscriptionLifecycleTest extends AbstractApiTest {
         subscription(u, SubscriptionStatuses.ACTIVE, LAST_MONTH, Instant.now().minusSeconds(60));
         subscription(u, SubscriptionStatuses.PENDING, Instant.now(), null);
 
-        // The lapsed row is filtered out, so the renewal the user has already started is what they
-        // are shown — rather than an empty document that reads as "your checkout vanished".
         mvc.perform(get(Routes.Plans.SUBSCRIPTION).header(HttpHeaders.AUTHORIZATION, bearer(u)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(SubscriptionStatuses.PENDING));

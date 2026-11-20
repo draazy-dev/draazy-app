@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { Download } from 'lucide-react';
 import { searchForModeration, getModerationProperty, setListingStatus, clearFlag, flagListing, updateListingAsModerator, archiveListing, restoreListing, moderationSummary } from '../../services/propertyService.js';
@@ -7,6 +7,7 @@ import { startPropertyReview, decidePropertyReview } from '../../services/proper
 import { saveNoteIfAny } from '../../components/ui/InternalNote.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { freshnessState } from '../../lib/freshness.js';
+import { preloadable } from '../../lib/preloadable.js';
 import { useAdminFlags } from '../../context/AdminFlagsContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { hasPermission } from '../../lib/adminModules.js';
@@ -15,18 +16,20 @@ import { useTabParam } from '../../lib/useTabParam.js';
 import Loading from '../../components/ui/Loading.jsx';
 import { PageNav, QueueTabs } from '../../components/admin/WorkQueue.jsx';
 import QueueTable from './properties/QueueTable.jsx';
-import QueueFilterBar, { EMPTY_FILTERS, ALL_TAB_DEFAULTS } from './properties/QueueFilterBar.jsx';
-import DuplicatesTab from './properties/DuplicatesTab.jsx';
-import PropertyReviewModal from './properties/PropertyReviewModal.jsx';
-import { PropertyEditModal, PropertyFlagModal, PropertyArchiveModal, PropertyViewModal, PropertyRecheckRejectModal } from './properties/PropertyModals.jsx';
-import { statusQuery, PAGE_LIMIT, exportCsv } from './properties/constants.js';
+import QueueFilterBar, { EMPTY_FILTERS } from './properties/QueueFilterBar.jsx';
+import { PropertyFlagModal, PropertyArchiveModal, PropertyViewModal, PropertyRecheckRejectModal } from './properties/PropertyModals.jsx';
+import PropertyEditModal from './properties/PropertyEditModal.jsx';
+import { basicsOf, editPatch } from './properties/editForm.js';
+import { statusQuery, PAGE_LIMIT, exportCsv, isMadeBy, MAKER_REASON } from './properties/constants.js';
+import { userMessage } from '../../lib/userMessage.js';
 
-// The verification routes bind `{id}` as a UUID while `propertyMapper` sets `id` to `slug || id`,
-// so only the review calls need the real key off `uuid`.
+const PropertyReviewModal = preloadable(() => import('./properties/PropertyReviewModal.jsx'));
+const DuplicatesTab = lazy(() => import('./properties/DuplicatesTab.jsx'));
+
 const pid = (listing) => listing?.uuid || listing?.id;
 
 const TABS = [
-  { key: 'verify', label: 'To verify', count: (s) => s?.pending, note: 'Open only: new and resubmitted listings with no decision yet, including ones waiting on the owner. A listing leaves once you approve or reject it. Oldest first.' },
+  { key: 'verify', label: 'To verify', count: (s) => s?.pending, note: 'Open only: new and resubmitted listings with no decision yet, including ones waiting on the owner. A listing leaves once you approve or reject it. Newest first.' },
   { key: 'recheck', label: 'Re-checks', count: (s) => s?.recheck, note: 'Open only: live listings whose owner changed price, furnishing or possession. They stay in search until you check them, and leave this tab once you pass or take them down.' },
   { key: 'badge', label: 'Badge requests', count: (s) => s?.badgeRequests, note: 'Open only: owners asking for the Verified badge. Check the vault documents in the review; a request leaves once you grant or decline it.' },
   { key: 'followup', label: 'Follow-up', count: (s) => s?.unconfirmed, note: 'Open only: live listings not confirmed as available in over 14 days. Send a WhatsApp nudge; a listing leaves once the owner confirms.' },
@@ -39,15 +42,14 @@ const TAB_KEYS = TABS.map((t) => t.key);
 const CSV_NAMES = { verify: 'verification-queue', recheck: 'recheck-queue', badge: 'badge-requests', followup: 'follow-up', flagged: 'flagged', all: 'listings' };
 
 const SORT_COLUMN = { recheck: 'recheck', badge: 'badge', followup: 'confirmed' };
-const sortFor = (tab, dir) => (SORT_COLUMN[tab] ? `${SORT_COLUMN[tab]}-${dir}` : dir);
+const sortFor = (tab) => (SORT_COLUMN[tab] ? `${SORT_COLUMN[tab]}-newest` : 'newest');
 
 function queueFilters(tab, f) {
-  const common = { q: f.q.trim() || undefined, deal: f.deal || undefined };
+  const common = { q: f.q.trim() || undefined, deal: f.deal || undefined, days: f.days || undefined };
   switch (tab) {
     case 'verify': return { ...common, status: 'pending', archived: false, progress: f.progress || undefined };
     case 'recheck': return { ...common, recheck: true, archived: false };
     case 'badge': return { ...common, badge: true, archived: false };
-    // Never predicate this on `real` — the mapper does not emit that field, and doing so hid fifty-three listings.
     case 'followup': return { ...common, status: 'approved', archived: false, unconfirmed: true };
     case 'flagged': return { ...common, status: 'flagged', archived: false };
     default: return {
@@ -59,7 +61,6 @@ function queueFilters(tab, f) {
   }
 }
 
-// `null`, `failed` and `[]` stay distinct, and `stale` makes rows inert until they answer `key`.
 function useModerationQueue(enabled, filters, sort, page, reloadToken) {
   const key = JSON.stringify([filters, sort, page]);
   const [state, setState] = useState({ page: null, failed: false, key: null });
@@ -80,14 +81,11 @@ function useModerationQueue(enabled, filters, sort, page, reloadToken) {
     return () => { alive = false; clearTimeout(t); };
   }, [enabled, key, reloadToken, debounced]);
   return useMemo(
-    // Not stale before the first answer: `page` is null there, so the loading gate shows instead.
     () => ({ page: state.page, failed: state.failed, stale: state.key != null && state.key !== key }),
     [state, key],
   );
 }
 
-// `pointer-events-none` is the load-bearing part: rows answering a superseded query still carry
-// Approve/Reject/Remind, and acting on one would reach the wrong owner.
 function QueueBody({ stale, children }) {
   return (
     <div aria-busy={stale || undefined} className={stale ? 'pointer-events-none select-none opacity-50' : undefined} data-testid={stale ? 'queue-updating' : undefined}>
@@ -96,7 +94,6 @@ function QueueBody({ stale, children }) {
   );
 }
 
-// The wording is the point: "nothing here" after a 500 would tell the desk the backlog is clear.
 function QueueFailed({ noun }) {
   return (
     <p className="p-10 text-center text-sm text-gray-400" data-testid="queue-error">
@@ -118,12 +115,11 @@ export default function AdminProperties() {
   const canEdit = canVerify || canModerate;
   const activeTab = tab;
 
-  const [filters, setFilters] = useState(() => (activeTab === 'all' ? ALL_TAB_DEFAULTS : EMPTY_FILTERS));
-  // Reset during render, not in an effect: the tab also changes from outside (palette, back button).
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [filtersTab, setFiltersTab] = useState(activeTab);
   if (filtersTab !== activeTab) {
     setFiltersTab(activeTab);
-    setFilters(activeTab === 'all' ? ALL_TAB_DEFAULTS : EMPTY_FILTERS);
+    setFilters(EMPTY_FILTERS);
   }
   const page = Math.max(1, parseInt(params.get('page'), 10) || 1);
   const setPage = useCallback((n) => setParams((prev) => {
@@ -132,10 +128,9 @@ export default function AdminProperties() {
     return next;
   }, { replace: true }), [setParams]);
 
-  const defaults = activeTab === 'all' ? ALL_TAB_DEFAULTS : EMPTY_FILTERS;
-  const filtered = Object.keys(defaults).some((k) => filters[k] !== defaults[k]);
+  const filtered = Object.keys(EMPTY_FILTERS).some((k) => filters[k] !== EMPTY_FILTERS[k]);
   const changeFilters = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
-  const clearFilters = () => changeFilters(defaults);
+  const clearFilters = () => changeFilters(EMPTY_FILTERS);
 
   const [review, setReview] = useState(null);
   const [edit, setEdit] = useState(null);
@@ -150,8 +145,6 @@ export default function AdminProperties() {
   const [recheckRejectReasonNote, setRecheckRejectReasonNote] = useState('');
   const [internalNote, setInternalNote] = useState('');
 
-  // The database counting the whole catalogue. `null` on failure, so a tab count is omitted rather
-  // than reading "0" — an all-clear nobody issued.
   const [summary, setSummary] = useState(null);
   const loadSummary = useCallback(() => moderationSummary()
     .then(setSummary)
@@ -164,7 +157,6 @@ export default function AdminProperties() {
   const [reloadToken, setReloadToken] = useState(0);
   const refresh = () => loadSummary().finally(() => setReloadToken((n) => n + 1));
 
-  // Without a tick a desk left open never escalates a row to overdue.
   const [, setAgeTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setAgeTick((n) => n + 1), 60_000);
@@ -177,7 +169,7 @@ export default function AdminProperties() {
 
   const isQueueTab = activeTab !== 'duplicates';
   const query = useMemo(() => queueFilters(activeTab, filters), [activeTab, filters]);
-  const sort = sortFor(activeTab, filters.sort);
+  const sort = sortFor(activeTab);
   const queue = useModerationQueue(isQueueTab, query, sort, page, reloadToken);
   const rows = useMemo(() => queue.page?.items || [], [queue.page]);
   const repliedIds = useMemo(
@@ -187,7 +179,24 @@ export default function AdminProperties() {
   const total = queue.page?.total ?? 0;
   const pageCount = queue.page?.pageCount ?? 0;
 
-  // A decision can empty the last page; step back rather than showing "nothing here" over a backlog.
+  const queueReady = queue.page != null;
+  const reviewSoon = queueReady || params.has('review');
+  useEffect(() => { if (reviewSoon) PropertyReviewModal.preload(); }, [reviewSoon]);
+
+  const panelRef = useRef(null);
+  const focusPending = useRef(null);
+  useEffect(() => {
+    if (review) { focusPending.current = { seen: undefined }; return; }
+    const pending = focusPending.current;
+    if (!pending || queue.stale || !queue.page) return;
+    if (pending.seen === undefined) { pending.seen = queue.page; return; }
+    if (pending.seen === queue.page) return;
+    focusPending.current = null;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    const target = panelRef.current?.querySelector('[data-testid="queue-row"] button') ?? panelRef.current;
+    target?.focus();
+  }, [review, queue.page, queue.stale]);
+
   useEffect(() => {
     if (queue.page && !queue.stale && rows.length === 0 && page > 1 && pageCount > 0) setPage(pageCount);
   }, [queue.page, queue.stale, rows.length, page, pageCount, setPage]);
@@ -196,10 +205,8 @@ export default function AdminProperties() {
 
   const showReview = (full) => {
     setReview(full);
-    // Opening the case marks the owner's replies read server-side.
     setOpenedIds((ids) => new Set(ids).add(pid(full)));
   };
-  // A row is slim, so the modal and the View card read the whole listing; the newest click wins.
   const detailTicket = useRef(0);
   const withDetail = (l, show) => {
     const ticket = ++detailTicket.current;
@@ -208,18 +215,16 @@ export default function AdminProperties() {
         if (ticket !== detailTicket.current) return;
         if (full) show(full); else toast(`No listing ${l.title || pid(l)} — it may have been removed`, 'error');
       })
-      .catch((err) => { if (ticket === detailTicket.current) toast(`Could not open the listing: ${err.message}`, 'error'); });
+      .catch((err) => { if (ticket === detailTicket.current) toast(`Could not open the listing: ${userMessage(err, 'please try again.')}`, 'error'); });
   };
   const openReview = (l) => withDetail(l, showReview);
   const openView = (l) => withDetail(l, setView);
 
-  // Keyed by id, not a boolean: the bell links here with a new ?review= while the page is mounted.
   const handledReviewId = useRef(null);
   const reviewParam = params.get('review');
   useEffect(() => {
     if (!reviewParam || handledReviewId.current === reviewParam) return undefined;
     let live = true;
-    // The id may be the uuid (review inbox) or the slug (analytics); the server takes either.
     getModerationProperty(reviewParam)
       .then((l) => {
         if (!live) return;
@@ -227,9 +232,8 @@ export default function AdminProperties() {
         if (l) showReview(l);
         else toast(`No listing ${reviewParam} — it may have been archived`, 'error');
       })
-      .catch((err) => { if (live) toast(`Could not open listing ${reviewParam}: ${err.message}`, 'error'); });
+      .catch((err) => { if (live) toast(`Could not open listing ${reviewParam}: ${userMessage(err, 'please try again.')}`, 'error'); });
     return () => { live = false; };
-    // `showReview` only sets state; listing it would re-run the lookup on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewParam, toast]);
 
@@ -238,24 +242,29 @@ export default function AdminProperties() {
     try {
       await clearFlag(l.id);
     } catch (err) {
-      toast(`Could not clear the flag: ${err.message}`, 'error');
+      toast(`Could not clear the flag: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     }
-    // Clearing withdraws the complaint, it does not verify: the server returns the row to `pending`.
     toast('Flag cleared — back in the review queue', 'success');
     refresh();
   };
-  // `PropertyModerationService` clears the re-check on any `setStatus`, so re-approving is "checked it, all fine".
+  const recheckBusy = useRef(false);
   const doRecheckPass = async (l) => {
-    if (!window.confirm(`Re-check "${l.title}" — confirm ${l.recheckReason || 'the edited fields'} look fine?`)) return;
+    if (recheckBusy.current) return;
+    recheckBusy.current = true;
     try {
-      await setListingStatus(l.id, 'approved', { expectedStatus: l.status });
-    } catch (err) {
-      toast(`Could not clear the re-check: ${err.message}`, 'error');
-      return;
+      if (!window.confirm(`Re-check "${l.title}" — confirm ${l.recheckReason || 'the edited fields'} look fine?`)) return;
+      try {
+        await setListingStatus(l.id, 'approved', { expectedStatus: l.status });
+      } catch (err) {
+        toast(`Could not clear the re-check: ${userMessage(err, 'please refresh and try again.')}`, 'error');
+        return;
+      }
+      toast('Re-check cleared — listing stays live', 'success');
+      refresh();
+    } finally {
+      recheckBusy.current = false;
     }
-    toast('Re-check cleared — listing stays live', 'success');
-    refresh();
   };
   const openRecheckReject = (l) => { setRecheckRejectFor(l); setRecheckRejectReasonCode(''); setRecheckRejectReasonNote(''); };
   const submitRecheckReject = async () => {
@@ -264,12 +273,11 @@ export default function AdminProperties() {
     if (!code) { toast('Choose a reason code before rejecting', 'error'); return; }
     if (code === 'other' && !note) { toast('Add a note for Other', 'error'); return; }
     const l = findListing(recheckRejectFor.id) || recheckRejectFor;
-    // One call writes the case file, the status and the owner's reason together; start first because deciding 404s.
     try {
       await startPropertyReview(pid(l));
       await decidePropertyReview(pid(l), 'reject', { reasonCode: code, note: note || undefined, expectedStatus: l.status });
     } catch (err) {
-      toast(`Could not reject: ${err.message}`, 'error');
+      toast(`Could not reject: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     }
     setRecheckRejectFor(null);
@@ -284,7 +292,7 @@ export default function AdminProperties() {
     try {
       await archiveListing(archiveFor.id, archiveReason.trim() || undefined);
     } catch (err) {
-      toast(`Could not archive: ${err.message}`, 'error');
+      toast(`Could not archive: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     }
     const noted = await saveNoteIfAny('listing', archiveFor.id, internalNote, 'Archived');
@@ -297,7 +305,7 @@ export default function AdminProperties() {
     try {
       await restoreListing(l.id);
     } catch (err) {
-      toast(`Could not restore: ${err.message}`, 'error');
+      toast(`Could not restore: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     }
     toast('Listing restored — moved to pending review', 'success');
@@ -310,7 +318,7 @@ export default function AdminProperties() {
     try {
       await flagListing(flagFor.id, r);
     } catch (err) {
-      toast(`Could not flag: ${err.message}`, 'error');
+      toast(`Could not flag: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     }
     const noted = await saveNoteIfAny('listing', flagFor.id, internalNote, 'Flagged');
@@ -318,50 +326,22 @@ export default function AdminProperties() {
     toast(noted.error ? 'Listing flagged \u2014 but the internal note could not be saved' : 'Listing flagged', noted.error ? 'error' : undefined);
     refresh();
   };
-  // `bhkNum`, not the rendered `bhk`: the label is "3 BHK", and the contract wants an integer.
-  const openEdit = (l, fromReview = false) => { setEdit({ id: l.id, title: l.title || '', price: l.price ?? '', area: l.area ?? '', bhk: l.bhkNum ? String(l.bhkNum) : '', type: l.type || '', locality: l.locality || '', localitySlug: l.localitySlug || '', deal: l.deal || 'buy', status: l.status || 'pending', _ref: l, _fromReview: fromReview }); };
+  const openEdit = (l, fromReview = false) => { setEdit({ ...basicsOf(l), _ref: l, _fromReview: fromReview }); };
   const closeEdit = () => {
     if (edit?._fromReview) setReview(edit._ref);
     setEdit(null);
   };
-  // Two calls: `ListingUpdate` deliberately omits `status` so a PATCH cannot self-escalate.
   const submitEdit = async () => {
-    const title = edit.title.trim();
-    const price = +edit.price;
-    const area = edit.area === '' ? '' : +edit.area;
     const ref = edit._ref || {};
-    const loc = edit.locality.trim();
-    const locChanged = loc !== (ref.locality || '') || (edit.localitySlug && edit.localitySlug !== (ref.localitySlug || ''));
-    if (!title) return toast('Title is required', 'error');
-    if (Number.isNaN(price) || price <= 0) return toast('Enter a valid price', 'error');
-    if (area !== '' && (Number.isNaN(area) || area < 0)) return toast('Area must be a positive number', 'error');
-    if (!loc) return toast('Locality is required', 'error');
-    const bhkRaw = String(edit.bhk ?? '').trim();
-    const bhkNum = bhkRaw === '' ? undefined : Number(bhkRaw);
-    if (bhkNum !== undefined && (!Number.isInteger(bhkNum) || bhkNum < 0)) {
-      return toast('Configuration must be a whole number of bedrooms', 'error');
-    }
-    if (edit._ref.status === 'rejected' && edit.status !== edit._ref.status) {
-      return toast('Use Request reopen in the review panel to reverse a final rejection', 'error');
-    }
-    const nextPatch = Object.fromEntries(Object.entries({
-      title: title !== (ref.title || '') ? title : undefined,
-      price: price !== Number(ref.price) ? price : undefined,
-      area: area !== '' && area !== Number(ref.area) ? area : undefined,
-      bhk: bhkNum !== undefined && bhkNum !== ref.bhkNum ? bhkNum : undefined,
-      type: edit.type.trim() !== (ref.type || '') ? edit.type.trim() : undefined,
-      locality: locChanged ? loc : undefined,
-      localitySlug: locChanged && edit.localitySlug ? edit.localitySlug : undefined,
-      deal: edit.deal !== (ref.deal || 'buy') ? edit.deal : undefined,
-    }).filter(([, value]) => value !== undefined));
+    const { patch: nextPatch, error } = editPatch(edit);
+    if (error) return toast(error, 'error');
     if (savingEdit) return;
     setSavingEdit(true);
     try {
-      // The moderator route: `/me/listings/{id}` is owner-scoped and 404s for anyone else's listing.
       if (Object.keys(nextPatch).length) await updateListingAsModerator(edit.id, nextPatch);
       if (canModerate && edit.status && edit.status !== edit._ref.status) await setListingStatus(edit.id, edit.status, { expectedStatus: edit._ref.status });
     } catch (err) {
-      toast(`Could not save: ${err.message}`, 'error');
+      toast(`Could not save: ${userMessage(err, 'please try again.')}`, 'error');
       return;
     } finally {
       setSavingEdit(false);
@@ -372,13 +352,10 @@ export default function AdminProperties() {
     if (edit._fromReview) {
       const saved = { ...ref, ...nextPatch, ...(canModerate ? { status: edit.status } : {}) };
       const fresh = await getModerationProperty(ref.uuid || edit.id).catch(() => null);
-      // Something opened while the read was in flight wins over this late reopen.
       setReview((current) => current ?? (fresh || saved));
     }
   };
 
-  /* The tab is opened synchronously inside the click and navigated only once the server accepts:
-     opening it after the await loses it to popup blockers, and before would promise an unrecorded send. */
   const chase = async (l, templateId) => {
     const handoff = window.open('', '_blank');
     try {
@@ -388,13 +365,12 @@ export default function AdminProperties() {
       refresh();
     } catch (err) {
       if (handoff) handoff.close();
-      toast(err?.message || 'Could not write this chaser', 'error');
+      toast(userMessage(err, 'Could not write this chaser'), 'error');
     }
   };
   const handleReminder = (l) => chase(l, 'wa-gentle');
   const handleConfirmReminder = (l) => chase(l, freshnessState(l) === 'dormant' ? 'wa-dormant' : 'wa-stale');
 
-  // The export reaches past the ten on screen: it asks the server for the first hundred matches.
   const exportCurrentCsv = async () => {
     try {
       const res = await searchForModeration(query, sort, { page: 1, size: 100 });
@@ -403,11 +379,12 @@ export default function AdminProperties() {
         ['ID', 'Title', 'BHK', 'Type', 'Locality', 'Price', 'Deal', 'Status', 'Owner', 'Mobile', 'Submitted', 'Re-check fields', 'Re-check queued at', 'Featured'],
         res.items.map((l) => [l.id, l.title, l.bhk, l.type, l.locality, l.price, l.deal, l.status, l.owner, l.ownerMobile, l.createdAt, l.recheckReason || '', l.recheckRequestedAt || '', l.featured ? 'Yes' : 'No']));
     } catch (err) {
-      toast(`Could not export: ${err.message}`, 'error');
+      toast(`Could not export: ${userMessage(err, 'please try again.')}`, 'error');
     }
   };
 
   const onEdit = canEdit ? openEdit : undefined;
+  const editBlockedReason = (l) => (isMadeBy(l, user?.id) ? MAKER_REASON : null);
   const moderateActions = canModerate ? {
     onReminder: handleReminder,
     onConfirmReminder: handleConfirmReminder,
@@ -445,8 +422,14 @@ export default function AdminProperties() {
         tabs={TABS.map((t) => ({ key: t.key, label: t.label, count: t.count(summary, dupCount) }))}
       />
 
-      {activeTab === 'duplicates' ? <DuplicatesTab onRefresh={refresh} onCount={setDupCount} canModerate={canModerate} /> : (
-        <section id="queue-panel" role="tabpanel" aria-labelledby={`queue-tab-${activeTab}`} className="dz-card overflow-hidden p-0">
+      {activeTab === 'duplicates' ? (
+        <div id="queue-panel" role="tabpanel" aria-labelledby="queue-tab-duplicates">
+          <Suspense fallback={<Loading />}>
+            <DuplicatesTab onRefresh={refresh} onCount={setDupCount} canModerate={canModerate} />
+          </Suspense>
+        </div>
+      ) : (
+        <section ref={panelRef} tabIndex={-1} id="queue-panel" role="tabpanel" aria-labelledby={`queue-tab-${activeTab}`} className="dz-card overflow-hidden p-0 outline-none">
           {activeMeta?.note ? (
             <p className="border-b border-white/10 px-4 py-2.5 text-xs text-gray-400" data-testid={`${activeTab}-note`}>{activeMeta.note}</p>
           ) : null}
@@ -457,19 +440,23 @@ export default function AdminProperties() {
                 rows={rows}
                 tab={activeTab}
                 repliedIds={repliedIds}
-                actions={actionsFor[activeTab]}
+                actions={{ ...actionsFor[activeTab], editBlocked: editBlockedReason }}
                 showScore
                 empty={filtered ? 'No listings match these filters.' : 'All caught up — nothing waiting here.'}
               />
             )}
           </QueueBody>
           {pageCount > 1 ? (
-            <div className="flex justify-end border-t border-white/10 p-3"><PageNav {...paging} /></div>
+            <div className="flex justify-end border-t border-white/10 p-3"><PageNav {...paging} label="Pages, bottom" /></div>
           ) : null}
         </section>
       )}
 
-      {review && <PropertyReviewModal review={review} setReview={setReview} onRefresh={refresh} onEdit={canEdit ? (l) => { setReview(null); openEdit(l, true); } : undefined} />}
+      {review && (
+        <Suspense fallback={null}>
+          <PropertyReviewModal review={review} setReview={setReview} onRefresh={refresh} onEdit={canEdit ? (l) => { setReview(null); openEdit(l, true); } : undefined} />
+        </Suspense>
+      )}
       <PropertyEditModal edit={edit} setEdit={setEdit} onClose={closeEdit} onSubmit={submitEdit} saving={savingEdit} canSetStatus={canModerate} />
       <PropertyFlagModal flagFor={flagFor} setFlagFor={setFlagFor} flagReason={flagReason} setFlagReason={setFlagReason} internalNote={internalNote} setInternalNote={setInternalNote} onSubmit={submitFlag} />
       <PropertyArchiveModal archiveFor={archiveFor} setArchiveFor={setArchiveFor} archiveReason={archiveReason} setArchiveReason={setArchiveReason} internalNote={internalNote} setInternalNote={setInternalNote} onSubmit={submitArchive} />

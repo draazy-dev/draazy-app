@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import { expect } from '@playwright/test';
 import { ACTORS } from '../fixtures/live.js';
-import { API, authHeaders, uniqueMobile } from './liveAuth.js';
+import { API, authHeaders, grantIdentityBadge, uniqueMobile } from './liveAuth.js';
 import { approve, call, newListing, sql } from './monetisation.js';
 
 const requireFrontend = createRequire(new URL('../../frontend/package.json', import.meta.url));
@@ -80,6 +80,11 @@ export function ageAccount(mobile, hours) {
   sql(`update users set created_at = now() - interval '${Number(hours)} hours' where mobile = '${digits(mobile)}'`);
 }
 
+/** Stamps the KYC badge directly; the ID-and-selfie review is covered by the identity specs. */
+export function kycDone(...mobiles) {
+  sql(`update users set verified = true where mobile in (${mobiles.map((m) => `'${digits(m)}'`).join(', ')})`);
+}
+
 /** Fills the referrer's month with granted referrals, so the next qualification meets the cap. */
 export function fillCap(referrerMobile, count) {
   for (let i = 0; i < count; i += 1) {
@@ -117,10 +122,12 @@ export async function liveListing(ownerMobile, overrides = {}) {
   return listing;
 }
 
-/** The admin's ownership grant as the review panel makes it: bill, evidence, then the explicit grant. */
+/** The admin's ownership grant as the review panel makes it: owner ID, bill, evidence, then the explicit grant. */
 export async function verifyOwnership(ownerMobile, listing) {
   const admin = await authHeaders(ACTORS.admin);
   const issuedOn = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+  const me = await fetch(`${API}/auth/me`, { headers: await authHeaders(ownerMobile) });
+  if (!(await me.json()).verified) await grantIdentityBadge(ownerMobile);
 
   const pdf = await PDFDocument.create();
   pdf.addPage().drawText(`TEST DOCUMENT: Electricity Bill\nIssued: ${issuedOn}\nR-101, Referral Court, Baner Road`);

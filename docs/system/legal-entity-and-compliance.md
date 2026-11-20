@@ -22,8 +22,7 @@ architected to **scale to millions with a clear future-funding path**.
 
 **Bottom line: incorporate a Private Limited Company.** It's the only structure that simultaneously
 gives you limited liability, **ESOP capability**, **angel/VC investability**, **DPIIT Startup
-recognition** (3-year tax holiday + abolished angel tax), and clean scalability. Every other
-structure fails on at least one dimension a fundable tech startup cannot compromise on.
+recognition** (3-year tax holiday + abolished angel tax), and clean scalability.
 
 **Two real-estate-specific flags most advisors miss:** (a) **MahaRERA real-estate-agent
 registration** likely applies to your brokerage/facilitation activity; (b) **DPDP Act** duties are
@@ -134,7 +133,7 @@ on MoA/AoA and authorized capital; keep authorized capital modest, e.g., ₹1–
 ### Tax
 - **Corporate tax options:** **25%** (turnover <= ₹400 Cr) under normal regime **with** exemptions, **or 22% (Sec 115BAA)** without exemptions (also removes MAT). **Strategy:** if DPIIT-recognised, stay in normal regime to use the **80-IAC 100% profit deduction for 3 of first 10 years**, then evaluate 115BAA.
 - **Angel tax:** **Abolished for all investors from FY 2024-25** (Finance Act 2024 scrapped Sec 56(2)(viib)) — major de-risking for future raises. DPIIT recognition still valuable for the tax holiday.
-- **GST:** Output **18%** on subscriptions, service fees and platform/brokerage fees; **claim input credit** on Razorpay fees, cloud (GCP/Cloudflare - note reverse-charge on some foreign SaaS), SMS/WhatsApp vendors. Watch **TDS you must deduct:** **194-H** (commission), **194-I/194-IB** (rent), **194-J** (professional fees).
+- **GST:** Output **18%** on subscriptions, service fees and platform/brokerage fees; **claim input credit** on Razorpay fees, cloud (DigitalOcean/Cloudflare - note reverse-charge on some foreign SaaS), SMS/WhatsApp vendors. Watch **TDS you must deduct:** **194-H** (commission), **194-I/194-IB** (rent), **194-J** (professional fees).
 - **Entity comparison:** Pvt Ltd's **22–25%** (with holiday -> effectively lower early) beats Partnership/LLP's flat **30% + surcharge/cess**; Sole Prop taxed at individual slabs (up to 30%) with unlimited liability. **Pvt Ltd wins on rate and reliefs.**
 
 ### Funding readiness
@@ -207,18 +206,16 @@ company name and brand don't diverge.
 ## 10. Final Recommendation
 
 **Incorporate Draazy as a Private Limited Company now**, and immediately layer on **DPIIT
-recognition + Udyam** (free, high-value) and the **"Draazy" trademark**. This structure is the
-**only** one that keeps every future door open — angel/VC funding, ESOPs for early hires, limited
-liability against your data/consumer risk, and the 80-IAC tax holiday — while your **fee-only,
-seam-based architecture already sidesteps the heaviest regulatory burden (RBI payment-aggregator
-licensing).**
+recognition + Udyam** (free, high-value) and the **"Draazy" trademark**. This is the **only**
+structure that keeps every future door open — angel/VC funding, ESOPs, limited liability against your
+data/consumer risk, and the 80-IAC tax holiday — while your **fee-only, seam-based architecture
+already sidesteps the heaviest regulatory burden (RBI payment-aggregator licensing).**
 
-The **two sector-specific items to action deliberately** — because they're where real-estate
-startups get caught — are **MahaRERA agent registration** (scope it before monetizing brokerage) and
-**DPDP compliance** (elevated because identity verification is in-house). The number itself is
-already handled exactly right: hashed, never stored. The two open items are the identifying fields
-the row *does* keep indefinitely — name, DOB and `person_key` — and the images on a case nobody ever
-decided, which no sweep collects. See §D.
+The **two sector-specific items to action deliberately** are **MahaRERA agent registration** (scope it
+before monetizing brokerage) and **DPDP compliance** (elevated because identity verification is
+in-house). The document number is already handled exactly right: hashed, never stored. The two open
+items are the identifying fields the row *does* keep indefinitely — name, DOB and `person_key` — and
+the images on a case nobody ever decided, which no sweep collects. See §D.
 
 **Scenario notes / assumptions made:**
 - *If solo founder:* still **Pvt Ltd** (not OPC) if you'll ever raise or grant ESOPs.
@@ -229,14 +226,12 @@ decided, which no sweep collects. See §D.
 
 ## 11. DPDP erasure — what is deleted, what is retained, and on whose authority
 
-*Home of the reasoning behind `identity.user.erasure.ErasureRetention`. That class holds no behaviour
-worth speaking of; it exists because the hard part of a right-to-erasure implementation is not the
-`UPDATE` statements but the decision about which data a statute forbids you to erase, and that decision
-is invisible in the code that acts on it. A reader can reconstruct **what** `ErasureService` does by
-reading it. They cannot reconstruct **why** a rent agreement survives an erasure request and a KYC
-record does not, and getting that wrong in either direction is a legal failure: erase too much and the
-platform destroys evidence it is required to hold; erase too little and it has not honoured a statutory
-right.*
+*Home of the reasoning behind `identity.user.erasure.ErasureRetention`, which holds no behaviour worth
+speaking of. The hard part of right-to-erasure is the decision about which data a statute forbids you
+to erase, and that is invisible in the code that acts on it: a reader can reconstruct **what**
+`ErasureService` does, not **why** a rent agreement survives an erasure request and a KYC record does
+not. Getting it wrong either way is a legal failure: erase too much and the platform destroys
+evidence it must hold; erase too little and it has not honoured a statutory right.*
 
 ### The governing rule
 
@@ -246,119 +241,107 @@ Digital Personal Data Protection Act 2023 (India):
 - **s.8(7)** — the Data Fiduciary *shall* erase on withdrawal of consent or once the purpose is served,
   *"unless retention is necessary for compliance with any law for the time being in force"*.
 
-So the question for every category is not "is this personal?" — most of it is — but "does another
-statute require us to keep being able to identify this person in this record?" Where the answer is yes,
-retention is not a concession the platform grants itself; it is a competing legal duty, and the record
-says which one.
+So the question per category is not "is this personal?" but "does another statute require us to keep
+being able to identify this person in this record?" Where yes, retention is a competing legal duty,
+and the record says which one.
 
 ### Two further principles that decided the harder cases
 
 1. **A record with two subjects has two sets of rights.** A rent agreement, a closed deal and a review
-   are each a statement involving somebody who is not the person asking to be erased. One party's
-   erasure right does not reach into the other party's evidence of a transaction they were also part
-   of. This is why a rent agreement is retained even though it names the erasing subject — the
-   counterparty's ability to prove the tenancy is not the subject's to extinguish.
+   each involve somebody who is not the person asking to be erased. One party's erasure right does not
+   reach into the other party's evidence of a transaction they were also part of — the counterparty's
+   ability to prove the tenancy is not the subject's to extinguish.
 2. **Pseudonymisation of the identity root de-identifies the graph.** Fifty-five tables carry a
-   `user_id` foreign key into `users`. Almost none holds contact data of its own — they hold a
-   reference. Once the `users` row no longer names a person, those references point at nobody, which is
-   what "irreversibly pseudonymised" means in practice. That is why erasure is a small, explicit sweep
-   of the tables that duplicate identity rather than a cascade over everything mentioning the id. A
-   cascade would delete the retained categories and could not be undone.
+   `user_id` foreign key into `users`, almost none holding contact data of its own. Once the `users`
+   row no longer names a person, those references point at nobody ("irreversibly pseudonymised"). So
+   erasure is a small, explicit sweep of the tables that duplicate identity, not a cascade — a cascade
+   would delete the retained categories irreversibly.
 
 ### Why the reasons are stored, not only coded
 
-`ErasureRetention.retainedWithReasons()` is written into `erasure_requests.retained` at execution, so a
-request decided today still carries the reasoning it was decided under after that class has been edited.
-A retention record whose justification is "whatever the current code says" is not a record of a
-decision. The map is ordered so the stored document reads the same way every time and a diff between two
+`ErasureRetention.retainedWithReasons()` is written into `erasure_requests.retained` at execution, so
+a request decided today still carries the reasoning it was decided under after that class is edited.
+The map is ordered so the stored document reads the same way every time and a diff between two
 requests is a real diff. The per-category statutory citations live in that method's strings — they are
-the disclosure itself, not commentary on it.
+the disclosure itself.
 
 ### Known gaps are disclosed, not hidden
 
 `ErasureRetention.knownGaps()` lists personal data this sweep does not reach, and is written into the
-stored request beside the retained categories: an erasure that quietly misses a table is worse than one
-that says it missed it, because the subject is told they were erased and the data is still there. Each
+stored request beside the retained categories: an erasure that quietly misses a table is worse than
+one that says it missed it, because the subject is told they were erased while the data remains. Each
 entry is a place where the platform duplicates identity outside the `users` row, so pseudonymising the
-identity root does *not* de-identify it. They are gaps rather than retentions — no statute requires any
-of them and each should be swept — and they are listed rather than swept because each needs its exact
-columns confirmed against the schema first, and a sweep that names a column wrongly fails at runtime on
-the one operation that must not fail halfway. Most of the list was **not** found by reading the code: it
-is derived from the migrated schema by `ErasureCoverageTest`, which classifies every personal-data
-column in `information_schema` and fails the build on any that is neither swept nor listed. Until that
-test existed, eight tables carrying live contact details were disclosed to nobody. Anything added to
-that list has to be a real disclosure, because the subject reads it.
+root does *not* de-identify it. They are gaps, not retentions — no statute requires any of them and
+each should be swept — listed rather than swept because each needs its exact columns confirmed against
+the schema first (a sweep naming a column wrongly fails at runtime on the one operation that must not
+fail halfway). Most of the list was **not** found by reading the code: `ErasureCoverageTest` derives
+it from the migrated schema, classifying every personal-data column in `information_schema` and
+failing the build on any that is neither swept nor listed. Anything added to the list has to be a real
+disclosure, because the subject reads it.
 
 ### How `ErasureCoverageTest` decides what counts as personal data
 
 Nothing in the schema marks a column as personal, so the set is derived from column names, and the
 derivation is deliberately **conservative — it must over-match, never under-match**. A false positive
 (`cities.name`, `localities.lat`, `plans.contact_limit`) costs one line in the test's `RETAINED`
-map saying why it is not personal, written once, by someone who had to look. A false negative costs a
-column of live personal data that erasure silently misses and no test ever mentions again. So the
-vocabulary is matched as a bare substring: `name` matches `tenant_name`, `society_name` and
-`plans.name` alike, and every match must be classified whether or not it turns out to be
-personal. The only concession is a short list of tokens (`pan`, `gst`, `ip`, `age`, `lat`, `lng`,
-`dob`) matched on underscore boundaries instead, because `contains("ip")` matches `description`,
-`recipient` and `script` and would turn the classification maps into a transcription of the whole
-schema that nobody would read. The heuristic is a tripwire for *new* tables, not an inventory of the
-existing one: the test's `ERASED` map deliberately lists columns the vocabulary does not match
-(`tenant_profiles.prior_landlord`, `identity_verifications.identity_hash`) so the behavioural check
-covers the whole sweep rather than only the part a regex found.
+map saying why it is not personal; a false negative costs a column of live personal data that erasure
+silently misses. So the vocabulary is matched as a bare substring: `name` matches `tenant_name`,
+`society_name` and `plans.name` alike, and every match must be classified. The only concession is a
+short list of tokens (`pan`, `gst`, `ip`, `age`, `lat`, `lng`, `dob`) matched on underscore
+boundaries, because `contains("ip")` matches `description`, `recipient` and `script` and would turn
+the classification maps into a transcription of the whole schema. The heuristic is a tripwire for
+*new* tables, not an inventory of existing ones: the test's `ERASED` map deliberately lists columns
+the vocabulary does not match (`tenant_profiles.prior_landlord`,
+`identity_verifications.identity_hash`) so the behavioural check covers the whole sweep.
 
 ### The four ways a column stops carrying personal data
 
 `CLEARED` reads back null (or false for a NOT NULL boolean). `REPLACED` keeps a value that is no
-longer the subject's — `users.mobile` is NOT NULL, so substitution is
-the only option the schema leaves. `ROW_REMOVED` deletes the whole row. `DETACHED` keeps the row and
-nulls its link to the subject, and is separate from the other two for a reason in each direction:
-it cannot be `CLEARED` because the nulled column is also the only way to find the row, so a read-back
-would look up a key that no longer exists and report the fixture broken; and it must not be
-`ROW_REMOVED` because this classification is read by people auditing what the company still holds,
-and recording that page views were deleted when they were kept would be a false statement about
-retained data in a document whose whole purpose is that its statements are true. `DETACHED`
-therefore additionally proves the rows *survived* — the half `ROW_REMOVED` would have had backwards.
-`page_views.user_id` is the case: the view is already counted in a daily aggregate naming nobody, so
-deleting the row would falsify settled traffic history to erase an identity that nulling removes just
-as completely.
+longer the subject's — `users.mobile` is NOT NULL, so substitution is the only option the schema
+leaves. `ROW_REMOVED` deletes the whole row. `DETACHED` keeps the row and nulls its link to the
+subject. It cannot be `CLEARED` because the nulled column is also the only way to find the row, so a
+read-back would look up a key that no longer exists; and it must not be `ROW_REMOVED` because this
+classification is read by people auditing what the company still holds, and recording that page views
+were deleted when they were kept would be a false statement about retained data. `DETACHED`
+therefore additionally proves the rows *survived*. `page_views.user_id` is the case: the view is
+already counted in a daily aggregate naming nobody, so deleting the row would falsify settled traffic
+history to erase an identity that nulling removes just as completely.
 
 ### Decisions worth reading twice
 
-- **`tenant_rentals` goes whole.** `address` is NOT NULL so nulling is unavailable, but the real
-  reason is that the rest of the row — rent, lease window — describes one tenancy closely enough to
-  identify it, so half-erasing would leave the more revealing half behind. The table used to hold a
-  free-text `landlord_name` as well: a third party's data with no foreign key, so the named landlord
-  could never be found to erase it. V57 dropped the column rather than leave that gap (ledger 285).
+- **`tenant_rentals` goes whole.** `address` is NOT NULL so nulling is unavailable, and the rest of
+  the row — rent, lease window — describes one tenancy closely enough to identify it, so
+  half-erasing would leave the more revealing half behind. The table used to hold a free-text
+  `landlord_name`: a third party's data with no foreign key, so the named landlord could never be
+  found to erase it. V57 dropped the column (ledger 285).
 - **`managed_property_rent_receipts` runs the same asymmetry from the other side.** The party erasing
   is normally the landlord, and the claim destroyed would be the tenant's. The three retained columns
-  are not incidental to the document, they *are* the document: a receipt that does not say who paid
-  whom for which address proves nothing. `tenant_name` and `landlord_name` are again free text with
-  no foreign key, and are kept deliberately because the receipt needs them, so the limitation is
-  disclosed rather than silent.
-- **`outbound_message` goes whole** because the column that matched the vocabulary is not the hard
-  one: `body` holds the rendered message, and a row with a nulled mobile and an intact "Hi Ramesh,
-  about your flat in Kothrud" is not erased in any sense a subject would accept.
+  *are* the document: a receipt that does not say who paid whom for which address proves nothing.
+  `tenant_name` and `landlord_name` are free text with no foreign key, and are kept deliberately, so
+  the limitation is disclosed rather than silent.
+- **`outbound_message` goes whole** because `body` holds the rendered message, and a row with a nulled
+  mobile and an intact "Hi Ramesh, about your flat in Kothrud" is not erased in any sense a subject
+  would accept.
 - **Society claims and residents are not swept: they no longer exist.** V94 emptied those tables when
   the society community features were retired, and the contract migration drops them.
-- **`identity_verifications.identity_hash` is cleared** precisely because it is the part most easily
-  argued into staying: it is the irreversible "one document, one account" dedup key, and keeping it
-  would let the platform recognise the same human on their return — the exact capability erasure
-  removes.
+- **`identity_verifications.identity_hash` is cleared** because it is the part most easily argued into
+  staying: it is the irreversible "one document, one account" dedup key, and keeping it would let the
+  platform recognise the same human on their return — the exact capability erasure removes.
 - **`service_request_parties.mobile` is `ROW_REMOVED` because the schema leaves no third option.** A
   pending row carries the mobile *instead of* a user id under a CHECK that exactly one is set, so
   blanking it violates the constraint and filling in a user id would bind an agreement to the account
   being erased. Claimed rows hold no mobile at all and are out of scope by construction.
 - **`flatmate_groups.lat/lng` are retained** on the same footing as `societies.lat/lng`, with one
-  difference worth naming: a group is created by a member, so the question is real rather than
-  rhetorical. The group outlives the member — erasing one person should not move a flat off the map
-  for everyone still living in it, and the group row de-identifies with the `users` row anyway.
+  difference: a group is created by a member, so the question is real. The group outlives the member —
+  erasing one person should not move a flat off the map for everyone still living in it, and the group
+  row de-identifies with the `users` row anyway.
 
 
 ## 12. DPDP data export — the redaction rule for shared records
 
 `DataExportScope` is to `DataExportService` what `ErasureRetention` is to `ErasureService`: the
-decision, held apart from the SQL. It exists because the hard part of a right-to-access
-implementation is not the `SELECT` statements — it is deciding which rows are the subject's to see.
+decision, held apart from the SQL. The hard part of right-to-access is deciding which rows are the
+subject's to see.
 
 **Governing rule.** Digital Personal Data Protection Act 2023 (India), **s.11(1)** grants the Data
 Principal a summary of personal data processed about them, the processing activities, and every
@@ -369,82 +352,75 @@ Principal"*. The redaction rule below is that limit, applied uniformly.
 
 Every table below was taken from the erasure coverage map, not enumerated afresh.
 `ErasureCoverageTest` classifies every personal-data column as swept, retained, or a disclosed gap;
-those three maps together *are* the platform's inventory of personal data, and they are already
-proved against `information_schema`. `DataExportCoverageTest` fails the build if a table named in
+those three maps together *are* the platform's inventory of personal data, proved against
+`information_schema`. `DataExportCoverageTest` fails the build if a table named in
 `ErasureRetention.knownGaps()` is neither exported nor explicitly excluded in `DataExportScope`.
 
-The principle behind that coupling: if the platform is willing to destroy a table's rows on the
-subject's say-so, it cannot claim those rows are none of the subject's business. The erasure gaps
-matter *most* — that is where personal data survives an erasure request — so `saved_searches.mobile`,
-`flatmate_group_members.name`, `city_waitlist`, `deal_parties`,
-`personal_documents`, `flatmate_seeker_posts` and the referral tables all ship in the export.
+The principle: if the platform will destroy a table's rows on the subject's say-so, it cannot claim
+those rows are none of the subject's business. The erasure gaps matter *most* — that is where personal
+data survives an erasure request — so `saved_searches.mobile`, `flatmate_group_members.name`,
+`city_waitlist`, `deal_parties`, `personal_documents`, `flatmate_seeker_posts` and the referral tables
+all ship in the export.
 
 ### The redaction rule (applied uniformly to every shared record)
 
 1. **The record is the subject's.** That it happened, when, its status, its money, and the property
    it concerns are exported in full — as much the subject's history as the counterparty's.
 2. **The subject's own contribution is exported in full**, including free text in which they named
-   somebody else (`tenant_profiles.prior_landlord`, `managed_properties.tenant_name`). They typed it,
+   somebody else (`tenant_profiles.prior_landlord`, `managed_properties.tenant_name`/`tenant_mobile`). They typed it,
    they can already read it in the product, and returning it discloses nothing new.
 3. **The counterparty is reduced to `partyRef`** (see `DataExportRedaction`). Stable across this
    subject's exports; meaningless outside them because the digest is salted with the subject's own id.
 4. **The counterparty's own contribution is exported only where the product already shows it to the
    subject** — a message in their chat thread, an enquiry note they received, the name on a referral
-   they made. Hiding these would leave a worse record of the correspondence than the inbox it came
-   from.
+   they made. Hiding these would leave a worse record than the inbox it came from.
 5. **The counterparty's contact details, government identifiers, documents, KYC and verification
    state are never exported, in any dataset, under any framing.** This is why `deals.counterparty_mobile`
    appears only when the subject *is* the counterparty, and why `rent_agreements` is two datasets.
 
-**Mechanical form of the rule (what the test actually checks).** No query in `DataExportScope`
-reads a second person's `users` row. `users` appears exactly once in the whole scope, in the
-`account` dataset, keyed on `id = :subjectId`. Every other reference to another person routes
-through `party_ref_src` or is omitted from the select list. Stating the rule as "no second-person
-`users` join" makes it checkable by reading SQL rather than by trusting a paragraph.
+**Mechanical form of the rule (what the test checks).** No query in `DataExportScope` reads a second
+person's `users` row. `users` appears exactly once in the whole scope, in the `account` dataset, keyed
+on `id = :subjectId`. Every other reference to another person routes through `party_ref_src` or is
+omitted from the select list — checkable by reading SQL rather than trusting a paragraph.
 
 ### The staff rule
 
 Free text a staff member wrote about the subject is not exported, and the staff member is never
 named. Covers `users.flag_reason`, `properties.flag_reason` and `archive_reason`, `internal_notes`,
 `ticket_notes`, `property_reviews`, and the `decided_by` / `recorded_by` / `assignee_id` /
-`handled_by` columns. The load-bearing reason: a moderator's assessment is a statement by an
-identifiable employee, and a fraud investigation that hands its subject the investigator's notes is
-not an investigation. The sole deliberate exception is `erasure_requests.decision_note`, which
-`GET /me/erasure` already returns to the subject.
+`handled_by` columns. A moderator's assessment is a statement by an identifiable employee, and a
+fraud investigation that hands its subject the investigator's notes is not an investigation. The sole
+deliberate exception is `erasure_requests.decision_note`, which `GET /me/erasure` already returns to
+the subject.
 
 ### Named columns, not `SELECT *`
 
-Every query names its columns. A named-column `SELECT` is the form in which a reviewer can see
-exactly what leaves the building, and it is the only form under which a migration adding a column
-cannot silently start exporting it. `select *` on `deals` would have begun disclosing
+Every query names its columns: a reviewer can see exactly what leaves the building, and a migration
+adding a column cannot silently start exporting it. `select *` on `deals` would have begun disclosing
 `counterparty_mobile` to landlords the day V11 shipped, with no diff anywhere to notice.
 
 ### Decisions worth reading twice (export)
 
-- **`PARTY_REF_SOURCE` alias, not per-column.** Hashing is a property of the alias rather than the
-  column, so a wrong guess about `offer_history.by` / `service_request_timeline.by` (both `text`,
-  schema does not say if they hold a user id, a staff email or a display name) costs an unhelpfully
-  opaque field rather than a disclosure.
+- **`PARTY_REF_SOURCE` alias, not per-column.** Hashing is a property of the alias, so a wrong guess
+  about `offer_history.by` / `service_request_timeline.by` (both `text`; schema does not say if they
+  hold a user id, a staff email or a display name) costs an opaque field rather than a disclosure.
 - **`property_reviews.target_id` is polymorphic.** For most reviews it is a property/locality/society
-  id; for `target_type = 'owner'` it is a *person's* id. Selecting it raw would have handed back the
-  reviewed person's primary key — the identifier the whole redaction rule exists to keep out —
-  through a column whose name gives no hint. So it is split: personal case routes through
-  `party_ref_src`; impersonal keeps the real id. Discriminator is `'owner'` (V7 CHECK), not
-  `'user'` — the neighbouring `reports` table uses `'user'` for the same concept, and a wrong value
-  compiles, runs, returns rows, and redacts nothing (a `CASE` whose condition is never true just
-  passes the id through).
-- **`reports_written` is redacted even though the subject knows who they reported.** Uniformity is
-  the point: the moment redaction has an "unless they already know" branch, every future dataset
-  has to be argued individually, and one argument will eventually be wrong. Also, "already knows
-  the person" is not the same as "should be handed their primary key in a file" — the id is a
-  durable global identifier the product never shows, and it is exactly what would let two exports
-  be joined.
+  id; for `target_type = 'owner'` it is a *person's* id. Selecting it raw would have returned the
+  reviewed person's primary key — the identifier the redaction rule exists to keep out — through a
+  column whose name gives no hint. So the personal case routes through `party_ref_src`; the impersonal
+  keeps the real id. The discriminator is `'owner'` (V7 CHECK), not `'user'` — the neighbouring
+  `reports` table uses `'user'` for the same concept, and a wrong value compiles, runs, returns rows,
+  and redacts nothing (a `CASE` whose condition is never true just passes the id through).
+- **`reports_written` is redacted even though the subject knows who they reported.** Uniformity is the
+  point: once redaction has an "unless they already know" branch, every future dataset has to be
+  argued individually, and one argument will be wrong. Also, "already knows the person" is not
+  "should be handed their primary key in a file" — the id is a durable global identifier the product
+  never shows, and exactly what would let two exports be joined.
 - **Withheld list is serialised into every response.** Same reasoning as `ErasureRetention.knownGaps()`:
-  a document that quietly omits a category is worse than one that names it. The subject can then ask
+  a document that quietly omits a category is worse than one that names it, and the subject can ask
   about it specifically. `reports` about the subject and `service_request_identities` are excluded
   because no redaction is safe. `audit_log` is excluded because it is a record of what staff did,
   indexed by the subject rather than about them.
 - **The redaction rule ships in the response payload**, not only in API docs. Two datasets return a
-  record with the other side removed, and a reader who does not know that is entitled to conclude
-  the platform holds nothing more. Putting the statement in the payload means it travels with the
-  data.
+  record with the other side removed, and a reader who does not know that is entitled to conclude the
+  platform holds nothing more; in the payload the statement travels with the data.

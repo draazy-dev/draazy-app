@@ -3,7 +3,7 @@
 import { test, expect } from '@playwright/test';
 import { PDFDocument } from '../../frontend/node_modules/pdf-lib/cjs/index.js';
 import { trackErrors } from '../helpers/console.js';
-import { signedInAs, authHeaders, API } from '../helpers/liveAuth.js';
+import { signedInAs, authHeaders, apiLogin, uniqueMobile, API, shownMobile } from '../helpers/liveAuth.js';
 import { pickPlaceholderLocality } from '../helpers/locality.js';
 import { ensureLocalityStats } from '../helpers/localityStats.js';
 
@@ -111,23 +111,215 @@ test.describe('LIVE: managed properties against the real API', () => {
     await expect(page.getByText('live-sale-deed.pdf')).toHaveCount(0);
   });
 
-  test('rent tracking writes through PATCH, and the dashboard reads it back', async ({ page }) => {
+  test('rent tracking validates, writes through PATCH, edits, and stops', async ({ page }) => {
     await signedInAs(page, OWNER.mobile);
     const id = await estimateAndSave(page);
-
-    const patched = page.waitForResponse(
+    const card = page.locator('.glass-card', { has: page.getByRole('heading', { name: 'Rent tracking' }) });
+    const read = async () =>
+      (await fetch(`${API}/me/managed-properties/${id}`, { headers: await authHeaders(OWNER.mobile) })).json();
+    const patchOf = () => page.waitForResponse(
       (r) => new URL(r.url()).pathname === `/api/me/managed-properties/${id}`
         && r.request().method() === 'PATCH',
       { timeout: 20000 },
     );
-    await page.getByPlaceholder('e.g. Rohit More').fill('Rahul Kulkarni');
-    await page.getByRole('button', { name: /Start tracking/i }).click();
-    expect((await patched).status()).toBe(200);
 
-    // Untouched valuation catches a partial PATCH that accidentally blanks the rest of the record.
-    const rec = await (await fetch(`${API}/me/managed-properties/${id}`, { headers: await authHeaders(OWNER.mobile) })).json();
-    expect(rec.rented).toBe(true);
-    expect(rec.tenantName).toBe('Rahul Kulkarni');
-    expect(rec.valuation).toBeTruthy();
+    await test.step('an empty or wrong form is refused before any request', async () => {
+      let patches = 0;
+      page.on('request', (r) => { if (r.method() === 'PATCH') patches += 1; });
+      await card.getByRole('button', { name: /Start tracking/i }).click();
+      await expect(card.getByText("Enter the tenant's full name, letters only.")).toBeVisible();
+      await expect(card.getByText("Enter the tenant's 10-digit mobile number.")).toBeVisible();
+      await card.getByLabel('Tenant mobile').fill(OWNER.mobile);
+      await card.getByLabel('Tenant mobile').blur();
+      await expect(card.getByText("That's your own number. Enter the tenant's.")).toBeVisible();
+      await card.getByLabel('Monthly rent').fill('');
+      await card.getByLabel('Monthly rent').blur();
+      await expect(card.getByText('Enter the monthly rent.')).toBeVisible();
+      expect(patches).toBe(0);
+    });
+
+    await test.step('a valid tenant starts tracking, number normalised', async () => {
+      await card.getByPlaceholder('e.g. Rohit More').fill('Rahul Kulkarni');
+      await card.getByLabel('Tenant mobile').fill('+91 91234 56780');
+      await expect(card.getByLabel('Tenant mobile')).toHaveValue(shownMobile('9123456780'));
+      await card.getByLabel('Monthly rent').fill('27500');
+      await expect(card.getByLabel('Monthly rent')).toHaveValue('27,500');
+      const patched = patchOf();
+      await card.getByRole('button', { name: /Start tracking/i }).click();
+      expect((await patched).status()).toBe(200);
+      await expect(card.getByText('+91 91234 56780')).toBeVisible();
+      await expect(card.getByRole('link', { name: 'Invite tenant on WhatsApp' }))
+        .toHaveAttribute('href', /^https:\/\/wa\.me\/919123456780\?text=.*dashboard%23rental/);
+
+      // Untouched valuation catches a partial PATCH that accidentally blanks the rest of the record.
+      const rec = await read();
+      expect(rec).toMatchObject({ rented: true, tenantName: 'Rahul Kulkarni', tenantMobile: '9123456780', monthlyRent: 27500 });
+      expect(rec.valuation).toBeTruthy();
+    });
+
+    await test.step('edit saves the change', async () => {
+      await card.getByRole('button', { name: 'Edit' }).click();
+      await card.getByPlaceholder('e.g. Rohit More').fill('Rahul S Kulkarni');
+      const patched = patchOf();
+      await card.getByRole('button', { name: 'Save changes' }).click();
+      expect((await patched).status()).toBe(200);
+      await expect(card.getByText(/Rahul S Kulkarni/)).toBeVisible();
+      expect((await read()).tenantName).toBe('Rahul S Kulkarni');
+    });
+
+    await test.step('stop tracking clears the tenant after a confirm', async () => {
+      await card.getByRole('button', { name: 'Edit' }).click();
+      await card.getByRole('button', { name: 'Stop tracking' }).click();
+      await expect(card.getByRole('alert')).toContainText('Past receipts stay');
+      const stopped = page.waitForResponse(
+        (r) => new URL(r.url()).pathname === `/api/me/managed-properties/${id}/rent-tracking`
+          && r.request().method() === 'DELETE',
+        { timeout: 20000 },
+      );
+      await card.getByRole('button', { name: 'Yes, stop' }).click();
+      expect((await stopped).status()).toBe(200);
+      await expect(card.getByRole('button', { name: /Start tracking/i })).toBeVisible();
+      await expect(card.getByPlaceholder('e.g. Rohit More')).toHaveValue('');
+      const rec = await read();
+      expect(rec.rented).toBe(false);
+      expect(rec.tenantName ?? null).toBeNull();
+      expect(rec.tenantMobile ?? null).toBeNull();
+    });
+  });
+
+  test('a tenant who signs up after being named sees the tracked rent and downloads their receipt', async ({ page }) => {
+    const owner = await authHeaders(OWNER.mobile);
+    const tenantMobile = uniqueMobile();
+    const res = await fetch(`${API}/me/managed-properties`, {
+      method: 'POST',
+      headers: owner,
+      body: JSON.stringify({
+        title: '2 BHK in Baner (tracked)', deal: 'rent', propertyType: 'Flat', price: 21500, locality: 'Baner',
+        rented: true, tenantName: 'Neha Joshi', tenantMobile, monthlyRent: 21500, dueDay: 5,
+      }),
+    });
+    expect(res.status).toBe(201);
+    const { id } = await res.json();
+    created.push(id);
+    const month = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit' })
+      .format(new Date()).slice(0, 7);
+    const receipt = await fetch(`${API}/me/managed-properties/${id}/rent-receipts`, {
+      method: 'POST', headers: owner, body: JSON.stringify({ rentMonth: month }),
+    });
+    expect(receipt.status).toBe(201);
+
+    const { accessToken } = await apiLogin(tenantMobile);
+    const me = await fetch(`${API}/auth/me`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ name: 'Neha Joshi' }),
+    });
+    expect(me.ok).toBe(true);
+    const user = await me.json();
+    await page.addInitScript((session) => {
+      localStorage.setItem('draazyTokens', JSON.stringify({ accessToken: session.accessToken }));
+      localStorage.setItem('draazyUser', JSON.stringify(session.user));
+    }, { accessToken, user });
+    await page.goto('/dashboard#rental');
+
+    const card = page.getByTestId('tracked-rent').filter({ hasText: '2 BHK in Baner (tracked)' });
+    await expect(card).toContainText('₹21,500/mo');
+    await expect(card).toContainText(/rent received by/);
+    const download = page.waitForEvent('download');
+    await card.getByRole('button', { name: /Download rent receipt/ }).click();
+    expect((await download).suggestedFilename()).toMatch(/\.pdf$/i);
+  });
+
+  test('the tenant says paid, the owner rejects then confirms, and the PAN reaches the FY receipts', async ({ page, browser }) => {
+    const owner = await authHeaders(OWNER.mobile);
+    const tenantMobile = uniqueMobile();
+    const res = await fetch(`${API}/me/managed-properties`, {
+      method: 'POST',
+      headers: owner,
+      body: JSON.stringify({
+        title: '2 BHK in Aundh (rent loop)', deal: 'rent', propertyType: 'Flat', price: 24000, locality: 'Aundh',
+        rented: true, tenantName: 'Kavya Rao', tenantMobile, monthlyRent: 24000, dueDay: 5,
+      }),
+    });
+    expect(res.status).toBe(201);
+    const { id } = await res.json();
+    created.push(id);
+    const read = async () => (await fetch(`${API}/me/managed-properties/${id}`, { headers: owner })).json();
+
+    const { accessToken } = await apiLogin(tenantMobile);
+    const named = await fetch(`${API}/auth/me`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ name: 'Kavya Rao' }),
+    });
+    expect(named.ok).toBe(true);
+    const tenantContext = await browser.newContext();
+    try {
+      const tenantPage = await tenantContext.newPage();
+      await tenantPage.addInitScript((session) => {
+        localStorage.setItem('draazyTokens', JSON.stringify({ accessToken: session.accessToken }));
+        localStorage.setItem('draazyUser', JSON.stringify(session.user));
+      }, { accessToken, user: await named.json() });
+      const tenantCard = tenantPage.getByTestId('tracked-rent').filter({ hasText: '2 BHK in Aundh (rent loop)' });
+      // A second goto to the same URL only changes the hash, so the card would keep its old state.
+      const openRental = () => (tenantPage.url().includes('/dashboard') ? tenantPage.reload() : tenantPage.goto('/dashboard#rental'));
+      const claim = async () => {
+        await openRental();
+        const posted = tenantPage.waitForResponse((r) => new URL(r.url()).pathname === `/api/me/tracked-rent/${id}/paid`);
+        await tenantCard.getByRole('button', { name: "I've paid" }).click();
+        expect((await posted).status()).toBe(200);
+        await expect(tenantCard.getByTestId('tracked-rent-status')).toContainText('waiting for');
+        await expect(tenantCard.getByRole('button', { name: "I've paid" })).toHaveCount(0);
+      };
+
+      await signedInAs(page, OWNER.mobile);
+      const ownerCard = page.locator('.glass-card', { has: page.getByRole('heading', { name: 'Rent tracking' }) });
+
+      await test.step('a rejected claim goes back to due for both sides', async () => {
+        await claim();
+        expect((await read()).rentClaims).toHaveLength(1);
+        await page.goto(`/owner-hub/property/${id}`);
+        await expect(ownerCard.getByTestId('rent-claim')).toContainText('Kavya Rao says');
+        const rejected = page.waitForResponse((r) => r.request().method() === 'DELETE'
+          && new URL(r.url()).pathname.startsWith(`/api/me/managed-properties/${id}/rent-claims/`));
+        await ownerCard.getByRole('button', { name: 'Not received' }).click();
+        expect((await rejected).status()).toBe(204);
+        await expect(ownerCard.getByTestId('rent-claim')).toHaveCount(0);
+        expect((await read()).rentClaims).toEqual([]);
+      });
+
+      await test.step('a second claim is confirmed into a receipt', async () => {
+        await claim();
+        await page.reload();
+        await ownerCard.getByRole('button', { name: 'Confirm received' }).click();
+        await expect(ownerCard.getByText('Received this month')).toBeVisible();
+      });
+
+      await test.step('the owner adds a PAN once rent crosses ₹1 lakh a year', async () => {
+        await expect(ownerCard.getByTestId('rent-pan-hint')).toBeVisible();
+        await ownerCard.getByRole('button', { name: 'Add PAN' }).click();
+        await ownerCard.getByTestId('rent-landlord-pan').fill('abcde12');
+        await ownerCard.getByTestId('rent-landlord-pan').blur();
+        await expect(ownerCard.getByText('Enter a valid PAN, like ABCDE1234F')).toBeVisible();
+        await ownerCard.getByTestId('rent-landlord-pan').fill('abcpe1234f');
+        const saved = page.waitForResponse((r) => r.request().method() === 'PATCH'
+          && new URL(r.url()).pathname === `/api/me/managed-properties/${id}`);
+        await ownerCard.getByRole('button', { name: 'Save changes' }).click();
+        expect((await saved).ok()).toBe(true);
+        await expect(ownerCard.getByTestId('rent-pan-hint')).toHaveCount(0);
+        expect((await read()).landlordPan).toBe('ABCPE1234F');
+      });
+
+      await test.step('the tenant downloads the financial-year bundle', async () => {
+        await openRental();
+        await expect(tenantCard.getByTestId('tracked-rent-status')).toContainText('rent received by');
+        await expect(tenantCard.getByTestId('tracked-rent-no-pan')).toHaveCount(0);
+        const download = tenantPage.waitForEvent('download');
+        await tenantCard.getByRole('button', { name: /Download all FY \d{4}-\d{2} rent receipts/ }).click();
+        expect((await download).suggestedFilename()).toMatch(/^Rent-Receipts-FY-\d{4}-\d{2}\.pdf$/);
+      });
+    } finally {
+      await tenantContext.close();
+    }
   });
 });

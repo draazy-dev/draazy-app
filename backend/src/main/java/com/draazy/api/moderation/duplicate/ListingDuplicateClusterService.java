@@ -10,10 +10,15 @@ import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
+import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ForbiddenException;
+import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.ContactVisibility;
+import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.security.AuthPrincipal;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -23,20 +28,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Derived on demand, never stored, because the signals change with live listing edits.
 @Service
 public class ListingDuplicateClusterService {
-
     private static final List<String> OCCUPYING = PropertyStatus.OCCUPYING_DUPLICATE_STATUSES;
 
-    // Generous because the real failure is splitting a duplicate pair across the boundary.
     static final int SCAN_CAP = 2000;
 
-    // Mirrors ListingDuplicateProbe.PHOTO_CANDIDATE_CAP so probe and desk agree.
     private static final int BAND_BUCKET_CAP = 200;
 
     private final PropertyRepository properties;
@@ -45,13 +48,16 @@ public class ListingDuplicateClusterService {
     private final ListingArchiveService archiveService;
     private final PropertyMapper propertyMapper;
     private final AuditService audit;
+    private final Notifier notifier;
 
     public ListingDuplicateClusterService(PropertyRepository properties,
             PropertyPhotoHashRepository photoHashes,
             ListingDuplicateDismissalRepository dismissals,
             ListingArchiveService archiveService,
             PropertyMapper propertyMapper,
-            AuditService audit) {
+            AuditService audit,
+            Notifier notifier) {
+        this.notifier = notifier;
         this.properties = properties;
         this.photoHashes = photoHashes;
         this.dismissals = dismissals;
@@ -62,8 +68,6 @@ public class ListingDuplicateClusterService {
 
     @Transactional(readOnly = true)
     public DuplicateClusterReport clusters() {
-
-        // One row past the ceiling distinguishes an exact page from a truncated scan.
         List<Property> scan = properties.findSignalCarrying(OCCUPYING, PageRequest.of(0, SCAN_CAP + 1));
         boolean truncated = scan.size() > SCAN_CAP;
         List<Property> candidates = truncated ? List.copyOf(scan.subList(0, SCAN_CAP)) : scan;
@@ -77,7 +81,6 @@ public class ListingDuplicateClusterService {
             components.union(link.a(), link.b());
         }
 
-        // Attribute after union so reasons key on the settled root, not a later child.
         Map<UUID, Set<String>> reasons = new HashMap<>();
         for (Link link : links) {
             reasons.computeIfAbsent(components.find(link.a()), k -> new TreeSet<>()).add(link.reason());
@@ -104,7 +107,7 @@ public class ListingDuplicateClusterService {
         Set<String> settled = found.isEmpty() ? Set.of()
                 : dismissals.findByClusterSignatureIn(found.stream().map(Candidate::signature).toList())
                         .stream().map(ListingDuplicateDismissal::getClusterSignature)
-                        .collect(java.util.stream.Collectors.toSet());
+                        .collect(Collectors.toSet());
 
         List<DuplicateCluster> clusters = found.stream()
                 .filter(c -> !settled.contains(c.signature()))
@@ -116,29 +119,43 @@ public class ListingDuplicateClusterService {
         return new DuplicateClusterReport(clusters, candidates.size(), truncated);
     }
 
-    // Archive through ListingArchiveService so a merge is reversible like other takedowns.
     @Transactional
     public void resolve(AuthPrincipal actor, String keepId, List<String> dropIds) {
         if (keepId == null || keepId.isBlank()) {
             throw new BadRequestException("Name the listing to keep");
         }
-        List<String> drops = dropIds == null ? List.of() : dropIds.stream()
-                .filter(id -> id != null && !id.isBlank())
-                .filter(id -> !id.equals(keepId))
-                .distinct()
+        UUID keep = parseIds(List.of(keepId)).get(0);
+        List<UUID> drops = parseIds(dropIds == null ? List.of() : dropIds).stream()
+                .filter(id -> !id.equals(keep))
                 .toList();
         if (drops.isEmpty()) {
             throw new BadRequestException("Name at least one listing to archive");
         }
-        for (String dropId : drops) {
-            archiveService.archive(actor, dropId, "Merged duplicate — kept " + keepId);
+        Map<UUID, Property> locked = new HashMap<>();
+        Stream.concat(Stream.of(keep), drops.stream()).sorted().forEach(id ->
+                properties.findForVerificationDecision(id).ifPresent(p -> locked.put(id, p)));
+        Property kept = locked.get(keep);
+        if (kept == null) {
+            throw NotFoundException.of("Listing to keep");
         }
-        audit.record(actor, "property.duplicate.merge", "property", keepId,
-                "archived", String.join(",", drops),
+        requireNoMaker(actor, locked.values());
+        if (kept.isArchived() || !OCCUPYING.contains(kept.getStatus())
+                || drops.stream().anyMatch(id -> locked.get(id) != null && locked.get(id).isArchived())) {
+            throw new ConflictException("stale_decision", "These listings changed while you were deciding");
+        }
+        for (UUID drop : drops) {
+            Property archived = archiveService.archive(actor, drop.toString(),
+                    ListingArchiveService.DUPLICATE_REASON + " — kept " + keep);
+            notifier.notify(archived.getOwner().getId(), "listing.archived_duplicate",
+                    "Your listing was archived",
+                    "\"" + archived.getTitle() + "\" was archived as a duplicate of another listing.",
+                    "/dashboard");
+        }
+        audit.record(actor, "property.duplicate.merge", "property", keep.toString(),
+                "archived", drops.stream().map(UUID::toString).collect(Collectors.joining(",")),
                 "count", drops.size());
     }
 
-    // Signature is derived from submitted ids, never accepted from the caller.
     @Transactional
     public void dismiss(AuthPrincipal actor, List<String> memberIds) {
         List<UUID> ids = parseIds(memberIds);
@@ -146,9 +163,8 @@ public class ListingDuplicateClusterService {
             throw new BadRequestException("A cluster is at least two listings");
         }
         String signature = DuplicateClusterSignature.of(ids);
+        requireNoMaker(actor, properties.findAllById(ids));
 
-        // Idempotent: a double-clicked button and two operators reaching the same verdict are the
-        // same fact, and the unique index would otherwise turn the second into a 500.
         if (dismissals.findByClusterSignature(signature).isPresent()) {
             return;
         }
@@ -163,7 +179,6 @@ public class ListingDuplicateClusterService {
     private DuplicateCluster render(Candidate c) {
         List<DuplicateCluster.Listing> listings = c.members().stream()
 
-                // Revealed so owner contact stays in the audited platform workflow.
                 .map(p -> new DuplicateCluster.Listing(p.getId().toString(), p.getSlug(), p.getTitle(),
                         p.getPrice(), p.getStatus(), propertyMapper.coverImage(p), p.getLocality(),
                         p.getPincode(), p.isVerified(), p.getCreatedAt(),
@@ -205,7 +220,6 @@ public class ListingDuplicateClusterService {
         return max.subtract(min).multiply(BigDecimal.TEN).compareTo(max) <= 0;
     }
 
-    // Bucketed rather than pairwise so the desk can scan the full candidate set.
     private void linkByDoorway(List<Property> candidates, List<Link> links) {
         Map<String, List<Property>> byMeter = new HashMap<>();
         Map<DoorwayKey, List<Property>> byAddress = new HashMap<>();
@@ -235,7 +249,6 @@ public class ListingDuplicateClusterService {
         }
     }
 
-    // Same two-step as the probe, applied symmetrically across all candidates.
     private void linkByPhotos(List<Property> candidates, List<Link> links) {
         List<UUID> ids = candidates.stream().map(Property::getId).toList();
         if (ids.isEmpty()) {
@@ -262,7 +275,6 @@ public class ListingDuplicateClusterService {
                         continue;
                     }
 
-                    // Same pair can share several bands; verify once to avoid duplicate edges.
                     if (!seen.add(pairKey(a, b))) {
                         continue;
                     }
@@ -279,6 +291,12 @@ public class ListingDuplicateClusterService {
         long x = a.getHash();
         long y = b.getHash();
         return x < y ? x * 31 + y : y * 31 + x;
+    }
+
+    private void requireNoMaker(AuthPrincipal actor, Collection<Property> members) {
+        if (members.stream().anyMatch(p -> p.isMadeBy(actor.userId()))) {
+            throw new ForbiddenException("You cannot decide a duplicate cluster that holds your own listing");
+        }
     }
 
     private List<UUID> parseIds(List<String> raw) {
@@ -299,24 +317,19 @@ public class ListingDuplicateClusterService {
         return List.copyOf(ids);
     }
 
-    /** A pair of listings and why they were linked. */
     private record Link(UUID a, UUID b, String reason) {
     }
 
-    /** A typed bucket key — see {@link #linkByDoorway} for why this is not a joined string. */
     private record DoorwayKey(String addressKey, String localitySlug) {
     }
 
     private record BandKey(int index, int value) {
     }
 
-    /** A cluster before rendering, so the dismissal filter can run on signatures alone. */
     private record Candidate(String signature, String reason, List<Property> members) {
     }
 
-    // Union-find with path compression. Union by nothing in particular — no rank, no size.
     private static final class DisjointSet {
-
         private final Map<UUID, UUID> parent = new HashMap<>();
 
         UUID find(UUID x) {

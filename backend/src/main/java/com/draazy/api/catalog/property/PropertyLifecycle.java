@@ -37,8 +37,7 @@ public class PropertyLifecycle {
                 && !permissions.granted(actor, BackOfficePermissions.PROPERTIES_VERIFY))) {
             throw new ForbiddenException("Property review permission is required");
         }
-        if (actor.userId().equals(property.getOwner().getId())
-                || actor.userId().toString().equals(property.getPostedByStaff())) {
+        if (property.isMadeBy(actor.userId())) {
             throw new ForbiddenException("You cannot approve or review your own listing");
         }
     }
@@ -50,8 +49,6 @@ public class PropertyLifecycle {
         }
     }
 
-    /** Every locality-keyed read skips a null slug, so a listing published without one is unreachable. Called
-     * by both approve routes before either writes, so a rollback cannot cost a reviewer their verdict. */
     public void requireFiled(Property property) {
         if (property.getLocalitySlug() == null || property.getLocalitySlug().isBlank()) {
             throw new ConflictException("This listing has no locality, so approving it would"
@@ -61,23 +58,19 @@ public class PropertyLifecycle {
         }
     }
 
-    public void publish(AuthPrincipal actor, Property property) {
-        publish(actor, property, false);
-    }
-
-    public void publishWithSecondApproval(AuthPrincipal actor, Property property) {
-        publish(actor, property, true);
-    }
-
-    private void publish(AuthPrincipal actor, Property property, boolean secondApprovalSatisfied) {
-        requireChecker(actor, property);
-        requireActive(property);
-        requireFiled(property);
+    public void requireOwnerConfirmed(Property property) {
         if (!PropertyStatus.APPROVED.equals(property.getStatus()) && property.awaitsOwnerConfirmation()) {
             throw new ConflictException("owner_not_confirmed",
                     "The owner has not confirmed this listing yet. Send the claim link and wait for them to confirm.");
         }
-        publicationGate.requirePublishable(actor, property, secondApprovalSatisfied);
+    }
+
+    public void publish(AuthPrincipal actor, Property property) {
+        requireChecker(actor, property);
+        requireActive(property);
+        requireFiled(property);
+        requireOwnerConfirmed(property);
+        publicationGate.requirePublishable(actor, property);
         boolean alreadyLive = PropertyStatus.APPROVED.equals(property.getStatus());
         boolean live = alreadyLive || liveGate.mayGoLive(property);
         property.setStatus(live ? PropertyStatus.APPROVED : PropertyStatus.PAUSED);
@@ -88,23 +81,55 @@ public class PropertyLifecycle {
         }
     }
 
-    // Deals listens so visits booked against a withdrawn listing are cancelled with it.
     public void announceArchived(Property property) {
         events.publishEvent(new PropertyArchived(property.getId()));
     }
 
-    /** Tells the owner their listing was approved, or that the free tier held it back. */
+    public void announceClosed(Property property) {
+        events.publishEvent(new PropertyClosed(property.getId()));
+    }
+
     public void announceApproval(Property property) {
         UUID ownerId = property.getOwner().getId();
         if (PropertyStatus.PAUSED.equals(property.getStatus())) {
             notifier.notify(ownerId, "listing.approved_paused", "Your listing is approved",
-                    "Approved — you're on the free tier (1 live listing). Buy a ₹" + settings.listingPass()
-                    + " listing pass or pause another listing to make it live.",
-                    "/dashboard");
+                    label(property) + " is approved. " + freeTierHold(property),
+                    reviewLink(property));
             return;
         }
         notifier.notify(ownerId, "listing.approved", "Your listing is approved",
-                "It is now live and visible to buyers.", "/property/" + property.getId());
+                label(property) + " is now live and visible to buyers.", "/property/" + property.getId());
+    }
+
+    public String approvalMessage(Property property) {
+        return PropertyStatus.PAUSED.equals(property.getStatus())
+                ? "\u2705 Your property has been verified and approved. " + freeTierHold(property)
+                : "\u2705 Your property has been verified and is now live.";
+    }
+
+    public void announceSubmitted(Property property) {
+        notifier.notify(property.getOwner().getId(), "listing.under_review", "Your listing is under review",
+                label(property) + " is with our team. We'll tell you as soon as it is reviewed.",
+                reviewLink(property));
+    }
+
+    public void announceReopened(Property property) {
+        notifier.notify(property.getOwner().getId(), "listing.reopened", "Your listing is back under review",
+                label(property) + " was reopened by our team and is being reviewed again.",
+                reviewLink(property));
+    }
+
+    public static String reviewLink(Property property) {
+        return "/messages?support=property:" + property.getId();
+    }
+
+    public static String label(Property property) {
+        return "\"" + property.getTitle() + "\" in " + property.getLocality();
+    }
+
+    private String freeTierHold(Property property) {
+        return "You're on the free tier (1 live listing). Buy a ₹" + settings.listingPass(property.getDeal())
+                + " listing pass or pause another listing to make it live.";
     }
 
     public void start(AuthPrincipal actor, Property property) {
@@ -133,16 +158,6 @@ public class PropertyLifecycle {
     }
 
     public void reenterPending(AuthPrincipal actor, Property property) {
-        if (PropertyStatus.REJECTED.equals(property.getStatus())) {
-            throw new ConflictException("second_approver_required",
-                    "A final rejection requires a second staff approver to reopen.");
-        }
-        reenterPendingAfterSecondApproval(actor, property);
-    }
-
-    public void reenterPendingAfterSecondApproval(AuthPrincipal actor, Property property) {
-            // The rejection told the owner to reply here to resubmit, and this is the only route out of
-            // REJECTED that needs no moderator. Owner-track only: "in_review" is not in the staff vocabulary.
         property.revertToPending();
         publishReentry(actor, property);
     }

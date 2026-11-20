@@ -4,9 +4,13 @@ import com.draazy.api.catalog.locality.LocalityBinding;
 import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyKind;
 import com.draazy.api.catalog.property.PropertyPossession;
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.society.Society;
 import com.draazy.api.catalog.society.SocietyRepository;
+import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
 import jakarta.validation.ConstraintViolation;
@@ -28,13 +32,16 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ListingEditRules {
+    private static final int MAX_CHANGE_TEXT = 300;
 
     private final LocalityBinding localities;
     private final SocietyRepository societies;
+    private final PropertyRepository properties;
 
-    public ListingEditRules(LocalityBinding localities, SocietyRepository societies) {
+    public ListingEditRules(LocalityBinding localities, SocietyRepository societies, PropertyRepository properties) {
         this.localities = localities;
         this.societies = societies;
+        this.properties = properties;
     }
 
     private static void clearStaleAddressParts(Property property, ListingUpdate update) {
@@ -59,7 +66,6 @@ public class ListingEditRules {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
     }
 
-    /** Did this PATCH relabel the commercial subtype? Absent formDetails is "unchanged", not "cleared". */
     private static boolean commercialTypeChanged(Property property, ListingUpdate update) {
         if (update.formDetails() == null) return false;
         Object incoming = update.formDetails().get("commercialType");
@@ -67,22 +73,18 @@ public class ListingEditRules {
                 ? null
                 : property.getFormDetails().get("commercialType");
 
-        /** Symmetric with the write, which replaces the map rather than merging: a PATCH that merely
-         * omits the key deletes an approved subtype, which is the same moderation event as relabelling. */
         return !Objects.equals(incoming, stored);
     }
 
-    /** Apply a PATCH body and report the re-review it earned; only non-null fields are applied.
-     * The two foundation blocks are kept first and contiguous — see the class Javadoc's rationale. */
     EditImpact apply(Property p, ListingUpdate in) {
         validateSanityPatch(p, in);
         boolean remoderationRequired = false;
         boolean recheckOnly = false;
         List<String> rechecked = new ArrayList<>();
+        List<Map<String, String>> changes = new ArrayList<>();
+        boolean carriesBhk = PropertyKind.carriesBhk(in.propertyType() == null ? p.getPropertyType() : in.propertyType());
 
-        // ── Foundation, OFF SEARCH: these change what the listing fundamentally *is*, so a stale
-        // index entry is a wrong answer rather than a late one. ───────────────────────────────
-        if (in.bhk() != null && !numericEquals(in.bhk(), p.getBhk())) {
+        if (in.bhk() != null && carriesBhk && !numericEquals(in.bhk(), p.getBhk())) {
             p.setBhk(in.bhk());
             remoderationRequired = true;
         }
@@ -95,8 +97,6 @@ public class ListingEditRules {
             remoderationRequired = true;
         }
 
-        // Same argument for zoning: an agricultural plot approved against a 7/12 extract must not be
-        // relabelled residential and go on answering a filter it was never checked for.
         if (Boolean.TRUE.equals(in.clearLandUse())) {
             if (p.getLandUse() != null) {
                 p.setLandUse(null);
@@ -115,9 +115,13 @@ public class ListingEditRules {
             remoderationRequired = true;
         }
         if (in.deal() != null && !in.deal().equals(p.getDeal())) {
+            // Packs and passes are priced per deal and read the listing's current deal, so a flip would reprice them.
+            if (p.getId() != null && properties.hasDealPricedActivity(p.getId())) {
+                throw new ConflictException(ErrorCodes.CONFLICT, "This listing already has seeker contacts or a "
+                        + "Listing Pass, so it can't switch between rent and sale. Archive it and post a new listing.");
+            }
             p.setDeal(in.deal());
 
-            // Rent and sale require different evidence; publication approval must not reuse the old verdict.
             p.revokeOwnershipVerification();
 
             p.setPriceUnit(DealIntent.priceUnitFor(in.deal()));
@@ -125,79 +129,74 @@ public class ListingEditRules {
         }
 
         if (in.price() != null && !in.price().equals(p.getPrice())) {
+            note(rechecked, changes, "price", p.getPrice(), in.price());
             p.setPrice(in.price());
             recheckOnly = true;
-            rechecked.add("price");
         }
         if (in.furnishing() != null && !in.furnishing().equals(p.getFurnishing())) {
+            note(rechecked, changes, "furnishing", p.getFurnishing(), in.furnishing());
             p.setFurnishing(in.furnishing());
             recheckOnly = true;
-            rechecked.add("furnishing");
         }
         if (in.possession() != null && !in.possession().equals(p.getPossession())) {
+            note(rechecked, changes, "possession", p.getPossession(), in.possession());
             p.setPossession(in.possession());
             recheckOnly = true;
-            rechecked.add("possession");
         }
 
-        // `address` is what AddressKey derives the duplicate signal from, so an edit to it is how a
-        // listing moves onto an address somebody else already holds. Re-check either way.
         if (in.address() != null && !in.address().equals(p.getAddress())) {
-
-            // A legacy/staff correction must not leave components that restore the old address.
+            note(rechecked, changes, "address", p.getAddress(), in.address());
             clearStaleAddressParts(p, in);
             p.setAddress(in.address());
             p.revokeOwnershipVerification();
             recheckOnly = true;
-            rechecked.add("address");
         }
         UUID wantedSociety = in.societyId() == null ? p.getSocietyId() : societyOf(in.societyId());
         if (in.societyId() != null && !Objects.equals(wantedSociety, p.getSocietyId())) {
+            note(rechecked, changes, "societyId", p.getSocietyId(), wantedSociety);
             stampSociety(p, wantedSociety, true);
             p.setSocietyId(wantedSociety);
             p.revokeOwnershipVerification();
             recheckOnly = true;
-            rechecked.add("societyId");
         }
         if (in.electricityMeterNo() != null && !Objects.equals(in.electricityMeterNo(), p.getElectricityMeterNo())) {
+            note(rechecked, changes, "electricityMeterNo", p.getElectricityMeterNo(), in.electricityMeterNo());
             p.setElectricityMeterNo(in.electricityMeterNo());
             p.revokeOwnershipVerification();
             recheckOnly = true;
-            rechecked.add("electricityMeterNo");
         }
         if (in.carpetArea() != null && materialCarpetAreaChange(p.getCarpetArea(), in.carpetArea())) {
+            note(rechecked, changes, "carpetArea", p.getCarpetArea(), in.carpetArea());
             recheckOnly = true;
-            rechecked.add("carpetArea");
         }
         if (locationMovedMoreThan500m(p, in)) {
+            note(rechecked, changes, "location", p.getLat() + "," + p.getLng(),
+                    (in.lat() == null ? p.getLat() : in.lat()) + "," + (in.lng() == null ? p.getLng() : in.lng()));
             recheckOnly = true;
-            rechecked.add("location");
         }
 
-        /** Photos, prose and amenities are the evidence a reviewer approved against, so swapping them re-sells
-         * that approval. Stays-live because it is the same flat, and going dark would cost a day per photo. */
         if (in.images() != null && !in.images().equals(p.getImages())) {
+            note(rechecked, changes, "images", p.getImages() == null ? 0 : p.getImages().size(), in.images().size());
             p.setImages(List.copyOf(in.images()));
             recheckOnly = true;
-            rechecked.add("images");
         }
         if (in.description() != null && !in.description().equals(p.getDescription())) {
+            note(rechecked, changes, "description", p.getDescription(), in.description());
             p.setDescription(in.description());
             recheckOnly = true;
-            rechecked.add("description");
         }
         if (in.amenities() != null && !in.amenities().equals(p.getAmenities())) {
+            note(rechecked, changes, "amenities", p.getAmenities(), in.amenities());
             p.setAmenities(List.copyOf(in.amenities()));
             recheckOnly = true;
-            rechecked.add("amenities");
         }
         if (in.reraId() != null && !in.reraId().equals(p.getReraId())) {
+            note(rechecked, changes, "reraId", p.getReraId(), in.reraId());
             recheckOnly = true;
-            rechecked.add("reraId");
         }
         if (plottedProjectChanged(p, in)) {
+            note(rechecked, changes, "plottedProject", plottedProjectOf(p), in.formDetails().get("plottedProject"));
             recheckOnly = true;
-            rechecked.add("plottedProject");
         }
 
         if (in.formDetails() != null) p.setFormDetails(Map.copyOf(in.formDetails()));
@@ -206,8 +205,6 @@ public class ListingEditRules {
         if (in.builtUpArea() != null) p.setBuiltUpArea(in.builtUpArea());
         if (in.superBuiltUpArea() != null) p.setSuperBuiltUpArea(in.superBuiltUpArea());
 
-        /** Non-foundation only because the membership rule holds: a PATCH carrying `floorPlan` alone has
-         * no `images` key, so without it an approved listing could render an unreviewed image. */
         if (in.floorPlan() != null) {
             String plan = in.floorPlan().isBlank() ? null : in.floorPlan();
             if (plan != null && (p.getImages() == null || !p.getImages().contains(plan))) {
@@ -218,13 +215,12 @@ public class ListingEditRules {
         if (in.video() != null) {
             String video = in.video().isBlank() ? null : in.video();
             if (!Objects.equals(video, p.getVideo())) {
+                note(rechecked, changes, "video", p.getVideo(), video);
                 recheckOnly = true;
-                rechecked.add("video");
             }
             p.setVideo(video);
         }
 
-        // Blank is how an owner withdraws a move-in claim.
         if (AvailableOn.isStated(in.availableOn(), in.availableFrom())) {
             p.setAvailableOn(AvailableOn.resolve(in.availableOn(), in.availableFrom(), true, p.getDeal()));
         }
@@ -272,8 +268,6 @@ public class ListingEditRules {
             p.setFloor(in.floor());
         }
 
-        // Plain non-foundation applies: correcting a bathroom count or a facing is not something the
-        // moderator approved, so it must not knock an approved listing back to pending.
         if (in.bathrooms() != null) {
             p.setBathrooms(in.bathrooms());
         }
@@ -303,8 +297,26 @@ public class ListingEditRules {
         }
 
         clearReadyToMoveSaleAvailableDate(p);
+        ListingShape.clearUnaskedAnswers(p);
 
-        return new EditImpact(remoderationRequired, recheckOnly && !remoderationRequired, rechecked);
+        return new EditImpact(remoderationRequired, recheckOnly && !remoderationRequired, rechecked, changes);
+    }
+
+    private static void note(List<String> rechecked, List<Map<String, String>> changes, String field,
+            Object before, Object after) {
+        rechecked.add(field);
+        changes.add(Map.of("field", field, "before", display(before), "after", display(after)));
+    }
+
+    private static String display(Object value) {
+        String text = value instanceof List<?> list
+                ? list.stream().map(String::valueOf).collect(Collectors.joining(", "))
+                : value == null ? "" : String.valueOf(value);
+        return text.length() > MAX_CHANGE_TEXT ? text.substring(0, MAX_CHANGE_TEXT) + "\u2026" : text;
+    }
+
+    private static Object plottedProjectOf(Property p) {
+        return p.getFormDetails() == null ? null : p.getFormDetails().get("plottedProject");
     }
 
     private void validateSanityPatch(Property p, ListingUpdate in) {
@@ -335,6 +347,23 @@ public class ListingEditRules {
         }
         if (in.deposit() != null && DealIntent.RENT.equals(deal) && price != null && in.deposit() > price * 24L) {
             violations.add(violation("deposit", "cannot exceed 24 months of rent"));
+        }
+        String areaUnit = in.areaUnit() == null ? p.getAreaUnit() : in.areaUnit();
+        if (in.price() != null || in.deal() != null) {
+            ListingShape.price(deal, price).forEach(problem -> violations.add(violation(problem.field(), problem.message())));
+        }
+        if (in.area() != null || in.areaUnit() != null) {
+            ListingShape.areaSize(in.area() == null ? p.getArea() : in.area(), areaUnit)
+                    .forEach(problem -> violations.add(violation(problem.field(), problem.message())));
+        }
+        if (in.areaUnit() != null || in.propertyType() != null) {
+            ListingShape.areaUnit(propertyType, areaUnit)
+                    .forEach(problem -> violations.add(violation(problem.field(), problem.message())));
+        }
+        if (in.landUse() != null || in.propertyType() != null) {
+            ListingShape.landUse(propertyType, Boolean.TRUE.equals(in.clearLandUse()) ? null
+                    : in.landUse() == null ? p.getLandUse() : in.landUse())
+                    .forEach(problem -> violations.add(violation(problem.field(), problem.message())));
         }
         if (isResidential(propertyType)) {
             if (in.carpetArea() != null || in.propertyType() != null) {
@@ -503,13 +532,10 @@ public class ListingEditRules {
         }
     }
 
-    /** The PATCH {@code societyId}: blank clears the binding, which is {@code null}. */
     private static UUID societyOf(String societyId) {
         return societyId.isBlank() ? null : UUID.fromString(societyId);
     }
 
-    /** A stale society id is a {@code 404}, not an FK {@code 409}; an archived society is refused only for a
-     * new binding. Stamps the slug and name formulas so the response carries them. */
     void stampSociety(Property p, UUID societyId, boolean newBinding) {
         if (societyId == null) {
             p.setSocietySlug(null);

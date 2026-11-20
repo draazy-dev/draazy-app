@@ -2,10 +2,6 @@ import { useNavigate } from 'react-router';
 import Icon from '../Icon.jsx';
 import { useCity } from '../../context/CityContext.jsx';
 
-/* Honest "launched but empty" state for a live city we don't have inventory for yet
-   (everything except Pune today). Shown instead of leaking Pune content when the active
-   city has no data. Keeps the platform's trust promise: never mislabel Pune homes as
-   belonging to another city. `context` tailors the headline (home hero vs. listings). */
 export default function NewCityEmptyState({ city, context = 'listings' }) {
   const navigate = useNavigate();
   const { setCity } = useCity();

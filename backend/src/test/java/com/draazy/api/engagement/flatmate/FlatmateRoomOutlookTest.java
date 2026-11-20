@@ -18,6 +18,7 @@ import com.draazy.api.support.AbstractApiTest;
 import com.draazy.api.support.UploadedPhotos;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,12 +31,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
 class FlatmateRoomOutlookTest extends AbstractApiTest {
-
     @Autowired UserRepository users;
         @Autowired PropertyRepository properties;
     @Autowired EntityManager em;
     private User host;
-    private String photo;
+    private String photos;
     private String ownerPropertyId;
 
     @BeforeEach
@@ -44,10 +44,12 @@ class FlatmateRoomOutlookTest extends AbstractApiTest {
         host.setName("Outlook Host");
         host.setMobileVerified(true);
         host = users.saveAndFlush(host);
-        photo = UploadedPhotos.of(host.getId());
+        photos = String.join("\",\"", UploadedPhotos.of(host.getId()), UploadedPhotos.of(host.getId()),
+                UploadedPhotos.of(host.getId()));
         Property flat = new Property(host, "Outlook parent flat", "rent", "apartment",
                 45000L, "Baner", "Pune");
         flat.setStatus(PropertyStatus.APPROVED);
+        flat.verifyOwnership(Instant.now(), null);
         ownerPropertyId = properties.saveAndFlush(flat).getId().toString();
     }
 
@@ -129,7 +131,8 @@ class FlatmateRoomOutlookTest extends AbstractApiTest {
         parent.setStatus(PropertyStatus.APPROVED);
         parent.setFacing("E");
         parent.setOverlooking("Garden");
-        parent = properties.saveAndFlush(parent);
+        parent.verifyOwnership(Instant.now(), null);
+        parent =  properties.saveAndFlush(parent);
 
         mvc.perform(post(Routes.Properties.SPLIT, parent.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
@@ -170,16 +173,15 @@ class FlatmateRoomOutlookTest extends AbstractApiTest {
 
     private String body(String fields) {
         return """
-                {"bhk":"2","roomType":"Private room","locality":"Baner",
-                 "society":"Outlook House","rentShare":15000,"hostRole":"owner",
+                {"bhk":"2","roomType":"Private room","attachedBath":"attached","locality":"Baner",
+                 "society":"Outlook House","rentShare":15000,"deposit":30000,"hostRole":"owner",
                  "propertyId":"%s",
-                 "photos":["%s"]%s}
-                """.formatted(ownerPropertyId, photo, fields.isEmpty() ? "" : "," + fields);
+                 "photos":["%s"]%s,%s,%s}
+                """.formatted(ownerPropertyId, photos, fields.isEmpty() ? "" : "," + fields,
+                FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS);
     }
 
     private void assertStoredAndReadable(String id, String facing, String overlooking) throws Exception {
-
-        // Evict the shared test persistence context so a cached entity cannot stand in for a write.
         em.flush();
         em.clear();
         var stored = jdbc.queryForMap("select facing, overlooking from flatmate_rooms where id = ?",

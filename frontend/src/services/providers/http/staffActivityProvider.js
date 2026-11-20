@@ -1,8 +1,5 @@
-// `action` is the dotted verb (`user.suspend`), never a service category — those are not audit
-// actions, so a filter offering them returns nothing.
 import { get, unwrapPage } from '../../http.js';
 
-// An empty string is a filter on the server — `entity=''` asks for rows whose entity is empty.
 const query = ({ actor, entity, action, from, to, q } = {}) => {
   const params = {};
   if (actor) params.actor = actor;
@@ -40,7 +37,6 @@ export async function getTeamPerformance(days = 7) {
   return performancePage(await get('/admin/team-performance', { days }), days);
 }
 
-// Same shape as team performance, narrowed server-side to the caller and their functions' queues.
 export async function getMyWork(days = 7) {
   return performancePage(await get('/admin/my-work', { days }), days);
 }

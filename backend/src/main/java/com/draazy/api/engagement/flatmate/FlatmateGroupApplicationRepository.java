@@ -1,7 +1,9 @@
 package com.draazy.api.engagement.flatmate;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,24 +14,22 @@ import org.springframework.data.repository.query.Param;
 
 public interface FlatmateGroupApplicationRepository
         extends JpaRepository<FlatmateGroupApplication, UUID> {
-
-    /** Uses the unfiltered created-at index so the admin board does not sort the full table. */
     Page<FlatmateGroupApplication> findByOrderByCreatedAtDesc(Pageable pageable);
 
     Page<FlatmateGroupApplication> findByModStatusIn(Collection<String> modStatuses, Pageable pageable);
 
     long countByModStatusIn(Collection<String> modStatuses);
 
-    List<FlatmateGroupApplication> findByListingIdOrderByCreatedAtDesc(UUID listingId);
+    boolean existsByIdAndModStatusIn(UUID id, Collection<String> modStatuses);
 
-    /** {@code modStatus} hides removed spam while leaving owner-facing status pending. */
+    @Query("select a.listingId from FlatmateGroupApplication a where a.id = :id")
+    Optional<UUID> findListingId(@Param("id") UUID id);
+
     Page<FlatmateGroupApplication> findByListingIdInAndModStatusInOrderByCreatedAtDesc(
             Collection<UUID> listingIds, Collection<String> modStatuses, Pageable pageable);
 
-    /** Check first so duplicate applications return the contract's 409 sentence. */
-    boolean existsByListingIdAndGroupId(UUID listingId, UUID groupId);
+    Optional<FlatmateGroupApplication> findByListingIdAndGroupId(UUID listingId, UUID groupId);
 
-    /** Callers pass the public moderation states: a removed application does not hold the flat. */
     boolean existsByListingIdAndStatusAndModStatusIn(UUID listingId, String status,
             Collection<String> modStatuses);
 
@@ -37,6 +37,26 @@ public interface FlatmateGroupApplicationRepository
             Collection<String> modStatuses, UUID id);
 
     List<FlatmateGroupApplication> findByListingIdAndStatus(UUID listingId, String status);
+
+    @Query("""
+            select a from FlatmateGroupApplication a
+            where a.applicantId = :applicantId and a.modStatus in :modStatuses
+              and (a.status = 'pending' or a.updatedAt >= :since)""")
+    List<FlatmateGroupApplication> findSentSince(@Param("applicantId") UUID applicantId,
+            @Param("modStatuses") Collection<String> modStatuses, @Param("since") Instant since);
+
+    @Query("""
+            select a from FlatmateGroupApplication a
+            where a.listingId in :listingIds and a.modStatus in :modStatuses
+              and (a.status = 'pending' or a.updatedAt >= :since)""")
+    List<FlatmateGroupApplication> findReceivedSince(@Param("listingIds") Collection<UUID> listingIds,
+            @Param("modStatuses") Collection<String> modStatuses, @Param("since") Instant since);
+
+    Optional<FlatmateGroupApplication> findByIdAndApplicantId(UUID id, UUID applicantId);
+
+    @Modifying
+    @Query("delete from FlatmateGroupApplication a where a.applicantId = :userId and a.status = 'pending'")
+    int deletePendingByApplicant(@Param("userId") UUID userId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
@@ -50,4 +70,8 @@ public interface FlatmateGroupApplicationRepository
                                 @Param("pending") String pending,
                                 @Param("status") String status,
                                 @Param("decidedAt") java.time.Instant decidedAt);
+
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update flatmate_group_applications set created_at = now() where id = :id", nativeQuery = true)
+    void restartClock(@Param("id") UUID id);
 }

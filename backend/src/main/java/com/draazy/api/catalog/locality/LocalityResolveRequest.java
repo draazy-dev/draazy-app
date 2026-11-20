@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
-/** What the client says the picked Google place is; only the dev lookup trusts it, a real one re-reads Google. */
 public record LocalityResolveRequest(
         @NotBlank @Size(max = 300) @Pattern(regexp = "^[A-Za-z0-9_-]+$") String placeId,
         @NotBlank @Size(max = 160) String name,

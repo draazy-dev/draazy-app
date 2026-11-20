@@ -24,13 +24,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Duplicate signals change independently from listing writes, so they own their service and columns. */
 @Service
 public class ListingDuplicateProbe {
-
     private static final List<String> OCCUPYING = PropertyStatus.OCCUPYING_DUPLICATE_STATUSES;
 
-    /** Photo band hits are candidates, not findings; two chance collisions must not hide the real one. */
     private static final int PHOTO_CANDIDATE_CAP = 200;
 
     private final PropertyRepository properties;
@@ -44,26 +41,21 @@ public class ListingDuplicateProbe {
         this.caseNotes = caseNotes;
     }
 
-    /** Reindex every write because city/locality changes alter what the address text means. */
     public void reindex(Property p) {
         p.setAddressKey(AddressKey.of(p.getAddress(), p.getCity(), p.getLocality()));
         p.setElectricityMeterKey(MeterKey.of(p.getElectricityMeterNo()));
     }
 
-    /** A typed {@code List} cannot collide on {@code |} inside a value, unlike a joined string.
-     * It also keeps {@code 2} and {@code 2.0} distinct if numeric signals are added. */
     public List<Object> signalOf(Property p) {
         return Arrays.asList(p.getElectricityMeterKey(), p.getAddressKey(), p.getLocalitySlug());
     }
 
-    /** {@code MANDATORY}: the finding must commit with the listing write that provoked it. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void flag(Property p) {
         flagSameDoorway(p);
         flagSamePhotos(p);
     }
 
-    /** Photo hashes come from the request body; absent hashes on PATCH must not clear stored ones. */
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean reindexPhotos(Property p, List<String> hexes) {
         if (hexes == null) {
@@ -86,7 +78,6 @@ public class ListingDuplicateProbe {
         }
         photoHashes.deleteByPropertyId(p.getId());
 
-        // Flush deletes first; kept photos reuse primary keys and Hibernate inserts before deletes.
         photoHashes.flush();
         List<PropertyPhotoHash> rows = new ArrayList<>();
         for (Long h : parsed) {
@@ -97,8 +88,6 @@ public class ListingDuplicateProbe {
     }
 
     private void flagSameDoorway(Property p) {
-
-        // With both keys null the query is provably empty and neither partial index is usable.
         if (p.getElectricityMeterKey() == null && p.getAddressKey() == null) {
             return;
         }
@@ -111,7 +100,6 @@ public class ListingDuplicateProbe {
             return;
         }
 
-        // Sorting stabilizes the note body without adding ORDER BY to the index-friendly query.
         String others = hits.stream().map(ListingDuplicateProbe::describe).sorted()
                 .collect(Collectors.joining("; "));
         caseNotes.postInternalOnce(p.getId(), p.getDeal(),
@@ -119,7 +107,6 @@ public class ListingDuplicateProbe {
                         + " another owner: " + others + ". " + nextStep(p));
     }
 
-    /** Reused photos catch relisted flats when address and meter comparisons cannot. */
     private void flagSamePhotos(Property p) {
         List<PropertyPhotoHash> mine = photoHashes.findByPropertyId(p.getId());
         if (mine.isEmpty()) {
@@ -152,7 +139,6 @@ public class ListingDuplicateProbe {
             return;
         }
 
-        // Stable ordering prevents postInternalOnce from filing the same finding on every edit.
         String others = properties.findAllById(matched).stream()
                 .map(ListingDuplicateProbe::describe).sorted().limit(2)
                 .collect(Collectors.joining("; "));
@@ -163,19 +149,16 @@ public class ListingDuplicateProbe {
                         + " amenity shot can honestly appear on two listings. " + nextStep(p));
     }
 
-    /** Age and owner verification help moderators tell a collision from a hijack. */
     private static String describe(Property p) {
         String ref = p.getSlug() == null ? p.getId().toString() : p.getSlug();
         return ref + " [" + p.getStatus()
                 + (p.isOwnerVerified() ? ", owner verified" : ", owner unverified")
                 + (p.getCreatedAt() == null ? ""
 
-                        // Pune desk reads this; UTC would date 3am local listings to the previous day.
                         : ", listed " + p.getCreatedAt().atZone(IST).toLocalDate())
                 + "]";
     }
 
-    /** Live listings need a stay-up-or-pull-down decision; there is no approval step left. */
     private static String nextStep(Property p) {
         return PropertyStatus.PENDING.equals(p.getStatus())
                 ? "Confirm who holds the mandate before approving."
@@ -183,7 +166,6 @@ public class ListingDuplicateProbe {
                         + " it should stay up.";
     }
 
-    /** Resweep closes the READ COMMITTED race where simultaneous submissions miss each other. */
     @Transactional
     public int resweepRecent(Instant since, int limit) {
         List<Property> recent =
@@ -192,18 +174,13 @@ public class ListingDuplicateProbe {
         return recent.size();
     }
 
-    /** Owners only see their own rows here, so the duplicate rule discloses nothing new. */
     @Transactional(readOnly = true)
     public ListingDuplicateVerdict ownDuplicate(UUID ownerId, String meter,
             String addressKey, String localitySlug) {
-
-        // Same short-circuit as flag(): null keys make the query empty and unindexed.
         if (meter == null && addressKey == null) {
             return ListingDuplicateVerdict.NONE;
         }
 
-        // One row is the whole answer. The caller is deciding whether to stop a submission, not
-        // describing a collision, so a second hit would change nothing it does.
         List<Property> hits = properties.findOwnDuplicateCandidates(
                 ownerId, OCCUPYING, meter, addressKey, localitySlug, PageRequest.of(0, 1));
         if (hits.isEmpty()) {

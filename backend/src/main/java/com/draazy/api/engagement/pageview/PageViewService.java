@@ -9,12 +9,8 @@ import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Enforces data minimisation server-side (query string stripped, referrer reduced to host), not by trust.
- * No dedupe or throttle: a write-time reporting judgement can't be undone later. */
 @Service
 public class PageViewService {
-
-    /** Older events are pinned to this ceiling, not refused: an idle tab is a real view, but can't backfill. */
     private static final Duration MAX_BACKDATE = Duration.ofHours(6);
 
     private final PageViewRepository repository;
@@ -23,7 +19,6 @@ public class PageViewService {
         this.repository = repository;
     }
 
-    /** Shared {@code receivedAt} keeps relative spacing (duration) as observed; absolute time is our clock's. */
     @Transactional
     public void record(PageViewBatchCreate body, AuthPrincipal principal) {
         Instant receivedAt = Instant.now();
@@ -47,7 +42,6 @@ public class PageViewService {
         repository.saveAll(rows);
     }
 
-    /** Strips from the first {@code ?} or {@code #} (search terms, campaign ids) and trailing slashes. */
     private static String normalisePath(String raw) {
         String path = raw.trim();
 
@@ -61,7 +55,6 @@ public class PageViewService {
         return path.isEmpty() ? "/" : path;
     }
 
-    /** Reduces to a lower-case host without {@code www.}; a search referrer's query is what the viewer typed. */
     private static String normaliseHost(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
@@ -87,7 +80,6 @@ public class PageViewService {
         return host.isBlank() ? null : host;
     }
 
-    /** Index of whichever of {@code chars} appears first, or -1 when none does. */
     private static int indexOfFirst(String value, char... chars) {
         int found = -1;
         for (char c : chars) {

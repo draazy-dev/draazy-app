@@ -5,7 +5,7 @@ import { acceptServiceRequestAmendment } from '../services/serviceRequestService
 import { openCashfreeCheckout } from '../lib/cashfree.js';
 import { fmtINR } from '../lib/format.js';
 import { amendmentRows } from '../lib/amendmentTerms.js';
-/** Terms our desk revised on a paid rent agreement; drafting waits for the customer to accept them. */
+import { userMessage } from '../lib/userMessage.js';
 
 export default function RevisedTerms({ request, onChanged }) {
   const { toast } = useToast();
@@ -18,15 +18,18 @@ export default function RevisedTerms({ request, onChanged }) {
     setBusy(true);
     try {
       const updated = await acceptServiceRequestAmendment(request.id, amendment.id);
-      if (updated.paymentSessionId) {
-        await openCashfreeCheckout(updated.paymentSessionId);
-        toast('We will apply the revised terms as soon as the payment is confirmed.', 'success');
-      } else {
+      if (!updated.paymentSessionId) {
         toast('Revised terms accepted. Our team will prepare the draft on them.', 'success');
+      } else {
+        const outcome = await openCashfreeCheckout(updated.paymentSessionId)
+          .catch(() => ({ error: true, unopened: true }));
+        if (outcome?.unopened) toast("We couldn't open payment. Nothing has been charged. Please try again.", 'error');
+        else if (outcome?.error) toast("Payment not completed. Tap Pay to try again. If you were charged, it shows here in a few minutes.", 'error');
+        else toast('We will apply the revised terms as soon as the payment is confirmed.', 'success');
       }
       onChanged();
     } catch (error) {
-      toast(error?.message || 'The revised terms could not be accepted. Please try again.', 'error');
+      toast(userMessage(error, 'The revised terms could not be accepted. Please try again.'), 'error');
     } finally {
       setBusy(false);
     }

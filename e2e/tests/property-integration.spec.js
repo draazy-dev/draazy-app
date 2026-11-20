@@ -150,14 +150,14 @@ test.describe('LIVE: property domain against the real API', () => {
   test('the document vault round-trips upload and delete through /me/documents', async ({ page }) => {
     await signedInAs(page, OWNER.mobile);
 
-    // Wait for the listing selector so uploads target an owner property.
+    // A ready-to-move flat: the vault hides Sale Deed for Meera's newer under-construction listing.
+    const listings = await (await fetch(`${API}/me/listings?size=20`, { headers: await authHeaders(OWNER.mobile) })).json();
+    const ready = listings.content.find((l) => l.title === '2 BHK Flat in Pimple Saudagar');
+    expect(ready, 'the seeded ready flat must remain owned by Meera').toBeTruthy();
     const mine = page.waitForResponse((r) => r.url().includes('/api/me/dashboard') && r.status() === 200);
-    await page.goto('/dashboard#documents');
+    await page.goto(`/dashboard?tab=documents&prop=${ready.id}`);
     await mine;
     await expect(page.getByRole('heading', { name: 'Document Vault' })).toBeVisible();
-    const ownerCtx = page.getByRole('button', { name: 'Property docs' });
-    await expect(ownerCtx).toBeVisible();
-    await ownerCtx.click();
 
     // Clear leftovers so a failed earlier run cannot exhaust the fixture slot.
     const stale = page.getByRole('button', { name: 'Remove Sale Deed' });
@@ -322,8 +322,8 @@ test.describe('LIVE: property domain against the real API', () => {
       (r) => /\/api\/me\/listings\/[^/]+$/.test(new URL(r.url()).pathname) && r.request().method() === 'DELETE',
       { timeout: 30_000 },
     );
-    page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: /Take down|Withdraw/i }).first().click();
+    await page.getByTestId('confirm-modal-ok').click();
     expect((await removed).status()).toBe(200);
 
     const mineRes = await fetch(`${API}/me/listings?size=100`, { headers });
@@ -436,7 +436,7 @@ test.describe('LIVE: identity verification against the real API', () => {
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 15000 });
 
     const { code, after } = await page.evaluate(async (b64) => {
-      const tokens = JSON.parse(localStorage.getItem('draazyTokens') || sessionStorage.getItem('draazyTokens') || 'null');
+      const tokens = { accessToken: (await import('/src/lib/auth.js')).readAccessToken() };
       const binary = atob(b64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
@@ -471,7 +471,7 @@ test.describe('LIVE: identity verification against the real API', () => {
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 15000 });
 
     const { simulate, after } = await page.evaluate(async (b64) => {
-      const tokens = JSON.parse(localStorage.getItem('draazyTokens') || sessionStorage.getItem('draazyTokens') || 'null');
+      const tokens = { accessToken: (await import('/src/lib/auth.js')).readAccessToken() };
       const auth = { Authorization: `Bearer ${tokens.accessToken}` };
       const binary = atob(b64);
       const bytes = new Uint8Array(binary.length);

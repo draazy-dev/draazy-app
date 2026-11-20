@@ -52,7 +52,7 @@ class OwnerFlatmateCardsTest extends AbstractApiTest {
                         .content("""
                                 {"name":"Poster","gender":"female","age":26,"occupation":"Designer",
                                  "budget":18000,"localities":["Baner"],"moveIn":"2026-09-01",
-                                 "flatPref":"women","roomPref":"private","tags":["Vegetarian"]}
+                                 "flatPref":"women","roomPref":"private"}
                                 """))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
@@ -91,10 +91,7 @@ class OwnerFlatmateCardsTest extends AbstractApiTest {
             String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"title":"Card group","locality":"Baner","rent":40000,
-                                     "name":"Group Host","role":"tenant","consentMobile":"9850000099"}
-                                    """))
+                            .content(FlatmateGroupFixture.hunting("Card group", "Baner", "any", 40000, 3, 1)))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
             String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
@@ -111,13 +108,15 @@ class OwnerFlatmateCardsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[0].seatsTotal").isNumber())
                     .andExpect(jsonPath("$.content[0].seatsOpen").isNumber())
                     .andExpect(jsonPath("$.content[0].memberCount").value(1))
-                    .andExpect(jsonPath("$.content[0].modStatus").value("pending"))
+                    .andExpect(jsonPath("$.content[0].modStatus").value("live"))
                     .andExpect(jsonPath("$.content[0].createdAt").isNotEmpty())
                     .andExpect(jsonPath("$.content[0].members").doesNotExist())
                     .andExpect(jsonPath("$.content[0].ownerConsentMobile").doesNotExist())
                     .andExpect(jsonPath("$.content[0].addressFingerprint").doesNotExist())
                     .andExpect(jsonPath("$.content[0].flagForReview").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].verificationTier").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].hostRole").value("tenant"))
+                    .andExpect(jsonPath("$.content[0].hunting").value(true))
+                    .andExpect(jsonPath("$.content[0].verificationTier").value("identity"))
                     .andExpect(jsonPath("$.content[0].reviewStatus").doesNotExist())
                     .andExpect(jsonPath("$.content[0].ownerMobile").doesNotExist())
                     .andExpect(jsonPath("$.content[0].ownerName").doesNotExist())

@@ -14,7 +14,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("No contact details in prose — and no false alarms on an ordinary price")
 class NoContactDetailsTest {
-
     private final NoContactDetails.Validator validator = new NoContactDetails.Validator();
 
     private boolean accepts(String text) {
@@ -166,8 +165,6 @@ class NoContactDetailsTest {
         assertThat(accepts(null)).isTrue();
     }
 
-    // The possessive local part is pinned both ways because a wrong one fails silently.
-    // Bean Validation is not fail-fast, so a 4,000-character run must not hang.
     static Stream<Arguments> hostileInputs() {
         return Stream.of(
                 Arguments.of("aLongRunWithNoSeparatorStillFinishesPromptly",

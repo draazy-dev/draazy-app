@@ -1,6 +1,7 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile, signedInAs, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { gotoSettled } from '../../../helpers/settle.js';
 
 const created = new Set();
 
@@ -81,7 +82,7 @@ test.afterEach(async () => {
 });
 
 async function openListing(page, id) {
-  await page.goto(`/property/${id}`, { waitUntil: 'networkidle' });
+  await gotoSettled(page, `/property/${id}`);
   await page.evaluate(() => document.querySelectorAll('.reveal,.fade-up,.fade-in').forEach((el) => el.classList.add('visible')));
   await expect(page.getByRole('heading', { level: 1, name: '2 BHK Flat for Rent in Baner' })).toBeVisible({ timeout: 20000 });
 }
@@ -100,7 +101,7 @@ test.describe('Chat with the owner from a listing', () => {
     await expect(page.getByRole('link', { name: /Chat with Owner/i })).toHaveCount(0);
   });
 
-  test('clicking "Contact Owner" requests contact, stages the chat and shows it waiting, with no composer', async ({ page }) => {
+  test('clicking "Contact Owner" requests contact and opens the waiting request thread, with no composer', async ({ page }) => {
     const { owner, id } = await fixture();
     const buyer = await actor('Zztest Staging Buyer');
     await signedInAs(page, buyer.mobile);
@@ -116,14 +117,17 @@ test.describe('Chat with the owner from a listing', () => {
     expect(ownerInbox.status, 'the owner can see the pending request').toBe(200);
     expect((ownerInbox.body?.content ?? []).some((row) => row.propertyId === id && row.status === 'pending')).toBe(true);
 
-    const chip = page.locator('.pc-propchip');
-    await expect(chip.getByText(/View listing/i)).toBeVisible({ timeout: 20000 });
-    await expect(chip.getByRole('link', { name: /View listing/i })).toHaveAttribute('href', `/property/${id}`);
-    // The message the seam composed on the buyer's behalf is already in the thread...
-    await expect(page.getByText(/interested in/i).first()).toBeVisible();
-    await expect(page.getByText(/Waiting for the owner to accept/i)).toBeVisible();
-    await expect(page.locator('.pc-input')).toHaveCount(0);
-    /* The server was never asked to create this thread, which is the whole point of staging — a
+    const thread = page.getByTestId('request-thread');
+    await expect(thread).toHaveAttribute('data-box', 'sent', { timeout: 20000 });
+    await expect(thread).toHaveAttribute('data-state', 'pending');
+    const chip = thread.getByTestId('chat-propchip');
+    await expect(chip.getByRole('link', { name: 'View listing' })).toHaveAttribute('href', '/property/' + id);
+    await expect(chip.getByRole('button', { name: 'Schedule visit' })).toBeVisible();
+    // The request message the seam composed on the buyer's behalf is the thread's only bubble.
+    await expect(thread.locator('.pc-bubble.me').getByText(/interested in/i)).toBeVisible();
+    await expect(thread.getByText('The chat opens once they accept.')).toBeVisible();
+    await expect(thread.getByRole('button', { name: 'Withdraw' })).toBeVisible();
+    await expect(page.locator('.pc-input')).toHaveCount(0);    /* The server was never asked to create this thread, which is the whole point of staging — a
        `POST /messages` here would have been a 403. An empty inbox is the proof. */
 
     const inbox = await api('GET', '/messages', buyer.headers);
@@ -159,5 +163,73 @@ test.describe('Chat with the owner from a listing', () => {
     await expect(page.getByText(/is this flat still available\?/i).first()).toBeVisible();
     await expect(page.locator('.pc-input')).toBeVisible();
     await expect(page.getByText(/Waiting for the owner to accept/i)).toHaveCount(0);
+  });
+
+  test('an approved buyer with no thread yet gets one when tapping "Chat with Owner", and the owner gets owner-side quick replies', async ({ page, browser }) => {
+    const { owner, id } = await fixture();
+    const buyer = await actor('Zztest Fresh Browser Buyer');
+    await openTheGate(buyer, owner, id);
+
+    await signedInAs(page, buyer.mobile);
+    await openListing(page, id);
+    await chatLink(page).click();
+    await expect(page).toHaveURL(new RegExp(`/messages\\?openProp=${id}`));
+    await expect(page.locator('.pc-input')).toBeVisible({ timeout: 20000 });
+
+    const threads = await api('GET', '/messages', buyer.headers);
+    expect(threads.body.content, 'one thread, created by the click').toHaveLength(1);
+    const detail = await api('GET', `/messages/${threads.body.content[0].id}`, buyer.headers);
+    expect(detail.body.messages, 'the opening hello is delivered exactly once').toHaveLength(1);
+
+    const ownerPage = await (await browser.newContext()).newPage();
+    await signedInAs(ownerPage, owner.mobile);
+    await ownerPage.goto(`/messages?c=${threads.body.content[0].id}`);
+    await expect(ownerPage.locator('.pc-input')).toBeVisible({ timeout: 20000 });
+    const ownerChips = ownerPage.locator('.pc-quick-chip');
+    await expect(ownerChips.filter({ hasText: "Yes, it's still available" })).toBeVisible({ timeout: 20000 });
+    await expect(ownerChips.filter({ hasText: /^Is it still available\?$/ })).toHaveCount(0);
+    await ownerPage.context().close();
+  });
+
+  test('an approved lead is a normal chat in the owner\'s Messages, not a request row, and nothing links to WhatsApp', async ({ page }) => {
+    const { owner, id } = await fixture();
+    const buyer = await actor('Zztest Lead Chat Buyer');
+    await openTheGate(buyer, owner, id);
+    const conv = await api('POST', '/messages', buyer.headers, { propertyId: id, body: 'Zztest — still available?' });
+    expect(conv.status).toBe(201);
+
+    await signedInAs(page, owner.mobile);
+    await page.goto('/dashboard?tab=leads');
+    await expect(page.getByTestId('requests-panel')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId('requests-caught-up')).toBeVisible();
+    await page.getByTestId('requests-past-toggle').click();
+    const lead = page.getByTestId('request-card');
+    await expect(lead).toHaveCount(1);
+    await expect(lead).toHaveAttribute('data-state', 'accepted');
+    await expect(lead.getByRole('button', { name: 'Open chat' })).toBeVisible();
+    await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+
+    await page.goto('/messages');
+    await expect(page.locator('.pc-conv[data-request-kind]')).toHaveCount(0);
+    await page.locator(`.pc-conv[data-conversation-id="${conv.body.id}"]`).click();
+    await expect(page.getByText(/still available\?/i).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('.pc-head a[href*="wa.me"]')).toHaveCount(0);
+    const detail = await api('GET', `/messages/${conv.body.id}`, owner.headers);
+    expect(detail.body.messages, 'reusing a thread posts nothing on the owner\'s behalf').toHaveLength(1);
+  });
+
+  test('when the owner deletes the listing, its chat stays readable but closes', async ({ page }) => {
+    const { owner, id } = await fixture();
+    const buyer = await actor('Zztest Closed Chat Buyer');
+    await openTheGate(buyer, owner, id);
+    const conv = await api('POST', '/messages', buyer.headers, { propertyId: id, body: 'Zztest — can I visit Sunday?' });
+    expect(conv.status).toBe(201);
+    expect((await api('DELETE', `/me/listings/${id}`, owner.headers)).status).toBe(200);
+
+    await signedInAs(page, buyer.mobile);
+    await page.goto(`/messages?c=${conv.body.id}`);
+    await expect(page.getByText(/can I visit Sunday\?/i).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('status').filter({ hasText: 'The owner deleted this listing' })).toBeVisible();
+    await expect(page.locator('.pc-input')).toHaveCount(0);
   });
 });

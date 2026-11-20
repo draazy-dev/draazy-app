@@ -19,6 +19,15 @@ const thisMonth = () =>
     .format(new Date())
     .slice(0, 7);
 
+/* A tenant named after the due day owes from next month, so the card is about that month instead. */
+async function owedMonth(mobile, id) {
+  const res = await fetch(`${API}/me/managed-properties/${id}`, { headers: await authHeaders(mobile) });
+  expect(res.status).toBe(200);
+  const { firstRentMonth } = await res.json();
+  const now = thisMonth();
+  return firstRentMonth && firstRentMonth > now ? firstRentMonth : now;
+}
+
 /** How a ledger row prints that month — the same `Intl` short form `ymLabel` produces. */
 const monthLabel = (ym) => {
   const [y, m] = ym.split('-');
@@ -51,6 +60,7 @@ async function estimateAndSave(page, mobile) {
 /** Fill the rent-tracking setup form and switch the property to rented. */
 async function startTracking(page) {
   await page.getByLabel(/Tenant name/i).fill(TENANT);
+  await page.getByLabel(/Tenant mobile/i).fill('9123456780');
   await page.getByLabel(/Monthly rent/i).fill(String(RENT));
   await page.getByRole('button', { name: /Start tracking/i }).click();
   await expect(page.getByText(/Recent months/i)).toBeVisible({ timeout: 20000 });
@@ -95,7 +105,7 @@ test.describe('LIVE: manual rent receipts against the real API', () => {
 
   test('marking a month received writes a server receipt that a second browser sees', async ({ page, browser }) => {
     const { mobile, id } = await ownerWithRentedFlat(page);
-    const ym = thisMonth();
+    const ym = await owedMonth(mobile, id);
 
     // The positive anchor for the absence assertion below: the account genuinely has a rented flat
     // and a rent figure, so a receipt *could* exist. It does not yet.
@@ -114,7 +124,7 @@ test.describe('LIVE: manual rent receipts against the real API', () => {
     await expect(page.getByText('Received this month')).toBeVisible();
 
     // Re-read from outside the page. A receipt that only exists in the tab that made it is the
-    // exact failure this port was for.
+    // exact failure this guards against.
     const res = await fetch(`${receiptsUrl(id)}?months=6`, { headers: await authHeaders(mobile) });
     expect(res.status).toBe(200);
     const rows = await res.json();
@@ -145,7 +155,7 @@ test.describe('LIVE: manual rent receipts against the real API', () => {
 
   test('a month can only be receipted once, and the second attempt is a deterministic 409', async ({ page }) => {
     const { mobile, id } = await ownerWithRentedFlat(page);
-    const ym = thisMonth();
+    const ym = await owedMonth(mobile, id);
 
     const posted = page.waitForResponse(
       (r) => new URL(r.url()).pathname === `/api/me/managed-properties/${id}/rent-receipts`

@@ -3,20 +3,71 @@ import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
 import { lastAt, relTime } from '../../../lib/chatFormat.js';
+import { fmtINR } from '../../../lib/format.js';
+import { isPending, kindLabel, stateLabel, stateTone } from '../requests/requestMeta.js';
 import ActionSheet from './ActionSheet.jsx';
 
-const lineOf = (c) => [c.property?.bhk, c.property?.loc, c.property?.price].filter(Boolean).join(' · ');
-const isServerId = (id) => id && !String(id).startsWith('staged:');
+const displayPrice = (p) => {
+  if (!p?.price) return '';
+  if (typeof p.price === 'string' && (p.price.includes('Cr') || p.price.includes('L') || p.price.includes('/mo') || p.price.includes(' '))) return p.price;
+  const num = typeof p.price === 'number' ? p.price : parseInt(String(p.price).replace(/[^\d]/g, ''), 10);
+  if (!num) return String(p.price);
+  return p.deal === 'rent' ? `${fmtINR(num)}/mo` : fmtINR(num);
+};
+
+const lineOf = (c) => [c.property?.bhk, c.property?.loc, displayPrice(c.property)].filter(Boolean).join(' · ');
+const isServerId = (id) => id && !/^(staged|request):/.test(String(id));
+export const SUPPORT_ID = 'support';
+const matches = (q) => (c) => !q || c.party.name.toLowerCase().includes(q) || c.property.title.toLowerCase().includes(q);
+
+function RequestRow({ c, active, onOpen }) {
+  const item = c.request;
+  const waiting = c.box === 'received' && isPending(item);
+  return (
+    <div className="pc-conv-wrap">
+      <button data-conversation-id={c.id} data-request-kind={item.kind} data-request-box={c.box} className={'pc-conv' + (active ? ' active' : '')} onClick={() => onOpen(c.id)}>
+        <div className="pc-conv-av"><div className="pc-av pc-av-initials">{c.party.avatar}</div></div>
+        <div className="pc-conv-main">
+          <div className="pc-conv-top"><span className="pc-conv-name">{c.party.name}</span><span className="pc-conv-time">{relTime(c.at)}</span></div>
+          <div className="pc-conv-bot">
+            <span className="pc-conv-last">{c.messages.at(-1).text}</span>
+            {waiting ? <span className="pc-pill req">Request</span> : <span className={`pc-req-pill ${stateTone(item)}`}>{stateLabel(item)}</span>}
+          </div>
+          <div className="pc-conv-prop">{kindLabel(item)} · {c.property.title}</div>
+        </div>
+      </button>
+    </div>
+  );
+}
+
+function SupportRow({ support, active, onOpen }) {
+  return (
+    <div className="pc-conv-wrap is-support">
+      <button data-testid="support-row" className={'pc-conv' + (active ? ' active' : '')} onClick={onOpen}>
+        <div className="pc-conv-av"><div className="pc-av pc-av-support"><Icon name="headset" className="w-5 h-5" /></div></div>
+        <div className="pc-conv-main">
+          <div className="pc-conv-top"><span className="pc-conv-name">Draazy support</span><span className="pc-conv-time">{support.at ? relTime(support.at) : ''}</span></div>
+          <div className="pc-conv-bot">
+            <span className="pc-conv-last">{support.last || 'Ask about a listing, payment or request'}</span>
+            {support.unread ? <span className="pc-unread">{support.unread}</span> : null}
+          </div>
+          <div className="pc-conv-prop">Official Draazy team</div>
+        </div>
+      </button>
+    </div>
+  );
+}
 
 export default function Inbox({
   t,
   items,
+  requests,
+  support,
   activeId,
-  tab,
-  setTab,
   search,
   setSearch,
   onOpen,
+  onOpenSupport,
   onRetry,
   onState,
   onBlock,
@@ -26,21 +77,28 @@ export default function Inbox({
   const [archived, setArchived] = useState(false);
   const [sheet, setSheet] = useState(null);
   const [swiped, setSwiped] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const searchOpen = searching || search !== '';
+  const toggleSearch = () => {
+    if (searchOpen) setSearch('');
+    setSearching(!searchOpen);
+  };
   const startX = useRef(0);
   const timer = useRef(null);
-  const requests = items.filter((c) => c.staged).length;
   const archivedCount = items.filter((c) => c.archived).length;
   const q = search.trim().toLowerCase();
 
   const visible = useMemo(() => {
     const base = items.filter((c) => archived ? c.archived : !c.archived)
-      .filter((c) => tab === 'requests' ? c.staged : !c.staged)
-      .filter((c) => !q || c.party.name.toLowerCase().includes(q) || c.property.title.toLowerCase().includes(q));
-    if (archived || tab === 'requests') return base;
+      .filter((c) => !c.staged)
+      .filter(matches(q));
+    if (archived) return base;
     const pinned = base.filter((c) => c.awaitingReply && (c.unread || c.messages.at(-1)?.from === 'them')).slice(0, 3);
     const pinnedIds = new Set(pinned.map((c) => c.id));
-    return [...pinned, ...base.filter((c) => !pinnedIds.has(c.id))];
-  }, [archived, items, q, tab]);
+    const rest = [...base.filter((c) => !pinnedIds.has(c.id)), ...requests.filter(matches(q))]
+      .sort((a, b) => lastAt(b) - lastAt(a));
+    return [...pinned, ...rest];
+  }, [archived, items, q, requests]);
 
   const rowActions = (c) => [
     { label: c.archived ? 'Unarchive' : 'Archive', icon: 'archive', onClick: () => onState(c.id, { archived: !c.archived }) },
@@ -62,23 +120,29 @@ export default function Inbox({
   return (
     <aside className="pc-list relative">
       <div className="pc-list-head">
-        <h2>{archived ? 'Archived' : t('misc.msgMessages')}</h2>
-        <div className="pc-tabs" role="tablist" aria-label={t('misc.msgFilters')}>
-          <button role="tab" aria-selected={tab === 'chats'} className={'pc-tab' + (tab === 'chats' ? ' active' : '')} onClick={() => setTab('chats')}>Chats</button>
-          <button role="tab" aria-selected={tab === 'requests'} className={'pc-tab' + (tab === 'requests' ? ' active' : '')} onClick={() => setTab('requests')}>Requests {requests > 0 && <span className="pc-reqbadge">{requests}</span>}</button>
+        <div className="pc-list-title">
+          <h1>{archived ? 'Archived' : t('misc.msgMessages')}</h1>
+          <button type="button" className="pc-hbtn relative tap-extend" aria-expanded={searchOpen} data-testid="msg-search-toggle"
+            aria-label={searchOpen ? 'Close search' : 'Open search'} onClick={toggleSearch}>
+            <Icon name={searchOpen ? 'x' : 'search'} className="w-5 h-5" />
+          </button>
         </div>
-        <div className="pc-search"><Icon name="search" className="w-4 h-4" /><input value={search} onChange={(e) => setSearch(e.target.value)} type="text" enterKeyHint="search" placeholder={t('misc.msgSearchPlaceholder')} aria-label={t('misc.msgSearchAria')} /></div>
+        {searchOpen ? (
+          <div className="pc-search"><Icon name="search" className="w-4 h-4" /><input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} type="text" enterKeyHint="search" placeholder={t('misc.msgSearchPlaceholder')} aria-label={t('misc.msgSearchAria')} /></div>
+        ) : null}
       </div>
       <div className="pc-convs">
+        {!archived && (!q || 'draazy support'.includes(q)) ? <SupportRow support={support} active={activeId === SUPPORT_ID} onOpen={() => onOpenSupport()} /> : null}
         {loading && Array.from({ length: 6 }, (_, i) => <div key={i} className="pc-conv pc-skel" />)}
         {!loading && error ? <div className="pc-empty-list"><p>Couldn't load chats</p><button type="button" onClick={onRetry}>Retry</button></div> : null}
         {!loading && !error && visible.length ? visible.map((c, index) => {
+          if (c.request) return <RequestRow key={c.id} c={c} active={c.id === activeId} onOpen={onOpen} />;
           const last = c.messages.at(-1);
           const fromMe = last?.from === 'me';
           const previewText = last?.attachments?.length && !last.text ? 'Photo' : last?.text;
           const preview = last ? `${fromMe ? t('misc.msgYouPrefix') : ''}${previewText}` : c.lastMessage;
           const listing = c.group ? t('misc.msgGroupMembers', { count: c.group.memberCount }) : c.property.title || lineOf(c);
-          const pinned = !archived && tab === 'chats' && index < 3 && c.awaitingReply && (c.unread || last?.from === 'them');
+          const pinned = !archived && index < 3 && c.awaitingReply && (c.unread || last?.from === 'them');
           return (
             <div key={c.id} className={'pc-conv-wrap' + (swiped === c.id ? ' swiped' : '')} onPointerDown={(e) => start(c, e)} onPointerUp={(e) => end(c, e)} onPointerCancel={() => clearTimeout(timer.current)} onContextMenu={(e) => { e.preventDefault(); setSheet(c); }}>
               <button data-conversation-id={c.id} data-staged={c.staged ? 'true' : 'false'} className={'pc-conv' + (c.id === activeId ? ' active' : '')} onClick={() => onOpen(c.id)}>
@@ -94,7 +158,7 @@ export default function Inbox({
             </div>
           );
         }) : null}
-        {!loading && !error && !visible.length ? <div className="pc-empty-list"><p>{tab === 'requests' ? t('misc.msgNoRequests') : 'No chats yet'}</p>{tab === 'chats' ? <><span>When an owner accepts your request, your chat opens here.</span><Link to="/listings">Browse listings</Link></> : null}</div> : null}
+        {!loading && !error && !visible.length ? <div className="pc-empty-list"><p>No chats yet</p><span>Requests you send or receive show up here, and become chats once accepted.</span><Link to="/listings">Browse listings</Link></div> : null}
       </div>
       {!archived && archivedCount > 0 ? <button type="button" className="pc-archived-link" onClick={() => setArchived(true)}>Archived ({archivedCount})</button> : null}
       {archived ? <button type="button" className="pc-archived-link" onClick={() => setArchived(false)}>Back to inbox</button> : null}

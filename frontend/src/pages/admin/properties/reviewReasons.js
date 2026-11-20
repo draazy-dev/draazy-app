@@ -2,55 +2,84 @@ export const REVIEW_REASONS = [
   {
     code: 'photos_not_real',
     label: 'Photos not real',
-    ownerMessage: 'Please upload clear, real photos of this home so we can verify the listing.',
+    ownerMessage: 'Please add clear photos of the actual property.',
+    rejectionMessage: 'The photos do not appear to be authentic.',
+    resubmittable: true,
   },
   {
     code: 'duplicate',
     label: 'Duplicate',
-    ownerMessage: 'This looks like another listing already on Draazy. Please confirm the correct listing.',
+    ownerMessage: 'Please tell us why this is not a duplicate listing.',
+    rejectionMessage: 'This listing was identified as a duplicate of an existing listing.',
   },
   {
     code: 'broker',
     label: 'Broker',
-    ownerMessage: 'Draazy is owner-only. Please confirm that you are the owner or an immediate family member.',
+    ownerMessage: 'Please confirm that you are the owner or family, not a broker.',
+    rejectionMessage: 'Draazy is strictly owner-only.',
   },
   {
     code: 'wrong_details',
     label: 'Wrong details',
-    ownerMessage: 'Some listing details do not match what was submitted. Please correct the details and resubmit.',
+    ownerMessage: 'Please correct the listing details.',
+    rejectionMessage: 'The listing contains inaccurate details.',
+    resubmittable: true,
   },
   {
     code: 'locality_unclear',
     label: 'Locality unclear',
-    ownerMessage: 'Please update the locality and address details so we can verify the exact property.',
+    ownerMessage: 'Please clarify the exact locality.',
+    rejectionMessage: 'The property locality could not be verified.',
+    resubmittable: true,
   },
   {
     code: 'document_unreadable',
     label: 'Document unreadable',
-    ownerMessage: 'Please upload a clearer document photo or scan so the details can be read.',
+    ownerMessage: 'Please upload a readable document.',
+    rejectionMessage: 'Ownership documents could not be verified.',
+    resubmittable: true,
   },
   {
     code: 'name_mismatch',
     label: 'Name mismatch',
-    ownerMessage: 'The name on the submitted document does not match the lister. Please clarify or upload the right proof.',
+    ownerMessage: 'Please explain the name mismatch.',
+    rejectionMessage: 'Ownership documents show an unverified name mismatch.',
+    resubmittable: true,
+  },
+  {
+    code: 'rera_not_found',
+    label: 'RERA ID not found',
+    ownerMessage: 'We could not find your RERA ID on MahaRERA. Please send the correct one.',
+    rejectionMessage: 'The RERA ID could not be found on MahaRERA.',
+  },
+  {
+    code: 'rera_mismatch',
+    label: 'RERA ID mismatch',
+    ownerMessage: 'Your RERA ID on MahaRERA does not match this project. Please correct it.',
+    rejectionMessage: 'The RERA ID on MahaRERA does not match this project.',
   },
   {
     code: 'other',
     label: 'Other',
-    ownerMessage: 'Please check the note below and update the listing so we can complete verification.',
+    ownerMessage: 'Please share the missing information.',
+    rejectionMessage: 'The listing does not meet moderation guidelines.',
   },
 ];
 
 export const REVIEW_REASON_BY_CODE = Object.fromEntries(REVIEW_REASONS.map((reason) => [reason.code, reason]));
 
+const FINAL_LINE = '\nThis decision is final. The listing cannot be resubmitted.';
+const RESUBMIT_LINE = '\nEdit the listing and resubmit it for review.';
+
+export const isResubmittableReason = (code) => Boolean(REVIEW_REASON_BY_CODE[code]?.resubmittable);
+
 export const ownerMessagePreview = (decision, reasonCode, note = '') => {
-  const reason = REVIEW_REASON_BY_CODE[reasonCode];
-  const base = reason?.ownerMessage || 'Please update the listing so we can complete verification.';
-  const suffix = note.trim() ? `\n\nReviewer note: ${note.trim()}` : '';
+  const reason = REVIEW_REASON_BY_CODE[reasonCode] || REVIEW_REASON_BY_CODE.other;
+  const extra = note.trim() ? ` ${note.trim()}` : '';
   if (decision === 'reject') {
-    return `${base}${suffix}\n\nThis decision is final. The listing cannot be resubmitted.`;
+    return `\u26D4 Your property could not be approved.\nReason: ${reason.rejectionMessage}${extra}${reason.resubmittable ? RESUBMIT_LINE : FINAL_LINE}`;
   }
-  return `${base}${suffix}`;
+  return `${reason.ownerMessage}${extra}`;
 };
 
 export const SIGNAL_LABELS = {

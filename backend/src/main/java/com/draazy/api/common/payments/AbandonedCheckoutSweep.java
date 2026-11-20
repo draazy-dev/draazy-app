@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class AbandonedCheckoutSweep {
-
     private static final Logger log = LoggerFactory.getLogger(AbandonedCheckoutSweep.class);
 
     private final List<AbandonedCheckouts> families;
@@ -29,7 +28,6 @@ public class AbandonedCheckoutSweep {
         return expired;
     }
 
-    // Per-family handling keeps one broken expiry query from stopping the rest.
     private int sweep(AbandonedCheckouts family, Instant cutoff) {
         try {
             return family.expireAbandonedCheckouts(cutoff);

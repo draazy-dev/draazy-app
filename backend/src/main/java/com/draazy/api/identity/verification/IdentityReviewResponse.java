@@ -5,13 +5,13 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-// Images are short-lived signed URLs; warnings carry dedup signals for approval.
 public record IdentityReviewResponse(
         UUID id,
         UUID userId,
         String userName,
         String accountName,
         String accountEmail,
+        String accountGender,
         String userMobile,
         String userRole,
         String status,
@@ -36,22 +36,18 @@ public record IdentityReviewResponse(
         String revocationReason,
         String claimedByName,
         boolean claimedByMe,
-        Instant qaSampledAt,
-        Instant qaReviewedAt,
-        String qaOutcome,
-        String qaReviewedByName,
-        boolean awaitingQa,
         Instant filesPurgedAt,
         Images images,
-        List<Warning> warnings) {
-
-    /** The OCR claim as stored: {@code number} is the last 4 only, the full number never lands. */
+        List<Warning> warnings,
+        IdentityAppealInfo appeal,
+        boolean appealCanDecide,
+        boolean appealCanReopen) {
     public record Claims(String number, String name, LocalDate dob) {
     }
 
     public record Images(String front, String back, String selfie) {
     }
 
-    public record Warning(String kind, UUID userId, String userName, UUID reviewId) {
+    public record Warning(String kind, UUID userId, String userName, String userMobile, UUID reviewId) {
     }
 }

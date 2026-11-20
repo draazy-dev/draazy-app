@@ -1,4 +1,3 @@
-/** The lists are server-paged and server-filtered; the summary carries the tab counts, GMV and the funnel. */
 import { get, unwrapPage } from '../../http.js';
 import { toDeal, toEnquiry, toVisit } from './enquiryBoardMapper.js';
 

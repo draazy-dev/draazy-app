@@ -1,7 +1,13 @@
 import { test, expect, ACTORS, STAFF } from '../../../fixtures/live.js';
 import { API, apiLogin, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tickDeskChecklist } from '../../../helpers/flatmateDesk.js';
+import { istInDays } from '../../../helpers/availability.js';
 
+const MOVE_IN = istInDays(28);
+
+const track = flatmateCleanup(test);
 const cardIds = (page) =>
   page.locator('[data-sf-id]').evaluateAll((els) => els.map((e) => e.dataset.sfId));
 /** The three feeds are HTTP round trips, so counting cards before one renders reads `[]` as empty. */
@@ -9,13 +15,13 @@ const cardsRendered = (page) => page.locator('.sf-card').first().waitFor({ timeo
 /* A tab in the strip, never the rescue CTA sharing its i18n name. Unscoped, strict mode fails
    whenever one feed has answered and another has not — a race that looks like flakiness. */
 
-const tab = (page, name) => page.getByRole('button', { name }).first();
-const openTab = (page, name) => tab(page, name).click();
+const tab = (page, key) => page.locator(`button[data-tab="${key}"]`);
+const openTab = (page, key) => tab(page, key).click();
 /** The Flatmates page, with the lazy route resolved rather than merely requested. */
 async function openFlatmates(page, query = '') {
   await page.goto('/flatmates' + query, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('h1').first()).toBeVisible({ timeout: 30_000 });
-  await expect(tab(page, /Move in now/i)).toBeVisible();
+  await expect(tab(page, 'move-in')).toBeVisible();
 }
 /* Drive the budget MAXIMUM: `.rng` holds two range inputs and [1] is the ceiling, so grabbing the
    first would narrow from the wrong end. Duplicates `helpers/app.js:setBudget`, which is mock-era. */
@@ -62,7 +68,6 @@ async function splitFlat() {
     city: 'Pune',
     bhk: 2,
     area: 900,
-    // Baner, so it never lands in the Aundh the empty-tab test below needs bare.
     locality: 'Baner',
     title: `Zztest flatmate discovery ${Date.now()}`,
     images: await uploadedListingPhotos(accessToken),
@@ -83,8 +88,10 @@ async function splitFlat() {
   const room = split.json.rooms[0];
   created.roomId = room.id;
 
+  const staffHeaders = await authHeaders(STAFF.rental);
+  await tickDeskChecklist(API, room.id, staffHeaders);
   const published = await api('PATCH', `/admin/flatmates/${room.id}/moderation`,
-    await authHeaders(STAFF.rental), { modStatus: 'approved' });
+    staffHeaders, { modStatus: 'approved' });
   expect(published.status, published.text).toBe(200);
 
   return { mobile, listingId: listing.json.id, room };
@@ -113,65 +120,63 @@ test.afterAll(async () => {
 });
 
 test.describe('Flatmates discovery (live)', () => {
-  test('shows two intent tabs with visible counts', async ({ page }) => {
+  test('shows three intent tabs with visible counts', async ({ page }) => {
     await openFlatmates(page);
-    const moveIn = tab(page, /Move in now/i);
-    const teamUp = tab(page, /Team up/i);
+    const moveIn = tab(page, 'move-in');
+    const people = tab(page, 'people');
+    const teams = tab(page, 'teams');
     await expect(moveIn).toBeVisible();
-    await expect(teamUp).toBeVisible();
+    await expect(people).toBeVisible();
+    await expect(teams).toBeVisible();
     await cardsRendered(page);
     /* `[1-9]` rather than `\d`: `tabCount` renders `0` while the feeds are in flight, so a `\d`
        would hold on a page that had counted nothing. */
 
     await expect(moveIn).toContainText(/[1-9]/);
-    await expect(teamUp).toContainText(/[1-9]/);
-    await expect(moveIn).toHaveAttribute('aria-label', /[1-9]\d* homes/);
+    await expect(people).toContainText(/[1-9]/);
+    await expect(teams).toContainText(/[1-9]/);
+    await expect(moveIn).toHaveAttribute('aria-label', /[1-9]\d* rooms/);
   });
 
-  test('Move in now holds only places; Team up holds only people', async ({ page, consoleErrors }) => {
+  test('Rooms holds only rooms; Flatmates holds only seekers; Teams holds only hunting groups', async ({ page, consoleErrors }) => {
     await openFlatmates(page);
     await cardsRendered(page);
     const places = await cardIds(page);
     expect(places.length).toBeGreaterThan(0);
-    expect(places.every((id) => id.startsWith('r:') || id.startsWith('g:'))).toBe(true);
-    /* Team up first, and wait for a `g:` card: `cardsRendered` is satisfied by room cards alone, so
-       "no groups on Move-in" would otherwise be provable by a groups feed that had not answered. */
+    expect(places.every((id) => id.startsWith('r:'))).toBe(true);
+    /* Wait for a card of the tab's own kind: `cardsRendered` is satisfied by stale cards from the
+       previous tab alone, so "only seekers" would otherwise be provable by a feed that had not answered. */
 
-    await openTab(page, /Team up/i);
-    await cardsRendered(page);
-    const people = await cardIds(page);
-    expect(people.length).toBeGreaterThan(0);
-    expect(people.every((id) => id.startsWith('s:') || id.startsWith('g:'))).toBe(true);
-    expect(people.some((id) => id.startsWith('s:'))).toBe(true);
+    await openTab(page, 'people');
+    await expect(page.locator('[data-sf-id^="s:"]').first()).toBeVisible({ timeout: 15_000 });
+    const seekers = await cardIds(page);
+    expect(seekers.every((id) => id.startsWith('s:'))).toBe(true);
+
+    await openTab(page, 'teams');
+    await expect(page.locator('[data-sf-id^="g:"]').first()).toBeVisible({ timeout: 15_000 });
+    const teams = await cardIds(page);
+    expect(teams.every((id) => id.startsWith('g:'))).toBe(true);
     expect(consoleErrors).toEqual([]);
   });
 
-  test('groups without an address sort into Team up', async ({ page }) => {
-    /* Read from the wire first, so a seed that gained an addressed group fails here with a reason
-       rather than turning the assertion below into a tautology. */
-    const feed = await fetch(`${API}/flatmates/feed?tab=team-up&size=100`).then((r) => r.json());
-    const groups = (feed.content || []).filter((row) => row.seatsTotal !== undefined);
-    expect(groups.length).toBeGreaterThan(0);
-    expect(groups.every((g) => !g.propertyId && !g.society)).toBe(true);
-
-    await openFlatmates(page);
-    await openTab(page, /Team up/i);
-    await expect(page.locator('[data-sf-id^="g:"]').first()).toBeVisible({ timeout: 15_000 });
-    const peopleGroups = (await cardIds(page)).filter((id) => id.startsWith('g:'));
-
-    await openTab(page, /Move in now/i);
-    await cardsRendered(page);
-    const placeGroups = (await cardIds(page)).filter((id) => id.startsWith('g:'));
-
-    expect(peopleGroups.length).toBeGreaterThan(0);
-    expect(placeGroups).toHaveLength(0);
+  test('every listed team is still hunting, and no group is listed among the rooms', async () => {
+    // Discriminated as the provider does: a room carries `roomType`; both carry `seatsTotal`.
+    const groupsOn = async (tab) => (await fetch(`${API}/flatmates/feed?tab=${tab}&size=100`).then((r) => r.json()))
+      .content.filter((row) => !row.roomType && !row.roomKind && row.seatsTotal != null);
+    const [hunting, onRooms] = [await groupsOn('teams'), await groupsOn('move-in')];
+    expect(hunting.length).toBeGreaterThan(0);
+    expect(hunting.every((g) => g.preferences)).toBe(true);
+    expect(onRooms).toEqual([]);
   });
 
   test('legacy ?view= deep links still resolve', async ({ page }) => {
     await openFlatmates(page, '?view=rooms');
-    await expect(page.locator('button[aria-current="page"]')).toHaveText(/Move in now/);
+    await expect(page.locator('button[aria-current="page"]')).toHaveText(/Rooms/);
     await openFlatmates(page, '?view=groups');
-    await expect(page.locator('button[aria-current="page"]')).toHaveText(/Team up/);
+    await expect(page.locator('button[aria-current="page"]')).toHaveText(/Teams/);
+    await openFlatmates(page, '?view=team-up');
+    await expect(page.locator('button[aria-current="page"]')).toHaveText(/Flatmates/);
+    await expect(page).toHaveURL(/view=people/);
   });
   test('a shareable room stays visible to a budget only its split price fits', async ({ page }) => {
     /* Both rooms are read off the live board rather than named, so the per-room / per-person pair
@@ -197,7 +202,7 @@ test.describe('Flatmates discovery (live)', () => {
     const card = page.locator(`[data-sf-id="r:${flat.room.id}"]`);
     await expect(card.getByText(/each, if shared/i)).toBeVisible();
     await card.getByRole('link').first().click();
-    await expect(page.getByText(/each if \d share/i).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('fm-split')).toContainText(/\d sharing₹[\d,]+each/, { timeout: 20_000 });
   });
 
   test('the room detail page carries the split choice into the enquiry', async ({ page }) => {
@@ -213,23 +218,32 @@ test.describe('Flatmates discovery (live)', () => {
   });
 
   test('an empty tab offers the other tab instead of a dead end', async ({ page }) => {
-    /* Checked on the wire: the day a spec publishes an Aundh room, this should fail saying so
-       rather than timing out on a locator and sending the reader to the wrong screen. */
-    const board = await fetch(`${API}/flatmates/feed?tab=move-in&size=100`).then((r) => r.json());
-    const aundh = board.content.filter((r) => r.locality === 'Aundh' || (r.localities || []).includes('Aundh'));
-    expect(aundh, 'the seed now has an approved Aundh Move-in row, so Move-in is not empty').toHaveLength(0);
+    const localities = await fetch(`${API}/admin/localities`, { headers: await authHeaders(ACTORS.admin) }).then((r) => r.json());
+    let loc;
+    for (const { name } of localities) {
+      const moveIn = await fetch(`${API}/flatmates/feed?tab=move-in&locality=${encodeURIComponent(name)}&size=1`).then((r) => r.json());
+      if (moveIn.totalElements === 0) { loc = name; break; }
+    }
+    expect(loc, 'every locality has a Move-in row, so no Move-in search is empty').toBeTruthy();
+    const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Empty Tab' });
+    const seeker = await api('POST', '/flatmates/posts', auth(accessToken), {
+      gender: 'female', age: 26, occupation: 'Engineer', budget: 16000,
+      localities: [loc], moveIn: MOVE_IN, flatPref: 'any', roomPref: 'private', note: 'Zztest empty tab',
+    });
+    expect(seeker.status, seeker.text).toBe(201);
+    track('posts', seeker.json.id, accessToken);
 
     const rooms = page.waitForResponse((r) => r.url().includes('/flatmates/feed') && r.url().includes('tab=move-in') && r.ok());
-    await openFlatmates(page, '?view=move-in&loc=Aundh');
+    await openFlatmates(page, `?view=move-in&loc=${encodeURIComponent(loc)}`);
     await rooms;
 
-    const rescue = page.getByText(/match these filters/i);
+    const rescue = page.getByText(/match(es)? these filters/i);
     await expect(rescue).toBeVisible();
     expect(await cardIds(page)).toHaveLength(0);
 
-    await page.getByRole('button', { name: /^Team up$/ }).first().click();
+    await page.getByRole('button', { name: /^(Flatmates|Teams)$/ }).click();
     // Switching must carry the filter over — the rescue promised these results.
-    await expect(page.locator('button[aria-current="page"]')).toHaveText(/Team up/);
+    await expect(page.locator('button[aria-current="page"]')).toHaveText(/Flatmates|Teams/);
     await cardsRendered(page);
     expect((await cardIds(page)).length).toBeGreaterThan(0);
   });

@@ -1,0 +1,34 @@
+REEL 03 / SET IMAGE (0 credits)
+==========================
+JOB ID ............. r03-set
+WHY ................ every clip of the reel attaches this image so the place is the same in every clip (rule R1)
+FLOW SETTINGS
+  Type ............. Image
+  Model ............ Nano Banana 2 Lite
+  Aspect ratio ..... 9:16 portrait
+  Outputs .......... 2
+  Cost shown ....... 0 credits (anything else: stop and ask the user)
+INGREDIENTS ........ none (text only; no reference image). No character chips: the set must be empty
+AFTER .............. the user picks one; rename it r03-set (or note its title in the ledger)
+
+PROMPT START
+Vertical 9:16 photorealistic photo, the eye-level view from where a person would hold a selfie phone while
+standing on the footpath: a clean, quiet road just outside the entrance of a premium township in Pune, on a bright sunny morning. On the left side of the frame, the closed modern entrance gate in
+brushed steel and glass, set in a light stone entrance wall that is completely plain, with no sign, no letters and no logo, with a small white security cabin beside the gate, the cabin empty. Behind the gate, tall
+slender white residential towers with white balcony bands and thin bronze vertical strips rise into a clear blue
+sky above a landscaped podium, with palms and dense green trees at their base. On the right side of the frame, a
+neat row of parked two-wheelers along a clean footpath lined with mature trees. There is no readable text anywhere: no signs, no number plates readable, no text. There
+are no people in the photo. Natural, slightly imperfect phone-camera look, true colours, everything in sharp
+focus.
+
+Lighting and colour: soft, bright morning sunlight from the side, clear blue sky, true colours.
+
+No text, no signs, no logos, no watermark.
+PROMPT END
+
+CHECK BEFORE THE USER PICKS
+  [ ] closed steel-and-glass gate + empty white security cabin on the LEFT; plain stone entrance wall, no sign
+  [ ] parked two-wheelers + footpath trees on the RIGHT
+  [ ] bright morning sun; clear blue sky; tall white towers with bronze vertical strips behind the gate
+  [ ] no readable text, signs, logos or number plates anywhere
+  [ ] empty of people; room left in the centre for the character

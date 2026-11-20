@@ -1,7 +1,3 @@
-/* ---------- success celebration ----------
-   Two party-popper cannons fire from the bottom corners, arcing confetti up and
-   toward the centre before gravity pulls it down — a livelier "you did it!" moment
-   than a plain top-down drizzle. Mixes round dots and spinning ribbons. */
 export const triggerConfetti = () => {
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
@@ -24,10 +20,10 @@ export const triggerConfetti = () => {
       });
       document.body.appendChild(c);
 
-      const angle = baseAngle + (Math.random() - 0.5) * 0.9; // radians, mostly upward
+      const angle = baseAngle + (Math.random() - 0.5) * 0.9;
       const speed = 620 + Math.random() * 560;
       const vx = Math.cos(angle) * speed;
-      const vy = Math.sin(angle) * speed; // negative = upward
+      const vy = Math.sin(angle) * speed;
       const spin = (Math.random() - 0.5) * 720;
 
       c.animate(
@@ -41,6 +37,6 @@ export const triggerConfetti = () => {
     }
   };
 
-  cannon(W * 0.12, -Math.PI * 0.42); // bottom-left → up & right
-  cannon(W * 0.88, -Math.PI * 0.58); // bottom-right → up & left
+  cannon(W * 0.12, -Math.PI * 0.42);
+  cannon(W * 0.88, -Math.PI * 0.58);
 };

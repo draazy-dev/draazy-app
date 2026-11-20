@@ -1,9 +1,6 @@
 
-/* Single source of truth for how owner edits are treated once a listing is live: TIER A (identity fields, existing
-   photos) stays live but is flagged for an anti bait-and-switch re-check; TIER B publishes instantly. */
 const amount = (s) => parseInt(String(s == null ? '' : s).replace(/[^\d]/g, ''), 10) || 0;
 
-/* Labels are owner-facing (shown in the edit summary + admin diff). */
 export const TIER_A_FIELDS = [
   { key: 'deal', label: 'Listing type (Sale / Rent)' },
   { key: 'propertyType', label: 'Property type' },
@@ -12,13 +9,10 @@ export const TIER_A_FIELDS = [
   { key: 'carpetArea', label: 'Carpet area' },
   { key: 'builtUp', label: 'Built-up area' },
   { key: 'plotArea', label: 'Plot area' },
-  // The zone is what `landUseFor` derives `landUse` from, and the server takes a listing off
-  // search for it.
   { key: 'plotZone', label: 'Plot zone' },
   { key: 'floor', label: 'Floor' },
   { key: 'totalFloors', label: 'Total floors' },
   { key: 'facing', label: 'Facing' },
-  // Match facing's client-side classification; server re-review is decided separately.
   { key: 'overlooking', label: 'Overlooking' },
   { key: 'age', label: 'Property age' },
   { key: 'construction', label: 'Possession status' },
@@ -34,8 +28,6 @@ export const TIER_A_FIELDS = [
 
 export const PHOTO_FIELD = { key: 'photos', label: 'Listing photos' };
 
-/* Identity = the fields that define which property this is; changing one is a new property for
- * the quota. */
 export const IDENTITY_FIELDS = ['propertyType', 'commercialType', 'locality'];
 
 export const TIER_B_FIELDS = [
@@ -84,20 +76,14 @@ export const TIER_B_FIELDS = [
   { key: 'waterSource', label: 'Water source' },
 ];
 
-/* Foundation fields whose edit takes the listing off search (server: revertToPending). */
-/* The server's own rule, narrower than Tier A/B and disagreeing with it in both directions on
- * purpose: collapsing them would make one lie. */
 export const FOUNDATION_OFF_SEARCH_KEYS = {
   bhk: ['bhk'],
   propertyType: ['propertyType'],
   locality: ['locality'],
   deal: ['deal'],
-  /* Only the zone is named here because `propertyType` is already its own entry above and both
-   * flatten into the same Set. */
   landUse: ['plotZone'],
 };
 
-/* Foundation fields whose edit is re-checked but stays in search (server: requestRecheck). */
 export const FOUNDATION_STAYS_LIVE_KEYS = {
   price: ['price', 'monthlyRent'],
   furnishing: ['furnishing'],
@@ -106,7 +92,6 @@ export const FOUNDATION_STAYS_LIVE_KEYS = {
   societyId: ['society'],
   electricityMeterNo: ['electricityMeterNo'],
   carpetArea: ['carpetArea'],
-  /* The evidence the approval was given against. */
   images: ['photos'],
   description: ['description'],
   amenities: ['amenities'],
@@ -123,19 +108,15 @@ const STAYS_LIVE_KEYS = new Set(Object.values(FOUNDATION_STAYS_LIVE_KEYS).flat()
 
 export const PRICE_REDUCED_PCT = 0.15;
 export const PRICE_JUMP_FLAG_PCT = 0.20;
-// buyer-facing "Price reduced" badge
-// admin flag on a sharp price increase
 export const MATERIAL_EDIT_WINDOW_DAYS = 30;
 export const MATERIAL_EDIT_CAP = 3;
 
-/* Normalise a value so arrays/booleans/strings compare cleanly. */
 const norm = (v) => {
   if (Array.isArray(v)) return v.map((x) => String(x)).sort().join('|');
   if (v == null) return '';
   return String(v).trim();
 };
 
-/* Did the owner drop any already-uploaded photo? Adding new ones never counts. */
 export const photosRemoved = (oldUrls = [], newUrls = []) => {
   if (!oldUrls.length) return false;
   const kept = new Set(newUrls);
@@ -159,16 +140,12 @@ export const classifyChanges = (oldForm = {}, newForm = {}, oldPhotoUrls = [], n
 
   const tierA = changed(TIER_A_FIELDS);
   const removedPhotos = photosRemoved(oldPhotoUrls, newPhotoUrls);
-  /* Any gallery change, not only a removal: the photographs are what the approval was given
-   * against. */
   const gallery = (urls) => (urls || []).map(String).join('|');
   if (removedPhotos || gallery(oldPhotoUrls) !== gallery(newPhotoUrls)) {
     tierA.push({ key: PHOTO_FIELD.key, label: PHOTO_FIELD.label, from: 'Original photos', to: 'Edited' });
   }
   const tierB = changed(TIER_B_FIELDS);
 
-  /* Derived rather than read off the tiers, because the server's outcome cuts across both: a price edit must not be
-     reported as "publishes instantly" when it does the opposite. */
   const remoderation = [...tierA, ...tierB].filter((c) => OFF_SEARCH_KEYS.has(c.key));
   const remoderationKeys = new Set(remoderation.map((c) => c.key));
   const staysLive = [...tierA, ...tierB].filter(

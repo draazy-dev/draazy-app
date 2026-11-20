@@ -15,10 +15,8 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-// Identity numbers are encrypted at rest; key ids stay in the payload so retired keys can decrypt old rows.
 @Component
 public class IdentityCipher {
-
     private static final String PREFIX = "enc:v1:";
     private static final Pattern KEY_ID = Pattern.compile("[a-z0-9-]{1,16}");
     private static final int IV_BYTES = 12;

@@ -7,6 +7,7 @@ import { useAdminFlags } from '../../context/AdminFlagsContext.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Loading from '../../components/ui/Loading.jsx';
+import { userMessage } from '../../lib/userMessage.js';
 
 const TYPE = 'faqs';
 
@@ -15,12 +16,12 @@ const BLANK_FAQ = { question: '', answer: '', category: 'general' };
 export default function AdminContent() {
   const { toast } = useToast();
   const { optionEnabled, loading: flagsLoading } = useAdminFlags();
-  // Live rows load on first open, archived rows on request.
   const [loaded, setLoaded] = useState({});
   const asked = useRef(new Set());
   const [faqs, setFaqs] = useState([]);
   const [editModal, setEditModal] = useState(null);
   const [editData, setEditData] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const load = (archived) => {
     if (asked.current.has(archived)) return;
@@ -30,7 +31,7 @@ export default function AdminContent() {
       setLoaded((l) => ({ ...l, [archived ? 'archived' : 'live']: true }));
     }).catch((err) => {
       asked.current.delete(archived);
-      toast(err?.message || `Could not load ${archived ? 'archived ' : ''}FAQs.`, 'error');
+      toast(userMessage(err, `Could not load ${archived ? 'archived ' : ''}FAQs.`), 'error');
     });
   };
 
@@ -54,9 +55,11 @@ export default function AdminContent() {
   const openEdit = (item) => { setEditModal({ isNew: false, id: item.id }); setEditData({ ...item }); };
   const closeMod = () => { setEditModal(null); setEditData({}); };
 
-  // Writes replace the row with the server's response; the audit
-  // row is written server-side from the authenticated principal.
   const saveItem = async () => {
+    if (saving) return;
+    if (!editData.question?.trim()) { toast('Enter the question.', 'error'); return; }
+    if (!editData.answer?.trim()) { toast('Enter the answer.', 'error'); return; }
+    setSaving(true);
     try {
       if (editModal.isNew) {
         const created = await createContent(TYPE, editData);
@@ -68,8 +71,9 @@ export default function AdminContent() {
       toast('Saved');
       closeMod();
     } catch (err) {
-      // The server names the offending field ("A faqs item needs 'question'"), which beats "Could not save".
-      toast(err?.message || 'Could not save. Please try again.', 'error');
+      toast(userMessage(err, 'Could not save. Please try again.'), 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -110,7 +114,7 @@ export default function AdminContent() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0"><div className="font-semibold">{f.question}</div><div className="mt-1 text-sm text-gray-400 line-clamp-2">{f.answer}</div></div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <button onClick={() => openEdit(f)} className="rounded-lg border border-white/10 p-1.5 text-gray-400 hover:bg-white/5"><Edit2 className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => openEdit(f)} aria-label="Edit FAQ" title="Edit" className="rounded-lg border border-white/10 p-1.5 text-gray-400 hover:bg-white/5"><Edit2 className="h-3.5 w-3.5" /></button>
                     <button onClick={() => archiveItem(f.id)} title="Archive" className="rounded-lg border border-white/10 p-1.5 text-gray-400 hover:bg-amber-500/10 hover:text-amber-300"><Archive className="h-3.5 w-3.5" /></button>
                   </div>
                 </div>
@@ -142,7 +146,7 @@ export default function AdminContent() {
       {editModal ? (
         <Modal open={true} onClose={closeMod} title={`${editModal.isNew ? 'Add' : 'Edit'} faq`} size="md"
           footer={<><button onClick={closeMod} className="dz-btn dz-btn-ghost">Cancel</button>
-            <button onClick={saveItem} className="dz-btn dz-btn-primary">Save</button></>}
+            <button onClick={saveItem} disabled={saving} className="dz-btn dz-btn-primary">Save</button></>}
         >
           <div className="space-y-3">
             <label className="block text-sm"><span className="mb-1 block text-gray-400">Question</span>

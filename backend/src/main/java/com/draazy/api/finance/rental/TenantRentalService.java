@@ -10,11 +10,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Why this is a separate service and not two more methods on `FinanceService`.
 @Service
 public class TenantRentalService {
-
-    /** Live rentals one tenant may hold. Abuse ceiling, not a product rule — see {@code addRental}. */
     static final int MAX_RENTALS_PER_TENANT = 50;
 
     private final TenantRentalRepository rentals;
@@ -23,7 +20,6 @@ public class TenantRentalService {
         this.rentals = rentals;
     }
 
-    // Resolve today once so a midnight read cannot mix financial years in one payload.
     @Transactional(readOnly = true)
     public List<TenantRentalDto> myRentals(UUID callerId) {
         LocalDate today = LocalDate.now(PlatformTime.IST);
@@ -77,7 +73,6 @@ public class TenantRentalService {
             throw new BadRequestException("leaseEnd cannot be before leaseStart");
         }
 
-        // `addRental` cannot produce this state because it forces ACTIVE, which makes this PATCH the only way in.
         if (RentalStatuses.ENDED.equals(row.getStatus()) && row.getLeaseEnd() == null) {
             throw new BadRequestException("leaseEnd is required when status is ended");
         }

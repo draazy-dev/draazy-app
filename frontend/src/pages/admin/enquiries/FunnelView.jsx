@@ -15,7 +15,6 @@ function FunnelView({ funnel }) {
 
   return (
     <div className="space-y-6">
-      {/* KPI cards */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
           <div className="text-2xl font-bold text-indigo-400">{fmtNum(enqCount)}</div>
@@ -38,7 +37,6 @@ function FunnelView({ funnel }) {
         </div>
       </div>
 
-      {/* Visual funnel */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
         <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-teal-400" /> Conversion Funnel
@@ -68,7 +66,6 @@ function FunnelView({ funnel }) {
         </div>
       </div>
 
-      {/* Platform-wide conversion rates */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-emerald-400" /> Platform-wide Conversion Rates
@@ -97,7 +94,6 @@ function FunnelView({ funnel }) {
         </div>
       </div>
 
-      {/* Locality breakdown */}
       {localityRows.length > 0 && (
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
           <h3 className="text-sm font-semibold text-gray-300 mb-3">Breakdown by Locality</h3>

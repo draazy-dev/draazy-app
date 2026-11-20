@@ -12,11 +12,8 @@ import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Advisory overlap check: double letting, duplicate filing, or non-owner licensor.
-// Advisory: an early renewal overlaps too, so the drafter judges, and nothing is refused.
 @Service
 public class RentAgreementOverlaps {
-
     private static final Pattern FLAT_WORDS = Pattern.compile("\\b(?:flat|no|number|unit|apt|apartment)\\b");
 
     private final ServiceRequestService requests;
@@ -69,7 +66,6 @@ public class RentAgreementOverlaps {
                 term.end(), null, false);
     }
 
-    // Must match the SQL function rent_agreement_flat_key, which the overlap query and its index use.
     static String flatKey(Map<String, Object> details) {
         Map<String, Object> prop = ServiceRequestPricing.childObject(
                 ServiceRequestPricing.childObject(details, "_state"), "prop");
@@ -95,9 +91,7 @@ public class RentAgreementOverlaps {
         return name.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}]", "");
     }
 
-    // [start, end); either end unknown means the overlap cannot be ruled out.
     private record Term(LocalDate start, LocalDate end) {
-
         static Term of(Map<String, Object> details) {
             Map<String, Object> safe = details == null ? Map.of() : details;
             Map<String, Object> terms = ServiceRequestPricing.childObject(

@@ -16,21 +16,20 @@ Detailed reference for the PuneNest prototype. Read the section relevant to your
 
 ## 2. Dropdown system (`dropdowns.css`, `dropdowns.js`)
 
-Why it exists: the homepage uses custom button menus, but other pages used raw OS-styled native
-`<select>`s, which looked dated. The system fixes both.
+Why: the homepage uses custom button menus, but other pages used raw OS-styled native `<select>`s.
 
 - **Native select restyle (CSS):** `dropdowns.css` restyles every native `<select>` (plus `.pn-select`)
-  to match the theme. It uses **targeted `!important`** on `appearance`, the chevron `background-image`,
-  `padding-right`, and the focus ring to beat Tailwind utility specificity. Colors/borders are graceful
+  to match the theme, using **targeted `!important`** on `appearance`, the chevron `background-image`,
+  `padding-right`, and the focus ring to beat Tailwind specificity. Colors/borders are graceful
   fallbacks. The homepage has no `<select>`, so it is unaffected.
-- **`dropdowns.css` must be linked before `</head>`** on every page that has selects (already done on the
+- **`dropdowns.css` must be linked before `</head>`** on every page that has selects (done on the
   consumer + back-office pages).
-- **Custom component:** `.pn-dropdown` is a fully custom, themeable dropdown built/managed by `dropdowns.js`.
+- **Custom component:** `.pn-dropdown` is a custom, themeable dropdown built/managed by `dropdowns.js`.
 - **In-place enhancer (high-value selects):** add `data-pn-enhance` to a native `<select>` to upgrade it
   while keeping the native element as the source of truth:
   - Hides the native select, builds a `.pn-dropdown` mirroring its options (supports `<optgroup>`).
   - Syncs selection back to the native select and dispatches a native `change` event, so existing JS
-    listeners keep working unchanged.
+    listeners keep working.
   - Auto-searchable from 16 options (`SEARCH_MIN_OPTIONS` in `components/ui/dropdownSearch.js`, shared by `Select`/`MultiSelect`); `searchable` or `asyncSearch` overrides it.
   - A `MutationObserver` rebuilds the menu when options are populated by JS.
   - Width is `auto` unless the select has the `w-full` class.
@@ -38,23 +37,22 @@ Why it exists: the homepage uses custom button menus, but other pages used raw O
     (searchable). **`#nearPoint` on `listings.html` is deliberately NOT enhanced** — it is cloned into the
     mobile filter panel and referenced by several JS sites.
 - **Stacking-context / portal fix (important):** an ancestor with a CSS animation (e.g. `.fade-up`) creates
-  a stacking context that traps an absolutely-positioned menu under cards/nav. Fix: when opening, the
+  a stacking context that traps an absolutely-positioned menu under cards/nav. Fix: on open, the
   `.pn-dropdown` **portals its `.pn-dropdown__menu` to `document.body`** with `position: fixed`, re-anchors
   on scroll/resize, and flips up near the viewport edge. The outside-click handler checks **both** the root
   and the portaled menu. Classes: `.pn-dropdown__menu--portal`, `.is-portal-open`.
   - When testing a portaled menu, option selectors must be **global**
-    (`.pn-dropdown__menu .pn-dropdown__option`), not scoped under `.pn-dropdown` (the menu is no longer a
-    descendant once portaled).
+    (`.pn-dropdown__menu .pn-dropdown__option`), not scoped under `.pn-dropdown`.
 
 ## 3. Back-office data layer (`admin-data.js`)
 
 - Single `localStorage` blob under key **`puneNestAdminDB_v4`**. Bump the version suffix to force a reseed
   after changing seed data.
 - `load()` auto-seeds on first use (deterministic RNG, seed `20260618`, for stable charts) and calls
-  `mergeRealListings()` which scans `puneNestListings:*` keys and adds real consumer listings to the
+  `mergeRealListings()`, which scans `puneNestListings:*` keys and adds real consumer listings to the
   pending verification queue (tagged `real: true`).
 - Exposes `load()`, `save()`, `reset()` so pages can manipulate the db directly (e.g. `admin-content.html`
-  edits FAQs/banners this way).
+  edits FAQs/banners).
 - Analytics generators: `trafficSeries`, `revenueSeries`, `kpis`, `funnel`, `listingsByLocality`,
   `dealStatus`, `serviceVolumes`.
 - CRUD: `setListingStatus`, `toggleFeatured`, `updateUser`, `addStaff`, `updateTicket`, `updateSettings`,
@@ -99,14 +97,14 @@ Why it exists: the homepage uses custom button menus, but other pages used raw O
 
 - Chart.js `4.4.1` via CDN, wrapped by `AdminUI.line/bar/doughnut`.
 - Gotcha (fixed, don't reintroduce): passing `ticks.callback: undefined` **overrides** Chart's default
-  category-label formatter and makes horizontal bar charts show indices instead of labels. Only set
-  `ticks.callback` when you actually have a formatter.
+  category-label formatter, so horizontal bar charts show indices instead of labels. Only set
+  `ticks.callback` when you have a formatter.
 
 ## 5. Verification harness (Playwright)
 
 - Approach: start a Node static HTTP server for the project dir, then drive Playwright Chromium headless:
   `chromium.launch({ channel: 'chrome', headless: true })`.
-- Seed a logged-in user with `page.addInitScript(...)` that sets `localStorage` key `puneNestUser` before
+- Seed a logged-in user with `page.addInitScript(...)` setting `localStorage` key `puneNestUser` before
   navigation (needed to pass guards on admin/ops pages).
 - Collect `console` + `pageerror`; **assert zero errors** after filtering an IGNORE regex for favicon,
   CDN (tailwind/chart.js), leaflet, and generic network noise.
@@ -121,6 +119,6 @@ Why it exists: the homepage uses custom button menus, but other pages used raw O
 - "PuneNest Assured" / owner-verified trust UI is a deliberate acquisition lever: hero trust strip and
   "No Spam Calls" pillar on the homepage, per-card verified badges on listings, an assured panel + owner
   verified meta on property pages, bold verified chips on the owner page.
-- Note: the listings-page full-width "Every listing is owner-verified" banner was intentionally **removed**
+- The listings-page full-width "Every listing is owner-verified" banner was intentionally **removed**
   (per-card badges are kept). Don't add it back.
 - `components.js` footer includes a "Staff & Admin" link to `staff-login.html`.

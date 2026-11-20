@@ -1,7 +1,6 @@
 package com.draazy.api.moderation.user;
 
 import com.draazy.api.common.error.NotFoundException;
-import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserMapper;
@@ -13,10 +12,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-// Centralises what staff may see of another person.
 @Component
 class BackOfficeUserView {
-
     static final String BADGE_FROM_IDENTITY = "identity";
     static final String BADGE_BY_HAND = "manual";
 
@@ -30,7 +27,6 @@ class BackOfficeUserView {
         this.identity = identity;
     }
 
-    /** Resolve an opaque id, or 404. Tolerates a malformed id rather than 500-ing on it. */
     User load(String id) {
         return Ids.parseUuid(id)
                 .flatMap(users::findById)
@@ -46,8 +42,6 @@ class BackOfficeUserView {
                 base.listingsCount(), base.joinedAt(), base.lastActive(),
                 base.createdAt(), base.permissions(), base.desks(),
 
-                // Boxed, and only on the back-office routes: see UserResponse#flagged for why a
-                // plain false would be the wrong answer on GET /auth/me.
                 user.isFlagged(), user.getFlagReason(), badgeSource(user));
     }
 
@@ -55,7 +49,6 @@ class BackOfficeUserView {
         return rows(List.of(user)).get(0);
     }
 
-    /** One identity query for the whole page, not one per row. */
     List<AdminUserRow> rows(List<User> page) {
         Set<UUID> identityBacked = identity.verifiedAmong(
                 page.stream().filter(User::isVerified).map(User::getId).toList());
@@ -63,10 +56,10 @@ class BackOfficeUserView {
             UserResponse base = mapper.toResponse(user);
             String source = !user.isVerified() ? null
                     : identityBacked.contains(user.getId()) ? BADGE_FROM_IDENTITY : BADGE_BY_HAND;
-            return new AdminUserRow(base.id(), base.name(), MobileMask.mask(base.mobile()), base.role(),
+            return new AdminUserRow(base.id(), base.name(), base.mobile(), base.role(),
                     base.status(), base.verified(), base.city(), base.listingsCount(),
                     base.joinedAt() != null ? base.joinedAt() : base.createdAt(),
-                    user.isFlagged(), user.getFlagReason(), source);
+                    user.isFlagged(), user.getFlagReason(), source, user.isArchived());
         }).toList();
     }
 
