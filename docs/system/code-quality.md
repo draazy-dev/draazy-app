@@ -108,11 +108,9 @@ change.
   Baseline on `feature/backend-integration`: **2266 run, 3 failures, 0 errors, 4 skipped** — all
   three pre-existing architecture guards (`ServiceSizeGuardTest`, `SpecCoverageTest`,
   `ErasureCoverageTest`), not regressions from adding CI.
-- **Coverage is deliberately unconfigured** in both languages. `backend/pom.xml` declares no
-  `jacoco-maven-plugin`, and `frontend/package.json` has no test runner (no vitest/jest/c8/nyc), so
-  neither a `jacoco.xml` nor an `lcov.info` is ever produced. Wiring a report path to a file that
-  never appears makes Sonar show **0.0% coverage**, which reads as *untested* rather than
-  *unmeasured*. Wire the paths in the same change that starts producing the reports.
+- **Java coverage** comes from JaCoCo, which the CI `backend` job runs from the command line (it is
+  not in `pom.xml`). The `sonar` job imports it along with the surefire results. There is **no JS
+  coverage**: `frontend/package.json` has no unit runner, and Playwright e2e does not produce lcov.
 - **No Checkmarx and no CodeQL.** Deferred past functional close (decision 41).
 - Backend static analysis: Checkstyle was replaced by Spotless (D36), and **Spotless is currently
   excluded** (D68). So there is still no active backend *formatting* gate.
