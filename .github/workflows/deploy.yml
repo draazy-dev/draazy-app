@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CF_PAGES_PROJECT: draazy
+  CF_PAGES_PROJECT: draazy-sandbox
   CF_PRODUCTION_BRANCH: main
 
   # Only the custom domain shares a registrable domain between SPA and /api.

@@ -116,7 +116,7 @@ Order matters: secrets first, workflow change second, flip last, or the sandbox 
 
 Ask the user to approve the design of 2.1 to 2.3 before writing them; this is architecture.
 
-- [ ] **2.1 [AGENT] `backend/deploy/do-app-prod.yaml`.** Copy the structure of `do-app-sandbox.yaml`
+- [x] **2.1 [AGENT] `backend/deploy/do-app-prod.yaml`.** Done; checked by `DeploymentManifestTest`. Copy the structure of `do-app-sandbox.yaml`
   (189 lines) and change it for prod:
   - `name: draazy-api-prod`, the same region as the prod database (`blr`).
   - `databases:` must point at a **Managed Database cluster** (`production: true`, `cluster_name`),
@@ -133,7 +133,8 @@ Ask the user to approve the design of 2.1 to 2.3 before writing them; this is ar
   **Done when:** a `ProdDeploymentManifestTest` (mirror `SandboxDeploymentManifestTest`) passes,
   asserting the profile is `prod`, the DB is `production: true`, no `FLYWAY_DB_PASSWORD` on the
   service, and every `${...}` in `application-prod.properties` is supplied.
-- [ ] **2.2 [AGENT] Production deploy workflow.** Either `.github/workflows/deploy-prod.yml` or a
+- [x] **2.2 [AGENT] Production deploy workflow.** Done as `deploy-prod.yml` (`DEPLOY.md` §5.2), without
+  `environment:` because GitHub Free ignores it on a private repo. Either `.github/workflows/deploy-prod.yml` or a
   parameterised `deploy.yml`. Requirements:
   - `workflow_dispatch` only; the confirm input must equal `production`.
   - `environment: production`, so the owner can add required reviewers in GitHub.
@@ -168,11 +169,13 @@ Ask the user to approve the design of 2.1 to 2.3 before writing them; this is ar
 
 The agent prepares the lists; the owner does the clicks.
 
-- [ ] **3.1 [OWNER] GitHub `production` environment** with required reviewers and these secrets.
+- [ ] **3.1 [OWNER] GitHub repository secrets and variables** (`PROD_*`; pushed with
+  `scripts/push-repo-secrets.py PROD`).
   **Generate every value fresh; never reuse a sandbox value.** For random secrets use
   `openssl rand -base64 48` (identity encryption key: exactly 32 bytes, base64).
   - `PROD_JWT_SECRET`, `PROD_REFERRAL_SIGNAL_SALT`, `PROD_IDENTITY_HASH_SECRET`,
-    `PROD_IDENTITY_ENCRYPTION_KEY`, `PROD_IDENTITY_ENCRYPTION_KEY_ID`, `PROD_STAFF_TOTP_KEY`
+    `PROD_IDENTITY_ENCRYPTION_KEY`, `PROD_STAFF_TOTP_KEY` (the key id `p1` is in the spec)
+  - `PROD_DB_APP_PASSWORD` (the `draazy_app` role); variables `PROD_DB_CLUSTER_NAME`, `PROD_CASHFREE_ENABLED`
   - `PROD_ORIGIN_SHARED_SECRET` (>= 32 chars; the same value goes into the prod Pages `ORIGIN_SHARED_SECRET`)
   - `PROD_CASHFREE_APP_ID`, `PROD_CASHFREE_SECRET_KEY` (**live** keys); `CASHFREE_WEBHOOK_SECRET`
     gets the same value as the secret key
@@ -183,8 +186,7 @@ The agent prepares the lists; the owner does the clicks.
   - `PROD_BOOTSTRAP_ADMIN_EMAIL`, `PROD_BOOTSTRAP_ADMIN_MOBILE`
   - `PROD_GOOGLE_PLACES_SERVER_KEY`, R2 credentials
   - `WEB_ORIGINS` = `https://draazy.com` **only** (security pass 2: do not include sandbox)
-  - `API_PUBLIC_ORIGIN`, `INTERNAL_PROXIES` = the DO load balancer's real CIDR (`DEPLOY.md` §4;
-    **not** `none`, or every visitor shares one rate-limit bucket)
+  - Variable `PROD_INTERNAL_PROXIES` (`DEPLOY.md` §4; **not** `none`, or every visitor shares one rate-limit bucket)
   - Frontend build: secrets `PROD_VITE_GOOGLE_MAPS_API_KEY` (referrer `draazy.com/*`), `PROD_VITE_GA_ID`;
     variables `PROD_VITE_TURNSTILE_SITE_KEY`, `PROD_VITE_VAPID_PUBLIC_KEY`, `PROD_VITE_CASHFREE_MODE=production`,
     `PROD_VITE_PMF_MODE`, `PROD_VITE_POSTHOG_KEY` and `PROD_VITE_POSTHOG_APP_URL` (PostHog project `draazy-prod`);
@@ -196,7 +198,8 @@ The agent prepares the lists; the owner does the clicks.
 - [ ] **3.3 [OWNER] DigitalOcean sandbox cleanup:** re-tick Trusted Sources on the sandbox DB (it was
   opened to all IPs on 2026-11-03).
 - [ ] **3.4 [OWNER] Cloudflare:**
-  - Prod Pages project on `draazy.com` with `ORIGIN_SHARED_SECRET`.
+  - Pages projects `draazy-prod` (on `draazy.com`) and `draazy-sandbox` (on `sandbox.draazy.com`, replacing
+    `draazy`), each with its own `API_ORIGIN` and `ORIGIN_SHARED_SECRET`.
   - WAF managed rules and an `/api/auth/*` rate-limit rule (Bot Fight Mode off).
   - Cache Rule for extensionless photo originals.
   - A prod R2 bucket with the `Access-Control-Allow-Origin` header (`DEPLOY.md` §3.2).

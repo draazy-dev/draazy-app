@@ -28,5 +28,7 @@
 
 https://sandbox.draazy.com/*
   X-Robots-Tag: noindex
-https://draazy.pages.dev/*
+https://draazy-sandbox.pages.dev/*
+  X-Robots-Tag: noindex
+https://draazy-prod.pages.dev/*
   X-Robots-Tag: noindex

@@ -149,7 +149,7 @@ from `spring.datasource` when `spring.flyway.url` is set, so both are bound expl
 | `DB_URL` / `DB_USER` / `DB_PASSWORD` | the serving app | runtime role |
 | `FLYWAY_DB_USER` | the serving app, for `DatabasePrivilegeCheck` only | — |
 
-The service must never carry `FLYWAY_DB_PASSWORD`; `SandboxDeploymentManifestTest` asserts it.
+The service must never carry `FLYWAY_DB_PASSWORD`; `DeploymentManifestTest` asserts it for both specs.
 
 **On the dev database both pairs are the same user**, so `DatabasePrivilegeCheck`
 (`backend/src/main/java/com/draazy/api/common/persistence/DatabasePrivilegeCheck.java`) only logs a
@@ -523,7 +523,7 @@ secret. Both halves must hold the same value:
 | Where | How |
 |---|---|
 | Backend | GitHub repository secret `SANDBOX_ORIGIN_SHARED_SECRET`, rendered into the spec as `ORIGIN_SHARED_SECRET` |
-| Pages Function | `npx wrangler pages secret put ORIGIN_SHARED_SECRET --project-name=draazy` |
+| Pages Function | `npx wrangler pages secret put ORIGIN_SHARED_SECRET --project-name=draazy-sandbox` |
 
 Generate it once (§3). The backend refuses to boot on a blank value or on one shorter than 32
 characters; the Function answers 502 `api_proxy_misconfigured` when its copy is unset. A **mismatch**
@@ -629,7 +629,7 @@ the first's backend.
 | `gate` | Rejects a mistyped confirmation; decides which halves run; requires `SANDBOX_VITE_TURNSTILE_SITE_KEY` |
 | `backend` (env `sandbox`) | Builds `backend/Dockerfile` on an amd64 runner and pushes it to GHCR tagged with the commit SHA; fails if any required secret is empty; renders the spec with `envsubst`; `doctl apps create --spec … --wait` (or `update <id>` when an app named `draazy-api-sandbox` exists); requires the latest deployment to be `ACTIVE`; smoke-tests `/api/actuator/health` on the default ingress (12 attempts); deletes the rendered spec |
 | `frontend-build` | `npm ci` and `npm run build` with the `VITE_*` inputs below; verifies `dist/index.html`, `404.html`, `_redirects`, `_headers`, `functions/api/[[path]].js` and the face model exist; uploads `dist/` and `functions/` as a one-day artifact |
-| `frontend-publish` | `wrangler pages deploy dist --project-name draazy --branch main`, tagged with the same SHA; then a smoke test through `sandbox.draazy.com` (deep links, security headers, no CORS grant, `/api/actuator/health` returns JSON `UP`) |
+| `frontend-publish` | `wrangler pages deploy dist --project-name draazy-sandbox --branch main`, tagged with the same SHA; then a smoke test through `sandbox.draazy.com` (deep links, security headers, no CORS grant, `/api/actuator/health` returns JSON `UP`) |
 
 The deploy **ships both halves from one commit, backend first**; the frontend runs unless the backend
 job failed or was cancelled. API changes are additive (expand/contract), so an old UI always works against
@@ -684,6 +684,29 @@ moves forward. Read the checks on the commit before dispatching.
 **Pages does not rebuild on a push.** The project is a direct-upload project; if a git integration is
 connected (Pages → Settings → Builds & deployments), disconnect it, because it would quietly replace what
 you deployed on purpose with the head of whatever branch was pushed.
+
+### 5.2 Production deploy pipeline
+
+`.github/workflows/deploy-prod.yml` (Actions → Deploy (production)) is the same pipeline aimed at
+`draazy.com`: spec `backend/deploy/do-app-prod.yaml`, app `draazy-api-prod`, Pages project `draazy-prod`.
+It differs from sandbox in five ways:
+
+- The confirmation is `production`, and the run fails unless the ref is `main` or a `v*` tag.
+- Before the app update, `backend` dumps the database (`pg_dump --format=custom`) to
+  `backups/predeploy/<UTC time>-<sha>.dump` in the private R2 bucket. The runner's IP is appended to the
+  cluster's trusted sources for the dump and removed afterwards, even on failure. A failed dump stops the
+  deploy. Set a 30-day lifecycle rule on that prefix in R2.
+- The origin smoke test also expects `403` from `/api/flags` straight at the origin (the gate is on).
+- The publish smoke test asserts `draazy.com` is **not** `noindex`, and the build refuses a
+  `PROD_VITE_CASHFREE_MODE` other than `production`.
+- Until `PROD_CASHFREE_ENABLED` is `true` (KYC pending), Cashfree is off and its webhook secret is a random
+  per-deploy value.
+
+Inputs beyond the `PROD_*` twins of the sandbox list: secret `PROD_DB_APP_PASSWORD` (the `draazy_app`
+role's password, §2.1), variables `PROD_DB_CLUSTER_NAME`, `PROD_INTERNAL_PROXIES` (§4) and
+`PROD_CASHFREE_ENABLED`. `DIGITALOCEAN_ACCESS_TOKEN` additionally needs **database: read, update** for the
+dump. `DeploymentManifestTest` checks both specs and that every required `${...}` in
+`application-prod.properties` reaches the prod service.
 
 ### Scheduled jobs
 
@@ -866,9 +889,9 @@ drag-and-drop upload is not supported with Functions and silently omits `api/[[p
 cd frontend
 npx wrangler login
 npx wrangler pages project create draazy --production-branch=main
-npx wrangler pages secret put API_ORIGIN --project-name=draazy
+npx wrangler pages secret put API_ORIGIN --project-name=draazy-sandbox
 # paste https://draazy-api-sandbox-466hx.ondigitalocean.app — scheme + host, no path, no trailing slash
-npx wrangler pages secret put ORIGIN_SHARED_SECRET --project-name=draazy
+npx wrangler pages secret put ORIGIN_SHARED_SECRET --project-name=draazy-sandbox
 # paste the value of SANDBOX_ORIGIN_SHARED_SECRET (§4)
 ```
 
@@ -891,13 +914,13 @@ directory; from the repository root it uploads a Function-less site):
 
 ```bash
 VITE_DEPLOY_ENV=sandbox VITE_GOOGLE_MAPS_API_KEY='<key>' VITE_TURNSTILE_SITE_KEY='<site key>' npm run build
-npx wrangler pages deploy dist --project-name=draazy --branch=main --commit-dirty=true
+npx wrangler pages deploy dist --project-name=draazy-sandbox --branch=main --commit-dirty=true
 ```
 
 ```powershell
 $env:VITE_DEPLOY_ENV='sandbox'; $env:VITE_GOOGLE_MAPS_API_KEY='<key>'; $env:VITE_TURNSTILE_SITE_KEY='<site key>'
 npm run build
-npx wrangler pages deploy dist --project-name=draazy --branch=main --commit-dirty=true
+npx wrangler pages deploy dist --project-name=draazy-sandbox --branch=main --commit-dirty=true
 ```
 
 `--branch=main` matches the production branch, which is what the custom domain serves; any other value
@@ -927,6 +950,8 @@ Run §9.3 against `https://sandbox.draazy.com`, then the cookie test in §9.3 an
   sign-in itself offline days later. A failed send answers `503` with `Retry-After: 60`.
 - **Backups.** The dev database is a lightweight, single-node database; do not rely on it for recovery. A
   scheduled logical dump to R2 is the stopgap until the database is upgraded to a Managed Database.
+- **Prod runs one API instance on a single-node cluster** (owner ruling 2026-11-20). A deploy or a node
+  failure is downtime, and the pre-deploy dump (§5.2) plus the cluster's daily backups are the only copies.
 - **The anonymous rate limiter is bypassable until `INTERNAL_PROXIES` is set (§4).** Not a boot failure and
   not visible in any log — it simply does not do what it looks like it does.
 - **Postgres TLS is `require`, not `verify-full`.** `application-sandbox.properties` pins `sslmode` so pgjdbc's

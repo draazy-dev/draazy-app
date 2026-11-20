@@ -1,0 +1,493 @@
+name: Deploy (production)
+
+# Same pipeline as deploy.yml (docs/DEPLOY.md §5.1 and §6), pointed at draazy.com, plus a database dump to the
+# private R2 bucket before every migration. deploy.yml stays sandbox-only.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "production" to confirm the target environment'
+        required: true
+        default: ''
+      target:
+        description: 'Which half to deploy'
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - backend
+          - frontend
+
+permissions:
+  contents: read
+
+# Never cancelled mid-run: a cancelled migrate or half-published site is worse than a queued deploy.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  APP_NAME: draazy-api-prod
+  CF_PAGES_PROJECT: draazy-prod
+  CF_PRODUCTION_BRANCH: main
+  SITE_URL: https://draazy.com
+  DEPLOY_SHA: ${{ github.sha }}
+
+jobs:
+  gate:
+    name: Decide what deploys
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      backend: ${{ steps.decide.outputs.backend }}
+      frontend: ${{ steps.decide.outputs.frontend }}
+    steps:
+      - name: Confirm target
+        if: inputs.confirm != 'production'
+        run: |
+          echo "::error::Confirmation input did not match 'production'. Nothing was deployed." >&2
+          exit 1
+
+      - name: Only main or a release tag ships
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          case "$REF" in
+            refs/heads/main|refs/tags/v*) ;;
+            *)
+              echo "::error::Production deploys only from main or a v* tag, not ${REF}." >&2
+              exit 1
+              ;;
+          esac
+
+      - id: decide
+        name: Decide which halves deploy
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          emit() {
+            echo "backend=$1" >> "$GITHUB_OUTPUT"
+            echo "frontend=$2" >> "$GITHUB_OUTPUT"
+            echo "::notice::This run deploys — backend=$1 frontend=$2"
+          }
+          case "$TARGET" in
+            both)     emit true  true  ;;
+            backend)  emit true  false ;;
+            frontend) emit false true  ;;
+            *)
+              echo "::error::Unknown target '${TARGET}'." >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Require the Turnstile site key
+        env:
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.PROD_VITE_TURNSTILE_SITE_KEY }}
+        run: |
+          if [ -z "${VITE_TURNSTILE_SITE_KEY}" ]; then
+            echo "::error::PROD_VITE_TURNSTILE_SITE_KEY is empty. Prod enforces Turnstile, so sign-in and both waitlists would be refused." >&2
+            exit 1
+          fi
+
+  backend:
+    name: Build image, back up the database, deploy to DigitalOcean
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    needs: gate
+    if: needs.gate.outputs.backend == 'true'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          persist-credentials: false
+
+      - id: owner
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "lower=${OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build and push image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          tags: ghcr.io/${{ steps.owner.outputs.lower }}/draazy-api:${{ env.DEPLOY_SHA }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Render app spec
+        env:
+          GHCR_OWNER: ${{ steps.owner.outputs.lower }}
+          GHCR_PULL_CREDENTIALS: ${{ secrets.GHCR_PULL_CREDENTIALS }}
+          DB_CLUSTER_NAME: ${{ vars.PROD_DB_CLUSTER_NAME }}
+          DB_APP_PASSWORD: ${{ secrets.PROD_DB_APP_PASSWORD }}
+          INTERNAL_PROXIES: ${{ vars.PROD_INTERNAL_PROXIES }}
+          BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.PROD_BOOTSTRAP_ADMIN_EMAIL }}
+          BOOTSTRAP_ADMIN_MOBILE: ${{ secrets.PROD_BOOTSTRAP_ADMIN_MOBILE }}
+          BOOTSTRAP_ADMIN_RECOVER: ${{ vars.PROD_BOOTSTRAP_ADMIN_RECOVER }}
+          ORIGIN_SHARED_SECRET: ${{ secrets.PROD_ORIGIN_SHARED_SECRET }}
+          JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
+          REFERRAL_SIGNAL_SALT: ${{ secrets.PROD_REFERRAL_SIGNAL_SALT }}
+          IDENTITY_HASH_SECRET: ${{ secrets.PROD_IDENTITY_HASH_SECRET }}
+          STAFF_TOTP_KEY: ${{ secrets.PROD_STAFF_TOTP_KEY }}
+          IDENTITY_ENCRYPTION_KEY: ${{ secrets.PROD_IDENTITY_ENCRYPTION_KEY }}
+          CASHFREE_ENABLED: ${{ vars.PROD_CASHFREE_ENABLED }}
+          CASHFREE_APP_ID: ${{ secrets.PROD_CASHFREE_APP_ID }}
+          CASHFREE_SECRET_KEY: ${{ secrets.PROD_CASHFREE_SECRET_KEY }}
+          ZEPTOMAIL_API_KEY: ${{ secrets.PROD_ZEPTOMAIL_API_KEY }}
+          ZEPTOMAIL_WEBHOOK_KEY: ${{ secrets.PROD_ZEPTOMAIL_WEBHOOK_KEY }}
+          WHATSAPP_ACCESS_TOKEN: ${{ secrets.PROD_WHATSAPP_ACCESS_TOKEN }}
+          WHATSAPP_APP_SECRET: ${{ secrets.PROD_WHATSAPP_APP_SECRET }}
+          WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${{ secrets.PROD_WHATSAPP_WEBHOOK_VERIFY_TOKEN }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.PROD_TURNSTILE_SECRET_KEY }}
+          R2_ENDPOINT: ${{ vars.PROD_R2_ENDPOINT }}
+          R2_BUCKET_PRIVATE: ${{ vars.PROD_R2_BUCKET_PRIVATE }}
+          R2_BUCKET_PUBLIC: ${{ vars.PROD_R2_BUCKET_PUBLIC }}
+          R2_PUBLIC_BASE_URL: ${{ vars.PROD_R2_PUBLIC_BASE_URL }}
+          R2_ACCESS_KEY_ID: ${{ secrets.PROD_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.PROD_R2_SECRET_ACCESS_KEY }}
+          GOOGLE_PLACES_SERVER_KEY: ${{ secrets.PROD_GOOGLE_PLACES_SERVER_KEY }}
+          PUSH_VAPID_PRIVATE_KEY: ${{ secrets.PROD_PUSH_VAPID_PRIVATE_KEY }}
+          PUSH_VAPID_PUBLIC_KEY: ${{ secrets.PROD_PUSH_VAPID_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          # Launch may precede Cashfree KYC; until PROD_CASHFREE_ENABLED is true the
+          # webhook secret is a throwaway, so no forged callback can match it.
+          if [ "${CASHFREE_ENABLED}" != "true" ]; then
+            CASHFREE_ENABLED=false
+            CASHFREE_APP_ID=disabled
+            CASHFREE_SECRET_KEY=$(openssl rand -hex 32)
+            echo "::add-mask::${CASHFREE_SECRET_KEY}"
+            export CASHFREE_ENABLED CASHFREE_APP_ID CASHFREE_SECRET_KEY
+          fi
+          required="GHCR_OWNER GHCR_PULL_CREDENTIALS DEPLOY_SHA DB_CLUSTER_NAME DB_APP_PASSWORD INTERNAL_PROXIES
+            BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_MOBILE ORIGIN_SHARED_SECRET JWT_SECRET REFERRAL_SIGNAL_SALT
+            IDENTITY_HASH_SECRET STAFF_TOTP_KEY IDENTITY_ENCRYPTION_KEY CASHFREE_ENABLED CASHFREE_APP_ID
+            CASHFREE_SECRET_KEY ZEPTOMAIL_API_KEY ZEPTOMAIL_WEBHOOK_KEY WHATSAPP_ACCESS_TOKEN WHATSAPP_APP_SECRET
+            WHATSAPP_WEBHOOK_VERIFY_TOKEN TURNSTILE_SECRET_KEY R2_ENDPOINT R2_BUCKET_PRIVATE R2_BUCKET_PUBLIC
+            R2_PUBLIC_BASE_URL R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY GOOGLE_PLACES_SERVER_KEY
+            PUSH_VAPID_PRIVATE_KEY PUSH_VAPID_PUBLIC_KEY"
+          for name in $required; do
+            [ -n "${!name}" ] || { echo "::error::$name is empty." >&2; exit 1; }
+          done
+          vars=$(printf '${%s} ' $required BOOTSTRAP_ADMIN_RECOVER)
+          envsubst "$vars" < backend/deploy/do-app-prod.yaml > "$RUNNER_TEMP/app.yaml"
+
+      - uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2.5.2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      # The cluster's trusted sources hold only the app, so the runner is let in for the dump and removed after.
+      - id: backup
+        name: Dump the database to the private R2 bucket
+        env:
+          DB_CLUSTER_NAME: ${{ vars.PROD_DB_CLUSTER_NAME }}
+          R2_ENDPOINT: ${{ vars.PROD_R2_ENDPOINT }}
+          R2_BUCKET_PRIVATE: ${{ vars.PROD_R2_BUCKET_PRIVATE }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.PROD_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.PROD_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          set -euo pipefail
+          if [ -z "$(doctl apps list --output json | jq -r --arg n "$APP_NAME" '.[] | select(.spec.name==$n) | .id')" ]; then
+            echo "::notice::First deploy: no app yet, so no data to back up."
+            exit 0
+          fi
+          cluster=$(doctl databases list --output json | jq -r --arg n "$DB_CLUSTER_NAME" '.[] | select(.name==$n) | .id')
+          [ -n "$cluster" ] || { echo "::error::No database cluster named ${DB_CLUSTER_NAME}." >&2; exit 1; }
+          ip=$(curl -fsS --max-time 15 https://api.ipify.org)
+          echo "cluster=$cluster" >> "$GITHUB_OUTPUT"
+          echo "ip=$ip" >> "$GITHUB_OUTPUT"
+          doctl databases firewalls append "$cluster" --rule "ip_addr:$ip" > /dev/null
+          conn=$(doctl databases connection "$cluster" --output json)
+          export PGPASSWORD=$(jq -r '.password' <<<"$conn")
+          echo "::add-mask::${PGPASSWORD}"
+          dump="$RUNNER_TEMP/predeploy.dump"
+          for attempt in $(seq 1 6); do
+            docker run --rm --network host -e PGPASSWORD postgres:17 pg_dump --format=custom --no-owner \
+              -h "$(jq -r '.host' <<<"$conn")" -p "$(jq -r '.port' <<<"$conn")" \
+              -U "$(jq -r '.user' <<<"$conn")" -d "$(jq -r '.database' <<<"$conn")" > "$dump" && break
+            [ "$attempt" -lt 6 ] || { echo "::error::pg_dump failed; nothing was deployed." >&2; exit 1; }
+            sleep 10
+          done
+          key="backups/predeploy/$(date -u +%Y%m%dT%H%M%SZ)-${DEPLOY_SHA}.dump"
+          aws s3 cp "$dump" "s3://${R2_BUCKET_PRIVATE}/${key}" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          echo "::notice::Database dumped to ${R2_BUCKET_PRIVATE}/${key} ($(du -h "$dump" | cut -f1))."
+
+      - name: Remove the runner from the database firewall
+        if: always() && steps.backup.outputs.cluster != ''
+        env:
+          CLUSTER: ${{ steps.backup.outputs.cluster }}
+          IP: ${{ steps.backup.outputs.ip }}
+        run: |
+          set -euo pipefail
+          for uuid in $(doctl databases firewalls list "$CLUSTER" --output json \
+              | jq -r --arg ip "$IP" '.[] | select(.type=="ip_addr" and .value==$ip) | .uuid'); do
+            doctl databases firewalls remove "$CLUSTER" --uuid "$uuid"
+          done
+          rm -f "$RUNNER_TEMP/predeploy.dump"
+
+      - id: deploy
+        name: Create or update the app
+        run: |
+          set -euo pipefail
+          id=$(doctl apps list --output json | jq -r --arg n "$APP_NAME" '.[] | select(.spec.name==$n) | .id')
+          if [ -z "$id" ]; then
+            doctl apps create --spec "$RUNNER_TEMP/app.yaml" --wait --output json > "$RUNNER_TEMP/app.json"
+            id=$(jq -r '.[0].id' "$RUNNER_TEMP/app.json")
+          else
+            doctl apps update "$id" --spec "$RUNNER_TEMP/app.yaml" --wait --output json > "$RUNNER_TEMP/app.json"
+          fi
+          phase=$(doctl apps list-deployments "$id" --output json | jq -r '.[0].phase')
+          [ "$phase" = "ACTIVE" ] || { echo "::error::Latest deployment is $phase, not ACTIVE." >&2; exit 1; }
+          echo "url=$(doctl apps get "$id" --output json | jq -r '.[0].default_ingress')" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test the origin
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            curl -fsS --max-time 15 "$URL/api/actuator/health" > /dev/null && break
+            [ "$attempt" -lt 12 ] || { echo "::error::Health check failed on $URL" >&2; exit 1; }
+            sleep 5
+          done
+          # Only health is exempt from the origin gate; anything else straight at the origin must be refused.
+          code=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "$URL/api/flags") || code=000
+          [ "$code" = "403" ] || { echo "::error::$URL/api/flags answered $code without the origin secret, expected 403." >&2; exit 1; }
+
+      - name: Remove rendered spec
+        if: always()
+        run: rm -f "$RUNNER_TEMP/app.yaml" "$RUNNER_TEMP/app.json"
+
+  frontend-build:
+    name: Build the frontend bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [gate, backend]
+    if: >-
+      !cancelled() &&
+      needs.gate.result == 'success' &&
+      needs.gate.outputs.frontend == 'true' &&
+      needs.backend.result != 'failure' &&
+      needs.backend.result != 'cancelled'
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_DEPLOY_ENV: prod
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.PROD_VITE_GOOGLE_MAPS_API_KEY }}
+          VITE_GOOGLE_MAPS_MAP_ID: ${{ vars.VITE_GOOGLE_MAPS_MAP_ID }}
+          VITE_CASHFREE_MODE: ${{ vars.PROD_VITE_CASHFREE_MODE }}
+          VITE_PMF_MODE: ${{ vars.PROD_VITE_PMF_MODE }}
+          VITE_GA_ID: ${{ secrets.PROD_VITE_GA_ID }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.PROD_VITE_VAPID_PUBLIC_KEY }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.PROD_VITE_TURNSTILE_SITE_KEY }}
+          VITE_POSTHOG_KEY: ${{ vars.PROD_VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_APP_URL: ${{ vars.PROD_VITE_POSTHOG_APP_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VITE_GOOGLE_MAPS_API_KEY}" ]; then
+            echo "::error::PROD_VITE_GOOGLE_MAPS_API_KEY is empty; every map would render as a watermarked grey box." >&2
+            exit 1
+          fi
+          if [ "${VITE_CASHFREE_MODE}" != "production" ]; then
+            echo "::error::PROD_VITE_CASHFREE_MODE is '${VITE_CASHFREE_MODE}', not 'production'; checkout would open the Cashfree sandbox." >&2
+            exit 1
+          fi
+          npm run build
+
+      - name: Verify build output
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          for required in dist/index.html dist/404.html dist/_redirects dist/_headers functions/api/'[[path]]'.js \
+                          dist/models/face_landmarker.task; do
+            if [ ! -f "$required" ]; then
+              echo "::error::Expected ${required} to exist before deploying. Refusing to publish an incomplete site." >&2
+              exit 1
+            fi
+          done
+
+      - name: Upload the built site
+        uses: actions/upload-artifact@v7
+        with:
+          name: site-prod-${{ env.DEPLOY_SHA }}
+          path: |
+            frontend/dist
+            frontend/functions
+            frontend/edge
+            frontend/src
+            frontend/scripts
+          if-no-files-found: error
+          retention-days: 1
+
+  frontend-publish:
+    name: Publish to Cloudflare Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: frontend-build
+    if: >-
+      !cancelled() &&
+      needs['frontend-build'].result == 'success'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Download the built site
+        uses: actions/download-artifact@v8
+        with:
+          name: site-prod-${{ env.DEPLOY_SHA }}
+          path: ${{ runner.temp }}/site
+
+      - name: Publish to Cloudflare Pages
+        working-directory: ${{ runner.temp }}/site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          for required in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            if [ -z "${!required}" ]; then
+              echo "::error::$required is empty." >&2
+              exit 1
+            fi
+          done
+          npx --yes wrangler@4 pages deploy dist \
+            --project-name "$CF_PAGES_PROJECT" \
+            --branch "$CF_PRODUCTION_BRANCH" \
+            --commit-hash "$DEPLOY_SHA" \
+            --commit-message "Deploy ${DEPLOY_SHA} from ${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER}"
+
+      - name: Smoke test through the proxy
+        run: |
+          set -euo pipefail
+          body="${RUNNER_TEMP}/health.json"
+          attempt=1
+          max=5
+
+          while : ; do
+            ok=true
+
+            curl -fsS --max-time 30 -o /dev/null "${SITE_URL}/" || ok=false
+
+            if [ "$ok" = true ]; then
+              for probe in "/listings 200" "/locality/baner 200" "/property/smoke 404" "/no-such-page-smoke 404"; do
+                set -- $probe
+                code=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' "${SITE_URL}$1") || code=000
+                if [ "$code" != "$2" ]; then
+                  echo "::warning::$1 answered $code, expected $2."
+                  ok=false
+                fi
+              done
+            fi
+
+            if [ "$ok" = true ]; then
+              rent_html=$(curl -sS --max-time 30 "${SITE_URL}/rent/pune") || rent_html=
+              if ! grep -q '<title[^>]*>Flats and homes for rent in Pune' <<<"$rent_html"; then
+                echo "::warning::/rent/pune fell back to the bare shell, so the edge cannot read the API (API_ORIGIN, ORIGIN_SHARED_SECRET, /api prefix)."
+                ok=false
+              fi
+            fi
+
+            # The inverse of the sandbox check: draazy.com is the one host search engines may index.
+            if [ "$ok" = true ] && curl -sS --max-time 30 -o /dev/null -D - "${SITE_URL}/" | grep -qi '^x-robots-tag: *noindex'; then
+              echo "::warning::${SITE_URL}/ answers noindex; check the host rules at the end of public/_headers."
+              ok=false
+            fi
+
+            if [ "$ok" = true ]; then
+              for path in / /property/smoke; do
+                head=$(curl -sS --max-time 30 -o /dev/null -D - "${SITE_URL}${path}" | tr -d '\r') || head=
+                for want in "^content-security-policy:.*frame-ancestors 'none'" "^strict-transport-security: *max-age=" \
+                    "^x-frame-options: *deny" "^x-content-type-options: *nosniff" "^referrer-policy: *no-referrer\$"; do
+                  if ! grep -qiE "$want" <<<"$head"; then
+                    echo "::warning::${path} lacks a header matching ${want}."
+                    ok=false
+                  fi
+                done
+              done
+            fi
+
+            if [ "$ok" = true ]; then
+              head=$(curl -sS --max-time 30 -o /dev/null -D - -H 'Origin: https://cors-probe.invalid' \
+                "${SITE_URL}/api/actuator/health" | tr -d '\r') || head=
+              if grep -qi '^access-control-allow-origin:' <<<"$head"; then
+                echo "::warning::/api granted CORS to a foreign Origin."
+                ok=false
+              fi
+            fi
+
+            if [ "$ok" = true ]; then
+              content_type=$(curl -fsS --max-time 60 -o "$body" -w '%{content_type}' \
+                "${SITE_URL}/api/actuator/health") || ok=false
+            fi
+
+            if [ "$ok" = true ]; then
+              case "$content_type" in
+                *json*) ;;
+                *)
+                  echo "::warning::/api/actuator/health answered '${content_type}', not JSON; the Pages Function is not intercepting /api."
+                  ok=false
+                  ;;
+              esac
+            fi
+
+            if [ "$ok" = true ] && ! grep -q '"status":"UP"' "$body"; then
+              echo "::warning::/api/actuator/health returned JSON but not status UP."
+              ok=false
+            fi
+
+            if [ "$ok" = true ]; then
+              echo "::notice::${SITE_URL} is serving, and /api is proxied to a healthy backend."
+              break
+            fi
+
+            if [ "$attempt" -ge "$max" ]; then
+              echo "::error::${SITE_URL} did not answer correctly after ${max} attempts. Check that API_ORIGIN and ORIGIN_SHARED_SECRET are set on the ${CF_PAGES_PROJECT} Pages project." >&2
+              exit 1
+            fi
+
+            attempt=$((attempt + 1))
+            sleep 10
+          done
+
+      - name: Remove smoke test output
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/health.json"
