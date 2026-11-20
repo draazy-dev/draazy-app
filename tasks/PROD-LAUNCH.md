@@ -191,11 +191,12 @@ The agent prepares the lists; the owner does the clicks.
     variables `PROD_VITE_TURNSTILE_SITE_KEY`, `PROD_VITE_VAPID_PUBLIC_KEY`, `PROD_VITE_CASHFREE_MODE=production`,
     `PROD_VITE_PMF_MODE`, `PROD_VITE_POSTHOG_KEY` and `PROD_VITE_POSTHOG_APP_URL` (PostHog project `draazy-prod`);
     shared `VITE_GOOGLE_MAPS_MAP_ID`. Backend `TURNSTILE_ENABLED=true`
-- **Resume here (2026-11-20).** PR #14 merged (`9e6f5b3e`). DO project `draazy-prod` and cluster `draazy-prod-db`
-  (PG 17, blr1, 1 node, `db-s-1vcpu-1gb`) exist; trusted sources still open. All 39 `PROD_*` values pushed;
+- **Resume here (2026-11-20).** PR #14 merged (`9e6f5b3e`). DO project `draazy-prod` exists. All 39 `PROD_*` values pushed;
   `PROD_INTERNAL_PROXIES=none` until §4's gate check, then `.*`. Pages `draazy-prod` has no variables yet.
   Done: DO tokens `draazy-sandbox-deploy` / `draazy-prod-deploy` pushed as `*_DIGITALOCEAN_ACCESS_TOKEN`;
-  `draazy_app` created on `draazy-prod-db` and verified (login OK). Next, in order: (1) merge PR #15; (2) run
+  `draazy-prod-db` deleted 2026-11-20 to save cost (DO cannot pause it). Next, in order: (0) recreate it with the
+  same name (PG 17, blr1, 1 node, `db-s-1vcpu-1gb`, project `draazy-prod`) and rerun the role setup minus the
+  `flyway_schema_history` line; (1) merge PR #15; (2) run
   `deploy-prod.yml` `target=backend`; (3) rerun the full `app-runtime-role.sql` (revokes `flyway_schema_history`);
   (4) set `API_ORIGIN` (agent) and `ORIGIN_SHARED_SECRET` (owner, no prefix) on `draazy-prod`, then
   `target=frontend`; (5) trusted sources = prod app only; (6) delete old DO tokens and the shared GitHub secret
